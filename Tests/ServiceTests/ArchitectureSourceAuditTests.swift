@@ -62,6 +62,28 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             allowedContents: "final class ContactService { private var contacts: [Contact] = [] }",
             cleanContents: "final class ContactService {}"
         )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
+                "Sources/Services/ContactService.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Services/NewRecipientService.swift",
+            violatingContents: "struct NewRecipientService { let contacts: Array<Contact> }",
+            allowedPath: "Sources/Services/ContactService.swift",
+            allowedContents: "final class ContactService { private var contacts: Array<Contact> = [] }",
+            cleanContents: "final class ContactService {}"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
+                "Sources/Services/FileProgressReporter.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/App/NewReporterFactory.swift",
+            violatingContents: "struct NewReporterFactory { let reporter: ProgressReporterImpl }",
+            allowedPath: "Sources/Services/FileProgressReporter.swift",
+            allowedContents: "struct FileProgressReporterBox { let reporter: ProgressReporterImpl }",
+            cleanContents: "struct FileProgressReporterBox {}"
+        )
     }
 
     func test_sourceAuditRules_ignoreCommentsAndStringLiterals() throws {
@@ -70,6 +92,7 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             contents: """
             // PgpEngine and PgpError should be ignored in comments.
             let message = "KeyInfo [Contact] import SwiftUI"
+            let raw = #"ProgressReporterImpl KeyProfile Array<Contact>"#
             struct NewView {}
             """
         )
@@ -94,6 +117,71 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.modelsSwiftUIPresentationPolicy.violations(in: [modelsSource]).isEmpty
+        )
+    }
+
+    func test_sourceAuditRules_preserveStringInterpolationCode() throws {
+        let generatedInterpolationSource = AuditedSource(
+            path: "Sources/App/NewView.swift",
+            contents: #"""
+            struct NewView {
+                let profile = "\(KeyProfile.advanced)"
+            }
+            """#
+        )
+        let generatedViolations = ArchitectureSourceAuditRules.generatedFFITypes
+            .violations(in: [generatedInterpolationSource])
+        XCTAssertEqual(generatedViolations.map(\.path), ["Sources/App/NewView.swift"])
+        XCTAssertEqual(generatedViolations.first?.matches, ["KeyProfile"])
+
+        let pgpErrorInterpolationSource = AuditedSource(
+            path: "Sources/App/NewView.swift",
+            contents: #"""
+            struct NewView {
+                let message = "\(PgpError.cancelled)"
+            }
+            """#
+        )
+        let pgpErrorViolations = ArchitectureSourceAuditRules.appLayerPgpErrorHandling
+            .violations(in: [pgpErrorInterpolationSource])
+        XCTAssertEqual(pgpErrorViolations.map(\.path), ["Sources/App/NewView.swift"])
+        XCTAssertEqual(pgpErrorViolations.first?.matches, ["PgpError"])
+
+        let rawInterpolationSource = AuditedSource(
+            path: "Sources/App/NewView.swift",
+            contents: ##"""
+            struct NewView {
+                let profile = #"\#(KeyProfile.advanced)"#
+            }
+            """##
+        )
+        let rawViolations = ArchitectureSourceAuditRules.generatedFFITypes
+            .violations(in: [rawInterpolationSource])
+        XCTAssertEqual(rawViolations.map(\.path), ["Sources/App/NewView.swift"])
+        XCTAssertEqual(rawViolations.first?.matches, ["KeyProfile"])
+
+        let nestedStringAndCommentSource = AuditedSource(
+            path: "Sources/App/NewView.swift",
+            contents: #"""
+            struct NewView {
+                let message = "\(String(describing: "PgpError KeyProfile Array<Contact>") /* PgpError */)"
+            }
+            """#
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.generatedFFITypes
+                .violations(in: [nestedStringAndCommentSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.appLayerPgpErrorHandling
+                .violations(in: [nestedStringAndCommentSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies
+                .violations(in: [nestedStringAndCommentSource])
+                .isEmpty
         )
     }
 
@@ -201,6 +289,7 @@ private enum ArchitectureSourceAuditRules {
             "PgpEngineProtocol",
             "PgpError",
             "ProgressReporter",
+            "ProgressReporterImpl",
             "PublicCertificateValidationResult",
             "S2kInfo",
             "SignatureStatus",
@@ -343,8 +432,8 @@ private enum ArchitectureSourceAuditRules {
 
     static let contactArrayRuntimeDependencies = ArchitectureSourceAuditRule(
         name: "Legacy Contact array runtime dependencies",
-        failureSummary: "New production code should not introduce ordinary runtime [Contact] dependencies.",
-        pattern: #"\[\s*Contact\s*\]"#,
+        failureSummary: "New production code should not introduce ordinary runtime Contact collection dependencies.",
+        pattern: #"(?:\[\s*Contact\s*\]|\bArray\s*<\s*Contact\s*>)"#,
         scope: { path in
             path.hasPrefix("Sources/")
                 && !path.hasPrefix("Sources/PgpMobile/")
@@ -644,15 +733,27 @@ private enum SwiftSourceSanitizer {
     ) {
         var escaped = false
         while index < text.endIndex {
+            if hashCount == 0, escaped {
+                let character = text[index]
+                replaceCharacters(1, in: text, index: &index, result: &result)
+                escaped = false
+                if character == "\n" {
+                    break
+                }
+                continue
+            }
+
+            if isInterpolationStart(hashCount: hashCount, in: text, at: index) {
+                replaceInterpolationOpening(hashCount: hashCount, in: text, index: &index, result: &result)
+                preserveInterpolationBody(in: text, index: &index, result: &result)
+                continue
+            }
+
             let character = text[index]
             replaceCharacters(1, in: text, index: &index, result: &result)
 
             if character == "\n" {
                 break
-            }
-            if hashCount == 0, escaped {
-                escaped = false
-                continue
             }
             if hashCount == 0, character == "\\" {
                 escaped = true
@@ -679,8 +780,83 @@ private enum SwiftSourceSanitizer {
                     break
                 }
             }
+            if isInterpolationStart(hashCount: hashCount, in: text, at: index) {
+                replaceInterpolationOpening(hashCount: hashCount, in: text, index: &index, result: &result)
+                preserveInterpolationBody(in: text, index: &index, result: &result)
+                continue
+            }
             replaceCharacters(1, in: text, index: &index, result: &result)
         }
+    }
+
+    private static func preserveInterpolationBody(
+        in text: String,
+        index: inout String.Index,
+        result: inout String
+    ) {
+        var parenDepth = 0
+        while index < text.endIndex {
+            if text[index...].hasPrefix("//") {
+                replaceLineComment(in: text, index: &index, result: &result)
+            } else if text[index...].hasPrefix("/*") {
+                replaceBlockComment(in: text, index: &index, result: &result)
+            } else if let literal = stringLiteralStart(in: text, at: index) {
+                replaceStringLiteral(
+                    in: text,
+                    index: &index,
+                    result: &result,
+                    literal: literal
+                )
+            } else {
+                let character = text[index]
+                if character == "(" {
+                    result.append(character)
+                    parenDepth += 1
+                    index = text.index(after: index)
+                } else if character == ")" {
+                    if parenDepth == 0 {
+                        appendPlaceholder(for: character, result: &result)
+                        index = text.index(after: index)
+                        break
+                    }
+                    result.append(character)
+                    parenDepth -= 1
+                    index = text.index(after: index)
+                } else {
+                    result.append(character)
+                    index = text.index(after: index)
+                }
+            }
+        }
+    }
+
+    private static func isInterpolationStart(
+        hashCount: Int,
+        in text: String,
+        at index: String.Index
+    ) -> Bool {
+        guard text[index] == "\\" else {
+            return false
+        }
+
+        var cursor = text.index(after: index)
+        for _ in 0..<hashCount {
+            guard cursor < text.endIndex, text[cursor] == "#" else {
+                return false
+            }
+            cursor = text.index(after: cursor)
+        }
+
+        return cursor < text.endIndex && text[cursor] == "("
+    }
+
+    private static func replaceInterpolationOpening(
+        hashCount: Int,
+        in text: String,
+        index: inout String.Index,
+        result: inout String
+    ) {
+        replaceCharacters(hashCount + 2, in: text, index: &index, result: &result)
     }
 
     private static func stringLiteralStart(in text: String, at index: String.Index) -> StringLiteralStart? {
