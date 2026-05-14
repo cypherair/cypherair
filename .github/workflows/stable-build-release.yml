@@ -255,6 +255,7 @@ jobs:
           Release readiness:
 
           - Formal GitHub Release creation is gated on this workflow run's \`rust-dependency-audit\` job.
+          - Apple app build probes passed for generic iOS and visionOS; stable asset generation fails before this point if Xcode 26.5 platform readiness is missing.
           - If the audit fails, these files may exist only as workflow artifacts and must not be treated as release-ready.
           - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
