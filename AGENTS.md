@@ -2,41 +2,15 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
-## Apple arm64e Mainline Context
+## Apple arm64e Status
 
-- Primary local main path: `/Users/tianren/coding/cypherair-main`
-- Remote repository: `cypherair/cypherair`
-- Main branch: `main`
-- Apple `arm64e` app support landed on `main` through PR #222, merge commit
-  `98e9e9fcdcc3760538b2b0e260a5daf52dc67c0e`.
-- `./build-xcframework.sh --release` is the official app-side entrypoint. It
-  packages iOS/macOS/visionOS device libraries as `arm64` + `arm64e`, keeps
-  simulator libraries on `arm64`, and writes `PgpMobile.arm64e-build-manifest.json`.
-- Normal `arm64` Rust slices use official Rust stable. `arm64e` slices use
-  nightly Cargo with explicit `RUSTC=<stage1>/bin/rustc` from the CypherAir
-  patched Rust stage1.
-- The former experiment worktree may remain locally for post-merge comparison
-  and diagnostics, but `main` is now the app-side source of truth.
-- Detailed arm64e status belongs in [docs/ARM64E_STATUS.md](docs/ARM64E_STATUS.md).
-  Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain,
-  release manifest shape, or app-side readiness changes.
+`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support status, related fork paths and branch posture, Rust stage1 toolchain provenance, OpenSSL carry chain, release manifest shape, and app-side readiness.
 
-## Related Forks
-
-- Rust fork: `/Users/tianren/coding/rust` (`cypherair/rust`, stage1 carry
-  branch `carry/cypherair-arm64e-toolchain`, integration branch
-  `integration/arm64e-upstream-prs`, upstream-prep branch
-  `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`)
-- OpenSSL glue fork: `/Users/tianren/coding/openssl-src-rs` (`cypherair/openssl-src-rs`, carry branch `carry/apple-arm64e-openssl-fork`; CypherAir tracks this branch in `pgp-mobile/Cargo.toml`)
-- OpenSSL target-definition fork: `/Users/tianren/coding/openssl` (`cypherair/openssl`, carry branch `carry/apple-arm64e-targets`, prep branch `prep/apple-arm64e-targets`)
-- Related but currently unconfirmed arm64e role: `/Users/tianren/coding/rust-openssl` (`cypherair/rust-openssl`)
+Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain, release manifest shape, related fork posture, or app-side arm64e readiness changes.
 
 ## Documentation Scope
 
-- Update permanent documentation in the current `main` worktree.
-- The post-merge `arm64e` migration checklist is archived at
-  [docs/archive/ARM64E_MAIN_MIGRATION.md](docs/archive/ARM64E_MAIN_MIGRATION.md);
-  current-state docs outrank archived material.
+- Treat archived docs as historical references; current-state docs take precedence.
 
 ## Project Overview
 
@@ -50,13 +24,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 
 ## Tech Stack
 
-- Apple Swift 6.3.1 (`SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release)
-- SwiftUI with iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere
-- Rust stable for normal targets, plus the CypherAir patched Rust stage1
-  toolchain for Apple `arm64e` slices
-- `sequoia-openpgp` 2.2.0 with `crypto-openssl`
-- UniFFI 0.31.x
-- CryptoKit + Security.framework, including ProtectedData app-data domains opened after app privacy authentication
+For current platform and SwiftUI conventions, see `docs/CONVENTIONS.md`. For architecture, Rust/UniFFI boundaries, and security framework ownership, see `docs/ARCHITECTURE.md` and `docs/SECURITY.md`. For build, validation, and XCFramework packaging details, see `docs/TESTING.md`. For exact Rust dependency versions, use `pgp-mobile/Cargo.toml` and `pgp-mobile/Cargo.lock`.
 
 ## Repository Layout
 
@@ -164,21 +132,7 @@ These areas define security invariants and failure behavior.
 
 ## Crypto / Product Model
 
-### Profiles
-
-- Profile A, Universal
-  v4, Ed25519 + X25519, SEIPDv1, Iterated+Salted S2K, broad interoperability
-- Profile B, Advanced
-  v6, Ed448 + X448, SEIPDv2 AEAD, Argon2id S2K, not GnuPG compatible
-
-### Authentication Modes
-
-- Standard
-  Biometrics with passcode fallback
-- High Security
-  Biometrics only, no passcode fallback
-
-Mode switching requires re-wrapping all Secure Enclave protected keys.
+For encryption profile behavior and authentication-mode product semantics, see `docs/PRD.md`. For algorithm suites, security invariants, access-control flags, and mode-switching implementation details, see `docs/SECURITY.md`.
 
 ## Working Style
 
@@ -234,7 +188,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 ### GitHub Actions Note
 
-The repository workflows target `macos-26`, but GitHub-hosted runner images may temporarily lag the project's minimum deployment target. At the moment, hosted Swift CI can still fail before tests start because the runner image reports **macOS 26.3** while the project targets **macOS 26.4**. Local `xcodebuild test ... -destination 'platform=macOS'` remains the source of truth for that runner-image mismatch until the hosted image catches up or a self-hosted runner is used.
+For current GitHub Actions lanes, hosted runner limitations, and the local-vs-hosted validation contract, see `docs/TESTING.md`.
 
 ## Agent Checklist
 
@@ -261,6 +215,13 @@ After editing:
 - Before any formal stable release or App Store candidate archive, follow
   `docs/APP_RELEASE_PROCESS.md`. Do not rely on `workflow_dispatch` alone as a
   substitute for creating the stable tag.
+- By default, keep project changes on a topic branch rather than `main`: use the
+  current branch when it is already the appropriate non-`main` branch for the
+  task, create a new branch from `main` when needed, or use a branch explicitly
+  specified by the user. Submit the work through a pull request. If uncommitted
+  work was started on `main` temporarily, create a branch to carry those changes
+  before committing. Do not commit directly to `main` unless the user explicitly
+  asks for that.
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`

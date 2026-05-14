@@ -21,7 +21,7 @@ graph TB
     end
 
     subgraph "Rust Engine"
-        PGP["pgp-mobile crate<br/>Sequoia 2.2.0 + crypto-openssl"]
+        PGP["pgp-mobile crate<br/>Sequoia 2.3.0 + crypto-openssl"]
     end
 
     UI --> SVC
@@ -192,7 +192,7 @@ The `pgp-mobile` Rust crate wraps `sequoia-openpgp` behind a UniFFI-annotated AP
 
 ```
 pgp-mobile/
-├── Cargo.toml        # sequoia-openpgp 2.2 + crypto-openssl + uniffi
+├── Cargo.toml        # sequoia-openpgp 2.3 + crypto-openssl + uniffi
 ├── src/
 │   ├── lib.rs        # UniFFI proc-macros, public API surface
 │   ├── keys.rs       # Key module root: UniFFI records, shared helpers, internal re-exports

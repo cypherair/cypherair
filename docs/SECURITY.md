@@ -6,7 +6,7 @@
 
 ## 1. Encryption Scheme
 
-All cryptographic operations use Sequoia PGP 2.2.0. Two profiles with different algorithm suites:
+All cryptographic operations use Sequoia PGP 2.3.0. Two profiles with different algorithm suites:
 
 ### Profile A (Universal Compatible)
 
