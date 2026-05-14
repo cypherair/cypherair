@@ -9,23 +9,18 @@ import Foundation
 /// through `KeyManagementService.unwrapPrivateKey(...)` first.
 @Observable
 final class PasswordMessageService {
+    typealias DetailedDecryptOutcome = PasswordMessageDetailedDecryptOutcome
 
-    enum DetailedDecryptOutcome {
-        case decrypted(plaintext: Data, verification: DetailedSignatureVerification)
-        case noSkesk
-        case passwordRejected
-    }
-
-    private let engine: PgpEngine
+    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
 
     init(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) {
-        self.engine = engine
+        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
     }
@@ -33,7 +28,7 @@ final class PasswordMessageService {
     func encryptText(
         _ plaintext: String,
         password: String,
-        format: PasswordMessageFormat,
+        format: PasswordMessageEnvelopeFormat,
         signWithFingerprint: String?
     ) async throws -> Data {
         try await encrypt(
@@ -48,7 +43,7 @@ final class PasswordMessageService {
     func encryptBinary(
         _ plaintext: Data,
         password: String,
-        format: PasswordMessageFormat,
+        format: PasswordMessageEnvelopeFormat,
         signWithFingerprint: String?
     ) async throws -> Data {
         try await encrypt(
@@ -62,51 +57,17 @@ final class PasswordMessageService {
 
     func decryptMessageDetailed(ciphertext: Data, password: String) async throws -> DetailedDecryptOutcome {
         let context = verificationContext()
-
-        let result: PasswordDecryptResult
-        do {
-            result = try await Self.performDecrypt(
-                engine: engine,
-                ciphertext: ciphertext,
-                password: password,
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        switch result.status {
-        case .decrypted:
-            guard let plaintext = result.plaintext else {
-                throw CypherAirError.internalError(
-                    reason: "Password decrypt returned decrypted status without plaintext."
-                )
-            }
-
-            let verification = DetailedSignatureVerification.from(
-                legacyStatus: result.signatureStatus ?? .notSigned,
-                legacySignerFingerprint: result.signerFingerprint,
-                summaryState: result.summaryState,
-                summaryEntryIndex: result.summaryEntryIndex,
-                signatures: result.signatures,
-                contacts: context.contacts,
-                ownKeys: keyManagement.keys,
-                contactsAvailability: context.contactsAvailability
-            )
-            return .decrypted(plaintext: plaintext, verification: verification)
-
-        case .noSkesk:
-            return .noSkesk
-
-        case .passwordRejected:
-            return .passwordRejected
-        }
+        return try await messageAdapter.decryptWithPassword(
+            ciphertext: ciphertext,
+            password: password,
+            verificationContext: context
+        )
     }
 
     private func encrypt(
         plaintext: Data,
         password: String,
-        format: PasswordMessageFormat,
+        format: PasswordMessageEnvelopeFormat,
         signWithFingerprint: String?,
         binary: Bool
     ) async throws -> Data {
@@ -126,19 +87,13 @@ final class PasswordMessageService {
             }
         }
 
-        let result: Data
-        do {
-            result = try await Self.performEncrypt(
-                engine: engine,
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingKey: signingKey,
-                binary: binary
-            )
-        } catch {
-            throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
-        }
+        let result = try await messageAdapter.encryptWithPassword(
+            plaintext: plaintext,
+            password: password,
+            format: format,
+            signingKey: signingKey,
+            binary: binary
+        )
 
         if signingKey != nil {
             signingKey!.resetBytes(in: 0..<signingKey!.count)
@@ -148,61 +103,17 @@ final class PasswordMessageService {
         return result
     }
 
-    private struct VerificationContext {
-        let verificationKeys: [Data]
-        let contacts: [Contact]
-        let contactsAvailability: ContactsAvailability
-    }
-
-    private func verificationContext() -> VerificationContext {
+    private func verificationContext() -> PGPMessageVerificationContext {
         let contactsContext = contactService.contactsForVerificationContext()
         let contactsAvailability = contactsContext.availability
         let contacts = contactsContext.contacts
-        return VerificationContext(
+        let ownKeys = keyManagement.keys
+        return PGPMessageVerificationContext(
             verificationKeys: contacts.map { $0.publicKeyData }
-                + keyManagement.keys.map { $0.publicKeyData },
+                + ownKeys.map { $0.publicKeyData },
             contacts: contacts,
+            ownKeys: ownKeys,
             contactsAvailability: contactsAvailability
-        )
-    }
-
-    @concurrent
-    private static func performEncrypt(
-        engine: PgpEngine,
-        plaintext: Data,
-        password: String,
-        format: PasswordMessageFormat,
-        signingKey: Data?,
-        binary: Bool
-    ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinaryWithPassword(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingKey: signingKey
-            )
-        } else {
-            return try engine.encryptWithPassword(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingKey: signingKey
-            )
-        }
-    }
-
-    @concurrent
-    private static func performDecrypt(
-        engine: PgpEngine,
-        ciphertext: Data,
-        password: String,
-        verificationKeys: [Data]
-    ) async throws -> PasswordDecryptResult {
-        try engine.decryptWithPassword(
-            ciphertext: ciphertext,
-            password: password,
-            verificationKeys: verificationKeys
         )
     }
 }

@@ -1282,18 +1282,19 @@ final class CommonHelpersTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let encryptionService = EncryptionService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         let decryptionService = DecryptionService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         let passwordMessageService = PasswordMessageService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )

@@ -99,14 +99,15 @@ final class TutorialSandboxContainer {
         )
         try? self.keyManagement.loadKeys()
         self.contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         self.encryptionService = EncryptionService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             temporaryArtifactStore: temporaryArtifactStore
         )
         self.decryptionService = DecryptionService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             temporaryArtifactStore: temporaryArtifactStore

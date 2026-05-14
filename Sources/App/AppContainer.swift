@@ -255,22 +255,23 @@ final class AppContainer: @unchecked Sendable {
         contactService: ContactService
     ) -> PgpServiceGraph {
         let temporaryArtifactStore = AppTemporaryArtifactStore()
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
-                engine: engine,
+                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             decryptionService: DecryptionService(
-                engine: engine,
+                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             passwordMessageService: PasswordMessageService(
-                engine: engine,
+                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService
             ),

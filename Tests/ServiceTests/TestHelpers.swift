@@ -160,11 +160,20 @@ enum TestHelpers {
     ) -> ServiceStack {
         let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = makeContactService(engine: engine)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
 
-        let encryptionSvc = EncryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
-        let decryptionSvc = DecryptionService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let encryptionSvc = EncryptionService(
+            messageAdapter: messageAdapter,
+            keyManagement: keyMgmt,
+            contactService: contactSvc
+        )
+        let decryptionSvc = DecryptionService(
+            messageAdapter: messageAdapter,
+            keyManagement: keyMgmt,
+            contactService: contactSvc
+        )
         let passwordMessageSvc = PasswordMessageService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc
         )
@@ -177,6 +186,7 @@ enum TestHelpers {
 
         return ServiceStack(
             engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc,
             encryptionService: encryptionSvc,
@@ -194,6 +204,7 @@ enum TestHelpers {
     /// Holds all services and mocks for a complete test environment.
     struct ServiceStack {
         let engine: PgpEngine
+        let messageAdapter: PGPMessageOperationAdapter
         let keyManagement: KeyManagementService
         let contactService: ContactService
         let encryptionService: EncryptionService
