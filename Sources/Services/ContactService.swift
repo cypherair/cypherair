@@ -28,7 +28,7 @@ final class ContactService: @unchecked Sendable {
 
     private let engine: PgpEngine
     private let repository: ContactRepository
-    private let domainRepository: ContactsDomainRepository
+    private let compatibilityMapper = ContactsCompatibilityMapper()
     private let legacyMigrationSource: ContactsLegacyMigrationSource
     private let contactsDomainStore: ContactsDomainStore?
     private let importMatcher = ContactImportMatcher()
@@ -58,7 +58,6 @@ final class ContactService: @unchecked Sendable {
             )
         }
         repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
-        domainRepository = ContactsDomainRepository()
         legacyMigrationSource = ContactsLegacyMigrationSource(
             engine: engine,
             repository: repository
@@ -566,17 +565,13 @@ final class ContactService: @unchecked Sendable {
             try runtimeSnapshot.validateContract()
             return runtimeSnapshot
         }
-        return try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        return try compatibilityMapper.makeCompatibilitySnapshot(from: contacts)
     }
 
     func compatibilityContacts(
         from snapshot: ContactsDomainSnapshot
     ) throws -> [Contact] {
-        try domainRepository.makeCompatibilityContacts(from: snapshot)
-    }
-
-    func seedContactsDomainRuntimeStateForTests() {
-        domainRepository.seedRuntimeStateForTests()
+        try compatibilityMapper.makeCompatibilityContacts(from: snapshot)
     }
 
     var contactsDomainRuntimeStateIsClearedForTests: Bool {
@@ -584,8 +579,7 @@ final class ContactService: @unchecked Sendable {
         verificationStates.isEmpty &&
         runtimeSnapshot == nil &&
         contactsSearchIndex == nil &&
-        contactsAvailability == .locked &&
-        domainRepository.runtimeStateIsClearedForTests
+        contactsAvailability == .locked
     }
 
     // MARK: - Lookup
@@ -1051,7 +1045,7 @@ final class ContactService: @unchecked Sendable {
             try runtimeSnapshot.validateContract()
             return runtimeSnapshot
         }
-        return try domainRepository.makeCompatibilitySnapshot(from: contacts)
+        return try compatibilityMapper.makeCompatibilitySnapshot(from: contacts)
     }
 
     private func persistProtectedRuntimeSnapshot(
@@ -1069,7 +1063,7 @@ final class ContactService: @unchecked Sendable {
         forFingerprint fingerprint: String,
         in snapshot: ContactsDomainSnapshot
     ) throws -> Contact {
-        let projected = try domainRepository.makeCompatibilityContacts(from: snapshot)
+        let projected = try compatibilityMapper.makeCompatibilityContacts(from: snapshot)
         guard let contact = projected.first(where: { $0.fingerprint == fingerprint }) else {
             throw CypherAirError.internalError(
                 reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
@@ -1174,7 +1168,7 @@ final class ContactService: @unchecked Sendable {
     }
 
     private func refreshCompatibilityProjection() throws {
-        runtimeSnapshot = try domainRepository.updateCompatibilityRuntime(from: contacts)
+        runtimeSnapshot = try compatibilityMapper.makeCompatibilitySnapshot(from: contacts)
         contactsSearchIndex = runtimeSnapshot.map(ContactsSearchIndex.init(snapshot:))
         contactsAvailability = .availableLegacyCompatibility
     }
@@ -1188,7 +1182,7 @@ final class ContactService: @unchecked Sendable {
     }
 
     private func applyProtectedRuntimeSnapshot(_ snapshot: ContactsDomainSnapshot) throws {
-        let projectedContacts = try domainRepository.updateProtectedRuntime(from: snapshot)
+        let projectedContacts = try compatibilityMapper.makeCompatibilityContacts(from: snapshot)
         contacts = projectedContacts
         runtimeSnapshot = snapshot
         contactsSearchIndex = ContactsSearchIndex(snapshot: snapshot)
@@ -1208,7 +1202,7 @@ final class ContactService: @unchecked Sendable {
         if let runtimeSnapshot {
             snapshot = runtimeSnapshot
         } else {
-            snapshot = try domainRepository.makeCompatibilitySnapshot(from: contacts)
+            snapshot = try compatibilityMapper.makeCompatibilitySnapshot(from: contacts)
         }
         try contactsDomainStore.replaceSnapshot(snapshot)
         try applyProtectedRuntimeSnapshot(snapshot)
@@ -1285,7 +1279,6 @@ final class ContactService: @unchecked Sendable {
         runtimeSnapshot = nil
         contactsSearchIndex = nil
         protectedDomainMigrationWarning = nil
-        domainRepository.clearRuntimeState()
     }
 
     private static func protectedDomainMigrationWarningMessage() -> String {

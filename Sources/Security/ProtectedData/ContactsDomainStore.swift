@@ -8,7 +8,7 @@ enum ContactsDomainStoreState: Equatable {
 }
 
 final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Sendable {
-    static let domainID = ContactsDomainRepository.domainID
+    static let domainID: ProtectedDataDomainID = "contacts"
 
     private struct OpenedSnapshot {
         let snapshot: ContactsDomainSnapshot
@@ -22,7 +22,6 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
     private let bootstrapStore: ProtectedDomainBootstrapStore
     private let currentWrappingRootKey: (() throws -> Data)?
     private let initialSnapshotProvider: () throws -> ContactsDomainSnapshot
-    private let snapshotRepository = ContactsDomainRepository()
 
     private(set) var snapshot: ContactsDomainSnapshot?
     private(set) var domainState: ContactsDomainStoreState = .locked
@@ -243,7 +242,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
     ) throws {
         try storageRoot.ensureDomainDirectoryExists(for: Self.domainID)
 
-        var plaintext = try snapshotRepository.encodeSnapshot(snapshot)
+        var plaintext = try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)
         defer {
             plaintext.protectedDataZeroize()
         }
@@ -270,7 +269,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         defer {
             validatedPlaintext.protectedDataZeroize()
         }
-        _ = try snapshotRepository.decodeSnapshot(validatedPlaintext)
+        _ = try ContactsDomainSnapshotCodec.decodeSnapshot(validatedPlaintext)
 
         let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
         let previousURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
@@ -328,13 +327,12 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                     defer {
                         plaintext.protectedDataZeroize()
                     }
-                    let decodedSnapshot = try snapshotRepository.decodeSnapshot(plaintext)
+                    let decodedSnapshot = try ContactsDomainSnapshotCodec.decodeSnapshot(plaintext)
                     candidates.append(
                         OpenedSnapshot(
-                            snapshot: decodedSnapshot,
+                            snapshot: decodedSnapshot.snapshot,
                             generationIdentifier: envelope.generationIdentifier,
-                            sourceSchemaVersion: snapshotRepository.lastDecodedSourceSchemaVersion
-                                ?? decodedSnapshot.schemaVersion
+                            sourceSchemaVersion: decodedSnapshot.sourceSchemaVersion
                         )
                     )
                 } catch {
@@ -427,7 +425,6 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
     private func clearUnlockedState() {
         snapshot = nil
         unlockedGenerationIdentifier = nil
-        snapshotRepository.clearRuntimeState()
     }
 }
 

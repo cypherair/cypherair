@@ -1,4 +1,5 @@
 import Foundation
+@testable import CypherAir
 
 /// Mock disk space provider for testing.
 /// Allows tests to simulate different disk space conditions.

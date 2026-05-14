@@ -187,6 +187,7 @@ Sources/
 │   ├── SigningService.swift
 │   ├── KeyManagementService.swift
 │   ├── ContactService.swift
+│   ├── ContactsCompatibilityMapper.swift
 │   ├── QRService.swift
 │   ├── SelfTestService.swift
 │   ├── FileProgressReporter.swift
@@ -204,12 +205,13 @@ Sources/
 │   ├── MemoryZeroingUtility.swift
 │   ├── Argon2idMemoryGuard.swift
 │   ├── MemoryInfoProvidable.swift
+│   ├── ProtectedData/
+│   │   └── ContactsDomainSnapshotCodec.swift
 │   └── Mocks/
 │       ├── MockAuthenticator.swift
 │       ├── MockKeychain.swift
 │       ├── MockSecureEnclave.swift
-│       ├── MockMemoryInfo.swift
-│       └── MockDiskSpace.swift
+│       └── MockMemoryInfo.swift
 ├── Models/
 │   ├── CypherAirError.swift
 │   ├── ExportableFile.swift

@@ -7,14 +7,14 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
     func test_emptySnapshot_validatesAndRoundTripsAsBinaryPlist() throws {
         let snapshot = ContactsDomainSnapshot.empty(now: referenceDate)
-        let repository = ContactsDomainRepository()
 
-        let encoded = try repository.encodeSnapshot(snapshot)
+        let encoded = try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)
         XCTAssertEqual(String(data: encoded.prefix(6), encoding: .utf8), "bplist")
 
-        let decoded = try repository.decodeSnapshot(encoded)
-        XCTAssertEqual(decoded, snapshot)
-        try decoded.validateContract()
+        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(encoded)
+        XCTAssertEqual(decoded.snapshot, snapshot)
+        XCTAssertEqual(decoded.sourceSchemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        try decoded.snapshot.validateContract()
     }
 
     func test_unsupportedSchemaVersion_isRejected() throws {
@@ -22,7 +22,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         snapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
 
         XCTAssertThrowsError(try snapshot.validateContract())
-        XCTAssertThrowsError(try ContactsDomainRepository().encodeSnapshot(snapshot))
+        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot))
     }
 
     func test_duplicateIdentifiersAndFingerprints_areRejected() throws {
@@ -160,10 +160,10 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
 
-        let decoded = try ContactsDomainRepository().decodeSnapshot(
+        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(
             try encoder.encode(legacySnapshot)
         )
-        let artifact = try XCTUnwrap(decoded.certificationArtifacts.first)
+        let artifact = try XCTUnwrap(decoded.snapshot.certificationArtifacts.first)
 
         XCTAssertEqual(artifact.validationStatus, .revalidationNeeded)
         XCTAssertEqual(artifact.source, .imported)
@@ -221,18 +221,44 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         )
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
-        let repository = ContactsDomainRepository()
 
-        let decoded = try repository.decodeSnapshot(try encoder.encode(legacySnapshot))
+        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(try encoder.encode(legacySnapshot))
 
-        XCTAssertEqual(repository.lastDecodedSourceSchemaVersion, 1)
-        XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
-        XCTAssertEqual(decoded.identities, snapshot.identities)
-        XCTAssertEqual(decoded.keyRecords, snapshot.keyRecords)
-        XCTAssertEqual(decoded.tags, snapshot.tags)
-        XCTAssertEqual(decoded.certificationArtifacts, snapshot.certificationArtifacts)
-        XCTAssertFalse(decoded.tags.contains { $0.displayName == "Team" })
-        XCTAssertNoThrow(try decoded.validateContract())
+        XCTAssertEqual(decoded.sourceSchemaVersion, 1)
+        XCTAssertEqual(decoded.snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(decoded.snapshot.identities, snapshot.identities)
+        XCTAssertEqual(decoded.snapshot.keyRecords, snapshot.keyRecords)
+        XCTAssertEqual(decoded.snapshot.tags, snapshot.tags)
+        XCTAssertEqual(decoded.snapshot.certificationArtifacts, snapshot.certificationArtifacts)
+        XCTAssertFalse(decoded.snapshot.tags.contains { $0.displayName == "Team" })
+        XCTAssertNoThrow(try decoded.snapshot.validateContract())
+    }
+
+    func test_decodeSnapshot_returnsSourceSchemaVersionPerPayloadWithoutState() throws {
+        let currentSnapshot = try makeValidSnapshot()
+        let currentPayload = try ContactsDomainSnapshotCodec.encodeSnapshot(currentSnapshot)
+        let legacySnapshot = LegacyContactsDomainSnapshotV1(
+            schemaVersion: 1,
+            identities: currentSnapshot.identities,
+            keyRecords: currentSnapshot.keyRecords,
+            recipientLists: [],
+            tags: currentSnapshot.tags,
+            certificationArtifacts: currentSnapshot.certificationArtifacts,
+            createdAt: currentSnapshot.createdAt,
+            updatedAt: currentSnapshot.updatedAt
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+
+        let legacyDecoded = try ContactsDomainSnapshotCodec.decodeSnapshot(
+            try encoder.encode(legacySnapshot)
+        )
+        let currentDecoded = try ContactsDomainSnapshotCodec.decodeSnapshot(currentPayload)
+
+        XCTAssertEqual(legacyDecoded.sourceSchemaVersion, 1)
+        XCTAssertEqual(currentDecoded.sourceSchemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(legacyDecoded.snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(currentDecoded.snapshot, currentSnapshot)
     }
 
     func test_v1MigrationIgnoresMalformedRecipientListsPayload() throws {
@@ -283,14 +309,14 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             options: 0
         )
 
-        let decoded = try ContactsDomainRepository().decodeSnapshot(malformedListPayload)
+        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(malformedListPayload)
 
-        XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
-        XCTAssertEqual(decoded.identities, snapshot.identities)
-        XCTAssertEqual(decoded.keyRecords, snapshot.keyRecords)
-        XCTAssertEqual(decoded.tags, snapshot.tags)
-        XCTAssertEqual(decoded.certificationArtifacts, snapshot.certificationArtifacts)
-        XCTAssertNoThrow(try decoded.validateContract())
+        XCTAssertEqual(decoded.snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertEqual(decoded.snapshot.identities, snapshot.identities)
+        XCTAssertEqual(decoded.snapshot.keyRecords, snapshot.keyRecords)
+        XCTAssertEqual(decoded.snapshot.tags, snapshot.tags)
+        XCTAssertEqual(decoded.snapshot.certificationArtifacts, snapshot.certificationArtifacts)
+        XCTAssertNoThrow(try decoded.snapshot.validateContract())
     }
 
     func test_v1MigrationRejectsInvalidPreservedData() throws {
@@ -310,7 +336,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         encoder.outputFormat = .binary
 
         XCTAssertThrowsError(
-            try ContactsDomainRepository().decodeSnapshot(try encoder.encode(legacySnapshot))
+            try ContactsDomainSnapshotCodec.decodeSnapshot(try encoder.encode(legacySnapshot))
         )
     }
 

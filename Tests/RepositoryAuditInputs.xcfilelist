@@ -173,11 +173,11 @@ $(SRCROOT)/Sources/Security/PrivateKeyModeSwitchAuthenticator.swift
 $(SRCROOT)/Sources/Security/PrivateKeyRewrapRecoveryCoordinator.swift
 $(SRCROOT)/Sources/Security/PrivateKeyRewrapWorkflow.swift
 $(SRCROOT)/Sources/Security/Mocks/MockAuthenticator.swift
-$(SRCROOT)/Sources/Security/Mocks/MockDiskSpace.swift
 $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockMemoryInfo.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
+$(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/KeyMetadataDomainStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataAccessGateClassifier.swift
@@ -206,7 +206,7 @@ $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportPublicCertificateValidator.swift
 $(SRCROOT)/Sources/Services/ContactRepository.swift
 $(SRCROOT)/Sources/Services/ContactService.swift
-$(SRCROOT)/Sources/Services/ContactsDomainRepository.swift
+$(SRCROOT)/Sources/Services/ContactsCompatibilityMapper.swift
 $(SRCROOT)/Sources/Services/ContactsLegacyMigrationSource.swift
 $(SRCROOT)/Sources/Services/ContactsSearchIndex.swift
 $(SRCROOT)/Sources/Services/DecryptionService.swift
