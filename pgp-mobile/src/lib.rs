@@ -308,25 +308,6 @@ impl PgpEngine {
         cert_signature::verify_direct_key_signature(&signature, &target_cert, &candidate_signers)
     }
 
-    /// Verify a User ID binding signature against a target certificate using crypto-only semantics.
-    ///
-    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
-    /// this selects the first matching occurrence.
-    pub fn verify_user_id_binding_signature(
-        &self,
-        signature: Vec<u8>,
-        target_cert: Vec<u8>,
-        user_id_data: Vec<u8>,
-        candidate_signers: Vec<Vec<u8>>,
-    ) -> Result<CertificateSignatureResult, PgpError> {
-        cert_signature::verify_user_id_binding_signature(
-            &signature,
-            &target_cert,
-            &user_id_data,
-            &candidate_signers,
-        )
-    }
-
     /// Verify a User ID binding signature against an explicitly selected User ID occurrence.
     pub fn verify_user_id_binding_signature_by_selector(
         &self,
@@ -340,26 +321,6 @@ impl PgpEngine {
             &target_cert,
             &user_id_selector,
             &candidate_signers,
-        )
-    }
-
-    /// Generate raw certification-signature bytes for a specific User ID on the target certificate.
-    ///
-    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
-    /// this selects the first matching occurrence.
-    pub fn generate_user_id_certification(
-        &self,
-        signer_secret_cert: Vec<u8>,
-        target_cert: Vec<u8>,
-        user_id_data: Vec<u8>,
-        certification_kind: CertificationKind,
-    ) -> Result<Vec<u8>, PgpError> {
-        let signer_secret_cert = Zeroizing::new(signer_secret_cert);
-        cert_signature::generate_user_id_certification(
-            &signer_secret_cert,
-            &target_cert,
-            &user_id_data,
-            certification_kind,
         )
     }
 
@@ -437,19 +398,6 @@ impl PgpEngine {
     ) -> Result<Vec<u8>, PgpError> {
         let secret_cert = Zeroizing::new(secret_cert);
         keys::generate_subkey_revocation(&secret_cert, &subkey_fingerprint)
-    }
-
-    /// Generate a User ID-specific revocation signature from an existing secret certificate.
-    ///
-    /// Legacy compatibility path: if the certificate contains duplicate User ID bytes,
-    /// this selects the first matching occurrence.
-    pub fn generate_user_id_revocation(
-        &self,
-        secret_cert: Vec<u8>,
-        user_id_data: Vec<u8>,
-    ) -> Result<Vec<u8>, PgpError> {
-        let secret_cert = Zeroizing::new(secret_cert);
-        keys::generate_user_id_revocation(&secret_cert, &user_id_data)
     }
 
     /// Generate a User ID-specific revocation signature using an explicit selector.

@@ -186,8 +186,8 @@ pub use key_info::parse_key_info;
 pub use profile::{detect_profile, get_key_version};
 pub use public_certificates::{merge_public_certificate_update, validate_public_certificate};
 pub use revocation::{
-    generate_key_revocation, generate_subkey_revocation, generate_user_id_revocation,
-    generate_user_id_revocation_by_selector, parse_revocation_cert,
+    generate_key_revocation, generate_subkey_revocation, generate_user_id_revocation_by_selector,
+    parse_revocation_cert,
 };
 pub use s2k::{parse_s2k_params, S2kInfo};
 pub use secret_transfer::{export_secret_key, extract_secret_key_bytes, import_secret_key};
