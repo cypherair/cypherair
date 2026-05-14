@@ -90,23 +90,23 @@ final class QRService {
     // MARK: - Key Inspection (for UI confirmation)
 
     /// Validate contact-import data as a public certificate and return normalized metadata.
-    func inspectImportablePublicCertificate(keyData: Data) throws -> PublicCertificateValidationResult {
-        try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
+    func inspectImportablePublicCertificate(keyData: Data) throws -> ImportablePublicCertificateInspection {
+        let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
+        return ImportablePublicCertificateInspection(
+            publicCertData: validation.publicCertData,
+            metadata: PGPKeyMetadataAdapter.metadata(from: validation)
+        )
     }
 
     /// Parse key metadata for display in the import confirmation view.
     /// This is a read-only inspection — no keys are stored.
     func inspectKeyMetadata(keyData: Data) throws -> PGPKeyMetadata {
-        try PGPKeyMetadataAdapter.metadata(
-            from: inspectImportablePublicCertificate(keyData: keyData)
-        )
+        try inspectImportablePublicCertificate(keyData: keyData).metadata
     }
 
     /// Detect the encryption profile of a public key.
     func detectKeyProfile(keyData: Data) throws -> PGPKeyProfile {
-        try PGPKeyMetadataAdapter.metadata(
-            from: inspectImportablePublicCertificate(keyData: keyData)
-        ).profile
+        try inspectImportablePublicCertificate(keyData: keyData).metadata.profile
     }
 
     // MARK: - QR Decoding from Image

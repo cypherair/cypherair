@@ -91,6 +91,26 @@ final class QRServiceTests: XCTestCase {
                        "Profile B fingerprint should survive QR URL round-trip")
     }
 
+    func test_inspectImportablePublicCertificate_returnsAppOwnedInspection() throws {
+        let generated = try engine.generateKey(
+            name: "Import Display",
+            email: "display@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+
+        let inspection = try qrService.inspectImportablePublicCertificate(
+            keyData: generated.publicKeyData
+        )
+
+        XCTAssertEqual(inspection.publicCertData, generated.publicKeyData)
+        XCTAssertEqual(inspection.metadata.fingerprint, keyInfo.fingerprint)
+        XCTAssertEqual(inspection.metadata.userId, keyInfo.userId)
+        XCTAssertEqual(inspection.metadata.profile, .universal)
+        XCTAssertEqual(inspection.metadata.keyVersion, 4)
+    }
+
     // MARK: - Negative: Wrong Scheme
 
     func test_parseImportURL_wrongScheme_https_throwsInvalidQRCode() {

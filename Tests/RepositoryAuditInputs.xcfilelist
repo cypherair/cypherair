@@ -247,6 +247,7 @@ $(SRCROOT)/Sources/Services/EncryptionService.swift
 $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
 $(SRCROOT)/Sources/Services/FileProgressReporter.swift
+$(SRCROOT)/Sources/Services/ImportablePublicCertificateInspection.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyCatalogStore.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyExportService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyMutationService.swift
