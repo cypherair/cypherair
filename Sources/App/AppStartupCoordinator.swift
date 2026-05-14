@@ -19,7 +19,7 @@ struct AppStartupCoordinator {
 
     func performPreAuthBootstrap(using container: AppContainer) -> AppStartupBootstrapSnapshot {
         let traceStore = container.authLifecycleTraceStore
-        var errors: [String] = []
+        let errors: [String] = []
         var recoveryDiagnostics: [String] = []
         var bootstrapOutcome: ProtectedDataBootstrapOutcome = .frameworkRecoveryNeeded
         var protectedDataFrameworkState: ProtectedDataFrameworkState = .sessionLocked

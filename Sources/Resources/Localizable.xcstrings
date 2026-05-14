@@ -5489,22 +5489,6 @@
         }
       }
     },
-    "error.recipientNotFound" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recipient key not found in contacts."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在通讯录中未找到收件人密钥。"
-          }
-        }
-      }
-    },
     "error.recipientPreferredKeyMissing" : {
       "localizations" : {
         "en" : {

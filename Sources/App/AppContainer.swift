@@ -763,7 +763,7 @@ final class AppContainer: @unchecked Sendable {
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         if !requiresManualAuthentication {
-            try? contactService.openLegacyCompatibilityForTests()
+            _ = try? contactService.openLegacyCompatibilityForTests()
         }
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
