@@ -7,12 +7,12 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
     func test_emptySnapshot_validatesAndRoundTripsAsBinaryPlist() throws {
         let snapshot = ContactsDomainSnapshot.empty(now: referenceDate)
-        let repository = ContactsDomainRepository()
+        let codec = ContactsDomainSnapshotCodec()
 
-        let encoded = try repository.encodeSnapshot(snapshot)
+        let encoded = try codec.encodeSnapshot(snapshot)
         XCTAssertEqual(String(data: encoded.prefix(6), encoding: .utf8), "bplist")
 
-        let decoded = try repository.decodeSnapshot(encoded)
+        let decoded = try codec.decodeSnapshot(encoded)
         XCTAssertEqual(decoded, snapshot)
         try decoded.validateContract()
     }
@@ -22,7 +22,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         snapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
 
         XCTAssertThrowsError(try snapshot.validateContract())
-        XCTAssertThrowsError(try ContactsDomainRepository().encodeSnapshot(snapshot))
+        XCTAssertThrowsError(try ContactsDomainSnapshotCodec().encodeSnapshot(snapshot))
     }
 
     func test_duplicateIdentifiersAndFingerprints_areRejected() throws {
@@ -160,7 +160,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
 
-        let decoded = try ContactsDomainRepository().decodeSnapshot(
+        let decoded = try ContactsDomainSnapshotCodec().decodeSnapshot(
             try encoder.encode(legacySnapshot)
         )
         let artifact = try XCTUnwrap(decoded.certificationArtifacts.first)
@@ -221,11 +221,11 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         )
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
-        let repository = ContactsDomainRepository()
+        let codec = ContactsDomainSnapshotCodec()
 
-        let decoded = try repository.decodeSnapshot(try encoder.encode(legacySnapshot))
+        let decoded = try codec.decodeSnapshot(try encoder.encode(legacySnapshot))
 
-        XCTAssertEqual(repository.lastDecodedSourceSchemaVersion, 1)
+        XCTAssertEqual(codec.lastDecodedSourceSchemaVersion, 1)
         XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
         XCTAssertEqual(decoded.identities, snapshot.identities)
         XCTAssertEqual(decoded.keyRecords, snapshot.keyRecords)
@@ -283,7 +283,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             options: 0
         )
 
-        let decoded = try ContactsDomainRepository().decodeSnapshot(malformedListPayload)
+        let decoded = try ContactsDomainSnapshotCodec().decodeSnapshot(malformedListPayload)
 
         XCTAssertEqual(decoded.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
         XCTAssertEqual(decoded.identities, snapshot.identities)
@@ -310,7 +310,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         encoder.outputFormat = .binary
 
         XCTAssertThrowsError(
-            try ContactsDomainRepository().decodeSnapshot(try encoder.encode(legacySnapshot))
+            try ContactsDomainSnapshotCodec().decodeSnapshot(try encoder.encode(legacySnapshot))
         )
     }
 

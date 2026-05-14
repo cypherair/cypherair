@@ -165,7 +165,8 @@ ProtectedData component ownership:
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, search/tag behavior, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
 - `ContactsDomainStore` is the Contacts protected-domain persistence owner; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
-- `ContactsDomainRepository` owns Contacts schema serialization, v1-to-v2 migration that drops legacy recipient-list data, legacy `Contact` compatibility projection, and runtime scratch/search/signer state clearing; Contacts schema or storage changes update the long-term docs and persisted-state inventory.
+- `ContactsDomainSnapshotCodec` owns Contacts protected-domain schema serialization, binary-plist payload decoding, v1-to-v2 migration that drops legacy recipient-list data, and decode scratch-buffer clearing.
+- `ContactsCompatibilityMapper` owns legacy/app compatibility projection between `Contact` arrays and `ContactsDomainSnapshot`; Contacts schema or storage changes update the long-term docs and persisted-state inventory.
 - `AppContainer` assembles the Contacts store, migration source, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists

@@ -8,16 +8,16 @@ struct ContactsLegacyRuntimeValues {
 final class ContactsLegacyMigrationSource: @unchecked Sendable {
     private let engine: PgpEngine
     private let repository: ContactRepository
-    private let domainRepository: ContactsDomainRepository
+    private let compatibilityMapper: ContactsCompatibilityMapper
 
     init(
         engine: PgpEngine,
         repository: ContactRepository,
-        domainRepository: ContactsDomainRepository = ContactsDomainRepository()
+        compatibilityMapper: ContactsCompatibilityMapper = ContactsCompatibilityMapper()
     ) {
         self.engine = engine
         self.repository = repository
-        self.domainRepository = domainRepository
+        self.compatibilityMapper = compatibilityMapper
     }
 
     func makeInitialSnapshot() throws -> ContactsDomainSnapshot {
@@ -25,7 +25,7 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
             return ContactsDomainSnapshot.empty()
         }
         let runtime = try loadRuntimeValues(repairMetadata: false)
-        return try domainRepository.makeCompatibilitySnapshot(from: runtime.contacts)
+        return try compatibilityMapper.makeCompatibilitySnapshot(from: runtime.contacts)
     }
 
     func loadRuntimeValues(repairMetadata: Bool) throws -> ContactsLegacyRuntimeValues {
