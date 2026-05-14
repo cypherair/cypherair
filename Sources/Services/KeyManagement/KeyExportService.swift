@@ -94,13 +94,13 @@ final class KeyExportService {
         engine: PgpEngine,
         certData: Data,
         passphrase: String,
-        profile: KeyProfile
+        profile: PGPKeyProfile
     ) async throws -> Data {
         do {
             return try engine.exportSecretKey(
                 certData: certData,
                 passphrase: passphrase,
-                profile: profile
+                profile: profile.ffiValue
             )
         } catch {
             throw CypherAirError.from(error) { .s2kError(reason: $0) }

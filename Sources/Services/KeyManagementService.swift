@@ -228,7 +228,7 @@ final class KeyManagementService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: KeyProfile
+        profile: PGPKeyProfile
     ) async throws -> PGPKeyIdentity {
         let token = provisioningInvalidationGate.makeToken()
         if let beforeAuthModeReadCheckpoint {
@@ -253,7 +253,7 @@ final class KeyManagementService: @unchecked Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         authMode: AuthenticationMode,
         token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
@@ -500,18 +500,13 @@ final class KeyManagementService: @unchecked Sendable {
             throw CypherAirError.noMatchingKey
         }
 
-        let discovery = try CertificateSelectionCatalogDiscovery.discover(
+        let catalog = try PGPCertificateSelectionAdapter.validatedCatalog(
             engine: engine,
-            certData: identity.publicKeyData
+            certData: identity.publicKeyData,
+            expectedFingerprint: identity.fingerprint
         )
 
-        guard discovery.raw.certificateFingerprint == identity.fingerprint else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Stored key metadata fingerprint does not match certificate data"
-            )
-        }
-
-        return discovery.catalog
+        return catalog
     }
 
     /// Discover selector-bearing subkey and User ID metadata off the main actor.
@@ -521,18 +516,13 @@ final class KeyManagementService: @unchecked Sendable {
             throw CypherAirError.noMatchingKey
         }
 
-        let discovery = try await Self.discoverSelectionCatalogOffMainActor(
+        let catalog = try await Self.discoverSelectionCatalogOffMainActor(
             engine: engine,
-            certData: identity.publicKeyData
+            certData: identity.publicKeyData,
+            expectedFingerprint: identity.fingerprint
         )
 
-        guard discovery.raw.certificateFingerprint == identity.fingerprint else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Stored key metadata fingerprint does not match certificate data"
-            )
-        }
-
-        return discovery.catalog
+        return catalog
     }
 
     // MARK: - Crash Recovery
@@ -558,11 +548,13 @@ final class KeyManagementService: @unchecked Sendable {
     @concurrent
     private static func discoverSelectionCatalogOffMainActor(
         engine: PgpEngine,
-        certData: Data
-    ) async throws -> (raw: DiscoveredCertificateSelectors, catalog: CertificateSelectionCatalog) {
-        try CertificateSelectionCatalogDiscovery.discover(
+        certData: Data,
+        expectedFingerprint: String
+    ) async throws -> CertificateSelectionCatalog {
+        try PGPCertificateSelectionAdapter.validatedCatalog(
             engine: engine,
-            certData: certData
+            certData: certData,
+            expectedFingerprint: expectedFingerprint
         )
     }
 

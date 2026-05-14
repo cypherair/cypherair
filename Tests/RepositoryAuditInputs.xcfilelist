@@ -143,7 +143,6 @@ $(SRCROOT)/Sources/App/Sign/SignView.swift
 $(SRCROOT)/Sources/App/Sign/VerifyScreenModel.swift
 $(SRCROOT)/Sources/App/Sign/VerifyView.swift
 $(SRCROOT)/Sources/Extensions/Data+Zeroing.swift
-$(SRCROOT)/Sources/Extensions/KeyProfile+Codable.swift
 $(SRCROOT)/Sources/Extensions/View+PlatformAvailability.swift
 $(SRCROOT)/Sources/Models/AppConfiguration.swift
 $(SRCROOT)/Sources/Models/CertificateSelectionCatalog.swift
@@ -172,8 +171,9 @@ $(SRCROOT)/Sources/Models/CypherAirError.swift
 $(SRCROOT)/Sources/Models/DetailedSignatureVerification.swift
 $(SRCROOT)/Sources/Models/ExportableFile.swift
 $(SRCROOT)/Sources/Models/IdentityPresentation.swift
-$(SRCROOT)/Sources/Models/KeyProfile+App.swift
+$(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
+$(SRCROOT)/Sources/Models/PGPKeyProfile.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsPersistence.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsSnapshot.swift
@@ -230,8 +230,6 @@ $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swi
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedSettingsStore.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManageable.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManager.swift
-$(SRCROOT)/Sources/Services/CertificateSelectionCatalogDiscovery.swift
-$(SRCROOT)/Sources/Services/CertificateSelectionCatalogMapper.swift
 $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportMatcher.swift
 $(SRCROOT)/Sources/Services/ContactImportPublicCertificateValidator.swift
@@ -246,7 +244,10 @@ $(SRCROOT)/Sources/Services/ContactSummaryProjector.swift
 $(SRCROOT)/Sources/Services/DecryptionService.swift
 $(SRCROOT)/Sources/Services/DiskSpaceChecker.swift
 $(SRCROOT)/Sources/Services/EncryptionService.swift
+$(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
 $(SRCROOT)/Sources/Services/FileProgressReporter.swift
+$(SRCROOT)/Sources/Services/ImportablePublicCertificateInspection.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyCatalogStore.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyExportService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyMutationService.swift

@@ -17,7 +17,7 @@ final class PasswordMessageServiceTests: XCTestCase {
     }
 
     private func generateKeyAndContact(
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         name: String = "Password Test"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(

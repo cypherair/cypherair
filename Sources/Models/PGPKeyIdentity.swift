@@ -17,7 +17,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     let keyVersion: UInt8
 
     /// Encryption profile.
-    let profile: KeyProfile
+    let profile: PGPKeyProfile
 
     /// Primary User ID (e.g., "Alice <alice@example.com>").
     let userId: String?
@@ -53,7 +53,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     let subkeyAlgo: String?
 
     /// Expiration date, if set. Nil means the key does not expire.
-    /// Populated from KeyInfo.expiryTimestamp (seconds since Unix epoch).
+    /// Populated from parsed key metadata expiry timestamp (seconds since Unix epoch).
     var expiryDate: Date?
 
     /// Short Key ID (last 16 hex chars of fingerprint). De-emphasized in UI.

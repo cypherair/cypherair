@@ -10,6 +10,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.appLayerPgpErrorHandling)
     }
 
+    func test_appLayerFFIAdapterUsage_isBlocked() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.appLayerFFIAdapterUsage)
+    }
+
     func test_modelsSwiftUIPresentationPolicy_isLimitedToKnownTemporaryExceptions() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.modelsSwiftUIPresentationPolicy)
     }
@@ -39,6 +43,17 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             allowedPath: "Sources/App/Common/OperationController.swift",
             allowedContents: "func shouldIgnore(_ error: Error) -> Bool { error is PgpError }",
             cleanContents: "func shouldIgnore(_ error: Error) -> Bool { false }"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.appLayerFFIAdapterUsage.withTemporaryExceptions([
+                "Sources/App/Contacts/Import/LegacyImportLoader.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/App/Contacts/Import/NewImportLoader.swift",
+            violatingContents: "struct NewImportLoader { let adapter = PGPKeyMetadataAdapter.self }",
+            allowedPath: "Sources/App/Contacts/Import/LegacyImportLoader.swift",
+            allowedContents: "struct LegacyImportLoader { let adapter = PGPCertificateSelectionAdapter.self }",
+            cleanContents: "struct ImportLoader {}"
         )
 
         try assertRuleBehavior(
@@ -90,9 +105,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         let source = AuditedSource(
             path: "Sources/App/NewView.swift",
             contents: """
-            // PgpEngine and PgpError should be ignored in comments.
+            // PgpEngine, PgpError, and PGPKeyMetadataAdapter should be ignored in comments.
             let message = "KeyInfo [Contact] import SwiftUI"
-            let raw = #"ProgressReporterImpl KeyProfile Array<Contact>"#
+            let raw = #"ProgressReporterImpl KeyProfile Array<Contact> PGPCertificateSelectionAdapter"#
             struct NewView {}
             """
         )
@@ -102,6 +117,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.appLayerPgpErrorHandling.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.appLayerFFIAdapterUsage.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.violations(in: [source]).isEmpty
@@ -147,6 +165,19 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         XCTAssertEqual(pgpErrorViolations.map(\.path), ["Sources/App/NewView.swift"])
         XCTAssertEqual(pgpErrorViolations.first?.matches, ["PgpError"])
 
+        let adapterInterpolationSource = AuditedSource(
+            path: "Sources/App/NewView.swift",
+            contents: #"""
+            struct NewView {
+                let adapterName = "\(PGPKeyMetadataAdapter.self)"
+            }
+            """#
+        )
+        let adapterViolations = ArchitectureSourceAuditRules.appLayerFFIAdapterUsage
+            .violations(in: [adapterInterpolationSource])
+        XCTAssertEqual(adapterViolations.map(\.path), ["Sources/App/NewView.swift"])
+        XCTAssertEqual(adapterViolations.first?.matches, ["PGPKeyMetadataAdapter"])
+
         let rawInterpolationSource = AuditedSource(
             path: "Sources/App/NewView.swift",
             contents: ##"""
@@ -175,6 +206,11 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.appLayerPgpErrorHandling
+                .violations(in: [nestedStringAndCommentSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.appLayerFFIAdapterUsage
                 .violations(in: [nestedStringAndCommentSource])
                 .isEmpty
         )
@@ -320,9 +356,6 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesView.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
-                    "Sources/App/Contacts/Import/PublicKeyImportLoader.swift",
-                    "Sources/App/Contacts/ImportConfirmView.swift",
-                    "Sources/App/Contacts/ImportConfirmationCoordinator.swift",
                     "Sources/App/Keys/BackupKeyView.swift",
                     "Sources/App/Keys/ImportKeyView.swift",
                     "Sources/App/Keys/KeyGenerationView.swift",
@@ -330,25 +363,20 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
-                "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
+                "FFI adapter files intentionally contain generated UniFFI types while exposing app-owned contracts upward.",
                 [
-                    "Sources/Models/CertificateSignatureVerification.swift",
-                    "Sources/Models/Contact.swift",
-                    "Sources/Models/Contacts/ContactCertificationArtifactReference.swift",
-                    "Sources/Models/Contacts/ContactKeyRecord.swift",
-                    "Sources/Models/Contacts/ContactKeySummary.swift",
-                    "Sources/Models/CypherAirError.swift",
-                    "Sources/Models/DetailedSignatureVerification.swift",
-                    "Sources/Models/KeyProfile+App.swift",
-                    "Sources/Models/PGPKeyIdentity.swift",
-                    "Sources/Models/SignatureVerification.swift",
-                    "Sources/Models/UserIdSelectionOption.swift",
+                    "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
+                    "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
                 ]
             ),
             (
-                "Extensions currently provide generated enum Codable or display support pending app-owned replacements.",
+                "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
                 [
-                    "Sources/Extensions/KeyProfile+Codable.swift",
+                    "Sources/Models/CertificateSignatureVerification.swift",
+                    "Sources/Models/Contacts/ContactCertificationArtifactReference.swift",
+                    "Sources/Models/CypherAirError.swift",
+                    "Sources/Models/DetailedSignatureVerification.swift",
+                    "Sources/Models/SignatureVerification.swift",
                 ]
             ),
             (
@@ -360,8 +388,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Services still call PgpEngine and map generated results directly until Phase 1 introduces adapter contracts.",
                 [
-                    "Sources/Services/CertificateSelectionCatalogDiscovery.swift",
-                    "Sources/Services/CertificateSelectionCatalogMapper.swift",
                     "Sources/Services/CertificateSignatureService.swift",
                     "Sources/Services/ContactImportMatcher.swift",
                     "Sources/Services/ContactImportPublicCertificateValidator.swift",
@@ -408,6 +434,20 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
         ])
+    )
+
+    static let appLayerFFIAdapterUsage = ArchitectureSourceAuditRule(
+        name: "App-layer FFI adapter usage",
+        failureSummary: "App-layer files should not call FFI adapters directly.",
+        pattern: wordPattern(for: [
+            "PGPCertificateSelectionAdapter",
+            "PGPKeyMetadataAdapter",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/App/") && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: [:]
     )
 
     static let modelsSwiftUIPresentationPolicy = ArchitectureSourceAuditRule(

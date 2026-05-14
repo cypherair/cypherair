@@ -35,8 +35,7 @@ final class MacPresentationRoutingTests: XCTestCase {
             .importConfirmation(
                 ImportConfirmationRequest(
                     keyData: Data(),
-                    keyInfo: testKeyInfo(),
-                    profile: .universal,
+                    metadata: testKeyMetadata(),
                     allowsUnverifiedImport: true,
                     onImportVerified: {},
                     onImportUnverified: {},
@@ -310,8 +309,8 @@ final class MacPresentationRoutingTests: XCTestCase {
         )
     }
 
-    private func testKeyInfo() -> KeyInfo {
-        KeyInfo(
+    private func testKeyMetadata() -> PGPKeyMetadata {
+        PGPKeyMetadata(
             fingerprint: "abc123",
             keyVersion: 4,
             userId: "alice@example.com",

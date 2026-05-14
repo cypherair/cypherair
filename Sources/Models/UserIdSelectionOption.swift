@@ -19,11 +19,4 @@ struct UserIdSelectionOption: Equatable, Hashable {
     /// Display-oriented current revocation state.
     let isCurrentlyRevoked: Bool
 
-    /// Selector input for by-selector Rust / FFI APIs.
-    var selectorInput: UserIdSelectorInput {
-        UserIdSelectorInput(
-            userIdData: userIdData,
-            occurrenceIndex: UInt64(occurrenceIndex)
-        )
-    }
 }

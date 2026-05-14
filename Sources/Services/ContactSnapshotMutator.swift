@@ -735,10 +735,11 @@ struct ContactSnapshotMutator {
         from validation: PublicCertificateValidationResult,
         now: Date
     ) -> ContactIdentity {
-        ContactIdentity(
+        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        return ContactIdentity(
             contactId: "contact-\(UUID().uuidString)",
-            displayName: IdentityPresentation.displayName(from: validation.keyInfo.userId),
-            primaryEmail: IdentityPresentation.email(from: validation.keyInfo.userId),
+            displayName: IdentityPresentation.displayName(from: metadata.userId),
+            primaryEmail: IdentityPresentation.email(from: metadata.userId),
             tagIds: [],
             notes: nil,
             createdAt: now,
@@ -753,20 +754,21 @@ struct ContactSnapshotMutator {
         usageState: ContactKeyUsageState,
         now: Date
     ) -> ContactKeyRecord {
-        ContactKeyRecord(
+        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        return ContactKeyRecord(
             keyId: "key-\(UUID().uuidString)",
             contactId: contactId,
-            fingerprint: validation.keyInfo.fingerprint,
-            primaryUserId: validation.keyInfo.userId,
-            displayName: IdentityPresentation.displayName(from: validation.keyInfo.userId),
-            email: IdentityPresentation.email(from: validation.keyInfo.userId),
-            keyVersion: validation.keyInfo.keyVersion,
-            profile: validation.profile,
-            primaryAlgo: validation.keyInfo.primaryAlgo,
-            subkeyAlgo: validation.keyInfo.subkeyAlgo,
-            hasEncryptionSubkey: validation.keyInfo.hasEncryptionSubkey,
-            isRevoked: validation.keyInfo.isRevoked,
-            isExpired: validation.keyInfo.isExpired,
+            fingerprint: metadata.fingerprint,
+            primaryUserId: metadata.userId,
+            displayName: IdentityPresentation.displayName(from: metadata.userId),
+            email: IdentityPresentation.email(from: metadata.userId),
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
             manualVerificationState: verificationState,
             usageState: usageState,
             certificationProjection: .empty,
@@ -784,17 +786,18 @@ struct ContactSnapshotMutator {
         verificationState: ContactVerificationState,
         now: Date
     ) -> ContactKeyRecord {
+        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
         var updatedRecord = existingRecord
-        updatedRecord.primaryUserId = validation.keyInfo.userId
-        updatedRecord.displayName = IdentityPresentation.displayName(from: validation.keyInfo.userId)
-        updatedRecord.email = IdentityPresentation.email(from: validation.keyInfo.userId)
-        updatedRecord.keyVersion = validation.keyInfo.keyVersion
-        updatedRecord.profile = validation.profile
-        updatedRecord.primaryAlgo = validation.keyInfo.primaryAlgo
-        updatedRecord.subkeyAlgo = validation.keyInfo.subkeyAlgo
-        updatedRecord.hasEncryptionSubkey = validation.keyInfo.hasEncryptionSubkey
-        updatedRecord.isRevoked = validation.keyInfo.isRevoked
-        updatedRecord.isExpired = validation.keyInfo.isExpired
+        updatedRecord.primaryUserId = metadata.userId
+        updatedRecord.displayName = IdentityPresentation.displayName(from: metadata.userId)
+        updatedRecord.email = IdentityPresentation.email(from: metadata.userId)
+        updatedRecord.keyVersion = metadata.keyVersion
+        updatedRecord.profile = metadata.profile
+        updatedRecord.primaryAlgo = metadata.primaryAlgo
+        updatedRecord.subkeyAlgo = metadata.subkeyAlgo
+        updatedRecord.hasEncryptionSubkey = metadata.hasEncryptionSubkey
+        updatedRecord.isRevoked = metadata.isRevoked
+        updatedRecord.isExpired = metadata.isExpired
         updatedRecord.manualVerificationState = verificationState
         updatedRecord.publicKeyData = publicKeyData
         updatedRecord.updatedAt = now

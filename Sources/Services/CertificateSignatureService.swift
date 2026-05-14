@@ -44,10 +44,10 @@ final class CertificateSignatureService {
 
     /// Discover selector-bearing metadata for arbitrary target certificate bytes.
     func selectionCatalog(targetCert: Data) throws -> CertificateSelectionCatalog {
-        try CertificateSelectionCatalogDiscovery.discover(
+        try PGPCertificateSelectionAdapter.selectionCatalog(
             engine: engine,
             certData: targetCert
-        ).catalog
+        )
     }
 
     func verifyDirectKeySignature(
@@ -74,7 +74,7 @@ final class CertificateSignatureService {
         targetCert: Data,
         selectedUserId: UserIdSelectionOption
     ) async throws -> CertificateSignatureVerification {
-        let selectorInput = try validatedSelectorInput(
+        let validatedUserId = try validatedUserIdSelection(
             targetCert: targetCert,
             selectedUserId: selectedUserId
         )
@@ -85,7 +85,7 @@ final class CertificateSignatureService {
                 engine: engine,
                 signature: signature,
                 targetCert: targetCert,
-                userIdSelector: selectorInput,
+                selectedUserId: validatedUserId,
                 candidateSigners: try candidateSignerCertificates()
             )
         } catch {
@@ -101,7 +101,7 @@ final class CertificateSignatureService {
         selectedUserId: UserIdSelectionOption,
         certificationKind: CertificationKind
     ) async throws -> Data {
-        let selectorInput = try validatedSelectorInput(
+        let validatedUserId = try validatedUserIdSelection(
             targetCert: targetCert,
             selectedUserId: selectedUserId
         )
@@ -121,7 +121,7 @@ final class CertificateSignatureService {
                 engine: engine,
                 signerSecretCert: signerSecretCert,
                 targetCert: targetCert,
-                userIdSelector: selectorInput,
+                selectedUserId: validatedUserId,
                 certificationKind: certificationKind
             )
         } catch {
@@ -295,22 +295,16 @@ final class CertificateSignatureService {
         return VerifiedContactCertificationArtifact(reference: reference)
     }
 
-    private func validatedSelectorInput(
+    private func validatedUserIdSelection(
         targetCert: Data,
         selectedUserId: UserIdSelectionOption
-    ) throws -> UserIdSelectorInput {
+    ) throws -> UserIdSelectionOption {
         let catalog = try selectionCatalog(targetCert: targetCert)
 
-        guard catalog.userIds.contains(where: {
-            $0.occurrenceIndex == selectedUserId.occurrenceIndex
-                && $0.userIdData == selectedUserId.userIdData
-        }) else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Selected User ID does not match the target certificate."
-            )
-        }
-
-        return selectedUserId.selectorInput
+        return try PGPCertificateSelectionAdapter.validateUserIdSelection(
+            selectedUserId,
+            in: catalog
+        )
     }
 
     @concurrent
@@ -332,13 +326,14 @@ final class CertificateSignatureService {
         engine: PgpEngine,
         signature: Data,
         targetCert: Data,
-        userIdSelector: UserIdSelectorInput,
+        selectedUserId: UserIdSelectionOption,
         candidateSigners: [Data]
     ) async throws -> CertificateSignatureResult {
-        try engine.verifyUserIdBindingSignatureBySelector(
+        try await PGPCertificateSelectionAdapter.verifyUserIdBindingSignature(
+            engine: engine,
             signature: signature,
             targetCert: targetCert,
-            userIdSelector: userIdSelector,
+            selectedUserId: selectedUserId,
             candidateSigners: candidateSigners
         )
     }
@@ -348,13 +343,14 @@ final class CertificateSignatureService {
         engine: PgpEngine,
         signerSecretCert: Data,
         targetCert: Data,
-        userIdSelector: UserIdSelectorInput,
+        selectedUserId: UserIdSelectionOption,
         certificationKind: CertificationKind
     ) async throws -> Data {
-        try engine.generateUserIdCertificationBySelector(
+        try await PGPCertificateSelectionAdapter.generateUserIdCertification(
+            engine: engine,
             signerSecretCert: signerSecretCert,
             targetCert: targetCert,
-            userIdSelector: userIdSelector,
+            selectedUserId: selectedUserId,
             certificationKind: certificationKind
         )
     }

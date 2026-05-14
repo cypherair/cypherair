@@ -11,8 +11,7 @@ struct LoadedPublicKeyFile {
 
 struct PublicKeyImportInspection {
     let keyData: Data
-    let keyInfo: KeyInfo
-    let profile: KeyProfile
+    let metadata: PGPKeyMetadata
 }
 
 @MainActor
@@ -20,11 +19,10 @@ struct PublicKeyImportLoader {
     let qrService: QRService
 
     func inspect(keyData: Data) throws -> PublicKeyImportInspection {
-        let validated = try qrService.inspectImportablePublicCertificate(keyData: keyData)
+        let inspection = try qrService.inspectImportablePublicCertificate(keyData: keyData)
         return PublicKeyImportInspection(
-            keyData: validated.publicCertData,
-            keyInfo: validated.keyInfo,
-            profile: validated.profile
+            keyData: inspection.publicCertData,
+            metadata: inspection.metadata
         )
     }
 

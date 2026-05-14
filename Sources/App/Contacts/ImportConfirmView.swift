@@ -3,8 +3,7 @@ import SwiftUI
 /// Confirmation sheet displayed before importing a public key.
 /// Shows key details and requires explicit confirmation before adding a contact.
 struct ImportConfirmView: View {
-    let keyInfo: KeyInfo
-    let detectedProfile: KeyProfile
+    let metadata: PGPKeyMetadata
     let onImportVerified: () -> Void
     let onImportUnverified: (() -> Void)?
     let onCancel: () -> Void
@@ -52,10 +51,10 @@ struct ImportConfirmView: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(IdentityPresentation.displayName(from: keyInfo.userId))
+                        Text(IdentityPresentation.displayName(from: metadata.userId))
                             .font(.headline)
 
-                        if let email = IdentityPresentation.email(from: keyInfo.userId) {
+                        if let email = IdentityPresentation.email(from: metadata.userId) {
                             Text(email)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -72,18 +71,18 @@ struct ImportConfirmView: View {
                     )
                     infoRow(
                         String(localized: "import.algorithm", defaultValue: "Algorithm"),
-                        value: keyInfo.primaryAlgo
+                        value: metadata.primaryAlgo
                     )
                     infoRow(
                         String(localized: "import.shortKeyId", defaultValue: "Short Key ID"),
-                        value: IdentityPresentation.shortKeyId(from: keyInfo.fingerprint)
+                        value: IdentityPresentation.shortKeyId(from: metadata.fingerprint)
                     )
                     infoRow(
                         String(localized: "import.canEncrypt", defaultValue: "Can Encrypt To"),
                         value: canEncryptLabel
                     )
 
-                    if let userId = keyInfo.userId {
+                    if let userId = metadata.userId {
                         infoRow(
                             String(localized: "import.userId", defaultValue: "User ID"),
                             value: userId,
@@ -92,9 +91,9 @@ struct ImportConfirmView: View {
                     }
                 }
 
-                if keyInfo.isRevoked || keyInfo.isExpired {
+                if metadata.isRevoked || metadata.isExpired {
                     VStack(alignment: .leading, spacing: 10) {
-                        if keyInfo.isRevoked {
+                        if metadata.isRevoked {
                             Label(
                                 String(localized: "import.revoked", defaultValue: "This key has been revoked"),
                                 systemImage: "exclamationmark.triangle.fill"
@@ -102,7 +101,7 @@ struct ImportConfirmView: View {
                             .foregroundStyle(.red)
                         }
 
-                        if keyInfo.isExpired {
+                        if metadata.isExpired {
                             Label(
                                 String(localized: "import.expired", defaultValue: "This key has expired"),
                                 systemImage: "clock.badge.exclamationmark"
@@ -123,7 +122,7 @@ struct ImportConfirmView: View {
                     .foregroundStyle(.secondary)
 
                 FingerprintView(
-                    fingerprint: keyInfo.fingerprint,
+                    fingerprint: metadata.fingerprint,
                     textSelectionEnabled: true
                 )
             }
@@ -177,13 +176,13 @@ struct ImportConfirmView: View {
     }
 
     private var profileLabel: String {
-        detectedProfile == .advanced
+        metadata.profile == .advanced
             ? String(localized: "import.profileB", defaultValue: "Advanced Security (Profile B)")
             : String(localized: "import.profileA", defaultValue: "Universal Compatible (Profile A)")
     }
 
     private var canEncryptLabel: String {
-        (keyInfo.hasEncryptionSubkey && !keyInfo.isRevoked && !keyInfo.isExpired)
+        (metadata.hasEncryptionSubkey && !metadata.isRevoked && !metadata.isExpired)
             ? String(localized: "common.yes", defaultValue: "Yes")
             : String(localized: "common.no", defaultValue: "No")
     }

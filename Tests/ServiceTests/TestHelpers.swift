@@ -64,7 +64,7 @@ enum TestHelpers {
     @discardableResult
     static func generateAndStoreKey(
         service: KeyManagementService,
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         name: String = "Test User",
         email: String? = "test@example.com"
     ) async throws -> PGPKeyIdentity {
@@ -111,6 +111,7 @@ enum TestHelpers {
         isDefault: Bool = false
     ) throws -> PGPKeyIdentity {
         let info = try engine.parseKeyInfo(keyData: secretCertData)
+        let metadata = PGPKeyMetadataAdapter.metadata(from: info)
         let armoredPublicKey = try engine.armorPublicKey(certData: secretCertData)
         let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
 
@@ -118,27 +119,27 @@ enum TestHelpers {
         let bundle = try mockSE.wrap(
             privateKey: secretCertData,
             using: handle,
-            fingerprint: info.fingerprint
+            fingerprint: metadata.fingerprint
         )
 
         let bundleStore = KeyBundleStore(keychain: mockKC)
-        try bundleStore.saveBundle(bundle, fingerprint: info.fingerprint)
+        try bundleStore.saveBundle(bundle, fingerprint: metadata.fingerprint)
 
         let identity = PGPKeyIdentity(
-            fingerprint: info.fingerprint,
-            keyVersion: info.keyVersion,
-            profile: info.profile,
-            userId: info.userId,
-            hasEncryptionSubkey: info.hasEncryptionSubkey,
-            isRevoked: info.isRevoked,
-            isExpired: info.isExpired,
+            fingerprint: metadata.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
             isDefault: isDefault,
             isBackedUp: false,
             publicKeyData: publicKeyData,
             revocationCert: Data(),
-            primaryAlgo: info.primaryAlgo,
-            subkeyAlgo: info.subkeyAlgo,
-            expiryDate: info.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo,
+            expiryDate: metadata.expiryDate
         )
 
         let metadataStore = KeyMetadataStore(keychain: mockKC)

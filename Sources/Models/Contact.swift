@@ -21,7 +21,7 @@ struct Contact: Identifiable, Hashable {
     let keyVersion: UInt8
 
     /// Encryption profile.
-    let profile: KeyProfile
+    let profile: PGPKeyProfile
 
     /// Primary User ID (e.g., "Bob <bob@example.com>").
     let userId: String?

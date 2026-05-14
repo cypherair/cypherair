@@ -46,7 +46,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
     }
 
     private func generateSigner(
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         name: String,
         email: String
     ) async throws -> PGPKeyIdentity {

@@ -34,8 +34,7 @@ private struct MacPresentationHostModifier: ViewModifier {
                 } : nil
 
                 ImportConfirmView(
-                    keyInfo: request.keyInfo,
-                    detectedProfile: request.profile,
+                    metadata: request.metadata,
                     onImportVerified: {
                         activePresentation = nil
                         request.onImportVerified()

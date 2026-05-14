@@ -11,7 +11,7 @@ final class SelfTestService {
     struct TestResult: Identifiable {
         let id = UUID()
         let name: String
-        let profile: KeyProfile?
+        let profile: PGPKeyProfile?
         let passed: Bool
         let message: String
         let duration: TimeInterval
@@ -54,7 +54,7 @@ final class SelfTestService {
 
         let engine = self.engine
         var results: [TestResult] = []
-        let profiles: [KeyProfile] = [.universal, .advanced]
+        let profiles = PGPKeyProfile.allCases
         let totalTests = profiles.count * 5 + 1 // 5 tests per profile + 1 QR test
         var completedTests = 0
 
@@ -156,7 +156,7 @@ final class SelfTestService {
 
     private func runTest<T>(
         name: String,
-        profile: KeyProfile?,
+        profile: PGPKeyProfile?,
         operation: () async throws -> T
     ) async -> TestOutput<T> {
         let start = Date()
@@ -187,13 +187,13 @@ final class SelfTestService {
     @concurrent
     private static func runKeyGenerationTest(
         engine: PgpEngine,
-        profile: KeyProfile
+        profile: PGPKeyProfile
     ) async throws -> GeneratedKey {
         let generated = try engine.generateKey(
             name: "Self-Test",
             email: "test@cypherair.local",
             expirySeconds: 3600,
-            profile: profile
+            profile: profile.ffiValue
         )
         let info = try engine.parseKeyInfo(keyData: generated.publicKeyData)
         guard info.keyVersion == profile.keyVersion else {
@@ -289,13 +289,13 @@ final class SelfTestService {
     private static func runExportImportTest(
         engine: PgpEngine,
         generated: GeneratedKey,
-        profile: KeyProfile
-    ) async throws -> KeyInfo {
+        profile: PGPKeyProfile
+    ) async throws -> PGPKeyMetadata {
         let passphrase = "self-test-passphrase-2024"
         var exported = try engine.exportSecretKey(
             certData: generated.certData,
             passphrase: passphrase,
-            profile: profile
+            profile: profile.ffiValue
         )
         var imported = try engine.importSecretKey(
             armoredData: exported,
@@ -310,16 +310,16 @@ final class SelfTestService {
         guard originalInfo.fingerprint == importedInfo.fingerprint else {
             throw CypherAirError.corruptData(reason: "Fingerprint mismatch after export/import")
         }
-        return importedInfo
+        return PGPKeyMetadataAdapter.metadata(from: importedInfo)
     }
 
     @concurrent
-    private static func runQrRoundTripTest(engine: PgpEngine) async throws -> KeyInfo {
+    private static func runQrRoundTripTest(engine: PgpEngine) async throws -> PGPKeyMetadata {
         var generated = try engine.generateKey(
             name: "QR-Test",
             email: nil,
             expirySeconds: 3600,
-            profile: .universal
+            profile: PGPKeyProfile.universal.ffiValue
         )
         defer {
             generated.certData.resetBytes(in: 0..<generated.certData.count)
@@ -332,7 +332,7 @@ final class SelfTestService {
         guard originalInfo.fingerprint == decodedInfo.fingerprint else {
             throw CypherAirError.corruptData(reason: "QR round-trip fingerprint mismatch")
         }
-        return decodedInfo
+        return PGPKeyMetadataAdapter.metadata(from: decodedInfo)
     }
 
     private static func makeReport(results: [TestResult], date: Date = Date()) -> SelfTestReport {
