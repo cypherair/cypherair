@@ -5,7 +5,9 @@
 
 ## 1. Layer Overview
 
-CypherAir is a three-layer application: a SwiftUI presentation layer, a Swift services layer, and a Rust cryptographic engine bridged via UniFFI.
+CypherAir is a layered application: a SwiftUI presentation layer, a Swift
+services layer, a Security layer, app-owned Models, and a Rust cryptographic
+engine reached through Swift FFI adapters and generated UniFFI bindings.
 
 ```mermaid
 graph TB
@@ -17,6 +19,7 @@ graph TB
     end
 
     subgraph "FFI Boundary"
+        ADAPT["Swift FFI Adapters<br/>Message · Key Metadata · Certificate Selection"]
         BIND["UniFFI Swift Bindings<br/>pgp_mobile.swift"]
     end
 
@@ -26,7 +29,8 @@ graph TB
 
     UI --> SVC
     SVC --> SEC
-    SVC --> BIND
+    SVC --> ADAPT
+    ADAPT --> BIND
     SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 Hardware"]
     SEC --> |Security.framework| KC["Keychain"]
     BIND --> PGP
@@ -72,20 +76,22 @@ Shared presentation-layer infrastructure used across multiple views.
 
 ### Services Layer (`Sources/Services/`)
 
-Orchestrates user-facing operations by coordinating the Security layer and the Rust PGP engine.
+Orchestrates user-facing operations by coordinating the Security layer, app-owned
+models, and FFI adapters. Message encryption/decryption and password-message
+operations call `PGPMessageOperationAdapter` rather than `PgpEngine` directly.
 
 | Service | Responsibility |
 |---------|---------------|
-| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) |
-| `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
-| `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
+| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter |
+| `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
+| `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
-| `FileProgressReporter` | Bridges Rust streaming progress callbacks to SwiftUI `@Observable` state. Implements UniFFI `ProgressReporter` protocol. Thread-safe via `OSAllocatedUnfairLock`. |
+| `FileProgressReporter` | Observable progress/cancellation state for streaming operations. Message encrypt/decrypt calls use an FFI-owned bridge to connect it to UniFFI progress callbacks; it still directly conforms to generated `ProgressReporter` as a transition for sign/verify streaming until that adapter work lands. Thread-safe via `OSAllocatedUnfairLock`. |
 | `DiskSpaceChecker` | Runtime disk space validation before streaming file encryption. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. The legacy in-memory `encryptFile(...)` helper still retains its fixed 100 MB guard. |
 
 ### Guided Tutorial Architecture (`Sources/App/Onboarding/`)
@@ -112,7 +118,13 @@ Safety is enforced by narrow host boundaries:
 | Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped |
 | Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
 
-Current app-surface workflows call the owning Swift service rather than `PgpEngine` directly. `PasswordMessageService` remains intentionally service-only until product scope adds a dedicated route and plaintext-handling contract.
+Current app-surface workflows call the owning Swift service rather than `PgpEngine`
+directly. Encrypt/decrypt/password-message services also avoid direct engine
+ownership by using `PGPMessageOperationAdapter`, which contains generated
+operation calls, generated-error normalization, progress bridging, and
+decrypt/password result mapping. `PasswordMessageService` remains intentionally
+service-only until product scope adds a dedicated route and plaintext-handling
+contract.
 
 ### Security Layer (`Sources/Security/`)
 
@@ -411,8 +423,8 @@ These pairs must be updated together. A change to one without the other will cau
 
 | Module A | Module B | Coupling Reason |
 |----------|----------|----------------|
-| `pgp-mobile/src/error.rs` | `Sources/Models/CypherAirError.swift` | PgpError enum variants must match 1:1 across FFI |
-| `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/*Service.swift` | Any Rust API change requires Swift call-site updates |
+| `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | PgpError enum variants must match 1:1 across FFI while legacy model mapping remains during the transition |
+| `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/FFI/*Adapter.swift` and remaining direct service callers | Any Rust API change requires Swift adapter or temporary direct call-site updates |
 | `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes 3 Keychain items; unwrapping reads them |
 | `SecureEnclaveManager` | `AuthenticationManager` | Mode switch re-wraps all keys via SE manager |
 | `DecryptionService` | `AuthenticationManager` | Phase 2 auth policy depends on current auth mode |

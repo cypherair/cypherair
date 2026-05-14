@@ -365,8 +365,11 @@ private enum ArchitectureSourceAuditRules {
             (
                 "FFI adapter files intentionally contain generated UniFFI types while exposing app-owned contracts upward.",
                 [
+                    "Sources/Services/FFI/PGPErrorMapper.swift",
                     "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
                     "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
+                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPMessageResultMapper.swift",
                 ]
             ),
             (
@@ -394,15 +397,12 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/ContactService.swift",
                     "Sources/Services/ContactSnapshotMutator.swift",
                     "Sources/Services/ContactsLegacyMigrationSource.swift",
-                    "Sources/Services/DecryptionService.swift",
-                    "Sources/Services/EncryptionService.swift",
                     "Sources/Services/FileProgressReporter.swift",
                     "Sources/Services/KeyManagement/KeyExportService.swift",
                     "Sources/Services/KeyManagement/KeyMutationService.swift",
                     "Sources/Services/KeyManagement/KeyProvisioningService.swift",
                     "Sources/Services/KeyManagement/SelectiveRevocationService.swift",
                     "Sources/Services/KeyManagementService.swift",
-                    "Sources/Services/PasswordMessageService.swift",
                     "Sources/Services/QRService.swift",
                     "Sources/Services/SelfTestService.swift",
                     "Sources/Services/SigningService.swift",
@@ -442,12 +442,23 @@ private enum ArchitectureSourceAuditRules {
         pattern: wordPattern(for: [
             "PGPCertificateSelectionAdapter",
             "PGPKeyMetadataAdapter",
+            "PGPMessageOperationAdapter",
+            "PGPMessageResultMapper",
+            "PGPErrorMapper",
         ]),
         scope: { path in
             path.hasPrefix("Sources/App/") && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: [:]
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Composition roots may construct FFI adapters while wiring the dependency graph.",
+                [
+                    "Sources/App/AppContainer.swift",
+                    "Sources/App/Onboarding/TutorialSandboxContainer.swift",
+                ]
+            ),
+        ])
     )
 
     static let modelsSwiftUIPresentationPolicy = ArchitectureSourceAuditRule(
@@ -501,8 +512,7 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Crypto services still accept legacy verification contexts until Contacts runtime contracts move to summaries.",
                 [
-                    "Sources/Services/DecryptionService.swift",
-                    "Sources/Services/PasswordMessageService.swift",
+                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
                     "Sources/Services/SigningService.swift",
                 ]
             ),
