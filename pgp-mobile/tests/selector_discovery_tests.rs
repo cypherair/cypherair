@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use pgp_mobile::armor;
 use pgp_mobile::error::PgpError;
-use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::keys::{self, KeyProfile, UserIdSelectorInput};
 use sequoia_openpgp as openpgp;
 
 use openpgp::cert::prelude::*;
@@ -586,7 +586,7 @@ fn test_discover_certificate_selectors_multiple_subkeys_preserve_native_order() 
 }
 
 #[test]
-fn test_discover_certificate_selectors_catalog_selectors_drive_existing_revocation_apis() {
+fn test_discover_certificate_selectors_catalog_selectors_drive_revocation_apis() {
     let generated = generate_key(KeyProfile::Universal, "SelectorRevocations");
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("selector discovery should succeed");
@@ -596,11 +596,15 @@ fn test_discover_certificate_selectors_catalog_selectors_drive_existing_revocati
         &discovered.subkeys[0].fingerprint,
     )
     .expect("subkey revocation should accept discovered subkey fingerprint");
-    let user_id_revocation = keys::generate_user_id_revocation(
+    let user_id = &discovered.user_ids[0];
+    let user_id_revocation = keys::generate_user_id_revocation_by_selector(
         &generated.cert_data,
-        &discovered.user_ids[0].user_id_data,
+        &UserIdSelectorInput {
+            user_id_data: user_id.user_id_data.clone(),
+            occurrence_index: user_id.occurrence_index,
+        },
     )
-    .expect("user ID revocation should accept discovered user ID bytes");
+    .expect("user ID revocation should accept discovered User ID selector");
 
     assert!(!subkey_revocation.is_empty());
     assert!(!user_id_revocation.is_empty());

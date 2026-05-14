@@ -3395,8 +3395,8 @@ final class KeyManagementServiceTests: XCTestCase {
     /// This uses a fixture-backed identity path instead of the normal import flow so the
     /// stored metadata preserves the duplicate-occurrence structure exactly as encoded in the
     /// source fixture. The duplicate-occurrence cryptographic semantics themselves remain
-    /// covered at the Rust/FFI layer by `FFIIntegrationTests.test_generateUserIdRevocation_*`
-    /// and by `pgp-mobile/tests/revocation_construction_tests.rs`.
+    /// covered at the Rust/FFI layer by selector-based User ID revocation tests in
+    /// `FFIIntegrationTests` and `pgp-mobile/tests/revocation_construction_tests.rs`.
     func test_exportUserIdRevocationCertificate_duplicateOccurrence_secondIndexRoutesThroughService() async throws {
         let fixture = try FixtureLoader.loadData(
             "selector_duplicate_userid_second_revoked_secret",

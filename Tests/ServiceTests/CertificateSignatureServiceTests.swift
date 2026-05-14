@@ -439,6 +439,45 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
     }
 
+    func test_generateUserIdCertification_outOfRangeSelector_throwsInvalidKeyDataWithoutUnwrap()
+        async throws
+    {
+        let signer = try await generateSigner(
+            profile: .universal,
+            name: "Out Of Range Signer",
+            email: "out-of-range-signer@example.com"
+        )
+        let target = try generatedTarget(
+            profile: .universal,
+            name: "Out Of Range Target",
+            email: "out-of-range-target@example.com"
+        )
+        let selectedUserId = try selectedUserId(for: target.publicKeyData)
+        let outOfRangeSelector = UserIdSelectionOption(
+            occurrenceIndex: selectedUserId.occurrenceIndex + 1,
+            userIdData: selectedUserId.userIdData,
+            displayText: selectedUserId.displayText,
+            isCurrentlyPrimary: selectedUserId.isCurrentlyPrimary,
+            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked
+        )
+        let unwrapCountBefore = stack.mockSE.unwrapCallCount
+
+        await XCTAssertThrowsErrorAsync(
+            try await self.stack.certificateSignatureService.generateUserIdCertification(
+                signerFingerprint: signer.fingerprint,
+                targetCert: target.publicKeyData,
+                selectedUserId: outOfRangeSelector,
+                certificationKind: .positive
+            )
+        ) { error in
+            guard case .invalidKeyData = error as? CypherAirError else {
+                return XCTFail("Expected invalidKeyData, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
     func test_verifyUserIdBindingSignature_mismatchedSelector_throwsInvalidKeyData() async throws {
         let signer = try await generateSigner(
             profile: .universal,

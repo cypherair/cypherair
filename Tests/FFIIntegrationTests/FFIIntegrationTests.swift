@@ -55,6 +55,15 @@ final class FFIIntegrationTests: XCTestCase {
         )
     }
 
+    private func userIdSelector(for certData: Data, occurrenceIndex: Int = 0) throws -> UserIdSelectorInput {
+        let discovered = try engine.discoverCertificateSelectors(certData: certData)
+        let userId = discovered.userIds[occurrenceIndex]
+        return selectorInput(
+            userIdData: userId.userIdData,
+            occurrenceIndex: userId.occurrenceIndex
+        )
+    }
+
     private func findTargetedPasswordTamper(
         ciphertext: Data,
         password: String,
@@ -633,9 +642,12 @@ final class FFIIntegrationTests: XCTestCase {
                 secretCert: generated.certData,
                 subkeyFingerprint: discovered.subkeys[0].fingerprint
             )
-            let userIdRevocation = try engine.generateUserIdRevocation(
+            let userIdRevocation = try engine.generateUserIdRevocationBySelector(
                 secretCert: generated.certData,
-                userIdData: discovered.userIds[0].userIdData
+                userIdSelector: selectorInput(
+                    userIdData: discovered.userIds[0].userIdData,
+                    occurrenceIndex: discovered.userIds[0].occurrenceIndex
+                )
             )
 
             XCTAssertFalse(subkeyRevocation.isEmpty)
@@ -1120,13 +1132,12 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertFalse(revocation.isEmpty)
     }
 
-    func test_generateUserIdRevocation_fixtureBinaryInput_returnsSignatureBytes() throws {
+    func test_generateUserIdRevocationBySelector_fixtureBinaryInput_returnsSignatureBytes() throws {
         let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
-        let userIdData = Data("GnuPG Test User <gnupg-test@example.com>".utf8)
 
-        let revocation = try engine.generateUserIdRevocation(
+        let revocation = try engine.generateUserIdRevocationBySelector(
             secretCert: secretCert,
-            userIdData: userIdData
+            userIdSelector: try userIdSelector(for: secretCert)
         )
 
         XCTAssertFalse(revocation.isEmpty)
@@ -1159,13 +1170,14 @@ final class FFIIntegrationTests: XCTestCase {
         }
     }
 
-    func test_generateUserIdRevocation_publicOnlyInput_throwsInvalidKeyData() throws {
+    func test_generateUserIdRevocationBySelector_publicOnlyInput_throwsInvalidKeyData() throws {
         let publicCert = try loadArmoredFixtureAsBinary("gpg_pubkey")
+        let selector = try userIdSelector(for: publicCert)
 
         XCTAssertThrowsError(
-            try engine.generateUserIdRevocation(
+            try engine.generateUserIdRevocationBySelector(
                 secretCert: publicCert,
-                userIdData: Data("GnuPG Test User <gnupg-test@example.com>".utf8)
+                userIdSelector: selector
             )
         ) { error in
             guard case .InvalidKeyData = error as? PgpError else {
@@ -1181,21 +1193,6 @@ final class FFIIntegrationTests: XCTestCase {
             try engine.generateSubkeyRevocation(
                 secretCert: secretCert,
                 subkeyFingerprint: "0000000000000000000000000000000000000000"
-            )
-        ) { error in
-            guard case .InvalidKeyData = error as? PgpError else {
-                return XCTFail("Expected InvalidKeyData, got \(error)")
-            }
-        }
-    }
-
-    func test_generateUserIdRevocation_selectorMiss_throwsInvalidKeyData() throws {
-        let secretCert = try loadArmoredFixtureAsBinary("gpg_secretkey")
-
-        XCTAssertThrowsError(
-            try engine.generateUserIdRevocation(
-                secretCert: secretCert,
-                userIdData: Data("missing@example.com".utf8)
             )
         ) { error in
             guard case .InvalidKeyData = error as? PgpError else {
@@ -1419,18 +1416,18 @@ final class FFIIntegrationTests: XCTestCase {
             expirySeconds: nil,
             profile: .advanced
         )
-        let userIdData = Data("FFI Persona Target <ffi-persona-target@example.com>".utf8)
+        let selector = try userIdSelector(for: target.publicKeyData)
 
-        let signature = try engine.generateUserIdCertification(
+        let signature = try engine.generateUserIdCertificationBySelector(
             signerSecretCert: signer.certData,
             targetCert: target.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: selector,
             certificationKind: .persona
         )
-        let result = try engine.verifyUserIdBindingSignature(
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
             signature: signature,
             targetCert: target.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: selector,
             candidateSigners: [signer.publicKeyData]
         )
 
@@ -1461,18 +1458,20 @@ final class FFIIntegrationTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        let userIdData = Data("Shared Identity <shared-identity@example.com>".utf8)
+        let targetSelector = try userIdSelector(for: target.publicKeyData)
+        let wrongTargetSelector = try userIdSelector(for: wrongTarget.publicKeyData)
+        XCTAssertEqual(targetSelector.userIdData, wrongTargetSelector.userIdData)
 
-        let signature = try engine.generateUserIdCertification(
+        let signature = try engine.generateUserIdCertificationBySelector(
             signerSecretCert: signer.certData,
             targetCert: target.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: targetSelector,
             certificationKind: .positive
         )
-        let result = try engine.verifyUserIdBindingSignature(
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
             signature: signature,
             targetCert: wrongTarget.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: wrongTargetSelector,
             candidateSigners: [signer.publicKeyData]
         )
 
@@ -1491,12 +1490,12 @@ final class FFIIntegrationTests: XCTestCase {
             ext: "txt"
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         let signerInfo = try engine.parseKeyInfo(keyData: signer)
-        let userIdData = Data("FFI Fallback Target <ffi-fallback-target@example.com>".utf8)
+        let selector = try userIdSelector(for: target)
 
-        let result = try engine.verifyUserIdBindingSignature(
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
             signature: signature,
             targetCert: target,
-            userIdData: userIdData,
+            userIdSelector: selector,
             candidateSigners: [signer]
         )
 
@@ -1519,18 +1518,18 @@ final class FFIIntegrationTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        let userIdData = Data("FFI Missing Target <ffi-missing-target@example.com>".utf8)
+        let selector = try userIdSelector(for: target.publicKeyData)
 
-        let signature = try engine.generateUserIdCertification(
+        let signature = try engine.generateUserIdCertificationBySelector(
             signerSecretCert: signer.certData,
             targetCert: target.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: selector,
             certificationKind: .positive
         )
-        let result = try engine.verifyUserIdBindingSignature(
+        let result = try engine.verifyUserIdBindingSignatureBySelector(
             signature: signature,
             targetCert: target.publicKeyData,
-            userIdData: userIdData,
+            userIdSelector: selector,
             candidateSigners: []
         )
 
@@ -1624,10 +1623,14 @@ final class FFIIntegrationTests: XCTestCase {
             profile: .universal
         )
         let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
-        let signature = try engine.generateUserIdCertification(
+        let selector = selectorInput(
+            userIdData: discovered.userIds[0].userIdData,
+            occurrenceIndex: discovered.userIds[0].occurrenceIndex
+        )
+        let signature = try engine.generateUserIdCertificationBySelector(
             signerSecretCert: signer.certData,
             targetCert: target.publicKeyData,
-            userIdData: discovered.userIds[0].userIdData,
+            userIdSelector: selector,
             certificationKind: .positive
         )
 
@@ -1664,10 +1667,14 @@ final class FFIIntegrationTests: XCTestCase {
             profile: .universal
         )
         let discovered = try engine.discoverCertificateSelectors(certData: target.publicKeyData)
-        let signature = try engine.generateUserIdCertification(
+        let selector = selectorInput(
+            userIdData: discovered.userIds[0].userIdData,
+            occurrenceIndex: discovered.userIds[0].occurrenceIndex
+        )
+        let signature = try engine.generateUserIdCertificationBySelector(
             signerSecretCert: signer.certData,
             targetCert: target.publicKeyData,
-            userIdData: discovered.userIds[0].userIdData,
+            userIdSelector: selector,
             certificationKind: .positive
         )
         let mismatchedData = discovered.userIds[0].userIdData + Data("-mismatch".utf8)

@@ -384,18 +384,19 @@ fn test_verify_user_id_binding_signature_signer_missing_empty_candidates() {
     let signer = generated_key(KeyProfile::Universal, "MissingSigner");
     let target = generated_key(KeyProfile::Universal, "MissingTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
-    let signature = cert_signature::generate_user_id_certification(
+    let selector = user_id_selector(&user_id_data, 0);
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer.cert_data,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     )
     .expect("certification generation should succeed");
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         &[],
     )
     .expect("signer-missing User ID verification should return a result");
@@ -426,18 +427,21 @@ fn test_verify_user_id_binding_signature_invalid_matching_user_id_returns_invali
         first_user_id_bytes(&wrong_target.public_key_data)
     );
 
-    let signature = cert_signature::generate_user_id_certification(
+    let target_selector = user_id_selector(&user_id_data, 0);
+    let wrong_target_selector =
+        user_id_selector(&first_user_id_bytes(&wrong_target.public_key_data), 0);
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer.cert_data,
         &target.public_key_data,
-        &user_id_data,
+        &target_selector,
         CertificationKind::Positive,
     )
     .expect("certification generation should succeed");
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature,
         &wrong_target.public_key_data,
-        &user_id_data,
+        &wrong_target_selector,
         &[signer.public_key_data.clone()],
     )
     .expect("invalid User ID verification should still return a result");
@@ -446,44 +450,6 @@ fn test_verify_user_id_binding_signature_invalid_matching_user_id_returns_invali
     assert_eq!(result.certification_kind, Some(CertificationKind::Positive));
     assert_eq!(result.signer_primary_fingerprint, None);
     assert_eq!(result.signing_key_fingerprint, None);
-}
-
-#[test]
-fn test_generate_user_id_certification_legacy_duplicate_userid_remains_valid_for_duplicate_occurrences()
-{
-    let signer = generated_key(KeyProfile::Universal, "LegacyDuplicateSigner");
-    let target = generated_key(KeyProfile::Universal, "LegacyDuplicateTarget");
-    let duplicated = duplicate_userid(
-        &target.cert_data,
-        "LegacyDuplicateTarget <legacyduplicatetarget@example.com>",
-    );
-    let user_id_data = first_user_id_bytes(&duplicated);
-
-    let signature = cert_signature::generate_user_id_certification(
-        &signer.cert_data,
-        &duplicated,
-        &user_id_data,
-        CertificationKind::Positive,
-    )
-    .expect("legacy certification generation should succeed");
-
-    let first_result = cert_signature::verify_user_id_binding_signature_by_selector(
-        &signature,
-        &duplicated,
-        &user_id_selector(&user_id_data, 0),
-        &[signer.public_key_data.clone()],
-    )
-    .expect("first occurrence verification should succeed");
-    let second_result = cert_signature::verify_user_id_binding_signature_by_selector(
-        &signature,
-        &duplicated,
-        &user_id_selector(&user_id_data, 1),
-        &[signer.public_key_data.clone()],
-    )
-    .expect("second occurrence verification should return a result");
-
-    assert_eq!(first_result.status, CertificateSignatureStatus::Valid);
-    assert_eq!(second_result.status, CertificateSignatureStatus::Valid);
 }
 
 #[test]
@@ -498,11 +464,12 @@ fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profile
             let signer = generated_key(profile, "KindSigner");
             let target = generated_key(profile, "KindTarget");
             let user_id_data = first_user_id_bytes(&target.public_key_data);
+            let selector = user_id_selector(&user_id_data, 0);
 
-            let signature = cert_signature::generate_user_id_certification(
+            let signature = cert_signature::generate_user_id_certification_by_selector(
                 &signer.cert_data,
                 &target.public_key_data,
-                &user_id_data,
+                &selector,
                 kind,
             )
             .expect("certification generation should succeed");
@@ -514,10 +481,10 @@ fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profile
             };
             assert_eq!(parsed.typ(), kind.signature_type());
 
-            let result = cert_signature::verify_user_id_binding_signature(
+            let result = cert_signature::verify_user_id_binding_signature_by_selector(
                 &signature,
                 &target.public_key_data,
-                &user_id_data,
+                &selector,
                 &[signer.public_key_data.clone()],
             )
             .expect("User ID verification should succeed");
@@ -568,7 +535,10 @@ fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_
     .expect("non-selected occurrence verification should return a result");
 
     assert_eq!(second_result.status, CertificateSignatureStatus::Valid);
-    assert_eq!(second_result.certification_kind, Some(CertificationKind::Persona));
+    assert_eq!(
+        second_result.certification_kind,
+        Some(CertificationKind::Persona)
+    );
     assert_eq!(first_result.status, CertificateSignatureStatus::Valid);
 }
 
@@ -578,12 +548,13 @@ fn test_verify_user_id_binding_signature_missing_issuer_fallback_succeeds_with_s
     let target = generated_key(KeyProfile::Universal, "FallbackTarget");
     let target_cert = parse_cert(&target.public_key_data);
     let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
     let signature = positive_certification_without_issuer(&signer_cert, &target_cert);
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         &[signer_secret_bytes],
     )
     .expect("fallback verification should succeed");
@@ -603,22 +574,23 @@ fn test_verify_user_id_binding_signature_issuer_guided_rejects_signing_only_subk
     let target = generated_key(KeyProfile::Universal, "IssuerGuidedUserIdTarget");
     let target_cert = parse_cert(&target.public_key_data);
     let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
     let signature_with_issuer =
         positive_certification_from_signing_only_subkey(&signer_cert, &target_cert, false);
     let signature_without_issuer =
         positive_certification_from_signing_only_subkey(&signer_cert, &target_cert, true);
 
-    let with_issuer_result = cert_signature::verify_user_id_binding_signature(
+    let with_issuer_result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature_with_issuer,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         &[signer_public_bytes.clone()],
     )
     .expect("issuer-guided verification should return a result");
-    let without_issuer_result = cert_signature::verify_user_id_binding_signature(
+    let without_issuer_result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature_without_issuer,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         &[signer_public_bytes],
     )
     .expect("fallback verification should return a result");
@@ -695,6 +667,7 @@ fn test_generate_user_id_certification_prefers_primary_over_certification_subkey
         .expect("signer should generate");
     let target = generated_key(KeyProfile::Universal, "PrimaryTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
 
     let mut signer_secret_bytes = Vec::new();
     signer_cert
@@ -706,18 +679,18 @@ fn test_generate_user_id_certification_prefers_primary_over_certification_subkey
         .serialize(&mut signer_public_bytes)
         .expect("public cert should serialize");
 
-    let signature = cert_signature::generate_user_id_certification(
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer_secret_bytes,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     )
     .expect("primary signer should generate certification");
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         &[signer_public_bytes],
     )
     .expect("verification should succeed");
@@ -735,11 +708,12 @@ fn test_generate_user_id_certification_public_only_input_rejected() {
     let signer = generated_key(KeyProfile::Universal, "PublicOnlySigner");
     let target = generated_key(KeyProfile::Universal, "PublicOnlyTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
 
-    let result = cert_signature::generate_user_id_certification(
+    let result = cert_signature::generate_user_id_certification_by_selector(
         &signer.public_key_data,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     );
 
@@ -764,15 +738,32 @@ fn test_generate_user_id_certification_by_selector_mismatch_returns_invalid_key_
 }
 
 #[test]
+fn test_generate_user_id_certification_by_selector_out_of_range_returns_invalid_key_data() {
+    let signer = generated_key(KeyProfile::Universal, "SelectorRangeGenerateSigner");
+    let target = generated_key(KeyProfile::Universal, "SelectorRangeGenerateTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+
+    let result = cert_signature::generate_user_id_certification_by_selector(
+        &signer.cert_data,
+        &target.public_key_data,
+        &user_id_selector(&user_id_data, 99),
+        CertificationKind::Positive,
+    );
+
+    assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
+}
+
+#[test]
 fn test_generate_user_id_certification_without_usable_certifier_returns_signing_failed() {
     let signer = unusable_certification_signer();
     let target = generated_key(KeyProfile::Universal, "UnusableTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
 
-    let result = cert_signature::generate_user_id_certification(
+    let result = cert_signature::generate_user_id_certification_by_selector(
         &signer,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     );
 
@@ -784,10 +775,11 @@ fn test_verify_direct_key_signature_wrong_signature_type_returns_err() {
     let signer = generated_key(KeyProfile::Universal, "WrongTypeSigner");
     let target = generated_key(KeyProfile::Universal, "WrongTypeTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
-    let signature = cert_signature::generate_user_id_certification(
+    let selector = user_id_selector(&user_id_data, 0);
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer.cert_data,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     )
     .expect("certification generation should succeed");
@@ -806,11 +798,12 @@ fn test_verify_user_id_binding_signature_wrong_signature_type_returns_err() {
     let generated = generated_key(KeyProfile::Universal, "WrongTypeDirect");
     let signature = direct_key_signature_bytes(&generated.public_key_data);
     let user_id_data = first_user_id_bytes(&generated.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         &signature,
         &generated.public_key_data,
-        &user_id_data,
+        &selector,
         &[generated.public_key_data.clone()],
     );
 
@@ -821,11 +814,12 @@ fn test_verify_user_id_binding_signature_wrong_signature_type_returns_err() {
 fn test_verify_user_id_binding_signature_malformed_signature_returns_err() {
     let generated = generated_key(KeyProfile::Universal, "MalformedSig");
     let user_id_data = first_user_id_bytes(&generated.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
 
-    let result = cert_signature::verify_user_id_binding_signature(
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
         b"not a signature packet",
         &generated.public_key_data,
-        &user_id_data,
+        &selector,
         &[generated.public_key_data.clone()],
     );
 
@@ -837,10 +831,11 @@ fn test_verify_user_id_binding_signature_by_selector_out_of_range_returns_invali
     let signer = generated_key(KeyProfile::Universal, "SelectorRangeSigner");
     let target = generated_key(KeyProfile::Universal, "SelectorRangeTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
-    let signature = cert_signature::generate_user_id_certification(
+    let selector = user_id_selector(&user_id_data, 0);
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer.cert_data,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     )
     .expect("certification generation should succeed");
@@ -861,10 +856,11 @@ fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_ke
     let target = generated_key(KeyProfile::Universal, "SelectorVerifyMismatchTarget");
     let user_id_data = first_user_id_bytes(&target.public_key_data);
     let mismatched = [user_id_data.clone(), b"-mismatch".to_vec()].concat();
-    let signature = cert_signature::generate_user_id_certification(
+    let selector = user_id_selector(&user_id_data, 0);
+    let signature = cert_signature::generate_user_id_certification_by_selector(
         &signer.cert_data,
         &target.public_key_data,
-        &user_id_data,
+        &selector,
         CertificationKind::Positive,
     )
     .expect("certification generation should succeed");
