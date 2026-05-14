@@ -342,12 +342,12 @@ Recommended PRs:
   functions and `find_user_id_first_match`. Regenerate bindings through the
   normal workflow. Do not hand-edit generated Swift.
 
-Status: PR 4A/4B/4C/4D completed in one Phase 4A-D cleanup PR. The selector
-contract was confirmed at the Swift service layer, Swift FFI and Rust tests no
-longer directly call raw first-match User ID APIs, and first-match-only
-duplicate compatibility tests were deleted. PR 4E remains pending and is the
-next phase for Rust/UniFFI export/helper deletion plus generated binding
-refresh.
+Status: completed across the Phase 4A-D selector cleanup PR and the Phase 4E
+raw export cleanup PR. The selector contract was confirmed at the Swift service
+layer, Swift FFI and Rust tests no longer directly call raw first-match User ID
+APIs, first-match-only duplicate compatibility tests were deleted, and PR 4E
+removed the raw Rust/UniFFI exports and internal raw helpers. Generated Swift
+bindings no longer expose the raw first-match engine methods.
 
 Entry conditions:
 
@@ -361,8 +361,9 @@ Exit conditions:
 
 - Phase 4A-D exit: Swift and Rust tests no longer rely on raw first-match User ID
   APIs; selector-backed Swift service APIs remain available and covered.
-- PR 4E exit: raw first-match User ID exports and internal raw helpers are gone,
-  generated bindings match Rust exports, and no generated Swift is hand-edited.
+- PR 4E exit: completed. Raw first-match User ID exports and internal raw
+  helpers are gone, generated bindings match Rust exports, and no generated
+  Swift was hand-edited.
 
 Validation:
 
