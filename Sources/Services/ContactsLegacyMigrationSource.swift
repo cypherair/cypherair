@@ -60,20 +60,21 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
         from validation: PublicCertificateValidationResult,
         verificationStates: [String: ContactVerificationState]
     ) -> Contact {
-        let resolvedVerificationState = verificationStates[validation.keyInfo.fingerprint] ?? .verified
+        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let resolvedVerificationState = verificationStates[metadata.fingerprint] ?? .verified
 
         return Contact(
-            fingerprint: validation.keyInfo.fingerprint,
-            keyVersion: validation.keyInfo.keyVersion,
-            profile: validation.profile,
-            userId: validation.keyInfo.userId,
-            isRevoked: validation.keyInfo.isRevoked,
-            isExpired: validation.keyInfo.isExpired,
-            hasEncryptionSubkey: validation.keyInfo.hasEncryptionSubkey,
+            fingerprint: metadata.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             verificationState: resolvedVerificationState,
             publicKeyData: validation.publicCertData,
-            primaryAlgo: validation.keyInfo.primaryAlgo,
-            subkeyAlgo: validation.keyInfo.subkeyAlgo
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo
         )
     }
 }

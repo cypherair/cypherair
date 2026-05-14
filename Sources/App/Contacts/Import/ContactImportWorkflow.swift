@@ -30,8 +30,7 @@ struct ContactImportWorkflow {
     ) -> ImportConfirmationRequest {
         ImportConfirmationRequest(
             keyData: inspection.keyData,
-            keyInfo: inspection.keyInfo,
-            profile: inspection.profile,
+            metadata: inspection.metadata,
             allowsUnverifiedImport: allowsUnverifiedImport,
             onImportVerified: {
                 importContact(

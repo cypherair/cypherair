@@ -4,8 +4,7 @@ import SwiftUI
 struct ImportConfirmationRequest: Identifiable {
     let id = UUID()
     let keyData: Data
-    let keyInfo: KeyInfo
-    let profile: KeyProfile
+    let metadata: PGPKeyMetadata
     let allowsUnverifiedImport: Bool
     let onImportVerified: @MainActor () -> Void
     let onImportUnverified: @MainActor () -> Void
@@ -61,8 +60,7 @@ struct ImportConfirmationSheetHost<Content: View>: View {
             .environment(\.importConfirmationCoordinator, coordinator)
             .sheet(item: $bindableCoordinator.request) { request in
                 ImportConfirmView(
-                    keyInfo: request.keyInfo,
-                    detectedProfile: request.profile,
+                    metadata: request.metadata,
                     onImportVerified: {
                         coordinator.confirmVerified()
                     },

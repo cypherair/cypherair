@@ -1,8 +1,14 @@
 import Foundation
 
-/// App-level extensions for the UniFFI-generated `KeyProfile` enum.
-/// The base `KeyProfile` enum is defined in `pgp_mobile.swift` (auto-generated).
-extension KeyProfile {
+/// App-owned encryption profile vocabulary.
+///
+/// Raw values intentionally match the historical generated `KeyProfile`
+/// Codable representation so persisted key metadata and Contacts payloads
+/// remain schema-compatible.
+enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
+    case universal
+    case advanced
+
     /// User-facing display name for the profile.
     var displayName: String {
         switch self {
@@ -17,11 +23,15 @@ extension KeyProfile {
     var shortDescription: String {
         switch self {
         case .universal:
-            String(localized: "profile.universal.description",
-                   defaultValue: "Works with all PGP tools including GnuPG.")
+            String(
+                localized: "profile.universal.description",
+                defaultValue: "Works with all PGP tools including GnuPG."
+            )
         case .advanced:
-            String(localized: "profile.advanced.description",
-                   defaultValue: "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG.")
+            String(
+                localized: "profile.advanced.description",
+                defaultValue: "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG."
+            )
         }
     }
 

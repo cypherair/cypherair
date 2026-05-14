@@ -96,13 +96,17 @@ final class QRService {
 
     /// Parse key metadata for display in the import confirmation view.
     /// This is a read-only inspection — no keys are stored.
-    func inspectKeyInfo(keyData: Data) throws -> KeyInfo {
-        try inspectImportablePublicCertificate(keyData: keyData).keyInfo
+    func inspectKeyMetadata(keyData: Data) throws -> PGPKeyMetadata {
+        try PGPKeyMetadataAdapter.metadata(
+            from: inspectImportablePublicCertificate(keyData: keyData)
+        )
     }
 
     /// Detect the encryption profile of a public key.
-    func detectKeyProfile(keyData: Data) throws -> KeyProfile {
-        try inspectImportablePublicCertificate(keyData: keyData).profile
+    func detectKeyProfile(keyData: Data) throws -> PGPKeyProfile {
+        try PGPKeyMetadataAdapter.metadata(
+            from: inspectImportablePublicCertificate(keyData: keyData)
+        ).profile
     }
 
     // MARK: - QR Decoding from Image

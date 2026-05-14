@@ -384,8 +384,7 @@ struct TutorialView: View {
         case .importConfirmation(let request):
             TutorialModalGuidanceHost(guidance: modalGuidance(for: modal)) {
                 ImportConfirmView(
-                    keyInfo: request.keyInfo,
-                    detectedProfile: request.profile,
+                    metadata: request.metadata,
                     onImportVerified: {
                         let action = request.onImportVerified
                         tutorialStore.dismissModal()

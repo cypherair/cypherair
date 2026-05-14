@@ -1125,22 +1125,23 @@ final class ContactService: @unchecked Sendable {
     ) throws -> Contact {
         let keyInfo = try engine.parseKeyInfo(keyData: binaryData)
         let profile = try engine.detectProfile(certData: binaryData)
+        let metadata = PGPKeyMetadataAdapter.metadata(from: keyInfo, profile: profile)
         let resolvedVerificationState = verificationState
-            ?? verificationStates[keyInfo.fingerprint]
+            ?? verificationStates[metadata.fingerprint]
             ?? .verified
 
         return Contact(
-            fingerprint: keyInfo.fingerprint,
-            keyVersion: keyInfo.keyVersion,
-            profile: profile,
-            userId: keyInfo.userId,
-            isRevoked: keyInfo.isRevoked,
-            isExpired: keyInfo.isExpired,
-            hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
+            fingerprint: metadata.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             verificationState: resolvedVerificationState,
             publicKeyData: binaryData,
-            primaryAlgo: keyInfo.primaryAlgo,
-            subkeyAlgo: keyInfo.subkeyAlgo
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo
         )
     }
 
@@ -1148,22 +1149,23 @@ final class ContactService: @unchecked Sendable {
         from validation: PublicCertificateValidationResult,
         verificationState: ContactVerificationState? = nil
     ) -> Contact {
+        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
         let resolvedVerificationState = verificationState
-            ?? verificationStates[validation.keyInfo.fingerprint]
+            ?? verificationStates[metadata.fingerprint]
             ?? .verified
 
         return Contact(
-            fingerprint: validation.keyInfo.fingerprint,
-            keyVersion: validation.keyInfo.keyVersion,
-            profile: validation.profile,
-            userId: validation.keyInfo.userId,
-            isRevoked: validation.keyInfo.isRevoked,
-            isExpired: validation.keyInfo.isExpired,
-            hasEncryptionSubkey: validation.keyInfo.hasEncryptionSubkey,
+            fingerprint: metadata.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             verificationState: resolvedVerificationState,
             publicKeyData: validation.publicCertData,
-            primaryAlgo: validation.keyInfo.primaryAlgo,
-            subkeyAlgo: validation.keyInfo.subkeyAlgo
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo
         )
     }
 

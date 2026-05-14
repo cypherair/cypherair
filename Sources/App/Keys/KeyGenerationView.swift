@@ -11,7 +11,7 @@ struct KeyGenerationView: View {
 
         var prefilledName: String?
         var prefilledEmail: String?
-        var lockedProfile: KeyProfile?
+        var lockedProfile: PGPKeyProfile?
         var lockedExpiryMonths: Int?
         var postGenerationBehavior: PostGenerationBehavior = .showPrompt
         var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?
@@ -35,7 +35,7 @@ struct KeyGenerationView: View {
     @FocusState private var focusedField: Field?
     @State private var name = ""
     @State private var email = ""
-    @State private var profile: KeyProfile = .universal
+    @State private var profile: PGPKeyProfile = .universal
     @State private var expiryMonths = 24
     @State private var isGenerating = false
     @State private var error: CypherAirError?
@@ -57,8 +57,8 @@ struct KeyGenerationView: View {
                     String(localized: "keygen.profile", defaultValue: "Profile"),
                     selection: $profile
                 ) {
-                    Text(KeyProfile.universal.displayName).tag(KeyProfile.universal)
-                    Text(KeyProfile.advanced.displayName).tag(KeyProfile.advanced)
+                    Text(PGPKeyProfile.universal.displayName).tag(PGPKeyProfile.universal)
+                    Text(PGPKeyProfile.advanced.displayName).tag(PGPKeyProfile.advanced)
                 }
                 .pickerStyle(.segmented)
                 .disabled(configuration.lockedProfile != nil)

@@ -81,7 +81,7 @@ final class SelectiveRevocationService {
             throw CypherAirError.noMatchingKey
         }
 
-        let validatedSelectorInput = try validatedUserIdSelectorInput(
+        let validatedUserIdSelection = try validatedUserIdSelection(
             certData: identity.publicKeyData,
             expectedFingerprint: identity.fingerprint,
             userIdSelection: userIdSelection
@@ -98,7 +98,7 @@ final class SelectiveRevocationService {
         let binaryRevocation = try await Self.generateUserIdRevocationOffMainActor(
             engine: engine,
             certData: secretKey,
-            userIdSelector: validatedSelectorInput
+            userIdSelection: validatedUserIdSelection
         )
 
         return try await Self.armorRevocationOffMainActor(
@@ -113,18 +113,11 @@ final class SelectiveRevocationService {
         certData: Data,
         expectedFingerprint: String
     ) throws -> CertificateSelectionCatalog {
-        let discovery = try CertificateSelectionCatalogDiscovery.discover(
+        try PGPCertificateSelectionAdapter.validatedCatalog(
             engine: engine,
-            certData: certData
+            certData: certData,
+            expectedFingerprint: expectedFingerprint
         )
-
-        guard discovery.raw.certificateFingerprint == expectedFingerprint else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Stored key metadata fingerprint does not match certificate data"
-            )
-        }
-
-        return discovery.catalog
     }
 
     private func validatedSubkeyFingerprint(
@@ -146,26 +139,20 @@ final class SelectiveRevocationService {
         return subkeySelection.fingerprint
     }
 
-    private func validatedUserIdSelectorInput(
+    private func validatedUserIdSelection(
         certData: Data,
         expectedFingerprint: String,
         userIdSelection: UserIdSelectionOption
-    ) throws -> UserIdSelectorInput {
+    ) throws -> UserIdSelectionOption {
         let catalog = try validatedCatalog(
             certData: certData,
             expectedFingerprint: expectedFingerprint
         )
 
-        guard catalog.userIds.contains(where: {
-            $0.occurrenceIndex == userIdSelection.occurrenceIndex
-                && $0.userIdData == userIdSelection.userIdData
-        }) else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Selected User ID does not match the target certificate."
-            )
-        }
-
-        return userIdSelection.selectorInput
+        return try PGPCertificateSelectionAdapter.validateUserIdSelection(
+            userIdSelection,
+            in: catalog
+        )
     }
 
     // MARK: - Off-Main-Actor Engine Helpers
@@ -190,12 +177,13 @@ final class SelectiveRevocationService {
     private static func generateUserIdRevocationOffMainActor(
         engine: PgpEngine,
         certData: Data,
-        userIdSelector: UserIdSelectorInput
+        userIdSelection: UserIdSelectionOption
     ) async throws -> Data {
         do {
-            return try engine.generateUserIdRevocationBySelector(
+            return try await PGPCertificateSelectionAdapter.generateUserIdRevocation(
+                engine: engine,
                 secretCert: certData,
-                userIdSelector: userIdSelector
+                selectedUserId: userIdSelection
             )
         } catch {
             throw CypherAirError.from(error) { .revocationError(reason: $0) }
