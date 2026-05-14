@@ -341,7 +341,7 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 
 Full details in [TDD](TDD.md). Key decisions:
 
-- **OpenPGP:** Sequoia PGP 2.2.0 (Rust) + crypto-openssl vendored.
+- **OpenPGP:** Sequoia PGP 2.3.0 (Rust) + crypto-openssl vendored.
 - **Profiles:** Profile A = `CipherSuite::Cv25519` + `Profile::RFC4880`. Profile B = `CipherSuite::Cv448` + `Profile::RFC9580`.
 - **FFI:** Mozilla UniFFI. The `pgp-mobile` wrapper crate generates Swift bindings and packaged outputs; the current Xcode project links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Key storage:** Keychain + SE P-256 wrapping (CryptoKit ECDH + AES-GCM). Two access control configurations for Standard/High Security modes.

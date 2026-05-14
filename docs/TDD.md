@@ -8,13 +8,13 @@
 
 ### 1.1 Selection
 
-sequoia-openpgp 2.2.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
+sequoia-openpgp 2.3.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
 
 Current stable app-build release ordering and the shared source/compliance asset contract are documented in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md) and [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
 
 | Library | Lang | RFC 9580 | Argon2id | iOS | Decision |
 |---------|------|----------|----------|-----|----------|
-| Sequoia 2.2.0 | Rust | Full | Native | Excellent | **SELECTED** |
+| Sequoia 2.3.0 | Rust | Full | Native | Excellent | **SELECTED** |
 | OpenPGP.js | JS | Partial | Yes | Uncertain | Rejected |
 | PGPainless | Java/Kotlin | Partial | Bouncy Castle | KMP bridge | Rejected |
 | rPGP | Rust | No | No | Excellent | Rejected |
@@ -23,7 +23,7 @@ Current stable app-build release ordering and the shared source/compliance asset
 ### 1.2 Backend: crypto-openssl (Vendored)
 
 ```toml
-sequoia-openpgp = { version = "2.2", default-features = false, features = [
+sequoia-openpgp = { version = "2.3", default-features = false, features = [
     "crypto-openssl", "compression-deflate"
     # compression-deflate: enabled for READING incoming compressed messages only.
     # Outgoing messages MUST NOT use compression. Bzip2 excluded (extra C dependency).
@@ -81,7 +81,7 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
     .generate()?;
 ```
 
-**Profile A `set_features` rationale:** Sequoia 2.2.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
+**Profile A `set_features` rationale:** Sequoia 2.3.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
 
 ### 1.4 Encryption Format Auto-Selection
 
