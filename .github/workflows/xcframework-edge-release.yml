@@ -50,25 +50,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Select Xcode 26.5
-        run: |
-          set -euo pipefail
-
-          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
-            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
-          elif [ -d "/Applications/Xcode_26.5.app/Contents/Developer" ]; then
-            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.5.app/Contents/Developer"
-          else
-            echo "::error::Xcode 26.5 was not found on this runner."
-            exit 1
-          fi
-
-          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
-          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
-
-          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
-          xcode-select -p
-          xcodebuild -version
+      - name: Check Xcode 26.5 platform probe readiness
+        id: platform_preflight
+        run: bash scripts/ci_xcode_platform_preflight.sh preflight
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
@@ -195,6 +179,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./build-xcframework.sh --release
       - name: Probe iOS build
+        if: steps.platform_preflight.outputs.ready == 'true'
         run: |
           xcodebuild build \
             -scheme CypherAir \
@@ -202,13 +187,21 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO
       - name: Probe visionOS build
+        if: steps.platform_preflight.outputs.ready == 'true'
         run: |
           xcodebuild build \
             -scheme CypherAir \
             -project CypherAir.xcodeproj \
             -destination 'generic/platform=visionOS' \
             CODE_SIGNING_ALLOWED=NO
+      - name: Skip Apple platform probes
+        if: steps.platform_preflight.outputs.ready != 'true'
+        run: |
+          echo "::warning::Apple platform probes skipped: ${{ steps.platform_preflight.outputs.skip_reason }}"
       - name: Package release assets
+        env:
+          APPLE_PLATFORM_PROBES_READY: ${{ steps.platform_preflight.outputs.ready }}
+          APPLE_PLATFORM_PROBES_SKIP_REASON: ${{ steps.platform_preflight.outputs.skip_reason }}
         run: |
           set -euo pipefail
 
@@ -220,6 +213,30 @@ jobs:
 
           ditto -c -k --sequesterRsrc --keepParent PgpMobile.xcframework "$XCFRAMEWORK_ZIP"
           shasum -a 256 "$XCFRAMEWORK_ZIP" > "$XCFRAMEWORK_CHECKSUM"
+
+          if [ "$APPLE_PLATFORM_PROBES_READY" = "true" ]; then
+            APPLE_PLATFORM_PROBES_STATUS="passed"
+            APPLE_PLATFORM_PROBES_SUMMARY="Apple app build probes passed for generic iOS and visionOS."
+          else
+            APPLE_PLATFORM_PROBES_STATUS="skipped"
+            APPLE_PLATFORM_PROBES_SKIP_REASON="${APPLE_PLATFORM_PROBES_SKIP_REASON:-unknown hosted runner readiness failure}"
+            APPLE_PLATFORM_PROBES_SUMMARY="Apple app build probes were skipped because the hosted runner was not Xcode 26.5 platform-ready: $APPLE_PLATFORM_PROBES_SKIP_REASON."
+          fi
+          export APPLE_PLATFORM_PROBES_STATUS
+          export APPLE_PLATFORM_PROBES_SKIP_REASON
+
+          APPLE_PLATFORM_PROBES_JSON="$(python3 - <<'PY'
+          import json
+          import os
+
+          status = os.environ["APPLE_PLATFORM_PROBES_STATUS"]
+          payload = {"status": status}
+          if status == "skipped":
+              payload["skip_reason"] = os.environ.get("APPLE_PLATFORM_PROBES_SKIP_REASON") or "unknown hosted runner readiness failure"
+
+          print(json.dumps(payload, separators=(",", ": ")))
+          PY
+          )"
 
           {
             echo "BUILT_AT=$BUILT_AT"
@@ -244,7 +261,8 @@ jobs:
             "rustc_version": "$RUSTC_VERSION",
             "arm64e_manifest": "$ARM64E_MANIFEST",
             "workflow_url": "$WORKFLOW_URL",
-            "source_ref": "$RELEASE_SOURCE_REF"
+            "source_ref": "$RELEASE_SOURCE_REF",
+            "apple_platform_probes": $APPLE_PLATFORM_PROBES_JSON
           }
           EOF
 
@@ -261,6 +279,10 @@ jobs:
           - Xcode: \`$XCODE_VERSION\`
           - Rust: \`$RUSTC_VERSION\`
           - Workflow: [$WORKFLOW_URL]($WORKFLOW_URL)
+
+          Platform probes:
+
+          - $APPLE_PLATFORM_PROBES_SUMMARY
 
           Assets:
 

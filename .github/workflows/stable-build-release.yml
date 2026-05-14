@@ -68,25 +68,8 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref || github.ref }}
-      - name: Select Xcode 26.5
-        run: |
-          set -euo pipefail
-
-          if [ -n "${XCODE_26_DEVELOPER_DIR:-}" ] && [ -d "${XCODE_26_DEVELOPER_DIR}" ]; then
-            SELECTED_DEVELOPER_DIR="${XCODE_26_DEVELOPER_DIR}"
-          elif [ -d "/Applications/Xcode_26.5.app/Contents/Developer" ]; then
-            SELECTED_DEVELOPER_DIR="/Applications/Xcode_26.5.app/Contents/Developer"
-          else
-            echo "::error::Xcode 26.5 was not found on this runner."
-            exit 1
-          fi
-
-          echo "DEVELOPER_DIR=${SELECTED_DEVELOPER_DIR}" >> "$GITHUB_ENV"
-          export DEVELOPER_DIR="${SELECTED_DEVELOPER_DIR}"
-
-          echo "Using DEVELOPER_DIR=${DEVELOPER_DIR}"
-          xcode-select -p
-          xcodebuild -version
+      - name: Require Xcode 26.5 platform probe readiness
+        run: bash scripts/ci_xcode_platform_preflight.sh preflight --strict
 
       - name: Install Rust stable toolchain
         run: |
@@ -272,6 +255,7 @@ jobs:
           Release readiness:
 
           - Formal GitHub Release creation is gated on this workflow run's \`rust-dependency-audit\` job.
+          - Apple app build probes passed for generic iOS and visionOS; stable asset generation fails before this point if Xcode 26.5 platform readiness is missing.
           - If the audit fails, these files may exist only as workflow artifacts and must not be treated as release-ready.
           - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
