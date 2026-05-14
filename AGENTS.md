@@ -261,6 +261,13 @@ After editing:
 - Before any formal stable release or App Store candidate archive, follow
   `docs/APP_RELEASE_PROCESS.md`. Do not rely on `workflow_dispatch` alone as a
   substitute for creating the stable tag.
+- By default, keep project changes on a topic branch rather than `main`: use the
+  current branch when it is already the appropriate non-`main` branch for the
+  task, create a new branch from `main` when needed, or use a branch explicitly
+  specified by the user. Submit the work through a pull request. If uncommitted
+  work was started on `main` temporarily, create a branch to carry those changes
+  before committing. Do not commit directly to `main` unless the user explicitly
+  asks for that.
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
