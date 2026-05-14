@@ -1302,30 +1302,7 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     private func repositoryAuditSwiftSourcePaths(under relativeDirectory: String) throws -> [String] {
-        let sourcesRootURL = try RepositoryAuditLoader.sourcesRootURL()
-        let rootURL = sourcesRootURL.appending(path: relativeDirectory, directoryHint: .isDirectory)
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
-        var paths: [String] = []
-        for case let fileURL as URL in enumerator {
-            guard fileURL.pathExtension == "swift" else {
-                continue
-            }
-            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
-            guard values.isRegularFile == true else {
-                continue
-            }
-            let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
-            paths.append("Sources/\(relativePath)")
-        }
-        return paths.sorted()
+        try RepositoryAuditLoader.swiftSourceRelativePaths(under: relativeDirectory)
     }
 
     private func sourceBlock(

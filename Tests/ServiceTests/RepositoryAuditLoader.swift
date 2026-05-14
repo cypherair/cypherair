@@ -16,6 +16,36 @@ enum RepositoryAuditLoader {
         try url(relativePath: "Sources")
     }
 
+    static func swiftSourceRelativePaths(under relativeDirectory: String = "") throws -> [String] {
+        let sourcesRootURL = try sourcesRootURL()
+        let normalizedDirectory = relativeDirectory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let scanRootURL = normalizedDirectory.isEmpty
+            ? sourcesRootURL
+            : sourcesRootURL.appending(path: normalizedDirectory, directoryHint: .isDirectory)
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: scanRootURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var paths: [String] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "swift" else {
+                continue
+            }
+            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            guard values.isRegularFile == true else {
+                continue
+            }
+            let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
+            paths.append("Sources/\(relativePath)")
+        }
+        return paths.sorted()
+    }
+
     static func url(relativePath: String) throws -> URL {
         let snapshotRootURL = try validatedSnapshotRootURL()
         let normalizedPath = relativePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))

@@ -102,7 +102,11 @@ The workspace currently includes three Xcode Test Plans:
 
 **CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
-Build-input audit tests such as `LocalizationCatalogTests` and the source-audit assertions in `TutorialSessionStoreTests` read a build-time `RepositoryAudit` snapshot bundled into `CypherAirTests.xctest`. This keeps the same static-audit semantics across macOS, iOS Simulator, and physical-device `CypherAir-UnitTests` runs.
+Build-input audit tests such as `LocalizationCatalogTests`, `ArchitectureSourceAuditTests`, and the source-audit assertions in `TutorialSessionStoreTests` read a build-time `RepositoryAudit` snapshot bundled into `CypherAirTests.xctest`. This keeps the same static-audit semantics across macOS, iOS Simulator, and physical-device `CypherAir-UnitTests` runs.
+
+`ArchitectureSourceAuditTests` are the Phase 0 architecture-refactor guardrails. They block new measurable boundary leaks for generated UniFFI types above the adapter boundary, App-layer `PgpError` handling, SwiftUI presentation policy in `Sources/Models`, and ordinary runtime `[Contact]` dependencies. Current debt is recorded as file-level temporary exceptions. If an exception file no longer contains the audited pattern, the test fails so the stale exception is removed. If a future PR intentionally adds a temporary exception, add the file with a reason in the test and explain the deferral in that PR.
+
+When adding, moving, or deleting Swift source files that should be visible to build-input audits, update both `Tests/RepositoryAuditInputs.xcfilelist` and `Tests/RepositoryAuditOutputs.xcfilelist` in the same change. The Xcode user-script sandbox only grants the snapshot phase access to files declared in these manifests.
 
 `TutorialSessionStoreTests` are the canonical unit-level coverage for the guided tutorial contract. They verify sandbox storage and mocks, the seven-module artifact flow, completion-version persistence, onboarding-to-tutorial handoff, replay unlock rules, unsafe-route blocklisting, output interception, production-page configuration seams, guidance resolver behavior, and source-audit guards that keep tutorial output handling out of production page implementations.
 
