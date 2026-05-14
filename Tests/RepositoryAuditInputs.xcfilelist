@@ -171,6 +171,8 @@ $(SRCROOT)/Sources/Models/CypherAirError.swift
 $(SRCROOT)/Sources/Models/DetailedSignatureVerification.swift
 $(SRCROOT)/Sources/Models/ExportableFile.swift
 $(SRCROOT)/Sources/Models/IdentityPresentation.swift
+$(SRCROOT)/Sources/Models/PasswordMessageDetailedDecryptOutcome.swift
+$(SRCROOT)/Sources/Models/PasswordMessageEnvelopeFormat.swift
 $(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
@@ -244,8 +246,11 @@ $(SRCROOT)/Sources/Services/ContactSummaryProjector.swift
 $(SRCROOT)/Sources/Services/DecryptionService.swift
 $(SRCROOT)/Sources/Services/DiskSpaceChecker.swift
 $(SRCROOT)/Sources/Services/EncryptionService.swift
+$(SRCROOT)/Sources/Services/FFI/PGPErrorMapper.swift
 $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPMessageOperationAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPMessageResultMapper.swift
 $(SRCROOT)/Sources/Services/FileProgressReporter.swift
 $(SRCROOT)/Sources/Services/ImportablePublicCertificateInspection.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyCatalogStore.swift

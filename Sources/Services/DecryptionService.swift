@@ -32,18 +32,18 @@ final class DecryptionService {
         let inputPath: String
     }
 
-    private let engine: PgpEngine
+    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
-        self.engine = engine
+        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.temporaryArtifactStore = temporaryArtifactStore
@@ -58,40 +58,16 @@ final class DecryptionService {
     /// - Returns: Phase1Result with matched key info.
     /// - Throws: CypherAirError.noMatchingKey if no local key matches.
     func parseRecipients(ciphertext: Data) async throws -> Phase1Result {
-        // Dearmor if needed
-        let binaryData: Data
-        do {
-            if let firstChar = ciphertext.first, firstChar == 0x2D { // '-' = ASCII armor
-                binaryData = try engine.dearmor(armored: ciphertext)
-            } else {
-                binaryData = ciphertext
-            }
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
+        let binaryData = try await messageAdapter.dearmorIfNeeded(ciphertext)
 
         // Match PKESK recipients against local certificates.
         // Uses Rust-side Sequoia key_handles() for correct subkey-to-cert matching,
         // returning primary fingerprints of matched certificates.
         let localCerts = keyManagement.keys.map { $0.publicKeyData }
-        let matchedFingerprints: [String]
-        do {
-            matchedFingerprints = try engine.matchRecipients(
-                ciphertext: binaryData,
-                localCerts: localCerts
-            )
-        } catch let error as PgpError {
-            switch error {
-            case .CorruptData(let reason):
-                throw CypherAirError.corruptData(reason: reason)
-            case .UnsupportedAlgorithm(let algo):
-                throw CypherAirError.unsupportedAlgorithm(algo: algo)
-            default:
-                throw CypherAirError.noMatchingKey
-            }
-        } catch {
-            throw CypherAirError.noMatchingKey
-        }
+        let matchedFingerprints = try await messageAdapter.matchRecipients(
+            ciphertext: binaryData,
+            localCerts: localCerts
+        )
 
         // Look up the matched key identity by primary fingerprint
         let matchedKey = keyManagement.keys.first { identity in
@@ -124,24 +100,10 @@ final class DecryptionService {
         let inputPath = fileURL.path
         let localCerts = keyManagement.keys.map { $0.publicKeyData }
 
-        let matchedFingerprints: [String]
-        do {
-            matchedFingerprints = try engine.matchRecipientsFromFile(
-                inputPath: inputPath,
-                localCerts: localCerts
-            )
-        } catch let error as PgpError {
-            switch error {
-            case .CorruptData(let reason):
-                throw CypherAirError.corruptData(reason: reason)
-            case .UnsupportedAlgorithm(let algo):
-                throw CypherAirError.unsupportedAlgorithm(algo: algo)
-            default:
-                throw CypherAirError.noMatchingKey
-            }
-        } catch {
-            throw CypherAirError.noMatchingKey
-        }
+        let matchedFingerprints = try await messageAdapter.matchRecipientsFromFile(
+            inputPath: inputPath,
+            localCerts: localCerts
+        )
 
         let matchedKey = keyManagement.keys.first { identity in
             matchedFingerprints.contains(identity.fingerprint)
@@ -184,30 +146,10 @@ final class DecryptionService {
 
         let context = verificationContext()
 
-        let result: DecryptDetailedResult
-        do {
-            result = try await Self.performDecryptDetailed(
-                engine: engine,
-                ciphertext: phase1.ciphertext,
-                secretKeys: [secretKey],
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return (
-            plaintext: result.plaintext,
-            verification: DetailedSignatureVerification.from(
-                legacyStatus: result.legacyStatus,
-                legacySignerFingerprint: result.legacySignerFingerprint,
-                summaryState: result.summaryState,
-                summaryEntryIndex: result.summaryEntryIndex,
-                signatures: result.signatures,
-                contacts: context.contacts,
-                ownKeys: keyManagement.keys,
-                contactsAvailability: context.contactsAvailability
-            )
+        return try await messageAdapter.decryptDetailed(
+            ciphertext: phase1.ciphertext,
+            secretKeys: [secretKey],
+            verificationContext: context
         )
     }
 
@@ -241,34 +183,27 @@ final class DecryptionService {
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
         let outputArtifact = try temporaryArtifactStore.makeDecryptedArtifact(for: inputFilename)
 
-        let fileResult: FileDecryptDetailedResult
+        let verification: DetailedSignatureVerification
         do {
-            fileResult = try await Self.performDecryptFileDetailed(
-                engine: engine,
+            verification = try await messageAdapter.decryptFileDetailed(
                 inputPath: phase1.inputPath,
                 outputPath: outputArtifact.fileURL.path,
                 secretKeys: [secretKey],
-                verificationKeys: context.verificationKeys,
+                verificationContext: context,
                 progress: progress
             )
             try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
+        } catch let error as CypherAirError {
+            outputArtifact.cleanup()
+            throw error
         } catch {
             outputArtifact.cleanup()
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
+            throw CypherAirError.corruptData(reason: error.localizedDescription)
         }
 
         return (
             artifact: outputArtifact,
-            verification: DetailedSignatureVerification.from(
-                legacyStatus: fileResult.legacyStatus,
-                legacySignerFingerprint: fileResult.legacySignerFingerprint,
-                summaryState: fileResult.summaryState,
-                summaryEntryIndex: fileResult.summaryEntryIndex,
-                signatures: fileResult.signatures,
-                contacts: context.contacts,
-                ownKeys: keyManagement.keys,
-                contactsAvailability: context.contactsAvailability
-            )
+            verification: verification
         )
     }
 
@@ -285,57 +220,17 @@ final class DecryptionService {
 
     // MARK: - Private
 
-    private struct VerificationContext {
-        let verificationKeys: [Data]
-        let contacts: [Contact]
-        let contactsAvailability: ContactsAvailability
-    }
-
-    private func verificationContext() -> VerificationContext {
+    private func verificationContext() -> PGPMessageVerificationContext {
         let contactsContext = contactService.contactsForVerificationContext()
         let contactsAvailability = contactsContext.availability
         let contacts = contactsContext.contacts
-        return VerificationContext(
+        let ownKeys = keyManagement.keys
+        return PGPMessageVerificationContext(
             verificationKeys: contacts.map { $0.publicKeyData }
-                + keyManagement.keys.map { $0.publicKeyData },
+                + ownKeys.map { $0.publicKeyData },
             contacts: contacts,
+            ownKeys: ownKeys,
             contactsAvailability: contactsAvailability
-        )
-    }
-
-    // MARK: - Off-Main-Actor Engine Helpers
-
-    /// Run detailed decryption off the main actor.
-    @concurrent
-    private static func performDecryptDetailed(
-        engine: PgpEngine,
-        ciphertext: Data,
-        secretKeys: [Data],
-        verificationKeys: [Data]
-    ) async throws -> DecryptDetailedResult {
-        try engine.decryptDetailed(
-            ciphertext: ciphertext,
-            secretKeys: secretKeys,
-            verificationKeys: verificationKeys
-        )
-    }
-
-    /// Run streaming file detailed decryption off the main actor.
-    @concurrent
-    private static func performDecryptFileDetailed(
-        engine: PgpEngine,
-        inputPath: String,
-        outputPath: String,
-        secretKeys: [Data],
-        verificationKeys: [Data],
-        progress: FileProgressReporter?
-    ) async throws -> FileDecryptDetailedResult {
-        try engine.decryptFileDetailed(
-            inputPath: inputPath,
-            outputPath: outputPath,
-            secretKeys: secretKeys,
-            verificationKeys: verificationKeys,
-            progress: progress
         )
     }
 }

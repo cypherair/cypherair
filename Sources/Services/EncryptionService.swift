@@ -10,20 +10,20 @@ import Foundation
 @Observable
 final class EncryptionService {
 
-    private let engine: PgpEngine
+    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
-        self.engine = engine
+        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.diskSpaceChecker = diskSpaceChecker
@@ -178,8 +178,7 @@ final class EncryptionService {
         let outputArtifact = try temporaryArtifactStore.makeStreamingArtifact(for: inputURL)
 
         do {
-            try await Self.performEncryptFile(
-                engine: engine,
+            try await messageAdapter.encryptFile(
                 inputPath: inputPath,
                 outputPath: outputArtifact.fileURL.path,
                 recipientKeys: recipientKeys,
@@ -188,9 +187,12 @@ final class EncryptionService {
                 progress: progress
             )
             try temporaryArtifactStore.applyAndVerifyCompleteProtection(to: outputArtifact.fileURL)
+        } catch let error as CypherAirError {
+            outputArtifact.cleanup()
+            throw error
         } catch {
             outputArtifact.cleanup()
-            throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
+            throw CypherAirError.encryptionFailed(reason: error.localizedDescription)
         }
 
         // Primary zeroing: immediately after engine call returns
@@ -269,19 +271,13 @@ final class EncryptionService {
             }
         }
 
-        let result: Data
-        do {
-            result = try await Self.performEncrypt(
-                engine: engine,
-                plaintext: plaintext,
-                recipientKeys: recipientKeys,
-                signingKey: signingKey,
-                selfKey: selfKey,
-                binary: binary
-            )
-        } catch {
-            throw CypherAirError.from(error) { .encryptionFailed(reason: $0) }
-        }
+        let result = try await messageAdapter.encrypt(
+            plaintext: plaintext,
+            recipientKeys: recipientKeys,
+            signingKey: signingKey,
+            selfKey: selfKey,
+            binary: binary
+        )
 
         // Primary zeroing: immediately after engine call returns, signingKey is most
         // likely uniquely referenced (UniFFI lower() temporaries released). This
@@ -292,55 +288,5 @@ final class EncryptionService {
         }
 
         return result
-    }
-
-    // MARK: - Off-Main-Actor Engine Helpers
-
-    /// Run encryption off the main actor.
-    @concurrent
-    private static func performEncrypt(
-        engine: PgpEngine,
-        plaintext: Data,
-        recipientKeys: [Data],
-        signingKey: Data?,
-        selfKey: Data?,
-        binary: Bool
-    ) async throws -> Data {
-        if binary {
-            return try engine.encryptBinary(
-                plaintext: plaintext,
-                recipients: recipientKeys,
-                signingKey: signingKey,
-                encryptToSelf: selfKey
-            )
-        } else {
-            return try engine.encrypt(
-                plaintext: plaintext,
-                recipients: recipientKeys,
-                signingKey: signingKey,
-                encryptToSelf: selfKey
-            )
-        }
-    }
-
-    /// Run streaming file encryption off the main actor.
-    @concurrent
-    private static func performEncryptFile(
-        engine: PgpEngine,
-        inputPath: String,
-        outputPath: String,
-        recipientKeys: [Data],
-        signingKey: Data?,
-        selfKey: Data?,
-        progress: FileProgressReporter?
-    ) async throws {
-        try engine.encryptFile(
-            inputPath: inputPath,
-            outputPath: outputPath,
-            recipients: recipientKeys,
-            signingKey: signingKey,
-            encryptToSelf: selfKey,
-            progress: progress
-        )
     }
 }

@@ -371,7 +371,7 @@ final class StreamingServiceTests: XCTestCase {
         mockDisk.availableBytes = 100  // Very low — 100 bytes available
         let diskChecker = DiskSpaceChecker(diskSpace: mockDisk)
         let encService = EncryptionService(
-            engine: stack.engine,
+            messageAdapter: stack.messageAdapter,
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
             diskSpaceChecker: diskChecker
@@ -486,7 +486,7 @@ final class StreamingServiceTests: XCTestCase {
         // We need a fresh decryption service with no local keys
         let (emptyKeyMgmt, _, _, _) = TestHelpers.makeKeyManagement()
         let decSvc = DecryptionService(
-            engine: engine,
+            messageAdapter: PGPMessageOperationAdapter(engine: engine),
             keyManagement: emptyKeyMgmt,
             contactService: stack.contactService
         )
