@@ -342,27 +342,36 @@ Recommended PRs:
   functions and `find_user_id_first_match`. Regenerate bindings through the
   normal workflow. Do not hand-edit generated Swift.
 
+Status: PR 4A/4B/4C/4D completed in one Phase 4A-D cleanup PR. The selector
+contract was confirmed at the Swift service layer, Swift FFI and Rust tests no
+longer directly call raw first-match User ID APIs, and first-match-only
+duplicate compatibility tests were deleted. PR 4E remains pending and is the
+next phase for Rust/UniFFI export/helper deletion plus generated binding
+refresh.
+
 Entry conditions:
 
 - Selector-based APIs cover duplicate User ID selection, out-of-range selectors,
   byte mismatch rejection, and Swift service behavior.
 - Downstream or public FFI compatibility expectations have been reviewed.
-- Swift and Rust tests have no direct raw first-match calls except explicitly
-  retained compatibility tests.
+- Swift and Rust tests have no direct raw first-match calls. Phase 4A-D retained
+  no explicit raw first-match compatibility tests.
 
 Exit conditions:
 
-- Raw first-match User ID exports and internal raw helpers are gone or
-  explicitly retained as deprecated compatibility APIs with named tests.
-- Selector-backed Swift service APIs remain available and covered.
-- Generated bindings match Rust exports.
+- Phase 4A-D exit: Swift and Rust tests no longer rely on raw first-match User ID
+  APIs; selector-backed Swift service APIs remain available and covered.
+- PR 4E exit: raw first-match User ID exports and internal raw helpers are gone,
+  generated bindings match Rust exports, and no generated Swift is hand-edited.
 
 Validation:
 
 - `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`.
-- If Swift-visible FFI changes occur, refresh the XCFramework and generated
-  bindings with `./build-xcframework.sh --release`, then run macOS Swift unit
-  tests.
+- Phase 4A-D test/docs-only cleanup does not require XCFramework regeneration
+  because Rust exports and generated bindings are unchanged.
+- PR 4E changes the Swift-visible FFI surface: refresh the XCFramework and
+  generated bindings with `./build-xcframework.sh --release`, then run macOS
+  Swift unit tests.
 
 ### Phase 5: Migration Boundary Isolation Only
 
