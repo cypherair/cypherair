@@ -1,10 +1,6 @@
 import Foundation
 
-final class ContactsDomainSnapshotCodec: @unchecked Sendable {
-    private(set) var lastDecodedSourceSchemaVersion: Int?
-
-    private var serializationScratchBuffer = Data()
-
+enum ContactsDomainSnapshotCodec {
     private struct SchemaProbe: Decodable {
         let schemaVersion: Int
     }
@@ -19,25 +15,17 @@ final class ContactsDomainSnapshotCodec: @unchecked Sendable {
         let updatedAt: Date
     }
 
-    func encodeSnapshot(_ snapshot: ContactsDomainSnapshot) throws -> Data {
+    static func encodeSnapshot(_ snapshot: ContactsDomainSnapshot) throws -> Data {
         try snapshot.validateContract()
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
-        let encoded = try encoder.encode(snapshot)
-        serializationScratchBuffer = encoded
-        defer {
-            serializationScratchBuffer.protectedDataZeroize()
-            serializationScratchBuffer = Data()
-        }
-        return encoded
+        return try encoder.encode(snapshot)
     }
 
-    func decodeSnapshot(_ data: Data) throws -> ContactsDomainSnapshot {
-        serializationScratchBuffer = data
-        defer {
-            serializationScratchBuffer.protectedDataZeroize()
-            serializationScratchBuffer = Data()
-        }
+    static func decodeSnapshot(_ data: Data) throws -> (
+        snapshot: ContactsDomainSnapshot,
+        sourceSchemaVersion: Int
+    ) {
         let decoder = PropertyListDecoder()
         let sourceSchemaVersion = try decoder.decode(SchemaProbe.self, from: data).schemaVersion
         let snapshot: ContactsDomainSnapshot
@@ -54,17 +42,10 @@ final class ContactsDomainSnapshotCodec: @unchecked Sendable {
             )
         }
         try snapshot.validateContract()
-        lastDecodedSourceSchemaVersion = sourceSchemaVersion
-        return snapshot
+        return (snapshot, sourceSchemaVersion)
     }
 
-    func clearRuntimeState() {
-        lastDecodedSourceSchemaVersion = nil
-        serializationScratchBuffer.protectedDataZeroize()
-        serializationScratchBuffer = Data()
-    }
-
-    private func migrateLegacyV1Snapshot(_ legacySnapshot: LegacySnapshotV1) throws -> ContactsDomainSnapshot {
+    private static func migrateLegacyV1Snapshot(_ legacySnapshot: LegacySnapshotV1) throws -> ContactsDomainSnapshot {
         guard legacySnapshot.schemaVersion == 1 else {
             throw ProtectedDataError.invalidEnvelope(
                 "Contacts v1 migration received an unexpected schema version."
