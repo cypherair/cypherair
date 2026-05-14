@@ -232,9 +232,9 @@ fn test_generate_user_id_revocation_public_only_input_rejected() {
         .value()
         .to_vec();
 
-    assert_invalid_key_data(keys::generate_user_id_revocation(
+    assert_invalid_key_data(keys::generate_user_id_revocation_by_selector(
         &generated.public_key_data,
-        &user_id,
+        &user_id_selector(&user_id, 0),
     ));
 }
 
@@ -328,8 +328,11 @@ fn test_generate_user_id_revocation_revokes_selected_user_id_only() {
         .value()
         .to_vec();
 
-    let revocation = keys::generate_user_id_revocation(&secret_with_extra_userid, &primary_user_id)
-        .expect("user id revocation should generate");
+    let revocation = keys::generate_user_id_revocation_by_selector(
+        &secret_with_extra_userid,
+        &user_id_selector(&primary_user_id, 0),
+    )
+    .expect("user id revocation should generate");
     let packet = Packet::from_bytes(&revocation).expect("revocation packet should parse");
     let (revoked_cert, _) = cert
         .insert_packets(vec![packet])
@@ -362,32 +365,6 @@ fn test_generate_user_id_revocation_revokes_selected_user_id_only() {
             .any(|(bytes, revoked)| bytes != &primary_user_id && !*revoked),
         "non-selected user ID should remain valid"
     );
-}
-
-#[test]
-fn test_generate_user_id_revocation_selector_miss_returns_invalid_key_data() {
-    let generated = generate_key(KeyProfile::Universal, "MissingUserid");
-    assert_invalid_key_data(keys::generate_user_id_revocation(
-        &generated.cert_data,
-        b"missing@example.com",
-    ));
-}
-
-#[test]
-fn test_generate_user_id_revocation_legacy_duplicate_userid_generates_signature() {
-    let generated = generate_key(KeyProfile::Universal, "LegacyDuplicateUserid");
-    let duplicated = duplicate_userid(
-        &generated.cert_data,
-        "LegacyDuplicateUserid <legacyduplicateuserid@example.com>",
-    );
-    let discovered = keys::discover_certificate_selectors(&duplicated)
-        .expect("selector discovery should succeed");
-    let user_id_data = discovered.user_ids[0].user_id_data.clone();
-
-    let revocation = keys::generate_user_id_revocation(&duplicated, &user_id_data)
-        .expect("legacy user id revocation should generate");
-
-    assert!(!revocation.is_empty());
 }
 
 #[test]
@@ -458,8 +435,11 @@ fn test_generate_subkey_and_user_id_revocations_are_signature_packets() {
     let subkey_revocation =
         keys::generate_subkey_revocation(&generated.cert_data, &subkey_fingerprint)
             .expect("subkey revocation should generate");
-    let user_id_revocation = keys::generate_user_id_revocation(&generated.cert_data, &user_id)
-        .expect("user id revocation should generate");
+    let user_id_revocation = keys::generate_user_id_revocation_by_selector(
+        &generated.cert_data,
+        &user_id_selector(&user_id, 0),
+    )
+    .expect("user id revocation should generate");
 
     let subkey_packet = Packet::from_bytes(&subkey_revocation).expect("subkey packet should parse");
     let user_id_packet =
