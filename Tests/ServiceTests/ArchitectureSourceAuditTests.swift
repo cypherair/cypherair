@@ -320,9 +320,6 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesView.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
-                    "Sources/App/Contacts/Import/PublicKeyImportLoader.swift",
-                    "Sources/App/Contacts/ImportConfirmView.swift",
-                    "Sources/App/Contacts/ImportConfirmationCoordinator.swift",
                     "Sources/App/Keys/BackupKeyView.swift",
                     "Sources/App/Keys/ImportKeyView.swift",
                     "Sources/App/Keys/KeyGenerationView.swift",
@@ -330,25 +327,20 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
-                "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
+                "FFI adapter files intentionally contain generated UniFFI types while exposing app-owned contracts upward.",
                 [
-                    "Sources/Models/CertificateSignatureVerification.swift",
-                    "Sources/Models/Contact.swift",
-                    "Sources/Models/Contacts/ContactCertificationArtifactReference.swift",
-                    "Sources/Models/Contacts/ContactKeyRecord.swift",
-                    "Sources/Models/Contacts/ContactKeySummary.swift",
-                    "Sources/Models/CypherAirError.swift",
-                    "Sources/Models/DetailedSignatureVerification.swift",
-                    "Sources/Models/KeyProfile+App.swift",
-                    "Sources/Models/PGPKeyIdentity.swift",
-                    "Sources/Models/SignatureVerification.swift",
-                    "Sources/Models/UserIdSelectionOption.swift",
+                    "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
+                    "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
                 ]
             ),
             (
-                "Extensions currently provide generated enum Codable or display support pending app-owned replacements.",
+                "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
                 [
-                    "Sources/Extensions/KeyProfile+Codable.swift",
+                    "Sources/Models/CertificateSignatureVerification.swift",
+                    "Sources/Models/Contacts/ContactCertificationArtifactReference.swift",
+                    "Sources/Models/CypherAirError.swift",
+                    "Sources/Models/DetailedSignatureVerification.swift",
+                    "Sources/Models/SignatureVerification.swift",
                 ]
             ),
             (
@@ -360,8 +352,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Services still call PgpEngine and map generated results directly until Phase 1 introduces adapter contracts.",
                 [
-                    "Sources/Services/CertificateSelectionCatalogDiscovery.swift",
-                    "Sources/Services/CertificateSelectionCatalogMapper.swift",
                     "Sources/Services/CertificateSignatureService.swift",
                     "Sources/Services/ContactImportMatcher.swift",
                     "Sources/Services/ContactImportPublicCertificateValidator.swift",

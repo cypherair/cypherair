@@ -21,7 +21,7 @@ final class SigningServiceTests: XCTestCase {
 
     /// Generate a key and register it as a contact.
     private func generateKeyAndContact(
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         name: String = "Signer"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(

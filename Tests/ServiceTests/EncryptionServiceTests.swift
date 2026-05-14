@@ -22,7 +22,7 @@ final class EncryptionServiceTests: XCTestCase {
 
     /// Generate a key and register it as a contact, returning the identity.
     private func generateKeyAndContact(
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         name: String = "Test"
     ) async throws -> PGPKeyIdentity {
         let identity = try await TestHelpers.generateAndStoreKey(

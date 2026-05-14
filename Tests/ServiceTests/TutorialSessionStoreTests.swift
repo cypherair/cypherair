@@ -1269,7 +1269,7 @@ final class TutorialSessionStoreTests: XCTestCase {
     private func makeImportConfirmationRequest() -> ImportConfirmationRequest {
         ImportConfirmationRequest(
             keyData: Data("demo-key".utf8),
-            keyInfo: KeyInfo(
+            metadata: PGPKeyMetadata(
                 fingerprint: String(repeating: "a", count: 40),
                 keyVersion: 4,
                 userId: "Bob Demo <bob@example.invalid>",
@@ -1281,7 +1281,6 @@ final class TutorialSessionStoreTests: XCTestCase {
                 subkeyAlgo: "X25519",
                 expiryTimestamp: nil
             ),
-            profile: .universal,
             allowsUnverifiedImport: true,
             onImportVerified: {},
             onImportUnverified: {},

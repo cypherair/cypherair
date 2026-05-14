@@ -34,7 +34,7 @@ final class DecryptionServiceTests: XCTestCase {
     /// Generate a key, add it as a contact, and encrypt a message to it.
     /// Returns the identity, binary ciphertext, and a Phase1Result with the correct matchedKey.
     private func encryptAndPreparePhase1(
-        profile: KeyProfile,
+        profile: PGPKeyProfile,
         plaintext: String = "Hello, encrypted world!",
         sign: Bool = true
     ) async throws -> (identity: PGPKeyIdentity, ciphertext: Data, phase1: DecryptionService.Phase1Result) {

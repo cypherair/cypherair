@@ -3,7 +3,7 @@ import SwiftUI
 @testable import CypherAir
 
 /// Tests for model types: CypherAirError, Contact, PGPKeyIdentity,
-/// KeyProfile+Codable, SignatureVerification, and ColorTheme.
+/// PGPKeyProfile, SignatureVerification, and ColorTheme.
 final class ModelTests: XCTestCase {
 
     // MARK: - CypherAirError: PgpError Mapping
@@ -308,35 +308,35 @@ final class ModelTests: XCTestCase {
         )
     }
 
-    // MARK: - KeyProfile+Codable
+    // MARK: - PGPKeyProfile
 
-    func test_keyProfile_encodeDecode_universal_roundTrip() throws {
+    func test_pgpKeyProfile_encodeDecode_universal_roundTrip() throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
-        let profile = KeyProfile.universal
+        let profile = PGPKeyProfile.universal
         let data = try encoder.encode(profile)
-        let decoded = try decoder.decode(KeyProfile.self, from: data)
+        let decoded = try decoder.decode(PGPKeyProfile.self, from: data)
 
         XCTAssertEqual(decoded, .universal)
     }
 
-    func test_keyProfile_encodeDecode_advanced_roundTrip() throws {
+    func test_pgpKeyProfile_encodeDecode_advanced_roundTrip() throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
-        let profile = KeyProfile.advanced
+        let profile = PGPKeyProfile.advanced
         let data = try encoder.encode(profile)
-        let decoded = try decoder.decode(KeyProfile.self, from: data)
+        let decoded = try decoder.decode(PGPKeyProfile.self, from: data)
 
         XCTAssertEqual(decoded, .advanced)
     }
 
-    func test_keyProfile_decode_unknownValue_throwsError() {
+    func test_pgpKeyProfile_decode_unknownValue_throwsError() {
         let decoder = JSONDecoder()
         let invalidJSON = Data("\"quantum\"".utf8)
 
-        XCTAssertThrowsError(try decoder.decode(KeyProfile.self, from: invalidJSON)) { error in
+        XCTAssertThrowsError(try decoder.decode(PGPKeyProfile.self, from: invalidJSON)) { error in
             guard case DecodingError.dataCorrupted = error else {
                 XCTFail("Expected DecodingError.dataCorrupted, got \(error)")
                 return
@@ -807,7 +807,7 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_userIdSelectionOption_selectorInput_preservesBytesAndOccurrence() {
+    func test_certificateSelectionAdapter_selectorInput_preservesBytesAndOccurrence() {
         let option = UserIdSelectionOption(
             occurrenceIndex: 1,
             userIdData: Data("duplicate@example.com".utf8),
@@ -815,8 +815,9 @@ final class ModelTests: XCTestCase {
             isCurrentlyPrimary: false,
             isCurrentlyRevoked: true
         )
+        let selectorInput = PGPCertificateSelectionAdapter.userIdSelectorInput(for: option)
 
-        XCTAssertEqual(option.selectorInput.userIdData, option.userIdData)
-        XCTAssertEqual(option.selectorInput.occurrenceIndex, 1)
+        XCTAssertEqual(selectorInput.userIdData, option.userIdData)
+        XCTAssertEqual(selectorInput.occurrenceIndex, 1)
     }
 }
