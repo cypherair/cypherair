@@ -4,7 +4,7 @@ Snapshot date: 2026-05-13
 
 ## Repo Identity
 
-- Primary local main worktree: `/Users/tianren/coding/cypherair-main`
+- Primary app repository: `cypherair/cypherair`
 - Remote repository: `cypherair/cypherair`
 - Canonical app branch: `main`
 - Apple `arm64e` app support landed on `main` through PR #222.
@@ -46,7 +46,7 @@ Snapshot date: 2026-05-13
   - the repo root intentionally has no `rust-toolchain.toml` custom override;
     ordinary local development and CI validation use explicit Rust official
     stable commands such as `cargo +stable`
-  - local Rust fork path: `/Users/tianren/coding/rust`
+  - Rust fork repository: `cypherair/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
   - current Rust stage1 carry head: `05e4abf6b2e`
   - Rust upstream-prep branch:
@@ -142,28 +142,25 @@ Snapshot date: 2026-05-13
     pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,
     then packages and tests the crate
 
-## Related Forks And Paths
+## Related Forks And Repositories
 
-- App repo main worktree:
-  - `/Users/tianren/coding/cypherair-main`
+- App repository:
+  - remote `cypherair/cypherair`
+  - canonical branch: `main`
 - Rust fork:
-  - `/Users/tianren/coding/rust`
   - remote `cypherair/rust`
   - stage1 carry branch: `carry/cypherair-arm64e-toolchain`
   - downstream integration branch: `integration/arm64e-upstream-prs`
   - upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
 - OpenSSL fork:
-  - `/Users/tianren/coding/openssl`
   - remote `cypherair/openssl`
   - carry branch `carry/apple-arm64e-targets`
   - prep branch `prep/apple-arm64e-targets`
 - openssl-src-rs fork:
-  - `/Users/tianren/coding/openssl-src-rs`
   - remote `cypherair/openssl-src-rs`
   - carry branch `carry/apple-arm64e-openssl-fork`
 - Related but currently unconfirmed in the active chain:
-  - `/Users/tianren/coding/rust-openssl`
   - remote `cypherair/rust-openssl`
 
 ## Upstreaming Posture
@@ -180,17 +177,17 @@ Snapshot date: 2026-05-13
 ## Latest LLVM Workaround-Shrink Validation
 
 - Date: 2026-05-03.
-- Local app worktree validation: `/Users/tianren/coding/cypherair-main`, branch
-  `main`, commit `ea37581`.
+- Local app validation: `cypherair/cypherair` branch `main`, commit
+  `ea37581`.
 - GitHub-hosted app validation: `cypherair/cypherair` branch `main`, commit
   `b50b211`.
-- Rust carry validation source:
-  `/Users/tianren/coding/rust:carry/cypherair-arm64e-toolchain` commit
-  `b402b926a05`, which keeps Rust-side ptrauth cleanup only for `callbr` and
-  no longer strips direct function calls carrying `"ptrauth"` operand bundles.
+- Rust carry validation source: `cypherair/rust` branch
+  `carry/cypherair-arm64e-toolchain`, commit `b402b926a05`, which keeps
+  Rust-side ptrauth cleanup only for `callbr` and no longer strips direct
+  function calls carrying `"ptrauth"` operand bundles.
 - Rust-consumed LLVM source:
-  `/Users/tianren/coding/cypherair-arm64e-llvm-workspaces/cypherair-llvm-from-rust-lang-integration:cypherair-arm64e-ptrauth-rust-llvm`
-  commit `18a66001b`.
+  `cypherair-llvm-from-rust-lang-integration` branch
+  `cypherair-arm64e-ptrauth-rust-llvm`, commit `18a66001b`.
 - Hosted Rust stage1 prerelease:
   `rust-arm64e-stage1-20260503T220008Z-b402b92-r25291584825-a1`, published by
   workflow run `25291584825` from source and checked-out commit

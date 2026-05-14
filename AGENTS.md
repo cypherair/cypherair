@@ -138,21 +138,7 @@ These areas define security invariants and failure behavior.
 
 ## Crypto / Product Model
 
-### Profiles
-
-- Profile A, Universal
-  v4, Ed25519 + X25519, SEIPDv1, Iterated+Salted S2K, broad interoperability
-- Profile B, Advanced
-  v6, Ed448 + X448, SEIPDv2 AEAD, Argon2id S2K, not GnuPG compatible
-
-### Authentication Modes
-
-- Standard
-  Biometrics with passcode fallback
-- High Security
-  Biometrics only, no passcode fallback
-
-Mode switching requires re-wrapping all Secure Enclave protected keys.
+For encryption profile behavior and authentication-mode product semantics, see `docs/PRD.md`. For algorithm suites, security invariants, access-control flags, and mode-switching implementation details, see `docs/SECURITY.md`.
 
 ## Working Style
 
