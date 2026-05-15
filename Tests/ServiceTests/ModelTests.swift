@@ -227,8 +227,7 @@ final class ModelTests: XCTestCase {
 
     func test_contact_displayName_nilUserId_returnsUnknown() {
         let contact = makeContact(userId: nil)
-        // The display name should use the localized "Unknown" fallback
-        XCTAssertFalse(contact.displayName.isEmpty)
+        XCTAssertEqual(contact.displayName, IdentityPresentation.legacyUnknownDisplayName)
     }
 
     func test_contact_displayName_noAngleBrackets_returnsUserId() {
@@ -306,6 +305,42 @@ final class ModelTests: XCTestCase {
             IdentityPresentation.fingerprintAccessibilityGroupLabel("ab12"),
             "a b 1 2"
         )
+    }
+
+    func test_identityPresentation_parsedDisplayName_nilUserId_returnsNil() {
+        XCTAssertNil(IdentityPresentation.parsedDisplayName(from: nil))
+    }
+
+    func test_identityPresentation_displayFallback_isStableDomainValue() {
+        XCTAssertEqual(
+            IdentityPresentation.displayName(from: nil),
+            IdentityPresentation.legacyUnknownDisplayName
+        )
+    }
+
+    func test_identityDisplayPresentation_nilUserId_returnsLocalizedFallback() {
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(from: nil),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_legacyUnknownDisplayName_returnsLocalizedFallback() {
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(IdentityPresentation.legacyUnknownDisplayName),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_emptyDisplayName_returnsLocalizedFallback() {
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(""),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_nonFallbackDisplayName_isUnchanged() {
+        XCTAssertEqual(IdentityDisplayPresentation.displayName("Alice"), "Alice")
     }
 
     // MARK: - PGPKeyProfile
@@ -521,7 +556,8 @@ final class ModelTests: XCTestCase {
         )
 
         XCTAssertEqual(identity?.source, .ownKey)
-        XCTAssertEqual(identity?.displayName, "Your Key")
+        XCTAssertEqual(identity?.displayName, "")
+        XCTAssertEqual(identity?.presentationDisplayName, "Your Key")
         XCTAssertEqual(identity?.secondaryText, ownKey.userId)
     }
 
@@ -558,6 +594,15 @@ final class ModelTests: XCTestCase {
         coordinator.setGracePeriod(42)
 
         XCTAssertEqual(coordinator.snapshot?.gracePeriod, AuthPreferences.defaultGracePeriod)
+    }
+
+    func test_protectedOrdinarySettings_validGracePeriodValues_matchSettingsOptions() {
+        let modelValues = Array(ProtectedOrdinarySettingsSnapshot.validGracePeriodValues).sorted()
+        let settingsValues = SettingsGracePeriodPresentation.options.map(\.value).sorted()
+
+        XCTAssertEqual(modelValues, [0, 60, 180, 300])
+        XCTAssertEqual(settingsValues, modelValues)
+        XCTAssertTrue(SettingsGracePeriodPresentation.options.allSatisfy { !$0.label.isEmpty })
     }
 
     func test_protectedOrdinarySettings_startsLockedWithoutReadingPersistence() {

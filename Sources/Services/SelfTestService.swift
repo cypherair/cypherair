@@ -383,7 +383,7 @@ final class SelfTestService {
         let generalStr = String(localized: "selftest.report.general", defaultValue: "General")
 
         for result in results {
-            let profileStr = result.profile?.displayName ?? generalStr
+            let profileStr = result.profile.map(localizedProfileName(for:)) ?? generalStr
             let statusStr = result.passed ? passStr : failStr
             report += "[\(statusStr)] \(profileStr) — \(result.name)"
             report += " (\(String(format: "%.3f", result.duration))s)"
@@ -397,5 +397,14 @@ final class SelfTestService {
             data: Data(report.utf8),
             suggestedFilename: filename
         )
+    }
+
+    private static func localizedProfileName(for profile: PGPKeyProfile) -> String {
+        switch profile {
+        case .universal:
+            String(localized: "profile.universal.name", defaultValue: "Universal Compatible")
+        case .advanced:
+            String(localized: "profile.advanced.name", defaultValue: "Advanced Security")
+        }
     }
 }

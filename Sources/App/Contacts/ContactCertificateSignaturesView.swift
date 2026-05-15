@@ -226,7 +226,7 @@ private struct ContactCertificateSignaturesHostView: View {
             if let contact = model.contact {
                 LabeledContent(
                     String(localized: "contactcertsig.contact", defaultValue: "Contact"),
-                    value: contact.displayName
+                    value: IdentityDisplayPresentation.displayName(contact.displayName)
                 )
                 if let email = contact.email {
                     LabeledContent(
@@ -620,7 +620,7 @@ private struct ContactCertificateSignerIdentityCard: View {
             )
             .font(.subheadline.weight(.semibold))
 
-            Text(identity.displayName)
+            Text(IdentityDisplayPresentation.displayName(identity.displayName))
                 .font(.headline)
 
             if let secondaryText = identity.secondaryText {

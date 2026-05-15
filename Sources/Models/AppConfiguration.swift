@@ -96,13 +96,8 @@ final class AppConfiguration {
         }
     }
 
-    /// Available grace period options (in seconds).
-    static let gracePeriodOptions: [(label: String, value: Int)] = [
-        (String(localized: "grace.immediately", defaultValue: "Immediately"), 0),
-        (String(localized: "grace.1min", defaultValue: "1 minute"), 60),
-        (String(localized: "grace.3min", defaultValue: "3 minutes"), 180),
-        (String(localized: "grace.5min", defaultValue: "5 minutes"), 300)
-    ]
+    /// Available grace period values in seconds.
+    static let validGracePeriodValues = [0, 60, 180, 300]
 
     private static var resetPersistentKeys: [String] {
         [

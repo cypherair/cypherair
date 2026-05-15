@@ -1,7 +1,9 @@
 import Foundation
 
-/// Shared presentation helpers for fingerprints, key IDs, and user IDs.
+/// Shared formatting and parsing helpers for fingerprints, key IDs, and user IDs.
 enum IdentityPresentation {
+    static let legacyUnknownDisplayName = "Unknown"
+
     static func shortKeyId(from fingerprint: String) -> String {
         String(fingerprint.suffix(16))
     }
@@ -29,10 +31,11 @@ enum IdentityPresentation {
     }
 
     static func displayName(from userId: String?) -> String {
-        guard let userId else {
-            return String(localized: "contact.unknown", defaultValue: "Unknown")
-        }
+        parsedDisplayName(from: userId) ?? legacyUnknownDisplayName
+    }
 
+    static func parsedDisplayName(from userId: String?) -> String? {
+        guard let userId else { return nil }
         if let angleBracketIndex = userId.firstIndex(of: "<") {
             let name = userId[userId.startIndex..<angleBracketIndex]
                 .trimmingCharacters(in: .whitespaces)

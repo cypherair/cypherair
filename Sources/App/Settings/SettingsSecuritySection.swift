@@ -52,7 +52,7 @@ struct SettingsSecuritySection: View {
                     set: { model.setGracePeriod($0) }
                 )
             ) {
-                ForEach(AppConfiguration.gracePeriodOptions, id: \.value) { option in
+                ForEach(SettingsGracePeriodPresentation.options) { option in
                     Text(option.label).tag(option.value)
                 }
             }

@@ -486,7 +486,7 @@ struct CypherAirApp: App {
             }
         } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+                        defaultValue: "This contact (\(IdentityDisplayPresentation.displayName(request.pendingUpdate.existingContact.displayName))) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
         }
         .alert(
             String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),

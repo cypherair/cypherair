@@ -241,7 +241,7 @@ private struct ContactRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(contact.displayName)
+                Text(IdentityDisplayPresentation.displayName(contact.displayName))
                     .font(.body.weight(.medium))
                     .lineLimit(1)
                 if contact.hasUnverifiedKeys {

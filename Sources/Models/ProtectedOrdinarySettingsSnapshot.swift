@@ -37,6 +37,6 @@ struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
     }
 
     static var validGracePeriodValues: Set<Int> {
-        Set(AppConfiguration.gracePeriodOptions.map(\.value))
+        Set(AppConfiguration.validGracePeriodValues)
     }
 }

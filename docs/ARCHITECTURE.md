@@ -196,11 +196,11 @@ The canonical row-level persisted-state classification, current status, and migr
 
 ### Models (`Sources/Models/`)
 
-Shared models and small coordinators for app-wide presentation state. Includes Swift representations of PGP keys, app-owned error enums and user-facing error messages per PRD Section 4.7, configuration types, ordinary-settings snapshot/persistence coordination, and shared identity presentation helpers. Generated `PgpError` normalization lives in the FFI mapper boundary rather than Models.
+Shared app-owned models and small coordinators for app-wide domain and persistence state. Includes Swift representations of PGP keys, app-owned error enums, configuration types, ordinary-settings snapshot/persistence coordination, and stable identity parsing/formatting helpers. SwiftUI colors, icons, and localized display text live in App-layer presentation helpers. Generated `PgpError` normalization lives in the FFI mapper boundary rather than Models.
 
 | Helper | Responsibility |
 |--------|---------------|
-| `IdentityPresentation` | Shared fingerprint formatting, short key ID derivation, user ID parsing, email extraction, and accessibility label generation |
+| `IdentityPresentation` | Shared fingerprint formatting, short key ID derivation, stable user ID display-name parsing, email extraction, and accessibility label generation |
 
 ### Rust Engine (`pgp-mobile/`)
 

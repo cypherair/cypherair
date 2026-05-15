@@ -77,7 +77,7 @@ struct EncryptRecipientsSection: View {
                 HStack {
                     compatibilityIndicator(for: contact)
                     VStack(alignment: .leading) {
-                        Text(contact.displayName)
+                        Text(IdentityDisplayPresentation.displayName(contact.displayName))
                         HStack(spacing: 6) {
                             Text(contact.preferredKey.profile.displayName)
                                 .font(.caption)

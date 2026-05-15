@@ -125,7 +125,7 @@ struct ContactDetailView: View {
             titleVisibility: .visible
         ) {
             ForEach(mergeCandidates) { candidate in
-                Button(candidate.displayName) {
+                Button(IdentityDisplayPresentation.displayName(candidate.displayName)) {
                     mergeContact(sourceContactId: candidate.contactId)
                 }
             }
@@ -220,7 +220,7 @@ struct ContactDetailView: View {
         Section {
             LabeledContent(
                 String(localized: "contactdetail.name", defaultValue: "Name"),
-                value: contact.displayName
+                value: IdentityDisplayPresentation.displayName(contact.displayName)
             )
             if let email = contact.primaryEmail {
                 LabeledContent(
