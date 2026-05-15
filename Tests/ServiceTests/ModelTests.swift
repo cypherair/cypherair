@@ -310,6 +310,19 @@ final class ModelTests: XCTestCase {
 
     // MARK: - PGPKeyProfile
 
+    func test_pgpKeyProfile_decode_historicalRawValues() throws {
+        let decoder = JSONDecoder()
+
+        XCTAssertEqual(
+            try decoder.decode(PGPKeyProfile.self, from: Data(#""universal""#.utf8)),
+            .universal
+        )
+        XCTAssertEqual(
+            try decoder.decode(PGPKeyProfile.self, from: Data(#""advanced""#.utf8)),
+            .advanced
+        )
+    }
+
     func test_pgpKeyProfile_encodeDecode_universal_roundTrip() throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
@@ -341,6 +354,58 @@ final class ModelTests: XCTestCase {
                 XCTFail("Expected DecodingError.dataCorrupted, got \(error)")
                 return
             }
+        }
+    }
+
+    // MARK: - OpenPGPCertificationKind
+
+    func test_openPGPCertificationKind_decode_historicalRawValues() throws {
+        let decoder = JSONDecoder()
+
+        let historicalValues: [(String, OpenPGPCertificationKind)] = [
+            ("generic", .generic),
+            ("persona", .persona),
+            ("casual", .casual),
+            ("positive", .positive),
+        ]
+
+        for (rawValue, expectedKind) in historicalValues {
+            let decoded = try decoder.decode(
+                OpenPGPCertificationKind.self,
+                from: Data(#""\#(rawValue)""#.utf8)
+            )
+            XCTAssertEqual(decoded, expectedKind)
+        }
+    }
+
+    func test_openPGPCertificationKind_encode_preservesHistoricalRawValues() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        for kind in OpenPGPCertificationKind.allCases {
+            let data = try encoder.encode(kind)
+            let rawValue = try decoder.decode(String.self, from: data)
+
+            XCTAssertEqual(rawValue, kind.rawValue)
+        }
+    }
+
+    func test_contactCertificationArtifactReference_decodesLegacyCertificationKindRawValues() throws {
+        let decoder = JSONDecoder()
+
+        for kind in OpenPGPCertificationKind.allCases {
+            let json = Data("""
+            {
+              "artifactId": "artifact-\(kind.rawValue)",
+              "keyId": "contact-key",
+              "createdAt": 0,
+              "certificationKind": "\(kind.rawValue)"
+            }
+            """.utf8)
+
+            let artifact = try decoder.decode(ContactCertificationArtifactReference.self, from: json)
+
+            XCTAssertEqual(artifact.certificationKind, kind)
         }
     }
 
