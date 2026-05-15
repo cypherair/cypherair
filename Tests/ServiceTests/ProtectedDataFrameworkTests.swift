@@ -3882,7 +3882,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 protectedSettingsStore: harness.store
             )
         )
-        coordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+        coordinator.loadAfterAppAuthentication(availability: .available)
 
         XCTAssertEqual(coordinator.snapshot, .firstRunDefaults)
     }
@@ -4295,7 +4295,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 protectedSettingsStore: harness.store
             )
         )
-        coordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+        coordinator.loadAfterAppAuthentication(availability: .available)
 
         coordinator.setGracePeriod(300)
         coordinator.setHasCompletedOnboarding(true)
@@ -4332,7 +4332,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
                 protectedSettingsStore: reopenedStore
             )
         )
-        reloadedCoordinator.loadAfterAppAuthentication(protectedSettingsDomainState: .unlocked)
+        reloadedCoordinator.loadAfterAppAuthentication(availability: .available)
 
         XCTAssertEqual(reloadedCoordinator.snapshot, expectedSnapshot)
     }

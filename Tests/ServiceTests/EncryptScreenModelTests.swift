@@ -1017,7 +1017,7 @@ final class EncryptScreenModelTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let availability = await service.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
@@ -1044,7 +1044,7 @@ final class EncryptScreenModelTests: XCTestCase {
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
@@ -1093,8 +1093,8 @@ final class EncryptScreenModelTests: XCTestCase {
         )
     }
 
-    private func authorizedContactsGate() -> ContactsPostAuthGateResult {
-        ContactsPostAuthGateResult(
+    private func authorizedContactsGate() -> ContactsPostAuthGateDecision {
+        ContactsPostAuthGateDecision(
             postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
             frameworkState: .sessionAuthorized
         )

@@ -50,12 +50,12 @@ final class ProtectedOrdinarySettingsCoordinator {
     }
 
     func loadAfterAppAuthentication(
-        protectedSettingsDomainState: ProtectedSettingsDomainState
+        availability: ProtectedOrdinarySettingsAvailability
     ) {
-        switch protectedSettingsDomainState {
-        case .unlocked:
+        switch availability {
+        case .available:
             loadFromPersistence()
-        case .locked, .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
+        case .unavailable:
             state = .recoveryRequired
         }
     }

@@ -25,8 +25,8 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
 
     func validateContract() throws {
         guard schemaVersion == Self.currentSchemaVersion else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload has an unsupported schema version."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload has an unsupported schema version."
             )
         }
 
@@ -73,8 +73,8 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             try Self.validateUnique(identity.tagIds, label: "tag membership for \(identity.contactId)")
             let missingTagIds = identity.tagIds.filter { !tagIds.contains($0) }
             guard missingTagIds.isEmpty else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains contact tag memberships without matching tags."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains contact tag memberships without matching tags."
                 )
             }
         }
@@ -84,13 +84,13 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             try Self.validateNonEmpty(keyRecord.contactId, label: "contact key contact identifier")
             try Self.validateNonEmpty(keyRecord.fingerprint, label: "contact key fingerprint")
             guard contactIds.contains(keyRecord.contactId) else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a key record without a matching contact."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a key record without a matching contact."
                 )
             }
             guard keyRecord.usageState == .historical || keyRecord.canEncryptTo else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains an active key record that cannot receive encrypted messages."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains an active key record that cannot receive encrypted messages."
                 )
             }
             try Self.validateUnique(
@@ -117,8 +117,8 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             try Self.validateNonEmpty(tag.tagId, label: "tag identifier")
             try Self.validateNonEmpty(tag.normalizedName, label: "normalized tag name")
             guard tag.normalizedName == ContactTag.normalizedName(for: tag.displayName) else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a tag with stale normalized metadata."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a tag with stale normalized metadata."
                 )
             }
         }
@@ -128,15 +128,15 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             try Self.validateNonEmpty(artifact.keyId, label: "certification artifact key identifier")
             try artifact.validatePayload()
             guard keyIds.contains(artifact.keyId) else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a certification artifact without a matching key."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a certification artifact without a matching key."
                 )
             }
             if let targetKeyFingerprint = artifact.targetKeyFingerprint,
                let keyRecord = keyRecords.first(where: { $0.keyId == artifact.keyId }),
                targetKeyFingerprint.lowercased() != keyRecord.fingerprint.lowercased() {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a certification artifact with stale target key metadata."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a certification artifact with stale target key metadata."
                 )
             }
         }
@@ -146,16 +146,16 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
             by: \.contactId
         ).mapValues(\.count)
         guard preferredCounts.values.allSatisfy({ $0 <= 1 }) else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains more than one preferred key for a contact."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains more than one preferred key for a contact."
             )
         }
     }
 
     private static func validateNonEmpty(_ value: String, label: String) throws {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains an empty \(label)."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains an empty \(label)."
             )
         }
     }
@@ -163,8 +163,8 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
     private static func validateUnique(_ values: [String], label: String) throws {
         let nonEmptyValues = values.filter { !$0.isEmpty }
         guard Set(nonEmptyValues).count == nonEmptyValues.count else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains duplicate \(label)."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains duplicate \(label)."
             )
         }
     }
@@ -176,13 +176,13 @@ struct ContactsDomainSnapshot: Codable, Equatable, Sendable {
     ) throws {
         for artifactID in artifactIDs {
             guard let artifact = artifactsByID[artifactID] else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains certification artifact references without matching artifacts."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains certification artifact references without matching artifacts."
                 )
             }
             guard artifact.keyId == keyId else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains certification artifact references for another key."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains certification artifact references for another key."
                 )
             }
         }

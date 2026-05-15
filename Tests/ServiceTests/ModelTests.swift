@@ -637,7 +637,7 @@ final class ModelTests: XCTestCase {
         )
 
         coordinator.loadAfterAppAuthentication(
-            protectedSettingsDomainState: .unlocked
+            availability: .available
         )
 
         XCTAssertEqual(coordinator.snapshot?.gracePeriod, 300)
@@ -656,7 +656,7 @@ final class ModelTests: XCTestCase {
         )
 
         coordinator.loadAfterAppAuthentication(
-            protectedSettingsDomainState: .locked
+            availability: .unavailable
         )
 
         XCTAssertNil(coordinator.snapshot)
@@ -680,7 +680,7 @@ final class ModelTests: XCTestCase {
         )
 
         coordinator.loadAfterAppAuthentication(
-            protectedSettingsDomainState: .recoveryNeeded
+            availability: .unavailable
         )
 
         XCTAssertNil(coordinator.snapshot)
