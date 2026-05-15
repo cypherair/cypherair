@@ -101,6 +101,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 - **PR 2A: Generated enum replacement**
   - Replace generated enum vocabulary with app-owned values where it appears in persisted data, service contracts, ScreenModel state, or UI-facing summaries.
   - Preserve schema compatibility with explicit migration or compatibility handling where needed.
+  - Status note: Phase 2 PR2A validation confirms current production code uses app-owned profile, certification-kind, signature-status, detailed-signature, and selector vocabulary above the FFI boundary, preserves historical raw values for persisted compatibility, and keeps generated enum conversion inside `Sources/Services/FFI`.
 
 - **PR 2B: Error vocabulary cleanup**
   - Keep `CypherAirError` as the shared app-owned error model.
