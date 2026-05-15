@@ -112,6 +112,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 
 - **PR 2D: Security vocabulary cleanup**
   - Remove ProtectedData and Security implementation vocabulary from app-owned domain models where those details can be represented by app-level availability or validation results.
+  - Status note: Phase 2 PR2D validation confirms current production Models use app-owned Contacts validation and ordinary-settings availability vocabulary, while ProtectedData outcome/state mapping and protected-settings persistence adapters live at Services, Security, or App composition boundaries with source-audit coverage blocking regression.
 
 ### Exit Markers
 
@@ -125,7 +126,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 - Run model and persistence tests affected by enum or schema changes.
 - Add migration or compatibility tests before changing persisted payload vocabulary.
 - Run localization checks when moving user-facing strings.
-- Run targeted source-audit checks for SwiftUI imports and generated FFI symbols in Models.
+- Run targeted source-audit checks for SwiftUI imports, generated FFI symbols, and ProtectedData / Security implementation vocabulary in Models.
 
 ## Phase 3: Contacts Runtime Consolidation
 

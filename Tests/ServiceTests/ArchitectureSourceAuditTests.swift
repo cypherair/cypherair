@@ -26,6 +26,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.modelsLocalizedPresentationText)
     }
 
+    func test_modelsSecurityImplementationVocabulary_isBlocked() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary)
+    }
+
     func test_contactArrayRuntimeDependencies_areLimitedToKnownTemporaryExceptions() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.contactArrayRuntimeDependencies)
     }
@@ -98,6 +102,17 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
 
         try assertRuleBehavior(
+            ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary.withTemporaryExceptions([
+                "Sources/Models/LegacySecurityModel.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Models/NewDomainModel.swift",
+            violatingContents: "import LocalAuthentication\nstruct NewDomainModel { let state: ProtectedDataFrameworkState }",
+            allowedPath: "Sources/Models/LegacySecurityModel.swift",
+            allowedContents: "struct LegacySecurityModel { let error: ProtectedDataError }",
+            cleanContents: "struct LegacySecurityModel { let availability: ProtectedOrdinarySettingsAvailability }"
+        )
+
+        try assertRuleBehavior(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
                 "Sources/Services/ContactService.swift": "fixture exception"
             ]),
@@ -163,7 +178,8 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             contents: """
             // import SwiftUI should be ignored in comments.
             // String(localized:) should be ignored in comments.
-            let note = "import SwiftUI String(localized:)"
+            // ProtectedDataError and ProtectedSettingsStore should be ignored in comments.
+            let note = "import SwiftUI String(localized:) ProtectedDataError ProtectedSettingsStore"
             struct NewDomainModel {}
             """
         )
@@ -172,6 +188,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.modelsLocalizedPresentationText.violations(in: [modelsSource]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary.violations(in: [modelsSource]).isEmpty
         )
     }
 
@@ -261,6 +280,19 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .violations(in: [nestedStringAndCommentSource])
                 .isEmpty
         )
+
+        let modelSecurityInterpolationSource = AuditedSource(
+            path: "Sources/Models/NewDomainModel.swift",
+            contents: #"""
+            struct NewDomainModel {
+                let message = "\(ProtectedDataError.authorizingUnavailable)"
+            }
+            """#
+        )
+        let modelSecurityViolations = ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary
+            .violations(in: [modelSecurityInterpolationSource])
+        XCTAssertEqual(modelSecurityViolations.map(\.path), ["Sources/Models/NewDomainModel.swift"])
+        XCTAssertEqual(modelSecurityViolations.first?.matches, ["ProtectedDataError"])
     }
 
     private func assertRulePasses(
@@ -495,6 +527,38 @@ private enum ArchitectureSourceAuditRules {
             path.hasPrefix("Sources/Models/") && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let modelsSecurityImplementationVocabulary = ArchitectureSourceAuditRule(
+        name: "Models Security implementation vocabulary",
+        failureSummary: "Core Models should not depend on Security or ProtectedData implementation vocabulary.",
+        pattern: #"^\s*import\s+(?:LocalAuthentication|Security)\b|"# + wordPattern(for: [
+            "AuthenticationManager",
+            "KeychainConstants",
+            "KeychainManager",
+            "KeychainManageable",
+            "LAContext",
+            "ProtectedData",
+            "ProtectedDataError",
+            "ProtectedDataFrameworkState",
+            "ProtectedDataPostUnlockOutcome",
+            "ProtectedDataRegistry",
+            "ProtectedDataSessionCoordinator",
+            "ProtectedDataStorageRoot",
+            "ProtectedDomainBootstrapStore",
+            "ProtectedDomainKeyManager",
+            "ProtectedSettingsDomainState",
+            "ProtectedSettingsOrdinarySettingsPersistence",
+            "ProtectedSettingsStore",
+            "SecureEnclaveManageable",
+            "SecureEnclaveManager",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/Models/") && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        expressionOptions: [.anchorsMatchLines],
         temporaryExceptions: temporaryExceptions([])
     )
 

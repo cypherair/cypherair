@@ -8,6 +8,9 @@
 > PR2C update: 2026-05-15 refreshed presentation-boundary evidence after
 > Phase 2 PR2C; Models no longer import SwiftUI or own localized presentation
 > text in current production code.
+> PR2D update: 2026-05-15 refreshed Security vocabulary evidence after
+> Phase 2 PR2D; Models no longer reference ProtectedData / Security
+> implementation vocabulary in current production code.
 > Scope: First-party Swift app code under `Sources/`. Generated UniFFI Swift
 > bindings in `Sources/PgpMobile/pgp_mobile.swift` are used only as evidence for
 > generated type origins, not classified as hand-maintained architecture debt.
@@ -37,10 +40,11 @@ material architecture debt around layer boundaries, FFI containment, model
 responsibility, Contacts runtime shape, and security workflow placement.
 
 The most persistent problem is not one isolated file. It is that generated
-UniFFI types, presentation policy, ProtectedData state, and legacy compatibility
-projections are used as ordinary app-facing vocabulary. That makes code harder
-to reason about because changes to Rust bindings, Contacts storage, or security
-authorization rules can ripple into Models, ScreenModels, UI, and tests.
+UniFFI types and legacy compatibility projections are used as ordinary
+app-facing vocabulary, while several App and ScreenModel flows still coordinate
+Security implementation details directly. That makes code harder to reason
+about because changes to Rust bindings, Contacts storage, or security
+authorization rules can ripple into ScreenModels, UI, services, and tests.
 
 Representative search snapshot:
 
@@ -56,6 +60,11 @@ Representative search snapshot:
 - Phase 2 PR2C validation found SwiftUI color/icon/status presentation and
   localized display text moved out of `Sources/Models` into App-layer
   presentation helpers, with source-audit coverage blocking regression.
+- Phase 2 PR2D validation found ProtectedData and Security implementation
+  vocabulary moved out of `Sources/Models`; Contacts validation now uses an
+  app-owned validation error that the ProtectedData storage boundary maps back
+  to `ProtectedDataError.invalidEnvelope(...)`, and Contacts post-auth decisions
+  store app-level availability rather than ProtectedData outcome/state values.
 - The Contacts runtime still exposes and mutates `[Contact]` while also
   maintaining `ContactsDomainSnapshot` and person-centered summary types.
 - Several UI routes and ScreenModels still call concrete services or security
@@ -84,7 +93,7 @@ Representative search snapshot:
 | Generated cancellation policy is normalized before reaching App code | [Sources/Services/FFI/PGPErrorMapper.swift](../Sources/Services/FFI/PGPErrorMapper.swift) maps generated `.OperationCancelled` to `CypherAirError.operationCancelled`. Current App and ScreenModel cancellation checks inspect only that app-owned case, for example [Sources/App/Common/OperationController.swift](../Sources/App/Common/OperationController.swift), [Sources/App/Keys/ImportKeyView.swift](../Sources/App/Keys/ImportKeyView.swift), and contact/key ScreenModels. | Direct generated `PgpError` interpretation no longer appears in production App or Models. FFI adapter files still own generated-error interpretation, while Services and App code consume `CypherAirError` or feature-specific app-owned errors. | Low to Medium. Future FFI calls must continue to normalize generated cancellation at the adapter boundary before App or ScreenModel code handles it. |
 | Models SwiftUI presentation policy is extracted | Phase 2 PR2C source inspection found no `import SwiftUI` in `Sources/Models`. `ColorTheme` now stays a persisted enum in [Sources/Models/ColorTheme.swift](../Sources/Models/ColorTheme.swift), while display names, tint colors, action colors, and swatches live in [Sources/App/Common/ColorTheme+Presentation.swift](../Sources/App/Common/ColorTheme+Presentation.swift). `SignatureVerification` keeps app-owned verification state in [Sources/Models/SignatureVerification.swift](../Sources/Models/SignatureVerification.swift), while SF Symbols, status colors, and localized status text live in [Sources/App/Common/SignatureVerification+Presentation.swift](../Sources/App/Common/SignatureVerification+Presentation.swift). | The former SwiftUI import and color/icon policy debt is resolved for current production code. The active concern is regression prevention: core Models should not regain SwiftUI presentation dependencies. | Low residual risk, guarded by source-audit tests for SwiftUI imports in Models. |
 | Models localized display text is extracted | Phase 2 PR2C source inspection found no `String(localized:)` or `String.localizedStringWithFormat` in `Sources/Models`. Profile labels, Contacts availability text, contact key-count text, grace-period picker labels, signature identity text, and `CypherAirError` localized descriptions moved to App-layer presentation helpers. `AppConfiguration` keeps only numeric grace-period values, and `IdentityPresentation.displayName(from:)` now uses a stable nonlocalized domain fallback for compatibility. | The former Models-layer localized presentation debt is resolved for current production code. The remaining concern is keeping future display text in App presentation helpers or ScreenModel-prepared display state. | Low residual risk, guarded by source-audit tests for localized presentation calls in Models. |
-| Models throw Security / ProtectedData errors | `ContactsDomainSnapshot.validateContract()` throws `ProtectedDataError.invalidEnvelope(...)` in [Sources/Models/Contacts/ContactsDomainSnapshot.swift:26](../Sources/Models/Contacts/ContactsDomainSnapshot.swift#L26). `ContactCertificationArtifactReference.validatePayload()` throws `ProtectedDataError.invalidEnvelope(...)` in [Sources/Models/Contacts/ContactCertificationArtifactReference.swift:189](../Sources/Models/Contacts/ContactCertificationArtifactReference.swift#L189). `ContactsPostAuthGateResult` stores `ProtectedDataPostUnlockOutcome` and `ProtectedDataFrameworkState` in [Sources/Models/Contacts/ContactsAvailability.swift:80](../Sources/Models/Contacts/ContactsAvailability.swift#L80). | Contacts domain models know ProtectedData error vocabulary and post-unlock framework state. This embeds storage/security framework details into app-owned domain types. | Medium. Future storage boundary changes can force model changes and broaden security-sensitive review scope. |
+| Models Security vocabulary is extracted | Phase 2 PR2D source inspection found no production `Sources/Models` references to `ProtectedDataError`, `ProtectedDataPostUnlockOutcome`, `ProtectedDataFrameworkState`, `ProtectedSettingsStore`, `ProtectedSettingsDomainState`, `LAContext`, Keychain, Secure Enclave, or `AuthenticationManager` code symbols. Contacts validation uses [Sources/Models/Contacts/ContactsDomainValidationError.swift](../Sources/Models/Contacts/ContactsDomainValidationError.swift), while ProtectedData storage files map that app-owned error back to protected-domain envelope failures. Contacts post-auth gate decisions live in [Sources/Services/ContactsPostAuthGateDecision.swift](../Sources/Services/ContactsPostAuthGateDecision.swift), and the protected-settings ordinary-settings adapter lives in [Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift](../Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift). | The former Models-layer ProtectedData/Security vocabulary debt is resolved for current production code. The active concern is regression prevention: app-owned Models should keep expressing validation and availability without storing Security implementation state. | Low residual risk, guarded by source-audit tests for ProtectedData and Security implementation vocabulary in Models. |
 | Legacy `Contact` projection remains active runtime state | `ContactService` stores `private var contacts: [Contact] = []` in [Sources/Services/ContactService.swift:27](../Sources/Services/ContactService.swift#L27) while also storing `runtimeSnapshot: ContactsDomainSnapshot?` in [Sources/Services/ContactService.swift:40](../Sources/Services/ContactService.swift#L40). Protected-domain open calls `applyProtectedRuntimeSnapshot(...)`, which projects the snapshot back into `[Contact]` in [Sources/Services/ContactService.swift:1184](../Sources/Services/ContactService.swift#L1184). | The protected Contacts domain is present, but the ordinary runtime still maintains a flat compatibility projection. The legacy projection is not only old-install migration input. | High. Two runtime representations create drift risk and make it harder to know which model is authoritative at a call site. |
 | Contacts compatibility mapper is in ordinary mutation paths | Protected add-contact returns `Contact` by calling `compatibilityContact(...)` in [Sources/Services/ContactService.swift:316](../Sources/Services/ContactService.swift#L316). `compatibilityContact(...)` rebuilds projected contacts from the snapshot in [Sources/Services/ContactService.swift:1062](../Sources/Services/ContactService.swift#L1062). The mapper itself converts snapshots into `[Contact]` in [Sources/Services/ContactsCompatibilityMapper.swift:58](../Sources/Services/ContactsCompatibilityMapper.swift#L58). | Compatibility projection is used to shape normal service results, not only legacy migration reads. This keeps legacy `Contact` in app-facing APIs such as `AddContactResult` and import workflows. | High. It slows migration to person-centered Contacts types and keeps older key-replacement semantics visible. |
 | ContactService owns too many Contacts responsibilities | `ContactService` constructs legacy repository and migration source in [Sources/Services/ContactService.swift:60](../Sources/Services/ContactService.swift#L60), opens the protected domain in [Sources/Services/ContactService.swift:72](../Sources/Services/ContactService.swift#L72), supports legacy compatibility open in [Sources/Services/ContactService.swift:130](../Sources/Services/ContactService.swift#L130), performs imports in [Sources/Services/ContactService.swift:184](../Sources/Services/ContactService.swift#L184), exposes summaries in [Sources/Services/ContactService.swift:492](../Sources/Services/ContactService.swift#L492), and performs snapshot persistence in [Sources/Services/ContactService.swift:1051](../Sources/Services/ContactService.swift#L1051). | The facade owns availability, migration fallback, legacy projection, import/update, protected mutation rollback, search/tag summaries, certification artifacts, and persistence coordination. | High. The file is a high-coupling center where migration, runtime, and current product behavior are hard to separate. |
@@ -120,6 +129,7 @@ The audit was prepared from targeted source inspection and searches focused on:
 - generated error/cancellation containment and `PGPErrorMapper` call sites
 - direct `PgpEngine` ownership
 - SwiftUI and localized presentation policy inside `Sources/Models`
+- ProtectedData and Security implementation vocabulary inside `Sources/Models`
 - `Contact` / `[Contact]` runtime references
 - direct service calls from views
 - Security and ProtectedData types inside App and ScreenModel code
@@ -129,6 +139,8 @@ The 2026-05-15 PR2B refresh also checked that production `Sources/App` and
 production use is limited to `Sources/Services/FFI`. The 2026-05-15 PR2C
 refresh also checked that `Sources/Models` no longer import SwiftUI or call
 `String(localized:)` / `String.localizedStringWithFormat`.
+The 2026-05-15 PR2D refresh checked that `Sources/Models` no longer reference
+ProtectedData or Security implementation vocabulary in production code.
 
 Because this audit can be updated together with code changes, validation should
 follow the touched surfaces. Documentation-only changes do not require Rust or
