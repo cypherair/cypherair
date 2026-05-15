@@ -99,16 +99,12 @@ final class CertificateSignatureService {
             signerSecretCert.resetBytes(in: 0..<signerSecretCert.count)
         }
 
-        do {
-            return try await certificateAdapter.generateUserIdCertification(
-                signerSecretCert: signerSecretCert,
-                targetCert: targetCert,
-                selectedUserId: validatedUserId,
-                certificationKind: certificationKind
-            )
-        } catch {
-            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
-        }
+        return try await certificateAdapter.generateUserIdCertification(
+            signerSecretCert: signerSecretCert,
+            targetCert: targetCert,
+            selectedUserId: validatedUserId,
+            certificationKind: certificationKind
+        )
     }
 
     func generateArmoredUserIdCertification(

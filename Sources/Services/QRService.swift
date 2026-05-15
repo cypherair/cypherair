@@ -24,12 +24,7 @@ final class QRService {
     /// - Parameter publicKeyData: Binary public key data.
     /// - Returns: A CIImage of the QR code, or nil if generation fails.
     func generateQRCode(for publicKeyData: Data) throws -> CIImage? {
-        let urlString: String
-        do {
-            urlString = try contactImportAdapter.encodeQrUrl(publicKeyData: publicKeyData)
-        } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-        }
+        let urlString = try contactImportAdapter.encodeQrUrl(publicKeyData: publicKeyData)
 
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(urlString.utf8)

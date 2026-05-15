@@ -6,6 +6,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.generatedFFITypes)
     }
 
+    func test_generatedErrorMapping_isLimitedToFFIAdapters() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.generatedErrorMappingContainment)
+    }
+
     func test_appLayerPgpErrorHandling_isLimitedToKnownTemporaryExceptions() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.appLayerPgpErrorHandling)
     }
@@ -43,6 +47,17 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             allowedPath: "Sources/App/Common/OperationController.swift",
             allowedContents: "func shouldIgnore(_ error: Error) -> Bool { error is PgpError }",
             cleanContents: "func shouldIgnore(_ error: Error) -> Bool { false }"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.generatedErrorMappingContainment.withTemporaryExceptions([
+                "Sources/Services/FFI/PGPErrorMapper.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Services/NewService.swift",
+            violatingContents: "struct NewService { func map(_ error: Error) { _ = PGPErrorMapper.map(error) { .internalError(reason: $0) } } }",
+            allowedPath: "Sources/Services/FFI/PGPErrorMapper.swift",
+            allowedContents: "enum PGPErrorMapper { static func map(_ error: PgpError) {} }",
+            cleanContents: "struct NewService {}"
         )
 
         try assertRuleBehavior(
@@ -105,15 +120,18 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         let source = AuditedSource(
             path: "Sources/App/NewView.swift",
             contents: """
-            // PgpEngine, PgpError, and PGPKeyMetadataAdapter should be ignored in comments.
+            // PgpEngine, PgpError, PGPErrorMapper, and PGPKeyMetadataAdapter should be ignored in comments.
             let message = "KeyInfo [Contact] import SwiftUI"
-            let raw = #"ProgressReporterImpl KeyProfile Array<Contact> PGPCertificateSelectionAdapter"#
+            let raw = #"ProgressReporterImpl KeyProfile Array<Contact> PGPCertificateSelectionAdapter PGPErrorMapper"#
             struct NewView {}
             """
         )
 
         XCTAssertTrue(
             ArchitectureSourceAuditRules.generatedFFITypes.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.generatedErrorMappingContainment.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.appLayerPgpErrorHandling.violations(in: [source]).isEmpty
@@ -201,6 +219,11 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.generatedFFITypes
+                .violations(in: [nestedStringAndCommentSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.generatedErrorMappingContainment
                 .violations(in: [nestedStringAndCommentSource])
                 .isEmpty
         )
@@ -373,6 +396,35 @@ private enum ArchitectureSourceAuditRules {
         },
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let generatedErrorMappingContainment = ArchitectureSourceAuditRule(
+        name: "Generated error mapping containment",
+        failureSummary: "Generated PgpError mapping should stay inside the FFI adapter boundary.",
+        pattern: wordPattern(for: [
+            "PGPErrorMapper",
+            "PgpError",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "FFI adapter files intentionally normalize generated PgpError values into CypherAirError.",
+                [
+                    "Sources/Services/FFI/PGPErrorMapper.swift",
+                    "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
+                    "Sources/Services/FFI/PGPContactImportAdapter.swift",
+                    "Sources/Services/FFI/PGPKeyOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
+                ]
+            ),
+        ])
     )
 
     static let appLayerFFIAdapterUsage = ArchitectureSourceAuditRule(

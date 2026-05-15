@@ -38,14 +38,10 @@ final class SigningService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        do {
-            return try await messageAdapter.signCleartext(
-                text: Data(text.utf8),
-                signerCert: secretKey
-            )
-        } catch {
-            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
-        }
+        return try await messageAdapter.signCleartext(
+            text: Data(text.utf8),
+            signerCert: secretKey
+        )
     }
 
     /// Create a detached signature for file data.
@@ -66,14 +62,10 @@ final class SigningService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        do {
-            return try await messageAdapter.signDetached(
-                data: data,
-                signerCert: secretKey
-            )
-        } catch {
-            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
-        }
+        return try await messageAdapter.signDetached(
+            data: data,
+            signerCert: secretKey
+        )
     }
 
     // MARK: - Streaming File Signing
@@ -101,15 +93,11 @@ final class SigningService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        do {
-            return try await messageAdapter.signDetachedFile(
-                inputPath: fileURL.path,
-                signerCert: secretKey,
-                progress: progress
-            )
-        } catch {
-            throw CypherAirError.from(error) { .signingFailed(reason: $0) }
-        }
+        return try await messageAdapter.signDetachedFile(
+            inputPath: fileURL.path,
+            signerCert: secretKey,
+            progress: progress
+        )
     }
 
     // MARK: - Verification
