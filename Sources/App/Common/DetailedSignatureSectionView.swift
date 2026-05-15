@@ -71,7 +71,7 @@ struct DetailedSignatureSectionView: View {
 private extension SignatureVerification {
     init(entry: DetailedSignatureVerification.Entry) {
         self.init(
-            status: SignatureStatus(from: entry.status),
+            status: MessageSignatureStatus(from: entry.status),
             signerFingerprint: entry.signerPrimaryFingerprint,
             signerContact: nil,
             signerIdentity: entry.signerIdentity,
@@ -81,7 +81,7 @@ private extension SignatureVerification {
     }
 }
 
-private extension SignatureStatus {
+private extension MessageSignatureStatus {
     init(from status: DetailedSignatureVerification.Entry.Status) {
         switch status {
         case .valid:

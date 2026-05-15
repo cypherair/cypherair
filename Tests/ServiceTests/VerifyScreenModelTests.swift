@@ -336,7 +336,7 @@ final class VerifyScreenModelTests: XCTestCase {
     }
 
     private func makeDetailedVerification(
-        status: SignatureStatus,
+        status: MessageSignatureStatus,
         signerFingerprint: String? = nil
     ) -> DetailedSignatureVerification {
         DetailedSignatureVerification(
@@ -355,7 +355,7 @@ final class VerifyScreenModelTests: XCTestCase {
     }
 
     private func makeDetailedEntryStatus(
-        from status: SignatureStatus
+        from status: MessageSignatureStatus
     ) -> DetailedSignatureVerification.Entry.Status {
         switch status {
         case .valid:

@@ -59,6 +59,7 @@ final class KeyProvisioningService {
     typealias ProvisioningCheckpoint = @Sendable () async -> Void
 
     private let engine: PgpEngine
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let memoryInfo: any MemoryInfoProvidable
     private let bundleStore: KeyBundleStore
@@ -73,6 +74,7 @@ final class KeyProvisioningService {
 
     init(
         engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         secureEnclave: any SecureEnclaveManageable,
         memoryInfo: any MemoryInfoProvidable,
         bundleStore: KeyBundleStore,
@@ -85,6 +87,7 @@ final class KeyProvisioningService {
         commitDrainWaiterRegisteredCheckpoint: ProvisioningCheckpoint? = nil
     ) {
         self.engine = engine
+        self.certificateAdapter = certificateAdapter
         self.secureEnclave = secureEnclave
         self.memoryInfo = memoryInfo
         self.bundleStore = bundleStore
@@ -176,6 +179,7 @@ final class KeyProvisioningService {
 
         var (secretKeyData, metadata, publicKeyData, revocationCert) = try await Self.importKeyOffMainActor(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             armoredData: armoredData,
             passphrase: passphrase
         )
@@ -310,6 +314,7 @@ final class KeyProvisioningService {
     @concurrent
     private static func importKeyOffMainActor(
         engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         armoredData: Data,
         passphrase: String
     ) async throws -> (
@@ -331,7 +336,9 @@ final class KeyProvisioningService {
             )
             let armoredPubKey = try engine.armorPublicKey(certData: secretKeyData)
             let publicKeyData = try engine.dearmor(armored: armoredPubKey)
-            let revocationCert = try engine.generateKeyRevocation(secretCert: secretKeyData)
+            let revocationCert = try await certificateAdapter.generateKeyRevocation(
+                secretCert: secretKeyData
+            )
             return (secretKeyData, metadata, publicKeyData, revocationCert)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }

@@ -28,45 +28,35 @@ struct VerifiedContactCertificationArtifact: Equatable, Sendable {
 @Observable
 final class CertificateSignatureService {
 
-    private let engine: PgpEngine
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
 
     init(
-        engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) {
-        self.engine = engine
+        self.certificateAdapter = certificateAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
     }
 
     /// Discover selector-bearing metadata for arbitrary target certificate bytes.
     func selectionCatalog(targetCert: Data) throws -> CertificateSelectionCatalog {
-        try PGPCertificateSelectionAdapter.selectionCatalog(
-            engine: engine,
-            certData: targetCert
-        )
+        try certificateAdapter.selectionCatalog(targetCert: targetCert)
     }
 
     func verifyDirectKeySignature(
         signature: Data,
         targetCert: Data
     ) async throws -> CertificateSignatureVerification {
-        let result: CertificateSignatureResult
-        do {
-            result = try await Self.performVerifyDirectKeySignature(
-                engine: engine,
-                signature: signature,
-                targetCert: targetCert,
-                candidateSigners: try candidateSignerCertificates()
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return makeVerification(from: result)
+        try await certificateAdapter.verifyDirectKeySignature(
+            signature: signature,
+            targetCert: targetCert,
+            candidateSigners: try candidateSignerCertificates(),
+            verificationContext: verificationContext()
+        )
     }
 
     func verifyUserIdBindingSignature(
@@ -79,27 +69,20 @@ final class CertificateSignatureService {
             selectedUserId: selectedUserId
         )
 
-        let result: CertificateSignatureResult
-        do {
-            result = try await Self.performVerifyUserIdBindingSignatureBySelector(
-                engine: engine,
-                signature: signature,
-                targetCert: targetCert,
-                selectedUserId: validatedUserId,
-                candidateSigners: try candidateSignerCertificates()
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return makeVerification(from: result)
+        return try await certificateAdapter.verifyUserIdBindingSignature(
+            signature: signature,
+            targetCert: targetCert,
+            selectedUserId: validatedUserId,
+            candidateSigners: try candidateSignerCertificates(),
+            verificationContext: verificationContext()
+        )
     }
 
     func generateUserIdCertification(
         signerFingerprint: String,
         targetCert: Data,
         selectedUserId: UserIdSelectionOption,
-        certificationKind: CertificationKind
+        certificationKind: OpenPGPCertificationKind
     ) async throws -> Data {
         let validatedUserId = try validatedUserIdSelection(
             targetCert: targetCert,
@@ -117,8 +100,7 @@ final class CertificateSignatureService {
         }
 
         do {
-            return try await Self.performGenerateUserIdCertificationBySelector(
-                engine: engine,
+            return try await certificateAdapter.generateUserIdCertification(
                 signerSecretCert: signerSecretCert,
                 targetCert: targetCert,
                 selectedUserId: validatedUserId,
@@ -133,7 +115,7 @@ final class CertificateSignatureService {
         signerFingerprint: String,
         targetCert: Data,
         selectedUserId: UserIdSelectionOption,
-        certificationKind: CertificationKind
+        certificationKind: OpenPGPCertificationKind
     ) async throws -> Data {
         let rawSignature = try await generateUserIdCertification(
             signerFingerprint: signerFingerprint,
@@ -142,15 +124,11 @@ final class CertificateSignatureService {
             certificationKind: certificationKind
         )
 
-        do {
-            return try engine.armor(data: rawSignature, kind: .signature)
-        } catch {
-            throw CypherAirError.from(error) { .armorError(reason: $0) }
-        }
+        return try await certificateAdapter.armorSignature(rawSignature)
     }
 
-    func canonicalSignatureData(from signature: Data) -> Data {
-        (try? engine.dearmor(armored: signature)) ?? signature
+    func canonicalSignatureData(from signature: Data) async -> Data {
+        await certificateAdapter.canonicalSignatureData(from: signature)
     }
 
     func validateDirectKeyCertificationArtifact(
@@ -160,7 +138,7 @@ final class CertificateSignatureService {
         source: ContactCertificationArtifactSource,
         exportFilename: String? = nil
     ) async throws -> ContactCertificationArtifactValidation {
-        let canonicalSignature = canonicalSignatureData(from: signature)
+        let canonicalSignature = await canonicalSignatureData(from: signature)
         let verification = try await verifyDirectKeySignature(
             signature: canonicalSignature,
             targetCert: targetCert
@@ -195,7 +173,7 @@ final class CertificateSignatureService {
         source: ContactCertificationArtifactSource,
         exportFilename: String? = nil
     ) async throws -> ContactCertificationArtifactValidation {
-        let canonicalSignature = canonicalSignatureData(from: signature)
+        let canonicalSignature = await canonicalSignatureData(from: signature)
         let verification = try await verifyUserIdBindingSignature(
             signature: canonicalSignature,
             targetCert: targetCert,
@@ -243,20 +221,6 @@ final class CertificateSignatureService {
         )
     }
 
-    private func makeVerification(
-        from result: CertificateSignatureResult
-    ) -> CertificateSignatureVerification {
-        CertificateSignatureVerification(
-            status: result.status,
-            certificationKind: result.certificationKind,
-            signerPrimaryFingerprint: result.signerPrimaryFingerprint,
-            signingKeyFingerprint: result.signingKeyFingerprint,
-            signerIdentity: resolveSignerIdentity(
-                primaryFingerprint: result.signerPrimaryFingerprint
-            )
-        )
-    }
-
     private func makeCertificationArtifact(
         canonicalSignatureData: Data,
         source: ContactCertificationArtifactSource,
@@ -301,57 +265,16 @@ final class CertificateSignatureService {
     ) throws -> UserIdSelectionOption {
         let catalog = try selectionCatalog(targetCert: targetCert)
 
-        return try PGPCertificateSelectionAdapter.validateUserIdSelection(
+        return try certificateAdapter.validateUserIdSelection(
             selectedUserId,
             in: catalog
         )
     }
 
-    @concurrent
-    private static func performVerifyDirectKeySignature(
-        engine: PgpEngine,
-        signature: Data,
-        targetCert: Data,
-        candidateSigners: [Data]
-    ) async throws -> CertificateSignatureResult {
-        try engine.verifyDirectKeySignature(
-            signature: signature,
-            targetCert: targetCert,
-            candidateSigners: candidateSigners
-        )
-    }
-
-    @concurrent
-    private static func performVerifyUserIdBindingSignatureBySelector(
-        engine: PgpEngine,
-        signature: Data,
-        targetCert: Data,
-        selectedUserId: UserIdSelectionOption,
-        candidateSigners: [Data]
-    ) async throws -> CertificateSignatureResult {
-        try await PGPCertificateSelectionAdapter.verifyUserIdBindingSignature(
-            engine: engine,
-            signature: signature,
-            targetCert: targetCert,
-            selectedUserId: selectedUserId,
-            candidateSigners: candidateSigners
-        )
-    }
-
-    @concurrent
-    private static func performGenerateUserIdCertificationBySelector(
-        engine: PgpEngine,
-        signerSecretCert: Data,
-        targetCert: Data,
-        selectedUserId: UserIdSelectionOption,
-        certificationKind: CertificationKind
-    ) async throws -> Data {
-        try await PGPCertificateSelectionAdapter.generateUserIdCertification(
-            engine: engine,
-            signerSecretCert: signerSecretCert,
-            targetCert: targetCert,
-            selectedUserId: selectedUserId,
-            certificationKind: certificationKind
+    private func verificationContext() -> PGPCertificateVerificationContext {
+        PGPCertificateVerificationContext(
+            contacts: contactService.contactsForVerificationContext().contacts,
+            ownKeys: keyManagement.keys
         )
     }
 }

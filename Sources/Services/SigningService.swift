@@ -4,16 +4,16 @@ import Foundation
 @Observable
 final class SigningService {
 
-    private let engine: PgpEngine
+    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
 
     init(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) {
-        self.engine = engine
+        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
     }
@@ -39,8 +39,9 @@ final class SigningService {
         }
 
         do {
-            return try await Self.performSignCleartext(
-                engine: engine, text: Data(text.utf8), signerCert: secretKey
+            return try await messageAdapter.signCleartext(
+                text: Data(text.utf8),
+                signerCert: secretKey
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -66,8 +67,9 @@ final class SigningService {
         }
 
         do {
-            return try await Self.performSignDetached(
-                engine: engine, data: data, signerCert: secretKey
+            return try await messageAdapter.signDetached(
+                data: data,
+                signerCert: secretKey
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -100,9 +102,10 @@ final class SigningService {
         }
 
         do {
-            return try await Self.performSignDetachedFile(
-                engine: engine, inputPath: fileURL.path,
-                signerCert: secretKey, progress: progress
+            return try await messageAdapter.signDetachedFile(
+                inputPath: fileURL.path,
+                signerCert: secretKey,
+                progress: progress
             )
         } catch {
             throw CypherAirError.from(error) { .signingFailed(reason: $0) }
@@ -119,30 +122,9 @@ final class SigningService {
         _ signedMessage: Data
     ) async throws -> (text: Data?, verification: DetailedSignatureVerification) {
         let context = verificationContext()
-
-        let result: VerifyDetailedResult
-        do {
-            result = try await Self.performVerifyCleartextDetailed(
-                engine: engine,
-                signedMessage: signedMessage,
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return (
-            text: result.content,
-            verification: DetailedSignatureVerification.from(
-                legacyStatus: result.legacyStatus,
-                legacySignerFingerprint: result.legacySignerFingerprint,
-                summaryState: result.summaryState,
-                summaryEntryIndex: result.summaryEntryIndex,
-                signatures: result.signatures,
-                contacts: context.contacts,
-                ownKeys: keyManagement.keys,
-                contactsAvailability: context.contactsAvailability
-            )
+        return try await messageAdapter.verifyCleartextDetailed(
+            signedMessage: signedMessage,
+            verificationContext: context
         )
     }
 
@@ -153,28 +135,10 @@ final class SigningService {
         signature: Data
     ) async throws -> DetailedSignatureVerification {
         let context = verificationContext()
-
-        let result: VerifyDetailedResult
-        do {
-            result = try await Self.performVerifyDetachedDetailed(
-                engine: engine,
-                data: data,
-                signature: signature,
-                verificationKeys: context.verificationKeys
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
+        return try await messageAdapter.verifyDetachedDetailed(
+            data: data,
+            signature: signature,
+            verificationContext: context
         )
     }
 
@@ -188,112 +152,27 @@ final class SigningService {
         progress: FileProgressReporter?
     ) async throws -> DetailedSignatureVerification {
         let context = verificationContext()
-
-        let result: FileVerifyDetailedResult
-        do {
-            result = try await Self.performVerifyDetachedFileDetailed(
-                engine: engine,
-                dataPath: fileURL.path,
-                signature: signature,
-                verificationKeys: context.verificationKeys,
-                progress: progress
-            )
-        } catch {
-            throw CypherAirError.from(error) { .corruptData(reason: $0) }
-        }
-
-        return DetailedSignatureVerification.from(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contacts: context.contacts,
-            ownKeys: keyManagement.keys,
-            contactsAvailability: context.contactsAvailability
+        return try await messageAdapter.verifyDetachedFileDetailed(
+            dataPath: fileURL.path,
+            signature: signature,
+            verificationContext: context,
+            progress: progress
         )
     }
 
     // MARK: - Private
 
-    private struct VerificationContext {
-        let verificationKeys: [Data]
-        let contacts: [Contact]
-        let contactsAvailability: ContactsAvailability
-    }
-
-    private func verificationContext() -> VerificationContext {
+    private func verificationContext() -> PGPMessageVerificationContext {
         let contactsContext = contactService.contactsForVerificationContext()
         let contactsAvailability = contactsContext.availability
         let contacts = contactsContext.contacts
-        return VerificationContext(
+        let ownKeys = keyManagement.keys
+        return PGPMessageVerificationContext(
             verificationKeys: contacts.map { $0.publicKeyData }
-                + keyManagement.keys.map { $0.publicKeyData },
+                + ownKeys.map { $0.publicKeyData },
             contacts: contacts,
+            ownKeys: ownKeys,
             contactsAvailability: contactsAvailability
-        )
-    }
-
-    // MARK: - Off-Main-Actor Engine Helpers
-
-    @concurrent
-    private static func performSignCleartext(
-        engine: PgpEngine, text: Data, signerCert: Data
-    ) async throws -> Data {
-        try engine.signCleartext(text: text, signerCert: signerCert)
-    }
-
-    @concurrent
-    private static func performSignDetached(
-        engine: PgpEngine, data: Data, signerCert: Data
-    ) async throws -> Data {
-        try engine.signDetached(data: data, signerCert: signerCert)
-    }
-
-    @concurrent
-    private static func performSignDetachedFile(
-        engine: PgpEngine, inputPath: String,
-        signerCert: Data, progress: FileProgressReporter?
-    ) async throws -> Data {
-        try engine.signDetachedFile(
-            inputPath: inputPath, signerCert: signerCert, progress: progress
-        )
-    }
-
-    @concurrent
-    private static func performVerifyCleartextDetailed(
-        engine: PgpEngine,
-        signedMessage: Data,
-        verificationKeys: [Data]
-    ) async throws -> VerifyDetailedResult {
-        try engine.verifyCleartextDetailed(
-            signedMessage: signedMessage,
-            verificationKeys: verificationKeys
-        )
-    }
-
-    @concurrent
-    private static func performVerifyDetachedDetailed(
-        engine: PgpEngine,
-        data: Data,
-        signature: Data,
-        verificationKeys: [Data]
-    ) async throws -> VerifyDetailedResult {
-        try engine.verifyDetachedDetailed(
-            data: data,
-            signature: signature,
-            verificationKeys: verificationKeys
-        )
-    }
-
-    @concurrent
-    private static func performVerifyDetachedFileDetailed(
-        engine: PgpEngine, dataPath: String, signature: Data,
-        verificationKeys: [Data], progress: FileProgressReporter?
-    ) async throws -> FileVerifyDetailedResult {
-        try engine.verifyDetachedFileDetailed(
-            dataPath: dataPath, signature: signature,
-            verificationKeys: verificationKeys, progress: progress
         )
     }
 }

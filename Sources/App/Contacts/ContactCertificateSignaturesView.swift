@@ -533,7 +533,7 @@ private struct ContactCertificateSignaturesHostView: View {
         }
     }
 
-    private func statusTitle(for status: CertificateSignatureStatus) -> String {
+    private func statusTitle(for status: CertificateSignatureVerificationStatus) -> String {
         switch status {
         case .valid:
             String(localized: "contactcertsig.status.valid", defaultValue: "Valid")

@@ -630,7 +630,10 @@ final class DecryptionServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(detailed.plaintext, expected.plaintext)
-        XCTAssertEqual(detailed.verification.legacyStatus, expected.legacyStatus)
+        XCTAssertEqual(
+            detailed.verification.legacyStatus,
+            messageStatus(from: expected.legacyStatus)
+        )
         XCTAssertEqual(
             detailed.verification.legacySignerFingerprint,
             expected.legacySignerFingerprint
@@ -1323,6 +1326,21 @@ final class DecryptionServiceTests: XCTestCase {
             return .unknownSigner
         case .bad:
             return .bad
+        case .expired:
+            return .expired
+        }
+    }
+
+    private func messageStatus(from status: SignatureStatus) -> MessageSignatureStatus {
+        switch status {
+        case .valid:
+            return .valid
+        case .unknownSigner:
+            return .unknownSigner
+        case .bad:
+            return .bad
+        case .notSigned:
+            return .notSigned
         case .expired:
             return .expired
         }

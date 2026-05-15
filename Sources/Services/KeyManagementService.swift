@@ -30,6 +30,7 @@ final class KeyManagementService: @unchecked Sendable {
 
     init(
         engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter? = nil,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authenticator: any AuthenticationEvaluable,
@@ -61,6 +62,7 @@ final class KeyManagementService: @unchecked Sendable {
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
+        let certificateAdapter = certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine)
 
         self.engine = engine
         self.catalogStore = catalogStore
@@ -72,6 +74,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             memoryInfo: memoryInfo,
             bundleStore: bundleStore,
@@ -85,11 +88,12 @@ final class KeyManagementService: @unchecked Sendable {
         )
         self.exportService = KeyExportService(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService
         )
         self.selectiveRevocationService = SelectiveRevocationService(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService
         )

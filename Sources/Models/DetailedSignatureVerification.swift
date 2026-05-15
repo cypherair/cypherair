@@ -49,7 +49,7 @@ struct DetailedSignatureVerification: Equatable {
         }
     }
 
-    let legacyStatus: SignatureStatus
+    let legacyStatus: MessageSignatureStatus
     let legacySignerFingerprint: String?
     let legacySignerContact: Contact?
     let legacySignerIdentity: SignatureVerification.SignerIdentity?
@@ -59,7 +59,7 @@ struct DetailedSignatureVerification: Equatable {
     let signatures: [Entry]
 
     init(
-        legacyStatus: SignatureStatus,
+        legacyStatus: MessageSignatureStatus,
         legacySignerFingerprint: String?,
         legacySignerContact: Contact?,
         legacySignerIdentity: SignatureVerification.SignerIdentity?,
@@ -89,66 +89,10 @@ struct DetailedSignatureVerification: Equatable {
         )
     }
 
-    static func from(
-        legacyStatus: SignatureStatus,
-        legacySignerFingerprint: String?,
-        summaryState: SignatureVerificationState,
-        summaryEntryIndex: UInt64?,
-        signatures: [DetailedSignatureEntry],
-        contacts: [Contact],
-        ownKeys: [PGPKeyIdentity],
-        contactsAvailability: ContactsAvailability = .availableLegacyCompatibility
-    ) -> DetailedSignatureVerification {
-        let contactsForVerification = contactsAvailability.allowsContactsVerification ? contacts : []
-        let unavailableReason = contactsAvailability.allowsContactsVerification ? nil : contactsAvailability
-        let legacySignerContact = legacySignerFingerprint.flatMap { fingerprint in
-            contactsForVerification.first(where: { $0.fingerprint == fingerprint })
-        }
-        let legacySignerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: legacySignerFingerprint,
-            contacts: contactsForVerification,
-            ownKeys: ownKeys
-        )
-
-        let mappedEntries = signatures.map { entry in
-            let appState = SignatureVerification.VerificationState(
-                ffiState: entry.state,
-                contactsAvailability: contactsAvailability
-            )
-            return Entry(
-                status: Entry.Status(from: entry.status),
-                verificationState: appState,
-                signerPrimaryFingerprint: entry.signerPrimaryFingerprint,
-                verificationCertificateFingerprint: entry.verificationCertificateFingerprint,
-                contactsUnavailableReason: appState == .contactsContextUnavailable ? unavailableReason : nil,
-                signerIdentity: SignatureVerification.SignerIdentity.resolve(
-                    fingerprint: entry.verificationCertificateFingerprint,
-                    contacts: contactsForVerification,
-                    ownKeys: ownKeys
-                )
-            )
-        }
-
-        let appSummaryState = SignatureVerification.VerificationState(
-            ffiState: summaryState,
-            contactsAvailability: contactsAvailability
-        )
-
-        return DetailedSignatureVerification(
-            legacyStatus: legacyStatus,
-            legacySignerFingerprint: legacySignerFingerprint,
-            legacySignerContact: legacySignerContact,
-            legacySignerIdentity: legacySignerIdentity,
-            summaryState: appSummaryState,
-            summaryEntryIndex: summaryEntryIndex,
-            contactsUnavailableReason: appSummaryState == .contactsContextUnavailable ? unavailableReason : nil,
-            signatures: mappedEntries
-        )
-    }
 }
 
 extension SignatureVerification.VerificationState {
-    init(legacyStatus: SignatureStatus) {
+    init(legacyStatus: MessageSignatureStatus) {
         switch legacyStatus {
         case .valid:
             self = .verified
@@ -163,28 +107,6 @@ extension SignatureVerification.VerificationState {
         }
     }
 
-    init(
-        ffiState: SignatureVerificationState,
-        contactsAvailability: ContactsAvailability
-    ) {
-        switch ffiState {
-        case .notSigned:
-            self = .notSigned
-        case .verified:
-            self = .verified
-        case .invalid:
-            self = .invalid
-        case .expired:
-            self = .expired
-        case .signerCertificateUnavailable:
-            if contactsAvailability.allowsContactsVerification {
-                self = .signerCertificateUnavailable
-            } else {
-                self = .contactsContextUnavailable
-            }
-        }
-    }
-
     init(entryStatus: DetailedSignatureVerification.Entry.Status) {
         switch entryStatus {
         case .valid:
@@ -193,21 +115,6 @@ extension SignatureVerification.VerificationState {
             self = .signerCertificateUnavailable
         case .bad:
             self = .invalid
-        case .expired:
-            self = .expired
-        }
-    }
-}
-
-private extension DetailedSignatureVerification.Entry.Status {
-    init(from status: DetailedSignatureStatus) {
-        switch status {
-        case .valid:
-            self = .valid
-        case .unknownSigner:
-            self = .unknownSigner
-        case .bad:
-            self = .bad
         case .expired:
             self = .expired
         }

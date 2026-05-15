@@ -382,15 +382,21 @@ final class ModelTests: XCTestCase {
             verificationCertificateFingerprint: nil
         )
 
-        let detailed = DetailedSignatureVerification.from(
-            legacyStatus: .unknownSigner,
-            legacySignerFingerprint: nil,
-            summaryState: .signerCertificateUnavailable,
-            summaryEntryIndex: 0,
-            signatures: [entry],
-            contacts: [],
-            ownKeys: [],
-            contactsAvailability: .availableLegacyCompatibility
+        let detailed = PGPMessageResultMapper.detachedVerifyDetailedResult(
+            VerifyDetailedResult(
+                legacyStatus: .unknownSigner,
+                legacySignerFingerprint: nil,
+                summaryState: .signerCertificateUnavailable,
+                summaryEntryIndex: 0,
+                signatures: [entry],
+                content: nil
+            ),
+            context: PGPMessageVerificationContext(
+                verificationKeys: [],
+                contacts: [],
+                ownKeys: [],
+                contactsAvailability: .availableLegacyCompatibility
+            )
         )
 
         XCTAssertEqual(detailed.summaryState, .signerCertificateUnavailable)

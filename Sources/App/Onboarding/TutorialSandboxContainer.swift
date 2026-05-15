@@ -88,8 +88,10 @@ final class TutorialSandboxContainer {
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         self.keyManagement = KeyManagementService(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
             authenticator: authManager,
@@ -113,12 +115,12 @@ final class TutorialSandboxContainer {
             temporaryArtifactStore: temporaryArtifactStore
         )
         self.signingService = SigningService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         self.certificateSignatureService = CertificateSignatureService(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )

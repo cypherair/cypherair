@@ -350,11 +350,9 @@ private enum ArchitectureSourceAuditRules {
             (
                 "App UI and ScreenModel surfaces still carry generated error or result vocabulary pending Phase 1/4 cleanup.",
                 [
-                    "Sources/App/Common/DetailedSignatureSectionView.swift",
                     "Sources/App/Common/OperationController.swift",
                     "Sources/App/Contacts/AddContactScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
-                    "Sources/App/Contacts/ContactCertificateSignaturesView.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
                     "Sources/App/Keys/BackupKeyView.swift",
                     "Sources/App/Keys/ImportKeyView.swift",
@@ -366,6 +364,7 @@ private enum ArchitectureSourceAuditRules {
                 "FFI adapter files intentionally contain generated UniFFI types while exposing app-owned contracts upward.",
                 [
                     "Sources/Services/FFI/PGPErrorMapper.swift",
+                    "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
                     "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
                     "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
@@ -375,11 +374,7 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
                 [
-                    "Sources/Models/CertificateSignatureVerification.swift",
-                    "Sources/Models/Contacts/ContactCertificationArtifactReference.swift",
                     "Sources/Models/CypherAirError.swift",
-                    "Sources/Models/DetailedSignatureVerification.swift",
-                    "Sources/Models/SignatureVerification.swift",
                 ]
             ),
             (
@@ -391,7 +386,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Services still call PgpEngine and map generated results directly until Phase 1 introduces adapter contracts.",
                 [
-                    "Sources/Services/CertificateSignatureService.swift",
                     "Sources/Services/ContactImportMatcher.swift",
                     "Sources/Services/ContactImportPublicCertificateValidator.swift",
                     "Sources/Services/ContactService.swift",
@@ -401,11 +395,9 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/KeyManagement/KeyExportService.swift",
                     "Sources/Services/KeyManagement/KeyMutationService.swift",
                     "Sources/Services/KeyManagement/KeyProvisioningService.swift",
-                    "Sources/Services/KeyManagement/SelectiveRevocationService.swift",
                     "Sources/Services/KeyManagementService.swift",
                     "Sources/Services/QRService.swift",
                     "Sources/Services/SelfTestService.swift",
-                    "Sources/Services/SigningService.swift",
                 ]
             ),
         ])
@@ -441,6 +433,7 @@ private enum ArchitectureSourceAuditRules {
         failureSummary: "App-layer files should not call FFI adapters directly.",
         pattern: wordPattern(for: [
             "PGPCertificateSelectionAdapter",
+            "PGPCertificateOperationAdapter",
             "PGPKeyMetadataAdapter",
             "PGPMessageOperationAdapter",
             "PGPMessageResultMapper",
@@ -496,7 +489,6 @@ private enum ArchitectureSourceAuditRules {
                 "Legacy verification models still resolve signer identity from flat Contact arrays pending Phase 1/3 cleanup.",
                 [
                     "Sources/Models/CertificateSignatureSignerIdentity.swift",
-                    "Sources/Models/DetailedSignatureVerification.swift",
                     "Sources/Models/SignatureVerification.swift",
                 ]
             ),
@@ -510,10 +502,11 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
-                "Crypto services still accept legacy verification contexts until Contacts runtime contracts move to summaries.",
+                "FFI mapping boundaries still accept legacy verification contexts until Contacts runtime contracts move to summaries.",
                 [
+                    "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
-                    "Sources/Services/SigningService.swift",
+                    "Sources/Services/FFI/PGPMessageResultMapper.swift",
                 ]
             ),
         ])

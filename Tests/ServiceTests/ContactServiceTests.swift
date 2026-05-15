@@ -3666,7 +3666,7 @@ final class ContactServiceTests: XCTestCase {
             email: "pr6-signer@example.invalid"
         )
         let certificateSignatureService = CertificateSignatureService(
-            engine: engine,
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             keyManagement: keyManagement,
             contactService: service
         )

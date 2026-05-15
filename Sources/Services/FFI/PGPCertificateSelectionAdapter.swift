@@ -10,7 +10,7 @@ enum PGPCertificateSelectionAdapter {
         do {
             discovered = try engine.discoverCertificateSelectors(certData: certData)
         } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
+            throw PGPErrorMapper.map(error) { .invalidKeyData(reason: $0) }
         }
 
         return map(discovered)

@@ -1561,6 +1561,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         )
         let contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
@@ -1577,12 +1578,12 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             contactService: contactService
         )
         let signingService = SigningService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         let certificateSignatureService = CertificateSignatureService(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )

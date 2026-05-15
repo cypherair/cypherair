@@ -484,7 +484,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         var parsedFingerprint: String?
         var decryptedPlaintext: Data?
-        var decryptedStatus: SignatureStatus?
+        var decryptedStatus: MessageSignatureStatus?
         var configuration = DecryptView.Configuration()
         configuration.onParsed = { result in
             parsedFingerprint = result.matchedKey?.fingerprint
@@ -878,7 +878,7 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     private func makeSignature(
-        status: SignatureStatus,
+        status: MessageSignatureStatus,
         signerFingerprint: String? = nil
     ) -> SignatureVerification {
         SignatureVerification(
@@ -889,7 +889,7 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     private func makeDetailedVerification(
-        status: SignatureStatus,
+        status: MessageSignatureStatus,
         signerFingerprint: String? = nil
     ) -> DetailedSignatureVerification {
         DetailedSignatureVerification(
@@ -908,7 +908,7 @@ final class DecryptScreenModelTests: XCTestCase {
     }
 
     private func makeDetailedEntryStatus(
-        from status: SignatureStatus
+        from status: MessageSignatureStatus
     ) -> DetailedSignatureVerification.Entry.Status {
         switch status {
         case .valid:

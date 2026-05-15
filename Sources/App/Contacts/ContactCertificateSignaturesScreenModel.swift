@@ -36,11 +36,11 @@ final class ContactCertificateSignaturesScreenModel {
         String,
         Data,
         UserIdSelectionOption,
-        CertificationKind
+        OpenPGPCertificationKind
     ) async throws -> Data
     typealias SignatureFileImportAction = @MainActor (URL) throws -> (data: Data, text: String?)
 
-    private static let certificationKinds: [CertificationKind] = [
+    private static let certificationKinds: [OpenPGPCertificationKind] = [
         .generic,
         .persona,
         .casual,
@@ -77,7 +77,7 @@ final class ContactCertificateSignaturesScreenModel {
     var showFileImporter = false
     var selectedUserId: UserIdSelectionOption?
     var selectedSignerFingerprint: String?
-    var selectedCertificationKind: CertificationKind = .generic
+    var selectedCertificationKind: OpenPGPCertificationKind = .generic
     var verification: CertificateSignatureVerification?
     var error: CypherAirError?
     var showError = false
@@ -169,7 +169,7 @@ final class ContactCertificateSignaturesScreenModel {
         keyManagement.keys
     }
 
-    var certificationKinds: [CertificationKind] {
+    var certificationKinds: [OpenPGPCertificationKind] {
         Self.certificationKinds
     }
 
@@ -355,7 +355,7 @@ final class ContactCertificateSignaturesScreenModel {
         invalidateVerification()
     }
 
-    func selectCertificationKind(_ kind: CertificationKind) {
+    func selectCertificationKind(_ kind: OpenPGPCertificationKind) {
         guard !isOperationLocked else {
             return
         }
@@ -472,7 +472,7 @@ final class ContactCertificateSignaturesScreenModel {
         }
     }
 
-    func title(for kind: CertificationKind) -> String {
+    func title(for kind: OpenPGPCertificationKind) -> String {
         switch kind {
         case .generic:
             String(localized: "contactcertsig.kind.generic", defaultValue: "Generic")

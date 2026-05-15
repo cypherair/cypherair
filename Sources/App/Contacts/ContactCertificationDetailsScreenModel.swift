@@ -37,7 +37,7 @@ final class ContactCertificationDetailsScreenModel {
         String,
         Data,
         UserIdSelectionOption,
-        CertificationKind
+        OpenPGPCertificationKind
     ) async throws -> Data
     typealias ValidateUserIdArtifactAction = @MainActor (
         Data,
@@ -58,7 +58,7 @@ final class ContactCertificationDetailsScreenModel {
     typealias ExportArtifactAction = @MainActor (String) throws -> (data: Data, filename: String)
     typealias SignatureFileImportAction = @MainActor (URL) throws -> (data: Data, text: String?)
 
-    private static let certificationKinds: [CertificationKind] = [
+    private static let certificationKinds: [OpenPGPCertificationKind] = [
         .generic,
         .persona,
         .casual,
@@ -99,7 +99,7 @@ final class ContactCertificationDetailsScreenModel {
     var selectedKeyId: String?
     var selectedUserId: UserIdSelectionOption?
     var selectedSignerFingerprint: String?
-    var selectedCertificationKind: CertificationKind = .generic
+    var selectedCertificationKind: OpenPGPCertificationKind = .generic
     var importMode: ImportMode = .userIdBinding
     var signatureInput = ""
     var importedSignature = ImportedTextInputState()
@@ -247,7 +247,7 @@ final class ContactCertificationDetailsScreenModel {
         keyManagement.keys
     }
 
-    var certificationKinds: [CertificationKind] {
+    var certificationKinds: [OpenPGPCertificationKind] {
         Self.certificationKinds
     }
 
@@ -376,7 +376,7 @@ final class ContactCertificationDetailsScreenModel {
         selectedSignerFingerprint = fingerprint
     }
 
-    func selectCertificationKind(_ kind: CertificationKind) {
+    func selectCertificationKind(_ kind: OpenPGPCertificationKind) {
         guard !isOperationLocked else {
             return
         }
@@ -609,7 +609,7 @@ final class ContactCertificationDetailsScreenModel {
         }
     }
 
-    func title(for kind: CertificationKind) -> String {
+    func title(for kind: OpenPGPCertificationKind) -> String {
         switch kind {
         case .generic:
             String(localized: "contactcertsig.kind.generic", defaultValue: "Generic")
@@ -633,7 +633,7 @@ final class ContactCertificationDetailsScreenModel {
         }
     }
 
-    func title(for status: CertificateSignatureStatus) -> String {
+    func title(for status: CertificateSignatureVerificationStatus) -> String {
         switch status {
         case .valid:
             String(localized: "contactcertsig.status.valid", defaultValue: "Valid")

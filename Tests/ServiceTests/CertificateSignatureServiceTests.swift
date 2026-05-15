@@ -252,7 +252,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
             email: "kinds-target@example.com"
         )
         let selectedUserId = try selectedUserId(for: target.publicKeyData)
-        let kinds: [CertificationKind] = [.generic, .persona, .casual, .positive]
+        let kinds: [OpenPGPCertificationKind] = [.generic, .persona, .casual, .positive]
 
         for kind in kinds {
             let signature = try await stack.certificateSignatureService.generateUserIdCertification(
