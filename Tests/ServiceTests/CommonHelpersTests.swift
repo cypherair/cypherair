@@ -1310,7 +1310,10 @@ final class CommonHelpersTests: XCTestCase {
             contactService: contactService
         )
         let qrService = QRService(engine: engine)
-        let selfTestService = SelfTestService(engine: engine)
+        let selfTestService = SelfTestService(
+            engine: engine,
+            messageAdapter: messageAdapter
+        )
         let localDataResetService = LocalDataResetService(
             keychain: mockKC,
             protectedDataStorageRoot: protectedDataStorageRoot,

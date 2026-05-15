@@ -1588,7 +1588,10 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             contactService: contactService
         )
         let qrService = QRService(engine: engine)
-        let selfTestService = SelfTestService(engine: engine)
+        let selfTestService = SelfTestService(
+            engine: engine,
+            messageAdapter: messageAdapter
+        )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             protectedDataStorageRoot: storageRoot,

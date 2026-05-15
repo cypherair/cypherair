@@ -200,6 +200,10 @@ enum TestHelpers {
             passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
             certificateSignatureService: certificateSignatureSvc,
+            selfTestService: SelfTestService(
+                engine: engine,
+                messageAdapter: messageAdapter
+            ),
             mockSE: mockSE,
             mockKC: mockKC,
             mockAuth: mockAuth,
@@ -218,6 +222,7 @@ enum TestHelpers {
         let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
+        let selfTestService: SelfTestService
         let mockSE: MockSecureEnclave
         let mockKC: MockKeychain
         let mockAuth: MockAuthenticator

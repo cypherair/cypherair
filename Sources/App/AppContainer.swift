@@ -287,7 +287,10 @@ final class AppContainer: @unchecked Sendable {
                 contactService: contactService
             ),
             qrService: QRService(engine: engine),
-            selfTestService: SelfTestService(engine: engine)
+            selfTestService: SelfTestService(
+                engine: engine,
+                messageAdapter: messageAdapter
+            )
         )
     }
 

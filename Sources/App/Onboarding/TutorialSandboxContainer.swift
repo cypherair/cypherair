@@ -125,7 +125,10 @@ final class TutorialSandboxContainer {
             contactService: contactService
         )
         self.qrService = QRService(engine: engine)
-        self.selfTestService = SelfTestService(engine: engine)
+        self.selfTestService = SelfTestService(
+            engine: engine,
+            messageAdapter: messageAdapter
+        )
 
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true

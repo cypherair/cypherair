@@ -350,7 +350,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "App UI and ScreenModel surfaces still carry generated error or result vocabulary pending Phase 1/4 cleanup.",
                 [
-                    "Sources/App/Common/OperationController.swift",
                     "Sources/App/Contacts/AddContactScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
@@ -391,7 +390,6 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/ContactService.swift",
                     "Sources/Services/ContactSnapshotMutator.swift",
                     "Sources/Services/ContactsLegacyMigrationSource.swift",
-                    "Sources/Services/FileProgressReporter.swift",
                     "Sources/Services/KeyManagement/KeyExportService.swift",
                     "Sources/Services/KeyManagement/KeyMutationService.swift",
                     "Sources/Services/KeyManagement/KeyProvisioningService.swift",
@@ -415,7 +413,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Current cancellation-ignore handling checks generated PgpError until generated errors are normalized at the adapter boundary.",
                 [
-                    "Sources/App/Common/OperationController.swift",
                     "Sources/App/Contacts/AddContactScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",

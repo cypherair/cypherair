@@ -315,13 +315,8 @@ final class StreamingServiceTests: XCTestCase {
             } else {
                 XCTFail("Expected operationCancelled, got: \(error)")
             }
-        } catch let error as PgpError {
-            // Also acceptable if the PgpError comes through directly
-            if case .OperationCancelled = error {
-                // Expected
-            } else {
-                XCTFail("Expected OperationCancelled, got: \(error)")
-            }
+        } catch {
+            XCTFail("Expected operationCancelled, got: \(error)")
         }
     }
 
@@ -354,12 +349,8 @@ final class StreamingServiceTests: XCTestCase {
             } else {
                 XCTFail("Expected operationCancelled, got: \(error)")
             }
-        } catch let error as PgpError {
-            if case .OperationCancelled = error {
-                // Expected
-            } else {
-                XCTFail("Expected OperationCancelled, got: \(error)")
-            }
+        } catch {
+            XCTFail("Expected operationCancelled, got: \(error)")
         }
     }
 
