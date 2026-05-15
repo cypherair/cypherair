@@ -58,8 +58,7 @@ private final class KeyProvisioningCommitDrain: @unchecked Sendable {
 final class KeyProvisioningService {
     typealias ProvisioningCheckpoint = @Sendable () async -> Void
 
-    private let engine: PgpEngine
-    private let certificateAdapter: PGPCertificateOperationAdapter
+    private let keyAdapter: PGPKeyOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let memoryInfo: any MemoryInfoProvidable
     private let bundleStore: KeyBundleStore
@@ -73,8 +72,7 @@ final class KeyProvisioningService {
     private let commitDrain = KeyProvisioningCommitDrain()
 
     init(
-        engine: PgpEngine,
-        certificateAdapter: PGPCertificateOperationAdapter,
+        keyAdapter: PGPKeyOperationAdapter,
         secureEnclave: any SecureEnclaveManageable,
         memoryInfo: any MemoryInfoProvidable,
         bundleStore: KeyBundleStore,
@@ -86,8 +84,7 @@ final class KeyProvisioningService {
         afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: ProvisioningCheckpoint? = nil
     ) {
-        self.engine = engine
-        self.certificateAdapter = certificateAdapter
+        self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
         self.memoryInfo = memoryInfo
         self.bundleStore = bundleStore
@@ -111,8 +108,7 @@ final class KeyProvisioningService {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        var (generated, metadata) = try await Self.generateKeyOffMainActor(
-            engine: engine,
+        var generated = try await keyAdapter.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
@@ -128,27 +124,27 @@ final class KeyProvisioningService {
         let bundle = try secureEnclave.wrap(
             privateKey: generated.certData,
             using: seHandle,
-            fingerprint: metadata.fingerprint
+            fingerprint: generated.metadata.fingerprint
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        let fingerprint = metadata.fingerprint
+        let fingerprint = generated.metadata.fingerprint
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: metadata.keyVersion,
+            keyVersion: generated.metadata.keyVersion,
             profile: profile,
-            userId: metadata.userId,
-            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            userId: generated.metadata.userId,
+            hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
             isRevoked: false,
             isExpired: false,
             isDefault: catalogStore.keys.isEmpty,
             isBackedUp: false,
             publicKeyData: generated.publicKeyData,
             revocationCert: generated.revocationCert,
-            primaryAlgo: metadata.primaryAlgo,
-            subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate
+            primaryAlgo: generated.metadata.primaryAlgo,
+            subkeyAlgo: generated.metadata.subkeyAlgo,
+            expiryDate: generated.metadata.expiryDate
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)
@@ -165,26 +161,19 @@ final class KeyProvisioningService {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        let s2kInfo: S2kInfo
-        do {
-            s2kInfo = try engine.parseS2kParams(armoredData: armoredData)
-        } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-        }
+        let protectionInfo = try keyAdapter.importProtectionInfo(armoredData: armoredData)
 
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: memoryInfo)
-        try memoryGuard.validate(s2kInfo: s2kInfo)
+        try memoryGuard.validate(protectionInfo: protectionInfo)
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        var (secretKeyData, metadata, publicKeyData, revocationCert) = try await Self.importKeyOffMainActor(
-            engine: engine,
-            certificateAdapter: certificateAdapter,
+        var imported = try await keyAdapter.importSecretKey(
             armoredData: armoredData,
             passphrase: passphrase
         )
         defer {
-            secretKeyData.resetBytes(in: 0..<secretKeyData.count)
+            imported.secretKeyData.resetBytes(in: 0..<imported.secretKeyData.count)
         }
         if let afterImportOffMainActorCheckpoint {
             await afterImportOffMainActorCheckpoint()
@@ -192,7 +181,7 @@ final class KeyProvisioningService {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        if catalogStore.containsKey(fingerprint: metadata.fingerprint) {
+        if catalogStore.containsKey(fingerprint: imported.metadata.fingerprint) {
             throw CypherAirError.duplicateKey
         }
 
@@ -200,29 +189,29 @@ final class KeyProvisioningService {
         let accessControl = try authMode.createAccessControl()
         let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
         let bundle = try secureEnclave.wrap(
-            privateKey: secretKeyData,
+            privateKey: imported.secretKeyData,
             using: seHandle,
-            fingerprint: metadata.fingerprint
+            fingerprint: imported.metadata.fingerprint
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        let fingerprint = metadata.fingerprint
+        let fingerprint = imported.metadata.fingerprint
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
-            keyVersion: metadata.keyVersion,
-            profile: metadata.profile,
-            userId: metadata.userId,
-            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            keyVersion: imported.metadata.keyVersion,
+            profile: imported.metadata.profile,
+            userId: imported.metadata.userId,
+            hasEncryptionSubkey: imported.metadata.hasEncryptionSubkey,
             isRevoked: false,
-            isExpired: metadata.isExpired,
+            isExpired: imported.metadata.isExpired,
             isDefault: catalogStore.keys.isEmpty,
             isBackedUp: false,
-            publicKeyData: publicKeyData,
-            revocationCert: revocationCert,
-            primaryAlgo: metadata.primaryAlgo,
-            subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate
+            publicKeyData: imported.publicKeyData,
+            revocationCert: imported.revocationCert,
+            primaryAlgo: imported.metadata.primaryAlgo,
+            subkeyAlgo: imported.metadata.subkeyAlgo,
+            expiryDate: imported.metadata.expiryDate
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)
@@ -285,63 +274,4 @@ final class KeyProvisioningService {
         )
     }
 
-    @concurrent
-    private static func generateKeyOffMainActor(
-        engine: PgpEngine,
-        name: String,
-        email: String?,
-        expirySeconds: UInt64?,
-        profile: PGPKeyProfile
-    ) async throws -> (GeneratedKey, PGPKeyMetadata) {
-        do {
-            let generated = try engine.generateKey(
-                name: name,
-                email: email,
-                expirySeconds: expirySeconds,
-                profile: profile.ffiValue
-            )
-            let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-            let metadata = PGPKeyMetadataAdapter.metadata(
-                from: keyInfo,
-                profile: profile.ffiValue
-            )
-            return (generated, metadata)
-        } catch {
-            throw CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
-        }
-    }
-
-    @concurrent
-    private static func importKeyOffMainActor(
-        engine: PgpEngine,
-        certificateAdapter: PGPCertificateOperationAdapter,
-        armoredData: Data,
-        passphrase: String
-    ) async throws -> (
-        secretKeyData: Data,
-        metadata: PGPKeyMetadata,
-        publicKeyData: Data,
-        revocationCert: Data
-    ) {
-        do {
-            let secretKeyData = try engine.importSecretKey(
-                armoredData: armoredData,
-                passphrase: passphrase
-            )
-            let keyInfo = try engine.parseKeyInfo(keyData: secretKeyData)
-            let profile = try engine.detectProfile(certData: secretKeyData)
-            let metadata = PGPKeyMetadataAdapter.metadata(
-                from: keyInfo,
-                profile: profile
-            )
-            let armoredPubKey = try engine.armorPublicKey(certData: secretKeyData)
-            let publicKeyData = try engine.dearmor(armored: armoredPubKey)
-            let revocationCert = try await certificateAdapter.generateKeyRevocation(
-                secretCert: secretKeyData
-            )
-            return (secretKeyData, metadata, publicKeyData, revocationCert)
-        } catch {
-            throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-        }
-    }
 }

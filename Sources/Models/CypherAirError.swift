@@ -1,9 +1,9 @@
 import Foundation
 
-/// App-level error type that wraps PgpError, Security errors, and UI errors
-/// with user-facing localized messages per PRD Section 4.7.
+/// App-level error type for PGP, Security, and UI errors with user-facing
+/// localized messages per PRD Section 4.7.
 enum CypherAirError: Error, LocalizedError {
-    // PGP-layer errors (mapped from PgpError)
+    // PGP-layer errors
     case aeadAuthenticationFailed
     case noMatchingKey
     case unsupportedAlgorithm(algo: String)
@@ -128,63 +128,12 @@ enum CypherAirError: Error, LocalizedError {
 
     /// Wrap any error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.
-    /// - If it's a PgpError, map via init(pgpError:).
     /// - Otherwise, use the fallback case with the error's description.
     static func from(_ error: Error, fallback: (String) -> CypherAirError) -> CypherAirError {
         if let cypherAirError = error as? CypherAirError {
             return cypherAirError
-        } else if let pgpError = error as? PgpError {
-            return CypherAirError(pgpError: pgpError)
         } else {
             return fallback(error.localizedDescription)
-        }
-    }
-
-    /// Initialize from a UniFFI PgpError.
-    init(pgpError: PgpError) {
-        switch pgpError {
-        case .AeadAuthenticationFailed:
-            self = .aeadAuthenticationFailed
-        case .NoMatchingKey:
-            self = .noMatchingKey
-        case .UnsupportedAlgorithm(let algo):
-            self = .unsupportedAlgorithm(algo: algo)
-        case .KeyExpired:
-            self = .keyExpired
-        case .BadSignature:
-            self = .badSignature
-        case .UnknownSigner:
-            self = .unknownSigner
-        case .CorruptData(let reason):
-            self = .corruptData(reason: reason)
-        case .WrongPassphrase:
-            self = .wrongPassphrase
-        case .InvalidKeyData(let reason):
-            self = .invalidKeyData(reason: reason)
-        case .EncryptionFailed(let reason):
-            self = .encryptionFailed(reason: reason)
-        case .SigningFailed(let reason):
-            self = .signingFailed(reason: reason)
-        case .ArmorError(let reason):
-            self = .armorError(reason: reason)
-        case .IntegrityCheckFailed:
-            self = .integrityCheckFailed
-        case .Argon2idMemoryExceeded(let requiredMb):
-            self = .argon2idMemoryExceeded(requiredMb: requiredMb)
-        case .RevocationError(let reason):
-            self = .revocationError(reason: reason)
-        case .KeyGenerationFailed(let reason):
-            self = .keyGenerationFailed(reason: reason)
-        case .S2kError(let reason):
-            self = .s2kError(reason: reason)
-        case .InternalError(let reason):
-            self = .internalError(reason: reason)
-        case .OperationCancelled:
-            self = .operationCancelled
-        case .FileIoError(let reason):
-            self = .fileIoError(reason: reason)
-        case .KeyTooLargeForQr(_, _):
-            self = .keyTooLargeForQr
         }
     }
 }

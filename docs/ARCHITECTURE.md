@@ -77,9 +77,9 @@ Shared presentation-layer infrastructure used across multiple views.
 ### Services Layer (`Sources/Services/`)
 
 Orchestrates user-facing operations by coordinating the Security layer, app-owned
-models, and FFI adapters. Message encryption/decryption, password-message, QR,
-contact-import, and self-test operations call dedicated FFI adapters rather than
-`PgpEngine` directly.
+models, and FFI adapters. Message encryption/decryption, password-message,
+key-generation/import/export/expiry, QR, contact-import, and self-test operations
+call dedicated FFI adapters rather than `PgpEngine` directly.
 
 | Service | Responsibility |
 |---------|---------------|
@@ -87,7 +87,7 @@ contact-import, and self-test operations call dedicated FFI adapters rather than
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
-| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
+| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers and key/certificate FFI adapters |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update through the contact-import FFI adapter, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -120,9 +120,10 @@ Safety is enforced by narrow host boundaries:
 | Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
 
 Current app-surface workflows call the owning Swift service rather than `PgpEngine`
-directly. Encrypt/decrypt/password-message services avoid direct engine
-ownership by using `PGPMessageOperationAdapter`, while QR/contact import use
-`PGPContactImportAdapter` and the diagnostic runner uses
+directly. Key-management helpers avoid direct engine ownership through
+`PGPKeyOperationAdapter` and `PGPCertificateOperationAdapter`.
+Encrypt/decrypt/password-message services use `PGPMessageOperationAdapter`,
+QR/contact import use `PGPContactImportAdapter`, and the diagnostic runner uses
 `PGPSelfTestOperationAdapter`. These adapters contain generated operation calls,
 generated-error normalization, progress bridging where applicable, and generated
 result mapping. `PasswordMessageService` remains intentionally service-only until
@@ -195,7 +196,7 @@ The canonical row-level persisted-state classification, current status, and migr
 
 ### Models (`Sources/Models/`)
 
-Shared models and small coordinators for app-wide presentation state. Includes Swift representations of PGP keys, error enums mapping from `PgpError`, user-facing error messages per PRD Section 4.7, configuration types, ordinary-settings snapshot/persistence coordination, and shared identity presentation helpers.
+Shared models and small coordinators for app-wide presentation state. Includes Swift representations of PGP keys, app-owned error enums and user-facing error messages per PRD Section 4.7, configuration types, ordinary-settings snapshot/persistence coordination, and shared identity presentation helpers. Generated `PgpError` normalization lives in the FFI mapper boundary rather than Models.
 
 | Helper | Responsibility |
 |--------|---------------|
@@ -436,12 +437,12 @@ These pairs must be updated together. A change to one without the other will cau
 
 | Module A | Module B | Coupling Reason |
 |----------|----------|----------------|
-| `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | PgpError enum variants must match 1:1 across FFI while legacy model mapping remains during the transition |
-| `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/FFI/*Adapter.swift` and remaining direct service callers | Any Rust API change requires Swift adapter or temporary direct call-site updates |
+| `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | Generated PgpError variants are normalized at the FFI mapper boundary into the app-owned `CypherAirError` vocabulary |
+| `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/FFI/*Adapter.swift` and explicitly documented temporary call sites | Any Rust API change requires Swift adapter or documented temporary call-site updates |
 | `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes 3 Keychain items; unwrapping reads them |
 | `SecureEnclaveManager` | `AuthenticationManager` | Mode switch re-wraps all keys via SE manager |
 | `DecryptionService` | `AuthenticationManager` | Phase 2 auth policy depends on current auth mode |
-| `KeyManagementService` | `pgp-mobile/src/keys.rs` | Profile → CipherSuite mapping must stay synchronized |
+| `PGPKeyOperationAdapter` | `pgp-mobile/src/keys.rs` | Profile → CipherSuite mapping and key-operation result mapping must stay synchronized |
 
 ## 5. Storage Layout
 

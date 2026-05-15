@@ -2,18 +2,18 @@ import Foundation
 
 /// Owns key export and revocation-export workflows behind the key-management facade.
 final class KeyExportService {
-    private let engine: PgpEngine
+    private let keyAdapter: PGPKeyOperationAdapter
     private let certificateAdapter: PGPCertificateOperationAdapter
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
 
     init(
-        engine: PgpEngine,
+        keyAdapter: PGPKeyOperationAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService
     ) {
-        self.engine = engine
+        self.keyAdapter = keyAdapter
         self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
@@ -33,8 +33,7 @@ final class KeyExportService {
             throw CypherAirError.noMatchingKey
         }
 
-        let exported = try await Self.exportKeyOffMainActor(
-            engine: engine,
+        let exported = try await keyAdapter.exportSecretKey(
             certData: secretKey,
             passphrase: passphrase,
             profile: identity.profile
@@ -78,29 +77,7 @@ final class KeyExportService {
             throw CypherAirError.noMatchingKey
         }
 
-        do {
-            return try engine.armorPublicKey(certData: identity.publicKeyData)
-        } catch {
-            throw CypherAirError.from(error) { .armorError(reason: $0) }
-        }
-    }
-
-    @concurrent
-    private static func exportKeyOffMainActor(
-        engine: PgpEngine,
-        certData: Data,
-        passphrase: String,
-        profile: PGPKeyProfile
-    ) async throws -> Data {
-        do {
-            return try engine.exportSecretKey(
-                certData: certData,
-                passphrase: passphrase,
-                profile: profile.ffiValue
-            )
-        } catch {
-            throw CypherAirError.from(error) { .s2kError(reason: $0) }
-        }
+        return try keyAdapter.armorPublicKey(certData: identity.publicKeyData)
     }
 
 }

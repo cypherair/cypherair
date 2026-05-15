@@ -19,12 +19,13 @@ enum TestHelpers {
         let mockKC = MockKeychain()
         let mockAuth = MockAuthenticator()
         let privateKeyControlStore = privateKeyControlStore ?? InMemoryPrivateKeyControlStore(mode: .standard)
+        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
 
         let service: KeyManagementService
         if let memInfo = memoryInfo {
             service = KeyManagementService(
-                engine: engine, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
+                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
                 defaults: .standard,
@@ -32,7 +33,7 @@ enum TestHelpers {
             )
         } else {
             service = KeyManagementService(
-                engine: engine, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
+                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
                 privateKeyControlStore: privateKeyControlStore

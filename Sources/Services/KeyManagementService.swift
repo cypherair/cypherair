@@ -2,7 +2,7 @@ import Foundation
 import LocalAuthentication
 
 /// Manages the full key lifecycle: generation, import, export, deletion, and default selection.
-/// Coordinates PgpEngine (Rust) for crypto operations and Security layer for SE wrapping/Keychain storage.
+/// Coordinates OpenPGP adapters and Security layer for SE wrapping/Keychain storage.
 ///
 /// All private key material is SE-wrapped before storage and zeroized from memory after use.
 @Observable
@@ -13,7 +13,7 @@ final class KeyManagementService: @unchecked Sendable {
     private(set) var legacyMetadataMigrationLoadWarning: String?
     private(set) var metadataLoadState: KeyMetadataLoadState = .locked
 
-    private let engine: PgpEngine
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
@@ -29,8 +29,8 @@ final class KeyManagementService: @unchecked Sendable {
     private var legacyMetadataMigrationCompletedInProcess = false
 
     init(
-        engine: PgpEngine,
-        certificateAdapter: PGPCertificateOperationAdapter? = nil,
+        keyAdapter: PGPKeyOperationAdapter,
+        certificateAdapter: PGPCertificateOperationAdapter,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authenticator: any AuthenticationEvaluable,
@@ -62,9 +62,7 @@ final class KeyManagementService: @unchecked Sendable {
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
-        let certificateAdapter = certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine)
-
-        self.engine = engine
+        self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
@@ -73,8 +71,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
-            engine: engine,
-            certificateAdapter: certificateAdapter,
+            keyAdapter: keyAdapter,
             secureEnclave: secureEnclave,
             memoryInfo: memoryInfo,
             bundleStore: bundleStore,
@@ -87,7 +84,7 @@ final class KeyManagementService: @unchecked Sendable {
             commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
         )
         self.exportService = KeyExportService(
-            engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService
@@ -98,7 +95,7 @@ final class KeyManagementService: @unchecked Sendable {
             privateKeyAccessService: privateKeyAccessService
         )
         self.mutationService = KeyMutationService(
-            engine: engine,
+            keyAdapter: keyAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults,
@@ -504,8 +501,7 @@ final class KeyManagementService: @unchecked Sendable {
             throw CypherAirError.noMatchingKey
         }
 
-        let catalog = try PGPCertificateSelectionAdapter.validatedCatalog(
-            engine: engine,
+        let catalog = try certificateAdapter.validatedCatalog(
             certData: identity.publicKeyData,
             expectedFingerprint: identity.fingerprint
         )
@@ -521,7 +517,7 @@ final class KeyManagementService: @unchecked Sendable {
         }
 
         let catalog = try await Self.discoverSelectionCatalogOffMainActor(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             certData: identity.publicKeyData,
             expectedFingerprint: identity.fingerprint
         )
@@ -551,12 +547,11 @@ final class KeyManagementService: @unchecked Sendable {
 
     @concurrent
     private static func discoverSelectionCatalogOffMainActor(
-        engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         certData: Data,
         expectedFingerprint: String
     ) async throws -> CertificateSelectionCatalog {
-        try PGPCertificateSelectionAdapter.validatedCatalog(
-            engine: engine,
+        try certificateAdapter.validatedCatalog(
             certData: certData,
             expectedFingerprint: expectedFingerprint
         )

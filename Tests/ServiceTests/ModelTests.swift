@@ -6,10 +6,10 @@ import SwiftUI
 /// PGPKeyProfile, SignatureVerification, and ColorTheme.
 final class ModelTests: XCTestCase {
 
-    // MARK: - CypherAirError: PgpError Mapping
+    // MARK: - PGPErrorMapper
 
-    func test_cypherAirError_initFromPgpError_aeadMapped() {
-        let error = CypherAirError(pgpError: .AeadAuthenticationFailed)
+    func test_pgpErrorMapper_aeadMapped() {
+        let error = PGPErrorMapper.map(.AeadAuthenticationFailed)
         if case .aeadAuthenticationFailed = error {
             // Expected
         } else {
@@ -17,8 +17,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_noMatchingKeyMapped() {
-        let error = CypherAirError(pgpError: .NoMatchingKey)
+    func test_pgpErrorMapper_noMatchingKeyMapped() {
+        let error = PGPErrorMapper.map(.NoMatchingKey)
         if case .noMatchingKey = error {
             // Expected
         } else {
@@ -26,8 +26,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_wrongPassphraseMapped() {
-        let error = CypherAirError(pgpError: .WrongPassphrase)
+    func test_pgpErrorMapper_wrongPassphraseMapped() {
+        let error = PGPErrorMapper.map(.WrongPassphrase)
         if case .wrongPassphrase = error {
             // Expected
         } else {
@@ -35,8 +35,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_unsupportedAlgorithmMapped() {
-        let error = CypherAirError(pgpError: .UnsupportedAlgorithm(algo: "RSA"))
+    func test_pgpErrorMapper_unsupportedAlgorithmMapped() {
+        let error = PGPErrorMapper.map(.UnsupportedAlgorithm(algo: "RSA"))
         if case .unsupportedAlgorithm(let algo) = error {
             XCTAssertEqual(algo, "RSA")
         } else {
@@ -44,8 +44,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_keyExpiredMapped() {
-        let error = CypherAirError(pgpError: .KeyExpired)
+    func test_pgpErrorMapper_keyExpiredMapped() {
+        let error = PGPErrorMapper.map(.KeyExpired)
         if case .keyExpired = error {
             // Expected
         } else {
@@ -53,8 +53,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_badSignatureMapped() {
-        let error = CypherAirError(pgpError: .BadSignature)
+    func test_pgpErrorMapper_badSignatureMapped() {
+        let error = PGPErrorMapper.map(.BadSignature)
         if case .badSignature = error {
             // Expected
         } else {
@@ -62,8 +62,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_unknownSignerMapped() {
-        let error = CypherAirError(pgpError: .UnknownSigner)
+    func test_pgpErrorMapper_unknownSignerMapped() {
+        let error = PGPErrorMapper.map(.UnknownSigner)
         if case .unknownSigner = error {
             // Expected
         } else {
@@ -71,8 +71,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_corruptDataMapped() {
-        let error = CypherAirError(pgpError: .CorruptData(reason: "test damage"))
+    func test_pgpErrorMapper_corruptDataMapped() {
+        let error = PGPErrorMapper.map(.CorruptData(reason: "test damage"))
         if case .corruptData(let reason) = error {
             XCTAssertEqual(reason, "test damage")
         } else {
@@ -80,8 +80,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_invalidKeyDataMapped() {
-        let error = CypherAirError(pgpError: .InvalidKeyData(reason: "not a key"))
+    func test_pgpErrorMapper_invalidKeyDataMapped() {
+        let error = PGPErrorMapper.map(.InvalidKeyData(reason: "not a key"))
         if case .invalidKeyData(let reason) = error {
             XCTAssertEqual(reason, "not a key")
         } else {
@@ -89,8 +89,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_encryptionFailedMapped() {
-        let error = CypherAirError(pgpError: .EncryptionFailed(reason: "no recipients"))
+    func test_pgpErrorMapper_encryptionFailedMapped() {
+        let error = PGPErrorMapper.map(.EncryptionFailed(reason: "no recipients"))
         if case .encryptionFailed(let reason) = error {
             XCTAssertEqual(reason, "no recipients")
         } else {
@@ -98,8 +98,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_signingFailedMapped() {
-        let error = CypherAirError(pgpError: .SigningFailed(reason: "invalid key"))
+    func test_pgpErrorMapper_signingFailedMapped() {
+        let error = PGPErrorMapper.map(.SigningFailed(reason: "invalid key"))
         if case .signingFailed(let reason) = error {
             XCTAssertEqual(reason, "invalid key")
         } else {
@@ -107,8 +107,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_armorErrorMapped() {
-        let error = CypherAirError(pgpError: .ArmorError(reason: "bad format"))
+    func test_pgpErrorMapper_armorErrorMapped() {
+        let error = PGPErrorMapper.map(.ArmorError(reason: "bad format"))
         if case .armorError(let reason) = error {
             XCTAssertEqual(reason, "bad format")
         } else {
@@ -116,8 +116,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_integrityCheckFailedMapped() {
-        let error = CypherAirError(pgpError: .IntegrityCheckFailed)
+    func test_pgpErrorMapper_integrityCheckFailedMapped() {
+        let error = PGPErrorMapper.map(.IntegrityCheckFailed)
         if case .integrityCheckFailed = error {
             // Expected
         } else {
@@ -125,8 +125,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_argon2idMemoryExceededMapped() {
-        let error = CypherAirError(pgpError: .Argon2idMemoryExceeded(requiredMb: 512))
+    func test_pgpErrorMapper_argon2idMemoryExceededMapped() {
+        let error = PGPErrorMapper.map(.Argon2idMemoryExceeded(requiredMb: 512))
         if case .argon2idMemoryExceeded(let requiredMb) = error {
             XCTAssertEqual(requiredMb, 512)
         } else {
@@ -134,8 +134,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_revocationErrorMapped() {
-        let error = CypherAirError(pgpError: .RevocationError(reason: "bad cert"))
+    func test_pgpErrorMapper_revocationErrorMapped() {
+        let error = PGPErrorMapper.map(.RevocationError(reason: "bad cert"))
         if case .revocationError(let reason) = error {
             XCTAssertEqual(reason, "bad cert")
         } else {
@@ -143,8 +143,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_keyGenerationFailedMapped() {
-        let error = CypherAirError(pgpError: .KeyGenerationFailed(reason: "rng failure"))
+    func test_pgpErrorMapper_keyGenerationFailedMapped() {
+        let error = PGPErrorMapper.map(.KeyGenerationFailed(reason: "rng failure"))
         if case .keyGenerationFailed(let reason) = error {
             XCTAssertEqual(reason, "rng failure")
         } else {
@@ -152,8 +152,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_s2kErrorMapped() {
-        let error = CypherAirError(pgpError: .S2kError(reason: "unsupported mode"))
+    func test_pgpErrorMapper_s2kErrorMapped() {
+        let error = PGPErrorMapper.map(.S2kError(reason: "unsupported mode"))
         if case .s2kError(let reason) = error {
             XCTAssertEqual(reason, "unsupported mode")
         } else {
@@ -161,8 +161,8 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_cypherAirError_initFromPgpError_internalErrorMapped() {
-        let error = CypherAirError(pgpError: .InternalError(reason: "unexpected state"))
+    func test_pgpErrorMapper_internalErrorMapped() {
+        let error = PGPErrorMapper.map(.InternalError(reason: "unexpected state"))
         if case .internalError(let reason) = error {
             XCTAssertEqual(reason, "unexpected state")
         } else {

@@ -383,6 +383,7 @@ final class AppContainer: @unchecked Sendable {
             }
         )
         let engine = PgpEngine()
+        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
@@ -410,7 +411,7 @@ final class AppContainer: @unchecked Sendable {
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         let keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -646,6 +647,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
+        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
@@ -765,7 +767,7 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,

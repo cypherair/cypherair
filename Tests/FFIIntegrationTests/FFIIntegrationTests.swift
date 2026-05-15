@@ -2160,7 +2160,7 @@ final class FFIIntegrationTests: XCTestCase {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should pass: 512 MB < 75% of 6 GB (4.5 GB).
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// C4.2: 1 GB Argon2id params → graceful error with limited memory.
@@ -2178,7 +2178,7 @@ final class FFIIntegrationTests: XCTestCase {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should fail: 1 GB > 75% of 1 GB (768 MB).
-        XCTAssertThrowsError(try memoryGuard.validate(s2kInfo: s2kInfo)) { error in
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib))) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -2206,7 +2206,7 @@ final class FFIIntegrationTests: XCTestCase {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should pass: 1 GB < 75% of 6 GB (4.5 GB).
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// C4.3: 2 GB Argon2id → graceful refusal even on device with moderate available memory.
@@ -2224,7 +2224,7 @@ final class FFIIntegrationTests: XCTestCase {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // Should fail: 2 GB > 75% of 2.5 GB (1.875 GB).
-        XCTAssertThrowsError(try memoryGuard.validate(s2kInfo: s2kInfo)) { error in
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib))) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -2259,7 +2259,7 @@ final class FFIIntegrationTests: XCTestCase {
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
 
         // At exact threshold (<=): should pass.
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// C4.4: One byte below 75% boundary — should fail.
@@ -2279,7 +2279,7 @@ final class FFIIntegrationTests: XCTestCase {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = minPassingAvailable - 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertThrowsError(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// C4.4: Profile A (Iterated+Salted) — guard is a no-op even with minimal memory.
@@ -2301,7 +2301,7 @@ final class FFIIntegrationTests: XCTestCase {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// Defensive: argon2id type with memoryKib=0 — guard should not throw.
@@ -2315,7 +2315,7 @@ final class FFIIntegrationTests: XCTestCase {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// Defensive: unknown S2K type — guard should be a no-op.
@@ -2329,7 +2329,7 @@ final class FFIIntegrationTests: XCTestCase {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
     /// Verify that the guard queries the memory provider exactly once.
@@ -2343,7 +2343,7 @@ final class FFIIntegrationTests: XCTestCase {
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 8 * 1024 * 1024 * 1024
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)
-        _ = try? memoryGuard.validate(s2kInfo: s2kInfo)
+        _ = try? memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib))
         XCTAssertEqual(mockMemory.callCount, 1,
                        "Guard should query memory provider exactly once")
     }

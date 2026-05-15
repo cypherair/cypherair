@@ -88,11 +88,12 @@ final class TutorialSandboxContainer {
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
+        let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         self.keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,

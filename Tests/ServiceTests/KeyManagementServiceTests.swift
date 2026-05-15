@@ -342,7 +342,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
     private func makeFreshService() -> KeyManagementService {
         KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -351,10 +352,31 @@ final class KeyManagementServiceTests: XCTestCase {
     }
 
     private func makeTemporaryDirectory(_ prefix: String) throws -> URL {
-        let url = FileManager.default.temporaryDirectory
+        let url = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("CypherAirTests", isDirectory: true)
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func supportsCompleteProtectedFileCreation() throws -> Bool {
+        let probeDirectory = try makeTemporaryDirectory("ProtectedFileCreationProbe")
+        defer {
+            try? FileManager.default.removeItem(at: probeDirectory)
+        }
+
+        let probeURL = probeDirectory.appendingPathComponent("probe.dat")
+        guard FileManager.default.createFile(
+            atPath: probeURL.path,
+            contents: Data([0]),
+            attributes: [.protectionKey: FileProtectionType.complete]
+        ) else {
+            return false
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: probeURL.path)
+        return attributes[.protectionKey] as? FileProtectionType == .complete
     }
 
     private func makeCheckpointedProvisioningService(
@@ -370,7 +392,8 @@ final class KeyManagementServiceTests: XCTestCase {
         let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         let metadataPersistence = RecordingKeyMetadataPersistence()
         let service = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
             authenticator: localAuthenticator,
@@ -394,7 +417,8 @@ final class KeyManagementServiceTests: XCTestCase {
         let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         let metadataPersistence = RecordingKeyMetadataPersistence()
         let service = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
             authenticator: localAuthenticator,
@@ -423,7 +447,8 @@ final class KeyManagementServiceTests: XCTestCase {
         let localAuthenticator = MockAuthenticator()
         let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         let service = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
             authenticator: localAuthenticator,
@@ -502,7 +527,8 @@ final class KeyManagementServiceTests: XCTestCase {
             sharedRightIdentifier: sharedRightIdentifier
         )
         let keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
             authenticator: MockAuthenticator(),
@@ -700,7 +726,8 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_generateKey_withInjectedMetadataPersistenceDoesNotWriteMetadataKeychainRows() async throws {
         let metadataPersistence = RecordingKeyMetadataPersistence()
         let protectedMetadataService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1018,7 +1045,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
         // Create a new service instance pointing at the same Keychain
         let newService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1035,7 +1063,8 @@ final class KeyManagementServiceTests: XCTestCase {
         mockKC.resetCallHistory()
 
         let newService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1071,7 +1100,8 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.delete(service: serviceName, account: KeychainConstants.metadataAccount)
 
         let freshService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1111,7 +1141,8 @@ final class KeyManagementServiceTests: XCTestCase {
         try mockKC.delete(service: serviceName, account: KeychainConstants.metadataAccount)
 
         let freshService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1147,7 +1178,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
         // Load should succeed, skipping the corrupt entry
         let newService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1377,7 +1409,8 @@ final class KeyManagementServiceTests: XCTestCase {
             coordinator: coordinator
         )
         let promptAwareService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: observingSecureEnclave,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -1841,6 +1874,10 @@ final class KeyManagementServiceTests: XCTestCase {
     }
 
     func test_generateKey_realProtectedDataRelockAfterIdentityStore_doesNotLeaveOrphanedMetadata() async throws {
+        guard try supportsCompleteProtectedFileCreation() else {
+            throw XCTSkip("Complete file protection is unavailable in this macOS test sandbox.")
+        }
+
         let checkpointGate = ProvisioningCheckpointGate()
         let relockInvalidationGate = ProvisioningCheckpointGate()
         let target = try await makeProtectedKeyMetadataProvisioningTarget(
@@ -2093,7 +2130,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
         // Create a fresh service with the same mock Keychain — simulates cold restart
         let freshService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
@@ -2498,7 +2536,8 @@ final class KeyManagementServiceTests: XCTestCase {
 
         // Create a fresh service to simulate cold restart
         let freshService = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
