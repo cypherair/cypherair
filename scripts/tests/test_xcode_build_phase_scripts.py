@@ -180,6 +180,15 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
                 "\n".join(f"$(SRCROOT)/{relative_path}" for relative_path in required_files) + "\n",
                 encoding="utf-8",
             )
+            snapshot_output_list = srcroot / "Tests/RepositoryAuditOutputs.xcfilelist"
+            snapshot_output_list.write_text(
+                "\n".join(
+                    "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/"
+                    f"RepositoryAudit/{relative_path}"
+                    for relative_path in required_files
+                ) + "\n",
+                encoding="utf-8",
+            )
             target_build_dir.mkdir(parents=True, exist_ok=True)
 
             env = os.environ.copy()
