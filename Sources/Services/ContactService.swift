@@ -762,14 +762,10 @@ final class ContactService: @unchecked Sendable {
             )
         }
 
-        do {
-            return (
-                try certificateAdapter.armorSignatureForExport(artifact.canonicalSignatureData),
-                artifact.resolvedExportFilename
-            )
-        } catch {
-            throw CypherAirError.from(error) { .armorError(reason: $0) }
-        }
+        return (
+            try certificateAdapter.armorSignatureForExport(artifact.canonicalSignatureData),
+            artifact.resolvedExportFilename
+        )
     }
 
     func refreshCertificationProjections() throws {
