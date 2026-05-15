@@ -115,6 +115,14 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func armorSignatureForExport(_ signature: Data) throws -> Data {
+        do {
+            return try engine.armor(data: signature, kind: .signature)
+        } catch {
+            throw PGPErrorMapper.map(error) { .armorError(reason: $0) }
+        }
+    }
+
     func generateKeyRevocation(secretCert: Data) async throws -> Data {
         do {
             return try await Self.performGenerateKeyRevocation(

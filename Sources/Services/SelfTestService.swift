@@ -37,27 +37,27 @@ final class SelfTestService {
     /// Most recent report data, retained only in process memory.
     private(set) var latestReport: SelfTestReport?
 
-    private let engine: PgpEngine
+    private let selfTestAdapter: PGPSelfTestOperationAdapter
     private let messageAdapter: PGPMessageOperationAdapter
 
     init(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter? = nil
+        selfTestAdapter: PGPSelfTestOperationAdapter,
+        messageAdapter: PGPMessageOperationAdapter
     ) {
-        self.engine = engine
-        self.messageAdapter = messageAdapter ?? PGPMessageOperationAdapter(engine: engine)
+        self.selfTestAdapter = selfTestAdapter
+        self.messageAdapter = messageAdapter
     }
 
     // MARK: - Run Self-Test
 
     /// Run the complete self-test suite for both profiles.
-    /// Heavy crypto work is delegated to `@concurrent` helpers so progress
+    /// Heavy crypto work is delegated to FFI adapters so progress
     /// updates remain responsive while crypto stays off the main actor.
     func runAllTests() async {
         latestReport = nil
         state = .running(progress: 0)
 
-        let engine = self.engine
+        let selfTestAdapter = self.selfTestAdapter
         let messageAdapter = self.messageAdapter
         var results: [TestResult] = []
         let profiles = PGPKeyProfile.allCases
@@ -70,7 +70,10 @@ final class SelfTestService {
                 name: String(localized: "selftest.name.keyGeneration", defaultValue: "Key Generation"),
                 profile: profile
             ) {
-                try await Self.runKeyGenerationTest(engine: engine, profile: profile)
+                try await Self.runKeyGenerationTest(
+                    selfTestAdapter: selfTestAdapter,
+                    profile: profile
+                )
             }
             results.append(genResult.result)
             completedTests += 1
@@ -80,8 +83,7 @@ final class SelfTestService {
             guard genResult.passed, var generated = genResult.value else { continue }
             defer {
                 // Best-effort zeroing of self-test key material per CLAUDE.md #5.
-                generated.certData.resetBytes(in: 0..<generated.certData.count)
-                generated.revocationCert.resetBytes(in: 0..<generated.revocationCert.count)
+                generated.zeroizeSensitiveMaterial()
             }
 
             // Test 2: Encrypt/Decrypt round-trip
@@ -132,7 +134,7 @@ final class SelfTestService {
                 profile: profile
             ) {
                 try await Self.runExportImportTest(
-                    engine: engine,
+                    selfTestAdapter: selfTestAdapter,
                     generated: generated,
                     profile: profile
                 )
@@ -147,7 +149,7 @@ final class SelfTestService {
             name: String(localized: "selftest.name.qrRoundTrip", defaultValue: "QR URL Encode/Decode"),
             profile: nil
         ) {
-            try await Self.runQrRoundTripTest(engine: engine)
+            try await Self.runQrRoundTripTest(selfTestAdapter: selfTestAdapter)
         }
         results.append(qrResult.result)
         completedTests += 1
@@ -199,30 +201,27 @@ final class SelfTestService {
         }
     }
 
-    @concurrent
     private static func runKeyGenerationTest(
-        engine: PgpEngine,
+        selfTestAdapter: PGPSelfTestOperationAdapter,
         profile: PGPKeyProfile
-    ) async throws -> GeneratedKey {
-        let generated = try engine.generateKey(
+    ) async throws -> PGPSelfTestGeneratedKey {
+        let generated = try await selfTestAdapter.generateKey(
             name: "Self-Test",
             email: "test@cypherair.local",
             expirySeconds: 3600,
-            profile: profile.ffiValue
+            profile: profile
         )
-        let info = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-        guard info.keyVersion == profile.keyVersion else {
+        guard generated.keyVersion == profile.keyVersion else {
             throw CypherAirError.corruptData(
-                reason: "Wrong key version: expected \(profile.keyVersion), got \(info.keyVersion)"
+                reason: "Wrong key version: expected \(profile.keyVersion), got \(generated.keyVersion)"
             )
         }
         return generated
     }
 
-    @concurrent
     private static func runEncryptDecryptTest(
         messageAdapter: PGPMessageOperationAdapter,
-        generated: GeneratedKey
+        generated: PGPSelfTestGeneratedKey
     ) async throws -> DetailedSignatureVerification {
         let plaintext = Data("Self-test 自检 🔐".utf8)
         let ciphertext = try await messageAdapter.encrypt(
@@ -246,10 +245,9 @@ final class SelfTestService {
         return decrypted.verification
     }
 
-    @concurrent
     private static func runSignVerifyTest(
         messageAdapter: PGPMessageOperationAdapter,
-        generated: GeneratedKey
+        generated: PGPSelfTestGeneratedKey
     ) async throws -> DetailedSignatureVerification {
         let text = Data("Signed message 签名消息".utf8)
         let signed = try await messageAdapter.signCleartext(
@@ -269,10 +267,9 @@ final class SelfTestService {
         return verified.verification
     }
 
-    @concurrent
     private static func runTamperDetectionTest(
         messageAdapter: PGPMessageOperationAdapter,
-        generated: GeneratedKey
+        generated: PGPSelfTestGeneratedKey
     ) async throws -> Bool {
         let plaintext = Data("Tamper test".utf8)
         var ciphertext = try await messageAdapter.encrypt(
@@ -310,7 +307,7 @@ final class SelfTestService {
         return true
     }
 
-    private static func verificationContext(for generated: GeneratedKey) -> PGPMessageVerificationContext {
+    private static func verificationContext(for generated: PGPSelfTestGeneratedKey) -> PGPMessageVerificationContext {
         PGPMessageVerificationContext(
             verificationKeys: [generated.publicKeyData],
             contacts: [],
@@ -319,19 +316,18 @@ final class SelfTestService {
         )
     }
 
-    @concurrent
     private static func runExportImportTest(
-        engine: PgpEngine,
-        generated: GeneratedKey,
+        selfTestAdapter: PGPSelfTestOperationAdapter,
+        generated: PGPSelfTestGeneratedKey,
         profile: PGPKeyProfile
     ) async throws -> PGPKeyMetadata {
         let passphrase = "self-test-passphrase-2024"
-        var exported = try engine.exportSecretKey(
+        var exported = try await selfTestAdapter.exportSecretKey(
             certData: generated.certData,
             passphrase: passphrase,
-            profile: profile.ffiValue
+            profile: profile
         )
-        var imported = try engine.importSecretKey(
+        var imported = try await selfTestAdapter.importSecretKey(
             armoredData: exported,
             passphrase: passphrase
         )
@@ -339,34 +335,34 @@ final class SelfTestService {
             exported.resetBytes(in: 0..<exported.count)
             imported.resetBytes(in: 0..<imported.count)
         }
-        let originalInfo = try engine.parseKeyInfo(keyData: generated.certData)
-        let importedInfo = try engine.parseKeyInfo(keyData: imported)
-        guard originalInfo.fingerprint == importedInfo.fingerprint else {
+        let originalMetadata = try await selfTestAdapter.metadata(forKeyData: generated.certData)
+        let importedMetadata = try await selfTestAdapter.metadata(forKeyData: imported)
+        guard originalMetadata.fingerprint == importedMetadata.fingerprint else {
             throw CypherAirError.corruptData(reason: "Fingerprint mismatch after export/import")
         }
-        return PGPKeyMetadataAdapter.metadata(from: importedInfo)
+        return importedMetadata
     }
 
-    @concurrent
-    private static func runQrRoundTripTest(engine: PgpEngine) async throws -> PGPKeyMetadata {
-        var generated = try engine.generateKey(
+    private static func runQrRoundTripTest(
+        selfTestAdapter: PGPSelfTestOperationAdapter
+    ) async throws -> PGPKeyMetadata {
+        var generated = try await selfTestAdapter.generateKey(
             name: "QR-Test",
             email: nil,
             expirySeconds: 3600,
-            profile: PGPKeyProfile.universal.ffiValue
+            profile: .universal
         )
         defer {
-            generated.certData.resetBytes(in: 0..<generated.certData.count)
-            generated.revocationCert.resetBytes(in: 0..<generated.revocationCert.count)
+            generated.zeroizeSensitiveMaterial()
         }
-        let url = try engine.encodeQrUrl(publicKeyData: generated.publicKeyData)
-        let decoded = try engine.decodeQrUrl(url: url)
-        let originalInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-        let decodedInfo = try engine.parseKeyInfo(keyData: decoded)
-        guard originalInfo.fingerprint == decodedInfo.fingerprint else {
+        let url = try await selfTestAdapter.encodeQrUrl(publicKeyData: generated.publicKeyData)
+        let decoded = try await selfTestAdapter.decodeQrUrl(url)
+        let originalMetadata = try await selfTestAdapter.metadata(forKeyData: generated.publicKeyData)
+        let decodedMetadata = try await selfTestAdapter.metadata(forKeyData: decoded)
+        guard originalMetadata.fingerprint == decodedMetadata.fingerprint else {
             throw CypherAirError.corruptData(reason: "QR round-trip fingerprint mismatch")
         }
-        return PGPKeyMetadataAdapter.metadata(from: decodedInfo)
+        return decodedMetadata
     }
 
     private static func makeReport(results: [TestResult], date: Date = Date()) -> SelfTestReport {

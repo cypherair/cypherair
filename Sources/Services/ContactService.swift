@@ -26,7 +26,8 @@ final class ContactService: @unchecked Sendable {
     /// All imported contacts.
     private var contacts: [Contact] = []
 
-    private let engine: PgpEngine
+    private let contactImportAdapter: PGPContactImportAdapter
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let repository: ContactRepository
     private let compatibilityMapper = ContactsCompatibilityMapper()
     private let legacyMigrationSource: ContactsLegacyMigrationSource
@@ -42,11 +43,13 @@ final class ContactService: @unchecked Sendable {
     private(set) var protectedDomainMigrationWarning: String?
 
     init(
-        engine: PgpEngine,
+        contactImportAdapter: PGPContactImportAdapter,
+        certificateAdapter: PGPCertificateOperationAdapter,
         contactsDirectory: URL? = nil,
         contactsDomainStore: ContactsDomainStore? = nil
     ) {
-        self.engine = engine
+        self.contactImportAdapter = contactImportAdapter
+        self.certificateAdapter = certificateAdapter
         let resolvedContactsDirectory: URL
         if let contactsDirectory {
             resolvedContactsDirectory = contactsDirectory
@@ -59,10 +62,10 @@ final class ContactService: @unchecked Sendable {
         }
         repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
         legacyMigrationSource = ContactsLegacyMigrationSource(
-            engine: engine,
+            contactImportAdapter: contactImportAdapter,
             repository: repository
         )
-        snapshotMutator = ContactSnapshotMutator(engine: engine)
+        snapshotMutator = ContactSnapshotMutator(contactImportAdapter: contactImportAdapter)
         self.contactsDomainStore = contactsDomainStore
     }
 
@@ -205,25 +208,17 @@ final class ContactService: @unchecked Sendable {
         publicKeyData: Data,
         verificationState: ContactVerificationState = .verified
     ) throws -> AddContactResult {
-        let validation = try ContactImportPublicCertificateValidator.validate(
-            publicKeyData,
-            using: engine
-        )
+        let validation = try contactImportAdapter.validateImportablePublicCertificate(publicKeyData)
         let binaryData = validation.publicCertData
         var contact = makeContact(from: validation, verificationState: verificationState)
 
         // Check for same-fingerprint duplicate/update
         if let existingIndex = contacts.firstIndex(where: { $0.fingerprint == contact.fingerprint }) {
             let existingContact = contacts[existingIndex]
-            let mergedResult: CertificateMergeResult
-            do {
-                mergedResult = try engine.mergePublicCertificateUpdate(
-                    existingCert: existingContact.publicKeyData,
-                    incomingCertOrUpdate: binaryData
-                )
-            } catch {
-                throw ContactImportPublicCertificateValidator.mapError(error)
-            }
+            let mergedResult = try contactImportAdapter.mergePublicCertificateUpdate(
+                existingCert: existingContact.publicKeyData,
+                incomingCertOrUpdate: binaryData
+            )
             let resolvedVerificationState: ContactVerificationState =
                 (existingContact.isVerified || verificationState == .verified)
                 ? .verified
@@ -240,9 +235,8 @@ final class ContactService: @unchecked Sendable {
                 return .duplicate(contacts[existingIndex])
 
             case .updated:
-                let updatedValidation = try ContactImportPublicCertificateValidator.validate(
-                    mergedResult.mergedCertData,
-                    using: engine
+                let updatedValidation = try contactImportAdapter.validateImportablePublicCertificate(
+                    mergedResult.mergedCertData
                 )
                 let updatedContact = makeContact(
                     from: updatedValidation,
@@ -352,7 +346,7 @@ final class ContactService: @unchecked Sendable {
 
     @discardableResult
     private func performConfirmKeyUpdate(existingFingerprint: String, keyData: Data) throws -> Contact {
-        let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
+        let validation = try contactImportAdapter.validateImportablePublicCertificate(keyData)
         let verifiedContact = makeContact(from: validation, verificationState: .verified)
 
         // Write new key first — if this fails, the old contact remains intact
@@ -770,7 +764,7 @@ final class ContactService: @unchecked Sendable {
 
         do {
             return (
-                try engine.armor(data: artifact.canonicalSignatureData, kind: .signature),
+                try certificateAdapter.armorSignatureForExport(artifact.canonicalSignatureData),
                 artifact.resolvedExportFilename
             )
         } catch {
@@ -1123,9 +1117,7 @@ final class ContactService: @unchecked Sendable {
         from binaryData: Data,
         verificationState: ContactVerificationState? = nil
     ) throws -> Contact {
-        let keyInfo = try engine.parseKeyInfo(keyData: binaryData)
-        let profile = try engine.detectProfile(certData: binaryData)
-        let metadata = PGPKeyMetadataAdapter.metadata(from: keyInfo, profile: profile)
+        let metadata = try contactImportAdapter.metadata(forKeyData: binaryData)
         let resolvedVerificationState = verificationState
             ?? verificationStates[metadata.fingerprint]
             ?? .verified
@@ -1146,10 +1138,10 @@ final class ContactService: @unchecked Sendable {
     }
 
     private func makeContact(
-        from validation: PublicCertificateValidationResult,
+        from validation: PGPValidatedPublicCertificate,
         verificationState: ContactVerificationState? = nil
     ) -> Contact {
-        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let metadata = validation.metadata
         let resolvedVerificationState = verificationState
             ?? verificationStates[metadata.fingerprint]
             ?? .verified

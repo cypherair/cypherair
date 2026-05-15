@@ -10,10 +10,10 @@ import CoreImage.CIFilterBuiltins
 @Observable
 final class QRService {
 
-    private let engine: PgpEngine
+    private let contactImportAdapter: PGPContactImportAdapter
 
-    init(engine: PgpEngine) {
-        self.engine = engine
+    init(contactImportAdapter: PGPContactImportAdapter) {
+        self.contactImportAdapter = contactImportAdapter
     }
 
     // MARK: - QR Generation
@@ -26,7 +26,7 @@ final class QRService {
     func generateQRCode(for publicKeyData: Data) throws -> CIImage? {
         let urlString: String
         do {
-            urlString = try engine.encodeQrUrl(publicKeyData: publicKeyData)
+            urlString = try contactImportAdapter.encodeQrUrl(publicKeyData: publicKeyData)
         } catch {
             throw CypherAirError.from(error) { .invalidKeyData(reason: $0) }
         }
@@ -77,11 +77,11 @@ final class QRService {
             throw CypherAirError.unsupportedQRVersion
         }
 
-        // Delegate to Rust engine for full parsing and validation.
+        // Delegate to the FFI adapter for full parsing and validation.
         // Any engine error here means the QR payload is invalid — always map to .invalidQRCode
-        // regardless of the specific PgpError variant (InvalidKeyData, CorruptData, etc.).
+        // regardless of the specific generated error variant.
         do {
-            return try engine.decodeQrUrl(url: urlString)
+            return try contactImportAdapter.decodeQrUrl(urlString)
         } catch {
             throw CypherAirError.invalidQRCode
         }
@@ -91,10 +91,10 @@ final class QRService {
 
     /// Validate contact-import data as a public certificate and return normalized metadata.
     func inspectImportablePublicCertificate(keyData: Data) throws -> ImportablePublicCertificateInspection {
-        let validation = try ContactImportPublicCertificateValidator.validate(keyData, using: engine)
+        let validation = try contactImportAdapter.validateImportablePublicCertificate(keyData)
         return ImportablePublicCertificateInspection(
             publicCertData: validation.publicCertData,
-            metadata: PGPKeyMetadataAdapter.metadata(from: validation)
+            metadata: validation.metadata
         )
     }
 

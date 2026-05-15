@@ -89,6 +89,8 @@ final class TutorialSandboxContainer {
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         self.keyManagement = KeyManagementService(
             engine: engine,
             certificateAdapter: certificateAdapter,
@@ -100,7 +102,11 @@ final class TutorialSandboxContainer {
             privateKeyControlStore: privateKeyControlStore
         )
         try? self.keyManagement.loadKeys()
-        self.contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
+        self.contactService = ContactService(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            contactsDirectory: contactsDirectory
+        )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         self.encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
@@ -124,9 +130,9 @@ final class TutorialSandboxContainer {
             keyManagement: keyManagement,
             contactService: contactService
         )
-        self.qrService = QRService(engine: engine)
+        self.qrService = QRService(contactImportAdapter: contactImportAdapter)
         self.selfTestService = SelfTestService(
-            engine: engine,
+            selfTestAdapter: selfTestAdapter,
             messageAdapter: messageAdapter
         )
 
