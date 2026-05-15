@@ -217,13 +217,13 @@ Sources/
 │   ├── ExportableFile.swift
 │   ├── IdentityPresentation.swift
 │   ├── PGPKeyIdentity.swift
+│   ├── PGPKeyProfile.swift
+│   ├── OpenPGPCertificationKind.swift
 │   ├── Contact.swift
-│   ├── KeyProfile+App.swift
 │   ├── SignatureVerification.swift
 │   └── AppConfiguration.swift
 ├── Extensions/
-│   ├── Data+Zeroing.swift
-│   └── KeyProfile+Codable.swift
+│   └── Data+Zeroing.swift
 └── Resources/
     ├── Assets.xcassets
     └── Localizable.xcstrings
