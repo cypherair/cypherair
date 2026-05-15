@@ -533,7 +533,7 @@ final class AppContainer: @unchecked Sendable {
                     contactService.protectedDomainMigrationWarning
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
-                    protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
+                    availability: Self.protectedOrdinarySettingsAvailability(
                         postUnlockOutcome: postUnlockOutcome,
                         protectedSettingsStore: protectedSettingsStore
                     )
@@ -833,7 +833,7 @@ final class AppContainer: @unchecked Sendable {
                     )
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
-                    protectedSettingsDomainState: Self.protectedSettingsDomainStateForOrdinarySettings(
+                    availability: Self.protectedOrdinarySettingsAvailability(
                         postUnlockOutcome: postUnlockOutcome,
                         protectedSettingsStore: protectedSettingsStore
                     )
@@ -954,24 +954,24 @@ final class AppContainer: @unchecked Sendable {
         _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
     }
 
-    private static func protectedSettingsDomainStateForOrdinarySettings(
+    private static func protectedOrdinarySettingsAvailability(
         postUnlockOutcome: ProtectedDataPostUnlockOutcome,
         protectedSettingsStore: ProtectedSettingsStore
-    ) -> ProtectedSettingsDomainState {
+    ) -> ProtectedOrdinarySettingsAvailability {
         switch postUnlockOutcome {
         case .opened, .noProtectedDomainPresent, .noRegisteredDomainPresent:
             protectedSettingsStore.syncPreAuthorizationState()
-            return protectedSettingsStore.domainState
+            return protectedSettingsStore.domainState == .unlocked ? .available : .unavailable
         case .domainOpenFailed(let domainID) where domainID == ProtectedSettingsStore.domainID:
             protectedSettingsStore.syncPreAuthorizationState()
-            return protectedSettingsStore.domainState
+            return protectedSettingsStore.domainState == .unlocked ? .available : .unavailable
         case .noRegisteredOpeners,
              .noAuthenticatedContext,
              .pendingMutationRecoveryRequired,
              .frameworkRecoveryNeeded,
              .authorizationDenied,
              .domainOpenFailed:
-            return .frameworkUnavailable
+            return .unavailable
         }
     }
 

@@ -189,6 +189,7 @@ $(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
 $(SRCROOT)/Sources/Models/PGPKeyImportS2KInfo.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
+$(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsAvailability.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsPersistence.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsSnapshot.swift
@@ -242,6 +243,7 @@ $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataStorageRoot.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainBootstrapStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainKeyManager.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift
+$(SRCROOT)/Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedSettingsStore.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManageable.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManager.swift
