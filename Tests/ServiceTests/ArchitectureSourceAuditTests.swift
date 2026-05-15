@@ -22,6 +22,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.modelsSwiftUIPresentationPolicy)
     }
 
+    func test_modelsLocalizedPresentationText_isBlocked() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.modelsLocalizedPresentationText)
+    }
+
     func test_contactArrayRuntimeDependencies_areLimitedToKnownTemporaryExceptions() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.contactArrayRuntimeDependencies)
     }
@@ -73,13 +77,24 @@ final class ArchitectureSourceAuditTests: XCTestCase {
 
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.modelsSwiftUIPresentationPolicy.withTemporaryExceptions([
-                "Sources/Models/ColorTheme.swift": "fixture exception"
+                "Sources/Models/LegacyPresentationModel.swift": "fixture exception"
             ]),
             violatingPath: "Sources/Models/NewDomainModel.swift",
             violatingContents: "import SwiftUI\nstruct NewDomainModel {}",
-            allowedPath: "Sources/Models/ColorTheme.swift",
-            allowedContents: "import SwiftUI\nstruct ColorTheme {}",
-            cleanContents: "import Foundation\nstruct ColorTheme {}"
+            allowedPath: "Sources/Models/LegacyPresentationModel.swift",
+            allowedContents: "import SwiftUI\nstruct LegacyPresentationModel {}",
+            cleanContents: "import Foundation\nstruct LegacyPresentationModel {}"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.modelsLocalizedPresentationText.withTemporaryExceptions([
+                "Sources/Models/LegacyLocalizedModel.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Models/NewDomainModel.swift",
+            violatingContents: #"struct NewDomainModel { let label = String(localized: "model.label") }"#,
+            allowedPath: "Sources/Models/LegacyLocalizedModel.swift",
+            allowedContents: #"struct LegacyLocalizedModel { let label = String.localizedStringWithFormat("%d keys", 2) }"#,
+            cleanContents: "struct LegacyLocalizedModel { let label = \"\" }"
         )
 
         try assertRuleBehavior(
@@ -147,12 +162,16 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             path: "Sources/Models/NewDomainModel.swift",
             contents: """
             // import SwiftUI should be ignored in comments.
-            let note = "import SwiftUI"
+            // String(localized:) should be ignored in comments.
+            let note = "import SwiftUI String(localized:)"
             struct NewDomainModel {}
             """
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.modelsSwiftUIPresentationPolicy.violations(in: [modelsSource]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.modelsLocalizedPresentationText.violations(in: [modelsSource]).isEmpty
         )
     }
 
@@ -458,22 +477,25 @@ private enum ArchitectureSourceAuditRules {
 
     static let modelsSwiftUIPresentationPolicy = ArchitectureSourceAuditRule(
         name: "Models SwiftUI presentation policy",
-        failureSummary: "Core Models should not import SwiftUI in new files.",
+        failureSummary: "Core Models should not import SwiftUI.",
         pattern: #"^\s*import\s+SwiftUI\b"#,
         scope: { path in
             path.hasPrefix("Sources/Models/") && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
         expressionOptions: [.anchorsMatchLines],
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Theme and signature display policy still live in Models pending Phase 2 presentation extraction.",
-                [
-                    "Sources/Models/ColorTheme.swift",
-                    "Sources/Models/SignatureVerification.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let modelsLocalizedPresentationText = ArchitectureSourceAuditRule(
+        name: "Models localized presentation text",
+        failureSummary: "Core Models should not own localized presentation text.",
+        pattern: #"\bString\s*(?:\(\s*localized\s*:|\.localizedStringWithFormat\s*\()"#,
+        scope: { path in
+            path.hasPrefix("Sources/Models/") && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let contactArrayRuntimeDependencies = ArchitectureSourceAuditRule(

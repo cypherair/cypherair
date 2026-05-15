@@ -308,6 +308,21 @@ final class ModelTests: XCTestCase {
         )
     }
 
+    func test_identityPresentation_parsedDisplayName_nilUserId_returnsNil() {
+        XCTAssertNil(IdentityPresentation.parsedDisplayName(from: nil))
+    }
+
+    func test_identityPresentation_displayFallback_isStableDomainValue() {
+        XCTAssertEqual(
+            IdentityPresentation.displayName(from: nil),
+            IdentityPresentation.legacyUnknownDisplayName
+        )
+    }
+
+    func test_identityDisplayPresentation_nilUserId_returnsLocalizedFallback() {
+        XCTAssertFalse(IdentityDisplayPresentation.displayName(from: nil).isEmpty)
+    }
+
     // MARK: - PGPKeyProfile
 
     func test_pgpKeyProfile_decode_historicalRawValues() throws {
@@ -521,7 +536,8 @@ final class ModelTests: XCTestCase {
         )
 
         XCTAssertEqual(identity?.source, .ownKey)
-        XCTAssertEqual(identity?.displayName, "Your Key")
+        XCTAssertEqual(identity?.displayName, "")
+        XCTAssertEqual(identity?.presentationDisplayName, "Your Key")
         XCTAssertEqual(identity?.secondaryText, ownKey.userId)
     }
 
@@ -558,6 +574,15 @@ final class ModelTests: XCTestCase {
         coordinator.setGracePeriod(42)
 
         XCTAssertEqual(coordinator.snapshot?.gracePeriod, AuthPreferences.defaultGracePeriod)
+    }
+
+    func test_protectedOrdinarySettings_validGracePeriodValues_matchSettingsOptions() {
+        let modelValues = Array(ProtectedOrdinarySettingsSnapshot.validGracePeriodValues).sorted()
+        let settingsValues = SettingsGracePeriodPresentation.options.map(\.value).sorted()
+
+        XCTAssertEqual(modelValues, [0, 60, 180, 300])
+        XCTAssertEqual(settingsValues, modelValues)
+        XCTAssertTrue(SettingsGracePeriodPresentation.options.allSatisfy { !$0.label.isEmpty })
     }
 
     func test_protectedOrdinarySettings_startsLockedWithoutReadingPersistence() {

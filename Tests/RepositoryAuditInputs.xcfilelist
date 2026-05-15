@@ -11,6 +11,8 @@ $(SRCROOT)/Sources/App/Common/AuthenticationShieldOverlayView.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifact.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactError.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactStore.swift
+$(SRCROOT)/Sources/App/Common/ColorTheme+Presentation.swift
+$(SRCROOT)/Sources/App/Common/CypherAirError+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
 $(SRCROOT)/Sources/App/Common/CypherMotion.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationButtonLabel.swift
@@ -21,13 +23,16 @@ $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
 $(SRCROOT)/Sources/App/Common/FileImportRequestGate.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift
+$(SRCROOT)/Sources/App/Common/IdentityDisplayPresentation.swift
 $(SRCROOT)/Sources/App/Common/MacPresentationPolish.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift
+$(SRCROOT)/Sources/App/Common/PGPKeyProfile+Presentation.swift
 $(SRCROOT)/Sources/App/Common/PrivacyScreenLifecycleGate.swift
 $(SRCROOT)/Sources/App/Common/PrivacyScreenModifier.swift
 $(SRCROOT)/Sources/App/Common/SecurityScopedFileAccess.swift
 $(SRCROOT)/Sources/App/Common/SignatureIdentityCardView.swift
+$(SRCROOT)/Sources/App/Common/SignatureVerification+Presentation.swift
 $(SRCROOT)/Sources/App/Common/TextImport/ImportedTextInputState.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactView.swift
@@ -36,10 +41,12 @@ $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificationDetailsView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactDetailView.swift
+$(SRCROOT)/Sources/App/Contacts/ContactIdentitySummary+Presentation.swift
 $(SRCROOT)/Sources/App/Contacts/ContactKeySummaryView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactKeyUsageState+ContactDetailPresentation.swift
 $(SRCROOT)/Sources/App/Contacts/ContactTagAssignmentSheet.swift
 $(SRCROOT)/Sources/App/Contacts/ContactsScreenModel.swift
+$(SRCROOT)/Sources/App/Contacts/ContactsAvailability+Presentation.swift
 $(SRCROOT)/Sources/App/Contacts/ContactsView.swift
 $(SRCROOT)/Sources/App/Contacts/Import/AppSceneIncomingURLRouter.swift
 $(SRCROOT)/Sources/App/Contacts/Import/ContactImportWorkflow.swift
@@ -122,6 +129,7 @@ $(SRCROOT)/Sources/App/Settings/SettingsProtectedClipboardNoticeRow.swift
 $(SRCROOT)/Sources/App/Settings/SettingsScreenHostView.swift
 $(SRCROOT)/Sources/App/Settings/SettingsScreenModel.swift
 $(SRCROOT)/Sources/App/Settings/SettingsScreenPresentations.swift
+$(SRCROOT)/Sources/App/Settings/SettingsGracePeriodPresentation.swift
 $(SRCROOT)/Sources/App/Settings/SettingsSecuritySection.swift
 $(SRCROOT)/Sources/App/Settings/SettingsView.swift
 $(SRCROOT)/Sources/App/Settings/SourceComplianceDependency.swift

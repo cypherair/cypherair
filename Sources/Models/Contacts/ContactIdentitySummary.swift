@@ -30,11 +30,4 @@ struct ContactIdentitySummary: Identifiable, Hashable, Sendable {
     var hasUnverifiedKeys: Bool {
         keys.contains { !$0.isVerified }
     }
-
-    var keyCountDescription: String {
-        String.localizedStringWithFormat(
-            String(localized: "contacts.keyCount", defaultValue: "%d keys"),
-            keys.count
-        )
-    }
 }

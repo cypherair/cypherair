@@ -729,7 +729,7 @@ struct ContactSnapshotMutator {
         let metadata = validation.metadata
         return ContactIdentity(
             contactId: "contact-\(UUID().uuidString)",
-            displayName: IdentityPresentation.displayName(from: metadata.userId),
+            displayName: Self.domainDisplayName(from: metadata.userId),
             primaryEmail: IdentityPresentation.email(from: metadata.userId),
             tagIds: [],
             notes: nil,
@@ -751,7 +751,7 @@ struct ContactSnapshotMutator {
             contactId: contactId,
             fingerprint: metadata.fingerprint,
             primaryUserId: metadata.userId,
-            displayName: IdentityPresentation.displayName(from: metadata.userId),
+            displayName: Self.domainDisplayName(from: metadata.userId),
             email: IdentityPresentation.email(from: metadata.userId),
             keyVersion: metadata.keyVersion,
             profile: metadata.profile,
@@ -780,7 +780,7 @@ struct ContactSnapshotMutator {
         let metadata = validation.metadata
         var updatedRecord = existingRecord
         updatedRecord.primaryUserId = metadata.userId
-        updatedRecord.displayName = IdentityPresentation.displayName(from: metadata.userId)
+        updatedRecord.displayName = Self.domainDisplayName(from: metadata.userId)
         updatedRecord.email = IdentityPresentation.email(from: metadata.userId)
         updatedRecord.keyVersion = metadata.keyVersion
         updatedRecord.profile = metadata.profile
@@ -810,13 +810,18 @@ struct ContactSnapshotMutator {
             return
         }
         if snapshot.identities[identityIndex].displayName.isEmpty ||
-            snapshot.identities[identityIndex].displayName == IdentityPresentation.displayName(from: nil) {
+            snapshot.identities[identityIndex].displayName == IdentityPresentation.legacyUnknownDisplayName {
             snapshot.identities[identityIndex].displayName = keyRecord.displayName
         }
         if snapshot.identities[identityIndex].primaryEmail == nil {
             snapshot.identities[identityIndex].primaryEmail = keyRecord.email
         }
         snapshot.identities[identityIndex].updatedAt = now
+    }
+
+    private static func domainDisplayName(from userId: String?) -> String {
+        IdentityPresentation.parsedDisplayName(from: userId)
+            ?? IdentityPresentation.legacyUnknownDisplayName
     }
 
     private func pruneCertificationArtifacts(

@@ -51,7 +51,7 @@ struct ImportConfirmView: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(IdentityPresentation.displayName(from: metadata.userId))
+                        Text(IdentityDisplayPresentation.displayName(from: metadata.userId))
                             .font(.headline)
 
                         if let email = IdentityPresentation.email(from: metadata.userId) {

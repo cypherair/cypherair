@@ -15,7 +15,7 @@ struct SignatureIdentityCardView: View {
                     Spacer()
                 }
 
-                Text(signerIdentity.displayName)
+                Text(signerIdentity.presentationDisplayName)
                     .font(.headline)
 
                 if let secondaryText = signerIdentity.secondaryText, !secondaryText.isEmpty {
