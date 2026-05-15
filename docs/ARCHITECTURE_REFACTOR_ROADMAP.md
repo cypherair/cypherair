@@ -75,6 +75,10 @@ Purpose: contain generated UniFFI interaction and generated-error interpretation
   - Normalize generated key-inspection and QR/import errors at the boundary.
   - Keep untrusted input parsing behavior and self-test coverage unchanged.
 
+- **PR 1E: Phase 1 close-out and key-operation containment**
+  - Move key generation, secret-key import/export, S2K inspection, public-key armor, and expiry modification behind the FFI adapter boundary.
+  - Move generated `PgpError` mapping and generated cancellation interpretation out of Models, Views, and ScreenModels where it blocks Phase 1 exit markers.
+
 ### Exit Markers
 
 - Normal production Services call adapter / mapper contracts rather than exposing generated records upward.
@@ -100,7 +104,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 
 - **PR 2B: Error vocabulary cleanup**
   - Keep `CypherAirError` as the shared app-owned error model.
-  - Move generated `PgpError` mapping and generated cancellation interpretation out of Models.
+  - Continue residual error vocabulary cleanup after the Phase 1 close-out moved generated `PgpError` mapping and generated cancellation interpretation out of Models, Views, and ScreenModels.
 
 - **PR 2C: Presentation policy extraction**
   - Move display-only helpers such as colors, icons, localized labels, and view-specific display text out of core Models and into presentation helpers or ScreenModel-prepared display state.

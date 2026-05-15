@@ -250,10 +250,6 @@ struct KeyGenerationView: View {
            case .operationCancelled = cypherAirError {
             return true
         }
-        if let pgpError = error as? PgpError,
-           case .OperationCancelled = pgpError {
-            return true
-        }
         return false
     }
 }

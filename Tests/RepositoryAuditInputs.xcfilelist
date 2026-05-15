@@ -178,6 +178,7 @@ $(SRCROOT)/Sources/Models/PasswordMessageDetailedDecryptOutcome.swift
 $(SRCROOT)/Sources/Models/PasswordMessageEnvelopeFormat.swift
 $(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
+$(SRCROOT)/Sources/Models/PGPKeyImportS2KInfo.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsPersistence.swift
@@ -253,6 +254,7 @@ $(SRCROOT)/Sources/Services/FFI/PGPCertificateOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPContactImportAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPKeyOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageResultMapper.swift
 $(SRCROOT)/Sources/Services/FFI/PGPSelfTestOperationAdapter.swift

@@ -963,8 +963,10 @@ final class CommonHelpersTests: XCTestCase {
             keychain: keychain,
             privateKeyControlStore: privateKeyControlStore
         )
+        let engine = PgpEngine()
         let keyManagement = KeyManagementService(
-            engine: PgpEngine(),
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
@@ -1009,8 +1011,10 @@ final class CommonHelpersTests: XCTestCase {
             keychain: keychain,
             privateKeyControlStore: privateKeyControlStore
         )
+        let engine = PgpEngine()
         let keyManagement = KeyManagementService(
-            engine: PgpEngine(),
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
             authenticator: authManager,
@@ -1132,7 +1136,8 @@ final class CommonHelpersTests: XCTestCase {
         let setupPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         setupAuthManager.configurePrivateKeyControlStore(setupPrivateKeyControlStore)
         let setupKeyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: setupAuthManager,
@@ -1196,7 +1201,8 @@ final class CommonHelpersTests: XCTestCase {
         let keyManagementPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         authManager.configurePrivateKeyControlStore(keyManagementPrivateKeyControlStore)
         let keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: authManager,

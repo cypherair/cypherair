@@ -43,7 +43,7 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
         let memoryGuard = Argon2idMemoryGuard() // Uses SystemMemoryInfo (real)
 
         // On an 8 GB+ device, 512 MB should be well within limits.
-        XCTAssertNoThrow(try memoryGuard.validate(s2kInfo: s2kInfo))
+        XCTAssertNoThrow(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
 
         // If the guard passes, proceed with actual import.
         let imported = try engine.importSecretKey(

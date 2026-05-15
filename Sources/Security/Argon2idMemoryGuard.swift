@@ -21,30 +21,30 @@ struct Argon2idMemoryGuard {
     /// Validate that the device has sufficient memory to perform Argon2id
     /// key derivation for the given S2K parameters.
     ///
-    /// - Parameter s2kInfo: The parsed S2K parameters from the key file.
+    /// - Parameter protectionInfo: App-owned S2K protection info parsed at the FFI boundary.
     /// - Throws: `CypherAirError.argon2idMemoryExceeded` if memory requirement
     ///   exceeds 75% of available memory.
     /// RFC 9580 maximum encoded_m is 31 (2^31 KiB = 2 TB).
     /// Any value beyond this is malformed or malicious.
     private static let maxMemoryKib: UInt64 = 1 << 31
 
-    func validate(s2kInfo: S2kInfo) throws {
+    func validate(protectionInfo: PGPKeyImportS2KInfo) throws {
         // Non-Argon2id (Profile A: "iterated-salted") — no memory check needed.
-        guard s2kInfo.s2kType == "argon2id" else { return }
+        guard protectionInfo.s2kType == "argon2id" else { return }
 
         // memoryKib=0 means no memory requirement (shouldn't happen for argon2id,
         // but be defensive).
-        guard s2kInfo.memoryKib > 0 else { return }
+        guard protectionInfo.memoryKib > 0 else { return }
 
         // Defense-in-depth: reject memoryKib values that exceed RFC 9580's
         // maximum encoded_m=31 (2^31 KiB). This prevents overflow in the
         // multiplication below and rejects malformed S2K parameters early.
-        guard s2kInfo.memoryKib <= Self.maxMemoryKib else {
-            let requiredMb = s2kInfo.memoryKib / 1024
+        guard protectionInfo.memoryKib <= Self.maxMemoryKib else {
+            let requiredMb = protectionInfo.memoryKib / 1024
             throw CypherAirError.argon2idMemoryExceeded(requiredMb: requiredMb)
         }
 
-        let requiredBytes = s2kInfo.memoryKib * 1024
+        let requiredBytes = protectionInfo.memoryKib * 1024
         let availableBytes = memoryInfo.availableMemoryBytes()
 
         // 75% threshold using integer arithmetic to avoid floating-point rounding.
@@ -69,7 +69,7 @@ struct Argon2idMemoryGuard {
         }
 
         guard !exceeds else {
-            let requiredMb = s2kInfo.memoryKib / 1024
+            let requiredMb = protectionInfo.memoryKib / 1024
             throw CypherAirError.argon2idMemoryExceeded(requiredMb: requiredMb)
         }
     }

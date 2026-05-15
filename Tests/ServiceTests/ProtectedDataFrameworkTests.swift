@@ -1550,8 +1550,10 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let keyManagement = KeyManagementService(
-            engine: engine,
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
@@ -1560,7 +1562,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             privateKeyControlStore: privateKeyControlStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
-        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let contactService = ContactService(

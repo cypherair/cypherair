@@ -660,10 +660,6 @@ final class ContactCertificateSignaturesScreenModel {
            case .operationCancelled = cypherAirError {
             return true
         }
-        if let pgpError = error as? PgpError,
-           case .OperationCancelled = pgpError {
-            return true
-        }
         return false
     }
 }

@@ -341,21 +341,10 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Composition roots still construct or inject PgpEngine until the FFI adapter graph exists.",
+                "Composition roots may construct PgpEngine and FFI adapters while wiring the dependency graph.",
                 [
                     "Sources/App/AppContainer.swift",
                     "Sources/App/Onboarding/TutorialSandboxContainer.swift",
-                ]
-            ),
-            (
-                "App UI and ScreenModel surfaces still carry generated error or result vocabulary pending Phase 1/4 cleanup.",
-                [
-                    "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
-                    "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
-                    "Sources/App/Keys/BackupKeyView.swift",
-                    "Sources/App/Keys/ImportKeyView.swift",
-                    "Sources/App/Keys/KeyGenerationView.swift",
-                    "Sources/App/Keys/SelectiveRevocationScreenModel.swift",
                 ]
             ),
             (
@@ -366,30 +355,10 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
                     "Sources/Services/FFI/PGPContactImportAdapter.swift",
                     "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
+                    "Sources/Services/FFI/PGPKeyOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageResultMapper.swift",
                     "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
-                ]
-            ),
-            (
-                "Models still include generated enum/result vocabulary pending Phase 1/2 adapter and model cleanup.",
-                [
-                    "Sources/Models/CypherAirError.swift",
-                ]
-            ),
-            (
-                "Security still consumes generated S2K metadata until the import/FFI boundary is narrowed.",
-                [
-                    "Sources/Security/Argon2idMemoryGuard.swift",
-                ]
-            ),
-            (
-                "Services still call PgpEngine and map generated results directly until Phase 1 introduces adapter contracts.",
-                [
-                    "Sources/Services/KeyManagement/KeyExportService.swift",
-                    "Sources/Services/KeyManagement/KeyMutationService.swift",
-                    "Sources/Services/KeyManagement/KeyProvisioningService.swift",
-                    "Sources/Services/KeyManagementService.swift",
                 ]
             ),
         ])
@@ -403,19 +372,7 @@ private enum ArchitectureSourceAuditRules {
             path.hasPrefix("Sources/App/") && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Current cancellation-ignore handling checks generated PgpError until generated errors are normalized at the adapter boundary.",
-                [
-                    "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
-                    "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
-                    "Sources/App/Keys/BackupKeyView.swift",
-                    "Sources/App/Keys/ImportKeyView.swift",
-                    "Sources/App/Keys/KeyGenerationView.swift",
-                    "Sources/App/Keys/SelectiveRevocationScreenModel.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let appLayerFFIAdapterUsage = ArchitectureSourceAuditRule(
@@ -426,6 +383,7 @@ private enum ArchitectureSourceAuditRules {
             "PGPCertificateOperationAdapter",
             "PGPContactImportAdapter",
             "PGPKeyMetadataAdapter",
+            "PGPKeyOperationAdapter",
             "PGPMessageOperationAdapter",
             "PGPMessageResultMapper",
             "PGPErrorMapper",

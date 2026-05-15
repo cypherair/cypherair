@@ -2,7 +2,7 @@ import Foundation
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
-    private let engine: PgpEngine
+    private let keyAdapter: PGPKeyOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
     private let defaults: UserDefaults
@@ -13,7 +13,7 @@ final class KeyMutationService {
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
 
     init(
-        engine: PgpEngine,
+        keyAdapter: PGPKeyOperationAdapter,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         defaults: UserDefaults,
@@ -23,7 +23,7 @@ final class KeyMutationService {
         privateKeyAccessService: PrivateKeyAccessService,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol
     ) {
-        self.engine = engine
+        self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
@@ -56,8 +56,7 @@ final class KeyMutationService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        var result = try await Self.modifyExpiryOffMainActor(
-            engine: engine,
+        var result = try await keyAdapter.modifyExpiry(
             certData: secretKey,
             newExpirySeconds: newExpirySeconds
         )
@@ -118,9 +117,9 @@ final class KeyMutationService {
         }
 
         var updated = existingIdentity
-        updated.isExpired = result.keyInfo.isExpired
+        updated.isExpired = result.metadata.isExpired
         updated.publicKeyData = result.publicKeyData
-        updated.expiryDate = result.keyInfo.expiryTimestamp.map {
+        updated.expiryDate = result.metadata.expiryTimestamp.map {
             Date(timeIntervalSince1970: TimeInterval($0))
         }
 
@@ -220,22 +219,6 @@ final class KeyMutationService {
 
         if catalogStore.keys.isEmpty {
             try? privateKeyControlStore.clearRewrapJournal()
-        }
-    }
-
-    @concurrent
-    private static func modifyExpiryOffMainActor(
-        engine: PgpEngine,
-        certData: Data,
-        newExpirySeconds: UInt64?
-    ) async throws -> ModifyExpiryResult {
-        do {
-            return try engine.modifyExpiry(
-                certData: certData,
-                newExpirySeconds: newExpirySeconds
-            )
-        } catch {
-            throw CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
         }
     }
 
