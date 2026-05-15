@@ -608,6 +608,11 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/scripts/snapshot_repository_audit_inputs.sh",
+				"$(SRCROOT)/.git/HEAD",
+				"$(SRCROOT)/.git/config",
+				"$(SRCROOT)/.git/index",
+				"$(SRCROOT)/.git/info/exclude",
+				"$(SRCROOT)/Sources",
 				"$(SRCROOT)/Tests/RepositoryAuditInputs.xcfilelist",
 			);
 			name = "Snapshot Repository Audit Inputs";
