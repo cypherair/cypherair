@@ -17,7 +17,8 @@ enum RepositoryAuditLoader {
     }
 
     static func swiftSourceRelativePaths(under relativeDirectory: String = "") throws -> [String] {
-        let sourcesRootURL = try sourcesRootURL()
+        let snapshotRootURL = try validatedSnapshotRootURL()
+        let sourcesRootURL = snapshotRootURL.appending(path: "Sources", directoryHint: .isDirectory)
         let normalizedDirectory = relativeDirectory.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let scanRootURL = normalizedDirectory.isEmpty
             ? sourcesRootURL
@@ -40,12 +41,7 @@ enum RepositoryAuditLoader {
             guard values.isRegularFile == true else {
                 continue
             }
-            let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
-            if relativePath.hasPrefix("Sources/") {
-                paths.append(relativePath)
-            } else {
-                paths.append("Sources/\(relativePath)")
-            }
+            paths.append(try snapshotRelativePath(for: fileURL, snapshotRootURL: snapshotRootURL))
         }
         return paths.sorted()
     }
@@ -90,11 +86,29 @@ enum RepositoryAuditLoader {
         return snapshotRootURL
     }
 
+    private static func snapshotRelativePath(for fileURL: URL, snapshotRootURL: URL) throws -> String {
+        let snapshotRootPath = snapshotRootURL.standardizedFileURL.path
+        let snapshotRootPrefix = snapshotRootPath.hasSuffix("/")
+            ? snapshotRootPath
+            : "\(snapshotRootPath)/"
+        let filePath = fileURL.standardizedFileURL.path
+        guard filePath.hasPrefix(snapshotRootPrefix) else {
+            throw RepositoryAuditError.invalidSnapshotPath(filePath)
+        }
+
+        let relativePath = String(filePath.dropFirst(snapshotRootPrefix.count))
+        guard relativePath.hasPrefix("Sources/") else {
+            throw RepositoryAuditError.invalidSnapshotPath(relativePath)
+        }
+        return relativePath
+    }
+
     enum RepositoryAuditError: Error, CustomStringConvertible {
         case missingBundleResourceURL
         case missingSnapshot(String)
         case missingResource(String)
         case invalidEncoding(String)
+        case invalidSnapshotPath(String)
 
         var description: String {
             switch self {
@@ -106,6 +120,8 @@ enum RepositoryAuditLoader {
                 return "RepositoryAudit resource not found: \(relativePath)"
             case .invalidEncoding(let relativePath):
                 return "RepositoryAudit resource is not valid UTF-8: \(relativePath)"
+            case .invalidSnapshotPath(let path):
+                return "RepositoryAudit source path is outside the Sources snapshot: \(path)"
             }
         }
     }
