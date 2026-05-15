@@ -105,6 +105,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 - **PR 2B: Error vocabulary cleanup**
   - Keep `CypherAirError` as the shared app-owned error model.
   - Continue residual error vocabulary cleanup after the Phase 1 close-out moved generated `PgpError` mapping and generated cancellation interpretation out of Models, Views, and ScreenModels.
+  - Status note: Phase 2 PR2B validation confirms current production code keeps generated `PgpError` mapping in the FFI adapter boundary, keeps `CypherAirError` free of generated error mapping, and blocks new non-FFI `PGPErrorMapper` use with source-audit coverage.
 
 - **PR 2C: Presentation policy extraction**
   - Move display-only helpers such as colors, icons, localized labels, and view-specific display text out of core Models and into presentation helpers or ScreenModel-prepared display state.
