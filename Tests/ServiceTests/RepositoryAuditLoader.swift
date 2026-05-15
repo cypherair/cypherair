@@ -41,7 +41,11 @@ enum RepositoryAuditLoader {
                 continue
             }
             let relativePath = String(fileURL.path.dropFirst(sourcesRootURL.path.count + 1))
-            paths.append("Sources/\(relativePath)")
+            if relativePath.hasPrefix("Sources/") {
+                paths.append(relativePath)
+            } else {
+                paths.append("Sources/\(relativePath)")
+            }
         }
         return paths.sorted()
     }
