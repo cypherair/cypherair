@@ -2,6 +2,18 @@ import Foundation
 import XCTest
 
 final class ArchitectureSourceAuditTests: XCTestCase {
+    func test_repositoryAuditLoader_returnsRepositoryRelativeSwiftSourcePaths() throws {
+        let paths = try RepositoryAuditLoader.swiftSourceRelativePaths()
+
+        XCTAssertFalse(paths.isEmpty)
+        XCTAssertTrue(paths.allSatisfy { $0.hasPrefix("Sources/") })
+        XCTAssertFalse(paths.contains { $0.hasPrefix("Sources/Sources/") })
+
+        let knownPath = "Sources/App/AppContainer.swift"
+        XCTAssertTrue(paths.contains(knownPath))
+        XCTAssertFalse(try RepositoryAuditLoader.loadString(relativePath: knownPath).isEmpty)
+    }
+
     func test_generatedUniFFITypes_doNotLeakIntoNewUpperLayerFiles() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.generatedFFITypes)
     }
