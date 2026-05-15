@@ -67,7 +67,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         }
 
         let initialSnapshot = try initialSnapshotProvider()
-        try initialSnapshot.validateContract()
+        try validateSnapshotForProtectedData(initialSnapshot)
         let wrappingRootKeyBox = SensitiveBytesBox(data: wrappingRootKey)
         defer {
             wrappingRootKeyBox.zeroize()
@@ -185,7 +185,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
             }
             throw ProtectedDataError.authorizingUnavailable
         }
-        try updatedSnapshot.validateContract()
+        try validateSnapshotForProtectedData(updatedSnapshot)
 
         var domainMasterKey = try activeDomainMasterKey()
         defer {
@@ -426,6 +426,14 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         snapshot = nil
         unlockedGenerationIdentifier = nil
     }
+
+    private func validateSnapshotForProtectedData(_ snapshot: ContactsDomainSnapshot) throws {
+        do {
+            try snapshot.validateContract()
+        } catch let error as ContactsDomainValidationError {
+            throw ProtectedDataError.invalidEnvelope(error.reason)
+        }
+    }
 }
 
 extension ContactsDomainStore: ProtectedDomainRecoveryHandler {
@@ -448,7 +456,9 @@ extension ContactsDomainStore: ProtectedDomainRecoveryHandler {
         switch phase {
         case .journaled, .sharedResourceProvisioned:
             stagedSnapshot = try initialSnapshotProvider()
-            try stagedSnapshot?.validateContract()
+            if let stagedSnapshot {
+                try validateSnapshotForProtectedData(stagedSnapshot)
+            }
         case .artifactsStaged, .validated:
             stagedSnapshot = nil
         case .membershipCommitted:

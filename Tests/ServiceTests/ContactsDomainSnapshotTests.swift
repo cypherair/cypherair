@@ -21,8 +21,15 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         var snapshot = try makeValidSnapshot()
         snapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
 
-        XCTAssertThrowsError(try snapshot.validateContract())
-        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot))
+        XCTAssertThrowsError(try snapshot.validateContract()) { error in
+            XCTAssertTrue(error is ContactsDomainValidationError)
+        }
+        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)) { error in
+            XCTAssertEqual(
+                error as? ProtectedDataError,
+                .invalidEnvelope("Contacts payload has an unsupported schema version.")
+            )
+        }
     }
 
     func test_duplicateIdentifiersAndFingerprints_areRejected() throws {
@@ -337,7 +344,12 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
         XCTAssertThrowsError(
             try ContactsDomainSnapshotCodec.decodeSnapshot(try encoder.encode(legacySnapshot))
-        )
+        ) { error in
+            XCTAssertEqual(
+                error as? ProtectedDataError,
+                .invalidEnvelope("Contacts payload contains a key record without a matching contact.")
+            )
+        }
     }
 
     func test_certificationArtifactDigestMismatch_isRejected() throws {

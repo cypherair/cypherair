@@ -38,7 +38,7 @@ final class ContactServiceTests: XCTestCase {
 
     // MARK: - Post-Auth Gate
 
-    func test_postAuthGateResult_mappingMatchesPR3Contract() {
+    func test_postAuthGateDecision_mappingMatchesProtectedDataBoundaryContract() {
         struct MappingCase {
             let name: String
             let outcome: ProtectedDataPostUnlockOutcome
@@ -149,15 +149,15 @@ final class ContactServiceTests: XCTestCase {
         ]
 
         for testCase in cases {
-            let result = ContactsPostAuthGateResult(
+            let decision = ContactsPostAuthGateDecision(
                 postUnlockOutcome: testCase.outcome,
                 frameworkState: testCase.frameworkState
             )
 
-            XCTAssertEqual(result.availability, testCase.availability, testCase.name)
-            XCTAssertEqual(result.allowsLegacyCompatibilityLoad, testCase.allowsLegacyLoad, testCase.name)
-            XCTAssertEqual(result.allowsProtectedDomainOpen, testCase.allowsProtectedOpen, testCase.name)
-            XCTAssertTrue(result.clearsRuntime, testCase.name)
+            XCTAssertEqual(decision.availability, testCase.availability, testCase.name)
+            XCTAssertEqual(decision.allowsLegacyCompatibilityLoad, testCase.allowsLegacyLoad, testCase.name)
+            XCTAssertEqual(decision.allowsProtectedDomainOpen, testCase.allowsProtectedOpen, testCase.name)
+            XCTAssertTrue(decision.clearsRuntime, testCase.name)
         }
     }
 
@@ -175,7 +175,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(contactService.contactsAvailability, .locked)
 
         let availability = contactService.openLegacyCompatibilityAfterPostUnlock(
-            gateResult: ContactsPostAuthGateResult(
+            gateDecision: ContactsPostAuthGateDecision(
                 postUnlockOutcome: .noRegisteredDomainPresent,
                 frameworkState: .sessionAuthorized
             )
@@ -197,7 +197,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(contactService.availableContacts.isEmpty)
 
         let availability = contactService.openLegacyCompatibilityAfterPostUnlock(
-            gateResult: ContactsPostAuthGateResult(
+            gateDecision: ContactsPostAuthGateDecision(
                 postUnlockOutcome: .authorizationDenied,
                 frameworkState: .sessionAuthorized
             )
@@ -238,7 +238,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -265,7 +265,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let reopenedAvailability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -295,7 +295,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -305,6 +305,38 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: ContactRepository(contactsDirectory: contactsDirectory).quarantineDirectory.path
         ))
+    }
+
+    func test_contactsDomainStoreInitialSnapshotValidationMapsToProtectedDataInvalidEnvelope() async throws {
+        let contactsDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirContactsInvalidInitial-\(UUID().uuidString)", isDirectory: true)
+        let harness = try makeContactsProtectedHarness(
+            prefix: "ContactsInvalidInitial",
+            contactsDirectory: contactsDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+
+        var invalidSnapshot = ContactsDomainSnapshot.empty()
+        invalidSnapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
+
+        do {
+            try await harness.store.ensureCommittedIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                initialSnapshotProvider: {
+                    invalidSnapshot
+                }
+            )
+            XCTFail("Expected invalid Contacts snapshot to fail at the ProtectedData storage boundary.")
+        } catch {
+            XCTAssertEqual(
+                error as? ProtectedDataError,
+                .invalidEnvelope("Contacts payload has an unsupported schema version.")
+            )
+        }
+
+        XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID])
     }
 
     func test_contactsV1SnapshotWithRecipientListsMigratesToV2AndWritesBack() async throws {
@@ -405,7 +437,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -446,7 +478,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -478,7 +510,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
@@ -508,7 +540,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -540,7 +572,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
@@ -563,7 +595,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -595,7 +627,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
@@ -622,7 +654,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -656,7 +688,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(initialAvailability, .availableProtectedDomain)
@@ -691,7 +723,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let reopenedAvailability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
@@ -720,7 +752,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(initialAvailability, .availableProtectedDomain)
@@ -759,7 +791,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -792,7 +824,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(initialAvailability, .availableProtectedDomain)
@@ -828,7 +860,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -863,7 +895,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: harness.store
         )
         let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
@@ -891,7 +923,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
 
@@ -3591,7 +3623,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let availability = await service.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
@@ -3619,7 +3651,7 @@ final class ContactServiceTests: XCTestCase {
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(
-            gateResult: authorizedContactsGate(),
+            gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
         XCTAssertEqual(availability, .availableProtectedDomain)
@@ -3862,8 +3894,8 @@ final class ContactServiceTests: XCTestCase {
         return try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
     }
 
-    private func authorizedContactsGate() -> ContactsPostAuthGateResult {
-        ContactsPostAuthGateResult(
+    private func authorizedContactsGate() -> ContactsPostAuthGateDecision {
+        ContactsPostAuthGateDecision(
             postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
             frameworkState: .sessionAuthorized
         )

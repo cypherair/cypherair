@@ -72,8 +72,8 @@ struct ContactCertificationTargetSelector: Codable, Equatable, Hashable, Sendabl
         case .userId:
             guard let userIdData, !userIdData.isEmpty,
                   let occurrenceIndex, occurrenceIndex >= 0 else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a User ID certification selector without exact User ID metadata."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a User ID certification selector without exact User ID metadata."
                 )
             }
         }
@@ -191,25 +191,25 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
 
         if let signatureDigest, !signatureDigest.isEmpty, !canonicalSignatureData.isEmpty {
             guard signatureDigest == Self.sha256Hex(for: canonicalSignatureData) else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts payload contains a certification artifact with a stale signature digest."
+                throw ContactsDomainValidationError.invalidPayload(
+                    reason: "Contacts payload contains a certification artifact with a stale signature digest."
                 )
             }
         }
 
         guard validationStatus != .valid || !canonicalSignatureData.isEmpty else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains a valid certification artifact without signature bytes."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains a valid certification artifact without signature bytes."
             )
         }
         guard validationStatus != .valid || effectiveSignatureDigest != nil else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains a valid certification artifact without a signature digest."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains a valid certification artifact without a signature digest."
             )
         }
         guard validationStatus != .valid || targetCertificateDigest?.isEmpty == false else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts payload contains a valid certification artifact without a target certificate digest."
+            throw ContactsDomainValidationError.invalidPayload(
+                reason: "Contacts payload contains a valid certification artifact without a target certificate digest."
             )
         }
     }

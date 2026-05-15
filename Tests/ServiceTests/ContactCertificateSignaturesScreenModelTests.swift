@@ -1391,7 +1391,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(
-            gateResult: ContactsPostAuthGateResult(
+            gateDecision: ContactsPostAuthGateDecision(
                 postUnlockOutcome: .opened([ProtectedSettingsStore.domainID]),
                 frameworkState: .sessionAuthorized
             ),

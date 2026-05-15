@@ -73,14 +73,14 @@ final class ContactService: @unchecked Sendable {
 
     @discardableResult
     func openContactsAfterPostUnlock(
-        gateResult: ContactsPostAuthGateResult,
+        gateDecision: ContactsPostAuthGateDecision,
         wrappingRootKey: () throws -> Data
     ) async -> ContactsAvailability {
         guard let contactsDomainStore else {
-            return openLegacyCompatibilityAfterPostUnlock(gateResult: gateResult)
+            return openLegacyCompatibilityAfterPostUnlock(gateDecision: gateDecision)
         }
-        guard gateResult.allowsProtectedDomainOpen else {
-            clearContactsRuntimeState(availability: gateResult.availability)
+        guard gateDecision.allowsProtectedDomainOpen else {
+            clearContactsRuntimeState(availability: gateDecision.availability)
             return contactsAvailability
         }
 
@@ -119,8 +119,8 @@ final class ContactService: @unchecked Sendable {
                !contactsDomainCommittedAfterFailure,
                activeLegacyExistedAtOpenStart,
                !quarantineExistedAtOpenStart,
-               gateResult.allowsLegacyCompatibilityLoad {
-                return openLegacyCompatibilityAfterPostUnlock(gateResult: gateResult)
+               gateDecision.allowsLegacyCompatibilityLoad {
+                return openLegacyCompatibilityAfterPostUnlock(gateDecision: gateDecision)
             }
             clearContactsRuntimeState(availability: .recoveryNeeded)
             return contactsAvailability
@@ -131,10 +131,10 @@ final class ContactService: @unchecked Sendable {
 
     @discardableResult
     func openLegacyCompatibilityAfterPostUnlock(
-        gateResult: ContactsPostAuthGateResult
+        gateDecision: ContactsPostAuthGateDecision
     ) -> ContactsAvailability {
-        guard gateResult.allowsLegacyCompatibilityLoad else {
-            clearContactsRuntimeState(availability: gateResult.availability)
+        guard gateDecision.allowsLegacyCompatibilityLoad else {
+            clearContactsRuntimeState(availability: gateDecision.availability)
             return contactsAvailability
         }
 

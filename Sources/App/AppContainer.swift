@@ -521,7 +521,7 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
                 _ = await contactService.openContactsAfterPostUnlock(
-                    gateResult: ContactsPostAuthGateResult(
+                    gateDecision: ContactsPostAuthGateDecision(
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
                     ),
@@ -827,7 +827,7 @@ final class AppContainer: @unchecked Sendable {
                     source: source
                 )
                 _ = contactService.openLegacyCompatibilityAfterPostUnlock(
-                    gateResult: ContactsPostAuthGateResult(
+                    gateDecision: ContactsPostAuthGateDecision(
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
                     )

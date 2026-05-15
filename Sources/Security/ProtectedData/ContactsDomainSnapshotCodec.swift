@@ -16,7 +16,9 @@ enum ContactsDomainSnapshotCodec {
     }
 
     static func encodeSnapshot(_ snapshot: ContactsDomainSnapshot) throws -> Data {
-        try snapshot.validateContract()
+        try mapValidationError {
+            try snapshot.validateContract()
+        }
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
         return try encoder.encode(snapshot)
@@ -41,7 +43,9 @@ enum ContactsDomainSnapshotCodec {
                 "Contacts payload has an unsupported schema version."
             )
         }
-        try snapshot.validateContract()
+        try mapValidationError {
+            try snapshot.validateContract()
+        }
         return (snapshot, sourceSchemaVersion)
     }
 
@@ -61,7 +65,17 @@ enum ContactsDomainSnapshotCodec {
             createdAt: legacySnapshot.createdAt,
             updatedAt: Date()
         )
-        try migratedSnapshot.validateContract()
+        try mapValidationError {
+            try migratedSnapshot.validateContract()
+        }
         return migratedSnapshot
+    }
+
+    private static func mapValidationError<T>(_ operation: () throws -> T) throws -> T {
+        do {
+            return try operation()
+        } catch let error as ContactsDomainValidationError {
+            throw ProtectedDataError.invalidEnvelope(error.reason)
+        }
     }
 }
