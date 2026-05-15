@@ -12,7 +12,7 @@ final class QRServiceTests: XCTestCase {
     override func setUp() {
         super.setUp()
         engine = PgpEngine()
-        qrService = QRService(engine: engine)
+        qrService = QRService(contactImportAdapter: PGPContactImportAdapter(engine: engine))
     }
 
     override func tearDown() {

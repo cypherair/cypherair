@@ -52,8 +52,14 @@ enum TestHelpers {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
 
-        let service = ContactService(engine: engine, contactsDirectory: tempDir)
+        let service = ContactService(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            contactsDirectory: tempDir
+        )
         try? service.openLegacyCompatibilityForTests()
         return (service, tempDir)
     }
@@ -163,6 +169,7 @@ enum TestHelpers {
         let (contactSvc, tempDir) = makeContactService(engine: engine)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
 
         let encryptionSvc = EncryptionService(
             messageAdapter: messageAdapter,
@@ -201,7 +208,7 @@ enum TestHelpers {
             signingService: signingSvc,
             certificateSignatureService: certificateSignatureSvc,
             selfTestService: SelfTestService(
-                engine: engine,
+                selfTestAdapter: selfTestAdapter,
                 messageAdapter: messageAdapter
             ),
             mockSE: mockSE,
@@ -239,5 +246,48 @@ enum TestHelpers {
     /// Remove a temporary directory created by makeContactService.
     static func cleanupTempDir(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
+    }
+}
+
+extension ContactService {
+    convenience init(
+        engine: PgpEngine,
+        contactsDirectory: URL? = nil,
+        contactsDomainStore: ContactsDomainStore? = nil
+    ) {
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        self.init(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: contactsDomainStore
+        )
+    }
+}
+
+extension ContactSnapshotMutator {
+    init(
+        engine: PgpEngine,
+        importMatcher: ContactImportMatcher = ContactImportMatcher()
+    ) {
+        self.init(
+            contactImportAdapter: PGPContactImportAdapter(engine: engine),
+            importMatcher: importMatcher
+        )
+    }
+}
+
+extension ContactsLegacyMigrationSource {
+    convenience init(
+        engine: PgpEngine,
+        repository: ContactRepository,
+        compatibilityMapper: ContactsCompatibilityMapper = ContactsCompatibilityMapper()
+    ) {
+        self.init(
+            contactImportAdapter: PGPContactImportAdapter(engine: engine),
+            repository: repository,
+            compatibilityMapper: compatibilityMapper
+        )
     }
 }

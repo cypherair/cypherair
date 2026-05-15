@@ -350,7 +350,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "App UI and ScreenModel surfaces still carry generated error or result vocabulary pending Phase 1/4 cleanup.",
                 [
-                    "Sources/App/Contacts/AddContactScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
                     "Sources/App/Keys/BackupKeyView.swift",
@@ -365,9 +364,11 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPErrorMapper.swift",
                     "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
                     "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
+                    "Sources/Services/FFI/PGPContactImportAdapter.swift",
                     "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageResultMapper.swift",
+                    "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
                 ]
             ),
             (
@@ -385,17 +386,10 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Services still call PgpEngine and map generated results directly until Phase 1 introduces adapter contracts.",
                 [
-                    "Sources/Services/ContactImportMatcher.swift",
-                    "Sources/Services/ContactImportPublicCertificateValidator.swift",
-                    "Sources/Services/ContactService.swift",
-                    "Sources/Services/ContactSnapshotMutator.swift",
-                    "Sources/Services/ContactsLegacyMigrationSource.swift",
                     "Sources/Services/KeyManagement/KeyExportService.swift",
                     "Sources/Services/KeyManagement/KeyMutationService.swift",
                     "Sources/Services/KeyManagement/KeyProvisioningService.swift",
                     "Sources/Services/KeyManagementService.swift",
-                    "Sources/Services/QRService.swift",
-                    "Sources/Services/SelfTestService.swift",
                 ]
             ),
         ])
@@ -413,7 +407,6 @@ private enum ArchitectureSourceAuditRules {
             (
                 "Current cancellation-ignore handling checks generated PgpError until generated errors are normalized at the adapter boundary.",
                 [
-                    "Sources/App/Contacts/AddContactScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
                     "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
                     "Sources/App/Keys/BackupKeyView.swift",
@@ -431,10 +424,12 @@ private enum ArchitectureSourceAuditRules {
         pattern: wordPattern(for: [
             "PGPCertificateSelectionAdapter",
             "PGPCertificateOperationAdapter",
+            "PGPContactImportAdapter",
             "PGPKeyMetadataAdapter",
             "PGPMessageOperationAdapter",
             "PGPMessageResultMapper",
             "PGPErrorMapper",
+            "PGPSelfTestOperationAdapter",
         ]),
         scope: { path in
             path.hasPrefix("Sources/App/") && path.hasSuffix(".swift")

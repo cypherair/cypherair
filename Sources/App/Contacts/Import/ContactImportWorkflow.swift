@@ -89,7 +89,7 @@ struct ContactImportWorkflow {
                 )
             }
         } catch {
-            onFailure(ContactImportPublicCertificateValidator.mapError(error))
+            onFailure(Self.contactImportError(from: error))
         }
     }
 
@@ -123,7 +123,14 @@ struct ContactImportWorkflow {
             )
             onSuccess(contact)
         } catch {
-            onFailure(ContactImportPublicCertificateValidator.mapError(error))
+            onFailure(Self.contactImportError(from: error))
         }
+    }
+
+    private static func contactImportError(from error: Error) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        }
+        return .invalidKeyData(reason: error.localizedDescription)
     }
 }

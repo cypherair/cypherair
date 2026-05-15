@@ -237,7 +237,6 @@ $(SRCROOT)/Sources/Security/SecureEnclaveManageable.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManager.swift
 $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportMatcher.swift
-$(SRCROOT)/Sources/Services/ContactImportPublicCertificateValidator.swift
 $(SRCROOT)/Sources/Services/ContactRecipientResolver.swift
 $(SRCROOT)/Sources/Services/ContactRepository.swift
 $(SRCROOT)/Sources/Services/ContactService.swift
@@ -252,9 +251,11 @@ $(SRCROOT)/Sources/Services/EncryptionService.swift
 $(SRCROOT)/Sources/Services/FFI/PGPErrorMapper.swift
 $(SRCROOT)/Sources/Services/FFI/PGPCertificateOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPContactImportAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageResultMapper.swift
+$(SRCROOT)/Sources/Services/FFI/PGPSelfTestOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FileProgressReporter.swift
 $(SRCROOT)/Sources/Services/ImportablePublicCertificateInspection.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyCatalogStore.swift

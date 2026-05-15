@@ -17,14 +17,14 @@ struct ContactSnapshotMutator {
         let targetContactId: String
     }
 
-    private let engine: PgpEngine
+    private let contactImportAdapter: PGPContactImportAdapter
     private let importMatcher: ContactImportMatcher
 
     init(
-        engine: PgpEngine,
+        contactImportAdapter: PGPContactImportAdapter,
         importMatcher: ContactImportMatcher = ContactImportMatcher()
     ) {
-        self.engine = engine
+        self.contactImportAdapter = contactImportAdapter
         self.importMatcher = importMatcher
     }
 
@@ -33,26 +33,18 @@ struct ContactSnapshotMutator {
         verificationState: ContactVerificationState,
         in snapshot: inout ContactsDomainSnapshot
     ) throws -> Mutation<AddOutcome> {
-        let validation = try ContactImportPublicCertificateValidator.validate(
-            publicKeyData,
-            using: engine
-        )
+        let validation = try contactImportAdapter.validateImportablePublicCertificate(publicKeyData)
         let binaryData = validation.publicCertData
         let now = Date()
 
         if let existingIndex = snapshot.keyRecords.firstIndex(where: {
-            $0.fingerprint == validation.keyInfo.fingerprint
+            $0.fingerprint == validation.metadata.fingerprint
         }) {
             let existingRecord = snapshot.keyRecords[existingIndex]
-            let mergedResult: CertificateMergeResult
-            do {
-                mergedResult = try engine.mergePublicCertificateUpdate(
-                    existingCert: existingRecord.publicKeyData,
-                    incomingCertOrUpdate: binaryData
-                )
-            } catch {
-                throw ContactImportPublicCertificateValidator.mapError(error)
-            }
+            let mergedResult = try contactImportAdapter.mergePublicCertificateUpdate(
+                existingCert: existingRecord.publicKeyData,
+                incomingCertOrUpdate: binaryData
+            )
 
             let resolvedVerificationState: ContactVerificationState =
                 (existingRecord.manualVerificationState.isVerified || verificationState == .verified)
@@ -77,9 +69,8 @@ struct ContactSnapshotMutator {
                 )
 
             case .updated:
-                let updatedValidation = try ContactImportPublicCertificateValidator.validate(
-                    mergedResult.mergedCertData,
-                    using: engine
+                let updatedValidation = try contactImportAdapter.validateImportablePublicCertificate(
+                    mergedResult.mergedCertData
                 )
                 snapshot.keyRecords[existingIndex] = updatedKeyRecord(
                     preserving: existingRecord,
@@ -104,7 +95,7 @@ struct ContactSnapshotMutator {
                 snapshot.updatedAt = now
                 try normalizeKeyUsage(in: &snapshot, updatedAt: now)
                 return Mutation(
-                    output: .updated(fingerprint: updatedValidation.keyInfo.fingerprint),
+                    output: .updated(fingerprint: updatedValidation.metadata.fingerprint),
                     didMutate: true
                 )
             }
@@ -116,9 +107,9 @@ struct ContactSnapshotMutator {
             from: validation,
             contactId: identity.contactId,
             verificationState: verificationState,
-            usageState: validation.keyInfo.hasEncryptionSubkey
-                && !validation.keyInfo.isRevoked
-                && !validation.keyInfo.isExpired
+            usageState: validation.metadata.hasEncryptionSubkey
+                && !validation.metadata.isRevoked
+                && !validation.metadata.isExpired
                 ? .preferred
                 : .historical,
             now: now
@@ -128,7 +119,7 @@ struct ContactSnapshotMutator {
         snapshot.updatedAt = now
         try normalizeKeyUsage(in: &snapshot, updatedAt: now)
         return Mutation(
-            output: .added(fingerprint: validation.keyInfo.fingerprint, candidate: candidateMatch),
+            output: .added(fingerprint: validation.metadata.fingerprint, candidate: candidateMatch),
             didMutate: true
         )
     }
@@ -732,10 +723,10 @@ struct ContactSnapshotMutator {
     }
 
     private func makeIdentity(
-        from validation: PublicCertificateValidationResult,
+        from validation: PGPValidatedPublicCertificate,
         now: Date
     ) -> ContactIdentity {
-        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let metadata = validation.metadata
         return ContactIdentity(
             contactId: "contact-\(UUID().uuidString)",
             displayName: IdentityPresentation.displayName(from: metadata.userId),
@@ -748,13 +739,13 @@ struct ContactSnapshotMutator {
     }
 
     private func makeKeyRecord(
-        from validation: PublicCertificateValidationResult,
+        from validation: PGPValidatedPublicCertificate,
         contactId: String,
         verificationState: ContactVerificationState,
         usageState: ContactKeyUsageState,
         now: Date
     ) -> ContactKeyRecord {
-        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let metadata = validation.metadata
         return ContactKeyRecord(
             keyId: "key-\(UUID().uuidString)",
             contactId: contactId,
@@ -781,12 +772,12 @@ struct ContactSnapshotMutator {
 
     private func updatedKeyRecord(
         preserving existingRecord: ContactKeyRecord,
-        from validation: PublicCertificateValidationResult,
+        from validation: PGPValidatedPublicCertificate,
         publicKeyData: Data,
         verificationState: ContactVerificationState,
         now: Date
     ) -> ContactKeyRecord {
-        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let metadata = validation.metadata
         var updatedRecord = existingRecord
         updatedRecord.primaryUserId = metadata.userId
         updatedRecord.displayName = IdentityPresentation.displayName(from: metadata.userId)

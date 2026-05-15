@@ -1135,10 +1135,8 @@ final class ContactServiceTests: XCTestCase {
             verificationState: .verified,
             in: &snapshot
         )
-        let validation = try ContactImportPublicCertificateValidator.validate(
-            generated.publicKeyData,
-            using: engine
-        )
+        let validation = try PGPContactImportAdapter(engine: engine)
+            .validateImportablePublicCertificate(generated.publicKeyData)
 
         XCTAssertNil(matcher.candidateMatch(for: validation, in: snapshot))
     }

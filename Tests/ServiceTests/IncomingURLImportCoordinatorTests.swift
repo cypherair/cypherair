@@ -177,7 +177,11 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
     @MainActor
     private func makeCoordinator() -> IncomingURLImportCoordinator {
         IncomingURLImportCoordinator(
-            importLoader: PublicKeyImportLoader(qrService: QRService(engine: stack.engine)),
+            importLoader: PublicKeyImportLoader(
+                qrService: QRService(
+                    contactImportAdapter: PGPContactImportAdapter(engine: stack.engine)
+                )
+            ),
             importWorkflow: ContactImportWorkflow(contactService: stack.contactService)
         )
     }

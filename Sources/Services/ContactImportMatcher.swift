@@ -2,16 +2,16 @@ import Foundation
 
 struct ContactImportMatcher {
     func candidateMatch(
-        for validation: PublicCertificateValidationResult,
+        for validation: PGPValidatedPublicCertificate,
         in snapshot: ContactsDomainSnapshot
     ) -> ContactCandidateMatch? {
         let differentFingerprintContactIds = Set(
             snapshot.keyRecords
-                .filter { $0.fingerprint != validation.keyInfo.fingerprint }
+                .filter { $0.fingerprint != validation.metadata.fingerprint }
                 .map(\.contactId)
         )
 
-        let incomingEmail = normalizedEmail(validation.keyInfo.userId)
+        let incomingEmail = normalizedEmail(validation.metadata.userId)
         if let incomingEmail {
             let strongMatches = snapshot.identities.filter {
                 differentFingerprintContactIds.contains($0.contactId) &&
@@ -38,12 +38,12 @@ struct ContactImportMatcher {
             }
         }
 
-        guard let incomingUserId = validation.keyInfo.userId else {
+        guard let incomingUserId = validation.metadata.userId else {
             return nil
         }
         if let weakKey = snapshot.keyRecords.first(where: {
-            $0.primaryUserId == incomingUserId &&
-            $0.fingerprint != validation.keyInfo.fingerprint
+            $0.primaryUserId == incomingUserId
+                && $0.fingerprint != validation.metadata.fingerprint
         }),
            let identity = snapshot.identities.first(where: { $0.contactId == weakKey.contactId }) {
             return ContactCandidateMatch(

@@ -720,7 +720,7 @@ final class FFIIntegrationTests: XCTestCase {
             }
             switch pgpError {
             case .InvalidKeyData(let reason):
-                XCTAssertEqual(reason, ContactImportPublicCertificateValidator.publicOnlyReasonToken)
+                XCTAssertEqual(reason, PGPContactImportAdapter.publicOnlyReasonToken)
             default:
                 XCTFail("Expected InvalidKeyData, got \(pgpError)")
             }

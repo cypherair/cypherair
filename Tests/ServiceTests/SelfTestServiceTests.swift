@@ -16,7 +16,7 @@ final class SelfTestServiceTests: XCTestCase {
         super.setUp()
         engine = PgpEngine()
         selfTestService = SelfTestService(
-            engine: engine,
+            selfTestAdapter: PGPSelfTestOperationAdapter(engine: engine),
             messageAdapter: PGPMessageOperationAdapter(engine: engine)
         )
     }

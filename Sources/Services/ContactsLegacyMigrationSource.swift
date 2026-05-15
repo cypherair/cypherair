@@ -6,16 +6,16 @@ struct ContactsLegacyRuntimeValues {
 }
 
 final class ContactsLegacyMigrationSource: @unchecked Sendable {
-    private let engine: PgpEngine
+    private let contactImportAdapter: PGPContactImportAdapter
     private let repository: ContactRepository
     private let compatibilityMapper: ContactsCompatibilityMapper
 
     init(
-        engine: PgpEngine,
+        contactImportAdapter: PGPContactImportAdapter,
         repository: ContactRepository,
         compatibilityMapper: ContactsCompatibilityMapper = ContactsCompatibilityMapper()
     ) {
-        self.engine = engine
+        self.contactImportAdapter = contactImportAdapter
         self.repository = repository
         self.compatibilityMapper = compatibilityMapper
     }
@@ -33,10 +33,7 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
         var loadedContacts: [Contact] = []
 
         for storedContact in try repository.loadStoredContactsIfDirectoryExists() {
-            let validation = try ContactImportPublicCertificateValidator.validate(
-                storedContact.data,
-                using: engine
-            )
+            let validation = try contactImportAdapter.validateImportablePublicCertificate(storedContact.data)
             let contact = makeContact(
                 from: validation,
                 verificationStates: loadedVerificationStates
@@ -57,10 +54,10 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
     }
 
     private func makeContact(
-        from validation: PublicCertificateValidationResult,
+        from validation: PGPValidatedPublicCertificate,
         verificationStates: [String: ContactVerificationState]
     ) -> Contact {
-        let metadata = PGPKeyMetadataAdapter.metadata(from: validation)
+        let metadata = validation.metadata
         let resolvedVerificationState = verificationStates[metadata.fingerprint] ?? .verified
 
         return Contact(

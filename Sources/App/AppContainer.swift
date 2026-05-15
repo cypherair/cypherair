@@ -252,6 +252,8 @@ final class AppContainer: @unchecked Sendable {
     private static func makePgpServiceGraph(
         engine: PgpEngine,
         certificateAdapter: PGPCertificateOperationAdapter,
+        contactImportAdapter: PGPContactImportAdapter,
+        selfTestAdapter: PGPSelfTestOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) -> PgpServiceGraph {
@@ -286,9 +288,9 @@ final class AppContainer: @unchecked Sendable {
                 keyManagement: keyManagement,
                 contactService: contactService
             ),
-            qrService: QRService(engine: engine),
+            qrService: QRService(contactImportAdapter: contactImportAdapter),
             selfTestService: SelfTestService(
-                engine: engine,
+                selfTestAdapter: selfTestAdapter,
                 messageAdapter: messageAdapter
             )
         )
@@ -382,6 +384,8 @@ final class AppContainer: @unchecked Sendable {
         )
         let engine = PgpEngine()
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let contactsDirectory = documentDirectory
             .appendingPathComponent("contacts", isDirectory: true)
@@ -389,7 +393,7 @@ final class AppContainer: @unchecked Sendable {
             .appendingPathComponent("self-test", isDirectory: true)
         let contactsLegacyRepository = ContactRepository(contactsDirectory: contactsDirectory)
         let contactsMigrationSource = ContactsLegacyMigrationSource(
-            engine: engine,
+            contactImportAdapter: contactImportAdapter,
             repository: contactsLegacyRepository
         )
         let contactsDomainStore = ContactsDomainStore(
@@ -423,7 +427,8 @@ final class AppContainer: @unchecked Sendable {
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedDataFrameworkSentinelStore)
         let contactService = ContactService(
-            engine: engine,
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
             contactsDirectory: contactsDirectory,
             contactsDomainStore: contactsDomainStore
         )
@@ -550,6 +555,8 @@ final class AppContainer: @unchecked Sendable {
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             certificateAdapter: certificateAdapter,
+            contactImportAdapter: contactImportAdapter,
+            selfTestAdapter: selfTestAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
@@ -640,6 +647,8 @@ final class AppContainer: @unchecked Sendable {
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
         let contactsDirectory = documentDirectory
@@ -768,7 +777,8 @@ final class AppContainer: @unchecked Sendable {
         )
         try? keyManagement.loadKeys()
         let contactService = ContactService(
-            engine: engine,
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
             contactsDirectory: contactsDirectory
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
@@ -844,6 +854,8 @@ final class AppContainer: @unchecked Sendable {
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             certificateAdapter: certificateAdapter,
+            contactImportAdapter: contactImportAdapter,
+            selfTestAdapter: selfTestAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
