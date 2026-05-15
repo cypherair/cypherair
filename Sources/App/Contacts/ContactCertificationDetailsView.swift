@@ -213,7 +213,7 @@ private struct ContactCertificationDetailsHostView: View {
             if let contact = model.contact {
                 LabeledContent(
                     String(localized: "contactcertsig.contact", defaultValue: "Contact"),
-                    value: contact.displayName
+                    value: IdentityDisplayPresentation.displayName(contact.displayName)
                 )
                 if let email = contact.primaryEmail {
                     LabeledContent(
@@ -247,7 +247,7 @@ private struct ContactCertificationDetailsHostView: View {
                 if let key = model.selectedKey {
                     LabeledContent(
                         String(localized: "contactcertification.key", defaultValue: "Key"),
-                        value: key.displayName
+                        value: IdentityDisplayPresentation.displayName(key.displayName)
                     )
                 }
             } else {
@@ -259,7 +259,7 @@ private struct ContactCertificationDetailsHostView: View {
                     )
                 ) {
                     ForEach(model.keys) { key in
-                        Text(key.displayName)
+                        Text(IdentityDisplayPresentation.displayName(key.displayName))
                             .tag(Optional(key.keyId))
                     }
                 }
@@ -650,7 +650,7 @@ private struct ContactCertificationSignerIdentityView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(String(localized: "contactcertsig.result.signer", defaultValue: "Signer"))
                 .font(.subheadline.weight(.semibold))
-            Text(identity.displayName)
+            Text(IdentityDisplayPresentation.displayName(identity.displayName))
                 .font(.headline)
             if let secondaryText = identity.secondaryText {
                 Text(secondaryText)

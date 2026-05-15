@@ -12,7 +12,10 @@ struct ContactKeySummaryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Label(key.displayName, systemImage: key.usageState.systemImage)
+                Label(
+                    IdentityDisplayPresentation.displayName(key.displayName),
+                    systemImage: key.usageState.systemImage
+                )
                     .font(.body.weight(.medium))
                 Spacer()
                 usageBadge

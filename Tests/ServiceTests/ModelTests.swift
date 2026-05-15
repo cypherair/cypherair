@@ -227,8 +227,7 @@ final class ModelTests: XCTestCase {
 
     func test_contact_displayName_nilUserId_returnsUnknown() {
         let contact = makeContact(userId: nil)
-        // The display name should use the localized "Unknown" fallback
-        XCTAssertFalse(contact.displayName.isEmpty)
+        XCTAssertEqual(contact.displayName, IdentityPresentation.legacyUnknownDisplayName)
     }
 
     func test_contact_displayName_noAngleBrackets_returnsUserId() {
@@ -320,7 +319,28 @@ final class ModelTests: XCTestCase {
     }
 
     func test_identityDisplayPresentation_nilUserId_returnsLocalizedFallback() {
-        XCTAssertFalse(IdentityDisplayPresentation.displayName(from: nil).isEmpty)
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(from: nil),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_legacyUnknownDisplayName_returnsLocalizedFallback() {
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(IdentityPresentation.legacyUnknownDisplayName),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_emptyDisplayName_returnsLocalizedFallback() {
+        XCTAssertEqual(
+            IdentityDisplayPresentation.displayName(""),
+            String(localized: "contact.unknown", defaultValue: "Unknown")
+        )
+    }
+
+    func test_identityDisplayPresentation_nonFallbackDisplayName_isUnchanged() {
+        XCTAssertEqual(IdentityDisplayPresentation.displayName("Alice"), "Alice")
     }
 
     // MARK: - PGPKeyProfile

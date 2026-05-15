@@ -262,7 +262,9 @@ final class EncryptScreenModel {
                 localized: "encrypt.unverified.confirm.message",
                 defaultValue: "These recipients are not verified yet: %@. Continue only if you trust these keys."
             ),
-            selectedUnverifiedContacts.map(\.displayName).joined(separator: ", ")
+            selectedUnverifiedContacts
+                .map { IdentityDisplayPresentation.displayName($0.displayName) }
+                .joined(separator: ", ")
         )
     }
 

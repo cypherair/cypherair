@@ -313,9 +313,9 @@ private struct TagDetailHostView: View {
             ? String(localized: "tagManagement.members.selected", defaultValue: "Selected")
             : String(localized: "tagManagement.members.notSelected", defaultValue: "Not selected")
         if let email = contact.primaryEmail {
-            return "\(contact.displayName), \(email), \(state)"
+            return "\(IdentityDisplayPresentation.displayName(contact.displayName)), \(email), \(state)"
         }
-        return "\(contact.displayName), \(state)"
+        return "\(IdentityDisplayPresentation.displayName(contact.displayName)), \(state)"
     }
 }
 
@@ -328,7 +328,7 @@ private struct ContactMemberRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(contact.displayName)
+                Text(IdentityDisplayPresentation.displayName(contact.displayName))
                     .foregroundStyle(.primary)
                 if let email = contact.primaryEmail {
                     Text(email)

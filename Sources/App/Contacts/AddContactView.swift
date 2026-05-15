@@ -225,7 +225,7 @@ private struct AddContactScreenHostView: View {
             }
         } message: { request in
             Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(request.pendingUpdate.existingContact.displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
+                        defaultValue: "This contact (\(IdentityDisplayPresentation.displayName(request.pendingUpdate.existingContact.displayName))) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
         }
         .fileImporter(
             isPresented: $model.showFileImporter,
