@@ -311,23 +311,34 @@ sequenceDiagram
     participant Cam as System Camera
     participant iOS as iOS URL Routing
     participant App as CypherAirApp
+    participant Loader as PublicKeyImportLoader
     participant QR as QRService
+    participant Adapter as PGPContactImportAdapter
     participant CS as ContactService
     participant V as ImportConfirmView
 
     Cam->>iOS: Scans QR → recognizes cypherair:// URL
     iOS->>App: onOpenURL(cypherair://import/v1/<base64url>)
-    App->>QR: parseImportURL(url)
-    QR->>QR: Validate /v1/ path segment
-    QR->>QR: Base64url decode → binary bytes
-    QR->>QR: Parse as OpenPGP public key (v4 or v6, via pgp-mobile)
-    alt Invalid data
-        QR-->>App: Error: "Not a valid CypherAir public key"
+    App->>Loader: loadFromURL(url)
+    Loader->>QR: parseImportURL(url)
+    QR->>QR: Validate scheme, import host/path, length, and v1 segment
+    QR->>Adapter: decodeQrUrl(urlString)
+    Adapter->>Adapter: Decode QR payload through pgp-mobile
+    alt Invalid URL or QR payload
+        QR-->>Loader: Error: invalid QR code
     end
-    QR-->>App: Parsed key details (name, email, fingerprint, algorithm, profile)
+    QR-->>Loader: Public certificate bytes
+    Loader->>QR: inspectImportablePublicCertificate(keyData)
+    QR->>Adapter: validateImportablePublicCertificate(keyData)
+    Adapter->>Adapter: Normalize, validate public certificate, map metadata
+    alt Secret/private key or invalid certificate
+        QR-->>Loader: Contact import validation error
+    end
+    QR-->>Loader: App-owned public certificate inspection
+    Loader-->>App: Key metadata + normalized public certificate
     App->>V: Show key details confirmation page (includes profile indicator)
     V-->>App: User confirms "Add to Contacts"
-    App->>CS: store(publicKey)
+    App->>CS: addContact(publicKey)
     CS-->>App: Success
 ```
 
