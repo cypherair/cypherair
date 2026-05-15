@@ -63,10 +63,10 @@
 				App/Common/AppTemporaryArtifact.swift,
 				App/Common/AppTemporaryArtifactError.swift,
 				App/Common/AppTemporaryArtifactStore.swift,
-				App/Common/AuthLifecycleTraceEnvironment.swift,
 				App/Common/AuthenticationShieldCoordinator.swift,
 				App/Common/AuthenticationShieldHost.swift,
 				App/Common/AuthenticationShieldOverlayView.swift,
+				App/Common/AuthLifecycleTraceEnvironment.swift,
 				"App/Common/ColorTheme+Presentation.swift",
 				"App/Common/CypherAirError+Presentation.swift",
 				App/Common/CypherMotion.swift,
@@ -179,13 +179,13 @@
 				App/Settings/SettingsAppearanceSection.swift,
 				App/Settings/SettingsEncryptionSection.swift,
 				App/Settings/SettingsFormView.swift,
+				App/Settings/SettingsGracePeriodPresentation.swift,
 				App/Settings/SettingsLocalDataResetViews.swift,
 				App/Settings/SettingsNavigationSection.swift,
 				App/Settings/SettingsProtectedClipboardNoticeRow.swift,
 				App/Settings/SettingsScreenHostView.swift,
 				App/Settings/SettingsScreenModel.swift,
 				App/Settings/SettingsScreenPresentations.swift,
-				App/Settings/SettingsGracePeriodPresentation.swift,
 				App/Settings/SettingsSecuritySection.swift,
 				App/Settings/SettingsView.swift,
 				App/Settings/SourceComplianceDependency.swift,
@@ -261,11 +261,11 @@
 				Resources/InfoPlist.xcstrings,
 				Resources/Localizable.xcstrings,
 				Security/Argon2idMemoryGuard.swift,
-				Security/AuthErrorTraceMetadata.swift,
-				Security/AuthLifecycleTraceStore.swift,
 				Security/AuthenticationEvaluable.swift,
 				Security/AuthenticationManager.swift,
 				Security/AuthenticationPromptCoordinator.swift,
+				Security/AuthErrorTraceMetadata.swift,
+				Security/AuthLifecycleTraceStore.swift,
 				Security/AuthTraceMetadata.swift,
 				Security/KeyBundleStore.swift,
 				Security/KeychainManageable.swift,
@@ -315,8 +315,8 @@
 				Services/ContactsCompatibilityMapper.swift,
 				Services/ContactService.swift,
 				Services/ContactsLegacyMigrationSource.swift,
-				Services/ContactsPostAuthGateDecision.swift,
 				Services/ContactSnapshotMutator.swift,
+				Services/ContactsPostAuthGateDecision.swift,
 				Services/ContactsSearchIndex.swift,
 				Services/ContactSummaryProjector.swift,
 				Services/DecryptionService.swift,
@@ -815,7 +815,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14101;
+				CURRENT_PROJECT_VERSION = 14200;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -845,7 +845,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1040,7 +1040,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14101;
+				CURRENT_PROJECT_VERSION = 14200;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1070,7 +1070,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
@@ -1185,7 +1185,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14101;
+				CURRENT_PROJECT_VERSION = 14200;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
 				ENABLE_C_BOUNDS_SAFETY = YES;
@@ -1215,7 +1215,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
