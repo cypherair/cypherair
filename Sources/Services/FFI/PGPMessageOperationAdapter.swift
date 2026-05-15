@@ -190,6 +190,118 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func signCleartext(
+        text: Data,
+        signerCert: Data
+    ) async throws -> Data {
+        do {
+            return try await Self.performSignCleartext(
+                engine: engine,
+                text: text,
+                signerCert: signerCert
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .signingFailed(reason: $0) }
+        }
+    }
+
+    func signDetached(
+        data: Data,
+        signerCert: Data
+    ) async throws -> Data {
+        do {
+            return try await Self.performSignDetached(
+                engine: engine,
+                data: data,
+                signerCert: signerCert
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .signingFailed(reason: $0) }
+        }
+    }
+
+    func signDetachedFile(
+        inputPath: String,
+        signerCert: Data,
+        progress: FileProgressReporter?
+    ) async throws -> Data {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            return try await Self.performSignDetachedFile(
+                engine: engine,
+                inputPath: inputPath,
+                signerCert: signerCert,
+                progress: progressBridge
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .signingFailed(reason: $0) }
+        }
+    }
+
+    func verifyCleartextDetailed(
+        signedMessage: Data,
+        verificationContext: PGPMessageVerificationContext
+    ) async throws -> (text: Data?, verification: DetailedSignatureVerification) {
+        do {
+            let result = try await Self.performVerifyCleartextDetailed(
+                engine: engine,
+                signedMessage: signedMessage,
+                verificationKeys: verificationContext.verificationKeys
+            )
+            return PGPMessageResultMapper.verifyDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
+        }
+    }
+
+    func verifyDetachedDetailed(
+        data: Data,
+        signature: Data,
+        verificationContext: PGPMessageVerificationContext
+    ) async throws -> DetailedSignatureVerification {
+        do {
+            let result = try await Self.performVerifyDetachedDetailed(
+                engine: engine,
+                data: data,
+                signature: signature,
+                verificationKeys: verificationContext.verificationKeys
+            )
+            return PGPMessageResultMapper.detachedVerifyDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
+        }
+    }
+
+    func verifyDetachedFileDetailed(
+        dataPath: String,
+        signature: Data,
+        verificationContext: PGPMessageVerificationContext,
+        progress: FileProgressReporter?
+    ) async throws -> DetailedSignatureVerification {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            let result = try await Self.performVerifyDetachedFileDetailed(
+                engine: engine,
+                dataPath: dataPath,
+                signature: signature,
+                verificationKeys: verificationContext.verificationKeys,
+                progress: progressBridge
+            )
+            return PGPMessageResultMapper.fileVerifyDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
+        }
+    }
+
     @concurrent
     private static func performDearmor(engine: PgpEngine, armored: Data) async throws -> Data {
         try engine.dearmor(armored: armored)
@@ -326,6 +438,80 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             ciphertext: ciphertext,
             password: password,
             verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performSignCleartext(
+        engine: PgpEngine,
+        text: Data,
+        signerCert: Data
+    ) async throws -> Data {
+        try engine.signCleartext(text: text, signerCert: signerCert)
+    }
+
+    @concurrent
+    private static func performSignDetached(
+        engine: PgpEngine,
+        data: Data,
+        signerCert: Data
+    ) async throws -> Data {
+        try engine.signDetached(data: data, signerCert: signerCert)
+    }
+
+    @concurrent
+    private static func performSignDetachedFile(
+        engine: PgpEngine,
+        inputPath: String,
+        signerCert: Data,
+        progress: ProgressReporter?
+    ) async throws -> Data {
+        try engine.signDetachedFile(
+            inputPath: inputPath,
+            signerCert: signerCert,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performVerifyCleartextDetailed(
+        engine: PgpEngine,
+        signedMessage: Data,
+        verificationKeys: [Data]
+    ) async throws -> VerifyDetailedResult {
+        try engine.verifyCleartextDetailed(
+            signedMessage: signedMessage,
+            verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performVerifyDetachedDetailed(
+        engine: PgpEngine,
+        data: Data,
+        signature: Data,
+        verificationKeys: [Data]
+    ) async throws -> VerifyDetailedResult {
+        try engine.verifyDetachedDetailed(
+            data: data,
+            signature: signature,
+            verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performVerifyDetachedFileDetailed(
+        engine: PgpEngine,
+        dataPath: String,
+        signature: Data,
+        verificationKeys: [Data],
+        progress: ProgressReporter?
+    ) async throws -> FileVerifyDetailedResult {
+        try engine.verifyDetachedFileDetailed(
+            dataPath: dataPath,
+            signature: signature,
+            verificationKeys: verificationKeys,
+            progress: progress
         )
     }
 }

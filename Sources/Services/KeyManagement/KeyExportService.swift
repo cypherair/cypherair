@@ -3,15 +3,18 @@ import Foundation
 /// Owns key export and revocation-export workflows behind the key-management facade.
 final class KeyExportService {
     private let engine: PgpEngine
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
 
     init(
         engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService
     ) {
         self.engine = engine
+        self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
     }
@@ -49,10 +52,7 @@ final class KeyExportService {
         }
 
         if !identity.revocationCert.isEmpty {
-            return try await Self.armorRevocationOffMainActor(
-                engine: engine,
-                revocationData: identity.revocationCert
-            )
+            return try await certificateAdapter.armorSignature(identity.revocationCert)
         }
 
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
@@ -60,14 +60,10 @@ final class KeyExportService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let generatedRevocation = try await Self.generateKeyRevocationOffMainActor(
-            engine: engine,
-            certData: secretKey
+        let generatedRevocation = try await certificateAdapter.generateKeyRevocation(
+            secretCert: secretKey
         )
-        let armoredRevocation = try await Self.armorRevocationOffMainActor(
-            engine: engine,
-            revocationData: generatedRevocation
-        )
+        let armoredRevocation = try await certificateAdapter.armorSignature(generatedRevocation)
 
         catalogStore.updateRevocation(
             fingerprint: fingerprint,
@@ -107,27 +103,4 @@ final class KeyExportService {
         }
     }
 
-    @concurrent
-    private static func generateKeyRevocationOffMainActor(
-        engine: PgpEngine,
-        certData: Data
-    ) async throws -> Data {
-        do {
-            return try engine.generateKeyRevocation(secretCert: certData)
-        } catch {
-            throw CypherAirError.from(error) { .revocationError(reason: $0) }
-        }
-    }
-
-    @concurrent
-    private static func armorRevocationOffMainActor(
-        engine: PgpEngine,
-        revocationData: Data
-    ) async throws -> Data {
-        do {
-            return try engine.armor(data: revocationData, kind: .signature)
-        } catch {
-            throw CypherAirError.from(error) { .armorError(reason: $0) }
-        }
-    }
 }

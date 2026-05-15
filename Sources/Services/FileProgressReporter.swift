@@ -2,13 +2,12 @@ import Foundation
 import os
 
 /// Bridges Rust streaming progress callbacks to SwiftUI-observable state.
-/// Implements the UniFFI-generated `ProgressReporter` protocol.
 ///
 /// Thread safety: `onProgress()` is called from a Rust worker thread.
 /// Uses `OSAllocatedUnfairLock` for the cancel flag and dispatches UI
 /// updates to `@MainActor`.
 @Observable
-final class FileProgressReporter: ProgressReporter, @unchecked Sendable {
+final class FileProgressReporter: @unchecked Sendable {
 
     // MARK: - Observable State
 
@@ -38,9 +37,9 @@ final class FileProgressReporter: ProgressReporter, @unchecked Sendable {
         cancelLock.withLock { $0 = true }
     }
 
-    // MARK: - ProgressReporter Protocol
+    // MARK: - Progress Callback
 
-    /// Called from the Rust worker thread on each progress update.
+    /// Called by FFI adapter bridges on each progress update.
     /// Returns `false` to signal cancellation.
     func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool {
         Task { @MainActor [weak self] in

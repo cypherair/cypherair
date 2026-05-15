@@ -1867,15 +1867,12 @@ final class FFIIntegrationTests: XCTestCase {
         let inputURL = try writeTempFile(data, filename: "ffi-detailed-detached-\(UUID().uuidString).txt")
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
-        let progress = FileProgressReporter()
-        progress.cancel()
-
         XCTAssertThrowsError(
             try engine.verifyDetachedFileDetailed(
                 dataPath: inputURL.path,
                 signature: signature,
                 verificationKeys: [signerA],
-                progress: progress
+                progress: CancellingProgressReporter()
             )
         ) { error in
             guard case .OperationCancelled = error as? PgpError else {
@@ -2646,4 +2643,10 @@ final class FFIIntegrationTests: XCTestCase {
 /// Error thrown when PgpEngine is unexpectedly nil in concurrent test closures.
 private enum ConcurrentTestError: Error {
     case engineDeallocated
+}
+
+private final class CancellingProgressReporter: ProgressReporter, @unchecked Sendable {
+    func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool {
+        false
+    }
 }

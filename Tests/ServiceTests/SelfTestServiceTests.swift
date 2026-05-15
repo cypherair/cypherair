@@ -6,7 +6,7 @@ private enum SelfTestReportExportTestError: Error {
 }
 
 /// Tests for SelfTestService — the one-tap diagnostic.
-/// SelfTestService only depends on PgpEngine (no mocks needed).
+/// SelfTestService uses real PGP adapters (no mocks needed).
 final class SelfTestServiceTests: XCTestCase {
 
     private var engine: PgpEngine!
@@ -15,7 +15,10 @@ final class SelfTestServiceTests: XCTestCase {
     override func setUp() {
         super.setUp()
         engine = PgpEngine()
-        selfTestService = SelfTestService(engine: engine)
+        selfTestService = SelfTestService(
+            engine: engine,
+            messageAdapter: PGPMessageOperationAdapter(engine: engine)
+        )
     }
 
     override func tearDown() {

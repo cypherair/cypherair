@@ -38,9 +38,14 @@ final class SelfTestService {
     private(set) var latestReport: SelfTestReport?
 
     private let engine: PgpEngine
+    private let messageAdapter: PGPMessageOperationAdapter
 
-    init(engine: PgpEngine) {
+    init(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter? = nil
+    ) {
         self.engine = engine
+        self.messageAdapter = messageAdapter ?? PGPMessageOperationAdapter(engine: engine)
     }
 
     // MARK: - Run Self-Test
@@ -53,6 +58,7 @@ final class SelfTestService {
         state = .running(progress: 0)
 
         let engine = self.engine
+        let messageAdapter = self.messageAdapter
         var results: [TestResult] = []
         let profiles = PGPKeyProfile.allCases
         let totalTests = profiles.count * 5 + 1 // 5 tests per profile + 1 QR test
@@ -83,7 +89,10 @@ final class SelfTestService {
                 name: String(localized: "selftest.name.encryptDecrypt", defaultValue: "Encrypt/Decrypt"),
                 profile: profile
             ) {
-                try await Self.runEncryptDecryptTest(engine: engine, generated: generated)
+                try await Self.runEncryptDecryptTest(
+                    messageAdapter: messageAdapter,
+                    generated: generated
+                )
             }
             results.append(encDecResult.result)
             completedTests += 1
@@ -94,7 +103,10 @@ final class SelfTestService {
                 name: String(localized: "selftest.name.signVerify", defaultValue: "Sign/Verify"),
                 profile: profile
             ) {
-                try await Self.runSignVerifyTest(engine: engine, generated: generated)
+                try await Self.runSignVerifyTest(
+                    messageAdapter: messageAdapter,
+                    generated: generated
+                )
             }
             results.append(signResult.result)
             completedTests += 1
@@ -105,7 +117,10 @@ final class SelfTestService {
                 name: String(localized: "selftest.name.tamperDetection", defaultValue: "Tamper Detection"),
                 profile: profile
             ) {
-                try await Self.runTamperDetectionTest(engine: engine, generated: generated)
+                try await Self.runTamperDetectionTest(
+                    messageAdapter: messageAdapter,
+                    generated: generated
+                )
             }
             results.append(tamperResult.result)
             completedTests += 1
@@ -206,61 +221,66 @@ final class SelfTestService {
 
     @concurrent
     private static func runEncryptDecryptTest(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         generated: GeneratedKey
-    ) async throws -> DecryptDetailedResult {
+    ) async throws -> DetailedSignatureVerification {
         let plaintext = Data("Self-test 自检 🔐".utf8)
-        let ciphertext = try engine.encrypt(
+        let ciphertext = try await messageAdapter.encrypt(
             plaintext: plaintext,
-            recipients: [generated.publicKeyData],
+            recipientKeys: [generated.publicKeyData],
             signingKey: generated.certData,
-            encryptToSelf: nil
+            selfKey: nil,
+            binary: false
         )
-        let decrypted = try engine.decryptDetailed(
+        let decrypted = try await messageAdapter.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: [generated.certData],
-            verificationKeys: [generated.publicKeyData]
+            verificationContext: verificationContext(for: generated)
         )
         guard decrypted.plaintext == plaintext else {
             throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
         }
-        guard decrypted.legacyStatus == .valid else {
+        guard decrypted.verification.legacyStatus == .valid else {
             throw CypherAirError.badSignature
         }
-        return decrypted
+        return decrypted.verification
     }
 
     @concurrent
     private static func runSignVerifyTest(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         generated: GeneratedKey
-    ) async throws -> VerifyDetailedResult {
+    ) async throws -> DetailedSignatureVerification {
         let text = Data("Signed message 签名消息".utf8)
-        let signed = try engine.signCleartext(
+        let signed = try await messageAdapter.signCleartext(
             text: text,
             signerCert: generated.certData
         )
-        let verified = try engine.verifyCleartextDetailed(
+        let verified = try await messageAdapter.verifyCleartextDetailed(
             signedMessage: signed,
-            verificationKeys: [generated.publicKeyData]
+            verificationContext: verificationContext(for: generated)
         )
-        guard verified.legacyStatus == .valid else {
+        guard verified.text == text else {
+            throw CypherAirError.corruptData(reason: "Signed text mismatch after verification")
+        }
+        guard verified.verification.legacyStatus == .valid else {
             throw CypherAirError.badSignature
         }
-        return verified
+        return verified.verification
     }
 
     @concurrent
     private static func runTamperDetectionTest(
-        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
         generated: GeneratedKey
     ) async throws -> Bool {
         let plaintext = Data("Tamper test".utf8)
-        var ciphertext = try engine.encrypt(
+        var ciphertext = try await messageAdapter.encrypt(
             plaintext: plaintext,
-            recipients: [generated.publicKeyData],
+            recipientKeys: [generated.publicKeyData],
             signingKey: nil,
-            encryptToSelf: nil
+            selfKey: nil,
+            binary: false
         )
 
         let midpoint = ciphertext.count / 2
@@ -268,10 +288,15 @@ final class SelfTestService {
 
         let decryptSucceeded: Bool
         do {
-            _ = try engine.decryptDetailed(
+            _ = try await messageAdapter.decryptDetailed(
                 ciphertext: ciphertext,
                 secretKeys: [generated.certData],
-                verificationKeys: []
+                verificationContext: PGPMessageVerificationContext(
+                    verificationKeys: [],
+                    contacts: [],
+                    ownKeys: [],
+                    contactsAvailability: .availableLegacyCompatibility
+                )
             )
             decryptSucceeded = true
         } catch {
@@ -283,6 +308,15 @@ final class SelfTestService {
         }
 
         return true
+    }
+
+    private static func verificationContext(for generated: GeneratedKey) -> PGPMessageVerificationContext {
+        PGPMessageVerificationContext(
+            verificationKeys: [generated.publicKeyData],
+            contacts: [],
+            ownKeys: [],
+            contactsAvailability: .availableLegacyCompatibility
+        )
     }
 
     @concurrent

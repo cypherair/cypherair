@@ -19,11 +19,12 @@ enum TestHelpers {
         let mockKC = MockKeychain()
         let mockAuth = MockAuthenticator()
         let privateKeyControlStore = privateKeyControlStore ?? InMemoryPrivateKeyControlStore(mode: .standard)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
 
         let service: KeyManagementService
         if let memInfo = memoryInfo {
             service = KeyManagementService(
-                engine: engine, secureEnclave: mockSE,
+                engine: engine, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
                 defaults: .standard,
@@ -31,7 +32,7 @@ enum TestHelpers {
             )
         } else {
             service = KeyManagementService(
-                engine: engine, secureEnclave: mockSE,
+                engine: engine, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
                 privateKeyControlStore: privateKeyControlStore
@@ -161,6 +162,7 @@ enum TestHelpers {
         let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = makeContactService(engine: engine)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
 
         let encryptionSvc = EncryptionService(
             messageAdapter: messageAdapter,
@@ -177,9 +179,13 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc
         )
-        let signingSvc = SigningService(engine: engine, keyManagement: keyMgmt, contactService: contactSvc)
+        let signingSvc = SigningService(
+            messageAdapter: messageAdapter,
+            keyManagement: keyMgmt,
+            contactService: contactSvc
+        )
         let certificateSignatureSvc = CertificateSignatureService(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc
         )
@@ -194,6 +200,10 @@ enum TestHelpers {
             passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
             certificateSignatureService: certificateSignatureSvc,
+            selfTestService: SelfTestService(
+                engine: engine,
+                messageAdapter: messageAdapter
+            ),
             mockSE: mockSE,
             mockKC: mockKC,
             mockAuth: mockAuth,
@@ -212,6 +222,7 @@ enum TestHelpers {
         let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
+        let selfTestService: SelfTestService
         let mockSE: MockSecureEnclave
         let mockKC: MockKeychain
         let mockAuth: MockAuthenticator

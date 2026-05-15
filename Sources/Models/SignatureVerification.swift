@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// App-level signature verification result for display in the UI.
-/// Wraps the UniFFI `SignatureStatus` with user-facing information.
 struct SignatureVerification {
     enum VerificationState: Equatable {
         case notSigned
@@ -92,7 +91,7 @@ struct SignatureVerification {
     }
 
     /// The graded verification result.
-    let status: SignatureStatus
+    let status: MessageSignatureStatus
 
     /// App-level verification state that separates crypto verification from Contacts availability.
     let verificationState: VerificationState
@@ -112,7 +111,7 @@ struct SignatureVerification {
     }
 
     init(
-        status: SignatureStatus,
+        status: MessageSignatureStatus,
         signerFingerprint: String?,
         signerContact: Contact?,
         signerIdentity: SignerIdentity? = nil,

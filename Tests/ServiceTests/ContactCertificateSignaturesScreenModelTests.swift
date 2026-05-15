@@ -734,7 +734,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             )
         }
         let certificateSignatureService = CertificateSignatureService(
-            engine: stack.engine,
+            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
             keyManagement: stack.keyManagement,
             contactService: protectedContacts.service
         )
@@ -790,7 +790,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             )
         }
         let certificateSignatureService = CertificateSignatureService(
-            engine: stack.engine,
+            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
             keyManagement: stack.keyManagement,
             contactService: protectedContacts.service
         )
@@ -1164,7 +1164,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             )
         }
         let certificateSignatureService = CertificateSignatureService(
-            engine: stack.engine,
+            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
             keyManagement: stack.keyManagement,
             contactService: protectedContacts.service
         )
@@ -1228,7 +1228,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             )
         }
         let certificateSignatureService = CertificateSignatureService(
-            engine: stack.engine,
+            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
             keyManagement: stack.keyManagement,
             contactService: protectedContacts.service
         )

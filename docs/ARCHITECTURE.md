@@ -91,7 +91,7 @@ operations call `PGPMessageOperationAdapter` rather than `PgpEngine` directly.
 | `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
-| `FileProgressReporter` | Observable progress/cancellation state for streaming operations. Message encrypt/decrypt calls use an FFI-owned bridge to connect it to UniFFI progress callbacks; it still directly conforms to generated `ProgressReporter` as a transition for sign/verify streaming until that adapter work lands. Thread-safe via `OSAllocatedUnfairLock`. |
+| `FileProgressReporter` | Observable progress/cancellation state for streaming operations. Message encrypt/decrypt/sign/verify calls use an FFI-owned bridge to connect it to UniFFI progress callbacks. Thread-safe via `OSAllocatedUnfairLock`. |
 | `DiskSpaceChecker` | Runtime disk space validation before streaming file encryption. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. The legacy in-memory `encryptFile(...)` helper still retains its fixed 100 MB guard. |
 
 ### Guided Tutorial Architecture (`Sources/App/Onboarding/`)

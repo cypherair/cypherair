@@ -12,16 +12,16 @@ import Foundation
 /// v1 policy (plan §3.4): selective revocations are generated on demand and returned armored.
 /// They are not persisted; `KeyCatalogStore` state is not mutated by this service.
 final class SelectiveRevocationService {
-    private let engine: PgpEngine
+    private let certificateAdapter: PGPCertificateOperationAdapter
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
 
     init(
-        engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService
     ) {
-        self.engine = engine
+        self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
     }
@@ -54,16 +54,12 @@ final class SelectiveRevocationService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let binaryRevocation = try await Self.generateSubkeyRevocationOffMainActor(
-            engine: engine,
-            certData: secretKey,
+        let binaryRevocation = try await certificateAdapter.generateSubkeyRevocation(
+            secretCert: secretKey,
             subkeyFingerprint: validatedSubkeyFingerprint
         )
 
-        return try await Self.armorRevocationOffMainActor(
-            engine: engine,
-            revocationData: binaryRevocation
-        )
+        return try await certificateAdapter.armorSignature(binaryRevocation)
     }
 
     /// Generate and armor a User ID-scoped revocation signature for the given User ID selection.
@@ -95,16 +91,12 @@ final class SelectiveRevocationService {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
 
-        let binaryRevocation = try await Self.generateUserIdRevocationOffMainActor(
-            engine: engine,
-            certData: secretKey,
-            userIdSelection: validatedUserIdSelection
+        let binaryRevocation = try await certificateAdapter.generateUserIdRevocation(
+            secretCert: secretKey,
+            selectedUserId: validatedUserIdSelection
         )
 
-        return try await Self.armorRevocationOffMainActor(
-            engine: engine,
-            revocationData: binaryRevocation
-        )
+        return try await certificateAdapter.armorSignature(binaryRevocation)
     }
 
     // MARK: - Selector Validation (public-only, no unwrap)
@@ -113,8 +105,7 @@ final class SelectiveRevocationService {
         certData: Data,
         expectedFingerprint: String
     ) throws -> CertificateSelectionCatalog {
-        try PGPCertificateSelectionAdapter.validatedCatalog(
-            engine: engine,
+        try certificateAdapter.validatedCatalog(
             certData: certData,
             expectedFingerprint: expectedFingerprint
         )
@@ -149,56 +140,9 @@ final class SelectiveRevocationService {
             expectedFingerprint: expectedFingerprint
         )
 
-        return try PGPCertificateSelectionAdapter.validateUserIdSelection(
+        return try certificateAdapter.validateUserIdSelection(
             userIdSelection,
             in: catalog
         )
-    }
-
-    // MARK: - Off-Main-Actor Engine Helpers
-
-    @concurrent
-    private static func generateSubkeyRevocationOffMainActor(
-        engine: PgpEngine,
-        certData: Data,
-        subkeyFingerprint: String
-    ) async throws -> Data {
-        do {
-            return try engine.generateSubkeyRevocation(
-                secretCert: certData,
-                subkeyFingerprint: subkeyFingerprint
-            )
-        } catch {
-            throw CypherAirError.from(error) { .revocationError(reason: $0) }
-        }
-    }
-
-    @concurrent
-    private static func generateUserIdRevocationOffMainActor(
-        engine: PgpEngine,
-        certData: Data,
-        userIdSelection: UserIdSelectionOption
-    ) async throws -> Data {
-        do {
-            return try await PGPCertificateSelectionAdapter.generateUserIdRevocation(
-                engine: engine,
-                secretCert: certData,
-                selectedUserId: userIdSelection
-            )
-        } catch {
-            throw CypherAirError.from(error) { .revocationError(reason: $0) }
-        }
-    }
-
-    @concurrent
-    private static func armorRevocationOffMainActor(
-        engine: PgpEngine,
-        revocationData: Data
-    ) async throws -> Data {
-        do {
-            return try engine.armor(data: revocationData, kind: .signature)
-        } catch {
-            throw CypherAirError.from(error) { .armorError(reason: $0) }
-        }
     }
 }

@@ -1283,6 +1283,7 @@ final class CommonHelpersTests: XCTestCase {
         )
         let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
@@ -1299,17 +1300,20 @@ final class CommonHelpersTests: XCTestCase {
             contactService: contactService
         )
         let signingService = SigningService(
-            engine: engine,
+            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         let certificateSignatureService = CertificateSignatureService(
-            engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
         let qrService = QRService(engine: engine)
-        let selfTestService = SelfTestService(engine: engine)
+        let selfTestService = SelfTestService(
+            engine: engine,
+            messageAdapter: messageAdapter
+        )
         let localDataResetService = LocalDataResetService(
             keychain: mockKC,
             protectedDataStorageRoot: protectedDataStorageRoot,

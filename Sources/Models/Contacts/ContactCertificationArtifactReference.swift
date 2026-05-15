@@ -95,7 +95,7 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
     var targetSelector: ContactCertificationTargetSelector
     var signerPrimaryFingerprint: String?
     var signingKeyFingerprint: String?
-    var certificationKind: CertificationKind?
+    var certificationKind: OpenPGPCertificationKind?
     var validationStatus: ContactCertificationValidationStatus
     var targetCertificateDigest: String?
     var lastValidatedAt: Date?
@@ -115,7 +115,7 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
         targetSelector: ContactCertificationTargetSelector? = nil,
         signerPrimaryFingerprint: String? = nil,
         signingKeyFingerprint: String? = nil,
-        certificationKind: CertificationKind? = nil,
+        certificationKind: OpenPGPCertificationKind? = nil,
         validationStatus: ContactCertificationValidationStatus = .revalidationNeeded,
         targetCertificateDigest: String? = nil,
         lastValidatedAt: Date? = nil,
@@ -270,7 +270,7 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
         ) ?? Self.legacyTargetSelector(userId: userId)
         signerPrimaryFingerprint = try container.decodeIfPresent(String.self, forKey: .signerPrimaryFingerprint)
         signingKeyFingerprint = try container.decodeIfPresent(String.self, forKey: .signingKeyFingerprint)
-        certificationKind = try container.decodeIfPresent(CertificationKind.self, forKey: .certificationKind)
+        certificationKind = try container.decodeIfPresent(OpenPGPCertificationKind.self, forKey: .certificationKind)
         validationStatus = try container.decodeIfPresent(
             ContactCertificationValidationStatus.self,
             forKey: .validationStatus
@@ -279,41 +279,5 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
         lastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .lastValidatedAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         exportFilename = try container.decodeIfPresent(String.self, forKey: .exportFilename)
-    }
-}
-
-extension CertificationKind: Codable {
-    private enum CodingValue: String, Codable {
-        case generic
-        case persona
-        case casual
-        case positive
-    }
-
-    public init(from decoder: Decoder) throws {
-        switch try CodingValue(from: decoder) {
-        case .generic:
-            self = .generic
-        case .persona:
-            self = .persona
-        case .casual:
-            self = .casual
-        case .positive:
-            self = .positive
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        let value: CodingValue = switch self {
-        case .generic:
-            .generic
-        case .persona:
-            .persona
-        case .casual:
-            .casual
-        case .positive:
-            .positive
-        }
-        try value.encode(to: encoder)
     }
 }

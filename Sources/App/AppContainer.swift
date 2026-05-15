@@ -251,6 +251,7 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makePgpServiceGraph(
         engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService
     ) -> PgpServiceGraph {
@@ -276,17 +277,20 @@ final class AppContainer: @unchecked Sendable {
                 contactService: contactService
             ),
             signingService: SigningService(
-                engine: engine,
+                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService
             ),
             certificateSignatureService: CertificateSignatureService(
-                engine: engine,
+                certificateAdapter: certificateAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService
             ),
             qrService: QRService(engine: engine),
-            selfTestService: SelfTestService(engine: engine)
+            selfTestService: SelfTestService(
+                engine: engine,
+                messageAdapter: messageAdapter
+            )
         )
     }
 
@@ -377,6 +381,7 @@ final class AppContainer: @unchecked Sendable {
             }
         )
         let engine = PgpEngine()
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let contactsDirectory = documentDirectory
             .appendingPathComponent("contacts", isDirectory: true)
@@ -402,6 +407,7 @@ final class AppContainer: @unchecked Sendable {
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         let keyManagement = KeyManagementService(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
@@ -543,6 +549,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let pgpServices = makePgpServiceGraph(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )
@@ -632,6 +639,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
         let contactsDirectory = documentDirectory
@@ -749,6 +757,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let keyManagement = KeyManagementService(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticator: authManager,
@@ -834,6 +843,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let pgpServices = makePgpServiceGraph(
             engine: engine,
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             contactService: contactService
         )

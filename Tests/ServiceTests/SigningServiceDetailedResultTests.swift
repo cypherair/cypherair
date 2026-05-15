@@ -229,10 +229,8 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             guard case .operationCancelled = error else {
                 return XCTFail("Expected operationCancelled, got \(error)")
             }
-        } catch let error as PgpError {
-            guard case .OperationCancelled = error else {
-                return XCTFail("Expected OperationCancelled, got \(error)")
-            }
+        } catch {
+            XCTFail("Expected operationCancelled, got \(error)")
         }
     }
 
