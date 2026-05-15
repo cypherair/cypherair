@@ -1281,9 +1281,15 @@ final class CommonHelpersTests: XCTestCase {
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        let contactService = ContactService(engine: engine, contactsDirectory: contactDirectory)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
+        let contactService = ContactService(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            contactsDirectory: contactDirectory
+        )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
@@ -1309,9 +1315,9 @@ final class CommonHelpersTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
-        let qrService = QRService(engine: engine)
+        let qrService = QRService(contactImportAdapter: contactImportAdapter)
         let selfTestService = SelfTestService(
-            engine: engine,
+            selfTestAdapter: selfTestAdapter,
             messageAdapter: messageAdapter
         )
         let localDataResetService = LocalDataResetService(

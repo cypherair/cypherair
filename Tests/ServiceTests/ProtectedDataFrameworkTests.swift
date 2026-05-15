@@ -1559,9 +1559,15 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore
         )
-        let contactService = ContactService(engine: engine, contactsDirectory: contactsDirectory)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
+        let contactService = ContactService(
+            contactImportAdapter: contactImportAdapter,
+            certificateAdapter: certificateAdapter,
+            contactsDirectory: contactsDirectory
+        )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
@@ -1587,9 +1593,9 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
-        let qrService = QRService(engine: engine)
+        let qrService = QRService(contactImportAdapter: contactImportAdapter)
         let selfTestService = SelfTestService(
-            engine: engine,
+            selfTestAdapter: selfTestAdapter,
             messageAdapter: messageAdapter
         )
         let localDataResetService = LocalDataResetService(

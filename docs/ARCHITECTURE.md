@@ -77,8 +77,9 @@ Shared presentation-layer infrastructure used across multiple views.
 ### Services Layer (`Sources/Services/`)
 
 Orchestrates user-facing operations by coordinating the Security layer, app-owned
-models, and FFI adapters. Message encryption/decryption and password-message
-operations call `PGPMessageOperationAdapter` rather than `PgpEngine` directly.
+models, and FFI adapters. Message encryption/decryption, password-message, QR,
+contact-import, and self-test operations call dedicated FFI adapters rather than
+`PgpEngine` directly.
 
 | Service | Responsibility |
 |---------|---------------|
@@ -88,9 +89,9 @@ operations call `PGPMessageOperationAdapter` rather than `PgpEngine` directly.
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
-| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
-| `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing. **Security-critical: parses untrusted external input.** |
-| `SelfTestService` | One-tap diagnostic covering **both profiles**: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
+| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update through the contact-import FFI adapter, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
+| `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
+| `SelfTestService` | One-tap diagnostic covering **both profiles** through message and self-test FFI adapters: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 | `FileProgressReporter` | Observable progress/cancellation state for streaming operations. Message encrypt/decrypt/sign/verify calls use an FFI-owned bridge to connect it to UniFFI progress callbacks. Thread-safe via `OSAllocatedUnfairLock`. |
 | `DiskSpaceChecker` | Runtime disk space validation before streaming file encryption. Uses `volumeAvailableCapacityForImportantUsageKey` to prevent Jetsam termination during large file operations. The legacy in-memory `encryptFile(...)` helper still retains its fixed 100 MB guard. |
 
@@ -119,12 +120,13 @@ Safety is enforced by narrow host boundaries:
 | Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
 
 Current app-surface workflows call the owning Swift service rather than `PgpEngine`
-directly. Encrypt/decrypt/password-message services also avoid direct engine
-ownership by using `PGPMessageOperationAdapter`, which contains generated
-operation calls, generated-error normalization, progress bridging, and
-decrypt/password result mapping. `PasswordMessageService` remains intentionally
-service-only until product scope adds a dedicated route and plaintext-handling
-contract.
+directly. Encrypt/decrypt/password-message services avoid direct engine
+ownership by using `PGPMessageOperationAdapter`, while QR/contact import use
+`PGPContactImportAdapter` and the diagnostic runner uses
+`PGPSelfTestOperationAdapter`. These adapters contain generated operation calls,
+generated-error normalization, progress bridging where applicable, and generated
+result mapping. `PasswordMessageService` remains intentionally service-only until
+product scope adds a dedicated route and plaintext-handling contract.
 
 ### Security Layer (`Sources/Security/`)
 
