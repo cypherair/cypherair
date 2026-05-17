@@ -838,7 +838,7 @@
 					"$(PROJECT_DIR)/bindings",
 				);
 				INFOPLIST_FILE = "CypherAir-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = CypherAir;
+				INFOPLIST_KEY_CFBundleDisplayName = "CypherAir X";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -1064,7 +1064,7 @@
 					"$(PROJECT_DIR)/bindings",
 				);
 				INFOPLIST_FILE = "CypherAir-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = CypherAir;
+				INFOPLIST_KEY_CFBundleDisplayName = "CypherAir X";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
@@ -1210,7 +1210,7 @@
 					"$(PROJECT_DIR)/bindings",
 				);
 				INFOPLIST_FILE = "CypherAir-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = CypherAir;
+				INFOPLIST_KEY_CFBundleDisplayName = "CypherAir X";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;

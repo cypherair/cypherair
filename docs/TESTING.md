@@ -182,7 +182,7 @@ The repository also publishes unique edge XCFramework prereleases:
 
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework, conditionally runs hosted Apple platform probes when Xcode 26.5 is healthy, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
 - The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
-- `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` requires a healthy Xcode 26.5 platform/runtime install before expensive stable asset generation, can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails, while `publish-stable-release` depends on both jobs and creates the immutable GitHub Release only after the audit passes.
+- `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` uses the same hosted Xcode 26.5 platform preflight as edge, runs app-side iOS/visionOS probes only when the runner is platform-ready, records skipped probes in release notes when the hosted image lags, and can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails, while `publish-stable-release` depends on both jobs and creates the immutable GitHub Release only after the audit passes.
 
 Toolchain contract:
 
@@ -211,9 +211,9 @@ Impact:
 - Rust CI remains valid.
 - The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
 - The hosted Swift unit-test preview runs as a separate failure signal in PR and nightly workflows. If it fails before tests start because of the runner OS, diagnose that as a hosted-image mismatch and confirm with local macOS validation. No later jobs depend on this preview job, so it does not block additional automation steps.
-- PR, nightly, and edge Apple platform probes use `scripts/ci_xcode_platform_preflight.sh` to detect incomplete Xcode 26.5 hosted platform installs and skip those app probes with a warning while keeping the XCFramework packaging signal clean.
-- Formal stable release asset generation uses the same preflight in strict mode and fails before expensive packaging if the hosted runner is not release-capable.
-- Local macOS validation remains the source of truth until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+- PR, nightly, edge, and stable Apple platform probes use `scripts/ci_xcode_platform_preflight.sh` to detect incomplete Xcode 26.5 hosted platform installs and skip those app probes with a warning while keeping the XCFramework packaging and stable asset-generation signals clean.
+- Formal stable release notes record whether hosted app-side probes passed or were skipped. A skipped hosted probe does not stand in for release validation; local App Store candidate validation remains the source of truth while GitHub's hosted image catches up.
+- Continue using local macOS validation until GitHub's hosted image catches up or a self-hosted macOS runner is used.
 
 ## 2.3 Release Flows
 
