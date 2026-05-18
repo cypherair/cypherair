@@ -1,7 +1,7 @@
 import Foundation
 
 struct PGPCertificateVerificationContext {
-    let contacts: [Contact]
+    let contactKeys: [ContactKeyRecord]
     let ownKeys: [PGPKeyIdentity]
 }
 
@@ -175,7 +175,7 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
             signingKeyFingerprint: result.signingKeyFingerprint,
             signerIdentity: CertificateSignatureSignerIdentity.resolve(
                 fingerprint: result.signerPrimaryFingerprint,
-                contacts: context.contacts,
+                contactKeys: context.contactKeys,
                 ownKeys: context.ownKeys
             )
         )

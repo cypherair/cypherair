@@ -153,8 +153,12 @@ final class ContactCertificateSignaturesScreenModel {
         }
     }
 
-    var contact: Contact? {
-        contactService.availableContact(forFingerprint: fingerprint)
+    var contact: ContactKeySummary? {
+        contactService.availableKey(fingerprint: fingerprint)
+    }
+
+    private var contactKeyRecord: ContactKeyRecord? {
+        contactService.availableContactKeyRecord(fingerprint: fingerprint)
     }
 
     var contactsAvailability: ContactsAvailability {
@@ -365,18 +369,18 @@ final class ContactCertificateSignaturesScreenModel {
     }
 
     func verifyDirectKey() {
-        guard let contact, let signature = currentSignatureData else {
+        guard let contactKeyRecord, let signature = currentSignatureData else {
             return
         }
 
         startOperation(.directKeyVerify) {
-            let verification = try await self.verifyDirectKeyAction(signature, contact.publicKeyData)
+            let verification = try await self.verifyDirectKeyAction(signature, contactKeyRecord.publicKeyData)
             return (verification, nil, nil)
         }
     }
 
     func verifyUserIdBinding() {
-        guard let contact,
+        guard let contactKeyRecord,
               let selectedUserId,
               let signature = currentSignatureData else {
             return
@@ -385,7 +389,7 @@ final class ContactCertificateSignaturesScreenModel {
         startOperation(.userIdBindingVerify) {
             let verification = try await self.verifyUserIdBindingAction(
                 signature,
-                contact.publicKeyData,
+                contactKeyRecord.publicKeyData,
                 selectedUserId
             )
             return (verification, nil, nil)
@@ -393,7 +397,7 @@ final class ContactCertificateSignaturesScreenModel {
     }
 
     func certifyUserId() {
-        guard let contact,
+        guard let contactKeyRecord,
               let selectedUserId,
               let selectedSigner else {
             return
@@ -407,14 +411,14 @@ final class ContactCertificateSignaturesScreenModel {
         startOperation(.certifyUserId) {
             let armoredCertification = try await self.generateArmoredCertificationAction(
                 selectedSigner.fingerprint,
-                contact.publicKeyData,
+                contactKeyRecord.publicKeyData,
                 selectedUserId,
                 self.selectedCertificationKind
             )
             try Task.checkCancellation()
             let verification = try await self.verifyUserIdBindingAction(
                 armoredCertification,
-                contact.publicKeyData,
+                contactKeyRecord.publicKeyData,
                 selectedUserId
             )
             return (verification, armoredCertification, exportFilename)
@@ -505,7 +509,7 @@ final class ContactCertificateSignaturesScreenModel {
             return
         }
 
-        guard let targetCert = contact?.publicKeyData else {
+        guard let targetCert = contactKeyRecord?.publicKeyData else {
             loadState = .loaded
             return
         }

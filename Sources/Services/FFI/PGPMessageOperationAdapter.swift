@@ -2,7 +2,7 @@ import Foundation
 
 struct PGPMessageVerificationContext {
     let verificationKeys: [Data]
-    let contacts: [Contact]
+    let contactKeys: [ContactKeyRecord]
     let ownKeys: [PGPKeyIdentity]
     let contactsAvailability: ContactsAvailability
 }

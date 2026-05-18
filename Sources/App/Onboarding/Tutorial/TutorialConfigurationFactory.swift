@@ -42,7 +42,7 @@ struct TutorialConfigurationFactory {
                 store?.setRoutePath(
                     [
                         .addContact,
-                        .contactDetail(contactId: contact.contactId ?? "legacy-contact-\(contact.fingerprint)"),
+                        .contactDetail(contactId: contact.contactId),
                     ],
                     for: .contacts
                 )
@@ -73,9 +73,7 @@ struct TutorialConfigurationFactory {
                 defaultValue: "Hi Bob, this is a sandbox message from Alice. It is signed and encrypted inside the guided tutorial."
             )
             if let bobContact = store.session.artifacts.bobContact {
-                let resolvedContactId = bobContact.contactId
-                    ?? store.container?.contactService.contactId(forFingerprint: bobContact.fingerprint)
-                configuration.initialRecipientContactIds = resolvedContactId.map { [$0] } ?? []
+                configuration.initialRecipientContactIds = [bobContact.contactId]
             }
             configuration.initialSignerFingerprint = store.session.artifacts.aliceIdentity?.fingerprint
             configuration.onEncrypted = { [weak store] ciphertext in

@@ -31,19 +31,19 @@ struct SignatureVerification {
 
         static func resolve(
             fingerprint: String?,
-            contacts: [Contact],
+            contactKeys: [ContactKeyRecord],
             ownKeys: [PGPKeyIdentity]
         ) -> SignerIdentity? {
             guard let fingerprint else { return nil }
 
-            if let contact = contacts.first(where: { $0.fingerprint == fingerprint }) {
+            if let contactKey = contactKeys.first(where: { $0.fingerprint == fingerprint }) {
                 return SignerIdentity(
                     source: .contact,
-                    displayName: contact.displayName,
-                    secondaryText: contact.email ?? contact.userId,
-                    shortKeyId: contact.shortKeyId,
-                    fingerprint: contact.fingerprint,
-                    isVerifiedContact: contact.isVerified
+                    displayName: contactKey.displayName,
+                    secondaryText: contactKey.email ?? contactKey.primaryUserId,
+                    shortKeyId: IdentityPresentation.shortKeyId(from: contactKey.fingerprint),
+                    fingerprint: contactKey.fingerprint,
+                    isVerifiedContact: contactKey.manualVerificationState.isVerified
                 )
             }
 
@@ -78,9 +78,6 @@ struct SignatureVerification {
     /// Fingerprint of the signer, if known.
     let signerFingerprint: String?
 
-    /// The contact who signed (resolved from fingerprint), if available.
-    let signerContact: Contact?
-
     let signerIdentity: SignerIdentity?
 
     let contactsUnavailableReason: ContactsAvailability?
@@ -92,7 +89,6 @@ struct SignatureVerification {
     init(
         status: MessageSignatureStatus,
         signerFingerprint: String?,
-        signerContact: Contact?,
         signerIdentity: SignerIdentity? = nil,
         verificationState: VerificationState? = nil,
         contactsUnavailableReason: ContactsAvailability? = nil
@@ -100,18 +96,8 @@ struct SignatureVerification {
         self.status = status
         self.verificationState = verificationState ?? VerificationState(legacyStatus: status)
         self.signerFingerprint = signerFingerprint
-        self.signerContact = signerContact
         self.contactsUnavailableReason = contactsUnavailableReason
-        self.signerIdentity = signerIdentity ?? signerContact.map {
-            SignerIdentity(
-                source: .contact,
-                displayName: $0.displayName,
-                secondaryText: $0.email ?? $0.userId,
-                shortKeyId: $0.shortKeyId,
-                fingerprint: $0.fingerprint,
-                isVerifiedContact: $0.isVerified
-            )
-        } ?? signerFingerprint.map {
+        self.signerIdentity = signerIdentity ?? signerFingerprint.map {
             SignerIdentity(
                 source: .unknown,
                 displayName: "",

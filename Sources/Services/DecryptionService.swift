@@ -221,16 +221,14 @@ final class DecryptionService {
     // MARK: - Private
 
     private func verificationContext() -> PGPMessageVerificationContext {
-        let contactsContext = contactService.contactsForVerificationContext()
-        let contactsAvailability = contactsContext.availability
-        let contacts = contactsContext.contacts
+        let contactsContext = contactService.contactsVerificationContext()
         let ownKeys = keyManagement.keys
         return PGPMessageVerificationContext(
-            verificationKeys: contacts.map { $0.publicKeyData }
-                + ownKeys.map { $0.publicKeyData },
-            contacts: contacts,
+            verificationKeys: contactsContext.verificationKeys
+                + ownKeys.map(\.publicKeyData),
+            contactKeys: contactsContext.contactKeys,
             ownKeys: ownKeys,
-            contactsAvailability: contactsAvailability
+            contactsAvailability: contactsContext.availability
         )
     }
 }

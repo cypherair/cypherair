@@ -3,9 +3,7 @@ import Foundation
 @MainActor
 struct PendingContactKeyUpdate: Identifiable {
     let id = UUID()
-    let newContact: Contact
-    let existingContact: Contact
-    let keyData: Data
+    let request: ContactLegacyKeyReplacementRequest
 }
 
 @MainActor
@@ -23,7 +21,7 @@ struct ContactImportWorkflow {
     func makeImportConfirmationRequest(
         inspection: PublicKeyImportInspection,
         allowsUnverifiedImport: Bool,
-        onSuccess: @escaping @MainActor (Contact) -> Void,
+        onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onReplaceRequested: @escaping @MainActor (ContactKeyUpdateConfirmationRequest) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void,
         onCancel: @escaping @MainActor () -> Void = {}
@@ -57,32 +55,29 @@ struct ContactImportWorkflow {
     private func importContact(
         keyData: Data,
         verificationState: ContactVerificationState,
-        onSuccess: @escaping @MainActor (Contact) -> Void,
+        onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onReplaceRequested: @escaping @MainActor (ContactKeyUpdateConfirmationRequest) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void
     ) {
         do {
-            let result = try contactService.addContact(
+            let result = try contactService.importContact(
                 publicKeyData: keyData,
                 verificationState: verificationState
             )
             switch result {
-            case .added(let contact), .addedWithCandidate(let contact, _),
-                 .updated(let contact), .duplicate(let contact):
+            case .added(let contact, _),
+                 .addedWithCandidate(let contact, _, _),
+                 .updated(let contact, _),
+                 .duplicate(let contact, _):
                 onSuccess(contact)
-            case .keyUpdateDetected(let newContact, let existingContact, let replacementKeyData):
+            case .legacyKeyReplacementDetected(let request):
                 guard contactService.contactsAvailability != .availableProtectedDomain else {
                     onFailure(.contactKeyReplacementUnsupported)
                     return
                 }
-                let pendingUpdate = PendingContactKeyUpdate(
-                    newContact: newContact,
-                    existingContact: existingContact,
-                    keyData: replacementKeyData
-                )
                 onReplaceRequested(
                     makeKeyUpdateConfirmationRequest(
-                        pendingUpdate: pendingUpdate,
+                        pendingUpdate: PendingContactKeyUpdate(request: request),
                         onSuccess: onSuccess,
                         onFailure: onFailure
                     )
@@ -95,7 +90,7 @@ struct ContactImportWorkflow {
 
     private func makeKeyUpdateConfirmationRequest(
         pendingUpdate: PendingContactKeyUpdate,
-        onSuccess: @escaping @MainActor (Contact) -> Void,
+        onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void
     ) -> ContactKeyUpdateConfirmationRequest {
         ContactKeyUpdateConfirmationRequest(
@@ -113,14 +108,15 @@ struct ContactImportWorkflow {
 
     private func confirmReplacement(
         _ pendingUpdate: PendingContactKeyUpdate,
-        onSuccess: @escaping @MainActor (Contact) -> Void,
+        onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void
     ) {
         do {
-            let contact = try contactService.confirmKeyUpdate(
-                existingFingerprint: pendingUpdate.existingContact.fingerprint,
-                keyData: pendingUpdate.keyData
-            )
+            let result = try contactService.confirmLegacyKeyReplacement(pendingUpdate.request)
+            guard let contact = result.contact else {
+                onFailure(.contactKeyReplacementUnsupported)
+                return
+            }
             onSuccess(contact)
         } catch {
             onFailure(Self.contactImportError(from: error))

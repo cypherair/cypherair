@@ -290,7 +290,7 @@ final class SelfTestService {
                 secretKeys: [generated.certData],
                 verificationContext: PGPMessageVerificationContext(
                     verificationKeys: [],
-                    contacts: [],
+                    contactKeys: [],
                     ownKeys: [],
                     contactsAvailability: .availableLegacyCompatibility
                 )
@@ -310,7 +310,7 @@ final class SelfTestService {
     private static func verificationContext(for generated: PGPSelfTestGeneratedKey) -> PGPMessageVerificationContext {
         PGPMessageVerificationContext(
             verificationKeys: [generated.publicKeyData],
-            contacts: [],
+            contactKeys: [],
             ownKeys: [],
             contactsAvailability: .availableLegacyCompatibility
         )

@@ -51,7 +51,6 @@ struct DetailedSignatureVerification: Equatable {
 
     let legacyStatus: MessageSignatureStatus
     let legacySignerFingerprint: String?
-    let legacySignerContact: Contact?
     let legacySignerIdentity: SignatureVerification.SignerIdentity?
     let summaryState: SignatureVerification.VerificationState
     let summaryEntryIndex: UInt64?
@@ -61,7 +60,6 @@ struct DetailedSignatureVerification: Equatable {
     init(
         legacyStatus: MessageSignatureStatus,
         legacySignerFingerprint: String?,
-        legacySignerContact: Contact?,
         legacySignerIdentity: SignatureVerification.SignerIdentity?,
         summaryState: SignatureVerification.VerificationState? = nil,
         summaryEntryIndex: UInt64? = nil,
@@ -70,7 +68,6 @@ struct DetailedSignatureVerification: Equatable {
     ) {
         self.legacyStatus = legacyStatus
         self.legacySignerFingerprint = legacySignerFingerprint
-        self.legacySignerContact = legacySignerContact
         self.legacySignerIdentity = legacySignerIdentity
         self.summaryState = summaryState ?? SignatureVerification.VerificationState(legacyStatus: legacyStatus)
         self.summaryEntryIndex = summaryEntryIndex
@@ -82,7 +79,6 @@ struct DetailedSignatureVerification: Equatable {
         SignatureVerification(
             status: legacyStatus,
             signerFingerprint: legacySignerFingerprint,
-            signerContact: legacySignerContact,
             signerIdentity: legacySignerIdentity,
             verificationState: summaryState,
             contactsUnavailableReason: contactsUnavailableReason

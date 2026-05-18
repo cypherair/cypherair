@@ -202,9 +202,8 @@ final class CertificateSignatureService {
     }
 
     func candidateSignerCertificates() throws -> [Data] {
-        try contactService.requireContactsAvailable()
-        return contactService.availableContacts.map(\.publicKeyData)
-            + keyManagement.keys.map(\.publicKeyData)
+        let contactKeys = try contactService.candidateSignerPublicKeyData()
+        return contactKeys + keyManagement.keys.map(\.publicKeyData)
     }
 
     func resolveSignerIdentity(
@@ -212,7 +211,7 @@ final class CertificateSignatureService {
     ) -> CertificateSignatureSignerIdentity? {
         CertificateSignatureSignerIdentity.resolve(
             fingerprint: primaryFingerprint,
-            contacts: contactService.contactsForVerificationContext().contacts,
+            contactKeys: contactService.contactsVerificationContext().contactKeys,
             ownKeys: keyManagement.keys
         )
     }
@@ -269,7 +268,7 @@ final class CertificateSignatureService {
 
     private func verificationContext() -> PGPCertificateVerificationContext {
         PGPCertificateVerificationContext(
-            contacts: contactService.contactsForVerificationContext().contacts,
+            contactKeys: contactService.contactsVerificationContext().contactKeys,
             ownKeys: keyManagement.keys
         )
     }
