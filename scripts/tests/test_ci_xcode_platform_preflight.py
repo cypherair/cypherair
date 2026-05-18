@@ -89,6 +89,22 @@ class XcodePlatformPreflightTests(unittest.TestCase):
         self.assertIn("::error::", result.combined_output)
         self.assertIn("xcodebuild -showdestinations failed", result.combined_output)
 
+    def test_showdestinations_mixed_runtime_missing_and_project_failure_is_blocking(self) -> None:
+        result = self.run_preflight(
+            destinations="""\
+xcodebuild: error: Scheme CypherAir is not configured for this project.
+Ineligible destinations for the "CypherAir" scheme:
+    { platform:iOS, name:Any iOS Device, error:iOS 26.5 is not installed. }
+""",
+            destinations_status=65,
+        )
+
+        self.assertEqual(result.process.returncode, 1, result.combined_output)
+        self.assertNotIn("ready", result.outputs)
+        self.assertIn("::error::", result.combined_output)
+        self.assertIn("xcodebuild -showdestinations failed", result.combined_output)
+        self.assertIn("generic iOS destination reports iOS 26.5 is not installed", result.combined_output)
+
     def test_missing_generic_destination_is_blocking(self) -> None:
         cases = {
             "iOS": """\
@@ -275,3 +291,6 @@ class PreflightResult:
     def combined_output(self) -> str:
         return f"{self.process.stdout}\n{self.process.stderr}"
 
+
+if __name__ == "__main__":
+    unittest.main()

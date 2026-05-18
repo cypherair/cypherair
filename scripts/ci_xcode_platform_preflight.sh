@@ -145,6 +145,48 @@ show_destinations() {
     > "$output_file" 2>&1
 }
 
+showdestinations_failure_is_runtime_missing_only() {
+  local output_file="$1"
+
+  awk -v version="$required_version" '
+    BEGIN {
+      version_regex = version
+      gsub(/\./, "\\.", version_regex)
+      saw_runtime_missing = 0
+      invalid = 0
+    }
+
+    /^[[:space:]]*$/ { next }
+    /^Command line invocation:$/ { next }
+    /^[[:space:]]+.*xcodebuild.*-showdestinations/ { next }
+    /^User defaults from command line:$/ { next }
+    /^[[:space:]]+[A-Za-z_][A-Za-z0-9_]* = / { next }
+    /^Ineligible destinations for the "CypherAir" scheme:$/ { next }
+    /^Available destinations for the "CypherAir" scheme:$/ { next }
+
+    $0 ~ "^[[:space:]]*\\{ platform:iOS,.*name:Any iOS Device,.*error:iOS " version_regex " is not installed[^}]*\\}[[:space:]]*$" {
+      saw_runtime_missing = 1
+      next
+    }
+
+    $0 ~ "^[[:space:]]*\\{ platform:visionOS,.*name:Any visionOS Device,.*error:visionOS " version_regex " is not installed[^}]*\\}[[:space:]]*$" {
+      saw_runtime_missing = 1
+      next
+    }
+
+    {
+      invalid = 1
+      exit
+    }
+
+    END {
+      if (invalid || !saw_runtime_missing) {
+        exit 1
+      }
+    }
+  ' "$output_file"
+}
+
 check_platform_readiness() {
   local blocking_failures="" skippable_failures=""
   local xcode_version iphoneos_version xros_version destinations_file
@@ -194,7 +236,7 @@ check_platform_readiness() {
   fi
 
   if [ "$destinations_status" -ne 0 ]; then
-    if [ "$ios_runtime_missing_reported" != "true" ] && [ "$visionos_runtime_missing_reported" != "true" ]; then
+    if ! showdestinations_failure_is_runtime_missing_only "$destinations_file"; then
       record_failure blocking_failures "xcodebuild -showdestinations failed"
     fi
   else
