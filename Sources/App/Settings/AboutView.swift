@@ -7,7 +7,7 @@ struct AboutView: View {
             Section {
                 LabeledContent(
                     String(localized: "about.app", defaultValue: "App"),
-                    value: AppProductIdentity.displayName
+                    value: AppProductIdentity.localizedDisplayName
                 )
                 LabeledContent(
                     String(localized: "about.version", defaultValue: "Version"),
@@ -29,8 +29,8 @@ struct AboutView: View {
                 .accessibilityIdentifier("about.sourceCompliance")
             }
 
-            if AppProductIdentity.showsCypherAirXAboutCopy {
-                Section(AppProductIdentity.displayName) {
+            if AppProductIdentity.showsProductLineAboutContext {
+                Section(AppProductIdentity.localizedDisplayName) {
                     Text(String(
                         localized: "about.cypherAirX.description",
                         defaultValue: "CypherAir X is CypherAir’s exploratory product line for new directions still under evaluation, such as new encryption options, visual design updates, and interaction improvements. These explorations do not change CypherAir’s fully offline, no-network privacy model."

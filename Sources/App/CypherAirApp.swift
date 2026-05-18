@@ -307,7 +307,7 @@ struct CypherAirApp: App {
     var body: some Scene {
         #if os(macOS)
         Window(
-            AppProductIdentity.displayName,
+            AppProductIdentity.localizedDisplayName,
             id: mainWindowID
         ) {
             mainWindowSceneContent
@@ -322,7 +322,7 @@ struct CypherAirApp: App {
         }
         #elseif os(visionOS)
         Window(
-            AppProductIdentity.displayName,
+            AppProductIdentity.localizedDisplayName,
             id: mainWindowID
         ) {
             mainWindowSceneContent

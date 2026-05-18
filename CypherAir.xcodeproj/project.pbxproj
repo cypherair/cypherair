@@ -209,7 +209,7 @@
 				"Extensions/Data+Zeroing.swift",
 				"Extensions/View+PlatformAvailability.swift",
 				Models/AppConfiguration.swift,
-				Models/AppProductIdentity.swift,
+				App/Common/AppProductIdentity.swift,
 				Models/CertificateSelectionCatalog.swift,
 				Models/CertificateSignatureSignerIdentity.swift,
 				Models/CertificateSignatureVerification.swift,

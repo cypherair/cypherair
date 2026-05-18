@@ -7,7 +7,7 @@ struct HomeView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
     var body: some View {
         content
-        .navigationTitle(AppProductIdentity.displayName)
+        .navigationTitle(AppProductIdentity.localizedDisplayName)
     }
 
     @ViewBuilder

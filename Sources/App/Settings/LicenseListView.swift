@@ -68,7 +68,7 @@ struct LicenseListView: View {
     @ViewBuilder
     private var noticeListSections: some View {
         if !sections.appNotices.isEmpty {
-            Section(AppProductIdentity.displayName) {
+            Section(AppProductIdentity.localizedDisplayName) {
                 noticeRows(for: sections.appNotices)
             }
         }

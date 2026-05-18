@@ -497,22 +497,6 @@
         }
       }
     },
-    "app.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir X"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir X"
-          }
-        }
-      }
-    },
     "auth.switchMode.reason" : {
       "localizations" : {
         "en" : {

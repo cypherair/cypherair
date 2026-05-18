@@ -44,7 +44,7 @@ struct MacAppShellView: View {
                     sidebarRow(.verify)
                 }
             }
-            .navigationTitle(AppProductIdentity.displayName)
+            .navigationTitle(AppProductIdentity.localizedDisplayName)
         } detail: {
             detailContent(for: navigationState.selectedTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
