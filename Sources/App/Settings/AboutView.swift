@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// About page with app-level metadata only.
+/// About page with app metadata and product-line context.
 struct AboutView: View {
     var body: some View {
         List {
@@ -27,6 +27,17 @@ struct AboutView: View {
                     )
                 }
                 .accessibilityIdentifier("about.sourceCompliance")
+            }
+
+            if AppProductIdentity.showsCypherAirXAboutCopy {
+                Section(AppProductIdentity.displayName) {
+                    Text(String(
+                        localized: "about.cypherAirX.description",
+                        defaultValue: "CypherAir X is CypherAir’s exploratory product line for new directions still under evaluation, such as new encryption options, visual design updates, and interaction improvements. These explorations do not change CypherAir’s fully offline, no-network privacy model."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Section {

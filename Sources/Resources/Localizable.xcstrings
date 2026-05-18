@@ -49,6 +49,22 @@
         }
       }
     },
+    "about.cypherAirX.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir X is CypherAir’s exploratory product line for new directions still under evaluation, such as new encryption options, visual design updates, and interaction improvements. These explorations do not change CypherAir’s fully offline, no-network privacy model."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir X 是 CypherAir 的探索产品线，用来承载仍在评估中的新方向，例如新的加密方式、外观和交互改进。这些探索不会改变 CypherAir 完全离线、无网络访问的隐私模型。"
+          }
+        }
+      }
+    },
     "about.license" : {
       "localizations" : {
         "en" : {
