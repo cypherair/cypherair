@@ -1,7 +1,7 @@
-/* Localized strings for the CypherAir acknowledgements page in the system Settings app. */
+/* Localized strings for the CypherAir X acknowledgements page in the system Settings app. */
 "Open Source" = "开源";
-"CypherAir is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance." = "CypherAir 基于开源密码学和工具链构建。完整声明和许可证文本可在应用内的“设置”、“关于”、“源代码与合规”中查看。";
-"CypherAir" = "CypherAir";
+"CypherAir X is built with open-source cryptography and tooling. Complete notices and license text are available inside the app under Settings, About, Source & Compliance." = "CypherAir X 基于开源密码学和工具链构建。完整声明和许可证文本可在应用内的“设置”、“关于”、“源代码与合规”中查看。";
+"CypherAir X" = "CypherAir X";
 "base64" = "base64";
 "OpenSSL Rust Bindings" = "OpenSSL Rust 绑定";
 "OpenSSL Source" = "OpenSSL 源码";

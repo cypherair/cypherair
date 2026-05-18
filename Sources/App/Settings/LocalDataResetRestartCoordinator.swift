@@ -76,7 +76,7 @@ struct LocalDataResetRestartRequiredView: View {
                 Label(
                     String(
                         localized: "settings.resetAll.restartRequired.quit",
-                        defaultValue: "Quit CypherAir"
+                        defaultValue: "Quit CypherAir X"
                     ),
                     systemImage: "power"
                 )
@@ -95,12 +95,12 @@ struct LocalDataResetRestartRequiredView: View {
         #if os(macOS)
         String(
             localized: "settings.resetAll.restartRequired.message.mac",
-            defaultValue: "All local CypherAir data was deleted and verified. Quit and reopen CypherAir to complete a clean restart."
+            defaultValue: "All local CypherAir X data was deleted and verified. Quit and reopen CypherAir X to complete a clean restart."
         )
         #else
         String(
             localized: "settings.resetAll.restartRequired.message",
-            defaultValue: "All local CypherAir data was deleted and verified. Close CypherAir from the app switcher, then open it again to complete a clean restart."
+            defaultValue: "All local CypherAir X data was deleted and verified. Close CypherAir X from the app switcher, then open it again to complete a clean restart."
         )
         #endif
     }

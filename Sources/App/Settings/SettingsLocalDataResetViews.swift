@@ -34,7 +34,7 @@ struct SettingsLocalDataResetPhraseView: View {
                 Text(
                     String(
                         localized: "settings.resetAll.phraseInstructions",
-                        defaultValue: "Type RESET to permanently delete all CypherAir data on this device."
+                        defaultValue: "Type RESET to permanently delete all CypherAir X data on this device."
                     )
                 )
                 CypherSingleLineTextField(

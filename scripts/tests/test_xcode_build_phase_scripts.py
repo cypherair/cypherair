@@ -37,7 +37,7 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
                     {
                         "StringsTable": "Root",
                         "PreferenceSpecifiers": [
-                            {"Type": "PSGroupSpecifier", "Title": "About CypherAir"},
+                            {"Type": "PSGroupSpecifier", "Title": "About CypherAir X"},
                             {
                                 "Type": "PSTitleValueSpecifier",
                                 "Title": "Version",
@@ -60,7 +60,7 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
                     [
                         {
                             "id": "cypherair",
-                            "displayName": "CypherAir",
+                            "displayName": "CypherAir X",
                             "version": "Unspecified",
                             "licenseName": "GPL-3.0-or-later OR MPL-2.0",
                             "kind": "app",
@@ -144,7 +144,7 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
                 for item in acknowledgements["PreferenceSpecifiers"]
                 if item.get("Type") == "PSTitleValueSpecifier"
             }
-            self.assertEqual(values_by_title["CypherAir"], "GPL-3.0-or-later OR MPL-2.0")
+            self.assertEqual(values_by_title["CypherAir X"], "GPL-3.0-or-later OR MPL-2.0")
             self.assertEqual(values_by_title["Sequoia OpenPGP"], "2.2.0 / LGPL-2.0-or-later")
             self.assertEqual(values_by_title["OpenSSL Rust Bindings"], "0.10.77 / Apache-2.0")
             self.assertEqual(values_by_title["OpenSSL Source"], "300.6.0+3.6.2 / MIT/Apache-2.0")

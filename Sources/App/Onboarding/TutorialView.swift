@@ -117,7 +117,7 @@ struct TutorialView: View {
             .font(.headline)
             .foregroundStyle(.orange)
 
-            Text(String(localized: "guidedTutorial.hero.title", defaultValue: "Learn CypherAir in a real sandbox"))
+            Text(String(localized: "guidedTutorial.hero.title", defaultValue: "Learn CypherAir X in a real sandbox"))
                 .font(.title2.weight(.semibold))
 
             Text(String(localized: "guidedTutorial.promise", defaultValue: "This tutorial uses isolated tutorial data in a tutorial workspace. It does not read or write your real keys, contacts, settings, files, exports, or other real workspace content."))
@@ -235,7 +235,7 @@ struct TutorialView: View {
                         .font(.headline)
                         .foregroundStyle(.green)
 
-                        Text(String(localized: "guidedTutorial.completion.title", defaultValue: "You're ready to start using CypherAir"))
+                        Text(String(localized: "guidedTutorial.completion.title", defaultValue: "You're ready to start using CypherAir X"))
                             .font(.title2.weight(.semibold))
 
                         Text(String(localized: "guidedTutorial.completion.body", defaultValue: "You completed the Guided Tutorial in a safe sandbox. The real app is ready for your own keys and messages, and none of the tutorial data was saved into your real workspace."))
@@ -316,7 +316,7 @@ struct TutorialView: View {
     private var completionPrimaryActionTitle: String {
         switch presentationContext {
         case .onboardingFirstRun:
-            String(localized: "guidedTutorial.complete.enterApp", defaultValue: "Start Using CypherAir")
+            String(localized: "guidedTutorial.complete.enterApp", defaultValue: "Start Using CypherAir X")
         case .inApp:
             String(localized: "common.done", defaultValue: "Done")
         }

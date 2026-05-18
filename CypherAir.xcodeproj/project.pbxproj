@@ -209,6 +209,7 @@
 				"Extensions/Data+Zeroing.swift",
 				"Extensions/View+PlatformAvailability.swift",
 				Models/AppConfiguration.swift,
+				Models/AppProductIdentity.swift,
 				Models/CertificateSelectionCatalog.swift,
 				Models/CertificateSignatureSignerIdentity.swift,
 				Models/CertificateSignatureVerification.swift,
@@ -842,8 +843,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir uses FaceID to protect your secret keys.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = CypherAir;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir X uses Face ID to protect your secret keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "CypherAir X";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -1068,8 +1069,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir uses FaceID to protect your secret keys.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = CypherAir;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir X uses Face ID to protect your secret keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "CypherAir X";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -1214,8 +1215,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir uses FaceID to protect your secret keys.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = CypherAir;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "CypherAir X uses Face ID to protect your secret keys.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "CypherAir X";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";

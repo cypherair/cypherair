@@ -496,7 +496,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     static func migrationWarningMessage() -> String {
         String(
             localized: "app.loadWarning.keyMetadataMigration",
-            defaultValue: "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
+            defaultValue: "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir X and unlock again to retry."
         )
     }
 

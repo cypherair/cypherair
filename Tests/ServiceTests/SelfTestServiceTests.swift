@@ -84,7 +84,7 @@ final class SelfTestServiceTests: XCTestCase {
         XCTAssertNotNil(reportString, "Report should be UTF-8 text in memory")
         XCTAssertTrue(reportString?.contains("11") == true, "Report should reference 11 tests")
         XCTAssertTrue(
-            reportString?.contains("CypherAir Self-Test Report") == true,
+            reportString?.contains("CypherAir X Self-Test Report") == true,
             "Report should include the report title"
         )
     }

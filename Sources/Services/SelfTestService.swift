@@ -370,7 +370,7 @@ final class SelfTestService {
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let filename = "CypherAir-SelfTest-Report-\(dateFormatter.string(from: date)).txt"
 
-        var report = String(localized: "selftest.report.title", defaultValue: "CypherAir Self-Test Report") + "\n"
+        var report = String(localized: "selftest.report.title", defaultValue: "CypherAir X Self-Test Report") + "\n"
         let dateString = String(describing: date)
         report += String(localized: "selftest.report.date", defaultValue: "Date: \(dateString)") + "\n"
         report += "========================\n\n"

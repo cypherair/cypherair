@@ -404,7 +404,7 @@ final class SettingsScreenModelTests: XCTestCase {
             model.localDataResetFooter,
             String(
                 localized: "settings.resetAll.footer",
-                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir X install."
             )
         )
 
@@ -437,7 +437,7 @@ final class SettingsScreenModelTests: XCTestCase {
             model.localDataResetFooter,
             String(
                 localized: "guidedTutorial.settings.restricted.localDataReset",
-                defaultValue: "The tutorial sandbox cannot reset real CypherAir data."
+                defaultValue: "The tutorial sandbox cannot reset real CypherAir X data."
             )
         )
 

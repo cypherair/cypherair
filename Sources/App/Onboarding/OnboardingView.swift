@@ -83,7 +83,7 @@ struct OnboardingPageOne: View {
             Text(String(localized: "onboarding.p1.title", defaultValue: "Completely Offline"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.p1.body", defaultValue: "CypherAir never connects to the internet. Your messages and keys stay on your device."))
+            Text(String(localized: "onboarding.p1.body", defaultValue: "CypherAir X never connects to the internet. Your messages and keys stay on your device."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -152,7 +152,7 @@ struct OnboardingPageThree: View {
             Text(String(localized: "onboarding.p3.title", defaultValue: "Start with a Guided Tutorial"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.p3.body", defaultValue: "Learn CypherAir in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."))
+            Text(String(localized: "onboarding.p3.body", defaultValue: "Learn CypherAir X in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

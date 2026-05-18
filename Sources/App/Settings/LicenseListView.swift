@@ -68,7 +68,7 @@ struct LicenseListView: View {
     @ViewBuilder
     private var noticeListSections: some View {
         if !sections.appNotices.isEmpty {
-            Section(String(localized: "license.section.app", defaultValue: "CypherAir")) {
+            Section(AppProductIdentity.displayName) {
                 noticeRows(for: sections.appNotices)
             }
         }

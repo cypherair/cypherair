@@ -27,7 +27,7 @@ enum KeyMigrationRecoveryOutcome: Equatable {
         case .retryableFailure:
             return String(
                 localized: "startup.recovery.retryable",
-                defaultValue: "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
+                defaultValue: "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
             )
         case .unrecoverable:
             return String(

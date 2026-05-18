@@ -106,7 +106,7 @@ def build_acknowledgements_plist(
             "Type": "PSGroupSpecifier",
             "Title": "Open Source",
             "FooterText": (
-                "CypherAir is built with open-source cryptography and tooling. "
+                "CypherAir X is built with open-source cryptography and tooling. "
                 "Complete notices and license text are available inside the app "
                 "under Settings, About, Source & Compliance."
             ),
@@ -116,7 +116,7 @@ def build_acknowledgements_plist(
     if app_notice is not None:
         preference_specifiers.append(
             title_value_specifier(
-                title="CypherAir",
+                title="CypherAir X",
                 key="cypherair.acknowledgements.app",
                 value=license_summary(app_notice),
             )

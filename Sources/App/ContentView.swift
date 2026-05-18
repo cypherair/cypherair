@@ -44,7 +44,7 @@ struct MacAppShellView: View {
                     sidebarRow(.verify)
                 }
             }
-            .navigationTitle(String(localized: "app.name", defaultValue: "CypherAir"))
+            .navigationTitle(AppProductIdentity.displayName)
         } detail: {
             detailContent(for: navigationState.selectedTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

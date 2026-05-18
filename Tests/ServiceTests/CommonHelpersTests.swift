@@ -633,7 +633,7 @@ final class CommonHelpersTests: XCTestCase {
         let merged = coordinator.mergedStartupMessages(
             loadErrors: [],
             recoveryDiagnostics: [
-                "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
+                "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
             ]
         )
 
@@ -915,7 +915,7 @@ final class CommonHelpersTests: XCTestCase {
         let config = AppConfiguration(defaults: defaults)
         let contactsWarning = String(
             localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
         )
 
         config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
@@ -933,7 +933,7 @@ final class CommonHelpersTests: XCTestCase {
         let config = AppConfiguration(defaults: defaults)
         let contactsWarning = String(
             localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
         )
         let keyWarning = AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),

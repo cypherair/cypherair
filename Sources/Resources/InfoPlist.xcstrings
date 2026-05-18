@@ -7,13 +7,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         }
       }
@@ -24,13 +24,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         }
       }
@@ -41,13 +41,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir uses Face ID to protect your secret keys."
+            "value" : "CypherAir X uses Face ID to protect your secret keys."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 使用面容 ID 保护你的密钥。"
+            "value" : "CypherAir X 使用面容 ID 保护你的密钥。"
           }
         }
       }
@@ -58,13 +58,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "CypherAir X"
           }
         }
       }
