@@ -2402,6 +2402,49 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(contactService.availableContacts.count, 1)
     }
 
+    func test_requireContactPublicKeyData_returnsPublicCertificateBytesForFingerprintAndKeyID() throws {
+        let generated = try engine.generateKey(
+            name: "Public Key Lookup",
+            email: "lookup@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
+        guard case .added(_, let key) = result else {
+            return XCTFail("Expected .added, got \(result)")
+        }
+
+        XCTAssertEqual(
+            try contactService.requireContactPublicKeyData(fingerprint: key.fingerprint),
+            generated.publicKeyData
+        )
+        XCTAssertEqual(
+            try contactService.requireContactPublicKeyData(keyId: key.keyId),
+            generated.publicKeyData
+        )
+    }
+
+    func test_requireContactPublicKeyData_missingContactThrowsNotFound() throws {
+        XCTAssertThrowsError(
+            try contactService.requireContactPublicKeyData(fingerprint: String(repeating: "a", count: 40))
+        ) { error in
+            guard case .internalError(let reason) = error as? CypherAirError else {
+                return XCTFail("Expected internalError, got \(error)")
+            }
+            XCTAssertEqual(reason, "The selected contact could not be found.")
+        }
+
+        XCTAssertThrowsError(
+            try contactService.requireContactPublicKeyData(keyId: "legacy-key-missing")
+        ) { error in
+            guard case .internalError(let reason) = error as? CypherAirError else {
+                return XCTFail("Expected internalError, got \(error)")
+            }
+            XCTAssertEqual(reason, "The selected contact could not be found.")
+        }
+    }
+
     func test_addContact_secretCertificateRejectedWithoutPersisting() throws {
         let generated = try engine.generateKey(
             name: "Secret Contact Reject",
