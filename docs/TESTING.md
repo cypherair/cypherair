@@ -176,7 +176,7 @@ These jobs must pass on pull requests and nightly validation:
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
 - `apple-platform-probes` downloads the uploaded XCFramework artifact and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
-- `swift-unit-tests-hosted-preview` downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests`
+- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, build, link, or test failures after readiness still fail the job
 
 The repository also publishes unique edge XCFramework prereleases:
 
@@ -209,8 +209,8 @@ At the time of writing:
 Impact:
 
 - Rust CI remains valid.
-- The hosted Swift unit-test preview job can fail before test execution because the runner OS is older than the app/test deployment target.
-- The hosted Swift unit-test preview runs as a separate failure signal in PR and nightly workflows. If it fails before tests start because of the runner OS, diagnose that as a hosted-image mismatch and confirm with local macOS validation. No later jobs depend on this preview job, so it does not block additional automation steps.
+- The hosted Swift unit-test preview uses `scripts/ci_xcode_platform_preflight.sh macos-unit-test-preflight` to detect when the runner OS, selected Xcode, or macOS SDK cannot launch the app/test deployment target; those hosted-image mismatches emit a warning and skip the preview.
+- When the hosted Swift unit-test preview passes readiness and starts `xcodebuild test`, build, link, and test failures remain code or project failure signals. Local macOS validation remains the Swift source of truth while GitHub's hosted image catches up.
 - PR, nightly, edge, and stable Apple platform probes use `scripts/ci_xcode_platform_preflight.sh` to detect incomplete Xcode 26.5 hosted platform installs and skip those app probes with a warning while keeping the XCFramework packaging and stable asset-generation signals clean; `xcodebuild -showdestinations` project failures or missing generic iOS/visionOS destinations are treated as configuration regressions and fail the workflow.
 - Formal stable release notes record whether hosted app-side probes passed or were skipped. A skipped hosted probe does not stand in for release validation; local App Store candidate validation remains the source of truth while GitHub's hosted image catches up.
 - Continue using local macOS validation until GitHub's hosted image catches up or a self-hosted macOS runner is used.
