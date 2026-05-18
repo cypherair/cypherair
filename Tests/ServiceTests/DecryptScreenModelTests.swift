@@ -883,8 +883,7 @@ final class DecryptScreenModelTests: XCTestCase {
     ) -> SignatureVerification {
         SignatureVerification(
             status: status,
-            signerFingerprint: signerFingerprint,
-            signerContact: nil
+            signerFingerprint: signerFingerprint
         )
     }
 
@@ -895,7 +894,6 @@ final class DecryptScreenModelTests: XCTestCase {
         DetailedSignatureVerification(
             legacyStatus: status,
             legacySignerFingerprint: signerFingerprint,
-            legacySignerContact: nil,
             legacySignerIdentity: nil,
             signatures: status == .notSigned ? [] : [
                 DetailedSignatureVerification.Entry(

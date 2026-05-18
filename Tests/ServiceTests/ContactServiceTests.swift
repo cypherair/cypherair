@@ -168,7 +168,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
         try await contactService.relockProtectedData()
         XCTAssertTrue(contactService.availableContacts.isEmpty)
@@ -193,7 +193,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         XCTAssertFalse(contactService.availableContacts.isEmpty)
 
         let availability = contactService.openLegacyCompatibilityAfterPostUnlock(
@@ -219,7 +219,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(
+        _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
@@ -351,7 +351,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData, verificationState: .verified)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData, verificationState: .verified)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.addTag(named: "Migrated Tag", toContactId: contactId)
         var snapshot = try service.currentCompatibilitySnapshot()
@@ -457,7 +457,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4PreCutoverFallback",
             contactsDirectory: tempDir
@@ -495,7 +495,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let repository = ContactRepository(contactsDirectory: tempDir)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4CorruptProtected",
@@ -557,7 +557,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let repository = ContactRepository(contactsDirectory: tempDir)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4CommittedIgnoresLegacy",
@@ -612,7 +612,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let repository = ContactRepository(contactsDirectory: tempDir)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4CommittedNoFallback",
@@ -699,7 +699,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        _ = try protectedService.addContact(
+        _ = try protectedService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
@@ -762,7 +762,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try protectedService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
         try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: harness.storageRoot.domainEnvelopeURL(
@@ -834,7 +834,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try protectedService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
         try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
         let currentURL = harness.storageRoot.domainEnvelopeURL(
             for: ContactsDomainStore.domainID,
@@ -880,7 +880,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let repository = ContactRepository(contactsDirectory: tempDir)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4MissingBootstrap",
@@ -1097,7 +1097,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
         XCTAssertEqual(
             contactService.contactId(forFingerprint: generated.fingerprint),
@@ -1446,13 +1446,13 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        let firstResult = try service.addContact(publicKeyData: firstKey.publicKeyData)
-        guard case .added(let firstContact) = firstResult else {
+        let firstResult = try service.importContact(publicKeyData: firstKey.publicKeyData)
+        guard case .added(let firstContact, _) = firstResult else {
             return XCTFail("Expected .added, got \(firstResult)")
         }
 
-        let secondResult = try service.addContact(publicKeyData: secondKey.publicKeyData)
-        guard case .addedWithCandidate(let secondContact, let candidate) = secondResult else {
+        let secondResult = try service.importContact(publicKeyData: secondKey.publicKeyData)
+        guard case .addedWithCandidate(let secondContact, _, let candidate) = secondResult else {
             return XCTFail("Expected .addedWithCandidate, got \(secondResult)")
         }
 
@@ -1485,13 +1485,13 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        let firstResult = try service.addContact(publicKeyData: firstKey.publicKeyData)
-        guard case .added(let firstContact) = firstResult else {
+        let firstResult = try service.importContact(publicKeyData: firstKey.publicKeyData)
+        guard case .added(let firstContact, _) = firstResult else {
             return XCTFail("Expected .added, got \(firstResult)")
         }
 
-        let secondResult = try service.addContact(publicKeyData: secondKey.publicKeyData)
-        guard case .addedWithCandidate(let secondContact, let candidate) = secondResult else {
+        let secondResult = try service.importContact(publicKeyData: secondKey.publicKeyData)
+        guard case .addedWithCandidate(let secondContact, _, let candidate) = secondResult else {
             return XCTFail("Expected .addedWithCandidate, got \(secondResult)")
         }
 
@@ -1520,21 +1520,25 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        let firstResult = try service.addContact(publicKeyData: firstKey.publicKeyData)
-        guard case .added(let firstContact) = firstResult else {
+        let firstResult = try service.importContact(publicKeyData: firstKey.publicKeyData)
+        guard case .added(let firstContact, let firstKey) = firstResult else {
             return XCTFail("Expected .added, got \(firstResult)")
         }
-        let secondResult = try service.addContact(publicKeyData: secondKey.publicKeyData)
-        guard case .addedWithCandidate = secondResult else {
+        let secondResult = try service.importContact(publicKeyData: secondKey.publicKeyData)
+        guard case .addedWithCandidate(let secondContact, let secondImportedKey, _) = secondResult else {
             return XCTFail("Expected .addedWithCandidate, got \(secondResult)")
         }
+        let replacementRequest = ContactLegacyKeyReplacementRequest(
+            newContact: secondContact,
+            newKey: secondImportedKey,
+            existingContact: firstContact,
+            existingKey: firstKey,
+            keyData: secondKey.publicKeyData
+        )
 
         let beforeSnapshot = try service.currentCompatibilitySnapshot()
         XCTAssertThrowsError(
-            try service.confirmKeyUpdate(
-                existingFingerprint: firstContact.fingerprint,
-                keyData: secondKey.publicKeyData
-            )
+            try service.confirmLegacyKeyReplacement(replacementRequest)
         ) { error in
             guard let cypherError = error as? CypherAirError,
                   case .contactKeyReplacementUnsupported = cypherError else {
@@ -1562,12 +1566,12 @@ final class ContactServiceTests: XCTestCase {
             newExpirySeconds: 60 * 60 * 24 * 365
         )
 
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let beforeSnapshot = try service.currentCompatibilitySnapshot()
         let beforeRecord = try XCTUnwrap(beforeSnapshot.keyRecords.first)
 
-        let updateResult = try service.addContact(publicKeyData: refreshed.publicKeyData)
-        guard case .updated(let updatedContact) = updateResult else {
+        let updateResult = try service.importContact(publicKeyData: refreshed.publicKeyData)
+        guard case .updated(let updatedContact, _) = updateResult else {
             return XCTFail("Expected .updated, got \(updateResult)")
         }
 
@@ -1598,8 +1602,8 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: targetKey.publicKeyData, verificationState: .verified)
-        _ = try service.addContact(publicKeyData: sourceKey.publicKeyData, verificationState: .unverified)
+        _ = try service.importContact(publicKeyData: targetKey.publicKeyData, verificationState: .verified)
+        _ = try service.importContact(publicKeyData: sourceKey.publicKeyData, verificationState: .unverified)
         let targetContactId = try XCTUnwrap(service.contactId(forFingerprint: targetKey.fingerprint))
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: sourceKey.fingerprint))
 
@@ -1623,10 +1627,10 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(historicalSummary.historicalKeys.map(\.fingerprint), [sourceKey.fingerprint])
         XCTAssertEqual(try service.publicKeysForRecipientContactIDs([targetContactId]), [targetKey.publicKeyData])
 
-        let verificationContext = service.contactsForVerificationContext()
+        let verificationContext = service.contactsVerificationContext()
         XCTAssertEqual(verificationContext.availability, .availableProtectedDomain)
-        XCTAssertTrue(verificationContext.contacts.contains { $0.fingerprint == sourceKey.fingerprint })
-        XCTAssertTrue(verificationContext.contacts.contains { $0.fingerprint == targetKey.fingerprint })
+        XCTAssertTrue(verificationContext.contactKeys.contains { $0.fingerprint == sourceKey.fingerprint })
+        XCTAssertTrue(verificationContext.contactKeys.contains { $0.fingerprint == targetKey.fingerprint })
     }
 
     func test_pr5ProtectedMergeUnionsTags() async throws {
@@ -1648,8 +1652,8 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: targetKey.publicKeyData)
-        _ = try service.addContact(publicKeyData: sourceKey.publicKeyData)
+        _ = try service.importContact(publicKeyData: targetKey.publicKeyData)
+        _ = try service.importContact(publicKeyData: sourceKey.publicKeyData)
         let targetContactId = try XCTUnwrap(service.contactId(forFingerprint: targetKey.fingerprint))
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: sourceKey.fingerprint))
 
@@ -1716,8 +1720,8 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: firstKey.publicKeyData)
-        _ = try service.addContact(publicKeyData: secondKey.publicKeyData)
+        _ = try service.importContact(publicKeyData: firstKey.publicKeyData)
+        _ = try service.importContact(publicKeyData: secondKey.publicKeyData)
         let targetContactId = try XCTUnwrap(service.contactId(forFingerprint: firstKey.fingerprint))
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: secondKey.fingerprint))
         _ = try service.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
@@ -1769,7 +1773,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
 
         let firstTag = try service.addTag(named: "  Work   Legal  ", toContactId: contactId)
@@ -1822,8 +1826,8 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: first.publicKeyData)
-        _ = try service.addContact(publicKeyData: second.publicKeyData)
+        _ = try service.importContact(publicKeyData: first.publicKeyData)
+        _ = try service.importContact(publicKeyData: second.publicKeyData)
         let firstContactId = try XCTUnwrap(service.contactId(forFingerprint: first.fingerprint))
         let secondContactId = try XCTUnwrap(service.contactId(forFingerprint: second.fingerprint))
 
@@ -1924,7 +1928,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.createTag(named: "Managed")
         let model = TagDetailScreenModel(tagId: tag.tagId, contactService: service)
@@ -1972,8 +1976,8 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: member.publicKeyData)
-        _ = try service.addContact(publicKeyData: available.publicKeyData)
+        _ = try service.importContact(publicKeyData: member.publicKeyData)
+        _ = try service.importContact(publicKeyData: available.publicKeyData)
         let memberContactId = try XCTUnwrap(service.contactId(forFingerprint: member.fingerprint))
         let availableContactId = try XCTUnwrap(service.contactId(forFingerprint: available.fingerprint))
         let tag = try service.addTag(named: "Stable Grouping", toContactId: memberContactId)
@@ -2016,7 +2020,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.addTag(named: "Discardable", toContactId: contactId)
         let model = TagDetailScreenModel(tagId: tag.tagId, contactService: service)
@@ -2051,7 +2055,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.createTag(named: "Clearable")
         try service.assignTag(tagId: tag.tagId, toContactId: contactId)
@@ -2097,9 +2101,9 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: substring.publicKeyData)
-        _ = try service.addContact(publicKeyData: prefix.publicKeyData)
-        _ = try service.addContact(publicKeyData: exact.publicKeyData)
+        _ = try service.importContact(publicKeyData: substring.publicKeyData)
+        _ = try service.importContact(publicKeyData: prefix.publicKeyData)
+        _ = try service.importContact(publicKeyData: exact.publicKeyData)
         let exactContactId = try XCTUnwrap(service.contactId(forFingerprint: exact.fingerprint))
         let prefixContactId = try XCTUnwrap(service.contactId(forFingerprint: prefix.fingerprint))
         let substringContactId = try XCTUnwrap(service.contactId(forFingerprint: substring.fingerprint))
@@ -2150,8 +2154,8 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: preferred.publicKeyData)
-        _ = try service.addContact(publicKeyData: historical.publicKeyData)
+        _ = try service.importContact(publicKeyData: preferred.publicKeyData)
+        _ = try service.importContact(publicKeyData: historical.publicKeyData)
         let targetContactId = try XCTUnwrap(service.contactId(forFingerprint: preferred.fingerprint))
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: historical.fingerprint))
 
@@ -2207,8 +2211,8 @@ final class ContactServiceTests: XCTestCase {
             profile: .advanced
         )
 
-        _ = try service.addContact(publicKeyData: work.publicKeyData)
-        _ = try service.addContact(publicKeyData: personal.publicKeyData)
+        _ = try service.importContact(publicKeyData: work.publicKeyData)
+        _ = try service.importContact(publicKeyData: personal.publicKeyData)
         let workContactId = try XCTUnwrap(service.contactId(forFingerprint: work.fingerprint))
         let personalContactId = try XCTUnwrap(service.contactId(forFingerprint: personal.fingerprint))
         let workTag = try service.addTag(named: "Work", toContactId: workContactId)
@@ -2249,7 +2253,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.addTag(named: "Filter", toContactId: contactId)
         let model = ContactsScreenModel(contactService: service)
@@ -2278,7 +2282,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.addTag(named: "Temporary", toContactId: contactId)
 
@@ -2316,7 +2320,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
 
         let model = ContactsScreenModel(contactService: service)
@@ -2387,10 +2391,10 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .universal
         )
 
-        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
-        if case .added(let contact) = result {
-            XCTAssertFalse(contact.fingerprint.isEmpty)
+        if case .added(_, let key) = result {
+            XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
             XCTFail("Expected .added, got \(result)")
         }
@@ -2406,7 +2410,7 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
 
-        XCTAssertThrowsError(try contactService.addContact(publicKeyData: generated.certData)) { error in
+        XCTAssertThrowsError(try contactService.importContact(publicKeyData: generated.certData)) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -2429,7 +2433,7 @@ final class ContactServiceTests: XCTestCase {
         )
         let armoredSecret = try engine.armor(data: generated.certData, kind: .secretKey)
 
-        XCTAssertThrowsError(try contactService.addContact(publicKeyData: armoredSecret)) { error in
+        XCTAssertThrowsError(try contactService.importContact(publicKeyData: armoredSecret)) { error in
             guard let cypherError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError, got \(type(of: error))")
             }
@@ -2450,10 +2454,10 @@ final class ContactServiceTests: XCTestCase {
         )
 
         // Add once
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
         // Add again — same fingerprint
-        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
 
         if case .duplicate = result {
             // Expected
@@ -2475,17 +2479,18 @@ final class ContactServiceTests: XCTestCase {
             newExpirySeconds: 60 * 60 * 24 * 365
         )
 
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
-        let result = try contactService.addContact(publicKeyData: refreshed.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
+        let result = try contactService.importContact(publicKeyData: refreshed.publicKeyData)
 
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
         XCTAssertEqual(contactService.availableContacts.count, 1)
-        XCTAssertEqual(updatedContact.fingerprint, generated.fingerprint)
+        XCTAssertEqual(updatedKey.fingerprint, generated.fingerprint)
+        let updatedRecord = try XCTUnwrap(contactService.availableContactKeyRecord(fingerprint: updatedKey.fingerprint))
         XCTAssertEqual(
-            try engine.parseKeyInfo(keyData: updatedContact.publicKeyData).expiryTimestamp,
+            try engine.parseKeyInfo(keyData: updatedRecord.publicKeyData).expiryTimestamp,
             refreshed.keyInfo.expiryTimestamp
         )
 
@@ -2516,20 +2521,20 @@ final class ContactServiceTests: XCTestCase {
             newExpirySeconds: 60 * 60 * 24 * 365
         )
 
-        _ = try contactService.addContact(
+        _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
 
-        let result = try contactService.addContact(
+        let result = try contactService.importContact(
             publicKeyData: refreshed.publicKeyData,
             verificationState: .unverified
         )
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertFalse(updatedContact.isVerified)
+        XCTAssertFalse(updatedKey.isVerified)
 
         let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
         try restarted.openLegacyCompatibilityForTests()
@@ -2546,21 +2551,21 @@ final class ContactServiceTests: XCTestCase {
             newExpirySeconds: 60 * 60 * 24 * 365
         )
 
-        _ = try contactService.addContact(
+        _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
 
-        let result = try contactService.addContact(
+        let result = try contactService.importContact(
             publicKeyData: refreshed.publicKeyData,
             verificationState: .verified
         )
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertTrue(updatedContact.isVerified)
-        XCTAssertTrue(contactService.availableContact(forFingerprint: updatedContact.fingerprint)?.isVerified == true)
+        XCTAssertTrue(updatedKey.isVerified)
+        XCTAssertTrue(contactService.availableContact(forFingerprint: updatedKey.fingerprint)?.isVerified == true)
     }
 
     func test_addContact_sameFingerprintPrimaryUserIdUpdate_returnsUpdatedAndRefreshesDisplayIdentity() throws {
@@ -2570,23 +2575,23 @@ final class ContactServiceTests: XCTestCase {
         let baseInfo = try engine.parseKeyInfo(keyData: base)
         XCTAssertEqual(baseInfo.userId, "aaaaa")
 
-        _ = try contactService.addContact(publicKeyData: base)
-        let result = try contactService.addContact(publicKeyData: update)
+        _ = try contactService.importContact(publicKeyData: base)
+        let result = try contactService.importContact(publicKeyData: update)
 
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertEqual(updatedContact.fingerprint, baseInfo.fingerprint)
-        XCTAssertEqual(updatedContact.userId, "bbbbb")
-        XCTAssertEqual(updatedContact.displayName, "bbbbb")
+        XCTAssertEqual(updatedKey.fingerprint, baseInfo.fingerprint)
+        XCTAssertEqual(updatedKey.primaryUserId, "bbbbb")
+        XCTAssertEqual(updatedKey.displayName, "bbbbb")
         XCTAssertEqual(contactService.availableContacts.count, 1)
 
         let storedData = try Data(contentsOf: tempDir.appendingPathComponent("\(baseInfo.fingerprint).gpg"))
         XCTAssertEqual(try engine.parseKeyInfo(keyData: storedData).userId, "bbbbb")
     }
 
-    func test_addContact_sameFingerprintPrimaryUserIdCollision_returnsKeyUpdateDetectedWithoutPersistingMerge() throws {
+    func test_importContact_sameFingerprintPrimaryUserIdCollision_returnsLegacyKeyReplacementDetectedWithoutPersistingMerge() throws {
         let base = try loadFixture("merge_primary_uid_base")
         let update = try loadFixture("merge_primary_uid_update")
         let conflictingKey = try engine.generateKey(
@@ -2598,26 +2603,26 @@ final class ContactServiceTests: XCTestCase {
 
         let originalInfo = try engine.parseKeyInfo(keyData: base)
 
-        _ = try contactService.addContact(publicKeyData: base)
-        _ = try contactService.addContact(publicKeyData: conflictingKey.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: base)
+        _ = try contactService.importContact(publicKeyData: conflictingKey.publicKeyData)
 
-        let result = try contactService.addContact(publicKeyData: update)
-        guard case .keyUpdateDetected(let newContact, let existingContact, let keyData) = result else {
-            return XCTFail("Expected .keyUpdateDetected, got \(result)")
+        let result = try contactService.importContact(publicKeyData: update)
+        guard case .legacyKeyReplacementDetected(let request) = result else {
+            return XCTFail("Expected .legacyKeyReplacementDetected, got \(result)")
         }
 
-        XCTAssertEqual(newContact.fingerprint, originalInfo.fingerprint)
-        XCTAssertEqual(newContact.userId, "bbbbb")
-        XCTAssertEqual(existingContact.fingerprint, conflictingKey.fingerprint)
+        XCTAssertEqual(request.newKey.fingerprint, originalInfo.fingerprint)
+        XCTAssertEqual(request.newKey.primaryUserId, "bbbbb")
+        XCTAssertEqual(request.existingKey.fingerprint, conflictingKey.fingerprint)
         XCTAssertEqual(contactService.availableContacts.count, 2)
         XCTAssertEqual(contactService.availableContact(forFingerprint: originalInfo.fingerprint)?.userId, "aaaaa")
-        XCTAssertEqual(try engine.parseKeyInfo(keyData: keyData).userId, "bbbbb")
+        XCTAssertEqual(try engine.parseKeyInfo(keyData: request.keyData).userId, "bbbbb")
 
         let storedData = try Data(contentsOf: tempDir.appendingPathComponent("\(originalInfo.fingerprint).gpg"))
         XCTAssertEqual(try engine.parseKeyInfo(keyData: storedData).userId, "aaaaa")
     }
 
-    func test_confirmKeyUpdate_sameFingerprintMergeCollisionRemovesConflictingContact() throws {
+    func test_confirmLegacyKeyReplacement_sameFingerprintMergeCollisionRemovesConflictingContact() throws {
         let base = try loadFixture("merge_primary_uid_base")
         let update = try loadFixture("merge_primary_uid_update")
         let conflictingKey = try engine.generateKey(
@@ -2629,24 +2634,21 @@ final class ContactServiceTests: XCTestCase {
 
         let originalInfo = try engine.parseKeyInfo(keyData: base)
 
-        _ = try contactService.addContact(publicKeyData: base)
-        _ = try contactService.addContact(publicKeyData: conflictingKey.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: base)
+        _ = try contactService.importContact(publicKeyData: conflictingKey.publicKeyData)
 
-        let result = try contactService.addContact(publicKeyData: update)
-        guard case .keyUpdateDetected(_, let existingContact, let keyData) = result else {
-            return XCTFail("Expected .keyUpdateDetected, got \(result)")
+        let result = try contactService.importContact(publicKeyData: update)
+        guard case .legacyKeyReplacementDetected(let request) = result else {
+            return XCTFail("Expected .legacyKeyReplacementDetected, got \(result)")
         }
 
-        try contactService.confirmKeyUpdate(
-            existingFingerprint: existingContact.fingerprint,
-            keyData: keyData
-        )
+        try contactService.confirmLegacyKeyReplacement(request)
 
         XCTAssertEqual(contactService.availableContacts.count, 1)
         let survivingContact = try XCTUnwrap(contactService.availableContact(forFingerprint: originalInfo.fingerprint))
         XCTAssertEqual(survivingContact.userId, "bbbbb")
         XCTAssertTrue(survivingContact.isVerified)
-        XCTAssertFalse(contactService.availableContacts.contains { $0.fingerprint == existingContact.fingerprint })
+        XCTAssertFalse(contactService.availableContacts.contains { $0.fingerprint == request.existingKey.fingerprint })
 
         let survivingFile = tempDir.appendingPathComponent("\(originalInfo.fingerprint).gpg")
         XCTAssertTrue(FileManager.default.fileExists(atPath: survivingFile.path))
@@ -2655,7 +2657,7 @@ final class ContactServiceTests: XCTestCase {
             "bbbbb"
         )
 
-        let removedFile = tempDir.appendingPathComponent("\(existingContact.fingerprint).gpg")
+        let removedFile = tempDir.appendingPathComponent("\(request.existingKey.fingerprint).gpg")
         XCTAssertFalse(FileManager.default.fileExists(atPath: removedFile.path))
     }
 
@@ -2663,15 +2665,15 @@ final class ContactServiceTests: XCTestCase {
         let base = try loadFixture("merge_revocation_profile_a_base")
         let update = try loadFixture("merge_revocation_profile_a_update")
 
-        _ = try contactService.addContact(publicKeyData: base)
-        let result = try contactService.addContact(publicKeyData: update)
+        _ = try contactService.importContact(publicKeyData: base)
+        let result = try contactService.importContact(publicKeyData: update)
 
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertTrue(updatedContact.isRevoked)
-        XCTAssertFalse(updatedContact.canEncryptTo)
+        XCTAssertTrue(updatedKey.isRevoked)
+        XCTAssertFalse(updatedKey.canEncryptTo)
 
         let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
         try restarted.openLegacyCompatibilityForTests()
@@ -2682,60 +2684,60 @@ final class ContactServiceTests: XCTestCase {
         let base = try loadFixture("merge_revocation_profile_b_base")
         let update = try loadFixture("merge_revocation_profile_b_update")
 
-        _ = try contactService.addContact(publicKeyData: base)
-        let result = try contactService.addContact(publicKeyData: update)
+        _ = try contactService.importContact(publicKeyData: base)
+        let result = try contactService.importContact(publicKeyData: update)
 
-        guard case .updated(let updatedContact) = result else {
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertTrue(updatedContact.isRevoked)
-        XCTAssertFalse(updatedContact.canEncryptTo)
-        XCTAssertEqual(updatedContact.profile, .advanced)
+        XCTAssertTrue(updatedKey.isRevoked)
+        XCTAssertFalse(updatedKey.canEncryptTo)
+        XCTAssertEqual(updatedKey.profile, .advanced)
     }
 
     func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileA_refreshesEncryptionCapability() throws {
         let base = try loadFixture("merge_add_encryption_subkey_profile_a_base")
         let update = try loadFixture("merge_add_encryption_subkey_profile_a_update")
 
-        let added = try contactService.addContact(publicKeyData: base)
-        guard case .added(let baseContact) = added else {
+        let added = try contactService.importContact(publicKeyData: base)
+        guard case .added(_, let baseKey) = added else {
             return XCTFail("Expected .added, got \(added)")
         }
-        XCTAssertFalse(baseContact.hasEncryptionSubkey)
-        XCTAssertFalse(baseContact.canEncryptTo)
+        XCTAssertFalse(baseKey.hasEncryptionSubkey)
+        XCTAssertFalse(baseKey.canEncryptTo)
 
-        let result = try contactService.addContact(publicKeyData: update)
-        guard case .updated(let updatedContact) = result else {
+        let result = try contactService.importContact(publicKeyData: update)
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertTrue(updatedContact.hasEncryptionSubkey)
-        XCTAssertTrue(updatedContact.canEncryptTo)
+        XCTAssertTrue(updatedKey.hasEncryptionSubkey)
+        XCTAssertTrue(updatedKey.canEncryptTo)
     }
 
     func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileB_refreshesEncryptionCapability() throws {
         let base = try loadFixture("merge_add_encryption_subkey_profile_b_base")
         let update = try loadFixture("merge_add_encryption_subkey_profile_b_update")
 
-        let added = try contactService.addContact(publicKeyData: base)
-        guard case .added(let baseContact) = added else {
+        let added = try contactService.importContact(publicKeyData: base)
+        guard case .added(_, let baseKey) = added else {
             return XCTFail("Expected .added, got \(added)")
         }
-        XCTAssertFalse(baseContact.hasEncryptionSubkey)
-        XCTAssertFalse(baseContact.canEncryptTo)
+        XCTAssertFalse(baseKey.hasEncryptionSubkey)
+        XCTAssertFalse(baseKey.canEncryptTo)
 
-        let result = try contactService.addContact(publicKeyData: update)
-        guard case .updated(let updatedContact) = result else {
+        let result = try contactService.importContact(publicKeyData: update)
+        guard case .updated(_, let updatedKey) = result else {
             return XCTFail("Expected .updated, got \(result)")
         }
 
-        XCTAssertTrue(updatedContact.hasEncryptionSubkey)
-        XCTAssertTrue(updatedContact.canEncryptTo)
-        XCTAssertEqual(updatedContact.profile, .advanced)
+        XCTAssertTrue(updatedKey.hasEncryptionSubkey)
+        XCTAssertTrue(updatedKey.canEncryptTo)
+        XCTAssertEqual(updatedKey.profile, .advanced)
     }
 
-    func test_addContact_sameUserIdDifferentFingerprint_returnsKeyUpdateDetected() throws {
+    func test_importContact_sameUserIdDifferentFingerprint_returnsLegacyKeyReplacementDetected() throws {
         // Generate two keys with the same userId but different fingerprints
         let key1 = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
@@ -2747,16 +2749,16 @@ final class ContactServiceTests: XCTestCase {
         )
 
         // Add first key
-        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: key1.publicKeyData)
 
         // Add second key with same userId
-        let result = try contactService.addContact(publicKeyData: key2.publicKeyData)
+        let result = try contactService.importContact(publicKeyData: key2.publicKeyData)
 
-        if case .keyUpdateDetected(let newContact, let existingContact, _) = result {
-            XCTAssertNotEqual(newContact.fingerprint, existingContact.fingerprint,
+        if case .legacyKeyReplacementDetected(let request) = result {
+            XCTAssertNotEqual(request.newKey.fingerprint, request.existingKey.fingerprint,
                               "Key update should have different fingerprints")
         } else {
-            XCTFail("Expected .keyUpdateDetected, got \(result)")
+            XCTFail("Expected .legacyKeyReplacementDetected, got \(result)")
         }
 
         // Count should still be 1 — update not yet confirmed
@@ -2771,7 +2773,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .advanced
         )
 
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         XCTAssertEqual(contactService.availableContacts.count, 1)
 
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
@@ -2781,9 +2783,9 @@ final class ContactServiceTests: XCTestCase {
                        "Contact should be removed from array")
     }
 
-    // MARK: - Confirm Key Update
+    // MARK: - Confirm Legacy Key Replacement
 
-    func test_confirmKeyUpdate_replacesOldContact() throws {
+    func test_confirmLegacyKeyReplacement_replacesOldContact() throws {
         let key1 = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
             expirySeconds: nil, profile: .universal
@@ -2794,40 +2796,40 @@ final class ContactServiceTests: XCTestCase {
         )
 
         // Add first key
-        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: key1.publicKeyData)
         XCTAssertEqual(contactService.availableContacts.count, 1)
         let oldFingerprint = contactService.availableContacts[0].fingerprint
 
         // Detect update
-        let result = try contactService.addContact(publicKeyData: key2.publicKeyData)
-        guard case .keyUpdateDetected(let newContact, _, let keyData) = result else {
-            return XCTFail("Expected .keyUpdateDetected")
+        let result = try contactService.importContact(publicKeyData: key2.publicKeyData)
+        guard case .legacyKeyReplacementDetected(let request) = result else {
+            return XCTFail("Expected .legacyKeyReplacementDetected")
         }
 
         // Confirm update
-        let confirmedContact = try contactService.confirmKeyUpdate(
-            existingFingerprint: oldFingerprint,
-            keyData: keyData
-        )
+        let confirmedResult = try contactService.confirmLegacyKeyReplacement(request)
+        guard case .updated(_, let confirmedKey) = confirmedResult else {
+            return XCTFail("Expected .updated, got \(confirmedResult)")
+        }
 
         // Verify: old contact replaced, new contact present
         XCTAssertEqual(contactService.availableContacts.count, 1)
-        XCTAssertEqual(contactService.availableContacts[0].fingerprint, newContact.fingerprint)
+        XCTAssertEqual(contactService.availableContacts[0].fingerprint, request.newKey.fingerprint)
         XCTAssertNotEqual(contactService.availableContacts[0].fingerprint, oldFingerprint)
-        XCTAssertEqual(confirmedContact.fingerprint, newContact.fingerprint)
+        XCTAssertEqual(confirmedKey.fingerprint, request.newKey.fingerprint)
 
         // Verify: new file exists on disk
-        let newFile = tempDir.appendingPathComponent("\(newContact.fingerprint).gpg")
+        let newFile = tempDir.appendingPathComponent("\(request.newKey.fingerprint).gpg")
         XCTAssertTrue(FileManager.default.fileExists(atPath: newFile.path),
-                      "New key file should exist after confirmKeyUpdate")
+                      "New key file should exist after confirmLegacyKeyReplacement")
 
         // Verify: old file removed
         let oldFile = tempDir.appendingPathComponent("\(oldFingerprint).gpg")
         XCTAssertFalse(FileManager.default.fileExists(atPath: oldFile.path),
-                       "Old key file should be removed after confirmKeyUpdate")
+                       "Old key file should be removed after confirmLegacyKeyReplacement")
     }
 
-    func test_confirmKeyUpdate_secretKeyDataRejectedWithoutReplacingExistingContact() throws {
+    func test_confirmLegacyKeyReplacement_secretKeyDataRejectedWithoutReplacingExistingContact() throws {
         let key1 = try engine.generateKey(
             name: "Carol", email: "carol@example.com",
             expirySeconds: nil, profile: .universal
@@ -2837,18 +2839,23 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .universal
         )
 
-        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: key1.publicKeyData)
         let oldFingerprint = contactService.availableContacts[0].fingerprint
 
-        let result = try contactService.addContact(publicKeyData: key2.publicKeyData)
-        guard case .keyUpdateDetected = result else {
-            return XCTFail("Expected .keyUpdateDetected")
+        let result = try contactService.importContact(publicKeyData: key2.publicKeyData)
+        guard case .legacyKeyReplacementDetected(let request) = result else {
+            return XCTFail("Expected .legacyKeyReplacementDetected")
         }
 
         XCTAssertThrowsError(
-            try contactService.confirmKeyUpdate(
-                existingFingerprint: oldFingerprint,
-                keyData: key2.certData
+            try contactService.confirmLegacyKeyReplacement(
+                ContactLegacyKeyReplacementRequest(
+                    newContact: request.newContact,
+                    newKey: request.newKey,
+                    existingContact: request.existingContact,
+                    existingKey: request.existingKey,
+                    keyData: key2.certData
+                )
             )
         ) { error in
             guard let cypherError = error as? CypherAirError else {
@@ -2881,9 +2888,9 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNotEqual(firstByte, UInt8(ascii: "-"),
                           "publicKeyData should be binary, not armored")
 
-        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
-        if case .added(let contact) = result {
-            XCTAssertFalse(contact.fingerprint.isEmpty)
+        let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
+        if case .added(_, let key) = result {
+            XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
             XCTFail("Expected .added for binary Profile A key, got \(result)")
         }
@@ -2899,9 +2906,9 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNotEqual(firstByte, UInt8(ascii: "-"),
                           "publicKeyData should be binary, not armored")
 
-        let result = try contactService.addContact(publicKeyData: generated.publicKeyData)
-        if case .added(let contact) = result {
-            XCTAssertFalse(contact.fingerprint.isEmpty)
+        let result = try contactService.importContact(publicKeyData: generated.publicKeyData)
+        if case .added(_, let key) = result {
+            XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
             XCTFail("Expected .added for binary Profile B key, got \(result)")
         }
@@ -2919,9 +2926,9 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertTrue(firstChar?.hasPrefix("-----") == true,
                       "Armored data should start with PGP header")
 
-        let result = try contactService.addContact(publicKeyData: armoredData)
-        if case .added(let contact) = result {
-            XCTAssertFalse(contact.fingerprint.isEmpty)
+        let result = try contactService.importContact(publicKeyData: armoredData)
+        if case .added(_, let key) = result {
+            XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
             XCTFail("Expected .added for armored Profile A key, got \(result)")
         }
@@ -2939,8 +2946,8 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .advanced
         )
 
-        _ = try contactService.addContact(publicKeyData: key1.publicKeyData)
-        _ = try contactService.addContact(publicKeyData: key2.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: key1.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: key2.publicKeyData)
         XCTAssertEqual(contactService.availableContacts.count, 2)
 
         let info1 = try engine.parseKeyInfo(keyData: key1.publicKeyData)
@@ -2960,11 +2967,11 @@ final class ContactServiceTests: XCTestCase {
         )
 
         // Add contact to first service instance
-        let addResult = try contactService.addContact(publicKeyData: generated.publicKeyData)
-        guard case .added(let contact) = addResult else {
+        let addResult = try contactService.importContact(publicKeyData: generated.publicKeyData)
+        guard case .added(_, let key) = addResult else {
             XCTFail("Expected .added"); return
         }
-        let originalFingerprint = contact.fingerprint
+        let originalFingerprint = key.fingerprint
 
         // Create a NEW service instance pointing to the same temp directory
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
@@ -2981,20 +2988,20 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .universal
         )
 
-        let addResult = try contactService.addContact(
+        let addResult = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
-        guard case .added(let contact) = addResult else {
+        guard case .added(_, let key) = addResult else {
             XCTFail("Expected .added"); return
         }
-        XCTAssertFalse(contact.isVerified)
+        XCTAssertFalse(key.isVerified)
 
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
         try newService.openLegacyCompatibilityForTests()
 
         XCTAssertEqual(newService.availableContacts.count, 1)
-        XCTAssertEqual(newService.availableContacts.first?.fingerprint, contact.fingerprint)
+        XCTAssertEqual(newService.availableContacts.first?.fingerprint, key.fingerprint)
         XCTAssertFalse(newService.availableContacts.first?.isVerified ?? true)
     }
 
@@ -3004,20 +3011,20 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .universal
         )
 
-        let addResult = try contactService.addContact(
+        let addResult = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
-        guard case .added(let contact) = addResult else {
+        guard case .added(_, let key) = addResult else {
             XCTFail("Expected .added"); return
         }
 
-        try contactService.setVerificationState(.verified, for: contact.fingerprint)
-        XCTAssertTrue(contactService.availableContact(forFingerprint: contact.fingerprint)?.isVerified == true)
+        try contactService.setVerificationState(.verified, for: key.fingerprint)
+        XCTAssertTrue(contactService.availableContact(forFingerprint: key.fingerprint)?.isVerified == true)
 
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
         try newService.openLegacyCompatibilityForTests()
-        XCTAssertTrue(newService.availableContact(forFingerprint: contact.fingerprint)?.isVerified == true)
+        XCTAssertTrue(newService.availableContact(forFingerprint: key.fingerprint)?.isVerified == true)
     }
 
     func test_addContact_duplicateVerifiedImport_upgradesExistingUnverifiedContact() throws {
@@ -3026,21 +3033,21 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil, profile: .universal
         )
 
-        _ = try contactService.addContact(
+        _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
 
-        let duplicateResult = try contactService.addContact(
+        let duplicateResult = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .verified
         )
-        guard case .duplicate(let upgradedContact) = duplicateResult else {
+        guard case .duplicate(_, let upgradedKey) = duplicateResult else {
             XCTFail("Expected .duplicate"); return
         }
 
-        XCTAssertTrue(upgradedContact.isVerified)
-        XCTAssertTrue(contactService.availableContact(forFingerprint: upgradedContact.fingerprint)?.isVerified == true)
+        XCTAssertTrue(upgradedKey.isVerified)
+        XCTAssertTrue(contactService.availableContact(forFingerprint: upgradedKey.fingerprint)?.isVerified == true)
     }
 
     func test_protectedDomainCompatibilitySnapshot_roundTripsLegacyContactProjection() throws {
@@ -3048,28 +3055,29 @@ final class ContactServiceTests: XCTestCase {
             name: "Projection", email: "projection@example.com",
             expirySeconds: nil, profile: .universal
         )
-        let addResult = try contactService.addContact(
+        let addResult = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
-        guard case .added(let contact) = addResult else {
+        guard case .added(_, let key) = addResult else {
             return XCTFail("Expected .added")
         }
 
         let snapshot = try contactService.currentCompatibilitySnapshot()
         XCTAssertEqual(snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
-        XCTAssertEqual(snapshot.identities.map(\.contactId), ["legacy-contact-\(contact.fingerprint)"])
-        XCTAssertEqual(snapshot.keyRecords.map(\.keyId), ["legacy-key-\(contact.fingerprint)"])
+        XCTAssertEqual(snapshot.identities.map(\.contactId), ["legacy-contact-\(key.fingerprint)"])
+        XCTAssertEqual(snapshot.keyRecords.map(\.keyId), ["legacy-key-\(key.fingerprint)"])
         XCTAssertEqual(snapshot.keyRecords.first?.usageState, .preferred)
 
         let projectedContacts = try contactService.compatibilityContacts(from: snapshot)
         let projected = try XCTUnwrap(projectedContacts.first)
         XCTAssertEqual(projectedContacts.count, 1)
-        XCTAssertEqual(projected.fingerprint, contact.fingerprint)
-        XCTAssertEqual(projected.profile, contact.profile)
-        XCTAssertEqual(projected.userId, contact.userId)
-        XCTAssertEqual(projected.publicKeyData, contact.publicKeyData)
-        XCTAssertEqual(projected.canEncryptTo, contact.canEncryptTo)
+        XCTAssertEqual(projected.fingerprint, key.fingerprint)
+        XCTAssertEqual(projected.profile, key.profile)
+        XCTAssertEqual(projected.userId, key.primaryUserId)
+        let record = try XCTUnwrap(contactService.availableContactKeyRecord(fingerprint: key.fingerprint))
+        XCTAssertEqual(projected.publicKeyData, record.publicKeyData)
+        XCTAssertEqual(projected.canEncryptTo, key.canEncryptTo)
         XCTAssertFalse(projected.isVerified)
     }
 
@@ -3128,7 +3136,7 @@ final class ContactServiceTests: XCTestCase {
             name: "Relock", email: "relock@example.com",
             expirySeconds: nil, profile: .universal
         )
-        _ = try contactService.addContact(
+        _ = try contactService.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
@@ -3183,12 +3191,12 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        let result = try container.contactService.addContact(publicKeyData: generated.publicKeyData)
+        let result = try container.contactService.importContact(publicKeyData: generated.publicKeyData)
 
-        guard case .added(let contact) = result else {
+        guard case .added(_, let key) = result else {
             return XCTFail("Expected .added, got \(result)")
         }
-        XCTAssertEqual(contact.fingerprint, generated.fingerprint)
+        XCTAssertEqual(key.fingerprint, generated.fingerprint)
     }
 
     @MainActor
@@ -3214,7 +3222,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3274,7 +3282,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(
+        _ = try service.importContact(
             publicKeyData: generated.publicKeyData,
             verificationState: .unverified
         )
@@ -3308,7 +3316,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3346,7 +3354,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3387,7 +3395,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3459,7 +3467,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3510,7 +3518,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
@@ -3562,7 +3570,7 @@ final class ContactServiceTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try service.addContact(publicKeyData: generated.publicKeyData)
+        _ = try service.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)

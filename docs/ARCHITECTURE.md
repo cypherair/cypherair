@@ -89,7 +89,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers and key/certificate FFI adapters |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
-| `ContactService` | App/UI-facing Contacts facade for availability, public-key import/update through the contact-import FFI adapter, verification state, search/tags, lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
+| `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
 | `SelfTestService` | One-tap diagnostic covering **both profiles** through message and self-test FFI adapters: key gen → encrypt/decrypt → sign/verify → tamper test → QR round-trip |
 | `FileProgressReporter` | Observable progress/cancellation state for streaming operations. Message encrypt/decrypt/sign/verify calls use an FFI-owned bridge to connect it to UniFFI progress callbacks. Thread-safe via `OSAllocatedUnfairLock`. |
@@ -180,9 +180,11 @@ ProtectedData component ownership:
 - `ProtectedOrdinarySettingsCoordinator` is the source of truth for ordinary-settings availability and loaded snapshots; production reads/writes only after app privacy authentication has been reduced to app-level ordinary-settings availability
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready
 - `ContactService` is the only app/UI-facing Contacts facade. It owns Contacts availability, query APIs, mutation APIs, search/tag behavior, rollback behavior, verification state, migration/quarantine cleanup warnings, and relock cleanup.
+- Normal Contacts import call sites use `ContactService.importContact(...)` and receive `ContactImportResult` values built from `ContactIdentitySummary`, `ContactKeySummary`, and optional `ContactCandidateMatch` data. Legacy same-user-ID key replacement is isolated behind `ContactLegacyKeyReplacementRequest` and `confirmLegacyKeyReplacement(...)` until the legacy flat runtime is removed.
+- Services that need contact public keys use `ContactKeyRecord` lookups or `ContactsVerificationContext` from `ContactService` rather than consuming flat `Contact` values. Signature/decryption/password-message verification and certificate-signature signer resolution use key records so historical signer keys can participate without exposing the compatibility projection.
 - `ContactsDomainStore` is the Contacts protected-domain persistence owner; it opens the protected `contacts` domain post-auth, migrates active legacy contacts once, quarantines legacy plaintext, and never reads quarantine for ordinary routes.
 - `ContactsDomainSnapshotCodec` owns Contacts protected-domain schema serialization, binary-plist payload decoding, v1-to-v2 migration that drops legacy recipient-list data, and decode scratch-buffer clearing.
-- `ContactsCompatibilityMapper` owns legacy/app compatibility projection between `Contact` arrays and `ContactsDomainSnapshot`; Contacts schema or storage changes update the long-term docs and persisted-state inventory.
+- `ContactsCompatibilityMapper`, `ContactsLegacyMigrationSource`, `ContactImportMatcher`, and the compatibility state inside `ContactService` are the remaining legacy `Contact` holders. Phase 3C/3D should remove this projection once ordinary runtime and storage migration no longer need it.
 - `AppContainer` assembles the Contacts store, migration source, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
 - legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
@@ -340,8 +342,8 @@ sequenceDiagram
     Loader-->>App: Key metadata + normalized public certificate
     App->>V: Show key details confirmation page (includes profile indicator)
     V-->>App: User confirms "Add to Contacts"
-    App->>CS: addContact(publicKey)
-    CS-->>App: Success
+    App->>CS: importContact(publicKey)
+    CS-->>App: ContactImportResult summary/record response
 ```
 
 ### SE Key Wrapping

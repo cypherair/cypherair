@@ -448,28 +448,28 @@ final class ModelTests: XCTestCase {
 
     func test_signatureVerification_isWarning_forBad() {
         let verification = SignatureVerification(
-            status: .bad, signerFingerprint: nil, signerContact: nil
+            status: .bad, signerFingerprint: nil
         )
         XCTAssertTrue(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_forUnknown() {
         let verification = SignatureVerification(
-            status: .unknownSigner, signerFingerprint: "abc", signerContact: nil
+            status: .unknownSigner, signerFingerprint: "abc"
         )
         XCTAssertTrue(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_validIsFalse() {
         let verification = SignatureVerification(
-            status: .valid, signerFingerprint: "abc", signerContact: nil
+            status: .valid, signerFingerprint: "abc"
         )
         XCTAssertFalse(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_notSignedIsFalse() {
         let verification = SignatureVerification(
-            status: .notSigned, signerFingerprint: nil, signerContact: nil
+            status: .notSigned, signerFingerprint: nil
         )
         XCTAssertFalse(verification.isWarning)
     }
@@ -493,7 +493,7 @@ final class ModelTests: XCTestCase {
             ),
             context: PGPMessageVerificationContext(
                 verificationKeys: [],
-                contacts: [],
+                contactKeys: [],
                 ownKeys: [],
                 contactsAvailability: .availableLegacyCompatibility
             )
@@ -509,21 +509,21 @@ final class ModelTests: XCTestCase {
 
     func test_signatureVerification_statusColor_validIsGreen() {
         let verification = SignatureVerification(
-            status: .valid, signerFingerprint: nil, signerContact: nil
+            status: .valid, signerFingerprint: nil
         )
         XCTAssertEqual(verification.statusColor, .green)
     }
 
     func test_signatureVerification_statusColor_badIsRed() {
         let verification = SignatureVerification(
-            status: .bad, signerFingerprint: nil, signerContact: nil
+            status: .bad, signerFingerprint: nil
         )
         XCTAssertEqual(verification.statusColor, .red)
     }
 
     func test_signatureVerification_statusColor_notSignedIsSecondary() {
         let verification = SignatureVerification(
-            status: .notSigned, signerFingerprint: nil, signerContact: nil
+            status: .notSigned, signerFingerprint: nil
         )
         XCTAssertEqual(verification.statusColor, .secondary)
     }
@@ -536,7 +536,7 @@ final class ModelTests: XCTestCase {
 
         let identity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: contact.fingerprint,
-            contacts: [contact],
+            contactKeys: [makeContactKeyRecord(from: contact)],
             ownKeys: []
         )
 
@@ -551,7 +551,7 @@ final class ModelTests: XCTestCase {
 
         let identity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: ownKey.fingerprint,
-            contacts: [],
+            contactKeys: [],
             ownKeys: [ownKey]
         )
 
@@ -566,7 +566,7 @@ final class ModelTests: XCTestCase {
 
         let identity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: fingerprint,
-            contacts: [],
+            contactKeys: [],
             ownKeys: []
         )
 
@@ -769,6 +769,31 @@ final class ModelTests: XCTestCase {
             publicKeyData: Data(),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519"
+        )
+    }
+
+    private func makeContactKeyRecord(from contact: Contact) -> ContactKeyRecord {
+        ContactKeyRecord(
+            keyId: contact.fingerprint,
+            contactId: contact.contactId ?? contact.fingerprint,
+            fingerprint: contact.fingerprint,
+            primaryUserId: contact.userId,
+            displayName: contact.displayName,
+            email: contact.email,
+            keyVersion: contact.keyVersion,
+            profile: contact.profile,
+            primaryAlgo: contact.primaryAlgo,
+            subkeyAlgo: contact.subkeyAlgo,
+            hasEncryptionSubkey: contact.hasEncryptionSubkey,
+            isRevoked: contact.isRevoked,
+            isExpired: contact.isExpired,
+            manualVerificationState: contact.verificationState,
+            usageState: contact.usageState ?? .preferred,
+            certificationProjection: .empty,
+            certificationArtifactIds: [],
+            publicKeyData: contact.publicKeyData,
+            createdAt: Date(),
+            updatedAt: Date()
         )
     }
 

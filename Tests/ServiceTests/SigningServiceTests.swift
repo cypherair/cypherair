@@ -29,7 +29,7 @@ final class SigningServiceTests: XCTestCase {
             profile: profile,
             name: name
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
         return identity
     }
 
@@ -276,7 +276,7 @@ final class SigningServiceTests: XCTestCase {
             expirySeconds: 1,
             profile: .universal
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         // Sign while key is still valid
         let signed = try await stack.signingService.signCleartext(
@@ -309,7 +309,7 @@ final class SigningServiceTests: XCTestCase {
             expirySeconds: 1,
             profile: .advanced
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         // Sign while key is still valid
         let signed = try await stack.signingService.signCleartext(

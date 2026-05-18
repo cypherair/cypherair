@@ -44,7 +44,7 @@ final class DecryptionServiceTests: XCTestCase {
             name: profile == .universal ? "Alice" : "Bob"
         )
 
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let armoredCiphertext = try await stack.encryptionService.encryptText(
             plaintext,
@@ -78,7 +78,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_returnsNonEmptyKeyIds() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "test",
@@ -100,7 +100,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_profileB_returnsNonEmptyKeyIds() async throws {
         let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "test",
@@ -117,7 +117,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_noMatchingKey_throwsError() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "secret",
@@ -180,7 +180,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "test",
@@ -453,7 +453,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptMessage_profileA_endToEnd() async throws {
         let plaintext = "End-to-end Profile A 你好"
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             plaintext,
@@ -473,7 +473,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptMessage_profileB_endToEnd() async throws {
         let plaintext = "End-to-end Profile B 加密"
         let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             plaintext,
@@ -491,7 +491,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_profileA_matchesCorrectKey() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "match test",
@@ -510,7 +510,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     func test_parseRecipients_profileB_matchesCorrectKey() async throws {
         let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "match test",
@@ -609,8 +609,8 @@ final class DecryptionServiceTests: XCTestCase {
 
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
         let signerBInfo = try stack.engine.parseKeyInfo(keyData: signerB)
-        try stack.contactService.addContact(publicKeyData: signerA)
-        try stack.contactService.addContact(publicKeyData: signerB)
+        try stack.contactService.importContact(publicKeyData: signerA)
+        try stack.contactService.importContact(publicKeyData: signerB)
 
         let identity = try TestHelpers.provisionFixtureBackedIdentity(
             secretCertData: recipientSecret,
@@ -805,7 +805,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             name: "Detailed Message Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Detailed message end-to-end",
@@ -830,8 +830,8 @@ final class DecryptionServiceTests: XCTestCase {
         let recipientSecret = try loadFixture("ffi_detailed_recipient_secret")
         let ciphertext = try loadFixture("ffi_detailed_multisig_encrypted")
 
-        try stack.contactService.addContact(publicKeyData: signerA)
-        try stack.contactService.addContact(publicKeyData: signerB)
+        try stack.contactService.importContact(publicKeyData: signerA)
+        try stack.contactService.importContact(publicKeyData: signerB)
         let identity = try TestHelpers.provisionFixtureBackedIdentity(
             secretCertData: recipientSecret,
             engine: stack.engine,
@@ -937,7 +937,7 @@ final class DecryptionServiceTests: XCTestCase {
         let ciphertext = try loadFixture("ffi_detailed_repeated_encrypted")
         let signerAInfo = try stack.engine.parseKeyInfo(keyData: signerA)
 
-        try stack.contactService.addContact(publicKeyData: signerA)
+        try stack.contactService.importContact(publicKeyData: signerA)
         _ = try TestHelpers.provisionFixtureBackedIdentity(
             secretCertData: recipientSecret,
             engine: stack.engine,
@@ -977,7 +977,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             name: "Detailed Cancel Recipient"
         )
-        try stack.contactService.addContact(publicKeyData: recipient.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: recipient.publicKeyData)
 
         let plaintextURL = try makeTemporaryFile(
             named: "detailed-cancel.txt",
@@ -1024,7 +1024,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             name: "Detailed Tampered File A"
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let plaintextURL = try makeTemporaryFile(
             named: "detailed-tampered-a.txt",
@@ -1080,7 +1080,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             name: "Detailed Targeted File A"
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let plaintextURL = try makeTemporaryFile(
             named: "detailed-targeted-a.txt",
@@ -1135,7 +1135,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             name: "Detailed Tampered File B"
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let plaintextURL = try makeTemporaryFile(
             named: "detailed-tampered-b.txt",

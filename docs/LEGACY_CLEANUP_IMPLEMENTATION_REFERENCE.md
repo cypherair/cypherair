@@ -452,7 +452,7 @@ new protected storage.
 Recommended deletion waves:
 
 - Contacts: remove the legacy flat runtime, `openLegacyCompatibilityForTests`
-  dependence where possible, `.keyUpdateDetected`, and legacy contact ID
+  dependence where possible, `.legacyKeyReplacementDetected`, and legacy contact ID
   projection only after supported installs no longer need flat Contacts
   migration or fallback and after tutorial sandbox and UI-test containers no
   longer depend on legacy runtime loading.
@@ -546,7 +546,7 @@ Known surfaces that require this gate:
 - app-level password-message result surfaces that fold detailed decrypt results
   into `SignatureVerification` (completed in PR 3C)
 - raw first-match User ID FFI exports
-- Contacts legacy flat-runtime APIs, `.keyUpdateDetected`, and legacy contact ID
+- Contacts legacy flat-runtime APIs, `.legacyKeyReplacementDetected`, and legacy contact ID
   projection
 
 ## 6. Validation Matrix
