@@ -153,6 +153,7 @@ $(SRCROOT)/Sources/App/Sign/VerifyView.swift
 $(SRCROOT)/Sources/Extensions/Data+Zeroing.swift
 $(SRCROOT)/Sources/Extensions/View+PlatformAvailability.swift
 $(SRCROOT)/Sources/Models/AppConfiguration.swift
+$(SRCROOT)/Sources/Models/AppProductIdentity.swift
 $(SRCROOT)/Sources/Models/CertificateSelectionCatalog.swift
 $(SRCROOT)/Sources/Models/CertificateSignatureSignerIdentity.swift
 $(SRCROOT)/Sources/Models/CertificateSignatureVerification.swift
