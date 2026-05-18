@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "may17back.png",
+      "idiom" : "vision",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
