@@ -51,8 +51,9 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     case azure = "AppIconB"
     case slate = "AppIconC"
     case obsidian = "AppIconD"
+    case violet = "AppIconE"
 
-    private static let primary: AppIconOption = .azure
+    private static let primary: AppIconOption = .violet
 
     var id: String { rawValue }
 
@@ -86,6 +87,8 @@ enum AppIconOption: String, CaseIterable, Identifiable {
             String(localized: "settings.appIcon.slate", defaultValue: "Slate")
         case .obsidian:
             String(localized: "settings.appIcon.obsidian", defaultValue: "Obsidian")
+        case .violet:
+            String(localized: "settings.appIcon.violet", defaultValue: "Violet")
         }
     }
 
