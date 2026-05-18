@@ -951,7 +951,7 @@ final class AppContainer: @unchecked Sendable {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
     }
 
     private static func protectedOrdinarySettingsAvailability(

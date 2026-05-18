@@ -342,7 +342,6 @@ final class VerifyScreenModelTests: XCTestCase {
         DetailedSignatureVerification(
             legacyStatus: status,
             legacySignerFingerprint: signerFingerprint,
-            legacySignerContact: nil,
             legacySignerIdentity: nil,
             signatures: status == .notSigned ? [] : [
                 DetailedSignatureVerification.Entry(

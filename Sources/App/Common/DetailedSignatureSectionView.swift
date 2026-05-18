@@ -73,7 +73,6 @@ private extension SignatureVerification {
         self.init(
             status: MessageSignatureStatus(from: entry.status),
             signerFingerprint: entry.signerPrimaryFingerprint,
-            signerContact: nil,
             signerIdentity: entry.signerIdentity,
             verificationState: entry.verificationState,
             contactsUnavailableReason: entry.contactsUnavailableReason

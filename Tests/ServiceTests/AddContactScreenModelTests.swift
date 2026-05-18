@@ -116,7 +116,7 @@ final class AddContactScreenModelTests: XCTestCase {
 
         var presentedRequest: ImportConfirmationRequest?
         var dismissCount = 0
-        var completedContact: Contact?
+        var completedContact: ContactIdentitySummary?
         let hostActions = makeHostActions(
             onPresent: { presentedRequest = $0 },
             onDismiss: { dismissCount += 1 },
@@ -129,7 +129,7 @@ final class AddContactScreenModelTests: XCTestCase {
         request.onImportVerified()
 
         XCTAssertEqual(dismissCount, 1)
-        XCTAssertEqual(completedContact?.fingerprint, generated.fingerprint)
+        XCTAssertEqual(completedContact?.preferredKey?.fingerprint, generated.fingerprint)
         XCTAssertEqual(stack.contactService.availableContacts.count, 1)
     }
 
@@ -147,14 +147,14 @@ final class AddContactScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try stack.contactService.addContact(publicKeyData: firstKey.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
 
         let model = makeModel()
         model.importedKeyData = secondKey.publicKeyData
 
         var presentedRequest: ImportConfirmationRequest?
         var dismissCount = 0
-        var completedContact: Contact?
+        var completedContact: ContactIdentitySummary?
         let hostActions = makeHostActions(
             onPresent: { presentedRequest = $0 },
             onDismiss: { dismissCount += 1 },
@@ -175,7 +175,7 @@ final class AddContactScreenModelTests: XCTestCase {
 
         XCTAssertFalse(model.showKeyUpdateAlert)
         XCTAssertNil(model.pendingKeyUpdateRequest)
-        XCTAssertEqual(completedContact?.fingerprint, secondKey.fingerprint)
+        XCTAssertEqual(completedContact?.preferredKey?.fingerprint, secondKey.fingerprint)
         XCTAssertEqual(stack.contactService.availableContacts.count, 1)
         XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
     }
@@ -344,7 +344,7 @@ final class AddContactScreenModelTests: XCTestCase {
     private func makeHostActions(
         onPresent: @escaping @MainActor (ImportConfirmationRequest) -> Void,
         onDismiss: @escaping @MainActor () -> Void,
-        onComplete: @escaping @MainActor (Contact) -> Void
+        onComplete: @escaping @MainActor (ContactIdentitySummary) -> Void
     ) -> AddContactScreenHostActions {
         AddContactScreenHostActions(
             presentImportConfirmation: onPresent,

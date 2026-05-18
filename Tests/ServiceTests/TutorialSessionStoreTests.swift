@@ -176,12 +176,12 @@ final class TutorialSessionStoreTests: XCTestCase {
 
         await store.openModule(.addDemoContact)
         let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
-        let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
-        guard case .added(let contact) = addResult else {
+        let addResult = try container.contactService.importContact(publicKeyData: Data(bobArmored.utf8))
+        guard case .added(let contact, let key) = addResult else {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
-        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: key.fingerprint))
         XCTAssertTrue(store.isCompleted(.addDemoContact))
 
         let ciphertext = try await container.encryptionService.encryptText(
@@ -509,12 +509,12 @@ final class TutorialSessionStoreTests: XCTestCase {
         await store.noteAliceGenerated(alice)
 
         let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
-        let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
-        guard case .added(let contact) = addResult else {
+        let addResult = try container.contactService.importContact(publicKeyData: Data(bobArmored.utf8))
+        guard case .added(let contact, let key) = addResult else {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
-        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: key.fingerprint))
 
         let inactiveKey = EncryptView.RuntimeSyncKey(
             configuration: store.configurationFactory.encryptConfiguration(isActiveModule: false)
@@ -544,12 +544,12 @@ final class TutorialSessionStoreTests: XCTestCase {
         await store.noteAliceGenerated(alice)
 
         let bobArmored = try XCTUnwrap(store.session.artifacts.bobArmoredPublicKey)
-        let addResult = try container.contactService.addContact(publicKeyData: Data(bobArmored.utf8))
-        guard case .added(let contact) = addResult else {
+        let addResult = try container.contactService.importContact(publicKeyData: Data(bobArmored.utf8))
+        guard case .added(let contact, let key) = addResult else {
             return XCTFail("Expected Bob contact to be added")
         }
         store.noteBobImported(contact)
-        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: contact.fingerprint))
+        let contactId = try XCTUnwrap(container.contactService.contactId(forFingerprint: key.fingerprint))
 
         let ciphertext = try await container.encryptionService.encryptText(
             "Hello Bob from the guided tutorial",

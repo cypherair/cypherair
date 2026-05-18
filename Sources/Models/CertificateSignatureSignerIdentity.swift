@@ -10,19 +10,19 @@ struct CertificateSignatureSignerIdentity: Equatable {
 
     static func resolve(
         fingerprint: String?,
-        contacts: [Contact],
+        contactKeys: [ContactKeyRecord],
         ownKeys: [PGPKeyIdentity]
     ) -> CertificateSignatureSignerIdentity? {
         guard let fingerprint else { return nil }
 
-        if let contact = contacts.first(where: { $0.fingerprint == fingerprint }) {
+        if let contactKey = contactKeys.first(where: { $0.fingerprint == fingerprint }) {
             return CertificateSignatureSignerIdentity(
                 source: .contact,
-                displayName: contact.displayName,
-                secondaryText: contact.email ?? contact.userId,
-                shortKeyId: contact.shortKeyId,
-                fingerprint: contact.fingerprint,
-                isVerifiedContact: contact.isVerified
+                displayName: contactKey.displayName,
+                secondaryText: contactKey.email ?? contactKey.primaryUserId,
+                shortKeyId: IdentityPresentation.shortKeyId(from: contactKey.fingerprint),
+                fingerprint: contactKey.fingerprint,
+                isVerifiedContact: contactKey.manualVerificationState.isVerified
             )
         }
 

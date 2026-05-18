@@ -3,7 +3,7 @@ import Foundation
 struct AddContactScreenHostActions {
     let presentImportConfirmation: @MainActor (ImportConfirmationRequest) -> Void
     let dismissPresentedImportConfirmation: @MainActor () -> Void
-    let completeImportedContact: @MainActor (Contact) -> Void
+    let completeImportedContact: @MainActor (ContactIdentitySummary) -> Void
 }
 
 @MainActor

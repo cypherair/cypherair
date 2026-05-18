@@ -12,6 +12,10 @@ final class IncomingURLImportCoordinator {
     var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     var isTutorialImportBlocked = false
 
+    var importErrorDescription: String {
+        importError?.localizedDescription ?? ""
+    }
+
     init(
         importLoader: PublicKeyImportLoader,
         importWorkflow: ContactImportWorkflow,

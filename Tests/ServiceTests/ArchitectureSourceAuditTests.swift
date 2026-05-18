@@ -586,27 +586,12 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Legacy verification models still resolve signer identity from flat Contact arrays pending Phase 1/3 cleanup.",
-                [
-                    "Sources/Models/CertificateSignatureSignerIdentity.swift",
-                    "Sources/Models/SignatureVerification.swift",
-                ]
-            ),
-            (
-                "Contacts compatibility and migration paths intentionally retain flat Contact arrays during Phase 0.",
+                "Contacts compatibility, matching, migration, and projection paths retain flat Contact arrays until Phase 3C/3D removes the legacy runtime state.",
                 [
                     "Sources/Services/ContactImportMatcher.swift",
                     "Sources/Services/ContactsCompatibilityMapper.swift",
                     "Sources/Services/ContactsLegacyMigrationSource.swift",
                     "Sources/Services/ContactService.swift",
-                ]
-            ),
-            (
-                "FFI mapping boundaries still accept legacy verification contexts until Contacts runtime contracts move to summaries.",
-                [
-                    "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
-                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
-                    "Sources/Services/FFI/PGPMessageResultMapper.swift",
                 ]
             ),
         ])

@@ -316,7 +316,7 @@ final class TutorialSessionStore {
         await ensureBobPrepared()
     }
 
-    func noteBobImported(_ contact: Contact) {
+    func noteBobImported(_ contact: ContactIdentitySummary) {
         session.artifacts.bobContact = contact
         complete(.addDemoContact)
     }
@@ -376,22 +376,24 @@ final class TutorialSessionStore {
                 return false
             }
 
-            let result = try container.contactService.addContact(
+            let result = try container.contactService.importContact(
                 publicKeyData: Data(bobArmoredPublicKey.utf8)
             )
-            let contact: Contact
+            let contact: ContactIdentitySummary
             switch result {
-            case .added(let added), .addedWithCandidate(let added, _),
-                 .duplicate(let added), .updated(let added):
+            case .added(let added, _),
+                 .addedWithCandidate(let added, _, _),
+                 .duplicate(let added, _),
+                 .updated(let added, _):
                 contact = added
-            case .keyUpdateDetected(let newContact, _, _):
-                contact = newContact
+            case .legacyKeyReplacementDetected(let request):
+                contact = request.newContact
             }
 
             noteBobImported(contact)
             selectTab(.contacts)
             setRoutePath(
-                [.contactDetail(contactId: contact.contactId ?? "legacy-contact-\(contact.fingerprint)")],
+                [.contactDetail(contactId: contact.contactId)],
                 for: .contacts
             )
             return true

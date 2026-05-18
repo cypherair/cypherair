@@ -79,8 +79,8 @@ final class CertificateSignatureServiceTests: XCTestCase {
     func test_verifyDirectKeySignature_fixtureContact_returnsValidContactIdentity() async throws {
         let target = try loadFixture("ffi_direct_key_target")
         let signature = try loadFixture("ffi_direct_key_signature", ext: "sig")
-        let contactResult = try stack.contactService.addContact(publicKeyData: target)
-        guard case .added(let contact) = contactResult else {
+        let contactResult = try stack.contactService.importContact(publicKeyData: target)
+        guard case .added(_, let key) = contactResult else {
             return XCTFail("Expected contact to be added")
         }
 
@@ -90,14 +90,14 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(verification.status, .valid)
-        XCTAssertEqual(verification.signerPrimaryFingerprint, contact.fingerprint)
+        XCTAssertEqual(verification.signerPrimaryFingerprint, key.fingerprint)
         XCTAssertEqual(verification.signerIdentity?.source, .contact)
     }
 
     func test_verifyDirectKeySignature_wrongTarget_returnsInvalid() async throws {
         let target = try loadFixture("ffi_direct_key_target")
         let signature = try loadFixture("ffi_direct_key_signature", ext: "sig")
-        _ = try stack.contactService.addContact(publicKeyData: target)
+        _ = try stack.contactService.importContact(publicKeyData: target)
         let wrongTarget = try generatedTarget(
             profile: .universal,
             name: "Wrong Direct Target",
@@ -136,8 +136,8 @@ final class CertificateSignatureServiceTests: XCTestCase {
         let expectedSubkeyFingerprint = try loadStringFixture(
             "ffi_cert_binding_subkey_fingerprint"
         ).trimmingCharacters(in: .whitespacesAndNewlines)
-        let contactResult = try stack.contactService.addContact(publicKeyData: signerPublic)
-        guard case .added(let contact) = contactResult else {
+        let contactResult = try stack.contactService.importContact(publicKeyData: signerPublic)
+        guard case .added(_, let key) = contactResult else {
             return XCTFail("Expected contact to be added")
         }
         let selectedUserId = try selectedUserId(for: target)
@@ -149,7 +149,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(verification.status, .valid)
-        XCTAssertEqual(verification.signerPrimaryFingerprint, contact.fingerprint)
+        XCTAssertEqual(verification.signerPrimaryFingerprint, key.fingerprint)
         XCTAssertEqual(verification.signingKeyFingerprint, expectedSubkeyFingerprint)
         XCTAssertEqual(verification.signerIdentity?.source, .contact)
     }
@@ -339,7 +339,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
             name: "Artifact Metadata Target",
             email: "artifact-metadata-target@example.com"
         )
-        _ = try stack.contactService.addContact(publicKeyData: target.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: target.publicKeyData)
         let targetKey = try XCTUnwrap(
             stack.contactService.availableKey(fingerprint: target.fingerprint)
         )
@@ -385,7 +385,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         let target = try loadFixture("ffi_direct_key_target")
         let binary = try loadFixture("ffi_direct_key_signature", ext: "sig")
         let armored = try stack.engine.armor(data: binary, kind: .signature)
-        _ = try stack.contactService.addContact(publicKeyData: target)
+        _ = try stack.contactService.importContact(publicKeyData: target)
 
         let armoredVerification = try await stack.certificateSignatureService.verifyDirectKeySignature(
             signature: armored,
@@ -523,7 +523,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
             name: "Multiplicity Signer",
             email: "multiplicity-signer@example.com"
         )
-        _ = try stack.contactService.addContact(publicKeyData: signer.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: signer.publicKeyData)
 
         let candidates = try stack.certificateSignatureService.candidateSignerCertificates()
 

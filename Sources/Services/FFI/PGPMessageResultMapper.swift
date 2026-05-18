@@ -13,7 +13,7 @@ enum PGPMessageResultMapper {
                 summaryState: result.summaryState,
                 summaryEntryIndex: result.summaryEntryIndex,
                 signatures: result.signatures,
-                contacts: context.contacts,
+                contactKeys: context.contactKeys,
                 ownKeys: context.ownKeys,
                 contactsAvailability: context.contactsAvailability
             )
@@ -30,7 +30,7 @@ enum PGPMessageResultMapper {
             summaryState: result.summaryState,
             summaryEntryIndex: result.summaryEntryIndex,
             signatures: result.signatures,
-            contacts: context.contacts,
+            contactKeys: context.contactKeys,
             ownKeys: context.ownKeys,
             contactsAvailability: context.contactsAvailability
         )
@@ -56,7 +56,7 @@ enum PGPMessageResultMapper {
                     summaryState: result.summaryState,
                     summaryEntryIndex: result.summaryEntryIndex,
                     signatures: result.signatures,
-                    contacts: context.contacts,
+                    contactKeys: context.contactKeys,
                     ownKeys: context.ownKeys,
                     contactsAvailability: context.contactsAvailability
                 )
@@ -82,7 +82,7 @@ enum PGPMessageResultMapper {
                 summaryState: result.summaryState,
                 summaryEntryIndex: result.summaryEntryIndex,
                 signatures: result.signatures,
-                contacts: context.contacts,
+                contactKeys: context.contactKeys,
                 ownKeys: context.ownKeys,
                 contactsAvailability: context.contactsAvailability
             )
@@ -99,7 +99,7 @@ enum PGPMessageResultMapper {
             summaryState: result.summaryState,
             summaryEntryIndex: result.summaryEntryIndex,
             signatures: result.signatures,
-            contacts: context.contacts,
+            contactKeys: context.contactKeys,
             ownKeys: context.ownKeys,
             contactsAvailability: context.contactsAvailability
         )
@@ -115,7 +115,7 @@ enum PGPMessageResultMapper {
             summaryState: result.summaryState,
             summaryEntryIndex: result.summaryEntryIndex,
             signatures: result.signatures,
-            contacts: context.contacts,
+            contactKeys: context.contactKeys,
             ownKeys: context.ownKeys,
             contactsAvailability: context.contactsAvailability
         )
@@ -127,18 +127,15 @@ enum PGPMessageResultMapper {
         summaryState: SignatureVerificationState,
         summaryEntryIndex: UInt64?,
         signatures: [DetailedSignatureEntry],
-        contacts: [Contact],
+        contactKeys: [ContactKeyRecord],
         ownKeys: [PGPKeyIdentity],
         contactsAvailability: ContactsAvailability
     ) -> DetailedSignatureVerification {
-        let contactsForVerification = contactsAvailability.allowsContactsVerification ? contacts : []
+        let contactKeysForVerification = contactsAvailability.allowsContactsVerification ? contactKeys : []
         let unavailableReason = contactsAvailability.allowsContactsVerification ? nil : contactsAvailability
-        let legacySignerContact = legacySignerFingerprint.flatMap { fingerprint in
-            contactsForVerification.first(where: { $0.fingerprint == fingerprint })
-        }
         let legacySignerIdentity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: legacySignerFingerprint,
-            contacts: contactsForVerification,
+            contactKeys: contactKeysForVerification,
             ownKeys: ownKeys
         )
 
@@ -155,7 +152,7 @@ enum PGPMessageResultMapper {
                 contactsUnavailableReason: appState == .contactsContextUnavailable ? unavailableReason : nil,
                 signerIdentity: SignatureVerification.SignerIdentity.resolve(
                     fingerprint: entry.verificationCertificateFingerprint,
-                    contacts: contactsForVerification,
+                    contactKeys: contactKeysForVerification,
                     ownKeys: ownKeys
                 )
             )
@@ -169,7 +166,6 @@ enum PGPMessageResultMapper {
         return DetailedSignatureVerification(
             legacyStatus: MessageSignatureStatus(from: legacyStatus),
             legacySignerFingerprint: legacySignerFingerprint,
-            legacySignerContact: legacySignerContact,
             legacySignerIdentity: legacySignerIdentity,
             summaryState: appSummaryState,
             summaryEntryIndex: summaryEntryIndex,

@@ -115,7 +115,7 @@ struct TutorialArtifacts {
     var aliceIdentity: PGPKeyIdentity?
     var bobIdentity: PGPKeyIdentity?
     var bobArmoredPublicKey: String?
-    var bobContact: Contact?
+    var bobContact: ContactIdentitySummary?
     var encryptedMessage: String?
     var parseResult: DecryptionService.Phase1Result?
     var decryptedMessage: String?

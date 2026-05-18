@@ -225,13 +225,6 @@ final class ContactCertificationDetailsScreenModel {
         return keys.first { $0.keyId == selectedKeyId }
     }
 
-    var selectedKeyRecord: ContactKeyRecord? {
-        guard let selectedKeyId else {
-            return nil
-        }
-        return contactService.availableContactKeyRecord(keyId: selectedKeyId)
-    }
-
     var savedArtifacts: [ContactCertificationArtifactReference] {
         guard let selectedKeyId else {
             return []
@@ -284,7 +277,6 @@ final class ContactCertificationDetailsScreenModel {
 
     var canGenerateAndSave: Bool {
         contactsAvailability.allowsProtectedCertificationPersistence &&
-            selectedKeyRecord != nil &&
             selectedKey != nil &&
             selectedUserId != nil &&
             selectedSigner != nil &&
@@ -295,7 +287,6 @@ final class ContactCertificationDetailsScreenModel {
     var canVerifyImport: Bool {
         guard currentSignatureData != nil,
               selectedKey != nil,
-              selectedKeyRecord != nil,
               !isLoading,
               !isOperationLocked else {
             return false
@@ -460,7 +451,6 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
         guard let key = selectedKey,
-              let keyRecord = selectedKeyRecord,
               let selectedUserId,
               let selectedSigner else {
             return
@@ -472,9 +462,10 @@ final class ContactCertificationDetailsScreenModel {
                 signer: selectedSigner,
                 userId: selectedUserId
             )
+            let targetCert = try self.contactService.requireContactPublicKeyData(keyId: key.keyId)
             let armoredCertification = try await self.generateArmoredCertificationAction(
                 selectedSigner.fingerprint,
-                keyRecord.publicKeyData,
+                targetCert,
                 selectedUserId,
                 self.selectedCertificationKind
             )
@@ -482,7 +473,7 @@ final class ContactCertificationDetailsScreenModel {
             let validation = try await self.validateUserIdArtifactAction(
                 armoredCertification,
                 key,
-                keyRecord.publicKeyData,
+                targetCert,
                 selectedUserId,
                 .generated,
                 filename
@@ -504,19 +495,19 @@ final class ContactCertificationDetailsScreenModel {
 
     func verifyImportedSignature() {
         guard let signature = currentSignatureData,
-              let key = selectedKey,
-              let keyRecord = selectedKeyRecord else {
+              let key = selectedKey else {
             return
         }
 
         startOperation(.verifyImport) { checkActive in
+            let targetCert = try self.contactService.requireContactPublicKeyData(keyId: key.keyId)
             let validation: ContactCertificationArtifactValidation
             switch self.importMode {
             case .directKey:
                 validation = try await self.validateDirectKeyArtifactAction(
                     signature,
                     key,
-                    keyRecord.publicKeyData,
+                    targetCert,
                     .imported,
                     nil
                 )
@@ -533,7 +524,7 @@ final class ContactCertificationDetailsScreenModel {
                 validation = try await self.validateUserIdArtifactAction(
                     signature,
                     key,
-                    keyRecord.publicKeyData,
+                    targetCert,
                     selectedUserId,
                     .imported,
                     nil
@@ -687,7 +678,7 @@ final class ContactCertificationDetailsScreenModel {
             return
         }
 
-        guard let targetCert = selectedKeyRecord?.publicKeyData else {
+        guard let selectedKey else {
             loadState = .loaded
             return
         }
@@ -709,10 +700,14 @@ final class ContactCertificationDetailsScreenModel {
 
             do {
                 await Task.yield()
+                guard let self, generation == self.loadGeneration else {
+                    return
+                }
+                let targetCert = try self.contactService.requireContactPublicKeyData(keyId: selectedKey.keyId)
                 let catalog = try await selectionCatalogAction(targetCert)
                 try Task.checkCancellation()
 
-                guard let self, generation == self.loadGeneration else {
+                guard generation == self.loadGeneration else {
                     return
                 }
                 self.catalog = catalog

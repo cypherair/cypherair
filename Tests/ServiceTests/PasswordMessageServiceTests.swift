@@ -25,7 +25,7 @@ final class PasswordMessageServiceTests: XCTestCase {
             profile: profile,
             name: name
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
         return identity
     }
 

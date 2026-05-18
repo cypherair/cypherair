@@ -647,19 +647,20 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    private func makeContact(name: String, email: String) throws -> Contact {
+    private func makeContact(name: String, email: String) throws -> ContactKeyRecord {
         let generated = try stack.engine.generateKey(
             name: name,
             email: email,
             expirySeconds: nil,
             profile: .universal
         )
-        let result = try stack.contactService.addContact(publicKeyData: generated.publicKeyData)
-        guard case .added(let contact) = result else {
+        let result = try stack.contactService.importContact(publicKeyData: generated.publicKeyData)
+        guard case .added(_, let key) = result,
+              let record = stack.contactService.availableContactKeyRecord(fingerprint: key.fingerprint) else {
             XCTFail("Expected contact to be added")
             throw ContactCertificateSignaturesScreenModelTestError(message: "contact add failed")
         }
-        return contact
+        return record
     }
 
     @MainActor
@@ -1304,7 +1305,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try contactService.addContact(publicKeyData: generated.publicKeyData)
+        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
         let contactId = try XCTUnwrap(contactService.contactId(forFingerprint: generated.fingerprint))
         let key = try XCTUnwrap(contactService.availableKey(fingerprint: generated.fingerprint))
         let catalog = try certificateSignatureService.selectionCatalog(

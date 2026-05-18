@@ -31,7 +31,7 @@ final class StreamingServiceTests: XCTestCase {
             profile: profile,
             name: name
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
         return identity
     }
 
@@ -452,7 +452,7 @@ final class StreamingServiceTests: XCTestCase {
         )
 
         // Parse the external public key and add as contact
-        try stack.contactService.addContact(publicKeyData: externalKey.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: externalKey.publicKeyData)
 
         // Create a file and encrypt it TO the external key only
         let plaintext = Data("Secret for external".utf8)

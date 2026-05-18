@@ -78,7 +78,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try stack.contactService.addContact(publicKeyData: firstKey.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
         let url = try makeImportURL(publicKeyData: secondKey.publicKeyData)
 
         coordinator.handleIncomingURL(url, isTutorialPresentationActive: false)
@@ -111,7 +111,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        _ = try stack.contactService.addContact(publicKeyData: firstKey.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
         let url = try makeImportURL(publicKeyData: secondKey.publicKeyData)
 
         coordinator.handleIncomingURL(url, isTutorialPresentationActive: false)

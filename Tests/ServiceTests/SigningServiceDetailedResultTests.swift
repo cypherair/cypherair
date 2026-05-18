@@ -239,7 +239,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
     }
 
     private func addContact(_ publicKeyData: Data) throws {
-        _ = try stack.contactService.addContact(publicKeyData: publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: publicKeyData)
     }
 
     private func makeTemporaryFile(named name: String, contents: Data) throws -> URL {

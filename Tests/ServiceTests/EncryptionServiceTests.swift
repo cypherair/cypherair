@@ -30,7 +30,7 @@ final class EncryptionServiceTests: XCTestCase {
             profile: profile,
             name: name
         )
-        try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
         return identity
     }
 
@@ -406,7 +406,7 @@ final class EncryptionServiceTests: XCTestCase {
         let recipientKey = try! PgpEngine().generateKey(
             name: "Recipient", email: nil, expirySeconds: nil, profile: .universal
         )
-        try! stack.contactService.addContact(publicKeyData: recipientKey.publicKeyData)
+        try! stack.contactService.importContact(publicKeyData: recipientKey.publicKeyData)
         let info = try! PgpEngine().parseKeyInfo(keyData: recipientKey.publicKeyData)
         guard let recipientContactId = stack.contactService.contactId(forFingerprint: info.fingerprint) else {
             return XCTFail("Expected recipient contact ID")

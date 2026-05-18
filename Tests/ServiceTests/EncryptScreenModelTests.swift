@@ -283,7 +283,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Unverified Recipient"
         )
-        try stack.contactService.addContact(
+        try stack.contactService.importContact(
             publicKeyData: recipientIdentity.publicKeyData,
             verificationState: .unverified
         )
@@ -347,8 +347,8 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .advanced
         )
-        try opened.service.addContact(publicKeyData: preferred.publicKeyData, verificationState: .verified)
-        try opened.service.addContact(publicKeyData: historical.publicKeyData, verificationState: .unverified)
+        try opened.service.importContact(publicKeyData: preferred.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: historical.publicKeyData, verificationState: .unverified)
         let targetContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: preferred.fingerprint))
         let sourceContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: historical.fingerprint))
         _ = try opened.service.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
@@ -414,8 +414,8 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .advanced
         )
-        try opened.service.addContact(publicKeyData: first.publicKeyData, verificationState: .verified)
-        try opened.service.addContact(publicKeyData: second.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: second.publicKeyData, verificationState: .verified)
         let firstContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: first.fingerprint))
         let secondContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: second.fingerprint))
         let tag = try opened.service.addTag(named: "Team", toContactId: firstContactId)
@@ -480,8 +480,8 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .advanced
         )
-        try opened.service.addContact(publicKeyData: selectable.publicKeyData, verificationState: .verified)
-        try opened.service.addContact(publicKeyData: missingPreferred.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: selectable.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: missingPreferred.publicKeyData, verificationState: .verified)
         let selectableContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: selectable.fingerprint))
         let missingPreferredContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: missingPreferred.fingerprint))
         let tag = try opened.service.addTag(named: "Partial Team", toContactId: selectableContactId)
@@ -532,8 +532,8 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .advanced
         )
-        try opened.service.addContact(publicKeyData: retained.publicKeyData, verificationState: .verified)
-        try opened.service.addContact(publicKeyData: removed.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: retained.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: removed.publicKeyData, verificationState: .verified)
         let retainedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: retained.fingerprint))
         let removedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: removed.fingerprint))
 
@@ -572,7 +572,7 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        try opened.service.addContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
+        try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
         let unverifiedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: unverified.fingerprint))
         let tag = try opened.service.addTag(named: "Warning Team", toContactId: unverifiedContactId)
 
@@ -610,7 +610,7 @@ final class EncryptScreenModelTests: XCTestCase {
             expirySeconds: nil,
             profile: .universal
         )
-        try opened.service.addContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
+        try opened.service.importContact(publicKeyData: unverified.publicKeyData, verificationState: .unverified)
         let unverifiedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: unverified.fingerprint))
         let tag = try opened.service.addTag(named: "Warning Removed Team", toContactId: unverifiedContactId)
 
@@ -968,7 +968,7 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     private func importContactAndResolveContactId(for identity: PGPKeyIdentity) throws -> String {
-        _ = try stack.contactService.addContact(publicKeyData: identity.publicKeyData)
+        _ = try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
         return try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
     }
 
@@ -987,7 +987,7 @@ final class EncryptScreenModelTests: XCTestCase {
             contactsDirectory: directory
         )
         try writer.openLegacyCompatibilityForTests()
-        _ = try writer.addContact(publicKeyData: identity.publicKeyData)
+        _ = try writer.importContact(publicKeyData: identity.publicKeyData)
         let contactId = try XCTUnwrap(writer.contactId(forFingerprint: identity.fingerprint))
 
         let locked = ContactService(

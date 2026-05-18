@@ -455,70 +455,8 @@ struct CypherAirApp: App {
             }
         }
         #endif
-        .alert(
-            String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
-            isPresented: Binding(
-                get: { incomingURLImportCoordinator.importError != nil },
-                set: { if !$0 { incomingURLImportCoordinator.dismissImportError() } }
-            )
-        ) {
-            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
-                incomingURLImportCoordinator.dismissImportError()
-            }
-        } message: {
-            if let importError = incomingURLImportCoordinator.importError {
-                Text(importError.localizedDescription)
-            }
-        }
-        .alert(
-            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
-            isPresented: Binding(
-                get: { incomingURLImportCoordinator.pendingKeyUpdateRequest != nil },
-                set: { if !$0 { incomingURLImportCoordinator.cancelPendingKeyUpdate() } }
-            ),
-            presenting: incomingURLImportCoordinator.pendingKeyUpdateRequest
-        ) { request in
-            Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                incomingURLImportCoordinator.confirmPendingKeyUpdate()
-            }
-            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                incomingURLImportCoordinator.cancelPendingKeyUpdate()
-            }
-        } message: { request in
-            Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(IdentityDisplayPresentation.displayName(request.pendingUpdate.existingContact.displayName))) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
-        }
-        .alert(
-            String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
-            isPresented: Binding(
-                get: { incomingURLImportCoordinator.isTutorialImportBlocked },
-                set: { if !$0 { incomingURLImportCoordinator.dismissTutorialImportBlocked() } }
-            )
-        ) {
-            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
-                incomingURLImportCoordinator.dismissTutorialImportBlocked()
-            }
-        } message: {
-            Text(String(
-                localized: "import.tutorialBlocked.message",
-                defaultValue: "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
-            ))
-        }
-        .alert(
-            String(localized: "app.loadError.title", defaultValue: "Load Warning"),
-            isPresented: Binding(
-                get: { loadWarningCoordinator.presentedWarning != nil },
-                set: { if !$0 { loadWarningCoordinator.dismissPresentedWarning() } }
-            )
-        ) {
-            Button(String(localized: "error.ok", defaultValue: "OK")) {
-                loadWarningCoordinator.dismissPresentedWarning()
-            }
-        } message: {
-            if let presentedWarning = loadWarningCoordinator.presentedWarning {
-                Text(presentedWarning)
-            }
-        }
+        .incomingURLImportAlerts(coordinator: incomingURLImportCoordinator)
+        .appLoadWarningAlert(coordinator: loadWarningCoordinator)
         .onAppear {
             presentPendingLoadWarningIfPossible(source: "initialState")
         }
@@ -872,6 +810,116 @@ private final class CypherAirKeyboardPolicyDelegate: NSObject, UIApplicationDele
     }
 }
 #endif
+
+// MARK: - App Alerts
+
+@MainActor
+private extension View {
+    func incomingURLImportAlerts(
+        coordinator: IncomingURLImportCoordinator
+    ) -> some View {
+        self
+            .importErrorAlert(coordinator: coordinator)
+            .legacyKeyReplacementAlert(coordinator: coordinator)
+            .tutorialImportBlockedAlert(coordinator: coordinator)
+    }
+
+    func importErrorAlert(
+        coordinator: IncomingURLImportCoordinator
+    ) -> some View {
+        alert(
+            String(localized: "import.error.alertTitle", defaultValue: "Import Failed"),
+            isPresented: Binding(
+                get: { coordinator.importError != nil },
+                set: { if !$0 { coordinator.dismissImportError() } }
+            )
+        ) {
+            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
+                coordinator.dismissImportError()
+            }
+        } message: {
+            Text(coordinator.importErrorDescription)
+        }
+    }
+
+    func legacyKeyReplacementAlert(
+        coordinator: IncomingURLImportCoordinator
+    ) -> some View {
+        alert(
+            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
+            isPresented: Binding(
+                get: { coordinator.pendingKeyUpdateRequest != nil },
+                set: { if !$0 { coordinator.cancelPendingKeyUpdate() } }
+            ),
+            presenting: coordinator.pendingKeyUpdateRequest
+        ) { _ in
+            Button(
+                String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"),
+                role: .destructive
+            ) {
+                coordinator.confirmPendingKeyUpdate()
+            }
+            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
+                coordinator.cancelPendingKeyUpdate()
+            }
+        } message: { request in
+            Text(request.confirmationMessage)
+        }
+    }
+
+    func tutorialImportBlockedAlert(
+        coordinator: IncomingURLImportCoordinator
+    ) -> some View {
+        alert(
+            String(localized: "import.tutorialBlocked.title", defaultValue: "Close Tutorial to Import"),
+            isPresented: Binding(
+                get: { coordinator.isTutorialImportBlocked },
+                set: { if !$0 { coordinator.dismissTutorialImportBlocked() } }
+            )
+        ) {
+            Button(String(localized: "import.error.ok", defaultValue: "OK")) {
+                coordinator.dismissTutorialImportBlocked()
+            }
+        } message: {
+            Text(String(
+                localized: "import.tutorialBlocked.message",
+                defaultValue: "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+            ))
+        }
+    }
+
+    func appLoadWarningAlert(
+        coordinator: AppLoadWarningCoordinator
+    ) -> some View {
+        alert(
+            String(localized: "app.loadError.title", defaultValue: "Load Warning"),
+            isPresented: Binding(
+                get: { coordinator.presentedWarning != nil },
+                set: { if !$0 { coordinator.dismissPresentedWarning() } }
+            ),
+            presenting: coordinator.presentedWarning
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                coordinator.dismissPresentedWarning()
+            }
+        } message: { warning in
+            Text(warning)
+        }
+    }
+}
+
+@MainActor
+private extension ContactKeyUpdateConfirmationRequest {
+    var confirmationMessage: String {
+        let displayName = IdentityDisplayPresentation.displayName(
+            pendingUpdate.request.existingContact.displayName
+        )
+        return String(
+            localized: "addcontact.keyUpdate.message",
+            defaultValue: "This contact (\(displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"
+        )
+    }
+}
 
 // MARK: - Optional Tint
 
