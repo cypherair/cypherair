@@ -52,11 +52,13 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     case slate = "AppIconC"
     case obsidian = "AppIconD"
 
+    private static let primary: AppIconOption = .azure
+
     var id: String { rawValue }
 
-    /// The name passed to `setAlternateIconName`. `nil` means the primary icon (AppIconA).
+    /// The name passed to `setAlternateIconName`. `nil` means the primary icon configured at build time.
     var iconName: String? {
-        self == .silver ? nil : rawValue
+        self == Self.primary ? nil : rawValue
     }
 
     /// Bundle resource filename for the preview thumbnail (without extension).
@@ -89,8 +91,8 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 
     /// Match the current `alternateIconName` to an option.
     static func current(from alternateIconName: String?) -> AppIconOption {
-        guard let name = alternateIconName else { return .silver }
-        return AppIconOption(rawValue: name) ?? .silver
+        guard let name = alternateIconName else { return primary }
+        return AppIconOption(rawValue: name) ?? primary
     }
 }
 
