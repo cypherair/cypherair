@@ -75,7 +75,7 @@ final class SelfTestServiceTests: XCTestCase {
 
         let report = try XCTUnwrap(selfTestService.latestReport)
         XCTAssertTrue(
-            report.suggestedFilename.hasPrefix("CypherAir-SelfTest-Report-"),
+            report.suggestedFilename.hasPrefix("CypherAir-X-SelfTest-Report-"),
             "Report should have a suggested export filename"
         )
         XCTAssertEqual((report.suggestedFilename as NSString).pathExtension, "txt")
@@ -94,7 +94,7 @@ final class SelfTestServiceTests: XCTestCase {
         var presentedReport: SelfTestService.SelfTestReport? = try XCTUnwrap(selfTestService.latestReport)
 
         let exportURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAir-SelfTest-Report-\(UUID().uuidString).txt")
+            .appendingPathComponent("CypherAir-X-SelfTest-Report-\(UUID().uuidString).txt")
 
         SelfTestReportExportCompletion.finish(
             .success(exportURL),
