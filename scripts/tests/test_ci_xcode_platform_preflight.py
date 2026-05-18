@@ -274,4 +274,3 @@ class PreflightResult:
     @property
     def combined_output(self) -> str:
         return f"{self.process.stdout}\n{self.process.stderr}"
-
