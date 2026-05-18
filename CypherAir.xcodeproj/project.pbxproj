@@ -60,6 +60,7 @@
 				App/AppRoute.swift,
 				App/AppShellComposition.swift,
 				App/AppStartupCoordinator.swift,
+				App/Common/AppProductIdentity.swift,
 				App/Common/AppTemporaryArtifact.swift,
 				App/Common/AppTemporaryArtifactError.swift,
 				App/Common/AppTemporaryArtifactStore.swift,
@@ -209,7 +210,6 @@
 				"Extensions/Data+Zeroing.swift",
 				"Extensions/View+PlatformAvailability.swift",
 				Models/AppConfiguration.swift,
-				App/Common/AppProductIdentity.swift,
 				Models/CertificateSelectionCatalog.swift,
 				Models/CertificateSignatureSignerIdentity.swift,
 				Models/CertificateSignatureVerification.swift,
@@ -824,7 +824,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14201;
+				CURRENT_PROJECT_VERSION = 14202;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1050,7 +1050,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14201;
+				CURRENT_PROJECT_VERSION = 14202;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1196,7 +1196,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=*]" = CypherAir.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 14201;
+				CURRENT_PROJECT_VERSION = 14202;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
