@@ -4,10 +4,30 @@
     {
       "layers" : [
         {
-          "glass" : false,
+          "glass-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "appearance" : "tinted",
+              "value" : true
+            }
+          ],
           "hidden" : false,
           "image-name" : "CypherAirIconEfront.png",
-          "name" : "CypherAirIconEfront"
+          "name" : "CypherAirIconEfront",
+          "position-specializations" : [
+            {
+              "idiom" : "square",
+              "value" : {
+                "scale" : 1,
+                "translation-in-points" : [
+                  -35,
+                  -50
+                ]
+              }
+            }
+          ]
         }
       ],
       "name" : "Group1",
@@ -23,9 +43,34 @@
     {
       "layers" : [
         {
-          "glass" : false,
+          "glass-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "appearance" : "dark",
+              "value" : false
+            },
+            {
+              "appearance" : "tinted",
+              "value" : true
+            }
+          ],
+          "hidden" : false,
           "image-name" : "CypherAirIconEMiddle7.png",
-          "name" : "CypherAirIconEMiddle7"
+          "name" : "CypherAirIconEMiddle7",
+          "position-specializations" : [
+            {
+              "idiom" : "square",
+              "value" : {
+                "scale" : 1,
+                "translation-in-points" : [
+                  -35,
+                  -50
+                ]
+              }
+            }
+          ]
         }
       ],
       "name" : "Group2",
@@ -72,11 +117,103 @@
             {
               "appearance" : "dark",
               "value" : false
+            },
+            {
+              "appearance" : "tinted",
+              "value" : true
             }
           ],
-          "hidden" : false,
+          "hidden-specializations" : [
+            {
+              "value" : true
+            },
+            {
+              "idiom" : "square",
+              "value" : true
+            }
+          ],
           "image-name" : "cypherairiconeback.png",
-          "name" : "cypherairiconeback"
+          "name" : "cypherairiconeback",
+          "opacity-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : 0
+            },
+            {
+              "appearance" : "tinted",
+              "value" : 0
+            }
+          ]
+        },
+        {
+          "glass-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : false
+            },
+            {
+              "appearance" : "tinted",
+              "value" : false
+            }
+          ],
+          "hidden-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "idiom" : "square",
+              "value" : false
+            },
+            {
+              "idiom" : "watchOS",
+              "value" : false
+            }
+          ],
+          "image-name" : "97872B02-1F64-4E84-A86D-CCE6809A2D66.png",
+          "name" : "97872B02-1F64-4E84-A86D-CCE6809A2D66",
+          "opacity-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : 0
+            },
+            {
+              "appearance" : "tinted",
+              "value" : 0
+            }
+          ]
+        },
+        {
+          "glass-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : false
+            },
+            {
+              "appearance" : "tinted",
+              "value" : false
+            }
+          ],
+          "hidden-specializations" : [
+            {
+              "value" : true
+            },
+            {
+              "idiom" : "square",
+              "value" : true
+            }
+          ],
+          "image-name" : "75385E81-1BC8-4F9A-BB12-E2987B695B25.png",
+          "name" : "75385E81-1BC8-4F9A-BB12-E2987B695B25",
+          "opacity-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : 0
+            },
+            {
+              "appearance" : "tinted",
+              "value" : 0
+            }
+          ]
         }
       ],
       "name" : "Group3",
