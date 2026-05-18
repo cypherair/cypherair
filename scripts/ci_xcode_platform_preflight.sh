@@ -146,60 +146,87 @@ show_destinations() {
 }
 
 check_platform_readiness() {
-  local failures=""
+  local blocking_failures="" skippable_failures=""
   local xcode_version iphoneos_version xros_version destinations_file
+  local destinations_status ios_runtime_missing_reported="false" visionos_runtime_missing_reported="false"
 
   xcode_version="$(DEVELOPER_DIR="$DEVELOPER_DIR" xcodebuild -version 2>/dev/null | sed -n 's/^Xcode //p' | head -n1)"
   case "$xcode_version" in
     "$required_version"|"$required_version".*) ;;
     *)
-      record_failure failures "selected Xcode is ${xcode_version:-unknown}, not $required_version"
+      record_failure skippable_failures "selected Xcode is ${xcode_version:-unknown}, not $required_version"
       ;;
   esac
 
   iphoneos_version="$(sdk_version iphoneos)"
   if [ "$iphoneos_version" != "$required_version" ]; then
-    record_failure failures "iphoneos SDK is ${iphoneos_version:-missing}, not $required_version"
+    record_failure skippable_failures "iphoneos SDK is ${iphoneos_version:-missing}, not $required_version"
   fi
 
   xros_version="$(sdk_version xros)"
   if [ "$xros_version" != "$required_version" ]; then
-    record_failure failures "xros SDK is ${xros_version:-missing}, not $required_version"
+    record_failure skippable_failures "xros SDK is ${xros_version:-missing}, not $required_version"
   fi
 
   if ! runtime_available "iOS" "$required_version"; then
-    record_failure failures "iOS $required_version simulator runtime is not available"
+    record_failure skippable_failures "iOS $required_version simulator runtime is not available"
   fi
 
   if ! runtime_available "visionOS" "$required_version"; then
-    record_failure failures "visionOS $required_version simulator runtime is not available"
+    record_failure skippable_failures "visionOS $required_version simulator runtime is not available"
   fi
 
   destinations_file="$(mktemp "${TMPDIR:-/tmp}/cypherair-destinations.XXXXXX")"
-  if ! show_destinations "$destinations_file"; then
-    record_failure failures "xcodebuild -showdestinations failed"
+  if show_destinations "$destinations_file"; then
+    destinations_status=0
+  else
+    destinations_status=$?
   fi
 
   if grep -q "iOS $required_version is not installed" "$destinations_file"; then
-    record_failure failures "generic iOS destination reports iOS $required_version is not installed"
-  elif ! grep -Eq "platform:iOS.*name:Any iOS Device" "$destinations_file"; then
-    record_failure failures "generic iOS destination is not eligible"
+    ios_runtime_missing_reported="true"
+    record_failure skippable_failures "generic iOS destination reports iOS $required_version is not installed"
   fi
 
   if grep -q "visionOS $required_version is not installed" "$destinations_file"; then
-    record_failure failures "generic visionOS destination reports visionOS $required_version is not installed"
-  elif ! grep -Eq "platform:visionOS.*name:Any visionOS Device" "$destinations_file"; then
-    record_failure failures "generic visionOS destination is not eligible"
+    visionos_runtime_missing_reported="true"
+    record_failure skippable_failures "generic visionOS destination reports visionOS $required_version is not installed"
+  fi
+
+  if [ "$destinations_status" -ne 0 ]; then
+    if [ "$ios_runtime_missing_reported" != "true" ] && [ "$visionos_runtime_missing_reported" != "true" ]; then
+      record_failure blocking_failures "xcodebuild -showdestinations failed"
+    fi
+  else
+    if [ "$ios_runtime_missing_reported" != "true" ] && ! grep -Eq "platform:iOS.*name:Any iOS Device" "$destinations_file"; then
+      record_failure blocking_failures "generic iOS destination is not eligible"
+    fi
+
+    if [ "$visionos_runtime_missing_reported" != "true" ] && ! grep -Eq "platform:visionOS.*name:Any visionOS Device" "$destinations_file"; then
+      record_failure blocking_failures "generic visionOS destination is not eligible"
+    fi
   fi
 
   rm -f "$destinations_file"
 
-  if [ -n "$failures" ]; then
-    printf '%s\n' "$failures"
+  if [ -n "$blocking_failures" ]; then
+    printf '%s\n' "$blocking_failures"
+    if [ -n "$skippable_failures" ]; then
+      printf '%s\n' "$skippable_failures"
+    fi
+    return 2
+  fi
+
+  if [ -n "$skippable_failures" ]; then
+    printf '%s\n' "$skippable_failures"
     return 1
   fi
 
   return 0
+}
+
+failure_summary() {
+  awk 'NF { sub(/^- /, ""); printf "%s%s", sep, $0; sep="; " }'
 }
 
 select_xcode
@@ -225,7 +252,10 @@ begin_group "Available simulator runtimes"
 DEVELOPER_DIR="$DEVELOPER_DIR" xcrun simctl list runtimes available || true
 end_group
 
-if readiness_failures="$(check_platform_readiness)"; then
+readiness_status=0
+readiness_failures="$(check_platform_readiness)" || readiness_status=$?
+
+if [ "$readiness_status" -eq 0 ]; then
   github_output_set ready "true"
   github_output_set skip_reason ""
   summary_line "### Xcode $required_version Platform Probe Readiness"
@@ -236,7 +266,18 @@ if readiness_failures="$(check_platform_readiness)"; then
   exit 0
 fi
 
-skip_reason="$(printf '%s\n' "$readiness_failures" | awk 'NF { sub(/^- /, ""); printf "%s%s", sep, $0; sep="; " }')"
+skip_reason="$(printf '%s\n' "$readiness_failures" | failure_summary)"
+
+if [ "$readiness_status" -eq 2 ]; then
+  summary_line "### Xcode $required_version Platform Probe Readiness"
+  summary_line ""
+  summary_line "- Status: failed"
+  summary_line "- Reason: $skip_reason"
+  printf '::error::Xcode %s platform probe preflight failed due to project configuration: %s\n' "$required_version" "$skip_reason"
+  printf '%s\n' "$readiness_failures"
+  exit 1
+fi
+
 github_output_set ready "false"
 github_output_set skip_reason "$skip_reason"
 summary_line "### Xcode $required_version Platform Probe Readiness"
