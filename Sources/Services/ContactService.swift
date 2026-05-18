@@ -789,16 +789,6 @@ final class ContactService: @unchecked Sendable {
         return contacts.first { $0.fingerprint == fingerprint }
     }
 
-    func requireAvailableContactKeyRecord(fingerprint: String) throws -> ContactKeyRecord {
-        try requireContactsAvailable()
-        guard let keyRecord = availableContactKeyRecord(fingerprint: fingerprint) else {
-            throw CypherAirError.internalError(
-                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-            )
-        }
-        return keyRecord
-    }
-
     func requireContactPublicKeyData(fingerprint: String) throws -> Data {
         try requireContactsAvailable()
         guard let publicKeyData = availableContactKeyRecord(fingerprint: fingerprint)?.publicKeyData else {
