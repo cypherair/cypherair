@@ -1274,7 +1274,7 @@ final class ContactService: @unchecked Sendable {
     private static func protectedDomainMigrationWarningMessage() -> String {
         String(
             localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
         )
     }
 }

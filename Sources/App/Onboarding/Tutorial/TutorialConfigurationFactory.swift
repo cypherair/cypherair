@@ -193,7 +193,7 @@ struct TutorialConfigurationFactory {
         configuration.localDataResetAvailability = .disabled(
             footer: String(
                 localized: "guidedTutorial.settings.restricted.localDataReset",
-                defaultValue: "The tutorial sandbox cannot reset real CypherAir data."
+                defaultValue: "The tutorial sandbox cannot reset real CypherAir X data."
             )
         )
         return configuration

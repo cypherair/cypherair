@@ -307,7 +307,7 @@ struct CypherAirApp: App {
     var body: some Scene {
         #if os(macOS)
         Window(
-            String(localized: "app.name", defaultValue: "CypherAir"),
+            AppProductIdentity.localizedDisplayName,
             id: mainWindowID
         ) {
             mainWindowSceneContent
@@ -322,7 +322,7 @@ struct CypherAirApp: App {
         }
         #elseif os(visionOS)
         Window(
-            String(localized: "app.name", defaultValue: "CypherAir"),
+            AppProductIdentity.localizedDisplayName,
             id: mainWindowID
         ) {
             mainWindowSceneContent
@@ -501,7 +501,7 @@ struct CypherAirApp: App {
         } message: {
             Text(String(
                 localized: "import.tutorialBlocked.message",
-                defaultValue: "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+                defaultValue: "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
             ))
         }
         .alert(

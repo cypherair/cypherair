@@ -21,7 +21,7 @@ struct MyKeysView: View {
         case .locked:
             metadataStateContent(
                 title: String(localized: "keys.locked.title", defaultValue: "Keys Locked"),
-                subtitle: String(localized: "keys.locked.description", defaultValue: "Unlock CypherAir to show your keys."),
+                subtitle: String(localized: "keys.locked.description", defaultValue: "Unlock CypherAir X to show your keys."),
                 systemImage: "lock"
             )
         case .loading:

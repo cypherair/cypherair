@@ -142,7 +142,7 @@ private struct SelectiveRevocationScreenHostView: View {
             Text(
                 String(
                     localized: "selectiverevocation.explanation",
-                    defaultValue: "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir."
+                    defaultValue: "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir X."
                 )
             )
             .font(.callout)

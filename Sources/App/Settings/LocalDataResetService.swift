@@ -13,7 +13,7 @@ struct LocalDataResetError: LocalizedError, Equatable {
     var errorDescription: String? {
         String(
             localized: "settings.resetAll.error",
-            defaultValue: "Some CypherAir data could not be reset. Restart the app and try again."
+            defaultValue: "Some CypherAir X data could not be reset. Restart the app and try again."
         )
     }
 }

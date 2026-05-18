@@ -145,7 +145,7 @@ final class SettingsScreenModel {
         case .enabled:
             String(
                 localized: "settings.resetAll.footer",
-                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir install."
+                defaultValue: "Use this only when you want this device to behave like a fresh CypherAir X install."
             )
         case .disabled(let footer):
             footer
@@ -167,12 +167,12 @@ final class SettingsScreenModel {
         if localDataResetSucceeded {
             return String(
                 localized: "settings.resetAll.success.message",
-                defaultValue: "CypherAir local data was reset. Restart the app to complete the fresh-start state."
+                defaultValue: "CypherAir X local data was reset. Restart the app to complete the fresh-start state."
             )
         }
         return localDataResetErrorMessage ?? String(
             localized: "settings.resetAll.error.message",
-            defaultValue: "CypherAir could not reset all local data."
+            defaultValue: "CypherAir X could not reset all local data."
         )
     }
 
@@ -373,7 +373,7 @@ final class SettingsScreenModel {
                         policy: appConfiguration.appSessionAuthenticationPolicy,
                         reason: String(
                             localized: "settings.resetAll.authReason",
-                            defaultValue: "Authenticate to reset all CypherAir data on this device."
+                            defaultValue: "Authenticate to reset all CypherAir X data on this device."
                         ),
                         source: "localDataReset"
                     )

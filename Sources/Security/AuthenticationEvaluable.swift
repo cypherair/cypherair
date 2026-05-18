@@ -209,7 +209,7 @@ enum PrivateKeyControlError: Error, LocalizedError, Equatable {
         case .locked:
             String(
                 localized: "error.privateKeyControl.locked",
-                defaultValue: "Private key protection settings are locked. Unlock CypherAir and try again."
+                defaultValue: "Private key protection settings are locked. Unlock CypherAir X and try again."
             )
         case .recoveryNeeded:
             String(

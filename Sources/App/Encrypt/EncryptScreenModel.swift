@@ -789,7 +789,7 @@ final class EncryptScreenModel {
             error: .encryptionFailed(
                 reason: String(
                     localized: "encrypt.protectedPreferencesLocked",
-                    defaultValue: "Unlock CypherAir before encrypting with app defaults."
+                    defaultValue: "Unlock CypherAir X before encrypting with app defaults."
                 )
             )
         )

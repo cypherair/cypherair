@@ -369,7 +369,7 @@ def build_notice_manifest(packages: list[PackageRecord], license_sources: dict[s
     notices = [
         {
             "id": "cypherair",
-            "displayName": "CypherAir",
+            "displayName": "CypherAir X",
             "version": app_version_string(),
             "repositoryURL": APP_REPOSITORY_URL,
             "licenseName": "GPL-3.0-or-later OR MPL-2.0",

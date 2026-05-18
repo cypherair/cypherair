@@ -7,7 +7,7 @@ struct HomeView: View {
     @Environment(\.appRouteNavigator) private var routeNavigator
     var body: some View {
         content
-        .navigationTitle(String(localized: "home.title", defaultValue: "CypherAir"))
+        .navigationTitle(AppProductIdentity.localizedDisplayName)
     }
 
     @ViewBuilder
@@ -16,7 +16,7 @@ struct HomeView: View {
         case .locked:
             metadataStateContent(
                 title: String(localized: "home.keysLocked.title", defaultValue: "Keys Locked"),
-                subtitle: String(localized: "home.keysLocked.subtitle", defaultValue: "Unlock CypherAir to show your key list."),
+                subtitle: String(localized: "home.keysLocked.subtitle", defaultValue: "Unlock CypherAir X to show your key list."),
                 systemImage: "lock"
             )
         case .loading:

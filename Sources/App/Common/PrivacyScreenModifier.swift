@@ -218,12 +218,12 @@ struct PrivacyScreenModifier: ViewModifier {
         #if os(macOS)
         String(
             localized: "privacy.biometricsLockedOut.message.macOS",
-            defaultValue: "CypherAir is set to Biometrics Only, so it will not use your Mac password as a fallback."
+            defaultValue: "CypherAir X is set to Biometrics Only, so it will not use your Mac password as a fallback."
         )
         #else
         String(
             localized: "privacy.biometricsLockedOut.message.device",
-            defaultValue: "CypherAir is set to Biometrics Only, so it will not use your device passcode as a fallback."
+            defaultValue: "CypherAir X is set to Biometrics Only, so it will not use your device passcode as a fallback."
         )
         #endif
     }

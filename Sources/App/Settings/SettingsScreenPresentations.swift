@@ -111,7 +111,7 @@ private struct SettingsScreenPresentations: ViewModifier {
                 Text(
                     String(
                         localized: "settings.resetAll.warning",
-                        defaultValue: "This permanently deletes CypherAir keys, contacts, preferences, app settings, and temporary files on this device."
+                        defaultValue: "This permanently deletes CypherAir X keys, contacts, preferences, app settings, and temporary files on this device."
                     )
                 )
             }

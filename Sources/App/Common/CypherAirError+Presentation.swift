@@ -53,7 +53,7 @@ extension CypherAirError: LocalizedError {
         case .keychainError:
             String(localized: "error.keychain", defaultValue: "Failed to access secure storage.")
         case .invalidQRCode:
-            String(localized: "error.invalidQR", defaultValue: "Not a valid CypherAir public key.")
+            String(localized: "error.invalidQR", defaultValue: "Not a valid CypherAir X public key.")
         case .unsupportedQRVersion:
             String(localized: "error.unsupportedQRVersion", defaultValue: "This QR code requires a newer version of the app. Please update.")
         case .contactImportRequiresPublicCertificate:

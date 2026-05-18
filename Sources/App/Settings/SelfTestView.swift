@@ -115,7 +115,7 @@ struct SelfTestView: View {
             isPresented: $showReportExporter,
             item: report?.data,
             contentTypes: [.data],
-            defaultFilename: report?.suggestedFilename ?? "CypherAir-SelfTest-Report.txt"
+            defaultFilename: report?.suggestedFilename ?? "CypherAir-X-SelfTest-Report.txt"
         ) { result in
             SelfTestReportExportCompletion.finish(
                 result,

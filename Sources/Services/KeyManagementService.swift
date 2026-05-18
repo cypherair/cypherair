@@ -215,7 +215,7 @@ final class KeyManagementService: @unchecked Sendable {
     private static func legacyMetadataMigrationWarningMessage() -> String {
         String(
             localized: "app.loadWarning.legacyMetadataMigration",
-            defaultValue: "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
+            defaultValue: "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir X and unlock again to retry."
         )
     }
 

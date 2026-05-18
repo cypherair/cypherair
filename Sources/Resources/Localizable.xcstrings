@@ -49,6 +49,22 @@
         }
       }
     },
+    "about.cypherAirX.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir X is CypherAir’s exploratory product line for new directions still under evaluation, such as new encryption options, visual design updates, and interaction improvements. These explorations do not change CypherAir’s fully offline, no-network privacy model."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CypherAir X 是 CypherAir 的探索产品线，用来承载仍在评估中的新方向，例如新的加密方式、外观和交互改进。这些探索不会改变 CypherAir 完全离线、无网络访问的隐私模型。"
+          }
+        }
+      }
+    },
     "about.license" : {
       "localizations" : {
         "en" : {
@@ -438,13 +454,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir and unlock again to retry cleanup."
+            "value" : "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "联系人已从受保护的应用数据中打开，但旧联系人文件未能完全清理。请重启 CypherAir 并再次解锁以重试清理。"
+            "value" : "联系人已从受保护的应用数据中打开，但旧联系人文件未能完全清理。请重启 CypherAir X 并再次解锁以重试清理。"
           }
         }
       }
@@ -454,13 +470,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir and unlock again to retry."
+            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir X and unlock again to retry."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
+            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir X 并再次解锁以重试。"
           }
         }
       }
@@ -470,29 +486,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir and unlock again to retry."
+            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir X and unlock again to retry."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir 并再次解锁以重试。"
-          }
-        }
-      }
-    },
-    "app.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
+            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir X 并再次解锁以重试。"
           }
         }
       }
@@ -3398,13 +3398,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock CypherAir to use contacts."
+            "value" : "Unlock CypherAir X to use contacts."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁 CypherAir 后才能使用联系人。"
+            "value" : "解锁 CypherAir X 后才能使用联系人。"
           }
         }
       }
@@ -3494,13 +3494,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restart CypherAir before using protected contact data."
+            "value" : "Restart CypherAir X before using protected contact data."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启 CypherAir 后才能使用受保护的联系人数据。"
+            "value" : "重启 CypherAir X 后才能使用受保护的联系人数据。"
           }
         }
       }
@@ -5206,13 +5206,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Not a valid CypherAir public key."
+            "value" : "Not a valid CypherAir X public key."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不是有效的 CypherAir 公钥。"
+            "value" : "不是有效的 CypherAir X 公钥。"
           }
         }
       }
@@ -5382,13 +5382,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Private key protection is locked. Unlock CypherAir and try again."
+            "value" : "Private key protection is locked. Unlock CypherAir X and try again."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "私钥保护已锁定。请解锁 CypherAir 后重试。"
+            "value" : "私钥保护已锁定。请解锁 CypherAir X 后重试。"
           }
         }
       }
@@ -6182,13 +6182,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start Using CypherAir"
+            "value" : "Start Using CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开始使用 CypherAir"
+            "value" : "开始使用 CypherAir X"
           }
         }
       }
@@ -6278,13 +6278,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You're ready to start using CypherAir"
+            "value" : "You're ready to start using CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你已经可以开始使用 CypherAir"
+            "value" : "你已经可以开始使用 CypherAir X"
           }
         }
       }
@@ -6470,13 +6470,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Learn CypherAir in a real sandbox"
+            "value" : "Learn CypherAir X in a real sandbox"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在真实沙箱中学习 CypherAir"
+            "value" : "在真实沙箱中学习 CypherAir X"
           }
         }
       }
@@ -7558,13 +7558,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The tutorial sandbox cannot reset real CypherAir data."
+            "value" : "The tutorial sandbox cannot reset real CypherAir X data."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "教程沙盒不能重置真实的 CypherAir 数据。"
+            "value" : "教程沙盒不能重置真实的 CypherAir X 数据。"
           }
         }
       }
@@ -7798,13 +7798,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock CypherAir to show your key list."
+            "value" : "Unlock CypherAir X to show your key list."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁 CypherAir 以显示你的密钥列表。"
+            "value" : "解锁 CypherAir X 以显示你的密钥列表。"
           }
         }
       }
@@ -7901,22 +7901,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名"
-          }
-        }
-      }
-    },
-    "home.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
           }
         }
       }
@@ -8326,13 +8310,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
+            "value" : "CypherAir X does not import real contacts while the Guided Tutorial is open. Close the tutorial, then open the QR link again."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "引导教程打开时，CypherAir 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
+            "value" : "引导教程打开时，CypherAir X 不会导入真实联系人。请关闭教程，然后重新打开二维码链接。"
           }
         }
       }
@@ -9318,13 +9302,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unlock CypherAir to show your keys."
+            "value" : "Unlock CypherAir X to show your keys."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "解锁 CypherAir 以显示你的密钥。"
+            "value" : "解锁 CypherAir X 以显示你的密钥。"
           }
         }
       }
@@ -9681,22 +9665,6 @@
         }
       }
     },
-    "license.section.app" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CypherAir"
-          }
-        }
-      }
-    },
     "license.section.core" : {
       "localizations" : {
         "en" : {
@@ -9846,13 +9814,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir never connects to the internet. Your messages and keys stay on your device."
+            "value" : "CypherAir X never connects to the internet. Your messages and keys stay on your device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 永不联网。你的消息和密钥始终留在你的设备上。"
+            "value" : "CypherAir X 永不联网。你的消息和密钥始终留在你的设备上。"
           }
         }
       }
@@ -9910,13 +9878,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Learn CypherAir in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."
+            "value" : "Learn CypherAir X in an isolated sandbox first, or skip the tutorial and enter the real app right away. Tutorial actions never touch your real keys, contacts, settings, files, exports, or private-key security assets."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你可以先在隔离的教程沙箱中了解 CypherAir，或直接跳过教程进入真实应用。教程中的操作不会触碰你的真实密钥、联系人、设置、文件、导出内容或私钥安全资产。"
+            "value" : "你可以先在隔离的教程沙箱中了解 CypherAir X，或直接跳过教程进入真实应用。教程中的操作不会触碰你的真实密钥、联系人、设置、文件、导出内容或私钥安全资产。"
           }
         }
       }
@@ -10086,13 +10054,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir is set to Biometrics Only, so it will not use your device passcode as a fallback."
+            "value" : "CypherAir X is set to Biometrics Only, so it will not use your device passcode as a fallback."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 当前设置为“仅生物认证”，因此不会使用设备密码作为备用解锁方式。"
+            "value" : "CypherAir X 当前设置为“仅生物认证”，因此不会使用设备密码作为备用解锁方式。"
           }
         }
       }
@@ -10102,13 +10070,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir is set to Biometrics Only, so it will not use your Mac password as a fallback."
+            "value" : "CypherAir X is set to Biometrics Only, so it will not use your Mac password as a fallback."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 当前设置为“仅生物认证”，因此不会使用 Mac 密码作为备用解锁方式。"
+            "value" : "CypherAir X 当前设置为“仅生物认证”，因此不会使用 Mac 密码作为备用解锁方式。"
           }
         }
       }
@@ -10774,13 +10742,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir."
+            "value" : "Export a revocation signature for one subkey or one User ID. This does not modify the stored key and does not save a new revocation artifact in CypherAir X."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为一个子密钥或一个用户 ID 导出吊销签名。这不会修改已存储的密钥，也不会在 CypherAir 中保存新的吊销制品。"
+            "value" : "为一个子密钥或一个用户 ID 导出吊销签名。这不会修改已存储的密钥，也不会在 CypherAir X 中保存新的吊销制品。"
           }
         }
       }
@@ -11302,13 +11270,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir Self-Test Report"
+            "value" : "CypherAir X Self-Test Report"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 自检报告"
+            "value" : "CypherAir X 自检报告"
           }
         }
       }
@@ -11974,13 +11942,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Authenticate to reset all CypherAir data on this device."
+            "value" : "Authenticate to reset all CypherAir X data on this device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "认证以重置此设备上的所有 CypherAir 数据。"
+            "value" : "认证以重置此设备上的所有 CypherAir X 数据。"
           }
         }
       }
@@ -12022,13 +11990,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Some CypherAir data could not be reset. Restart the app and try again."
+            "value" : "Some CypherAir X data could not be reset. Restart the app and try again."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分 CypherAir 数据无法重置。请重启 App 后再试。"
+            "value" : "部分 CypherAir X 数据无法重置。请重启 App 后再试。"
           }
         }
       }
@@ -12038,13 +12006,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir could not reset all local data."
+            "value" : "CypherAir X could not reset all local data."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 未能重置所有本机数据。"
+            "value" : "CypherAir X 未能重置所有本机数据。"
           }
         }
       }
@@ -12070,13 +12038,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use this only when you want this device to behave like a fresh CypherAir install."
+            "value" : "Use this only when you want this device to behave like a fresh CypherAir X install."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅在希望此设备像全新安装 CypherAir 一样时使用。"
+            "value" : "仅在希望此设备像全新安装 CypherAir X 一样时使用。"
           }
         }
       }
@@ -12086,13 +12054,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Type RESET to permanently delete all CypherAir data on this device."
+            "value" : "Type RESET to permanently delete all CypherAir X data on this device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入 RESET 以永久删除此设备上的所有 CypherAir 数据。"
+            "value" : "输入 RESET 以永久删除此设备上的所有 CypherAir X 数据。"
           }
         }
       }
@@ -12118,13 +12086,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All local CypherAir data was deleted and verified. Close CypherAir from the app switcher, then open it again to complete a clean restart."
+            "value" : "All local CypherAir X data was deleted and verified. Close CypherAir X from the app switcher, then open it again to complete a clean restart."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有 CypherAir 本机数据已删除并验证。请从 App 切换器关闭 CypherAir，然后重新打开，以完成干净重启。"
+            "value" : "所有 CypherAir X 本机数据已删除并验证。请从 App 切换器关闭 CypherAir X，然后重新打开，以完成干净重启。"
           }
         }
       }
@@ -12134,13 +12102,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "All local CypherAir data was deleted and verified. Quit and reopen CypherAir to complete a clean restart."
+            "value" : "All local CypherAir X data was deleted and verified. Quit and reopen CypherAir X to complete a clean restart."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有 CypherAir 本机数据已删除并验证。请退出并重新打开 CypherAir，以完成干净重启。"
+            "value" : "所有 CypherAir X 本机数据已删除并验证。请退出并重新打开 CypherAir X，以完成干净重启。"
           }
         }
       }
@@ -12150,13 +12118,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quit CypherAir"
+            "value" : "Quit CypherAir X"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 CypherAir"
+            "value" : "退出 CypherAir X"
           }
         }
       }
@@ -12182,13 +12150,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir local data was reset. Restart the app to complete the fresh-start state."
+            "value" : "CypherAir X local data was reset. Restart the app to complete the fresh-start state."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir 本机数据已重置。请重启 App 以完成全新启动状态。"
+            "value" : "CypherAir X 本机数据已重置。请重启 App 以完成全新启动状态。"
           }
         }
       }
@@ -12230,13 +12198,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This permanently deletes CypherAir keys, contacts, preferences, app settings, and temporary files on this device."
+            "value" : "This permanently deletes CypherAir X keys, contacts, preferences, app settings, and temporary files on this device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这会永久删除此设备上的 CypherAir 密钥、联系人、偏好设置、App 设置和临时文件。"
+            "value" : "这会永久删除此设备上的 CypherAir X 密钥、联系人、偏好设置、App 设置和临时文件。"
           }
         }
       }
@@ -13110,13 +13078,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A previous secure key migration could not be fully recovered. CypherAir will retry recovery on next launch."
+            "value" : "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir 将在下次启动时重试恢复。"
+            "value" : "先前的安全密钥迁移未能完全恢复。CypherAir X 将在下次启动时重试恢复。"
           }
         }
       }
