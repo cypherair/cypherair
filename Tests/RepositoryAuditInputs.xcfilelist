@@ -40,6 +40,7 @@ $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificationDetailsView.swift
+$(SRCROOT)/Sources/App/Contacts/ContactDetailScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/ContactDetailView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactIdentitySummary+Presentation.swift
 $(SRCROOT)/Sources/App/Contacts/ContactKeySummaryView.swift
