@@ -901,12 +901,12 @@
     ]
   },
   {
-    "id": "openssl@0.10.79",
+    "id": "openssl@0.10.80",
     "displayName": "openssl",
-    "version": "0.10.79",
+    "version": "0.10.80",
     "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
     "licenseName": "Apache-2.0",
-    "licenseFileResourceName": "openssl-0.10.79.txt",
+    "licenseFileResourceName": "openssl-0.10.80.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
@@ -930,12 +930,12 @@
     ]
   },
   {
-    "id": "openssl-sys@0.9.115",
+    "id": "openssl-sys@0.9.116",
     "displayName": "openssl-sys",
-    "version": "0.9.115",
+    "version": "0.9.116",
     "repositoryURL": "https://github.com/rust-openssl/rust-openssl",
     "licenseName": "MIT",
-    "licenseFileResourceName": "openssl-sys-0.9.115.txt",
+    "licenseFileResourceName": "openssl-sys-0.9.116.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1585,12 +1585,12 @@
     ]
   },
   {
-    "id": "winnow@1.0.2",
+    "id": "winnow@1.0.3",
     "displayName": "winnow",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "repositoryURL": "https://github.com/winnow-rs/winnow",
     "licenseName": "MIT",
-    "licenseFileResourceName": "winnow-1.0.2.txt",
+    "licenseFileResourceName": "winnow-1.0.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
