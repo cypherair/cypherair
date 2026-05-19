@@ -190,6 +190,7 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
   - Move workflow-heavy key generation, import, backup, key detail, expiry, and selective-revocation behavior into ScreenModel-owned actions and state where not already complete.
 
 - **PR 4B: Contacts and QR route ScreenModels**
+  - Status: Implemented on 2026-05-19.
   - Move QR display/generation, contact detail mutations, import confirmation, and tag/contact route workflow state behind ScreenModels or narrow presentation coordinators.
 
 - **PR 4C: Settings-adjacent ScreenModel cleanup**
@@ -215,6 +216,12 @@ PR4A validation added key-route ScreenModel unit coverage for generation,
 import, backup, expiry modification, key detail stale-export suppression, and
 selective-revocation output interception. It also added source-audit coverage to
 block key-management workflow calls from key route Views.
+
+PR4B validation added QR Display ScreenModel unit coverage, tightened Add
+Contact QR-photo loader ownership, accepted existing Contact Detail, Contacts,
+tag, import-confirmation, and incoming-URL coordinators for the Contacts route
+scope, and added source-audit coverage to block contact/QR workflow calls from
+Contacts route Views.
 
 ## Phase 5: Security And App Composition Boundary
 
