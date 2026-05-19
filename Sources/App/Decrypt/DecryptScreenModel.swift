@@ -33,7 +33,7 @@ final class DecryptScreenModel {
     private let textCiphertextFileImportAction: TextCiphertextFileImportAction
     private let ciphertextFileInspectionAction: CiphertextFileInspectionAction
     private let textDecryptionAction: TextDecryptionAction
-    private let fileDecryptionAction: FileDecryptionAction
+    private let fileDecryptionAction: FileOperationAction<FileDecryptionRequest, FileDecryptionResult>
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     @ObservationIgnored private var decryptedFileOutput: TemporaryFileOutput?
     private var fileImportRequestGate = FileImportRequestGate()
@@ -159,7 +159,7 @@ final class DecryptScreenModel {
         self.textDecryptionAction = textDecryptionAction ?? { phase1 in
             try await decryptionService.decryptDetailed(phase1: phase1)
         }
-        self.fileDecryptionAction = fileDecryptionAction ?? { request in
+        self.fileDecryptionAction = FileOperationAction(injectedAction: fileDecryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
@@ -175,7 +175,7 @@ final class DecryptScreenModel {
             ) {
                 let result = try await decryptionService.decryptFileStreamingDetailed(
                     phase1: request.phase1Result,
-                    progress: operation.progress
+                    progress: progress
                 )
                 return FileDecryptionResult(
                     output: result.artifact.temporaryFileOutput,
@@ -404,9 +404,9 @@ final class DecryptScreenModel {
                 FileDecryptionRequest(
                     fileURL: fileURL,
                     phase1Result: filePhase1Result
-                )
+                ),
+                progress: progress
             )
-            _ = progress
             var pendingOutput: TemporaryFileOutput? = result.output
             defer {
                 pendingOutput?.cleanup()

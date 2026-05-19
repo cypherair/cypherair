@@ -53,7 +53,7 @@ final class EncryptScreenModel {
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
-    private let fileEncryptionAction: FileEncryptionAction
+    private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
     @ObservationIgnored private var encryptedFileOutput: TemporaryFileOutput?
@@ -133,7 +133,7 @@ final class EncryptScreenModel {
                 encryptToSelfFingerprint: encryptToSelfFingerprint
             )
         }
-        self.fileEncryptionAction = fileEncryptionAction ?? { request in
+        self.fileEncryptionAction = FileOperationAction(injectedAction: fileEncryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
@@ -153,7 +153,7 @@ final class EncryptScreenModel {
                     signWithFingerprint: request.signerFingerprint,
                     encryptToSelf: request.encryptToSelf,
                     encryptToSelfFingerprint: request.encryptToSelfFingerprint,
-                    progress: operationController.progress
+                    progress: progress
                 ).temporaryFileOutput
             }
         }
@@ -500,9 +500,9 @@ final class EncryptScreenModel {
                     signerFingerprint: signerFingerprint,
                     encryptToSelf: encryptToSelf,
                     encryptToSelfFingerprint: encryptToSelfFingerprint
-                )
+                ),
+                progress: progress
             )
-            _ = progress
             var pendingOutput: TemporaryFileOutput? = output
             defer {
                 pendingOutput?.cleanup()

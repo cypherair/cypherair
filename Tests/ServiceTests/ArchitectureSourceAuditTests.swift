@@ -66,6 +66,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.screenModelPublicAPIContainment)
     }
 
+    func test_screenModelStreamingServicesUsePerOperationProgressReporter() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.screenModelStreamingProgressOwnership)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -332,6 +336,51 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .isEmpty
         )
 
+        let staleOperationProgressSource = AuditedSource(
+            path: "Sources/App/Encrypt/NewEncryptScreenModel.swift",
+            contents: """
+            final class NewEncryptScreenModel {
+                func encrypt(service: EncryptionService, operation: OperationController) async throws {
+                    _ = try await service.encryptFileStreaming(
+                        inputURL: URL(fileURLWithPath: "/tmp/input"),
+                        recipientContactIds: [],
+                        signWithFingerprint: nil,
+                        encryptToSelf: false,
+                        encryptToSelfFingerprint: nil,
+                        progress: operation.progress
+                    )
+                }
+            }
+            """
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelStreamingProgressOwnership
+                .violations(in: [staleOperationProgressSource])
+                .map(\.path),
+            [staleOperationProgressSource.path]
+        )
+
+        let staleOperationControllerProgressSource = AuditedSource(
+            path: "Sources/App/Sign/NewSignScreenModel.swift",
+            contents: """
+            final class NewSignScreenModel {
+                func sign(service: SigningService, operationController: OperationController) async throws {
+                    _ = try await service.signDetachedStreaming(
+                        fileURL: URL(fileURLWithPath: "/tmp/input"),
+                        signerFingerprint: "ABCD",
+                        progress: operationController.progress
+                    )
+                }
+            }
+            """
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelStreamingProgressOwnership
+                .violations(in: [staleOperationControllerProgressSource])
+                .map(\.path),
+            [staleOperationControllerProgressSource.path]
+        )
+
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
@@ -419,6 +468,22 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.screenModelPublicAPIContainment.violations(in: [screenModelAPISource]).isEmpty
+        )
+
+        let progressStateReadSource = AuditedSource(
+            path: "Sources/App/Encrypt/NewScreenModel.swift",
+            contents: """
+            final class NewScreenModel {
+                var showsProgress: Bool {
+                    operation.isRunning && operation.progress != nil
+                }
+            }
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelStreamingProgressOwnership
+                .violations(in: [progressStateReadSource])
+                .isEmpty
         )
     }
 
@@ -854,6 +919,17 @@ private enum ArchitectureSourceAuditRules {
         name: "ScreenModel public API containment",
         failureSummary: "ScreenModels should expose app-owned request/result values instead of service phase, progress, or temporary-artifact internals.",
         pattern: #"\bDecryptionService\s*\.\s*(?:Phase1Result|FilePhase1Result)\b|\b(?:FileProgressReporter|AppTemporaryArtifact)\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/App/") && path.hasSuffix("ScreenModel.swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let screenModelStreamingProgressOwnership = ArchitectureSourceAuditRule(
+        name: "ScreenModel streaming progress ownership",
+        failureSummary: "ScreenModel streaming service calls must use the per-operation progress reporter passed by runFileOperation.",
+        pattern: #"\bprogress\s*:\s*(?:operation|operationController)\s*\.\s*progress\b"#,
         scope: { path in
             path.hasPrefix("Sources/App/") && path.hasSuffix("ScreenModel.swift")
         },

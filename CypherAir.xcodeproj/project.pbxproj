@@ -81,6 +81,7 @@
 				App/Common/DetailedSignatureSectionView.swift,
 				App/Common/FileExportController.swift,
 				App/Common/FileImportRequestGate.swift,
+				App/Common/FileOperationAction.swift,
 				App/Common/FingerprintView.swift,
 				App/Common/IdentityDisplayPresentation.swift,
 				App/Common/MacPresentationPolish.swift,

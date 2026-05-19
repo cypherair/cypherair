@@ -22,7 +22,7 @@ final class SignScreenModel {
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let cleartextSigningAction: CleartextSigningAction
-    private let detachedFileSigningAction: DetachedFileSigningAction
+    private let detachedFileSigningAction: FileOperationAction<DetachedFileSigningRequest, Data>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
@@ -70,7 +70,7 @@ final class SignScreenModel {
         self.cleartextSigningAction = cleartextSigningAction ?? { message, signerFingerprint in
             try await signingService.signCleartext(message, signerFingerprint: signerFingerprint)
         }
-        self.detachedFileSigningAction = detachedFileSigningAction ?? { request in
+        self.detachedFileSigningAction = FileOperationAction(injectedAction: detachedFileSigningAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
@@ -87,7 +87,7 @@ final class SignScreenModel {
                 try await signingService.signDetachedStreaming(
                     fileURL: request.fileURL,
                     signerFingerprint: request.signerFingerprint,
-                    progress: operationController.progress
+                    progress: progress
                 )
             }
         }
@@ -188,12 +188,12 @@ final class SignScreenModel {
         authLifecycleTraceStore?.record(category: .operation, name: "sign.file.start", metadata: ["mode": "file"])
 
         operation.runFileOperation(mapError: mapSigningError) { [self] progress in
-            _ = progress
             let signature = try await self.detachedFileSigningAction(
                 DetachedFileSigningRequest(
                     fileURL: fileURL,
                     signerFingerprint: signerFingerprint
-                )
+                ),
+                progress: progress
             )
             try Task.checkCancellation()
             self.detachedSignature = signature

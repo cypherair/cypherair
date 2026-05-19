@@ -31,7 +31,7 @@ final class VerifyScreenModel {
     let operation: OperationController
 
     private let cleartextVerificationAction: CleartextVerificationAction
-    private let detachedVerificationAction: DetachedVerificationAction
+    private let detachedVerificationAction: FileOperationAction<DetachedVerificationRequest, DetailedSignatureVerification>
     private let cleartextFileImportAction: CleartextFileImportAction
     private var fileImportRequestGate = FileImportRequestGate()
 
@@ -57,13 +57,12 @@ final class VerifyScreenModel {
         detachedVerificationAction: DetachedVerificationAction? = nil,
         cleartextFileImportAction: CleartextFileImportAction? = nil
     ) {
-        let operationController = operation
         self.configuration = configuration
         self.operation = operation
         self.cleartextVerificationAction = cleartextVerificationAction ?? { signedMessage in
             try await signingService.verifyCleartextDetailed(signedMessage)
         }
-        self.detachedVerificationAction = detachedVerificationAction ?? { request in
+        self.detachedVerificationAction = FileOperationAction(injectedAction: detachedVerificationAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
@@ -91,7 +90,7 @@ final class VerifyScreenModel {
                 return try await signingService.verifyDetachedStreamingDetailed(
                     fileURL: request.originalFileURL,
                     signature: signature,
-                    progress: operationController.progress
+                    progress: progress
                 )
             }
         }
@@ -304,12 +303,12 @@ final class VerifyScreenModel {
         clearDetachedVerificationState()
 
         operation.runFileOperation(mapError: mapVerificationError) { [self] progress in
-            _ = progress
             let result = try await self.detachedVerificationAction(
                 DetachedVerificationRequest(
                     originalFileURL: originalFileURL,
                     signatureFileURL: signatureFileURL
-                )
+                ),
+                progress: progress
             )
             try Task.checkCancellation()
             self.replaceDetachedDetailedVerification(with: result)
