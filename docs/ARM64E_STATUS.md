@@ -48,7 +48,7 @@ Snapshot date: 2026-05-13
     stable commands such as `cargo +stable`
   - Rust fork repository: `cypherair/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
-  - current Rust stage1 carry head: `05e4abf6b2e`
+  - current Rust stage1 carry head: `ffa5e3128fe`
   - Rust upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
   - current Rust upstream-prep head: `77e2e3639785`
@@ -73,14 +73,15 @@ Snapshot date: 2026-05-13
   - arm64e builds call the patched compiler through explicit `RUSTC` while
     using nightly Cargo as the driver for `-Zbuild-std`
   - latest verified stage1 prerelease:
-    `rust-arm64e-stage1-20260512T070847Z-05e4abf-r25718545417-a1`
+    `rust-arm64e-stage1-20260519T081052Z-ffa5e31-r26083865790-a1`
   - latest verified stage1 source ref:
     `refs/heads/carry/cypherair-arm64e-toolchain`
   - latest verified stage1 source commit:
-    `05e4abf6b2e667dd7f8695f9dbeae52724337736`
-  - latest verified stage1 workflow run: `25718545417`
-  - latest verified stage1 manifest declares `includedRustSrc: true` and
-    includes host `std`/`proc_macro`, so GitHub-hosted app builds can run
+    `ffa5e3128fed80404edd864ceb7a26e1bbb97c26`
+  - latest verified stage1 workflow run: `26083865790`
+  - latest verified stage1 manifest declares `includedRustSrc: true`, includes
+    host `std`/`proc_macro`, and includes Apple arm64e std targets for Darwin,
+    iOS, tvOS, and visionOS, so GitHub-hosted app builds can run
     `cargo -Zbuild-std` without relying on a runner-local Rust source tree
   - latest hosted LLVM-workaround-shrink validation force-downloaded the
     prerelease above and recorded the same source and checked-out commit in
