@@ -50,6 +50,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary)
     }
 
+    func test_keyRouteViews_doNotOrchestrateKeyManagementWorkflows() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -174,6 +178,27 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .violations(in: [contactsLegacySource])
                 .map(\.path),
             [contactsLegacySource.path]
+        )
+
+        let keyRouteViewSource = AuditedSource(
+            path: "Sources/App/Keys/KeyGenerationView.swift",
+            contents: "struct NewKeyView { func run() async throws { try await service.generateKey(name: \"\", email: nil, expirySeconds: nil, profile: .advanced) } }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment
+                .violations(in: [keyRouteViewSource])
+                .map(\.path),
+            [keyRouteViewSource.path]
+        )
+
+        let keyRouteScreenModelSource = AuditedSource(
+            path: "Sources/App/Keys/NewKeyScreenModel.swift",
+            contents: "final class NewKeyScreenModel { func run() async throws { try await keyManagement.generateKey(name: \"\", email: nil, expirySeconds: nil, profile: .advanced) } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment
+                .violations(in: [keyRouteScreenModelSource])
+                .isEmpty
         )
 
         try assertRuleBehavior(
@@ -632,6 +657,26 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([])
     )
+
+    static let keyRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
+        name: "Key route view workflow containment",
+        failureSummary: "Key-management route Views should send intent to ScreenModels instead of calling key workflow services directly.",
+        pattern: #"\b(?:keyManagement|service)\s*\.\s*(?:generateKey|importKey|exportKeyBackupData|exportKey|modifyExpiry|exportRevocationCertificate|exportSubkeyRevocationCertificate|exportUserIdRevocationCertificate|loadSelectionCatalog|setDefaultKey|deleteKey|confirmKeyBackupExported)\s*\("#,
+        scope: { path in
+            keyRouteViewPaths.contains(path)
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    private static let keyRouteViewPaths: Set<String> = [
+        "Sources/App/Keys/BackupKeyView.swift",
+        "Sources/App/Keys/ImportKeyView.swift",
+        "Sources/App/Keys/KeyDetailView.swift",
+        "Sources/App/Keys/KeyGenerationView.swift",
+        "Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift",
+        "Sources/App/Keys/SelectiveRevocationView.swift",
+    ]
 
     private static func wordPattern(for symbols: [String]) -> String {
         let alternation = symbols

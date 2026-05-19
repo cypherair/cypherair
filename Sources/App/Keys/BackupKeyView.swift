@@ -21,23 +21,6 @@ struct BackupKeyView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
 
-    enum Field {
-        case passphrase
-        case confirm
-    }
-
-    @FocusState private var focusedField: Field?
-    @State private var passphrase = ""
-    @State private var passphraseConfirm = ""
-    @State private var isExporting = false
-    @State private var exportedData: Data?
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var showFileExporter = false
-    @State private var exportTask: Task<Void, Never>?
-    @State private var exportToken: UInt64 = 0
-    @State private var exportedDataToken: UInt64?
-
     init(
         fingerprint: String,
         configuration: Configuration = .default
@@ -47,11 +30,50 @@ struct BackupKeyView: View {
     }
 
     var body: some View {
+        BackupKeyScreenHostView(
+            fingerprint: fingerprint,
+            keyManagement: keyManagement,
+            appSessionOrchestrator: appSessionOrchestrator,
+            configuration: configuration
+        )
+    }
+}
+
+private struct BackupKeyScreenHostView: View {
+    enum Field {
+        case passphrase
+        case confirm
+    }
+
+    let appSessionOrchestrator: AppSessionOrchestrator
+
+    @State private var model: BackupKeyScreenModel
+    @FocusState private var focusedField: Field?
+
+    init(
+        fingerprint: String,
+        keyManagement: KeyManagementService,
+        appSessionOrchestrator: AppSessionOrchestrator,
+        configuration: BackupKeyView.Configuration
+    ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
+        _model = State(
+            initialValue: BackupKeyScreenModel(
+                fingerprint: fingerprint,
+                keyManagement: keyManagement,
+                configuration: configuration
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+
         Form {
             Section {
                 CypherSecureTextField(
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),
-                    text: $passphrase,
+                    text: $model.passphrase,
                     submitLabel: .next,
                     onSubmit: { focusedField = .confirm }
                 )
@@ -59,7 +81,7 @@ struct BackupKeyView: View {
 
                 CypherSecureTextField(
                     String(localized: "backup.confirm", defaultValue: "Confirm Passphrase"),
-                    text: $passphraseConfirm,
+                    text: $model.passphraseConfirm,
                     submitLabel: .done,
                     onSubmit: { focusedField = nil }
                 )
@@ -67,7 +89,7 @@ struct BackupKeyView: View {
             } header: {
                 Text(String(localized: "backup.header", defaultValue: "Protect your backup with a strong passphrase."))
             } footer: {
-                if !passphrase.isEmpty && passphrase != passphraseConfirm {
+                if model.passphrasesMismatch {
                     Text(String(localized: "backup.mismatch", defaultValue: "Passphrases do not match."))
                         .foregroundStyle(.red)
                 }
@@ -75,9 +97,9 @@ struct BackupKeyView: View {
 
             Section {
                 Button {
-                    exportBackup()
+                    model.exportBackup()
                 } label: {
-                    if isExporting {
+                    if model.isExporting {
                         ProgressView()
                             .cypherPrimaryActionLabelFrame()
                     } else {
@@ -86,12 +108,11 @@ struct BackupKeyView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(passphrase.isEmpty || passphrase != passphraseConfirm || isExporting)
+                .disabled(model.exportButtonDisabled)
             }
 
-            if configuration.resultPresentation == .inlinePreview,
-               let exportedData,
-               let exportedString = String(data: exportedData, encoding: .utf8) {
+            if model.configuration.resultPresentation == .inlinePreview,
+               let exportedString = model.exportedString {
                 Section {
                     CypherOutputTextBlock(
                         text: exportedString,
@@ -102,10 +123,10 @@ struct BackupKeyView: View {
                 } header: {
                     Text(String(localized: "backup.ready", defaultValue: "Backup Ready"))
                 }
-            } else if exportedData != nil {
+            } else if model.exportedData != nil {
                 Section {
                     Button {
-                        showFileExporter = true
+                        model.showFileExporter = true
                     } label: {
                         Label(
                             String(localized: "backup.share", defaultValue: "Save Backup File"),
@@ -127,133 +148,33 @@ struct BackupKeyView: View {
         .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
         } message: { err in
             Text(err.localizedDescription)
         }
         .fileExporter(
-            isPresented: Binding(
-                get: { showFileExporter },
-                set: {
-                    showFileExporter = $0
-                }
-            ),
-            item: exportedData,
+            isPresented: $model.showFileExporter,
+            item: model.exportedData,
             contentTypes: [.data],
-            defaultFilename: "\(fingerprint.prefix(16)).asc"
+            defaultFilename: model.defaultFilename
         ) { result in
-            defer {
-                clearExportedData()
-            }
-
-            switch result {
-            case .success:
-                guard let exportedData,
-                      exportedDataToken == exportToken else {
-                    return
-                }
-                configuration.onExported?(exportedData)
-                keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
-            case .failure(let exportError):
-                guard exportedDataToken == exportToken else {
-                    return
-                }
-                error = CypherAirError.from(exportError) { .encryptionFailed(reason: $0) }
-                showError = true
-            }
+            model.handleFileExporterResult(result)
         }
         .onDisappear {
-            cancelExportAndClearTransientInput()
+            focusedField = nil
+            model.handleDisappear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            cancelExportAndClearTransientInput()
+            focusedField = nil
+            model.handleContentClearGenerationChange()
         }
-    }
-
-    private func exportBackup() {
-        exportTask?.cancel()
-        exportToken &+= 1
-        let token = exportToken
-        isExporting = true
-        let service = keyManagement
-        let fp = fingerprint
-        let pass = passphrase
-
-        exportTask = Task { @MainActor in
-            defer {
-                if token == exportToken {
-                    isExporting = false
-                    exportTask = nil
-                }
-            }
-
-            do {
-                var data = try await service.exportKeyBackupData(
-                    fingerprint: fp,
-                    passphrase: pass
-                )
-                var didHandOffData = false
-                defer {
-                    if !didHandOffData {
-                        data.resetBytes(in: 0..<data.count)
-                    }
-                }
-                try Task.checkCancellation()
-                guard token == exportToken else {
-                    return
-                }
-                exportedData = data
-                exportedDataToken = token
-                didHandOffData = true
-                if configuration.resultPresentation == .inlinePreview {
-                    configuration.onExported?(data)
-                    service.confirmKeyBackupExported(fingerprint: fp)
-                }
-                passphrase = ""
-                passphraseConfirm = ""
-            } catch {
-                guard !Self.shouldIgnore(error), token == exportToken else {
-                    return
-                }
-                self.error = CypherAirError.from(error) { .encryptionFailed(reason: $0) }
-                showError = true
-            }
-        }
-    }
-
-    private func cancelExportAndClearTransientInput() {
-        exportTask?.cancel()
-        exportToken &+= 1
-        exportTask = nil
-        isExporting = false
-        clearTransientInput()
-    }
-
-    private func clearTransientInput() {
-        passphrase = ""
-        passphraseConfirm = ""
-        focusedField = nil
-        showFileExporter = false
-        clearExportedData()
-    }
-
-    private func clearExportedData() {
-        exportedData?.resetBytes(in: 0..<(exportedData?.count ?? 0))
-        exportedData = nil
-        exportedDataToken = nil
-    }
-
-    private static func shouldIgnore(_ error: Error) -> Bool {
-        if error is CancellationError {
-            return true
-        }
-        if let cypherAirError = error as? CypherAirError,
-           case .operationCancelled = cypherAirError {
-            return true
-        }
-        return false
     }
 }

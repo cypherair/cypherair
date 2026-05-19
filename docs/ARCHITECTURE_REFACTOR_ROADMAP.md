@@ -186,6 +186,7 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
 ### Candidate PRs
 
 - **PR 4A: Remaining key-management route ScreenModels**
+  - Status: Implemented on 2026-05-19.
   - Move workflow-heavy key generation, import, backup, key detail, expiry, and selective-revocation behavior into ScreenModel-owned actions and state where not already complete.
 
 - **PR 4B: Contacts and QR route ScreenModels**
@@ -209,6 +210,11 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
 - Run targeted macOS UI smoke coverage for route ownership, tutorial-host behavior, and settings flows when those surfaces change.
 - Use source-audit checks for view-level service orchestration and generated-error handling in UI.
 - Verify tutorial configuration and output-interception behavior when shared production views are refactored.
+
+PR4A validation added key-route ScreenModel unit coverage for generation,
+import, backup, expiry modification, key detail stale-export suppression, and
+selective-revocation output interception. It also added source-audit coverage to
+block key-management workflow calls from key route Views.
 
 ## Phase 5: Security And App Composition Boundary
 

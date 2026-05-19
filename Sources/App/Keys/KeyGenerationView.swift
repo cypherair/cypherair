@@ -20,11 +20,6 @@ struct KeyGenerationView: View {
         static let `default` = Configuration()
     }
 
-    @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appRouteNavigator) private var routeNavigator
-
     enum Field {
         case name
         case email
@@ -32,38 +27,74 @@ struct KeyGenerationView: View {
 
     let configuration: Configuration
 
-    @FocusState private var focusedField: Field?
-    @State private var name = ""
-    @State private var email = ""
-    @State private var profile: PGPKeyProfile = .universal
-    @State private var expiryMonths = 24
-    @State private var isGenerating = false
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var generatedIdentity: PGPKeyIdentity?
-    @State private var generationTask: Task<Void, Never>?
-    @State private var generationToken: UInt64 = 0
-
-    private let expiryOptions = [12, 24, 36, 48, 60]
+    @Environment(KeyManagementService.self) private var keyManagement
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
+    @Environment(\.appRouteNavigator) private var routeNavigator
 
     init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     var body: some View {
+        KeyGenerationScreenHostView(
+            keyManagement: keyManagement,
+            appSessionOrchestrator: appSessionOrchestrator,
+            routeNavigator: routeNavigator,
+            configuration: configuration
+        )
+    }
+}
+
+private struct KeyGenerationScreenHostView: View {
+    let keyManagement: KeyManagementService
+    let appSessionOrchestrator: AppSessionOrchestrator
+
+    @State private var model: KeyGenerationScreenModel
+    @FocusState private var focusedField: KeyGenerationView.Field?
+
+    init(
+        keyManagement: KeyManagementService,
+        appSessionOrchestrator: AppSessionOrchestrator,
+        routeNavigator: AppRouteNavigator,
+        configuration: KeyGenerationView.Configuration
+    ) {
+        self.keyManagement = keyManagement
+        self.appSessionOrchestrator = appSessionOrchestrator
+
+        let postGenerationPromptAction: KeyGenerationScreenModel.PostGenerationPromptAction?
+        #if os(macOS)
+        postGenerationPromptAction = { identity in
+            routeNavigator.open(.postGenerationPrompt(identity: identity))
+        }
+        #else
+        postGenerationPromptAction = nil
+        #endif
+
+        _model = State(
+            initialValue: KeyGenerationScreenModel(
+                keyManagement: keyManagement,
+                configuration: configuration,
+                postGenerationPromptAction: postGenerationPromptAction
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+
         Form {
             Section {
                 Picker(
                     String(localized: "keygen.profile", defaultValue: "Profile"),
-                    selection: $profile
+                    selection: $model.profile
                 ) {
                     Text(PGPKeyProfile.universal.displayName).tag(PGPKeyProfile.universal)
                     Text(PGPKeyProfile.advanced.displayName).tag(PGPKeyProfile.advanced)
                 }
                 .pickerStyle(.segmented)
-                .disabled(configuration.lockedProfile != nil)
+                .disabled(model.configuration.lockedProfile != nil)
 
-                Text(profile.shortDescription)
+                Text(model.profile.shortDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -73,7 +104,7 @@ struct KeyGenerationView: View {
             Section {
                 CypherSingleLineTextField(
                     String(localized: "keygen.name", defaultValue: "Name"),
-                    text: $name,
+                    text: $model.name,
                     profile: .name,
                     submitLabel: .next,
                     onSubmit: { focusedField = .email }
@@ -83,7 +114,7 @@ struct KeyGenerationView: View {
 
                 CypherSingleLineTextField(
                     String(localized: "keygen.email", defaultValue: "Email (optional)"),
-                    text: $email,
+                    text: $model.email,
                     profile: .email,
                     submitLabel: .done,
                     onSubmit: { focusedField = nil }
@@ -97,23 +128,23 @@ struct KeyGenerationView: View {
             Section {
                 Picker(
                     String(localized: "keygen.expiry", defaultValue: "Expires After"),
-                    selection: $expiryMonths
+                    selection: $model.expiryMonths
                 ) {
-                    ForEach(expiryOptions, id: \.self) { months in
+                    ForEach(model.expiryOptions, id: \.self) { months in
                         Text(String(localized: "keygen.expiry.months", defaultValue: "\(months) months"))
                             .tag(months)
                     }
                 }
-                .disabled(configuration.lockedExpiryMonths != nil)
+                .disabled(model.configuration.lockedExpiryMonths != nil)
             } header: {
                 Text(String(localized: "keygen.expiry.header", defaultValue: "Validity"))
             }
 
             Section {
                 Button {
-                    generate()
+                    model.generate()
                 } label: {
-                    if isGenerating {
+                    if model.isGenerating {
                         ProgressView()
                             .cypherPrimaryActionLabelFrame()
                     } else {
@@ -122,7 +153,7 @@ struct KeyGenerationView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isGenerating)
+                .disabled(model.generateButtonDisabled)
                 .accessibilityIdentifier("keygen.generate")
             }
         }
@@ -136,14 +167,22 @@ struct KeyGenerationView: View {
         .navigationTitle(String(localized: "keygen.title", defaultValue: "Generate Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
         } message: { err in
             Text(err.localizedDescription)
         }
-        .sheet(item: $generatedIdentity) { identity in
+        .sheet(item: Binding(
+            get: { model.generatedIdentity },
+            set: { if $0 == nil { model.dismissGeneratedIdentity() } }
+        )) { identity in
             AppRouteHost(
                 resolver: .production,
                 macSheetSizing: .routedModal
@@ -154,102 +193,11 @@ struct KeyGenerationView: View {
             }
         }
         .onAppear {
-            if name.isEmpty, let prefilledName = configuration.prefilledName {
-                name = prefilledName
-            }
-            if email.isEmpty, let prefilledEmail = configuration.prefilledEmail {
-                email = prefilledEmail
-            }
-            if let lockedProfile = configuration.lockedProfile {
-                profile = lockedProfile
-            }
-            if let lockedExpiryMonths = configuration.lockedExpiryMonths {
-                expiryMonths = lockedExpiryMonths
-            }
+            model.handleAppear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            cancelGenerationAndClearTransientInput()
+            focusedField = nil
+            model.handleContentClearGenerationChange()
         }
-    }
-
-    private func generate() {
-        generationTask?.cancel()
-        generationToken &+= 1
-        let token = generationToken
-        isGenerating = true
-        let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-        let selectedProfile = profile
-        let expiryDate = Calendar.current.date(byAdding: .month, value: expiryMonths, to: Date()) ?? Date()
-        let expirySeconds = UInt64(max(0, expiryDate.timeIntervalSinceNow))
-        let service = keyManagement
-
-        generationTask = Task { @MainActor in
-            defer {
-                if token == generationToken {
-                    isGenerating = false
-                    generationTask = nil
-                }
-            }
-
-            do {
-                let identity = try await service.generateKey(
-                    name: trimmedName,
-                    email: trimmedEmail.isEmpty ? nil : trimmedEmail,
-                    expirySeconds: expirySeconds,
-                    profile: selectedProfile
-                )
-                try Task.checkCancellation()
-                guard token == generationToken else {
-                    return
-                }
-                configuration.onGenerated?(identity)
-
-                switch configuration.postGenerationBehavior {
-                case .showPrompt:
-                    #if os(macOS)
-                    routeNavigator.open(.postGenerationPrompt(identity: identity))
-                    #else
-                    generatedIdentity = identity
-                    #endif
-                case .externalPrompt:
-                    configuration.onPostGenerationPromptRequested?(identity)
-                case .suppressPrompt:
-                    break
-                }
-            } catch {
-                guard !Self.shouldIgnore(error), token == generationToken else {
-                    return
-                }
-                self.error = CypherAirError.from(error) { .keyGenerationFailed(reason: $0) }
-                showError = true
-            }
-        }
-    }
-
-    private func cancelGenerationAndClearTransientInput() {
-        generationTask?.cancel()
-        generationToken &+= 1
-        generationTask = nil
-        isGenerating = false
-        clearTransientInput()
-    }
-
-    private func clearTransientInput() {
-        name = ""
-        email = ""
-        focusedField = nil
-        generatedIdentity = nil
-    }
-
-    private static func shouldIgnore(_ error: Error) -> Bool {
-        if error is CancellationError {
-            return true
-        }
-        if let cypherAirError = error as? CypherAirError,
-           case .operationCancelled = cypherAirError {
-            return true
-        }
-        return false
     }
 }

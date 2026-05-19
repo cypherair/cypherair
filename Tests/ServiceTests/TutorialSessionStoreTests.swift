@@ -1199,32 +1199,36 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_keyImportAndBackup_clearSensitiveInputOnSuccessDismissAndContentClear() throws {
-        let importContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyView.swift")
-        XCTAssertTrue(importContents.contains("FileImportRequestGate"))
-        XCTAssertTrue(importContents.contains("handleFileImporterResult(result, token: fileImportRequestToken)"))
-        XCTAssertTrue(importContents.contains("fileImportRequestGate.invalidate()"))
-        XCTAssertTrue(importContents.contains("clearTransientInput()"))
-        XCTAssertTrue(importContents.contains("clearImportedKeyData()"))
-        XCTAssertTrue(importContents.contains(".onDisappear"))
-        XCTAssertTrue(importContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
-        XCTAssertTrue(importContents.contains("dismiss()"))
+        let importViewContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyView.swift")
+        let importScreenModelContents = try loadRepositoryAuditSource("Sources/App/Keys/ImportKeyScreenModel.swift")
+        XCTAssertTrue(importViewContents.contains("ImportKeyScreenHostView"))
+        XCTAssertTrue(importViewContents.contains("model.handleFileImporterResult(result, token: fileImportRequestToken)"))
+        XCTAssertTrue(importViewContents.contains("model.handleDisappear()"))
+        XCTAssertTrue(importViewContents.contains("model.handleContentClearGenerationChange()"))
+        XCTAssertTrue(importScreenModelContents.contains("FileImportRequestGate"))
+        XCTAssertTrue(importScreenModelContents.contains("fileImportRequestGate.invalidate()"))
+        XCTAssertTrue(importScreenModelContents.contains("clearTransientInput()"))
+        XCTAssertTrue(importScreenModelContents.contains("clearImportedKeyData()"))
+        XCTAssertTrue(importScreenModelContents.contains("dismissAction()"))
 
-        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
-        XCTAssertTrue(backupContents.contains("clearTransientInput()"))
-        XCTAssertTrue(backupContents.contains("clearExportedData()"))
-        XCTAssertTrue(backupContents.contains(".onDisappear"))
-        XCTAssertTrue(backupContents.contains(".onChange(of: appSessionOrchestrator.contentClearGeneration)"))
-        XCTAssertTrue(backupContents.contains("passphrase = \"\""))
-        XCTAssertTrue(backupContents.contains("passphraseConfirm = \"\""))
+        let backupViewContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        let backupScreenModelContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyScreenModel.swift")
+        XCTAssertTrue(backupViewContents.contains("BackupKeyScreenHostView"))
+        XCTAssertTrue(backupViewContents.contains("model.handleDisappear()"))
+        XCTAssertTrue(backupViewContents.contains("model.handleContentClearGenerationChange()"))
+        XCTAssertTrue(backupScreenModelContents.contains("clearTransientInput()"))
+        XCTAssertTrue(backupScreenModelContents.contains("clearExportedData()"))
+        XCTAssertTrue(backupScreenModelContents.contains("passphrase = \"\""))
+        XCTAssertTrue(backupScreenModelContents.contains("passphraseConfirm = \"\""))
     }
 
     func test_backupFileExporter_confirmsOnlyAfterSuccessfulSave() throws {
-        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyView.swift")
+        let backupContents = try loadRepositoryAuditSource("Sources/App/Keys/BackupKeyScreenModel.swift")
         let fileExporterStart = try XCTUnwrap(
-            backupContents.range(of: ".fileExporter(")?.lowerBound
+            backupContents.range(of: "func handleFileExporterResult")?.lowerBound
         )
         let fileExporterEnd = try XCTUnwrap(
-            backupContents.range(of: ".onDisappear", range: fileExporterStart..<backupContents.endIndex)?.lowerBound
+            backupContents.range(of: "func handleDisappear", range: fileExporterStart..<backupContents.endIndex)?.lowerBound
         )
         let fileExporterBody = String(backupContents[fileExporterStart..<fileExporterEnd])
         let successStart = try XCTUnwrap(fileExporterBody.range(of: "case .success:")?.lowerBound)
@@ -1234,24 +1238,29 @@ final class TutorialSessionStoreTests: XCTestCase {
 
         XCTAssertTrue(fileExporterBody.contains("exportedDataToken == exportToken"))
         XCTAssertTrue(successBody.contains("configuration.onExported?(exportedData)"))
-        XCTAssertTrue(successBody.contains("keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)"))
+        XCTAssertTrue(successBody.contains("confirmBackupExportedAction(fingerprint)"))
+        let consumeRange = try XCTUnwrap(successBody.range(of: "var exportedData = consumeExportedData()"))
+        let zeroizeRange = try XCTUnwrap(successBody.range(of: "exportedData.zeroize()"))
+        let callbackRange = try XCTUnwrap(successBody.range(of: "configuration.onExported?(exportedData)"))
+        XCTAssertLessThan(consumeRange.lowerBound, zeroizeRange.lowerBound)
+        XCTAssertLessThan(zeroizeRange.lowerBound, callbackRange.lowerBound)
         XCTAssertFalse(failureBody.contains("confirmKeyBackupExported"))
 
         let exportBackupStart = try XCTUnwrap(
-            backupContents.range(of: "private func exportBackup()")?.lowerBound
+            backupContents.range(of: "func exportBackup()")?.lowerBound
         )
         let exportBackupEnd = try XCTUnwrap(
             backupContents.range(
-                of: "private func cancelExportAndClearTransientInput()",
+                of: "func handleFileExporterResult",
                 range: exportBackupStart..<backupContents.endIndex
             )?.lowerBound
         )
         let exportBackupBody = String(backupContents[exportBackupStart..<exportBackupEnd])
 
         XCTAssertTrue(exportBackupBody.contains("exportedDataToken = token"))
-        XCTAssertTrue(exportBackupBody.contains("if configuration.resultPresentation == .inlinePreview"))
-        XCTAssertTrue(exportBackupBody.contains("configuration.onExported?(data)"))
-        XCTAssertTrue(exportBackupBody.contains("service.confirmKeyBackupExported(fingerprint: fp)"))
+        XCTAssertTrue(exportBackupBody.contains("if self.configuration.resultPresentation == .inlinePreview"))
+        XCTAssertTrue(exportBackupBody.contains("self.configuration.onExported?(data)"))
+        XCTAssertTrue(exportBackupBody.contains("self.confirmBackupExportedAction(fingerprint)"))
     }
 
     func test_outputPages_removeTutorialOutputCouplingFromPageImplementations() throws {
