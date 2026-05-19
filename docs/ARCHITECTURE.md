@@ -114,7 +114,7 @@ Safety is enforced by narrow host boundaries:
 | Family | Swift service owner | Current app owner | Status |
 |--------|---------------------|-------------------|--------|
 | Certificate Merge / Update | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Shipped |
-| Revocation Construction | `KeyManagementService` | `KeyDetailView`, `SelectiveRevocationView`, `SelectiveRevocationScreenModel` | Shipped |
+| Revocation Construction | `KeyManagementService` | `KeyDetailScreenModel`, `SelectiveRevocationScreenModel`, `KeyDetailView`, `SelectiveRevocationView` | Shipped |
 | Password / SKESK Symmetric Messages | `PasswordMessageService` | None | Service-only |
 | Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped |
 | Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
