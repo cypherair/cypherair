@@ -36,6 +36,10 @@
 > request/result wrappers, and added source-audit guardrails blocking
 > service phase, progress, and temporary-artifact internals from ScreenModel
 > public APIs.
+> Phase 4 close-out update: 2026-05-19 accepted PR4A through PR4C as complete
+> for the Phase 4-owned route and ScreenModel public-API scope. Settings
+> security, reset, ProtectedData orchestration, and broader App composition
+> policy remain explicitly deferred to Phase 5.
 > Scope: First-party Swift app code under `Sources/`. Generated UniFFI Swift
 > bindings in `Sources/PgpMobile/pgp_mobile.swift` are used only as evidence for
 > generated type origins, not classified as hand-maintained architecture debt.
@@ -122,6 +126,11 @@ Representative search snapshot:
   `DecryptionPhase1Result` / `FileDecryptionPhase1Result` models and replaced
   Encrypt, Decrypt, Sign, and Verify ScreenModel file-operation action seams so
   they no longer expose `FileProgressReporter` or `AppTemporaryArtifact`.
+- Phase 4 close-out accepted PR4A through PR4C as complete for the owned scope:
+  key routes, Contacts/QR routes, ScreenModel public API seams, and tutorial
+  output/configuration checks have current source-audit and focused test
+  coverage. Remaining Settings/Security/ProtectedData/App-composition findings
+  stay recorded below as Phase 5 debt rather than Phase 4 blockers.
 - Several UI routes and ScreenModels still call concrete services or security
   workflows directly, while other routes already use more focused ScreenModels.
 
@@ -236,6 +245,13 @@ app-owned, that Encrypt/Decrypt/Sign/Verify ScreenModel file-operation action
 signatures no longer expose `FileProgressReporter` or `AppTemporaryArtifact`,
 and that source-audit coverage blocks regressions for those ScreenModel public
 API seams.
+The 2026-05-19 Phase 4 close-out pass accepted PR4A through PR4C after targeted
+review and validation of key routes, Contacts/QR routes, ScreenModel public API
+seams, and tutorial output/configuration behavior. The pass found no blocking
+Phase 4 gaps; `MyKeysView` key-list state rendering, shared file-operation
+infrastructure, and narrow Contacts import coordinators remain accepted within
+the Phase 4 scope. Settings-facing security/reset/ProtectedData orchestration
+remains deferred to Phase 5.
 
 Because this audit can be updated together with code changes, validation should
 follow the touched surfaces. Documentation-only changes do not require Rust or
