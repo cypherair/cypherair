@@ -3,8 +3,13 @@ import Foundation
 @MainActor
 @Observable
 final class SignScreenModel {
+    struct DetachedFileSigningRequest {
+        let fileURL: URL
+        let signerFingerprint: String
+    }
+
     typealias CleartextSigningAction = @MainActor (String, String) async throws -> Data
-    typealias DetachedFileSigningAction = @MainActor (URL, String, FileProgressReporter) async throws -> Data
+    typealias DetachedFileSigningAction = @MainActor (DetachedFileSigningRequest) async throws -> Data
     typealias ClipboardNoticeDecision = @MainActor () async -> Bool
     typealias ClipboardWriter = @MainActor (String, Bool) -> Void
 
@@ -65,11 +70,11 @@ final class SignScreenModel {
         self.cleartextSigningAction = cleartextSigningAction ?? { message, signerFingerprint in
             try await signingService.signCleartext(message, signerFingerprint: signerFingerprint)
         }
-        self.detachedFileSigningAction = detachedFileSigningAction ?? { fileURL, signerFingerprint, progress in
+        self.detachedFileSigningAction = detachedFileSigningAction ?? { request in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
-                        resource: fileURL,
+                        resource: request.fileURL,
                         failure: .internalError(
                             reason: String(
                                 localized: "sign.cannotAccessFile",
@@ -80,9 +85,9 @@ final class SignScreenModel {
                 ]
             ) {
                 try await signingService.signDetachedStreaming(
-                    fileURL: fileURL,
-                    signerFingerprint: signerFingerprint,
-                    progress: progress
+                    fileURL: request.fileURL,
+                    signerFingerprint: request.signerFingerprint,
+                    progress: operationController.progress
                 )
             }
         }
@@ -183,7 +188,13 @@ final class SignScreenModel {
         authLifecycleTraceStore?.record(category: .operation, name: "sign.file.start", metadata: ["mode": "file"])
 
         operation.runFileOperation(mapError: mapSigningError) { [self] progress in
-            let signature = try await self.detachedFileSigningAction(fileURL, signerFingerprint, progress)
+            _ = progress
+            let signature = try await self.detachedFileSigningAction(
+                DetachedFileSigningRequest(
+                    fileURL: fileURL,
+                    signerFingerprint: signerFingerprint
+                )
+            )
             try Task.checkCancellation()
             self.detachedSignature = signature
             self.authLifecycleTraceStore?.record(

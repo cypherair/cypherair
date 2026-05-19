@@ -203,9 +203,16 @@ final class VerifyScreenModelTests: XCTestCase {
     @MainActor
     func test_verifyDetached_cancellationClearsProgressWithoutPublishingResult() async {
         let gate = VerifyOperationGate()
+        var capturedProgress: FileProgressReporter?
+        let operation = OperationController(progressFactory: {
+            let reporter = FileProgressReporter()
+            capturedProgress = reporter
+            return reporter
+        })
         let model = makeModel(
-            detachedVerificationAction: { _, _, progress in
-                _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
+            operation: operation,
+            detachedVerificationAction: { _ in
+                _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
                 return self.makeDetailedVerification(

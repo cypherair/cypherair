@@ -179,7 +179,7 @@ final class SignScreenModelTests: XCTestCase {
             name: "Signer"
         )
         let model = makeModel(
-            detachedFileSigningAction: { _, _, _ in
+            detachedFileSigningAction: { _ in
                 Data("detached-signature".utf8)
             }
         )
@@ -218,9 +218,16 @@ final class SignScreenModelTests: XCTestCase {
             name: "Signer"
         )
         let gate = SignOperationGate()
+        var capturedProgress: FileProgressReporter?
+        let operation = OperationController(progressFactory: {
+            let reporter = FileProgressReporter()
+            capturedProgress = reporter
+            return reporter
+        })
         let model = makeModel(
-            detachedFileSigningAction: { _, _, progress in
-                _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
+            operation: operation,
+            detachedFileSigningAction: { _ in
+                _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
                 return Data("signature".utf8)

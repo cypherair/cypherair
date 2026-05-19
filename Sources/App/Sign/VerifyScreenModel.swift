@@ -4,6 +4,11 @@ import UniformTypeIdentifiers
 @MainActor
 @Observable
 final class VerifyScreenModel {
+    struct DetachedVerificationRequest {
+        let originalFileURL: URL
+        let signatureFileURL: URL
+    }
+
     enum FilePickerTarget {
         case cleartextSignedImport
         case original
@@ -15,9 +20,7 @@ final class VerifyScreenModel {
         verification: DetailedSignatureVerification
     )
     typealias DetachedVerificationAction = @MainActor (
-        URL,
-        URL,
-        FileProgressReporter
+        DetachedVerificationRequest
     ) async throws -> DetailedSignatureVerification
     typealias CleartextFileImportAction = @MainActor (URL) throws -> (
         data: Data,
@@ -54,16 +57,17 @@ final class VerifyScreenModel {
         detachedVerificationAction: DetachedVerificationAction? = nil,
         cleartextFileImportAction: CleartextFileImportAction? = nil
     ) {
+        let operationController = operation
         self.configuration = configuration
         self.operation = operation
         self.cleartextVerificationAction = cleartextVerificationAction ?? { signedMessage in
             try await signingService.verifyCleartextDetailed(signedMessage)
         }
-        self.detachedVerificationAction = detachedVerificationAction ?? { originalURL, signatureURL, progress in
+        self.detachedVerificationAction = detachedVerificationAction ?? { request in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
-                        resource: originalURL,
+                        resource: request.originalFileURL,
                         failure: .internalError(
                             reason: String(
                                 localized: "verify.cannotAccessOriginal",
@@ -72,7 +76,7 @@ final class VerifyScreenModel {
                         )
                     ),
                     SecurityScopedAccessRequest(
-                        resource: signatureURL,
+                        resource: request.signatureFileURL,
                         failure: .internalError(
                             reason: String(
                                 localized: "verify.cannotAccessSignature",
@@ -82,12 +86,12 @@ final class VerifyScreenModel {
                     )
                 ]
             ) {
-                let signature = try Data(contentsOf: signatureURL)
+                let signature = try Data(contentsOf: request.signatureFileURL)
                 try Task.checkCancellation()
                 return try await signingService.verifyDetachedStreamingDetailed(
-                    fileURL: originalURL,
+                    fileURL: request.originalFileURL,
                     signature: signature,
-                    progress: progress
+                    progress: operationController.progress
                 )
             }
         }
@@ -300,10 +304,12 @@ final class VerifyScreenModel {
         clearDetachedVerificationState()
 
         operation.runFileOperation(mapError: mapVerificationError) { [self] progress in
+            _ = progress
             let result = try await self.detachedVerificationAction(
-                originalFileURL,
-                signatureFileURL,
-                progress
+                DetachedVerificationRequest(
+                    originalFileURL: originalFileURL,
+                    signatureFileURL: signatureFileURL
+                )
             )
             try Task.checkCancellation()
             self.replaceDetachedDetailedVerification(with: result)
