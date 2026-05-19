@@ -4,9 +4,11 @@ import XCTest
 
 @MainActor
 final class TutorialSessionStoreTests: XCTestCase {
-    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() throws {
+    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() async throws {
         let container = try TutorialSandboxContainer()
         defer { container.cleanup() }
+
+        try await container.openContactsIfNeeded()
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: container.contactsDirectory.path))
         try assertCompleteFileProtection(at: container.contactsDirectory)
@@ -15,6 +17,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         )
         XCTAssertEqual(container.authManager.currentMode, .standard)
+        XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
         XCTAssertEqual(container.contactService.testContactKeyRecords.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))

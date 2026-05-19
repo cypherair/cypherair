@@ -17,11 +17,6 @@ enum TutorialSandboxContainerError: LocalizedError {
     }
 }
 
-private final class TutorialSandboxContactsOpenResultBox: @unchecked Sendable {
-    var result: ContactsAvailability?
-    var error: Error?
-}
-
 /// Isolated dependency graph for the guided tutorial.
 /// Uses real app services backed by sandbox storage and mock security primitives.
 /// The product flow owns a single active tutorial sandbox at a time.
@@ -49,6 +44,7 @@ final class TutorialSandboxContainer {
     private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let temporaryArtifactStore: AppTemporaryArtifactStore
+    private let contactsWrappingRootKey: Data
     private var didCleanup = false
 
     init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
@@ -112,6 +108,7 @@ final class TutorialSandboxContainer {
         )
         try? self.keyManagement.loadKeys()
         let contactsWrappingRootKey = Data(repeating: 0x54, count: 32)
+        self.contactsWrappingRootKey = contactsWrappingRootKey
         let contactsDomainStore = try Self.makeContactsDomainStore(
             baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
             contactsDirectory: contactsDirectory,
@@ -156,10 +153,27 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
         self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
-        try Self.openContactsSynchronously(
-            contactService: self.contactService,
-            wrappingRootKey: contactsWrappingRootKey
-        )
+    }
+
+    func openContactsIfNeeded() async throws {
+        guard contactService.contactsAvailability != .availableProtectedDomain else {
+            return
+        }
+
+        let contactService = self.contactService
+        let wrappingRootKey = contactsWrappingRootKey
+        let availability = await Task.detached {
+            await contactService.openContactsAfterPostUnlock(
+                gateDecision: ContactsPostAuthGateDecision(
+                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                    frameworkState: .sessionAuthorized
+                ),
+                wrappingRootKey: { wrappingRootKey }
+            )
+        }.value
+        guard availability == .availableProtectedDomain else {
+            throw TutorialSandboxContainerError.contactsProtectedDomainOpenFailed
+        }
     }
 
     func cleanup() {
@@ -209,31 +223,5 @@ final class TutorialSandboxContainer {
                 try migrationSource.makeInitialSnapshot()
             }
         )
-    }
-
-    private static func openContactsSynchronously(
-        contactService: ContactService,
-        wrappingRootKey: Data
-    ) throws {
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultBox = TutorialSandboxContactsOpenResultBox()
-        Task.detached {
-            let availability = await contactService.openContactsAfterPostUnlock(
-                gateDecision: ContactsPostAuthGateDecision(
-                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                    frameworkState: .sessionAuthorized
-                ),
-                wrappingRootKey: { wrappingRootKey }
-            )
-            resultBox.result = availability
-            semaphore.signal()
-        }
-        semaphore.wait()
-        if let error = resultBox.error {
-            throw error
-        }
-        guard resultBox.result == .availableProtectedDomain else {
-            throw TutorialSandboxContainerError.contactsProtectedDomainOpenFailed
-        }
     }
 }

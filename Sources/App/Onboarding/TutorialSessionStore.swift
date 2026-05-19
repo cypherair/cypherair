@@ -140,6 +140,7 @@ final class TutorialSessionStore {
         guard canOpen(requestedModule) else { return }
 
         ensureSession()
+        guard await openContactsIfNeeded() else { return }
 
         if requestedModule == .sandbox {
             openSandboxAcknowledgement()
@@ -479,6 +480,25 @@ final class TutorialSessionStore {
         } catch {
             container = nil
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func openContactsIfNeeded() async -> Bool {
+        guard let activeContainer = container else {
+            return false
+        }
+
+        do {
+            try await activeContainer.openContactsIfNeeded()
+            errorMessage = nil
+            return true
+        } catch {
+            if container === activeContainer {
+                activeContainer.cleanup()
+                container = nil
+            }
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
