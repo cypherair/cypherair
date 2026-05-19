@@ -54,6 +54,14 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment)
     }
 
+    func test_contactsRouteViews_doNotOrchestrateContactOrQRWorkflows() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment)
+    }
+
+    func test_screenModelsDoNotExposePhotosUIPickerTypes() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.screenModelPhotosUIContainment)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -201,6 +209,93 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .isEmpty
         )
 
+        let contactsRouteViewSource = AuditedSource(
+            path: "Sources/App/Contacts/QRDisplayView.swift",
+            contents: "struct NewQRView { func run() throws { _ = try qrService.generateQRCode(for: Data()) } }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsRouteViewSource])
+                .map(\.path),
+            [contactsRouteViewSource.path]
+        )
+
+        let contactsRouteScreenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/QRDisplayScreenModel.swift",
+            contents: "final class QRDisplayScreenModel { func run() throws { _ = try qrService.generateQRCode(for: Data()) } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsRouteScreenModelSource])
+                .isEmpty
+        )
+
+        let contactsListScreenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/ContactsScreenModel.swift",
+            contents: "final class ContactsScreenModel { func run() { _ = contactService.contactIdentities() } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsListScreenModelSource])
+                .isEmpty
+        )
+
+        let contactsImportCoordinatorSource = AuditedSource(
+            path: "Sources/App/Contacts/Import/ContactImportWorkflow.swift",
+            contents: "struct ContactImportWorkflow { func run() throws { try contactService.importContact() } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsImportCoordinatorSource])
+                .isEmpty
+        )
+
+        let screenModelPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/NewScreenModel.swift",
+            contents: """
+            import PhotosUI
+            final class NewScreenModel {
+                func run(_ item: PhotosPickerItem) {}
+            }
+            """
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [screenModelPhotosUISource])
+                .map(\.path),
+            [screenModelPhotosUISource.path]
+        )
+
+        let loaderPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/Import/PublicKeyImportLoader.swift",
+            contents: """
+            import PhotosUI
+            struct PublicKeyImportLoader {
+                func load(_ item: PhotosPickerItem) {}
+            }
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [loaderPhotosUISource])
+                .isEmpty
+        )
+
+        let viewPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/AddContactView.swift",
+            contents: """
+            import PhotosUI
+            struct AddContactView {
+                let selectedPhotoItem: PhotosPickerItem?
+            }
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [viewPhotosUISource])
+                .isEmpty
+        )
+
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
@@ -237,6 +332,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             ArchitectureSourceAuditRules.appLayerFFIAdapterUsage.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
@@ -261,6 +359,18 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary.violations(in: [modelsSource]).isEmpty
+        )
+
+        let screenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/NewScreenModel.swift",
+            contents: """
+            // PhotosPickerItem and import PhotosUI should be ignored in comments.
+            let message = "PhotosPickerItem import PhotosUI"
+            final class NewScreenModel {}
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment.violations(in: [screenModelSource]).isEmpty
         )
     }
 
@@ -669,6 +779,29 @@ private enum ArchitectureSourceAuditRules {
         temporaryExceptions: temporaryExceptions([])
     )
 
+    static let contactsRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
+        name: "Contacts route view workflow containment",
+        failureSummary: "Contacts route Views should send intent to ScreenModels or coordinators instead of calling contact or QR workflow services directly.",
+        pattern: #"\b(?:contactService|qrService|importLoader|importWorkflow|service)\s*\.\s*(?:generateQRCode|parseImportURL|inspectImportablePublicCertificate|inspectKeyMetadata|detectKeyProfile|decodeQRCodes|loadKeyDataFromQRPhoto|loadFromQRPhoto|loadFromURL|inspect|loadFromFile|makeImportConfirmationRequest|importContact|removeContactIdentity|mergeContact|addTag|assignTag|removeTag|setVerificationState|setPreferredKey|setKeyUsageState|contactIdentities|availableContactIdentity|availableContactKeyRecord|contactTagSummaries|tagSuggestions|createTag|replaceTagMembership|renameTag|deleteTag|requireContactPublicKeyData)\s*\("#,
+        scope: { path in
+            isContactsViewPath(path)
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let screenModelPhotosUIContainment = ArchitectureSourceAuditRule(
+        name: "ScreenModel PhotosUI containment",
+        failureSummary: "ScreenModels should expose app-owned selection values instead of PhotosUI picker types.",
+        pattern: #"^\s*import\s+PhotosUI\b|\bPhotosPickerItem\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/App/") && path.hasSuffix("ScreenModel.swift")
+        },
+        stripsCommentsAndStrings: true,
+        expressionOptions: [.anchorsMatchLines],
+        temporaryExceptions: temporaryExceptions([])
+    )
+
     private static let keyRouteViewPaths: Set<String> = [
         "Sources/App/Keys/BackupKeyView.swift",
         "Sources/App/Keys/ImportKeyView.swift",
@@ -677,6 +810,11 @@ private enum ArchitectureSourceAuditRules {
         "Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift",
         "Sources/App/Keys/SelectiveRevocationView.swift",
     ]
+
+    private static func isContactsViewPath(_ path: String) -> Bool {
+        path.hasPrefix("Sources/App/Contacts/")
+            && path.hasSuffix("View.swift")
+    }
 
     private static func wordPattern(for symbols: [String]) -> String {
         let alternation = symbols

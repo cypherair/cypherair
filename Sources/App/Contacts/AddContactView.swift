@@ -124,9 +124,9 @@ private struct AddContactScreenHostView: View {
                     return
                 }
 
-                model.processSelectedQRPhoto {
-                    try await importLoader.loadKeyDataFromQRPhoto(newItem)
-                }
+                model.processSelectedQRPhoto(
+                    importLoader.makeQRPhotoSelection(from: newItem)
+                )
             }
             .onChange(of: runtimeSyncKey) { _, _ in
                 model.updateConfiguration(configuration)

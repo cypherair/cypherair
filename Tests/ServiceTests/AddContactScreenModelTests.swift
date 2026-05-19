@@ -175,11 +175,18 @@ final class AddContactScreenModelTests: XCTestCase {
 
     @MainActor
     func test_processSelectedQRPhoto_successAndFailure_updateState() async {
-        let model = makeModel()
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                XCTAssertEqual(selection.identifier, "armored-success")
+                return try await selection.loadKeyData()
+            }
+        )
 
-        model.processSelectedQRPhoto {
-            Data("-----BEGIN PGP PUBLIC KEY BLOCK-----".utf8)
-        }
+        model.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "armored-success") {
+                Data("-----BEGIN PGP PUBLIC KEY BLOCK-----".utf8)
+            }
+        )
 
         await waitUntil("QR photo success handling") {
             model.isProcessingQR == false
@@ -191,16 +198,24 @@ final class AddContactScreenModelTests: XCTestCase {
 
         model.dismissError()
 
-        model.processSelectedQRPhoto {
-            throw CypherAirError.invalidQRCode
-        }
+        let failingModel = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                XCTAssertEqual(selection.identifier, "invalid-qr")
+                return try await selection.loadKeyData()
+            }
+        )
+        failingModel.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "invalid-qr") {
+                throw CypherAirError.invalidQRCode
+            }
+        )
 
         await waitUntil("QR photo failure handling") {
-            model.isProcessingQR == false
+            failingModel.isProcessingQR == false
         }
 
-        XCTAssertTrue(model.showError)
-        if case .invalidQRCode? = model.error {
+        XCTAssertTrue(failingModel.showError)
+        if case .invalidQRCode? = failingModel.error {
             // Expected
         } else {
             XCTFail("Expected invalid QR code error")
@@ -208,14 +223,46 @@ final class AddContactScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_clearTransientInputDuringQRProcessingSuppressesLateLoadedKey() async {
-        let model = makeModel()
-        let gate = AddContactAsyncGate()
+    func test_processSelectedQRPhoto_binaryData_usesInjectedLoaderAndStoresImportedFile() async {
+        let binaryKeyData = Data([0xff, 0xfe, 0xfd])
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                XCTAssertEqual(selection.identifier, "binary-success")
+                return try await selection.loadKeyData()
+            }
+        )
 
-        model.processSelectedQRPhoto {
-            await gate.suspend()
-            return Data("late-public-key".utf8)
+        model.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "binary-success") {
+                binaryKeyData
+            }
+        )
+
+        await waitUntil("QR photo binary success handling") {
+            model.isProcessingQR == false
         }
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertEqual(model.importedKeyData, binaryKeyData)
+        XCTAssertEqual(model.importedFileName, "Binary key from QR")
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_clearTransientInputDuringQRProcessingSuppressesLateLoadedKey() async {
+        let gate = AddContactAsyncGate()
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                try await selection.loadKeyData()
+            }
+        )
+
+        model.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "late-key") {
+                await gate.suspend()
+                return Data("late-public-key".utf8)
+            }
+        )
 
         await waitUntil("QR processing to suspend") {
             guard model.isProcessingQR else {
@@ -236,6 +283,75 @@ final class AddContactScreenModelTests: XCTestCase {
         XCTAssertNil(model.importedKeyData)
         XCTAssertNil(model.importedFileName)
         XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_handleDisappearDuringQRProcessingCancelsAndSuppressesLateLoadedKey() async {
+        let gate = AddContactAsyncGate()
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                try await selection.loadKeyData()
+            }
+        )
+
+        model.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "disappear-late-key") {
+                await gate.suspend()
+                return Data("late-public-key".utf8)
+            }
+        )
+
+        await waitUntil("QR processing to suspend before disappear") {
+            guard model.isProcessingQR else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleDisappear()
+        XCTAssertFalse(model.isProcessingQR)
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertNil(model.importedKeyData)
+        XCTAssertNil(model.importedFileName)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_processSelectedQRPhoto_doesNotRetainScreenModelWhileLoaderIsSuspended() async {
+        let gate = AddContactAsyncGate()
+        var model: AddContactScreenModel? = makeModel(
+            qrPhotoKeyDataLoader: { selection in
+                try await selection.loadKeyData()
+            }
+        )
+        weak var weakModel = model
+
+        model?.processSelectedQRPhoto(
+            makeQRPhotoSelection(identifier: "suspended-loader") {
+                await gate.suspend()
+                return Data("late-public-key".utf8)
+            }
+        )
+
+        await waitUntil("QR processing loader to suspend") {
+            await gate.isSuspended()
+        }
+
+        model = nil
+
+        await waitUntil("QR processing should not retain model") {
+            weakModel == nil
+        }
+
+        await gate.resume()
+        await settleAsyncWork()
+        XCTAssertNil(weakModel)
     }
 
     @MainActor
@@ -323,15 +439,25 @@ final class AddContactScreenModelTests: XCTestCase {
     private func makeModel(
         configuration: AddContactView.Configuration = .default,
         inspectKeyDataAction: AddContactScreenModel.InspectKeyDataAction? = nil,
-        loadFileAction: AddContactScreenModel.LoadFileAction? = nil
+        loadFileAction: AddContactScreenModel.LoadFileAction? = nil,
+        qrPhotoKeyDataLoader: AddContactScreenModel.QRPhotoKeyDataLoader? = nil
     ) -> AddContactScreenModel {
         AddContactScreenModel(
             importLoader: PublicKeyImportLoader(qrService: qrService),
             importWorkflow: ContactImportWorkflow(contactService: stack.contactService),
             configuration: configuration,
             inspectKeyDataAction: inspectKeyDataAction,
-            loadFileAction: loadFileAction
+            loadFileAction: loadFileAction,
+            qrPhotoKeyDataLoader: qrPhotoKeyDataLoader
         )
+    }
+
+    @MainActor
+    private func makeQRPhotoSelection(
+        identifier: String,
+        loadKeyData: @escaping @MainActor () async throws -> Data
+    ) -> AddContactQRPhotoSelection {
+        AddContactQRPhotoSelection(identifier: identifier, loadKeyData: loadKeyData)
     }
 
     private func makeHostActions(

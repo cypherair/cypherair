@@ -34,6 +34,7 @@ $(SRCROOT)/Sources/App/Common/SecurityScopedFileAccess.swift
 $(SRCROOT)/Sources/App/Common/SignatureIdentityCardView.swift
 $(SRCROOT)/Sources/App/Common/SignatureVerification+Presentation.swift
 $(SRCROOT)/Sources/App/Common/TextImport/ImportedTextInputState.swift
+$(SRCROOT)/Sources/App/Contacts/AddContactQRPhotoSelection.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactView.swift
 $(SRCROOT)/Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift
@@ -55,6 +56,7 @@ $(SRCROOT)/Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift
 $(SRCROOT)/Sources/App/Contacts/Import/PublicKeyImportLoader.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmView.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmationCoordinator.swift
+$(SRCROOT)/Sources/App/Contacts/QRDisplayScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/QRDisplayView.swift
 $(SRCROOT)/Sources/App/Contacts/TagDetailScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/TagDetailView.swift

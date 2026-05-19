@@ -11,13 +11,14 @@ struct AddContactScreenHostActions {
 final class AddContactScreenModel {
     typealias InspectKeyDataAction = @MainActor (Data) throws -> PublicKeyImportInspection
     typealias LoadFileAction = @MainActor (URL) throws -> LoadedPublicKeyFile
-    typealias QRPhotoKeyDataLoader = @MainActor () async throws -> Data
+    typealias QRPhotoKeyDataLoader = @MainActor (AddContactQRPhotoSelection) async throws -> Data
 
     private(set) var configuration: AddContactView.Configuration
 
     private let importWorkflow: ContactImportWorkflow
     private let inspectKeyDataAction: InspectKeyDataAction
     private let loadFileAction: LoadFileAction
+    private let qrPhotoKeyDataLoader: QRPhotoKeyDataLoader
     private var qrProcessingTask: Task<Void, Never>?
     private var qrProcessingGeneration: UInt64 = 0
     private var fileImportRequestGate = FileImportRequestGate()
@@ -36,7 +37,8 @@ final class AddContactScreenModel {
         importWorkflow: ContactImportWorkflow,
         configuration: AddContactView.Configuration,
         inspectKeyDataAction: InspectKeyDataAction? = nil,
-        loadFileAction: LoadFileAction? = nil
+        loadFileAction: LoadFileAction? = nil,
+        qrPhotoKeyDataLoader: QRPhotoKeyDataLoader? = nil
     ) {
         self.importWorkflow = importWorkflow
         self.configuration = configuration
@@ -53,6 +55,9 @@ final class AddContactScreenModel {
                     )
                 )
             )
+        }
+        self.qrPhotoKeyDataLoader = qrPhotoKeyDataLoader ?? { selection in
+            try await selection.loadKeyData()
         }
     }
 
@@ -83,6 +88,7 @@ final class AddContactScreenModel {
 
     func handleDisappear() {
         fileImportRequestGate.invalidate()
+        cancelQRProcessing()
     }
 
     func updateConfiguration(_ configuration: AddContactView.Configuration) {
@@ -145,12 +151,13 @@ final class AddContactScreenModel {
         }
     }
 
-    func processSelectedQRPhoto(loadKeyData: @escaping QRPhotoKeyDataLoader) {
+    func processSelectedQRPhoto(_ selection: AddContactQRPhotoSelection) {
         qrProcessingTask?.cancel()
         qrProcessingGeneration &+= 1
         let generation = qrProcessingGeneration
+        let loadKeyData = qrPhotoKeyDataLoader
         isProcessingQR = true
-        qrProcessingTask = Task { @MainActor [weak self, generation] in
+        qrProcessingTask = Task { @MainActor [weak self, generation, selection, loadKeyData] in
             defer {
                 if let self, generation == self.qrProcessingGeneration {
                     self.isProcessingQR = false
@@ -159,7 +166,7 @@ final class AddContactScreenModel {
             }
 
             do {
-                let publicKeyData = try await loadKeyData()
+                let publicKeyData = try await loadKeyData(selection)
                 try Task.checkCancellation()
                 guard let self, generation == self.qrProcessingGeneration else {
                     return
@@ -225,11 +232,8 @@ final class AddContactScreenModel {
     }
 
     func clearTransientInput() {
-        qrProcessingTask?.cancel()
-        qrProcessingGeneration &+= 1
+        cancelQRProcessing()
         fileImportRequestGate.invalidate()
-        qrProcessingTask = nil
-        isProcessingQR = false
         armoredText = ""
         clearImportedKeyData()
         showFileImporter = false
@@ -243,6 +247,13 @@ final class AddContactScreenModel {
         }
         importedKeyData = nil
         importedFileName = nil
+    }
+
+    private func cancelQRProcessing() {
+        qrProcessingTask?.cancel()
+        qrProcessingGeneration &+= 1
+        qrProcessingTask = nil
+        isProcessingQR = false
     }
 
     private static func shouldIgnore(_ error: Error) -> Bool {
