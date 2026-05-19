@@ -5,10 +5,6 @@ import XCTest
 /// Shared test infrastructure for Services layer tests.
 /// Creates mock-backed service instances for integration-style testing.
 enum TestHelpers {
-    private final class ContactsOpenResultBox: @unchecked Sendable {
-        var result: ContactsAvailability?
-    }
-
     // MARK: - KeyManagementService Factory
 
     /// Create a KeyManagementService backed by mock SE, Keychain, and Authenticator.
@@ -52,7 +48,7 @@ enum TestHelpers {
     /// Returns the service and the temp directory URL (caller should clean up in tearDown).
     static func makeContactService(
         engine: PgpEngine = PgpEngine()
-    ) -> (service: ContactService, tempDir: URL) {
+    ) async -> (service: ContactService, tempDir: URL) {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirTests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -70,7 +66,7 @@ enum TestHelpers {
             certificateAdapter: certificateAdapter,
             contactsDomainStore: contactsDomainStore
         )
-        _ = openContactsSynchronously(
+        await openContactsForTests(
             service,
             wrappingRootKey: wrappingRootKey
         )
@@ -110,25 +106,17 @@ enum TestHelpers {
     }
 
     @discardableResult
-    static func openContactsSynchronously(
+    static func openContactsForTests(
         _ service: ContactService,
         wrappingRootKey: Data = Data(repeating: 0xA4, count: 32)
-    ) -> ContactsAvailability {
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultBox = ContactsOpenResultBox()
-        Task.detached {
-            let availability = await service.openContactsAfterPostUnlock(
-                gateDecision: ContactsPostAuthGateDecision(
-                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                    frameworkState: .sessionAuthorized
-                ),
-                wrappingRootKey: { wrappingRootKey }
-            )
-            resultBox.result = availability
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return resultBox.result ?? .recoveryNeeded
+    ) async -> ContactsAvailability {
+        await service.openContactsAfterPostUnlock(
+            gateDecision: ContactsPostAuthGateDecision(
+                postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                frameworkState: .sessionAuthorized
+            ),
+            wrappingRootKey: { wrappingRootKey }
+        )
     }
 
     // MARK: - Key Generation Helpers
@@ -231,9 +219,9 @@ enum TestHelpers {
     static func makeServiceStack(
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil
-    ) -> ServiceStack {
+    ) async -> ServiceStack {
         let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
-        let (contactSvc, tempDir) = makeContactService(engine: engine)
+        let (contactSvc, tempDir) = await makeContactService(engine: engine)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
@@ -338,8 +326,8 @@ extension ContactService {
     }
 
     @discardableResult
-    func openProtectedContactsForTests() throws -> ContactsAvailability {
-        let availability = TestHelpers.openContactsSynchronously(self)
+    func openProtectedContactsForTests() async throws -> ContactsAvailability {
+        let availability = await TestHelpers.openContactsForTests(self)
         guard availability == .availableProtectedDomain else {
             throw CypherAirError.contactsUnavailable(availability)
         }

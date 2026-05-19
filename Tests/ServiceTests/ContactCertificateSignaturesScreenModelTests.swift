@@ -30,9 +30,9 @@ private actor ContactCertificateAsyncGate {
 final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -217,7 +217,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         }
         XCTAssertEqual(loadCount, 0)
 
-        TestHelpers.openContactsSynchronously(stack.contactService)
+        await TestHelpers.openContactsForTests(stack.contactService)
         model.handleContactsAvailabilityChange(
             from: .locked,
             to: .availableProtectedDomain
@@ -715,9 +715,9 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -960,7 +960,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         }
         XCTAssertEqual(loadCount, 0)
 
-        TestHelpers.openContactsSynchronously(stack.contactService)
+        await TestHelpers.openContactsForTests(stack.contactService)
         model.handleContactsAvailabilityChange(
             from: .locked,
             to: .availableProtectedDomain

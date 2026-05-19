@@ -6,9 +6,9 @@ final class SigningServiceTests: XCTestCase {
 
     private var stack: TestHelpers.ServiceStack!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -157,7 +157,7 @@ final class SigningServiceTests: XCTestCase {
     func test_verifyCleartext_unknownSigner_returnsUnknownSigner() async throws {
         // Create a separate stack for signing — the signer must not be known
         // to the verifier's contacts or own keys
-        let otherStack = TestHelpers.makeServiceStack()
+        let otherStack = await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(
@@ -182,7 +182,7 @@ final class SigningServiceTests: XCTestCase {
     }
 
     func test_verifyCleartext_profileB_unknownSigner_returnsUnknownSigner() async throws {
-        let otherStack = TestHelpers.makeServiceStack()
+        let otherStack = await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
         let otherIdentity = try await TestHelpers.generateAndStoreKey(

@@ -8,9 +8,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
     private var stack: TestHelpers.ServiceStack!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {

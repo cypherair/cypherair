@@ -32,9 +32,9 @@ final class AddContactScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var qrService: QRService!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
         qrService = QRService(contactImportAdapter: PGPContactImportAdapter(engine: stack.engine))
     }
 

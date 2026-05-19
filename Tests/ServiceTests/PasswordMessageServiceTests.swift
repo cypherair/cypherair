@@ -5,9 +5,9 @@ final class PasswordMessageServiceTests: XCTestCase {
 
     private var stack: TestHelpers.ServiceStack!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
     }
 
     override func tearDown() {
@@ -120,7 +120,7 @@ final class PasswordMessageServiceTests: XCTestCase {
     func test_decryptMessage_signedByUnknownSignerWithLockedContactsKeepsContextUnavailable()
         async throws
     {
-        let otherStack = TestHelpers.makeServiceStack()
+        let otherStack = await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
         let signer = try await TestHelpers.generateAndStoreKey(
