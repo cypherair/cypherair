@@ -117,6 +117,7 @@ final class AppContainer: @unchecked Sendable {
     private struct UITestContactsBootstrap {
         let wrappingRootKey: Data
         let preloadContact: Bool
+        var didPreloadContact: Bool = false
         var isPreparing: Bool = false
         var cachedAvailability: ContactsAvailability?
         var waiters: [CheckedContinuation<ContactsAvailability, Never>] = []
@@ -960,7 +961,11 @@ final class AppContainer: @unchecked Sendable {
             return contactService.contactsAvailability
         }
         if let cachedAvailability = bootstrap.cachedAvailability {
-            return cachedAvailability
+            guard cachedAvailability != contactService.contactsAvailability else {
+                return cachedAvailability
+            }
+            bootstrap.cachedAvailability = nil
+            uiTestContactsBootstrap = bootstrap
         }
         if bootstrap.isPreparing {
             return await withCheckedContinuation { continuation in
@@ -977,13 +982,22 @@ final class AppContainer: @unchecked Sendable {
             ),
             wrappingRootKey: { bootstrap.wrappingRootKey }
         )
-        if availability == .availableProtectedDomain, bootstrap.preloadContact {
-            try? Self.preloadUITestContact(
-                engine: engine,
-                contactService: contactService
-            )
+        var didPreloadContact = bootstrap.didPreloadContact
+        if availability == .availableProtectedDomain,
+           bootstrap.preloadContact,
+           !bootstrap.didPreloadContact {
+            do {
+                try Self.preloadUITestContact(
+                    engine: engine,
+                    contactService: contactService
+                )
+                didPreloadContact = true
+            } catch {
+                didPreloadContact = false
+            }
         }
         let waiters = uiTestContactsBootstrap?.waiters ?? []
+        uiTestContactsBootstrap?.didPreloadContact = didPreloadContact
         uiTestContactsBootstrap?.cachedAvailability = availability
         uiTestContactsBootstrap?.isPreparing = false
         uiTestContactsBootstrap?.waiters.removeAll()
