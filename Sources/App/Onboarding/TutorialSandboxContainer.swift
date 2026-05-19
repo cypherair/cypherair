@@ -160,6 +160,7 @@ final class TutorialSandboxContainer {
             return
         }
 
+        try Task.checkCancellation()
         let contactService = self.contactService
         let wrappingRootKey = contactsWrappingRootKey
         let availability = await Task.detached {
@@ -171,6 +172,7 @@ final class TutorialSandboxContainer {
                 wrappingRootKey: { wrappingRootKey }
             )
         }.value
+        try Task.checkCancellation()
         guard availability == .availableProtectedDomain else {
             throw TutorialSandboxContainerError.contactsProtectedDomainOpenFailed
         }

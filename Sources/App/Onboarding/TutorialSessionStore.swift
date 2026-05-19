@@ -6,6 +6,8 @@ import SwiftUI
 final class TutorialSessionStore {
     @ObservationIgnored
     private weak var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator?
+    @ObservationIgnored
+    private let openTutorialContacts: @MainActor (TutorialSandboxContainer) async throws -> Void
 
     private(set) var session = TutorialSessionState()
     private(set) var container: TutorialSandboxContainer?
@@ -25,6 +27,14 @@ final class TutorialSessionStore {
     var isInspectorPresented: Bool { navigation.isInspectorPresented }
     var configurationFactory: TutorialConfigurationFactory { TutorialConfigurationFactory(store: self) }
     var blocklist = TutorialUnsafeRouteBlocklist()
+
+    init(
+        openTutorialContacts: @escaping @MainActor (TutorialSandboxContainer) async throws -> Void = { container in
+            try await container.openContactsIfNeeded()
+        }
+    ) {
+        self.openTutorialContacts = openTutorialContacts
+    }
 
     var nextModule: TutorialModuleID? {
         session.nextIncompleteModule
@@ -140,7 +150,16 @@ final class TutorialSessionStore {
         guard canOpen(requestedModule) else { return }
 
         ensureSession()
-        guard await openContactsIfNeeded() else { return }
+        guard let activeContainer = container,
+              let activeSessionID = session.sessionID else {
+            return
+        }
+        guard await openContactsIfNeeded(
+            for: activeContainer,
+            sessionID: activeSessionID
+        ) else {
+            return
+        }
 
         if requestedModule == .sandbox {
             openSandboxAcknowledgement()
@@ -148,7 +167,16 @@ final class TutorialSessionStore {
         }
 
         if requestedModule == .addDemoContact {
-            await ensureBobPrepared()
+            await ensureBobPrepared(
+                container: activeContainer,
+                sessionID: activeSessionID
+            )
+            guard isCurrentTutorialSession(
+                container: activeContainer,
+                sessionID: activeSessionID
+            ) else {
+                return
+            }
         }
 
         resetNavigationState(for: requestedModule)
@@ -483,15 +511,29 @@ final class TutorialSessionStore {
         }
     }
 
-    private func openContactsIfNeeded() async -> Bool {
-        guard let activeContainer = container else {
+    private func openContactsIfNeeded(
+        for activeContainer: TutorialSandboxContainer,
+        sessionID activeSessionID: TutorialSessionID
+    ) async -> Bool {
+        guard isCurrentTutorialSession(
+            container: activeContainer,
+            sessionID: activeSessionID
+        ) else {
             return false
         }
 
         do {
-            try await activeContainer.openContactsIfNeeded()
+            try await openTutorialContacts(activeContainer)
+            guard isCurrentTutorialSession(
+                container: activeContainer,
+                sessionID: activeSessionID
+            ) else {
+                return false
+            }
             errorMessage = nil
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             if container === activeContainer {
                 activeContainer.cleanup()
@@ -500,6 +542,15 @@ final class TutorialSessionStore {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private func isCurrentTutorialSession(
+        container expectedContainer: TutorialSandboxContainer,
+        sessionID expectedSessionID: TutorialSessionID
+    ) -> Bool {
+        !Task.isCancelled
+            && container === expectedContainer
+            && session.sessionID == expectedSessionID
     }
 
     private func refreshLifecycleState() {
@@ -527,13 +578,29 @@ final class TutorialSessionStore {
     }
 
     private func ensureBobPrepared() async {
-        guard let container else { return }
+        guard let container,
+              let sessionID = session.sessionID else {
+            return
+        }
+        await ensureBobPrepared(container: container, sessionID: sessionID)
+    }
+
+    private func ensureBobPrepared(
+        container activeContainer: TutorialSandboxContainer,
+        sessionID activeSessionID: TutorialSessionID
+    ) async {
+        guard isCurrentTutorialSession(
+            container: activeContainer,
+            sessionID: activeSessionID
+        ) else {
+            return
+        }
         if session.artifacts.bobIdentity != nil, session.artifacts.bobArmoredPublicKey != nil {
             return
         }
 
         do {
-            let bob = try await container.keyManagement.generateKey(
+            let bob = try await activeContainer.keyManagement.generateKey(
                 name: String(
                     localized: "guidedTutorial.demoName.bob",
                     defaultValue: "Bob Demo"
@@ -542,12 +609,26 @@ final class TutorialSessionStore {
                 expirySeconds: nil,
                 profile: .advanced
             )
+            guard isCurrentTutorialSession(
+                container: activeContainer,
+                sessionID: activeSessionID
+            ) else {
+                return
+            }
             session.artifacts.bobIdentity = bob
-            if let armored = try? container.keyManagement.exportPublicKey(fingerprint: bob.fingerprint),
+            if let armored = try? activeContainer.keyManagement.exportPublicKey(fingerprint: bob.fingerprint),
                let armoredString = String(data: armored, encoding: .utf8) {
                 session.artifacts.bobArmoredPublicKey = armoredString
             }
+        } catch is CancellationError {
+            return
         } catch {
+            guard isCurrentTutorialSession(
+                container: activeContainer,
+                sessionID: activeSessionID
+            ) else {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }
