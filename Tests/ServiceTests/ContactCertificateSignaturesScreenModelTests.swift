@@ -1378,22 +1378,14 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
 
         let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
         let wrappingRootKey = Data(repeating: 0xD6, count: 32)
-        let migrationSource = ContactsLegacyMigrationSource(
-            engine: stack.engine,
-            repository: ContactRepository(contactsDirectory: contactsDirectory)
-        )
         let store = ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
         let service = ContactService(
             engine: stack.engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(

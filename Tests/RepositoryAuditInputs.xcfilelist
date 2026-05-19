@@ -161,7 +161,6 @@ $(SRCROOT)/Sources/Models/CertificateSignatureVerification.swift
 $(SRCROOT)/Sources/Models/CertificateSignatureVerificationStatus.swift
 $(SRCROOT)/Sources/Models/CertificateSignerSource.swift
 $(SRCROOT)/Sources/Models/ColorTheme.swift
-$(SRCROOT)/Sources/Models/Contact.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactCandidateMatch.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactCandidateMatchStrength.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactCertificationArtifactReference.swift
@@ -177,6 +176,7 @@ $(SRCROOT)/Sources/Models/Contacts/ContactMergeResult.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactRecipientSummary.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactTag.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactTagSummary.swift
+$(SRCROOT)/Sources/Models/Contacts/ContactVerificationState.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactsAvailability.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactsDomainSnapshot.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactsDomainValidationError.swift
@@ -254,10 +254,7 @@ $(SRCROOT)/Sources/Security/SecureEnclaveManager.swift
 $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportMatcher.swift
 $(SRCROOT)/Sources/Services/ContactRecipientResolver.swift
-$(SRCROOT)/Sources/Services/ContactRepository.swift
 $(SRCROOT)/Sources/Services/ContactService.swift
-$(SRCROOT)/Sources/Services/ContactsCompatibilityMapper.swift
-$(SRCROOT)/Sources/Services/ContactsLegacyMigrationSource.swift
 $(SRCROOT)/Sources/Services/ContactsPostAuthGateDecision.swift
 $(SRCROOT)/Sources/Services/ContactsSearchIndex.swift
 $(SRCROOT)/Sources/Services/ContactSnapshotMutator.swift

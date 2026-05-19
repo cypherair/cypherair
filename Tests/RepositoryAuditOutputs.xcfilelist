@@ -161,7 +161,6 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/CertificateSignatureVerificationStatus.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/CertificateSignerSource.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/ColorTheme.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contact.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactCandidateMatch.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactCandidateMatchStrength.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactCertificationArtifactReference.swift
@@ -177,6 +176,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactRecipientSummary.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactTag.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactTagSummary.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactVerificationState.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactsAvailability.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactsDomainSnapshot.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Models/Contacts/ContactsDomainValidationError.swift
@@ -254,10 +254,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/CertificateSignatureService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactImportMatcher.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactRecipientResolver.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactRepository.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactService.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactsCompatibilityMapper.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactsLegacyMigrationSource.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactsPostAuthGateDecision.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactsSearchIndex.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/ContactSnapshotMutator.swift

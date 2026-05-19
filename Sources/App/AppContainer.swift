@@ -34,7 +34,6 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
-    let contactsDirectory: URL?
     let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
@@ -72,7 +71,6 @@ final class AppContainer: @unchecked Sendable {
         selfTestService: SelfTestService,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
         localDataResetService: LocalDataResetService,
-        contactsDirectory: URL? = nil,
         legacySelfTestReportsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
@@ -108,7 +106,6 @@ final class AppContainer: @unchecked Sendable {
         self.selfTestService = selfTestService
         self.temporaryArtifactStore = temporaryArtifactStore
         self.localDataResetService = localDataResetService
-        self.contactsDirectory = contactsDirectory
         self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
         self.defaultsSuiteName = defaultsSuiteName
         uiTestContactsBootstrap = nil
@@ -399,24 +396,14 @@ final class AppContainer: @unchecked Sendable {
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let contactsDirectory = documentDirectory
-            .appendingPathComponent("contacts", isDirectory: true)
         let legacySelfTestReportsDirectory = documentDirectory
             .appendingPathComponent("self-test", isDirectory: true)
-        let contactsLegacyRepository = ContactRepository(contactsDirectory: contactsDirectory)
-        let contactsMigrationSource = ContactsLegacyMigrationSource(
-            contactImportAdapter: contactImportAdapter,
-            repository: contactsLegacyRepository
-        )
         let contactsDomainStore = ContactsDomainStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
             currentWrappingRootKey: {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
-            },
-            initialSnapshotProvider: {
-                try contactsMigrationSource.makeInitialSnapshot()
             }
         )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
@@ -441,7 +428,6 @@ final class AppContainer: @unchecked Sendable {
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: contactsDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
@@ -540,9 +526,6 @@ final class AppContainer: @unchecked Sendable {
                         try protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
                 )
-                config.appendPostUnlockRecoveryLoadWarning(
-                    contactService.protectedDomainMigrationWarning
-                )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     availability: Self.protectedOrdinarySettingsAvailability(
                         postUnlockOutcome: postUnlockOutcome,
@@ -576,7 +559,6 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             legacyRightStoreClient: protectedDataRightStoreClient,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            contactsDirectory: contactsDirectory,
             defaults: defaults,
             defaultsDomainName: Bundle.main.bundleIdentifier,
             config: config,
@@ -628,7 +610,6 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
-            contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
     }
@@ -664,8 +645,6 @@ final class AppContainer: @unchecked Sendable {
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
-        let contactsDirectory = documentDirectory
-            .appendingPathComponent("contacts", isDirectory: true)
         let legacySelfTestReportsDirectory = documentDirectory
             .appendingPathComponent("self-test", isDirectory: true)
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -673,10 +652,6 @@ final class AppContainer: @unchecked Sendable {
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: documentDirectory,
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.createDirectory(
-            at: contactsDirectory,
             withIntermediateDirectories: true
         )
         try? FileManager.default.createDirectory(
@@ -761,8 +736,6 @@ final class AppContainer: @unchecked Sendable {
                     "contacts-sandbox",
                     isDirectory: true
                 ),
-                contactsDirectory: contactsDirectory,
-                contactImportAdapter: contactImportAdapter,
                 wrappingRootKey: contactsWrappingRootKey
             )
         } catch {
@@ -807,7 +780,6 @@ final class AppContainer: @unchecked Sendable {
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: contactsDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
@@ -890,7 +862,6 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             legacyRightStoreClient: nil,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            contactsDirectory: contactsDirectory,
             defaults: defaults,
             defaultsDomainName: suiteName,
             config: config,
@@ -941,7 +912,6 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
-            contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
@@ -1036,8 +1006,6 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeSandboxContactsDomainStore(
         baseDirectory: URL,
-        contactsDirectory: URL,
-        contactImportAdapter: PGPContactImportAdapter,
         wrappingRootKey: Data
     ) throws -> ContactsDomainStore {
         let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
@@ -1054,19 +1022,11 @@ final class AppContainer: @unchecked Sendable {
             try registryStore.saveRegistry(registry)
         }
 
-        let repository = ContactRepository(contactsDirectory: contactsDirectory)
-        let migrationSource = ContactsLegacyMigrationSource(
-            contactImportAdapter: contactImportAdapter,
-            repository: repository
-        )
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
     }
 

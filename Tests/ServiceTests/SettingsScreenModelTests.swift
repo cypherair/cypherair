@@ -1417,9 +1417,6 @@ final class SettingsScreenModelTests: XCTestCase {
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let contactsDirectory = container.contactsDirectory {
-            try? FileManager.default.removeItem(at: contactsDirectory)
-        }
         if let defaultsSuiteName = container.defaultsSuiteName {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
         }

@@ -68,7 +68,6 @@ enum TestHelpers {
         let service = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: tempDir,
             contactsDomainStore: contactsDomainStore
         )
         _ = openContactsSynchronously(
@@ -102,18 +101,11 @@ enum TestHelpers {
             try registryStore.saveRegistry(registry)
         }
 
-        let migrationSource = ContactsLegacyMigrationSource(
-            engine: engine,
-            repository: ContactRepository(contactsDirectory: contactsDirectory)
-        )
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
     }
 
@@ -341,7 +333,6 @@ extension ContactService {
         self.init(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: resolvedContactsDomainStore
         )
     }
@@ -356,7 +347,7 @@ extension ContactService {
     }
 
     var testContactKeyRecords: [ContactKeyRecord] {
-        guard let snapshot = try? currentCompatibilitySnapshot() else {
+        guard let snapshot = try? currentContactsDomainSnapshot() else {
             return []
         }
         return snapshot.keyRecords
@@ -381,20 +372,6 @@ extension ContactSnapshotMutator {
         self.init(
             contactImportAdapter: PGPContactImportAdapter(engine: engine),
             importMatcher: importMatcher
-        )
-    }
-}
-
-extension ContactsLegacyMigrationSource {
-    convenience init(
-        engine: PgpEngine,
-        repository: ContactRepository,
-        compatibilityMapper: ContactsCompatibilityMapper = ContactsCompatibilityMapper()
-    ) {
-        self.init(
-            contactImportAdapter: PGPContactImportAdapter(engine: engine),
-            repository: repository,
-            compatibilityMapper: compatibilityMapper
         )
     }
 }

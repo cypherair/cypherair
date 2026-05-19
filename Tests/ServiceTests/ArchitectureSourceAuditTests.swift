@@ -135,26 +135,45 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             cleanContents: "struct LegacySecurityModel { let availability: ProtectedOrdinarySettingsAvailability }"
         )
 
-        try assertRuleBehavior(
-            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
-                "Sources/Services/ContactsLegacyMigrationSource.swift": "fixture exception"
-            ]),
-            violatingPath: "Sources/Services/NewRecipientService.swift",
-            violatingContents: "struct NewRecipientService { let contacts: [Contact] }",
-            allowedPath: "Sources/Services/ContactsLegacyMigrationSource.swift",
-            allowedContents: "struct ContactsLegacyMigrationSource { let contacts: [Contact] }",
-            cleanContents: "struct ContactsLegacyMigrationSource {}"
+        let contactArraySource = AuditedSource(
+            path: "Sources/Services/NewRecipientService.swift",
+            contents: "struct NewRecipientService { let contacts: [Contact] }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies
+                .violations(in: [contactArraySource])
+                .map(\.path),
+            [contactArraySource.path]
         )
 
-        try assertRuleBehavior(
-            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
-                "Sources/Services/ContactsCompatibilityMapper.swift": "fixture exception"
-            ]),
-            violatingPath: "Sources/Services/NewRecipientService.swift",
-            violatingContents: "struct NewRecipientService { let contacts: Array<Contact> }",
-            allowedPath: "Sources/Services/ContactsCompatibilityMapper.swift",
-            allowedContents: "struct ContactsCompatibilityMapper { let contacts: Array<Contact> }",
-            cleanContents: "struct ContactsCompatibilityMapper {}"
+        let contactGenericArraySource = AuditedSource(
+            path: "Sources/Services/NewRecipientService.swift",
+            contents: "struct NewRecipientService { let contacts: Array<Contact> }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.contactArrayRuntimeDependencies
+                .violations(in: [contactGenericArraySource])
+                .map(\.path),
+            [contactGenericArraySource.path]
+        )
+
+        let contactsLegacySource = AuditedSource(
+            path: "Sources/Services/NewContactsLegacyRuntime.swift",
+            contents: """
+            struct Contact {}
+            struct NewContactsLegacyRuntime {
+                let repository = ContactRepository.self
+                let source = ContactsLegacyMigrationSource.self
+                let mapper = ContactsCompatibilityMapper.self
+                let availability = "not in stripped source"
+            }
+            """
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary
+                .violations(in: [contactsLegacySource])
+                .map(\.path),
+            [contactsLegacySource.path]
         )
 
         try assertRuleBehavior(
@@ -194,6 +213,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary.violations(in: [source]).isEmpty
         )
 
         let modelsSource = AuditedSource(
@@ -595,21 +617,13 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Contacts migration and compatibility snapshot construction still parse the retained one-time flat legacy source.",
-                [
-                    "Sources/Services/ContactsCompatibilityMapper.swift",
-                    "Sources/Services/ContactsLegacyMigrationSource.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let contactsLegacyRuntimeVocabulary = ArchitectureSourceAuditRule(
         name: "Contacts legacy runtime vocabulary",
-        failureSummary: "Production sources must not expose the removed flat Contacts runtime or legacy key replacement API.",
-        pattern: #"(?:availableLegacyCompatibility|openLegacyCompatibility|legacyKeyReplacementDetected)"#,
+        failureSummary: "Production sources must not reintroduce flat Contacts projection, migration, or repository code.",
+        pattern: #"(?:availableLegacyCompatibility|openLegacyCompatibility|legacyKeyReplacementDetected|\bContactRepository\b|\bContactsLegacyMigrationSource\b|\bContactsCompatibilityMapper\b|\bstruct\s+Contact\b)"#,
         scope: { path in
             path.hasPrefix("Sources/")
                 && !path.hasPrefix("Sources/PgpMobile/")

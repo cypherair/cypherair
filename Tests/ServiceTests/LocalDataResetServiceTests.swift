@@ -8,10 +8,11 @@ final class LocalDataResetServiceTests: XCTestCase {
     func test_resetAllLocalData_removesStorageAndClearsMemoryState() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
         defer {
+            try? FileManager.default.removeItem(
+                at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
+            )
             if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
                 try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-            } else if let contactsDirectory = container.contactsDirectory {
-                try? FileManager.default.removeItem(at: contactsDirectory)
             }
             if let defaultsSuiteName = container.defaultsSuiteName {
                 UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
@@ -61,16 +62,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             .appendingPathComponent("reset-marker.txt")
         try Data([0x03]).write(to: protectedMarker)
 
-        let contactsDirectory = try XCTUnwrap(container.contactsDirectory)
-        try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
-        let contactMarker = contactsDirectory.appendingPathComponent("contact.gpg")
-        try Data([0x04]).write(to: contactMarker)
-        let contactsQuarantineDirectory = ContactRepository(contactsDirectory: contactsDirectory).quarantineDirectory
-        try FileManager.default.createDirectory(at: contactsQuarantineDirectory, withIntermediateDirectories: true)
-        try Data([0x05]).write(
-            to: contactsQuarantineDirectory.appendingPathComponent("contact.gpg")
-        )
-
         let legacySelfTestReportsDirectory = try XCTUnwrap(container.legacySelfTestReportsDirectory)
         try FileManager.default.createDirectory(
             at: legacySelfTestReportsDirectory,
@@ -107,8 +98,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsQuarantineDirectory.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestReportsDirectory.path))
         XCTAssertNil(container.protectedOrdinarySettingsCoordinator.snapshot)
         XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)
@@ -124,14 +113,16 @@ final class LocalDataResetServiceTests: XCTestCase {
 
     func test_resetAllLocalData_missingProtectedDataBaseValidatesCleanAndPreservesResetAuth() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CypherAirResetMissingBase-\(UUID().uuidString)", isDirectory: true)
+        let temporaryArtifactStore = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
         defer {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
             )
+            try? FileManager.default.removeItem(at: temporaryDirectory)
             if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
                 try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-            } else if let contactsDirectory = container.contactsDirectory {
-                try? FileManager.default.removeItem(at: contactsDirectory)
             }
             if let defaultsSuiteName = container.defaultsSuiteName {
                 UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
@@ -141,7 +132,11 @@ final class LocalDataResetServiceTests: XCTestCase {
         let protectedDataBaseDirectory = container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         try? FileManager.default.removeItem(at: protectedDataBaseDirectory)
 
-        _ = try await container.localDataResetService.resetAllLocalData(
+        let resetService = makeResetService(
+            from: container,
+            temporaryArtifactStore: temporaryArtifactStore
+        )
+        _ = try await resetService.resetAllLocalData(
             authenticationContext: LAContext()
         )
 
@@ -316,8 +311,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         )
         if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
             try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-        } else if let contactsDirectory = container.contactsDirectory {
-            try? FileManager.default.removeItem(at: contactsDirectory)
         }
         if let defaultsSuiteName = container.defaultsSuiteName {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
@@ -334,8 +327,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         return LocalDataResetService(
             keychain: container.keychain,
             protectedDataStorageRoot: container.protectedDataStorageRoot,
-            contactsDirectory: container.contactsDirectory ?? FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString, isDirectory: true),
             defaults: defaults,
             defaultsDomainName: defaultsSuiteName,
             config: container.config,
