@@ -1,4 +1,6 @@
 import Foundation
+import PhotosUI
+import SwiftUI
 import XCTest
 @testable import CypherAir
 
@@ -175,11 +177,14 @@ final class AddContactScreenModelTests: XCTestCase {
 
     @MainActor
     func test_processSelectedQRPhoto_successAndFailure_updateState() async {
-        let model = makeModel()
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { item in
+                XCTAssertEqual(item.itemIdentifier, "armored-success")
+                return Data("-----BEGIN PGP PUBLIC KEY BLOCK-----".utf8)
+            }
+        )
 
-        model.processSelectedQRPhoto {
-            Data("-----BEGIN PGP PUBLIC KEY BLOCK-----".utf8)
-        }
+        model.processSelectedQRPhoto(PhotosPickerItem(itemIdentifier: "armored-success"))
 
         await waitUntil("QR photo success handling") {
             model.isProcessingQR == false
@@ -191,16 +196,20 @@ final class AddContactScreenModelTests: XCTestCase {
 
         model.dismissError()
 
-        model.processSelectedQRPhoto {
-            throw CypherAirError.invalidQRCode
-        }
+        let failingModel = makeModel(
+            qrPhotoKeyDataLoader: { item in
+                XCTAssertEqual(item.itemIdentifier, "invalid-qr")
+                throw CypherAirError.invalidQRCode
+            }
+        )
+        failingModel.processSelectedQRPhoto(PhotosPickerItem(itemIdentifier: "invalid-qr"))
 
         await waitUntil("QR photo failure handling") {
-            model.isProcessingQR == false
+            failingModel.isProcessingQR == false
         }
 
-        XCTAssertTrue(model.showError)
-        if case .invalidQRCode? = model.error {
+        XCTAssertTrue(failingModel.showError)
+        if case .invalidQRCode? = failingModel.error {
             // Expected
         } else {
             XCTFail("Expected invalid QR code error")
@@ -208,14 +217,38 @@ final class AddContactScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_clearTransientInputDuringQRProcessingSuppressesLateLoadedKey() async {
-        let model = makeModel()
-        let gate = AddContactAsyncGate()
+    func test_processSelectedQRPhoto_binaryData_usesInjectedLoaderAndStoresImportedFile() async {
+        let binaryKeyData = Data([0xff, 0xfe, 0xfd])
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { item in
+                XCTAssertEqual(item.itemIdentifier, "binary-success")
+                return binaryKeyData
+            }
+        )
 
-        model.processSelectedQRPhoto {
-            await gate.suspend()
-            return Data("late-public-key".utf8)
+        model.processSelectedQRPhoto(PhotosPickerItem(itemIdentifier: "binary-success"))
+
+        await waitUntil("QR photo binary success handling") {
+            model.isProcessingQR == false
         }
+
+        XCTAssertEqual(model.armoredText, "")
+        XCTAssertEqual(model.importedKeyData, binaryKeyData)
+        XCTAssertEqual(model.importedFileName, "Binary key from QR")
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_clearTransientInputDuringQRProcessingSuppressesLateLoadedKey() async {
+        let gate = AddContactAsyncGate()
+        let model = makeModel(
+            qrPhotoKeyDataLoader: { _ in
+                await gate.suspend()
+                return Data("late-public-key".utf8)
+            }
+        )
+
+        model.processSelectedQRPhoto(PhotosPickerItem(itemIdentifier: "late-key"))
 
         await waitUntil("QR processing to suspend") {
             guard model.isProcessingQR else {
@@ -323,14 +356,16 @@ final class AddContactScreenModelTests: XCTestCase {
     private func makeModel(
         configuration: AddContactView.Configuration = .default,
         inspectKeyDataAction: AddContactScreenModel.InspectKeyDataAction? = nil,
-        loadFileAction: AddContactScreenModel.LoadFileAction? = nil
+        loadFileAction: AddContactScreenModel.LoadFileAction? = nil,
+        qrPhotoKeyDataLoader: AddContactScreenModel.QRPhotoKeyDataLoader? = nil
     ) -> AddContactScreenModel {
         AddContactScreenModel(
             importLoader: PublicKeyImportLoader(qrService: qrService),
             importWorkflow: ContactImportWorkflow(contactService: stack.contactService),
             configuration: configuration,
             inspectKeyDataAction: inspectKeyDataAction,
-            loadFileAction: loadFileAction
+            loadFileAction: loadFileAction,
+            qrPhotoKeyDataLoader: qrPhotoKeyDataLoader
         )
     }
 

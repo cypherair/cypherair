@@ -55,6 +55,7 @@ $(SRCROOT)/Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift
 $(SRCROOT)/Sources/App/Contacts/Import/PublicKeyImportLoader.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmView.swift
 $(SRCROOT)/Sources/App/Contacts/ImportConfirmationCoordinator.swift
+$(SRCROOT)/Sources/App/Contacts/QRDisplayScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/QRDisplayView.swift
 $(SRCROOT)/Sources/App/Contacts/TagDetailScreenModel.swift
 $(SRCROOT)/Sources/App/Contacts/TagDetailView.swift

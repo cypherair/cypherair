@@ -1,4 +1,6 @@
 import Foundation
+import PhotosUI
+import SwiftUI
 
 struct AddContactScreenHostActions {
     let presentImportConfirmation: @MainActor (ImportConfirmationRequest) -> Void
@@ -11,13 +13,14 @@ struct AddContactScreenHostActions {
 final class AddContactScreenModel {
     typealias InspectKeyDataAction = @MainActor (Data) throws -> PublicKeyImportInspection
     typealias LoadFileAction = @MainActor (URL) throws -> LoadedPublicKeyFile
-    typealias QRPhotoKeyDataLoader = @MainActor () async throws -> Data
+    typealias QRPhotoKeyDataLoader = @MainActor (PhotosPickerItem) async throws -> Data
 
     private(set) var configuration: AddContactView.Configuration
 
     private let importWorkflow: ContactImportWorkflow
     private let inspectKeyDataAction: InspectKeyDataAction
     private let loadFileAction: LoadFileAction
+    private let qrPhotoKeyDataLoader: QRPhotoKeyDataLoader
     private var qrProcessingTask: Task<Void, Never>?
     private var qrProcessingGeneration: UInt64 = 0
     private var fileImportRequestGate = FileImportRequestGate()
@@ -36,7 +39,8 @@ final class AddContactScreenModel {
         importWorkflow: ContactImportWorkflow,
         configuration: AddContactView.Configuration,
         inspectKeyDataAction: InspectKeyDataAction? = nil,
-        loadFileAction: LoadFileAction? = nil
+        loadFileAction: LoadFileAction? = nil,
+        qrPhotoKeyDataLoader: QRPhotoKeyDataLoader? = nil
     ) {
         self.importWorkflow = importWorkflow
         self.configuration = configuration
@@ -53,6 +57,9 @@ final class AddContactScreenModel {
                     )
                 )
             )
+        }
+        self.qrPhotoKeyDataLoader = qrPhotoKeyDataLoader ?? { item in
+            try await importLoader.loadKeyDataFromQRPhoto(item)
         }
     }
 
@@ -145,12 +152,12 @@ final class AddContactScreenModel {
         }
     }
 
-    func processSelectedQRPhoto(loadKeyData: @escaping QRPhotoKeyDataLoader) {
+    func processSelectedQRPhoto(_ item: PhotosPickerItem) {
         qrProcessingTask?.cancel()
         qrProcessingGeneration &+= 1
         let generation = qrProcessingGeneration
         isProcessingQR = true
-        qrProcessingTask = Task { @MainActor [weak self, generation] in
+        qrProcessingTask = Task { @MainActor [weak self, generation, item] in
             defer {
                 if let self, generation == self.qrProcessingGeneration {
                     self.isProcessingQR = false
@@ -159,9 +166,12 @@ final class AddContactScreenModel {
             }
 
             do {
-                let publicKeyData = try await loadKeyData()
+                guard let self else {
+                    return
+                }
+                let publicKeyData = try await self.qrPhotoKeyDataLoader(item)
                 try Task.checkCancellation()
-                guard let self, generation == self.qrProcessingGeneration else {
+                guard generation == self.qrProcessingGeneration else {
                     return
                 }
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {

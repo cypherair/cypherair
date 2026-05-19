@@ -114,6 +114,7 @@
 				App/Contacts/Import/PublicKeyImportLoader.swift,
 				App/Contacts/ImportConfirmationCoordinator.swift,
 				App/Contacts/ImportConfirmView.swift,
+				App/Contacts/QRDisplayScreenModel.swift,
 				App/Contacts/QRDisplayView.swift,
 				App/Contacts/TagDetailScreenModel.swift,
 				App/Contacts/TagDetailView.swift,

@@ -54,6 +54,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment)
     }
 
+    func test_contactsRouteViews_doNotOrchestrateContactOrQRWorkflows() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -201,6 +205,47 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .isEmpty
         )
 
+        let contactsRouteViewSource = AuditedSource(
+            path: "Sources/App/Contacts/QRDisplayView.swift",
+            contents: "struct NewQRView { func run() throws { _ = try qrService.generateQRCode(for: Data()) } }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsRouteViewSource])
+                .map(\.path),
+            [contactsRouteViewSource.path]
+        )
+
+        let contactsRouteScreenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/QRDisplayScreenModel.swift",
+            contents: "final class QRDisplayScreenModel { func run() throws { _ = try qrService.generateQRCode(for: Data()) } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsRouteScreenModelSource])
+                .isEmpty
+        )
+
+        let contactsListScreenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/ContactsScreenModel.swift",
+            contents: "final class ContactsScreenModel { func run() { _ = contactService.contactIdentities() } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsListScreenModelSource])
+                .isEmpty
+        )
+
+        let contactsImportCoordinatorSource = AuditedSource(
+            path: "Sources/App/Contacts/Import/ContactImportWorkflow.swift",
+            contents: "struct ContactImportWorkflow { func run() throws { try contactService.importContact() } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment
+                .violations(in: [contactsImportCoordinatorSource])
+                .isEmpty
+        )
+
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
@@ -235,6 +280,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.appLayerFFIAdapterUsage.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.violations(in: [source]).isEmpty
@@ -669,6 +717,17 @@ private enum ArchitectureSourceAuditRules {
         temporaryExceptions: temporaryExceptions([])
     )
 
+    static let contactsRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
+        name: "Contacts route view workflow containment",
+        failureSummary: "Contacts route Views should send intent to ScreenModels or coordinators instead of calling contact or QR workflow services directly.",
+        pattern: #"\b(?:contactService|qrService|importLoader|importWorkflow|service)\s*\.\s*(?:generateQRCode|parseImportURL|inspectImportablePublicCertificate|inspectKeyMetadata|detectKeyProfile|decodeQRCodes|loadKeyDataFromQRPhoto|loadFromQRPhoto|loadFromURL|inspect|loadFromFile|makeImportConfirmationRequest|importContact|removeContactIdentity|mergeContact|addTag|assignTag|removeTag|setVerificationState|setPreferredKey|setKeyUsageState|contactIdentities|availableContactIdentity|availableContactKeyRecord|contactTagSummaries|tagSuggestions|createTag|replaceTagMembership|renameTag|deleteTag|requireContactPublicKeyData)\s*\("#,
+        scope: { path in
+            isContactsViewPath(path)
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
     private static let keyRouteViewPaths: Set<String> = [
         "Sources/App/Keys/BackupKeyView.swift",
         "Sources/App/Keys/ImportKeyView.swift",
@@ -677,6 +736,11 @@ private enum ArchitectureSourceAuditRules {
         "Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift",
         "Sources/App/Keys/SelectiveRevocationView.swift",
     ]
+
+    private static func isContactsViewPath(_ path: String) -> Bool {
+        path.hasPrefix("Sources/App/Contacts/")
+            && path.hasSuffix("View.swift")
+    }
 
     private static func wordPattern(for symbols: [String]) -> String {
         let alternation = symbols
