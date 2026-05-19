@@ -495,7 +495,7 @@ final class ModelTests: XCTestCase {
                 verificationKeys: [],
                 contactKeys: [],
                 ownKeys: [],
-                contactsAvailability: .availableLegacyCompatibility
+                contactsAvailability: .availableProtectedDomain
             )
         )
 

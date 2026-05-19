@@ -5,6 +5,9 @@ import XCTest
 /// Shared test infrastructure for Services layer tests.
 /// Creates mock-backed service instances for integration-style testing.
 enum TestHelpers {
+    private final class ContactsOpenResultBox: @unchecked Sendable {
+        var result: ContactsAvailability?
+    }
 
     // MARK: - KeyManagementService Factory
 
@@ -55,14 +58,85 @@ enum TestHelpers {
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let wrappingRootKey = Data(repeating: 0xA4, count: 32)
+        let contactsDomainStore = try? makeContactsDomainStore(
+            engine: engine,
+            contactsDirectory: tempDir,
+            wrappingRootKey: wrappingRootKey
+        )
 
         let service = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: tempDir
+            contactsDirectory: tempDir,
+            contactsDomainStore: contactsDomainStore
         )
-        try? service.openLegacyCompatibilityForTests()
+        _ = openContactsSynchronously(
+            service,
+            wrappingRootKey: wrappingRootKey
+        )
         return (service, tempDir)
+    }
+
+    static func makeContactsDomainStore(
+        engine: PgpEngine,
+        contactsDirectory: URL,
+        wrappingRootKey: Data = Data(repeating: 0xA4, count: 32)
+    ) throws -> ContactsDomainStore {
+        let storageRoot = ProtectedDataStorageRoot(
+            baseDirectory: contactsDirectory.appendingPathComponent(
+                "protected-contacts",
+                isDirectory: true
+            )
+        )
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        if registry.committedMembership.isEmpty,
+           registry.sharedResourceLifecycleState == .absent {
+            registry.sharedResourceLifecycleState = .ready
+            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+            try registryStore.saveRegistry(registry)
+        }
+
+        let migrationSource = ContactsLegacyMigrationSource(
+            engine: engine,
+            repository: ContactRepository(contactsDirectory: contactsDirectory)
+        )
+        return ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+    }
+
+    @discardableResult
+    static func openContactsSynchronously(
+        _ service: ContactService,
+        wrappingRootKey: Data = Data(repeating: 0xA4, count: 32)
+    ) -> ContactsAvailability {
+        let semaphore = DispatchSemaphore(value: 0)
+        let resultBox = ContactsOpenResultBox()
+        Task.detached {
+            let availability = await service.openContactsAfterPostUnlock(
+                gateDecision: ContactsPostAuthGateDecision(
+                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                    frameworkState: .sessionAuthorized
+                ),
+                wrappingRootKey: { wrappingRootKey }
+            )
+            resultBox.result = availability
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return resultBox.result ?? .recoveryNeeded
     }
 
     // MARK: - Key Generation Helpers
@@ -258,12 +332,44 @@ extension ContactService {
     ) {
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
+        let resolvedContactsDomainStore = contactsDomainStore ?? contactsDirectory.flatMap {
+            try? TestHelpers.makeContactsDomainStore(
+                engine: engine,
+                contactsDirectory: $0
+            )
+        }
         self.init(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
             contactsDirectory: contactsDirectory,
-            contactsDomainStore: contactsDomainStore
+            contactsDomainStore: resolvedContactsDomainStore
         )
+    }
+
+    @discardableResult
+    func openProtectedContactsForTests() throws -> ContactsAvailability {
+        let availability = TestHelpers.openContactsSynchronously(self)
+        guard availability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(availability)
+        }
+        return availability
+    }
+
+    var testContactKeyRecords: [ContactKeyRecord] {
+        guard let snapshot = try? currentCompatibilitySnapshot() else {
+            return []
+        }
+        return snapshot.keyRecords
+            .sorted { lhs, rhs in
+                if lhs.contactId != rhs.contactId {
+                    return lhs.contactId < rhs.contactId
+                }
+                return lhs.fingerprint < rhs.fingerprint
+            }
+    }
+
+    var testContactFingerprints: [String] {
+        testContactKeyRecords.map(\.fingerprint)
     }
 }
 

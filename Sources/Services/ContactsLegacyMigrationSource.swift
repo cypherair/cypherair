@@ -1,6 +1,6 @@
 import Foundation
 
-struct ContactsLegacyRuntimeValues {
+private struct ContactsLegacyRuntimeValues {
     let contacts: [Contact]
     let verificationStates: [String: ContactVerificationState]
 }
@@ -24,11 +24,11 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
         guard repository.activeLegacySourceExists() else {
             return ContactsDomainSnapshot.empty()
         }
-        let runtime = try loadRuntimeValues(repairMetadata: false)
+        let runtime = try loadRuntimeValues()
         return try compatibilityMapper.makeCompatibilitySnapshot(from: runtime.contacts)
     }
 
-    func loadRuntimeValues(repairMetadata: Bool) throws -> ContactsLegacyRuntimeValues {
+    private func loadRuntimeValues() throws -> ContactsLegacyRuntimeValues {
         let loadedVerificationStates = try repository.loadVerificationStatesIfDirectoryExists()
         var loadedContacts: [Contact] = []
 
@@ -43,9 +43,6 @@ final class ContactsLegacyMigrationSource: @unchecked Sendable {
 
         let loadedFingerprints = Set(loadedContacts.map(\.fingerprint))
         let filteredStates = loadedVerificationStates.filter { loadedFingerprints.contains($0.key) }
-        if repairMetadata && filteredStates != loadedVerificationStates {
-            try repository.saveVerificationStates(filteredStates)
-        }
 
         return ContactsLegacyRuntimeValues(
             contacts: loadedContacts,

@@ -209,24 +209,6 @@ private struct AddContactScreenHostView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
-        .alert(
-            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
-            isPresented: Binding(
-                get: { model.showKeyUpdateAlert },
-                set: { if !$0 { model.dismissPendingKeyUpdateRequest() } }
-            ),
-            presenting: model.pendingKeyUpdateRequest
-        ) { request in
-            Button(String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"), role: .destructive) {
-                model.confirmPendingKeyUpdate()
-            }
-            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                model.cancelPendingKeyUpdate()
-            }
-        } message: { request in
-            Text(String(localized: "addcontact.keyUpdate.message",
-                        defaultValue: "This contact (\(IdentityDisplayPresentation.displayName(request.pendingUpdate.request.existingContact.displayName))) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"))
-        }
         .fileImporter(
             isPresented: $model.showFileImporter,
             allowedContentTypes: [

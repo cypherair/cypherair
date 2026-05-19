@@ -9,7 +9,6 @@ final class IncomingURLImportCoordinator {
     private let importWorkflow: ContactImportWorkflow
 
     var importError: CypherAirError?
-    var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
     var isTutorialImportBlocked = false
 
     var importErrorDescription: String {
@@ -46,10 +45,6 @@ final class IncomingURLImportCoordinator {
                     onSuccess: { [self] _ in
                         importConfirmationCoordinator.dismiss()
                     },
-                    onReplaceRequested: { [self] request in
-                        importConfirmationCoordinator.dismiss()
-                        pendingKeyUpdateRequest = request
-                    },
                     onFailure: { [self] importError in
                         self.importError = importError
                         importConfirmationCoordinator.dismiss()
@@ -67,23 +62,5 @@ final class IncomingURLImportCoordinator {
 
     func dismissTutorialImportBlocked() {
         isTutorialImportBlocked = false
-    }
-
-    func confirmPendingKeyUpdate() {
-        guard let pendingKeyUpdateRequest else {
-            return
-        }
-
-        self.pendingKeyUpdateRequest = nil
-        pendingKeyUpdateRequest.onConfirm()
-    }
-
-    func cancelPendingKeyUpdate() {
-        guard let pendingKeyUpdateRequest else {
-            return
-        }
-
-        self.pendingKeyUpdateRequest = nil
-        pendingKeyUpdateRequest.onCancel()
     }
 }

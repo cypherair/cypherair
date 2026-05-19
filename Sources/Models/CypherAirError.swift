@@ -42,7 +42,6 @@ enum CypherAirError: Error {
     case duplicateKey
     case keyTooLargeForQr
     case contactsUnavailable(ContactsAvailability)
-    case contactKeyReplacementUnsupported
 
     /// Wrap any error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.

@@ -1,7 +1,6 @@
 import Foundation
 
 enum ContactsAvailability: String, Codable, Equatable, Sendable {
-    case availableLegacyCompatibility
     case availableProtectedDomain
     case opening
     case locked
@@ -13,7 +12,7 @@ enum ContactsAvailability: String, Codable, Equatable, Sendable {
 extension ContactsAvailability {
     var isAvailable: Bool {
         switch self {
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             true
         case .opening, .locked, .recoveryNeeded, .frameworkUnavailable, .restartRequired:
             false
@@ -32,8 +31,8 @@ extension ContactsAvailability {
         switch self {
         case .locked:
             true
-        case .availableLegacyCompatibility, .availableProtectedDomain,
-             .opening, .recoveryNeeded, .frameworkUnavailable, .restartRequired:
+        case .availableProtectedDomain, .opening, .recoveryNeeded,
+             .frameworkUnavailable, .restartRequired:
             false
         }
     }

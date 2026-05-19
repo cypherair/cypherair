@@ -230,7 +230,6 @@
 				Models/Contacts/ContactKeyRecord.swift,
 				Models/Contacts/ContactKeySummary.swift,
 				Models/Contacts/ContactKeyUsageState.swift,
-				Models/Contacts/ContactLegacyKeyReplacementRequest.swift,
 				Models/Contacts/ContactMergePreview.swift,
 				Models/Contacts/ContactMergeResult.swift,
 				Models/Contacts/ContactRecipientSummary.swift,

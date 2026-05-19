@@ -292,7 +292,7 @@ final class SelfTestService {
                     verificationKeys: [],
                     contactKeys: [],
                     ownKeys: [],
-                    contactsAvailability: .availableLegacyCompatibility
+                    contactsAvailability: .availableProtectedDomain
                 )
             )
             decryptSucceeded = true
@@ -312,7 +312,7 @@ final class SelfTestService {
             verificationKeys: [generated.publicKeyData],
             contactKeys: [],
             ownKeys: [],
-            contactsAvailability: .availableLegacyCompatibility
+            contactsAvailability: .availableProtectedDomain
         )
     }
 

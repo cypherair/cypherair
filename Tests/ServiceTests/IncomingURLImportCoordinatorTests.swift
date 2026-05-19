@@ -25,7 +25,6 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertNil(coordinator.importError)
-        XCTAssertNil(coordinator.pendingKeyUpdateRequest)
         XCTAssertFalse(coordinator.isTutorialImportBlocked)
     }
 
@@ -59,12 +58,12 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertNil(coordinator.importError)
-        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
-        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: generated.fingerprint))
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 1)
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: generated.fingerprint))
     }
 
     @MainActor
-    func test_handleIncomingURL_replacementFlow_confirmStoresReplacementAndClearsPendingRequest() throws {
+    func test_handleIncomingURL_sameUserIDImportAddsCandidateContactWithoutReplacementPrompt() throws {
         let coordinator = makeCoordinator()
         let firstKey = try stack.engine.generateKey(
             name: "Carol",
@@ -86,18 +85,13 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         request.onImportVerified()
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
-        XCTAssertNotNil(coordinator.pendingKeyUpdateRequest)
-
-        coordinator.confirmPendingKeyUpdate()
-
-        XCTAssertNil(coordinator.pendingKeyUpdateRequest)
-        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
-        XCTAssertNil(stack.contactService.availableContact(forFingerprint: firstKey.fingerprint))
-        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 2)
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
     }
 
     @MainActor
-    func test_handleIncomingURL_replacementFlow_cancelClearsPendingRequestWithoutReplacing() throws {
+    func test_handleIncomingURL_sameUserIDImportDoesNotRequireCancellation() throws {
         let coordinator = makeCoordinator()
         let firstKey = try stack.engine.generateKey(
             name: "Dana",
@@ -118,14 +112,10 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         let request = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
         request.onImportVerified()
 
-        XCTAssertNotNil(coordinator.pendingKeyUpdateRequest)
-
-        coordinator.cancelPendingKeyUpdate()
-
-        XCTAssertNil(coordinator.pendingKeyUpdateRequest)
-        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
-        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: firstKey.fingerprint))
-        XCTAssertNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
+        XCTAssertNil(coordinator.importConfirmationCoordinator.request)
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 2)
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
     }
 
     @MainActor
@@ -144,7 +134,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.isTutorialImportBlocked)
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertNil(coordinator.importError)
-        XCTAssertTrue(stack.contactService.availableContacts.isEmpty)
+        XCTAssertTrue(stack.contactService.testContactKeyRecords.isEmpty)
     }
 
     @MainActor

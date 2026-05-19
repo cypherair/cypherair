@@ -209,70 +209,6 @@
         }
       }
     },
-    "addcontact.keyUpdate.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        }
-      }
-    },
-    "addcontact.keyUpdate.confirm" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Replace Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换密钥"
-          }
-        }
-      }
-    },
-    "addcontact.keyUpdate.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This contact (%@) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此联系人（%@）的密钥已更新，指纹不同。请在接受前与联系人确认。是否替换现有密钥？"
-          }
-        }
-      }
-    },
-    "addcontact.keyUpdate.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key Update Detected"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检测到密钥更新"
-          }
-        }
-      }
-    },
     "addcontact.mode" : {
       "localizations" : {
         "en" : {
@@ -5025,22 +4961,6 @@
         }
       }
     },
-    "error.contactKeyReplacementUnsupported" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key replacement is only available for legacy contacts. Import the new key as a separate contact, then merge contacts if needed."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "密钥替换仅适用于旧版联系人。请将新密钥作为单独联系人导入，然后按需合并联系人。"
-          }
-        }
-      }
-    },
     "error.corruptData" : {
       "localizations" : {
         "en" : {
@@ -6445,6 +6365,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法创建沙箱联系人目录。"
+          }
+        }
+      }
+    },
+    "guidedTutorial.error.contactsProtectedDomain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not open isolated tutorial contacts storage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开隔离的教程联系人存储。"
           }
         }
       }

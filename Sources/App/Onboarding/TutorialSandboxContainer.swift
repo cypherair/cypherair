@@ -3,6 +3,7 @@ import Foundation
 enum TutorialSandboxContainerError: LocalizedError {
     case defaultsUnavailable
     case contactsDirectoryCreationFailed
+    case contactsProtectedDomainOpenFailed
 
     var errorDescription: String? {
         switch self {
@@ -10,8 +11,15 @@ enum TutorialSandboxContainerError: LocalizedError {
             String(localized: "guidedTutorial.error.defaults", defaultValue: "Could not create isolated tutorial preferences.")
         case .contactsDirectoryCreationFailed:
             String(localized: "guidedTutorial.error.contactsDirectory", defaultValue: "Could not create isolated tutorial contacts storage.")
+        case .contactsProtectedDomainOpenFailed:
+            String(localized: "guidedTutorial.error.contactsProtectedDomain", defaultValue: "Could not open isolated tutorial contacts storage.")
         }
     }
+}
+
+private final class TutorialSandboxContactsOpenResultBox: @unchecked Sendable {
+    var result: ContactsAvailability?
+    var error: Error?
 }
 
 /// Isolated dependency graph for the guided tutorial.
@@ -103,10 +111,18 @@ final class TutorialSandboxContainer {
             privateKeyControlStore: privateKeyControlStore
         )
         try? self.keyManagement.loadKeys()
+        let contactsWrappingRootKey = Data(repeating: 0x54, count: 32)
+        let contactsDomainStore = try Self.makeContactsDomainStore(
+            baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
+            contactsDirectory: contactsDirectory,
+            contactImportAdapter: contactImportAdapter,
+            wrappingRootKey: contactsWrappingRootKey
+        )
         self.contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: contactsDomainStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         self.encryptionService = EncryptionService(
@@ -140,7 +156,10 @@ final class TutorialSandboxContainer {
         self.mockAuthenticator.shouldSucceed = true
         self.mockAuthenticator.biometricsAvailable = true
         self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
-        _ = try? self.contactService.openLegacyCompatibilityForTests()
+        try Self.openContactsSynchronously(
+            contactService: self.contactService,
+            wrappingRootKey: contactsWrappingRootKey
+        )
     }
 
     func cleanup() {
@@ -154,5 +173,67 @@ final class TutorialSandboxContainer {
 
     deinit {
         cleanup()
+    }
+
+    private static func makeContactsDomainStore(
+        baseDirectory: URL,
+        contactsDirectory: URL,
+        contactImportAdapter: PGPContactImportAdapter,
+        wrappingRootKey: Data
+    ) throws -> ContactsDomainStore {
+        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tutorial.contacts.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        if registry.committedMembership.isEmpty,
+           registry.sharedResourceLifecycleState == .absent {
+            registry.sharedResourceLifecycleState = .ready
+            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+            try registryStore.saveRegistry(registry)
+        }
+
+        let repository = ContactRepository(contactsDirectory: contactsDirectory)
+        let migrationSource = ContactsLegacyMigrationSource(
+            contactImportAdapter: contactImportAdapter,
+            repository: repository
+        )
+        return ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+    }
+
+    private static func openContactsSynchronously(
+        contactService: ContactService,
+        wrappingRootKey: Data
+    ) throws {
+        let semaphore = DispatchSemaphore(value: 0)
+        let resultBox = TutorialSandboxContactsOpenResultBox()
+        Task.detached {
+            let availability = await contactService.openContactsAfterPostUnlock(
+                gateDecision: ContactsPostAuthGateDecision(
+                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                    frameworkState: .sessionAuthorized
+                ),
+                wrappingRootKey: { wrappingRootKey }
+            )
+            resultBox.result = availability
+            semaphore.signal()
+        }
+        semaphore.wait()
+        if let error = resultBox.error {
+            throw error
+        }
+        guard resultBox.result == .availableProtectedDomain else {
+            throw TutorialSandboxContainerError.contactsProtectedDomainOpenFailed
+        }
     }
 }

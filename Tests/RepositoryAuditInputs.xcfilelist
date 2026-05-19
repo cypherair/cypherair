@@ -172,7 +172,6 @@ $(SRCROOT)/Sources/Models/Contacts/ContactImportResult.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactKeyRecord.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactKeySummary.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactKeyUsageState.swift
-$(SRCROOT)/Sources/Models/Contacts/ContactLegacyKeyReplacementRequest.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactMergePreview.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactMergeResult.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactRecipientSummary.swift

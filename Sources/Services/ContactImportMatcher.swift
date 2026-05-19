@@ -57,20 +57,6 @@ struct ContactImportMatcher {
         return nil
     }
 
-    func conflictingLegacyContact(
-        forUserId userId: String?,
-        excludingFingerprint fingerprint: String,
-        contacts: [Contact]
-    ) -> Contact? {
-        guard let userId else {
-            return nil
-        }
-
-        return contacts.first {
-            $0.userId == userId && $0.fingerprint != fingerprint
-        }
-    }
-
     private func normalizedEmail(_ userIdOrEmail: String?) -> String? {
         let email = IdentityPresentation.email(from: userIdOrEmail) ?? userIdOrEmail
         guard let normalized = email?

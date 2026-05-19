@@ -386,8 +386,6 @@ final class TutorialSessionStore {
                  .duplicate(let added, _),
                  .updated(let added, _):
                 contact = added
-            case .legacyKeyReplacementDetected(let request):
-                contact = request.newContact
             }
 
             noteBobImported(contact)

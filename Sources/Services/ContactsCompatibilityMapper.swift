@@ -55,39 +55,6 @@ struct ContactsCompatibilityMapper {
         return snapshot
     }
 
-    func makeCompatibilityContacts(from snapshot: ContactsDomainSnapshot) throws -> [Contact] {
-        try snapshot.validateContract()
-        let identitiesByID = Dictionary(
-            uniqueKeysWithValues: snapshot.identities.map { ($0.contactId, $0) }
-        )
-        return snapshot.keyRecords
-            .sorted { lhs, rhs in
-                if lhs.contactId != rhs.contactId {
-                    return lhs.contactId < rhs.contactId
-                }
-                return lhs.fingerprint < rhs.fingerprint
-            }
-            .map { keyRecord in
-                let identity = identitiesByID[keyRecord.contactId]
-                return Contact(
-                    fingerprint: keyRecord.fingerprint,
-                    keyVersion: keyRecord.keyVersion,
-                    profile: keyRecord.profile,
-                    userId: keyRecord.primaryUserId,
-                    contactId: keyRecord.contactId,
-                    contactDisplayName: identity?.displayName,
-                    usageState: keyRecord.usageState,
-                    isRevoked: keyRecord.isRevoked,
-                    isExpired: keyRecord.isExpired,
-                    hasEncryptionSubkey: keyRecord.hasEncryptionSubkey,
-                    verificationState: keyRecord.manualVerificationState,
-                    publicKeyData: keyRecord.publicKeyData,
-                    primaryAlgo: keyRecord.primaryAlgo,
-                    subkeyAlgo: keyRecord.subkeyAlgo
-                )
-            }
-    }
-
     private static func legacyContactID(for fingerprint: String) -> String {
         "legacy-contact-\(fingerprint)"
     }
