@@ -3185,7 +3185,15 @@ final class ContactServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertFalse(container.contactService.testContactKeyRecords.isEmpty)
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
+        let firstAvailability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(firstAvailability, .availableProtectedDomain)
+        let preloadedRecordCount = container.contactService.testContactKeyRecords.count
+        XCTAssertGreaterThan(preloadedRecordCount, 0)
+        let secondAvailability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(secondAvailability, .availableProtectedDomain)
+        XCTAssertEqual(container.contactService.testContactKeyRecords.count, preloadedRecordCount)
         XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
 
         await container.protectedDataSessionCoordinator.relockCurrentSession()
@@ -3196,12 +3204,51 @@ final class ContactServiceTests: XCTestCase {
     }
 
     @MainActor
-    func test_makeUITest_authBypassOpensLegacyCompatibilityGateForContacts() throws {
+    func test_makeUITest_prepareContactsReopensAfterRelockWithoutDuplicatingPreload() async throws {
+        let container = AppContainer.makeUITest(preloadContact: true)
+        defer {
+            cleanup(container)
+        }
+
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
+
+        let firstAvailability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(firstAvailability, .availableProtectedDomain)
+        XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
+        let preloadedRecords = container.contactService.testContactKeyRecords
+        let preloadedFingerprints = Set(preloadedRecords.map(\.fingerprint))
+        XCTAssertGreaterThan(preloadedRecords.count, 0)
+        XCTAssertEqual(preloadedFingerprints.count, preloadedRecords.count)
+        XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
+
+        await container.protectedDataSessionCoordinator.relockCurrentSession()
+
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
+        XCTAssertTrue(container.contactService.contactsDomainRuntimeStateIsClearedForTests)
+        XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
+
+        let reopenedAvailability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
+        XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
+        let reopenedRecords = container.contactService.testContactKeyRecords
+        XCTAssertEqual(reopenedRecords.count, preloadedRecords.count)
+        XCTAssertEqual(Set(reopenedRecords.map(\.fingerprint)), preloadedFingerprints)
+        XCTAssertFalse(contactsDomainArtifactsExist(in: container.protectedDataStorageRoot))
+    }
+
+    @MainActor
+    func test_makeUITest_authBypassPreparesContactsWithAsyncBootstrap() async throws {
         let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
 
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
+        let availability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(availability, .availableProtectedDomain)
         XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
 
         let generated = try container.engine.generateKey(
@@ -3219,12 +3266,16 @@ final class ContactServiceTests: XCTestCase {
     }
 
     @MainActor
-    func test_makeUITest_manualAuthenticationDoesNotPreopenContactsGate() throws {
+    func test_makeUITest_manualAuthenticationDoesNotPreopenContactsGate() async throws {
         let container = AppContainer.makeUITest(requiresManualAuthentication: true)
         defer {
             cleanup(container)
         }
 
+        XCTAssertEqual(container.contactService.contactsAvailability, .locked)
+        XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
+        let availability = await container.prepareUITestContactsIfNeeded()
+        XCTAssertEqual(availability, .locked)
         XCTAssertEqual(container.contactService.contactsAvailability, .locked)
         XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
     }

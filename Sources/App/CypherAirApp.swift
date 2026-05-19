@@ -410,6 +410,9 @@ struct CypherAirApp: App {
                             ]
                         )
                     }
+                    .task {
+                        await prepareUITestContactsIfNeeded()
+                    }
                     .privacyScreen()
                     .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                     .environment(container.config)
@@ -507,6 +510,15 @@ struct CypherAirApp: App {
             syncMacTutorialHostAvailability()
         }
         #endif
+    }
+
+    @MainActor
+    private func prepareUITestContactsIfNeeded() async {
+        guard launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost,
+              !launchConfiguration.requiresManualAuthentication else {
+            return
+        }
+        _ = await container.prepareUITestContactsIfNeeded()
     }
 
     private var appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction {

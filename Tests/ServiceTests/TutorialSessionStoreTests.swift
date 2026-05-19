@@ -3,10 +3,44 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
+private final class TutorialContactsOpenGate {
+    private var didStart = false
+    private var isReleased = false
+    private var startContinuations: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func open(_ container: TutorialSandboxContainer) async throws {
+        didStart = true
+        startContinuations.forEach { $0.resume() }
+        startContinuations.removeAll()
+
+        guard !isReleased else { return }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { continuation in
+            startContinuations.append(continuation)
+        }
+    }
+
+    func release() {
+        isReleased = true
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+@MainActor
 final class TutorialSessionStoreTests: XCTestCase {
-    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() throws {
+    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() async throws {
         let container = try TutorialSandboxContainer()
         defer { container.cleanup() }
+
+        try await container.openContactsIfNeeded()
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: container.contactsDirectory.path))
         try assertCompleteFileProtection(at: container.contactsDirectory)
@@ -15,6 +49,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         )
         XCTAssertEqual(container.authManager.currentMode, .standard)
+        XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
         XCTAssertEqual(container.contactService.testContactKeyRecords.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
@@ -52,6 +87,67 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.lifecycleState, .inProgress)
         XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
         XCTAssertFalse(store.isCompleted(.sandbox))
+    }
+
+    func test_openModule_sandboxIgnoresContactsOpenAfterReset() async {
+        let gate = TutorialContactsOpenGate()
+        let store = TutorialSessionStore(openTutorialContacts: { container in
+            try await gate.open(container)
+        })
+        let task = Task { @MainActor in
+            await store.openModule(.sandbox)
+        }
+
+        await gate.waitUntilStarted()
+        XCTAssertNotNil(store.container)
+
+        store.resetTutorial()
+        gate.release()
+        await task.value
+
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .notStarted)
+        XCTAssertEqual(store.hostSurface, .hub)
+    }
+
+    func test_openModule_sandboxIgnoresContactsOpenAfterFinishAndCleanup() async {
+        let gate = TutorialContactsOpenGate()
+        let store = TutorialSessionStore(openTutorialContacts: { container in
+            try await gate.open(container)
+        })
+        let task = Task { @MainActor in
+            await store.openModule(.sandbox)
+        }
+
+        await gate.waitUntilStarted()
+        XCTAssertNotNil(store.container)
+
+        store.finishAndCleanupTutorial()
+        gate.release()
+        await task.value
+
+        XCTAssertNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .notStarted)
+        XCTAssertEqual(store.hostSurface, .hub)
+    }
+
+    func test_openModule_sandboxIgnoresContactsOpenAfterTaskCancellation() async {
+        let gate = TutorialContactsOpenGate()
+        let store = TutorialSessionStore(openTutorialContacts: { container in
+            try await gate.open(container)
+        })
+        let task = Task { @MainActor in
+            await store.openModule(.sandbox)
+        }
+
+        await gate.waitUntilStarted()
+        task.cancel()
+        gate.release()
+        await task.value
+
+        XCTAssertNotNil(store.container)
+        XCTAssertEqual(store.lifecycleState, .inProgress)
+        XCTAssertEqual(store.hostSurface, .hub)
     }
 
     func test_confirmSandboxAcknowledgement_completesSandboxAndAdvancesToIdentityModule() async {

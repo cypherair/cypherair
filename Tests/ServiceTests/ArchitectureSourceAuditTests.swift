@@ -50,6 +50,13 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary)
     }
 
+    func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
+        let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
+
+        XCTAssertFalse(contents.contains("DispatchSemaphore"))
+        XCTAssertFalse(contents.contains("openSandboxContactsSynchronously"))
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([

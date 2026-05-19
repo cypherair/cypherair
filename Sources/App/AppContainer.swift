@@ -1,9 +1,5 @@
 import Foundation
 
-private final class AppContainerContactsOpenResultBox: @unchecked Sendable {
-    var result: ContactsAvailability?
-}
-
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
@@ -41,6 +37,7 @@ final class AppContainer: @unchecked Sendable {
     let contactsDirectory: URL?
     let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
+    private var uiTestContactsBootstrap: UITestContactsBootstrap?
 
     init(
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
@@ -114,6 +111,16 @@ final class AppContainer: @unchecked Sendable {
         self.contactsDirectory = contactsDirectory
         self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
         self.defaultsSuiteName = defaultsSuiteName
+        uiTestContactsBootstrap = nil
+    }
+
+    private struct UITestContactsBootstrap {
+        let wrappingRootKey: Data
+        let preloadContact: Bool
+        var didPreloadContact: Bool = false
+        var isPreparing: Bool = false
+        var cachedAvailability: ContactsAvailability?
+        var waiters: [CheckedContinuation<ContactsAvailability, Never>] = []
     }
 
     private struct AuthenticationPromptStack {
@@ -804,12 +811,6 @@ final class AppContainer: @unchecked Sendable {
             contactsDomainStore: contactsDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
-        if !requiresManualAuthentication {
-            _ = openSandboxContactsSynchronously(
-                contactService: contactService,
-                wrappingRootKey: contactsWrappingRootKey
-            )
-        }
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
@@ -908,15 +909,7 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
 
-        if preloadContact {
-            try? preloadUITestContact(
-                engine: engine,
-                contactService: contactService,
-                wrappingRootKey: contactsWrappingRootKey
-            )
-        }
-
-        return AppContainer(
+        let container = AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
             authenticationShieldCoordinator: authenticationShieldCoordinator,
             authPromptCoordinator: authPromptCoordinator,
@@ -952,6 +945,66 @@ final class AppContainer: @unchecked Sendable {
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
+        if !requiresManualAuthentication {
+            container.uiTestContactsBootstrap = UITestContactsBootstrap(
+                wrappingRootKey: contactsWrappingRootKey,
+                preloadContact: preloadContact
+            )
+        }
+        return container
+    }
+
+    @MainActor
+    @discardableResult
+    func prepareUITestContactsIfNeeded() async -> ContactsAvailability {
+        guard var bootstrap = uiTestContactsBootstrap else {
+            return contactService.contactsAvailability
+        }
+        if let cachedAvailability = bootstrap.cachedAvailability {
+            guard cachedAvailability != contactService.contactsAvailability else {
+                return cachedAvailability
+            }
+            bootstrap.cachedAvailability = nil
+            uiTestContactsBootstrap = bootstrap
+        }
+        if bootstrap.isPreparing {
+            return await withCheckedContinuation { continuation in
+                uiTestContactsBootstrap?.waiters.append(continuation)
+            }
+        }
+
+        bootstrap.isPreparing = true
+        uiTestContactsBootstrap = bootstrap
+        let availability = await contactService.openContactsAfterPostUnlock(
+            gateDecision: ContactsPostAuthGateDecision(
+                postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                frameworkState: .sessionAuthorized
+            ),
+            wrappingRootKey: { bootstrap.wrappingRootKey }
+        )
+        var didPreloadContact = bootstrap.didPreloadContact
+        if availability == .availableProtectedDomain,
+           bootstrap.preloadContact,
+           !bootstrap.didPreloadContact {
+            do {
+                try Self.preloadUITestContact(
+                    engine: engine,
+                    contactService: contactService
+                )
+                didPreloadContact = true
+            } catch {
+                didPreloadContact = false
+            }
+        }
+        let waiters = uiTestContactsBootstrap?.waiters ?? []
+        uiTestContactsBootstrap?.didPreloadContact = didPreloadContact
+        uiTestContactsBootstrap?.cachedAvailability = availability
+        uiTestContactsBootstrap?.isPreparing = false
+        uiTestContactsBootstrap?.waiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(returning: availability)
+        }
+        return availability
     }
 
     private static func makeShieldEventHandler(
@@ -970,13 +1023,8 @@ final class AppContainer: @unchecked Sendable {
 
     private static func preloadUITestContact(
         engine: PgpEngine,
-        contactService: ContactService,
-        wrappingRootKey: Data
+        contactService: ContactService
     ) throws {
-        _ = openSandboxContactsSynchronously(
-            contactService: contactService,
-            wrappingRootKey: wrappingRootKey
-        )
         let generated = try engine.generateKey(
             name: "UITest Contact",
             email: "uitest-contact@example.invalid",
@@ -1020,27 +1068,6 @@ final class AppContainer: @unchecked Sendable {
                 try migrationSource.makeInitialSnapshot()
             }
         )
-    }
-
-    private static func openSandboxContactsSynchronously(
-        contactService: ContactService,
-        wrappingRootKey: Data
-    ) -> ContactsAvailability {
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultBox = AppContainerContactsOpenResultBox()
-        Task.detached {
-            let availability = await contactService.openContactsAfterPostUnlock(
-                gateDecision: ContactsPostAuthGateDecision(
-                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
-                    frameworkState: .sessionAuthorized
-                ),
-                wrappingRootKey: { wrappingRootKey }
-            )
-            resultBox.result = availability
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return resultBox.result ?? .recoveryNeeded
     }
 
     private static func protectedOrdinarySettingsAvailability(
