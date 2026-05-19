@@ -8,6 +8,25 @@ private struct KeyDetailScreenModelTestError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+private actor KeyDetailRevocationExportGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func suspend() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func isSuspended() -> Bool {
+        continuation != nil
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 final class KeyDetailScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
@@ -154,6 +173,39 @@ final class KeyDetailScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_handleDisappear_suppressesLateRevocationExportPayloadAndError() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let gate = KeyDetailRevocationExportGate()
+        let model = makeModel(
+            fingerprint: identity.fingerprint,
+            revocationExportAction: { _ in
+                await gate.suspend()
+                return Data("late-revocation".utf8)
+            }
+        )
+
+        model.exportRevocationCertificate()
+
+        await waitUntil("revocation export to suspend") {
+            let isSuspended = await gate.isSuspended()
+            return model.isPreparingRevocationExport && isSuspended
+        }
+
+        model.handleDisappear()
+
+        XCTAssertFalse(model.isPreparingRevocationExport)
+        XCTAssertNil(model.exportController.payload)
+        XCTAssertFalse(model.showError)
+
+        await gate.resume()
+        await drainMainActor()
+
+        XCTAssertFalse(model.isPreparingRevocationExport)
+        XCTAssertNil(model.exportController.payload)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
     func test_setDefaultAndDelete_invokeInjectedActionsAndDismiss() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
         var defaultFingerprint: String?
@@ -275,5 +327,12 @@ final class KeyDetailScreenModelTests: XCTestCase {
         }
 
         XCTFail("Timed out waiting for \(description)")
+    }
+
+    @MainActor
+    private func drainMainActor() async {
+        for _ in 0..<5 {
+            await Task.yield()
+        }
     }
 }

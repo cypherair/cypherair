@@ -76,11 +76,15 @@ $(SRCROOT)/Sources/App/Encrypt/EncryptScreenModel.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptScreenPresentations.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptView.swift
 $(SRCROOT)/Sources/App/HomeView.swift
+$(SRCROOT)/Sources/App/Keys/BackupKeyScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/BackupKeyView.swift
+$(SRCROOT)/Sources/App/Keys/ImportKeyScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/ImportKeyView.swift
 $(SRCROOT)/Sources/App/Keys/KeyDetailScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/KeyDetailView.swift
+$(SRCROOT)/Sources/App/Keys/KeyGenerationScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/KeyGenerationView.swift
+$(SRCROOT)/Sources/App/Keys/ModifyExpiry/ModifyExpiryScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift
 $(SRCROOT)/Sources/App/Keys/MyKeysView.swift
 $(SRCROOT)/Sources/App/Keys/PostGenerationPromptView.swift

@@ -373,6 +373,45 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
         model.finishExport()
     }
 
+    func test_outputInterceptionPreventsFileExporterPayloadForSubkeyExport() async {
+        let catalog = makeCatalog()
+        let subkey = catalog.subkeys[0]
+        var interceptedFilename: String?
+        var interceptedKind: OutputArtifactKind?
+        var configuration = SelectiveRevocationView.Configuration()
+        configuration.outputInterceptionPolicy = OutputInterceptionPolicy(
+            interceptDataExport: { _, filename, kind in
+                interceptedFilename = filename
+                interceptedKind = kind
+                return true
+            }
+        )
+        let model = makeModel(
+            configuration: configuration,
+            selectionCatalogAction: { _ in catalog },
+            subkeyRevocationExportAction: { _, _ in Data("subkey-revocation".utf8) }
+        )
+        model.loadIfNeeded()
+        await waitUntil("catalog to load") {
+            model.catalog == catalog
+        }
+        model.selectSubkey(subkey)
+
+        model.exportSelectedSubkey()
+
+        await waitUntil("interception to run") {
+            interceptedFilename != nil
+        }
+
+        XCTAssertEqual(interceptedKind, .revocation)
+        XCTAssertEqual(
+            interceptedFilename,
+            "subkey-revocation-\(IdentityPresentation.shortKeyId(from: fingerprint))-\(IdentityPresentation.shortKeyId(from: subkey.fingerprint)).asc"
+        )
+        XCTAssertFalse(model.exportController.isPresented)
+        XCTAssertNil(model.exportController.payload)
+    }
+
     func test_exportFailurePreservesSelectionAndDoesNotLeaveStalePayload() async {
         let catalog = makeCatalog()
         let selected = catalog.subkeys[0]
@@ -482,6 +521,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
     }
 
     private func makeModel(
+        configuration: SelectiveRevocationView.Configuration = .default,
         selectionCatalogAction: SelectiveRevocationScreenModel.SelectionCatalogAction? = nil,
         subkeyRevocationExportAction: SelectiveRevocationScreenModel.SubkeyRevocationExportAction? = nil,
         userIdRevocationExportAction: SelectiveRevocationScreenModel.UserIdRevocationExportAction? = nil
@@ -491,6 +531,7 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
         return SelectiveRevocationScreenModel(
             fingerprint: fingerprint,
             keyManagement: keyManagement,
+            configuration: configuration,
             selectionCatalogAction: selectionCatalogAction,
             subkeyRevocationExportAction: subkeyRevocationExportAction ?? { _, _ in
                 Data("subkey-revocation".utf8)
