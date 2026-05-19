@@ -20,7 +20,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 - Privacy model: zero network access
 - Permissions model: minimal permissions, only biometric usage description
 - Cryptography: Sequoia PGP via Rust + UniFFI + Swift
-- Platforms: iOS 26.4+, iPadOS 26.4+, macOS 26.4+, visionOS 26.4+
+- Platforms: iOS 26.5+, iPadOS 26.5+, macOS 26.5+, visionOS 26.5+
 
 ## Tech Stack
 

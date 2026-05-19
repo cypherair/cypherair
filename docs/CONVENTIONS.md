@@ -93,7 +93,7 @@ struct ContentView: View {
 
 ### Liquid Glass
 
-CypherAir targets iOS 26.4+, iPadOS 26.4+, macOS 26.4+, and visionOS 26.4+. Fully embrace modern SwiftUI chrome across those platforms. General Liquid Glass implementation guidance lives in agent/tooling guidance; the archived background guide is in `docs/archive/LIQUID_GLASS.md`. Current project rules:
+CypherAir targets iOS 26.5+, iPadOS 26.5+, macOS 26.5+, and visionOS 26.5+. Fully embrace modern SwiftUI chrome across those platforms. General Liquid Glass implementation guidance lives in agent/tooling guidance; the archived background guide is in `docs/archive/LIQUID_GLASS.md`. Current project rules:
 
 - On iOS and iPadOS, standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
 - On macOS and visionOS, prefer platform-native SwiftUI chrome instead of forcing iOS-styled glass.
@@ -103,13 +103,14 @@ CypherAir targets iOS 26.4+, iPadOS 26.4+, macOS 26.4+, and visionOS 26.4+. Full
 
 ## 3. Concurrency
 
-Apple Swift 6.3.2 defaults to main-actor isolation for new Xcode 26 projects (SE-0466). The project build setting `SWIFT_VERSION = 6.0` selects the Swift 6 language mode and is not the compiler release number.
+The project uses Apple Swift 6.3.2 with `SWIFT_VERSION = 6.0` and `SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated`. `SWIFT_VERSION` selects the Swift 6 language mode; it is not the compiler release number.
 
-- `@MainActor` is implicit for views and view models. Do not annotate explicitly unless needed for clarity.
+- Do not rely on implicit main-actor isolation for view models, screen models, or services. Annotate UI-bound `@Observable` models with `@MainActor` when their state is read or mutated by SwiftUI.
+- Plain SwiftUI `View` types still execute their `body` on the main actor through SwiftUI, but their owned reference state should make actor isolation explicit at the type boundary.
 - Use `@concurrent` to opt into the cooperative thread pool for CPU-intensive work (Argon2id key import/export, file encryption progress).
-- All types that cross actor boundaries must conform to `Sendable`. `@Observable` classes are implicitly `@MainActor`; use `nonisolated` for properties/methods that need to be accessed from other actors.
+- All types that cross actor boundaries must conform to `Sendable`. Use `nonisolated` only for properties/methods that are safe to access outside the owning actor.
 - Use `actor` for shared mutable state that is not UI-bound (e.g., a cache or in-progress operation tracker).
-- Perform PGP operations (encrypt, decrypt, sign, verify) on a background actor or `@concurrent` function to avoid blocking the UI. Return results to the main actor for display.
+- Perform PGP operations (encrypt, decrypt, sign, verify) on a background actor or `@concurrent` function to avoid blocking the UI. Return results to an explicitly main-actor-isolated model for display.
 
 ```swift
 @concurrent

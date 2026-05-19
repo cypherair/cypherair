@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD)
 
 > **Version:** v4.4<br>
-> **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+<br>
+> **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+<br>
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
 
@@ -20,7 +20,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 
 ### 1.3 Supported Platforms
 
-iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+ (same codebase). Minimum device: 8 GB RAM.
+iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+ (same codebase). Minimum device: 8 GB RAM.
 
 ### 1.4 Explicit Exclusions
 
@@ -151,7 +151,7 @@ The App decrypts both SEIPDv1 and SEIPDv2 messages regardless of the user's own 
 
 Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded results.
 
-The shipped verify and decrypt routes preserve a summary-first result presentation while also showing detailed per-signature entries when available.
+The shipped verify and decrypt routes prefer detailed per-signature results when available, with legacy summary data retained as fallback and compatibility context.
 
 Contact detail includes a contact-scoped certificate-signature workflow for direct-key verification, User ID binding verification, and User ID certification generation.
 
@@ -249,7 +249,7 @@ The App offers two authentication modes, selectable in Settings:
 
 Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 
-- Verify and decrypt screens keep the legacy summary-first result while also rendering detailed per-signature entries when available.
+- Verify and decrypt screens prefer detailed per-signature entries when available and fall back to legacy summary status only when detailed entries are absent.
 - Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
 - Password / SKESK message workflows are not currently exposed in the shipped app UI.
 
@@ -330,10 +330,10 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 ### 8.7 Memory Safety
 
 - [ ] Xcode Enhanced Security capability enabled with Hardware Memory Tagging.
-- [ ] App tested under MIE (Memory Integrity Enforcement) on all models of iPhone 17 and iPhone Air (A19/A19 Pro) with no crashes or tag mismatches.
+- [ ] App tested under MIE (Memory Integrity Enforcement) on supported A19/A19 Pro-or-newer hardware with no crashes or tag mismatches.
 - [ ] OpenSSL (vendored C code) operates correctly under hardware memory tagging in both debug and release builds.
 
-*Note: MIE is built right into Apple hardware and software in all models of iPhone 17 and iPhone Air. It provides hardware-level protection against buffer overflows and use-after-free vulnerabilities in C/C++ code (including vendored OpenSSL). On older devices, the App still runs normally but without hardware memory tagging protection.*
+*Note: MIE is built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It provides hardware-level protection against buffer overflows and use-after-free vulnerabilities in C/C++ code (including vendored OpenSSL). On unsupported older devices, the App still runs normally but without hardware memory tagging protection.*
 
 ---
 
@@ -347,7 +347,7 @@ Full details in [TDD](TDD.md). Key decisions:
 - **Key storage:** Keychain + SE P-256 wrapping (CryptoKit ECDH + AES-GCM). Two access control configurations for Standard/High Security modes.
 - **UI:** SwiftUI. UIKit where needed (UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask).
 - **Storage:** Keychain + sandbox. No database.
-- **Memory safety:** MIE / Enhanced Security enabled. Hardware Memory Tagging (MIE/EMTE) protects vendored OpenSSL C code on A19+ devices.
+- **Memory safety:** MIE / Enhanced Security enabled. Hardware Memory Tagging (MIE/EMTE) protects vendored OpenSSL C code on supported A19/A19 Pro-or-newer devices.
 
 ---
 
@@ -373,11 +373,11 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ### 10.3 v1.2 — Completed
 
-- [x] macOS 26.4+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). The Rust build/packaging workflow includes the `aarch64-apple-darwin` release archive and packaged output slice.
+- [x] macOS 26.5+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). The Rust build/packaging workflow includes the `aarch64-apple-darwin` release archive and packaged output slice.
 
 ### 10.4 v1.3 — Completed
 
-- [x] Native visionOS 26.4+ support (same codebase). The project ships native `visionOS` and `visionOS Simulator` Rust release archives, links them directly in Xcode, and validates the native app path with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
+- [x] Native visionOS 26.5+ support (same codebase). The project ships native `visionOS` and `visionOS Simulator` Rust release archives, links them directly in Xcode, and validates the native app path with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
 
 ### 10.5 v2.0
 

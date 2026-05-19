@@ -4,7 +4,7 @@ Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-o
 
 ## Tech Stack
 
-- **Platform:** iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+. Minimum device: 8 GB RAM.
+- **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
 - **OpenPGP:** Sequoia PGP 2.3.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering and the current source/compliance asset contract are documented in @docs/APP_RELEASE_PROCESS.md and @docs/XCFRAMEWORK_RELEASES.md.
 - **Profiles:** Profile A (Universal): v4 keys, Ed25519+X25519, SEIPDv1. Profile B (Advanced): v6 keys, Ed448+X448, SEIPDv2 AEAD. See @docs/PRD.md Section 3.
@@ -37,26 +37,26 @@ Detailed module breakdown: @docs/ARCHITECTURE.md
 ```bash
 # Rust: cross-compile for iOS device
 # Note: First build compiles vendored OpenSSL from source (~3-5 min). Subsequent builds are cached.
-cargo build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
 
 # Rust: cross-compile for Apple Silicon simulator
-cargo build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
 
 # Rust: cross-compile for macOS Apple Silicon
-cargo build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
 
 # Rust: cross-compile for visionOS device
-cargo build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
 
 # Rust: cross-compile for visionOS simulator
-cargo build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
+cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
 # Full Rust + UniFFI + packaged-artifact sync
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
     ./build-xcframework.sh --release
 
 # Run Rust tests
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # Run Swift unit + FFI tests locally (source of truth for Swift validation)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -137,12 +137,12 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - Every PR must include tests. Security changes require both positive and negative tests.
 - Crypto tests: run for **both profiles**. Round-trip tests (encrypt→decrypt, sign→verify), tamper tests (1-bit flip → failure).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
-- MIE: test on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging diagnostics enabled.
+- MIE: test on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging diagnostics enabled; current device examples live in `docs/SECURITY.md`.
 - Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
 - If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
-- **GitHub Actions caveat:** the hosted `macos-26` runner image may still report macOS 26.3, which is older than the project's current 26.4 deployment target. When that happens, hosted Swift tests can fail before execution even though local macOS validation passes.
+- **GitHub Actions caveat:** the hosted `macos-26` runner image may still lag the project's current 26.5 deployment target or expose Xcode before all matching platform runtimes are usable. When that happens, hosted Swift tests or app probes can be warning-skipped by preflight even though local validation passes.
 - Full testing guide: @docs/TESTING.md
 - Code review checklist: @docs/CODE_REVIEW.md
 
@@ -151,7 +151,7 @@ Switching modes requires re-wrapping all SE-protected keys. See @docs/SECURITY.m
 - Read and understand relevant source files before proposing edits.
 - Do not add features, refactor, or "improve" beyond what was asked.
 - Do not add error handling for impossible scenarios.
-- Run `cargo test` and `xcodebuild test` before considering a task complete.
+- Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.

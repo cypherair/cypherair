@@ -15,7 +15,7 @@ CypherAir has four test layers, each with different runtime requirements.
 **No device needed.** These test the `pgp-mobile` crate without any iOS dependency.
 
 ```bash
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ```
 
 The local default command above skips tests marked `#[ignore = "slow"]`, including
@@ -24,9 +24,9 @@ The local default command above skips tests marked `#[ignore = "slow"]`, includi
 The blocking automation lanes and the XCFramework edge-release workflow run the default suite plus the slow Rust targets explicitly:
 
 ```bash
-cargo test --manifest-path pgp-mobile/Cargo.toml
-cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
-cargo test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 ```
 
 Fixture-dependent ignored tests in `gnupg_fixture_regression_tests.rs` remain manual and
@@ -39,7 +39,7 @@ formal release validation:
 
 ```bash
 cargo +stable install cargo-audit --version 0.22.1 --locked
-cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
 The GitHub PR, nightly, edge XCFramework, and stable release workflows pin
@@ -68,7 +68,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 ### Layer 3: FFI Integration Tests
 
-**Run on:** iOS Simulator + Physical device.
+**Run on:** macOS local validation, iOS Simulator when the host/runtime supports it, and physical device when included in the selected test plan.
 **What they cover:** Round-trips across the Rust-Swift boundary (both profiles) — generate key in Rust, pass to Swift, pass back, verify identical. Unicode strings (Chinese, emoji) survive round-trip. Each `PgpError` variant maps to the correct Swift enum case. `KeyProfile`, password-message format/status enums, and password decrypt result records cross the FFI boundary.
 
 These tests exist in the Swift test target but call through the UniFFI bindings into Rust.
@@ -90,17 +90,17 @@ Guard all SE-dependent tests:
 try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available on this device")
 ```
 
-Guard MIE tests for A19:
+Guard MIE tests for supported hardware:
 ```swift
-// MIE tests only meaningful on A19/A19 Pro hardware
-// Run on all models of iPhone 17 or iPhone Air with Hardware Memory Tagging diagnostics enabled
+// MIE tests only meaningful on hardware that supports Hardware Memory Tagging.
+// Run on supported A19/A19 Pro-or-newer devices with Xcode diagnostics enabled.
 ```
 
 ## 2. Test Plans
 
 The workspace currently includes three Xcode Test Plans:
 
-**CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. Excludes device-only tests. Layer 1 (Rust unit tests) runs independently via `cargo test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
+**CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. macOS local validation does not execute iOS-only device classes, and any hardware-dependent test that is visible on another destination must guard and skip at runtime. Layer 1 (Rust unit tests) runs independently via `cargo +stable test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
 Build-input audit tests such as `LocalizationCatalogTests`, `ArchitectureSourceAuditTests`, and the source-audit assertions in `TutorialSessionStoreTests` read a build-time `RepositoryAudit` snapshot bundled into `CypherAirTests.xctest`. This keeps the same static-audit semantics across macOS, iOS Simulator, and physical-device `CypherAir-UnitTests` runs.
 
@@ -175,7 +175,7 @@ These jobs must pass on pull requests and nightly validation:
 
 - `rust-dependency-audit` audits `pgp-mobile/Cargo.lock` with `cargo-audit --deny warnings` as an independent failure signal
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
-- `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
+- `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs the `./build-xcframework.sh --release` entrypoint with CI-provided GitHub credentials so the script resolves the arm64e stage1 compiler explicitly, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
 - `apple-platform-probes` downloads the uploaded XCFramework artifact and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
 - `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, build, link, or test failures after readiness still fail the job
 
@@ -202,7 +202,7 @@ Toolchain contract:
 
 The repository workflows target `macos-26`, but GitHub's hosted runner image may still lag the app's minimum deployment target or expose an Xcode build before all matching Apple platform runtimes are installed.
 
-At the time of writing:
+Known hosted-image states that the workflows preflight:
 
 - Project deployment target: **macOS 26.5**
 - Hosted GitHub runner images can still report **macOS 26.3** or expose Xcode 26.5 before the matching iOS/visionOS 26.5 platform probes are usable
@@ -337,7 +337,7 @@ Recommended flows:
 
 ```bash
 # Cargo.lock dependency update
-cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
     ./build-xcframework.sh --release
@@ -345,7 +345,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 
 # Rust-backed behavior change
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
     ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -355,7 +355,7 @@ xcodebuild build -scheme CypherAir \
     CODE_SIGNING_ALLOWED=NO
 
 # UniFFI surface / bindings / packaged artifact change
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
     ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -717,7 +717,7 @@ These tests verify bidirectional compatibility with GnuPG. **Profile B is explic
 
 ## 8. MIE Validation Tests
 
-Run on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging enabled in Xcode diagnostics. Both profiles.
+Run on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enabled in Xcode diagnostics. Current examples include iPhone 17 and iPhone Air devices that expose the diagnostic. Test both profiles.
 
 | Test | Pass Criteria |
 |------|--------------|
@@ -728,7 +728,7 @@ Run on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging enable
 
 ## 9. AI Coding Expectations
 
-### Every PR Must Include
+### Functional PRs Must Include
 
 - Tests for all new or changed functionality. No exceptions. **Both profiles unless explicitly scoped to one.**
 - For security changes: both positive and negative tests (see Section 6).
@@ -736,6 +736,8 @@ Run on iPhone 17 or iPhone Air (A19/A19 Pro) with Hardware Memory Tagging enable
 - For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
 - For screen ownership, launch, routing, or tutorial-host refactors: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
 - For guided tutorial product, sandbox, output-interception, or completion-state changes: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS' -only-testing:CypherAirTests/TutorialSessionStoreTests`, then add the Mac UI plan above when the change affects tutorial launch, routing, or visible tutorial surfaces.
+
+Documentation-only PRs that do not touch code, generated files, project files, entitlements, release metadata, or build settings may use the documentation-only validation path in Section 2 instead of Rust/Xcode test runs.
 
 ### Coverage Goals
 
@@ -767,4 +769,4 @@ The POC Test Plan defines test cases that validated the technical stack. These m
 | C5.x FFI Boundary | Layer 3 | Both profiles. Round-trips, Unicode, error mapping, leak detection (manual Instruments) |
 | C6.x Secure Enclave | Layer 4 (device only) | Both profiles. Wrap/unwrap, lifecycle, deletion |
 | C7.x Auth Modes | Layer 4 (device only) | Standard/High Security, mode switching, crash recovery |
-| C8.x MIE | Layer 4 (A19 device only) | Both profiles. Hardware memory tagging validation |
+| C8.x MIE | Layer 4 (supported hardware only) | Both profiles. Hardware memory tagging validation |
