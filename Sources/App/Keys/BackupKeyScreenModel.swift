@@ -120,8 +120,11 @@ final class BackupKeyScreenModel {
         switch result {
         case .success:
             guard exportedDataToken == exportToken,
-                  let exportedData = consumeExportedData() else {
+                  var exportedData = consumeExportedData() else {
                 return
+            }
+            defer {
+                exportedData.zeroize()
             }
             configuration.onExported?(exportedData)
             confirmBackupExportedAction(fingerprint)

@@ -1239,6 +1239,11 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(fileExporterBody.contains("exportedDataToken == exportToken"))
         XCTAssertTrue(successBody.contains("configuration.onExported?(exportedData)"))
         XCTAssertTrue(successBody.contains("confirmBackupExportedAction(fingerprint)"))
+        let consumeRange = try XCTUnwrap(successBody.range(of: "var exportedData = consumeExportedData()"))
+        let zeroizeRange = try XCTUnwrap(successBody.range(of: "exportedData.zeroize()"))
+        let callbackRange = try XCTUnwrap(successBody.range(of: "configuration.onExported?(exportedData)"))
+        XCTAssertLessThan(consumeRange.lowerBound, zeroizeRange.lowerBound)
+        XCTAssertLessThan(zeroizeRange.lowerBound, callbackRange.lowerBound)
         XCTAssertFalse(failureBody.contains("confirmKeyBackupExported"))
 
         let exportBackupStart = try XCTUnwrap(
