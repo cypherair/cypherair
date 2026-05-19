@@ -193,11 +193,9 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
   - Status: Implemented on 2026-05-19.
   - Move QR display/generation, contact detail mutations, import confirmation, and tag/contact route workflow state behind ScreenModels or narrow presentation coordinators.
 
-- **PR 4C: Settings-adjacent ScreenModel cleanup**
-  - Reduce Settings ScreenModel exposure to concrete Security and reset internals by using narrower service-level workflows planned in Phase 5.
-
-- **PR 4D: ScreenModel public API cleanup**
+- **PR 4C: ScreenModel public API cleanup**
   - Replace concrete service internals, generated enums, and low-level file/progress infrastructure in ScreenModel public state with app-owned request/result/display models where practical.
+  - Exclude Settings security, reset, and ProtectedData orchestration cleanup; that work depends on Phase 5 service-level workflow boundaries.
 
 ### Exit Markers
 
@@ -208,7 +206,7 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
 ### Validation
 
 - Run affected ScreenModel unit tests.
-- Run targeted macOS UI smoke coverage for route ownership, tutorial-host behavior, and settings flows when those surfaces change.
+- Run targeted macOS UI smoke coverage for route ownership and tutorial-host behavior when those surfaces change.
 - Use source-audit checks for view-level service orchestration and generated-error handling in UI.
 - Verify tutorial configuration and output-interception behavior when shared production views are refactored.
 
@@ -240,7 +238,11 @@ Purpose: reduce App-layer ownership of Security, ProtectedData, local reset, and
 - **PR 5C: Protected settings and authorization handoff boundary**
   - Narrow App-layer knowledge of ProtectedData authorization handoff, mutation recovery, and `LAContext` lifecycle.
 
-- **PR 5D: Post-unlock composition cleanup**
+- **PR 5D: Settings-facing ScreenModel cleanup**
+  - After PR5A-PR5C establish narrower service-level workflows, remove Settings ScreenModel exposure to concrete Security, reset, and ProtectedData internals.
+  - Keep Settings confirmation, presentation state, and user-facing recovery affordances in App/UI code while routing sensitive orchestration through the new workflow boundaries.
+
+- **PR 5E: Post-unlock composition cleanup**
   - Keep `AppContainer` and tutorial sandbox as composition roots, but move operation policy and sequencing out of wiring code where feasible.
 
 ### Exit Markers
@@ -254,6 +256,7 @@ Purpose: reduce App-layer ownership of Security, ProtectedData, local reset, and
 - Treat each PR in this phase as security-sensitive.
 - Preserve AEAD hard-fail, two-phase decrypt auth, private-key zeroization, ProtectedData fail-closed behavior, no plaintext/private-key logging, and zero network access.
 - Run focused unit tests for auth mode, local reset, ProtectedData access gates, relock cleanup, recovery, and startup/post-unlock behavior.
+- For Settings-facing ScreenModel cleanup, also run affected Settings ScreenModel tests and targeted settings UI smoke coverage.
 - Require device-only validation when Secure Enclave, biometric, access-control, or real-device ProtectedData behavior changes.
 
 ## Phase 6: Closure And Canonical Sync
