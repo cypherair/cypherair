@@ -133,6 +133,11 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 
 Purpose: make the protected, person-centered Contacts domain the ordinary runtime model and isolate legacy flat-contact compatibility.
 
+> Close-out status: Accepted and closed for PR3A through PR3D. Use this section
+> as the historical Phase 3 record; new route-thinning or Security/App
+> composition work belongs to Phase 4 or Phase 5 unless it fixes a Phase 3
+> regression.
+
 ### Candidate PRs
 
 - **PR 3A: Contacts service contracts**
@@ -166,6 +171,13 @@ Purpose: make the protected, person-centered Contacts domain the ordinary runtim
 - Preserve search ranking, tag normalization, per-key verification/certification state, recipient selection, and certification artifact behavior.
 - Run Contacts service and ScreenModel tests affected by each PR.
 - Use source-audit checks to block `[Contact]` production dependencies and legacy flat Contacts projection types.
+
+Close-out validation confirmed the Phase 3 exit markers with
+`ArchitectureSourceAuditTests` plus targeted Contacts tests for empty
+protected-domain creation, schema v1-to-v2 writeback, protected recovery,
+candidate import, merge/historical signer behavior, recipient search, Contact
+Detail ScreenModel mutations, relock cleanup, URL import, and Encrypt tag
+selection.
 
 ## Phase 4: UI And ScreenModel Ownership
 

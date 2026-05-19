@@ -18,6 +18,9 @@
 > behind `ContactDetailScreenModel`; the route now renders current Contacts
 > summaries and routes delete, merge, tag, verification, and key-usage actions
 > through ScreenModel-owned actions.
+> Phase 3 close-out update: PR3A through PR3D are accepted as complete for the
+> Contacts runtime consolidation scope. Production `Sources/` have zero flat
+> `[Contact]` exceptions and no legacy flat Contacts projection types.
 > Scope: First-party Swift app code under `Sources/`. Generated UniFFI Swift
 > bindings in `Sources/PgpMobile/pgp_mobile.swift` are used only as evidence for
 > generated type origins, not classified as hand-maintained architecture debt.
@@ -87,6 +90,9 @@ Representative search snapshot:
   longer defines or reads flat `Contact`, `ContactRepository`,
   `ContactsLegacyMigrationSource`, or `ContactsCompatibilityMapper`; first
   protected `contacts` domain creation starts empty.
+- Phase 3 close-out validation accepted PR3A through PR3D as complete for the
+  Contacts runtime scope. Remaining Contacts service coupling stays recorded as
+  future architecture debt rather than a Phase 3 exit blocker.
 - Several UI routes and ScreenModels still call concrete services or security
   workflows directly, while other routes already use more focused ScreenModels.
 
@@ -104,7 +110,7 @@ Representative search snapshot:
 
 | Area | Representative evidence | Current problem | Risk |
 | --- | --- | --- | --- |
-| Generated enum and selector vocabulary is app-owned above the FFI boundary | Phase 2 PR2A source inspection found persisted and UI-facing key profile values use `PGPKeyProfile` in [Sources/Models/PGPKeyProfile.swift](../Sources/Models/PGPKeyProfile.swift), `PGPKeyIdentity`, `PGPKeyMetadata`, `Contact`, `ContactKeyRecord`, and `ContactKeySummary`. Certificate artifacts and contact-certificate ScreenModels use `OpenPGPCertificationKind` from [Sources/Models/OpenPGPCertificationKind.swift](../Sources/Models/OpenPGPCertificationKind.swift). User ID selection state uses app-owned `UserIdSelectionOption` in [Sources/Models/UserIdSelectionOption.swift](../Sources/Models/UserIdSelectionOption.swift), while generated `UserIdSelectorInput` construction lives in [Sources/Services/FFI/PGPCertificateSelectionAdapter.swift](../Sources/Services/FFI/PGPCertificateSelectionAdapter.swift). | The former generated-enum vocabulary leak is resolved for current production code. Historical raw values such as `universal`, `advanced`, and certification-kind names are intentionally retained by app-owned Codable enums as a schema compatibility contract. | Low residual risk, guarded by generated-FFI source-audit coverage and model tests for historical raw-value compatibility. |
+| Generated enum and selector vocabulary is app-owned above the FFI boundary | Phase 2 PR2A source inspection found persisted and UI-facing key profile values use `PGPKeyProfile` in [Sources/Models/PGPKeyProfile.swift](../Sources/Models/PGPKeyProfile.swift), `PGPKeyIdentity`, `PGPKeyMetadata`, `ContactKeyRecord`, and `ContactKeySummary`. Certificate artifacts and contact-certificate ScreenModels use `OpenPGPCertificationKind` from [Sources/Models/OpenPGPCertificationKind.swift](../Sources/Models/OpenPGPCertificationKind.swift). User ID selection state uses app-owned `UserIdSelectionOption` in [Sources/Models/UserIdSelectionOption.swift](../Sources/Models/UserIdSelectionOption.swift), while generated `UserIdSelectorInput` construction lives in [Sources/Services/FFI/PGPCertificateSelectionAdapter.swift](../Sources/Services/FFI/PGPCertificateSelectionAdapter.swift). | The former generated-enum vocabulary leak is resolved for current production code. Historical raw values such as `universal`, `advanced`, and certification-kind names are intentionally retained by app-owned Codable enums as a schema compatibility contract. | Low residual risk, guarded by generated-FFI source-audit coverage and model tests for historical raw-value compatibility. |
 | Generated FFI error mapping is contained at the FFI boundary | Phase 2 PR2B source inspection found `CypherAirError.from(_:)` in [Sources/Models/CypherAirError.swift](../Sources/Models/CypherAirError.swift) only preserves existing `CypherAirError` values and applies app-owned fallbacks. Generated `PgpError` normalization lives in [Sources/Services/FFI/PGPErrorMapper.swift](../Sources/Services/FFI/PGPErrorMapper.swift). | The former Models-layer generated-error mapping debt is resolved for current production code. The active concern is regression prevention: non-FFI layers should not reintroduce `PgpError` or `PGPErrorMapper` use. | Low residual risk, guarded by source-audit tests for generated error mapper containment and App-layer `PgpError` handling. |
 | Generated signature result mapping is contained at the FFI boundary | Phase 2 PR2A source inspection found `SignatureVerification` stores app-owned `MessageSignatureStatus` in [Sources/Models/SignatureVerification.swift](../Sources/Models/SignatureVerification.swift), and `DetailedSignatureVerification` stores app-owned `DetailedSignatureVerification.Entry.Status` plus app-owned verification state in [Sources/Models/DetailedSignatureVerification.swift](../Sources/Models/DetailedSignatureVerification.swift). Generated `SignatureStatus`, `SignatureVerificationState`, `DetailedSignatureEntry`, and `DetailedSignatureStatus` mapping lives in [Sources/Services/FFI/PGPMessageResultMapper.swift](../Sources/Services/FFI/PGPMessageResultMapper.swift). | The former generated signature model-state debt is resolved for current production code. The active concern is regression prevention because signature state remains trust-facing. | Low to Medium residual risk, guarded by generated-FFI source-audit coverage and existing detailed signature tests. |
 | FFI adapter boundary exists for normal production services | `AppContainer` and `TutorialSandboxContainer` still construct `PgpEngine`, which is an acceptable composition-root exception. Normal production Services store operation adapters such as `PGPMessageOperationAdapter`, `PGPKeyOperationAdapter`, `PGPCertificateOperationAdapter`, `PGPContactImportAdapter`, and `PGPSelfTestOperationAdapter`, while direct generated calls and generated result mapping live under [Sources/Services/FFI](../Sources/Services/FFI). | The former direct-engine ownership in primary Services is resolved for current production code. Residual risk is regression prevention and the need to keep new OpenPGP work inside adapter files instead of spreading generated calls back into services or App code. | Low to Medium residual risk, guarded by source-audit tests for generated UniFFI type containment and App-layer adapter usage. |
@@ -180,6 +186,11 @@ The 2026-05-18 PR3D refresh checked that production `Sources/` have zero
 `[Contact]` exceptions and no `ContactRepository`,
 `ContactsLegacyMigrationSource`, `ContactsCompatibilityMapper`, or production
 `struct Contact` reintroductions.
+The Phase 3 close-out pass accepted PR3A through PR3D as complete after
+rechecking source-audit guardrails and targeted Contacts tests for empty
+protected-domain creation, schema migration, protected recovery, candidate
+import, merge and historical signer behavior, recipient search, Contact Detail
+ScreenModel mutations, relock cleanup, URL import, and Encrypt tag selection.
 
 Because this audit can be updated together with code changes, validation should
 follow the touched surfaces. Documentation-only changes do not require Rust or
