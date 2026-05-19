@@ -199,9 +199,10 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
 
 ### Exit Markers
 
-- Route views own layout, lifecycle wiring, navigation presentation, import/export modifiers, sheets, alerts, and platform chrome.
-- Async workflow, error normalization, cancellation, importer/exporter state, cleanup, and cross-service coordination live outside view bodies.
-- ScreenModel public APIs use app-owned vocabulary and expose UI-consumable state.
+- Phase 4-owned route views own layout, lifecycle wiring, navigation presentation, import/export modifiers, sheets, alerts, and platform chrome.
+- For the Phase 4-owned route scope, async workflow, error normalization, cancellation, importer/exporter state, cleanup, and cross-service coordination live outside view bodies.
+- ScreenModel public APIs use app-owned vocabulary and expose UI-consumable state for the surfaces covered by Phase 4.
+- Settings security, reset, and ProtectedData orchestration remain an explicit Phase 5 exception until PR5A-PR5D establish and consume the narrower workflow boundaries.
 
 ### Validation
 
