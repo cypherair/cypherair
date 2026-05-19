@@ -8,7 +8,7 @@ import XCTest
 /// `parseRecipients` now uses `PgpEngine.matchRecipients()` for correct
 /// subkey-to-certificate matching via Sequoia's key_handles(). It returns
 /// primary fingerprints that match PGPKeyIdentity.fingerprint directly.
-/// Some Phase 2 tests still construct Phase1Result directly to isolate
+/// Some Phase 2 tests still construct DecryptionPhase1Result directly to isolate
 /// the decryption logic from the key-matching logic.
 final class DecryptionServiceTests: XCTestCase {
 
@@ -37,7 +37,7 @@ final class DecryptionServiceTests: XCTestCase {
         profile: PGPKeyProfile,
         plaintext: String = "Hello, encrypted world!",
         sign: Bool = true
-    ) async throws -> (identity: PGPKeyIdentity, ciphertext: Data, phase1: DecryptionService.Phase1Result) {
+    ) async throws -> (identity: PGPKeyIdentity, ciphertext: Data, phase1: DecryptionPhase1Result) {
         let identity = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
             profile: profile,
@@ -64,8 +64,8 @@ final class DecryptionServiceTests: XCTestCase {
         // Get recipient key IDs from the engine
         let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
 
-        // Construct Phase1Result with the correct matched key
-        let phase1 = DecryptionService.Phase1Result(
+        // Construct DecryptionPhase1Result with the correct matched key
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: recipientKeyIds,
             matchedKey: identity,
             ciphertext: binaryCiphertext
@@ -251,7 +251,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_decrypt_phase2_noMatchedKey_throwsError() async throws {
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: ["unknown"],
             matchedKey: nil,
             ciphertext: Data()
@@ -281,9 +281,9 @@ final class DecryptionServiceTests: XCTestCase {
         let midpoint = tampered.count / 2
         tampered[midpoint] ^= 0x01
 
-        // Construct Phase1Result with tampered data
+        // Construct DecryptionPhase1Result with tampered data
         let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: recipientKeyIds,
             matchedKey: identity,
             ciphertext: tampered
@@ -325,9 +325,9 @@ final class DecryptionServiceTests: XCTestCase {
         let midpoint = tampered.count / 2
         tampered[midpoint] ^= 0x01
 
-        // Construct Phase1Result with tampered data
+        // Construct DecryptionPhase1Result with tampered data
         let recipientKeyIds = try stack.engine.parseRecipients(ciphertext: binaryCiphertext)
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: recipientKeyIds,
             matchedKey: identity,
             ciphertext: tampered
@@ -692,7 +692,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_decryptDetailed_noMatchedKey_throwsNoMatchingKeyWithoutUnwrap() async throws {
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: ["unknown"],
             matchedKey: nil,
             ciphertext: Data()
@@ -717,7 +717,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
             matchedKey: identity,
             ciphertext: tampered
@@ -752,7 +752,7 @@ final class DecryptionServiceTests: XCTestCase {
             verificationKeys: [identity.publicKeyData],
             acceptedErrors: [.IntegrityCheckFailed]
         )
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
             matchedKey: identity,
             ciphertext: tampered
@@ -777,7 +777,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         var tampered = binaryCiphertext
         tampered[tampered.count / 2] ^= 0x01
-        let phase1 = DecryptionService.Phase1Result(
+        let phase1 = DecryptionPhase1Result(
             recipientKeyIds: try stack.engine.parseRecipients(ciphertext: binaryCiphertext),
             matchedKey: identity,
             ciphertext: tampered
@@ -1046,7 +1046,7 @@ final class DecryptionServiceTests: XCTestCase {
         encryptedData[encryptedData.count / 2] ^= 0x01
         try encryptedData.write(to: encryptedURL, options: .atomic)
 
-        let phase1 = DecryptionService.FilePhase1Result(
+        let phase1 = FileDecryptionPhase1Result(
             recipientKeyIds: [identity.fingerprint],
             matchedKey: identity,
             inputPath: encryptedURL.path
@@ -1157,7 +1157,7 @@ final class DecryptionServiceTests: XCTestCase {
         encryptedData[encryptedData.count / 2] ^= 0x01
         try encryptedData.write(to: encryptedURL, options: .atomic)
 
-        let phase1 = DecryptionService.FilePhase1Result(
+        let phase1 = FileDecryptionPhase1Result(
             recipientKeyIds: [identity.fingerprint],
             matchedKey: identity,
             inputPath: encryptedURL.path
@@ -1263,8 +1263,8 @@ final class DecryptionServiceTests: XCTestCase {
     private func makePhase1(
         matchedKey: PGPKeyIdentity,
         ciphertext: Data
-    ) throws -> DecryptionService.Phase1Result {
-        DecryptionService.Phase1Result(
+    ) throws -> DecryptionPhase1Result {
+        DecryptionPhase1Result(
             recipientKeyIds: try stack.engine.parseRecipients(ciphertext: ciphertext),
             matchedKey: matchedKey,
             ciphertext: ciphertext

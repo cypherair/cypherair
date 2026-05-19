@@ -1393,8 +1393,8 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
     }
 
-    private func makePhase1Result() -> DecryptionService.Phase1Result {
-        DecryptionService.Phase1Result(
+    private func makePhase1Result() -> DecryptionPhase1Result {
+        DecryptionPhase1Result(
             recipientKeyIds: ["ABCD1234"],
             matchedKey: nil,
             ciphertext: Data("ciphertext".utf8)
