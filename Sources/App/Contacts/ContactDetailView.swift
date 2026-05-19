@@ -408,7 +408,7 @@ private struct ContactDetailHostView: View {
             "externaldrive.badge.exclamationmark"
         case .restartRequired:
             "arrow.clockwise"
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             "person"
         }
     }

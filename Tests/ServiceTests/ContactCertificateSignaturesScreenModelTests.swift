@@ -172,7 +172,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 
         model.handleContactsAvailabilityChange(
             from: .opening,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
 
         await waitUntil("catalog reload after contacts reopen") {
@@ -217,10 +217,10 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         }
         XCTAssertEqual(loadCount, 0)
 
-        try stack.contactService.openLegacyCompatibilityForTests()
+        TestHelpers.openContactsSynchronously(stack.contactService)
         model.handleContactsAvailabilityChange(
             from: .locked,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
 
         await waitUntil("contacts-unavailable catalog reload") {
@@ -255,7 +255,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
 
         model.handleContactsAvailabilityChange(
             from: .opening,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
         await settleAsyncWork()
 
@@ -917,7 +917,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
 
         model.handleContactsAvailabilityChange(
             from: .opening,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
 
         await waitUntil("details catalog reload after contacts reopen") {
@@ -960,10 +960,10 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         }
         XCTAssertEqual(loadCount, 0)
 
-        try stack.contactService.openLegacyCompatibilityForTests()
+        TestHelpers.openContactsSynchronously(stack.contactService)
         model.handleContactsAvailabilityChange(
             from: .locked,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
 
         await waitUntil("details contacts-unavailable catalog reload") {
@@ -999,7 +999,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
 
         model.handleContactsAvailabilityChange(
             from: .opening,
-            to: .availableLegacyCompatibility
+            to: .availableProtectedDomain
         )
         await settleAsyncWork()
 
@@ -1008,14 +1008,14 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_legacyCompatibilityDisablesCertificationPersistenceActions() async throws {
+    func test_relockDisablesCertificationPersistenceActions() async throws {
         let (contactId, key, catalog) = try makeContactContext(
-            name: "Details Legacy",
-            email: "details-legacy@example.com"
+            name: "Details Relock",
+            email: "details-relock@example.com"
         )
         let signer = try await TestHelpers.generateProfileAKey(
             service: stack.keyManagement,
-            name: "Details Legacy Signer"
+            name: "Details Relock Signer"
         )
         let keyRecord = try XCTUnwrap(
             stack.contactService.availableContactKeyRecord(keyId: key.keyId)
@@ -1033,19 +1033,24 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         )
 
         model.loadIfNeeded()
-        await waitUntil("legacy details catalog load") {
+        await waitUntil("details catalog load") {
             model.loadState == .loaded
         }
 
-        XCTAssertEqual(model.contactsAvailability, .availableLegacyCompatibility)
-        XCTAssertFalse(model.canGenerateAndSave)
+        XCTAssertEqual(model.contactsAvailability, .availableProtectedDomain)
+        XCTAssertTrue(model.canGenerateAndSave)
 
         model.setSignatureInput(String(decoding: validSignature, as: UTF8.self))
         model.verifyImportedSignature()
-        await waitUntil("legacy valid import preview") {
+        await waitUntil("valid import preview") {
             model.pendingArtifact != nil
         }
 
+        XCTAssertTrue(model.canSavePendingArtifact)
+        try await stack.contactService.relockProtectedData()
+
+        XCTAssertEqual(model.contactsAvailability, .locked)
+        XCTAssertFalse(model.canGenerateAndSave)
         XCTAssertFalse(model.canSavePendingArtifact)
         model.savePendingSignature()
         await Task.yield()

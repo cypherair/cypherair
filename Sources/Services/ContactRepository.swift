@@ -34,7 +34,15 @@ struct ContactRepository {
     }
 
     func activeLegacySourceExists() -> Bool {
-        fileManager.fileExists(atPath: contactsDirectory.path)
+        guard let contents = try? fileManager.contentsOfDirectory(
+            at: contactsDirectory,
+            includingPropertiesForKeys: nil
+        ) else {
+            return false
+        }
+        return contents.contains { url in
+            url.pathExtension == "gpg" || url.lastPathComponent == metadataURL.lastPathComponent
+        }
     }
 
     func quarantineExists() -> Bool {

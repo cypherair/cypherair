@@ -214,7 +214,7 @@ final class EncryptScreenModelTests: XCTestCase {
             service: stack.keyManagement,
             name: "Delayed Recipient"
         )
-        let delayed = try makeLockedLegacyContactServiceSeeded(with: recipientIdentity)
+        let delayed = try await makeLockedProtectedContactServiceSeeded(with: recipientIdentity)
         defer { try? FileManager.default.removeItem(at: delayed.directory) }
 
         var configuration = EncryptView.Configuration()
@@ -972,30 +972,33 @@ final class EncryptScreenModelTests: XCTestCase {
         return try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
     }
 
-    private func makeLockedLegacyContactServiceSeeded(
+    private func makeLockedProtectedContactServiceSeeded(
         with identity: PGPKeyIdentity
-    ) throws -> (service: ContactService, contactId: String, directory: URL) {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("EncryptDelayedPrefill-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true
+    ) async throws -> (service: ContactService, contactId: String, directory: URL) {
+        let opened = try await makeOpenedProtectedContactService(
+            prefix: "EncryptDelayedPrefill"
         )
-
-        let writer = ContactService(
-            engine: stack.engine,
-            contactsDirectory: directory
+        _ = try opened.service.importContact(publicKeyData: identity.publicKeyData)
+        let contactId = try XCTUnwrap(
+            opened.service.contactId(forFingerprint: identity.fingerprint)
         )
-        try writer.openLegacyCompatibilityForTests()
-        _ = try writer.importContact(publicKeyData: identity.publicKeyData)
-        let contactId = try XCTUnwrap(writer.contactId(forFingerprint: identity.fingerprint))
-
+        let lockedStore = ContactsDomainStore(
+            storageRoot: opened.harness.storageRoot,
+            registryStore: opened.harness.registryStore,
+            domainKeyManager: opened.harness.domainKeyManager,
+            currentWrappingRootKey: { opened.harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain should not rebuild from legacy source.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
         let locked = ContactService(
             engine: stack.engine,
-            contactsDirectory: directory
+            contactsDirectory: opened.contactsDirectory,
+            contactsDomainStore: lockedStore
         )
         XCTAssertEqual(locked.contactsAvailability, .locked)
-        return (locked, contactId, directory)
+        return (locked, contactId, opened.contactsDirectory)
     }
 
     private func makeOpenedProtectedContactService(

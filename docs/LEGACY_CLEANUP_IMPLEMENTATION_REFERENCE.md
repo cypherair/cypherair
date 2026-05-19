@@ -451,11 +451,10 @@ new protected storage.
 
 Recommended deletion waves:
 
-- Contacts: remove the legacy flat runtime, `openLegacyCompatibilityForTests`
-  dependence where possible, `.legacyKeyReplacementDetected`, and legacy contact ID
-  projection only after supported installs no longer need flat Contacts
-  migration or fallback and after tutorial sandbox and UI-test containers no
-  longer depend on legacy runtime loading.
+- Contacts: Phase 3 PR3C removed the legacy flat runtime, legacy availability
+  fallback, key-replacement outcome, and runtime projection. A future human-approved
+  cutoff is still required before deleting the retained old-install migration path
+  from active `Documents/contacts` into the protected `contacts` domain.
 - Protected settings: remove legacy ordinary-settings defaults import and schema
   v1 upgrade only after supported installs are expected to hold schema v2.
 - Private-key control: remove legacy auth-mode defaults import after old-install
@@ -546,8 +545,9 @@ Known surfaces that require this gate:
 - app-level password-message result surfaces that fold detailed decrypt results
   into `SignatureVerification` (completed in PR 3C)
 - raw first-match User ID FFI exports
-- Contacts legacy flat-runtime APIs, `.legacyKeyReplacementDetected`, and legacy contact ID
-  projection
+- Contacts legacy flat-runtime APIs, legacy key-replacement outcomes, and runtime
+  contact ID projection (completed in Phase 3 PR3C; retained legacy code is
+  migration-only)
 
 ## 6. Validation Matrix
 

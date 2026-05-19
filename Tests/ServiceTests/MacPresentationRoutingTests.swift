@@ -9,7 +9,6 @@ final class MacPresentationRoutingTests: XCTestCase {
         let appLevelBlockers: [MacTutorialHostBlocker] = [
             .importConfirmationSheet,
             .importErrorAlert,
-            .keyUpdateAlert,
             .tutorialImportBlockedAlert,
             .loadWarningAlert
         ]

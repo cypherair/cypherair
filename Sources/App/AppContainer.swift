@@ -1,5 +1,9 @@
 import Foundation
 
+private final class AppContainerContactsOpenResultBox: @unchecked Sendable {
+    var result: ContactsAvailability?
+}
+
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
@@ -742,6 +746,21 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
+        let contactsWrappingRootKey = Data(repeating: 0xCA, count: 32)
+        let contactsDomainStore: ContactsDomainStore
+        do {
+            contactsDomainStore = try makeSandboxContactsDomainStore(
+                baseDirectory: protectedDataBaseDirectory.appendingPathComponent(
+                    "contacts-sandbox",
+                    isDirectory: true
+                ),
+                contactsDirectory: contactsDirectory,
+                contactImportAdapter: contactImportAdapter,
+                wrappingRootKey: contactsWrappingRootKey
+            )
+        } catch {
+            fatalError("Failed to create UI-test Contacts protected domain: \(error)")
+        }
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(protectedSettingsStore)
@@ -781,11 +800,15 @@ final class AppContainer: @unchecked Sendable {
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory
+            contactsDirectory: contactsDirectory,
+            contactsDomainStore: contactsDomainStore
         )
         protectedDataSessionCoordinator.registerRelockParticipant(contactService)
         if !requiresManualAuthentication {
-            _ = try? contactService.openLegacyCompatibilityForTests()
+            _ = openSandboxContactsSynchronously(
+                contactService: contactService,
+                wrappingRootKey: contactsWrappingRootKey
+            )
         }
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
@@ -826,11 +849,12 @@ final class AppContainer: @unchecked Sendable {
                     ),
                     source: source
                 )
-                _ = contactService.openLegacyCompatibilityAfterPostUnlock(
+                _ = await contactService.openContactsAfterPostUnlock(
                     gateDecision: ContactsPostAuthGateDecision(
                         postUnlockOutcome: postUnlockOutcome,
                         frameworkState: protectedDataSessionCoordinator.frameworkState
-                    )
+                    ),
+                    wrappingRootKey: { contactsWrappingRootKey }
                 )
                 protectedOrdinarySettingsCoordinator.loadAfterAppAuthentication(
                     availability: Self.protectedOrdinarySettingsAvailability(
@@ -885,7 +909,11 @@ final class AppContainer: @unchecked Sendable {
         )
 
         if preloadContact {
-            try? preloadUITestContact(engine: engine, contactService: contactService)
+            try? preloadUITestContact(
+                engine: engine,
+                contactService: contactService,
+                wrappingRootKey: contactsWrappingRootKey
+            )
         }
 
         return AppContainer(
@@ -942,9 +970,13 @@ final class AppContainer: @unchecked Sendable {
 
     private static func preloadUITestContact(
         engine: PgpEngine,
-        contactService: ContactService
+        contactService: ContactService,
+        wrappingRootKey: Data
     ) throws {
-        try contactService.openLegacyCompatibilityForTests()
+        _ = openSandboxContactsSynchronously(
+            contactService: contactService,
+            wrappingRootKey: wrappingRootKey
+        )
         let generated = try engine.generateKey(
             name: "UITest Contact",
             email: "uitest-contact@example.invalid",
@@ -952,6 +984,63 @@ final class AppContainer: @unchecked Sendable {
             profile: .universal
         )
         _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
+    }
+
+    private static func makeSandboxContactsDomainStore(
+        baseDirectory: URL,
+        contactsDirectory: URL,
+        contactImportAdapter: PGPContactImportAdapter,
+        wrappingRootKey: Data
+    ) throws -> ContactsDomainStore {
+        let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = ProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.uitests.contacts.\(UUID().uuidString)"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        var registry = try registryStore.loadRegistry()
+        if registry.committedMembership.isEmpty,
+           registry.sharedResourceLifecycleState == .absent {
+            registry.sharedResourceLifecycleState = .ready
+            registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
+            try registryStore.saveRegistry(registry)
+        }
+
+        let repository = ContactRepository(contactsDirectory: contactsDirectory)
+        let migrationSource = ContactsLegacyMigrationSource(
+            contactImportAdapter: contactImportAdapter,
+            repository: repository
+        )
+        return ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            currentWrappingRootKey: { wrappingRootKey },
+            initialSnapshotProvider: {
+                try migrationSource.makeInitialSnapshot()
+            }
+        )
+    }
+
+    private static func openSandboxContactsSynchronously(
+        contactService: ContactService,
+        wrappingRootKey: Data
+    ) -> ContactsAvailability {
+        let semaphore = DispatchSemaphore(value: 0)
+        let resultBox = AppContainerContactsOpenResultBox()
+        Task.detached {
+            let availability = await contactService.openContactsAfterPostUnlock(
+                gateDecision: ContactsPostAuthGateDecision(
+                    postUnlockOutcome: .opened([ContactsDomainStore.domainID]),
+                    frameworkState: .sessionAuthorized
+                ),
+                wrappingRootKey: { wrappingRootKey }
+            )
+            resultBox.result = availability
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return resultBox.result ?? .recoveryNeeded
     }
 
     private static func protectedOrdinarySettingsAvailability(

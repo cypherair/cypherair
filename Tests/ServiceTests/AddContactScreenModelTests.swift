@@ -130,11 +130,11 @@ final class AddContactScreenModelTests: XCTestCase {
 
         XCTAssertEqual(dismissCount, 1)
         XCTAssertEqual(completedContact?.preferredKey?.fingerprint, generated.fingerprint)
-        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 1)
     }
 
     @MainActor
-    func test_addContact_keyUpdateFlow_surfacesPendingAlert_andConfirmCompletesReplacement() throws {
+    func test_addContact_sameUserIDImportCompletesWithoutReplacementPrompt() throws {
         let firstKey = try stack.engine.generateKey(
             name: "Carol",
             email: "carol@example.com",
@@ -167,17 +167,10 @@ final class AddContactScreenModelTests: XCTestCase {
         request.onImportVerified()
 
         XCTAssertEqual(dismissCount, 1)
-        XCTAssertNil(completedContact)
-        XCTAssertTrue(model.showKeyUpdateAlert)
-        XCTAssertNotNil(model.pendingKeyUpdateRequest)
-
-        model.confirmPendingKeyUpdate()
-
-        XCTAssertFalse(model.showKeyUpdateAlert)
-        XCTAssertNil(model.pendingKeyUpdateRequest)
         XCTAssertEqual(completedContact?.preferredKey?.fingerprint, secondKey.fingerprint)
-        XCTAssertEqual(stack.contactService.availableContacts.count, 1)
-        XCTAssertNotNil(stack.contactService.availableContact(forFingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 2)
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
     }
 
     @MainActor

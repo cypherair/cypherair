@@ -3,7 +3,7 @@ import Foundation
 extension ContactsAvailability {
     var unavailableTitle: String {
         switch self {
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             String(localized: "contacts.availability.available.title", defaultValue: "Contacts Available")
         case .opening:
             String(localized: "contacts.availability.opening.title", defaultValue: "Opening Contacts")
@@ -20,7 +20,7 @@ extension ContactsAvailability {
 
     var unavailableDescription: String {
         switch self {
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             String(localized: "contacts.availability.available.description", defaultValue: "Contacts are ready.")
         case .opening:
             String(localized: "contacts.availability.opening.description", defaultValue: "Contacts are opening after app authentication.")
@@ -47,7 +47,7 @@ extension ContactsAvailability {
             "externaldrive.badge.exclamationmark"
         case .restartRequired:
             "arrow.clockwise"
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             "person.2"
         }
     }

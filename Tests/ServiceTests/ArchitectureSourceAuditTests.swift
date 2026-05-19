@@ -46,6 +46,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.contactArrayRuntimeDependencies)
     }
 
+    func test_contactsLegacyRuntimeVocabulary_isRemovedFromProductionSources() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary)
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
@@ -126,24 +130,24 @@ final class ArchitectureSourceAuditTests: XCTestCase {
 
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
-                "Sources/Services/ContactService.swift": "fixture exception"
+                "Sources/Services/ContactsLegacyMigrationSource.swift": "fixture exception"
             ]),
             violatingPath: "Sources/Services/NewRecipientService.swift",
             violatingContents: "struct NewRecipientService { let contacts: [Contact] }",
-            allowedPath: "Sources/Services/ContactService.swift",
-            allowedContents: "final class ContactService { private var contacts: [Contact] = [] }",
-            cleanContents: "final class ContactService {}"
+            allowedPath: "Sources/Services/ContactsLegacyMigrationSource.swift",
+            allowedContents: "struct ContactsLegacyMigrationSource { let contacts: [Contact] }",
+            cleanContents: "struct ContactsLegacyMigrationSource {}"
         )
 
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.contactArrayRuntimeDependencies.withTemporaryExceptions([
-                "Sources/Services/ContactService.swift": "fixture exception"
+                "Sources/Services/ContactsCompatibilityMapper.swift": "fixture exception"
             ]),
             violatingPath: "Sources/Services/NewRecipientService.swift",
             violatingContents: "struct NewRecipientService { let contacts: Array<Contact> }",
-            allowedPath: "Sources/Services/ContactService.swift",
-            allowedContents: "final class ContactService { private var contacts: Array<Contact> = [] }",
-            cleanContents: "final class ContactService {}"
+            allowedPath: "Sources/Services/ContactsCompatibilityMapper.swift",
+            allowedContents: "struct ContactsCompatibilityMapper { let contacts: Array<Contact> }",
+            cleanContents: "struct ContactsCompatibilityMapper {}"
         )
 
         try assertRuleBehavior(
@@ -586,15 +590,26 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Contacts compatibility, matching, migration, and projection paths retain flat Contact arrays until Phase 3C/3D removes the legacy runtime state.",
+                "Contacts migration and compatibility snapshot construction still parse the retained one-time flat legacy source.",
                 [
-                    "Sources/Services/ContactImportMatcher.swift",
                     "Sources/Services/ContactsCompatibilityMapper.swift",
                     "Sources/Services/ContactsLegacyMigrationSource.swift",
-                    "Sources/Services/ContactService.swift",
                 ]
             ),
         ])
+    )
+
+    static let contactsLegacyRuntimeVocabulary = ArchitectureSourceAuditRule(
+        name: "Contacts legacy runtime vocabulary",
+        failureSummary: "Production sources must not expose the removed flat Contacts runtime or legacy key replacement API.",
+        pattern: #"(?:availableLegacyCompatibility|openLegacyCompatibility|legacyKeyReplacementDetected)"#,
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
     )
 
     private static func wordPattern(for symbols: [String]) -> String {

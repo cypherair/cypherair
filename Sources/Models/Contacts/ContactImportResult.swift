@@ -9,29 +9,24 @@ enum ContactImportResult: Equatable, Sendable {
     )
     case duplicate(contact: ContactIdentitySummary, key: ContactKeySummary)
     case updated(contact: ContactIdentitySummary, key: ContactKeySummary)
-    case legacyKeyReplacementDetected(ContactLegacyKeyReplacementRequest)
 
-    var contact: ContactIdentitySummary? {
+    var contact: ContactIdentitySummary {
         switch self {
         case .added(let contact, _),
              .addedWithCandidate(let contact, _, _),
              .duplicate(let contact, _),
              .updated(let contact, _):
             contact
-        case .legacyKeyReplacementDetected:
-            nil
         }
     }
 
-    var key: ContactKeySummary? {
+    var key: ContactKeySummary {
         switch self {
         case .added(_, let key),
              .addedWithCandidate(_, let key, _),
              .duplicate(_, let key),
              .updated(_, let key):
             key
-        case .legacyKeyReplacementDetected:
-            nil
         }
     }
 }

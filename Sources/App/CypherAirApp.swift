@@ -500,9 +500,6 @@ struct CypherAirApp: App {
         .onChange(of: incomingURLImportCoordinator.importError != nil) { _, _ in
             syncMacTutorialHostAvailability()
         }
-        .onChange(of: incomingURLImportCoordinator.pendingKeyUpdateRequest?.id) { _, _ in
-            syncMacTutorialHostAvailability()
-        }
         .onChange(of: incomingURLImportCoordinator.isTutorialImportBlocked) { _, _ in
             syncMacTutorialHostAvailability()
         }
@@ -749,10 +746,6 @@ struct CypherAirApp: App {
             isActive: incomingURLImportCoordinator.importError != nil
         )
         macTutorialHostAvailability.setAppLevelBlocker(
-            .keyUpdateAlert,
-            isActive: incomingURLImportCoordinator.pendingKeyUpdateRequest != nil
-        )
-        macTutorialHostAvailability.setAppLevelBlocker(
             .tutorialImportBlockedAlert,
             isActive: incomingURLImportCoordinator.isTutorialImportBlocked
         )
@@ -820,7 +813,6 @@ private extension View {
     ) -> some View {
         self
             .importErrorAlert(coordinator: coordinator)
-            .legacyKeyReplacementAlert(coordinator: coordinator)
             .tutorialImportBlockedAlert(coordinator: coordinator)
     }
 
@@ -839,31 +831,6 @@ private extension View {
             }
         } message: {
             Text(coordinator.importErrorDescription)
-        }
-    }
-
-    func legacyKeyReplacementAlert(
-        coordinator: IncomingURLImportCoordinator
-    ) -> some View {
-        alert(
-            String(localized: "addcontact.keyUpdate.title", defaultValue: "Key Update Detected"),
-            isPresented: Binding(
-                get: { coordinator.pendingKeyUpdateRequest != nil },
-                set: { if !$0 { coordinator.cancelPendingKeyUpdate() } }
-            ),
-            presenting: coordinator.pendingKeyUpdateRequest
-        ) { _ in
-            Button(
-                String(localized: "addcontact.keyUpdate.confirm", defaultValue: "Replace Key"),
-                role: .destructive
-            ) {
-                coordinator.confirmPendingKeyUpdate()
-            }
-            Button(String(localized: "addcontact.keyUpdate.cancel", defaultValue: "Cancel"), role: .cancel) {
-                coordinator.cancelPendingKeyUpdate()
-            }
-        } message: { request in
-            Text(request.confirmationMessage)
         }
     }
 
@@ -905,19 +872,6 @@ private extension View {
         } message: { warning in
             Text(warning)
         }
-    }
-}
-
-@MainActor
-private extension ContactKeyUpdateConfirmationRequest {
-    var confirmationMessage: String {
-        let displayName = IdentityDisplayPresentation.displayName(
-            pendingUpdate.request.existingContact.displayName
-        )
-        return String(
-            localized: "addcontact.keyUpdate.message",
-            defaultValue: "This contact (\(displayName)) has a new key with a different fingerprint. Verify with the contact before accepting. Replace the existing key?"
-        )
     }
 }
 

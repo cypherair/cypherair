@@ -26,8 +26,6 @@ final class AddContactScreenModel {
     var armoredText = ""
     var error: CypherAirError?
     var showError = false
-    var pendingKeyUpdateRequest: ContactKeyUpdateConfirmationRequest?
-    var showKeyUpdateAlert = false
     var isProcessingQR = false
     var showFileImporter = false
     var importedKeyData: Data?
@@ -122,29 +120,6 @@ final class AddContactScreenModel {
         showError = false
     }
 
-    func dismissPendingKeyUpdateRequest() {
-        pendingKeyUpdateRequest = nil
-        showKeyUpdateAlert = false
-    }
-
-    func confirmPendingKeyUpdate() {
-        guard let pendingKeyUpdateRequest else {
-            return
-        }
-
-        dismissPendingKeyUpdateRequest()
-        pendingKeyUpdateRequest.onConfirm()
-    }
-
-    func cancelPendingKeyUpdate() {
-        guard let pendingKeyUpdateRequest else {
-            return
-        }
-
-        dismissPendingKeyUpdateRequest()
-        pendingKeyUpdateRequest.onCancel()
-    }
-
     func addContact(actions: AddContactScreenHostActions) {
         do {
             let keyData = importedKeyData ?? Data(armoredText.utf8)
@@ -155,11 +130,6 @@ final class AddContactScreenModel {
                 onSuccess: { contact in
                     actions.dismissPresentedImportConfirmation()
                     actions.completeImportedContact(contact)
-                },
-                onReplaceRequested: { [self] request in
-                    actions.dismissPresentedImportConfirmation()
-                    self.pendingKeyUpdateRequest = request
-                    self.showKeyUpdateAlert = true
                 },
                 onFailure: { [self] importError in
                     self.error = importError
@@ -262,8 +232,6 @@ final class AddContactScreenModel {
         isProcessingQR = false
         armoredText = ""
         clearImportedKeyData()
-        pendingKeyUpdateRequest = nil
-        showKeyUpdateAlert = false
         showFileImporter = false
         error = nil
         showError = false

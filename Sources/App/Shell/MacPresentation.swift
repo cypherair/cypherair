@@ -45,7 +45,6 @@ enum MacPresentationHostMode {
 enum MacTutorialHostBlocker: String, CaseIterable {
     case importConfirmationSheet
     case importErrorAlert
-    case keyUpdateAlert
     case tutorialImportBlockedAlert
     case loadWarningAlert
     case hostImportConfirmation

@@ -229,7 +229,7 @@ private extension ContactsScreenHostView {
             "externaldrive.badge.exclamationmark"
         case .restartRequired:
             "arrow.clockwise"
-        case .availableLegacyCompatibility, .availableProtectedDomain:
+        case .availableProtectedDomain:
             "person.2"
         }
     }

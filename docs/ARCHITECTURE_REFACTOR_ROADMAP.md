@@ -145,10 +145,12 @@ Purpose: make the protected, person-centered Contacts domain the ordinary runtim
 - **PR 3C: Legacy compatibility isolation**
   - Keep old-install migration and compatibility behavior behind explicit migration or compatibility boundaries.
   - Ensure legacy/quarantine sources are not ordinary fallback state after protected-domain cutover.
+  - Status note: Phase 3 PR3C removed the flat Contacts runtime fallback, legacy availability state, and legacy key-replacement import path. The retained legacy path is first protected-domain creation from active old-install `Documents/contacts`; after cutover, active/quarantine files are cleanup-only.
 
 - **PR 3D: Legacy runtime projection removal**
   - Remove ordinary runtime dependence on `[Contact]` after current call sites have moved and retained migration paths are isolated.
   - Keep compatibility tests only where they prove migration or explicitly retained support behavior.
+  - Status note: PR3C closed most PR3D runtime-projection debt for production sources; remaining follow-up should focus on any test-only naming cleanup and eventual migration-support cutoff work.
 
 ### Exit Markers
 
