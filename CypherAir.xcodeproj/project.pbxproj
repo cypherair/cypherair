@@ -99,6 +99,7 @@
 				App/Contacts/ContactCertificateSignaturesView.swift,
 				App/Contacts/ContactCertificationDetailsScreenModel.swift,
 				App/Contacts/ContactCertificationDetailsView.swift,
+				App/Contacts/ContactDetailScreenModel.swift,
 				App/Contacts/ContactDetailView.swift,
 				"App/Contacts/ContactIdentitySummary+Presentation.swift",
 				App/Contacts/ContactKeySummaryView.swift,

@@ -14,7 +14,6 @@ struct ContactDetailView: View {
     let configuration: Configuration
 
     @Environment(ContactService.self) private var contactService
-    @Environment(\.dismiss) private var dismiss
 
     init(
         contactId: String,
@@ -24,30 +23,42 @@ struct ContactDetailView: View {
         self.configuration = configuration
     }
 
-    @State private var showDeleteConfirmation = false
-    @State private var showMergeDialog = false
-    @State private var showAddTagSheet = false
-    @State private var pendingTagRemoval: ContactTagSummary?
-    @State private var detailError: String?
-    @State private var showDetailError = false
-
-    private var contact: ContactIdentitySummary? {
-        contactService.availableContactIdentity(forContactID: contactId)
+    var body: some View {
+        ContactDetailHostView(
+            contactId: contactId,
+            configuration: configuration,
+            contactService: contactService
+        )
     }
+}
 
-    private var mergeCandidates: [ContactIdentitySummary] {
-        contactService.availableContactIdentities.filter { $0.contactId != contactId }
-    }
+private struct ContactDetailHostView: View {
+    let configuration: ContactDetailView.Configuration
 
-    private var allowsProtectedIdentityActions: Bool {
-        contactService.contactsAvailability == .availableProtectedDomain
+    @Environment(\.dismiss) private var dismiss
+    @State private var model: ContactDetailScreenModel
+
+    init(
+        contactId: String,
+        configuration: ContactDetailView.Configuration,
+        contactService: ContactService
+    ) {
+        self.configuration = configuration
+        _model = State(
+            initialValue: ContactDetailScreenModel(
+                contactId: contactId,
+                contactService: contactService
+            )
+        )
     }
 
     var body: some View {
+        @Bindable var model = model
+
         Group {
-            if !contactService.contactsAvailability.isAvailable {
-                contactsUnavailableContent(contactService.contactsAvailability)
-            } else if let contact {
+            if !model.contactsAvailability.isAvailable {
+                contactsUnavailableContent(model.contactsAvailability)
+            } else if let contact = model.contact {
                 List {
                     identitySection(contact)
                     tagsSection(contact)
@@ -84,7 +95,7 @@ struct ContactDetailView: View {
 
                     Section {
                         Button(role: .destructive) {
-                            showDeleteConfirmation = true
+                            model.showDeleteConfirmation = true
                         } label: {
                             Label(
                                 String(localized: "contactdetail.delete", defaultValue: "Remove Contact"),
@@ -109,11 +120,13 @@ struct ContactDetailView: View {
         .navigationTitle(String(localized: "contactdetail.title", defaultValue: "Contact"))
         .confirmationDialog(
             String(localized: "contactdetail.delete.title", defaultValue: "Remove Contact"),
-            isPresented: $showDeleteConfirmation,
+            isPresented: $model.showDeleteConfirmation,
             titleVisibility: .visible
         ) {
             Button(String(localized: "contactdetail.delete.confirm", defaultValue: "Remove"), role: .destructive) {
-                removeContactIdentity()
+                if model.removeContactIdentity() {
+                    dismiss()
+                }
             }
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
         } message: {
@@ -121,41 +134,41 @@ struct ContactDetailView: View {
         }
         .confirmationDialog(
             String(localized: "contactdetail.merge.title", defaultValue: "Merge Contact"),
-            isPresented: $showMergeDialog,
+            isPresented: $model.showMergeDialog,
             titleVisibility: .visible
         ) {
-            ForEach(mergeCandidates) { candidate in
+            ForEach(model.mergeCandidates) { candidate in
                 Button(IdentityDisplayPresentation.displayName(candidate.displayName)) {
-                    mergeContact(sourceContactId: candidate.contactId)
+                    model.mergeContact(sourceContactId: candidate.contactId)
                 }
             }
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {}
         } message: {
             Text(String(localized: "contactdetail.merge.message", defaultValue: "Choose another contact to merge into this contact. Their keys and memberships will move here."))
         }
-        .sheet(isPresented: $showAddTagSheet) {
+        .sheet(isPresented: $model.showAddTagSheet) {
             ContactTagAssignmentSheet(
-                availableTags: contactService.contactTagSummaries(),
-                assignedTagIds: Set(contact?.tagIds ?? []),
-                assignExistingTag: assignExistingTag,
-                createAndAssignTag: addTag
+                availableTags: model.availableTags,
+                assignedTagIds: model.assignedTagIds,
+                assignExistingTag: model.assignExistingTag,
+                createAndAssignTag: model.addTag
             )
         }
         .confirmationDialog(
             String(localized: "contactdetail.removeTag.title", defaultValue: "Remove Tag"),
             isPresented: Binding(
-                get: { pendingTagRemoval != nil },
-                set: { if !$0 { pendingTagRemoval = nil } }
+                get: { model.pendingTagRemoval != nil },
+                set: { if !$0 { model.pendingTagRemoval = nil } }
             ),
             titleVisibility: .visible,
-            presenting: pendingTagRemoval
+            presenting: model.pendingTagRemoval
         ) { tag in
             Button(String(localized: "contactdetail.removeTag.confirm", defaultValue: "Remove Tag"), role: .destructive) {
-                removeTag(tag.tagId)
-                pendingTagRemoval = nil
+                model.removeTag(tag.tagId)
+                model.pendingTagRemoval = nil
             }
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) {
-                pendingTagRemoval = nil
+                model.pendingTagRemoval = nil
             }
         } message: { tag in
             Text(
@@ -170,11 +183,14 @@ struct ContactDetailView: View {
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showDetailError
+            isPresented: Binding(
+                get: { model.showDetailError },
+                set: { if !$0 { model.dismissDetailError() } }
+            )
         ) {
             Button(String(localized: "error.ok", defaultValue: "OK")) {}
         } message: {
-            if let detailError {
+            if let detailError = model.detailError {
                 Text(detailError)
             }
         }
@@ -191,26 +207,26 @@ struct ContactDetailView: View {
                         Label(tag.displayName, systemImage: "tag")
                         Spacer()
                         Button(role: .destructive) {
-                            pendingTagRemoval = tag
+                            model.pendingTagRemoval = tag
                         } label: {
                             Image(systemName: "minus.circle")
                         }
                         .buttonStyle(.borderless)
                         .accessibilityLabel(String(localized: "contactdetail.removeTag", defaultValue: "Remove Tag"))
-                        .disabled(!allowsProtectedIdentityActions)
+                        .disabled(!model.allowsProtectedIdentityActions)
                     }
                 }
             }
 
             Button {
-                showAddTagSheet = true
+                model.showAddTagSheet = true
             } label: {
                 Label(
                     String(localized: "contactdetail.addTag", defaultValue: "Add Tag"),
                     systemImage: "tag.badge.plus"
                 )
             }
-            .disabled(!allowsProtectedIdentityActions)
+            .disabled(!model.allowsProtectedIdentityActions)
         } header: {
             Text(String(localized: "contactdetail.tags", defaultValue: "Tags"))
         }
@@ -297,7 +313,7 @@ struct ContactDetailView: View {
                 }
                 .disabled(
                     !configuration.allowsCertificateSignatureLaunch ||
-                        !contactService.contactsAvailability.allowsProtectedCertificationPersistence
+                        !model.allowsProtectedCertificationPersistence
                 )
                 .accessibilityIdentifier("contactdetail.certifyContact")
             }
@@ -332,11 +348,11 @@ struct ContactDetailView: View {
                     ContactKeySummaryView(
                         key: key,
                         configuration: configuration,
-                        allowsUsageActions: allowsProtectedIdentityActions,
-                        markVerified: { markVerified(fingerprint: $0) },
-                        setPreferred: { setPreferredKey(fingerprint: $0) },
-                        markHistorical: { setKeyUsage(.historical, fingerprint: $0) },
-                        markAdditionalActive: { setKeyUsage(.additionalActive, fingerprint: $0) }
+                        allowsUsageActions: model.allowsProtectedIdentityActions,
+                        markVerified: { model.markVerified(fingerprint: $0) },
+                        setPreferred: { model.setPreferredKey(fingerprint: $0) },
+                        markHistorical: { model.setKeyUsage(.historical, fingerprint: $0) },
+                        markAdditionalActive: { model.setKeyUsage(.additionalActive, fingerprint: $0) }
                     )
                 }
             }
@@ -347,22 +363,22 @@ struct ContactDetailView: View {
 
     private var actionsSection: some View {
         Section {
-            if allowsProtectedIdentityActions {
+            if model.allowsProtectedIdentityActions {
                 Button {
-                    showMergeDialog = true
+                    model.showMergeDialog = true
                 } label: {
                     Label(
                         String(localized: "contactdetail.merge", defaultValue: "Merge Another Contact Into This Contact"),
                         systemImage: "person.2.fill"
                     )
                 }
-                .disabled(mergeCandidates.isEmpty)
+                .disabled(model.mergeCandidates.isEmpty)
                 .accessibilityIdentifier("contactdetail.merge")
             }
         } header: {
             Text(String(localized: "contactdetail.actions", defaultValue: "Actions"))
         } footer: {
-            if allowsProtectedIdentityActions && mergeCandidates.isEmpty {
+            if model.allowsProtectedIdentityActions && model.mergeCandidates.isEmpty {
                 Text(String(localized: "contactdetail.merge.none", defaultValue: "There are no other contacts to merge."))
             }
         }
@@ -378,68 +394,6 @@ struct ContactDetailView: View {
                 ProgressView()
             }
         }
-    }
-
-    private func removeContactIdentity() {
-        do {
-            try contactService.removeContactIdentity(contactId: contactId)
-            dismiss()
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func mergeContact(sourceContactId: String) {
-        do {
-            _ = try contactService.mergeContact(sourceContactId: sourceContactId, into: contactId)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func addTag(_ name: String) throws {
-        try contactService.addTag(named: name, toContactId: contactId)
-    }
-
-    private func assignExistingTag(_ tagId: String) throws {
-        try contactService.assignTag(tagId: tagId, toContactId: contactId)
-    }
-
-    private func removeTag(_ tagId: String) {
-        do {
-            try contactService.removeTag(tagId: tagId, fromContactId: contactId)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func markVerified(fingerprint: String) {
-        do {
-            try contactService.setVerificationState(.verified, for: fingerprint)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func setPreferredKey(fingerprint: String) {
-        do {
-            try contactService.setPreferredKey(fingerprint: fingerprint, for: contactId)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func setKeyUsage(_ usageState: ContactKeyUsageState, fingerprint: String) {
-        do {
-            try contactService.setKeyUsageState(usageState, fingerprint: fingerprint)
-        } catch {
-            presentError(error)
-        }
-    }
-
-    private func presentError(_ error: Error) {
-        detailError = error.localizedDescription
-        showDetailError = true
     }
 
     private func systemImage(for availability: ContactsAvailability) -> String {
