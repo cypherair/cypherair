@@ -218,60 +218,60 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    // MARK: - Contact: Display Name
+    // MARK: - ContactKeyRecord: Display Name
 
-    func test_contact_displayName_withNameAndEmail_extractsName() {
-        let contact = makeContact(userId: "Alice <alice@example.com>")
-        XCTAssertEqual(contact.displayName, "Alice")
+    func test_contactKeyRecord_displayName_withNameAndEmail_extractsName() {
+        let keyRecord = makeContactKeyRecord(userId: "Alice <alice@example.com>")
+        XCTAssertEqual(keyRecord.displayName, "Alice")
     }
 
-    func test_contact_displayName_nilUserId_returnsUnknown() {
-        let contact = makeContact(userId: nil)
-        XCTAssertEqual(contact.displayName, IdentityPresentation.legacyUnknownDisplayName)
+    func test_contactKeyRecord_displayName_nilUserId_returnsUnknown() {
+        let keyRecord = makeContactKeyRecord(userId: nil)
+        XCTAssertEqual(keyRecord.displayName, IdentityPresentation.legacyUnknownDisplayName)
     }
 
-    func test_contact_displayName_noAngleBrackets_returnsUserId() {
-        let contact = makeContact(userId: "just-a-name")
-        XCTAssertEqual(contact.displayName, "just-a-name")
+    func test_contactKeyRecord_displayName_noAngleBrackets_returnsUserId() {
+        let keyRecord = makeContactKeyRecord(userId: "just-a-name")
+        XCTAssertEqual(keyRecord.displayName, "just-a-name")
     }
 
-    // MARK: - Contact: Email Extraction
+    // MARK: - ContactKeyRecord: Email Extraction
 
-    func test_contact_email_extractsFromUserId() {
-        let contact = makeContact(userId: "Alice <alice@example.com>")
-        XCTAssertEqual(contact.email, "alice@example.com")
+    func test_contactKeyRecord_email_extractsFromUserId() {
+        let keyRecord = makeContactKeyRecord(userId: "Alice <alice@example.com>")
+        XCTAssertEqual(keyRecord.email, "alice@example.com")
     }
 
-    func test_contact_email_noAngleBrackets_returnsNil() {
-        let contact = makeContact(userId: "Alice")
-        XCTAssertNil(contact.email)
+    func test_contactKeyRecord_email_noAngleBrackets_returnsNil() {
+        let keyRecord = makeContactKeyRecord(userId: "Alice")
+        XCTAssertNil(keyRecord.email)
     }
 
-    func test_contact_email_nilUserId_returnsNil() {
-        let contact = makeContact(userId: nil)
-        XCTAssertNil(contact.email)
+    func test_contactKeyRecord_email_nilUserId_returnsNil() {
+        let keyRecord = makeContactKeyRecord(userId: nil)
+        XCTAssertNil(keyRecord.email)
     }
 
-    // MARK: - Contact: canEncryptTo
+    // MARK: - ContactKeyRecord: canEncryptTo
 
-    func test_contact_canEncryptTo_validKey_returnsTrue() {
-        let contact = makeContact(hasEncryptionSubkey: true, isRevoked: false, isExpired: false)
-        XCTAssertTrue(contact.canEncryptTo)
+    func test_contactKeyRecord_canEncryptTo_validKey_returnsTrue() {
+        let keyRecord = makeContactKeyRecord(hasEncryptionSubkey: true, isRevoked: false, isExpired: false)
+        XCTAssertTrue(keyRecord.canEncryptTo)
     }
 
-    func test_contact_canEncryptTo_expired_returnsFalse() {
-        let contact = makeContact(hasEncryptionSubkey: true, isRevoked: false, isExpired: true)
-        XCTAssertFalse(contact.canEncryptTo)
+    func test_contactKeyRecord_canEncryptTo_expired_returnsFalse() {
+        let keyRecord = makeContactKeyRecord(hasEncryptionSubkey: true, isRevoked: false, isExpired: true)
+        XCTAssertFalse(keyRecord.canEncryptTo)
     }
 
-    func test_contact_canEncryptTo_revoked_returnsFalse() {
-        let contact = makeContact(hasEncryptionSubkey: true, isRevoked: true, isExpired: false)
-        XCTAssertFalse(contact.canEncryptTo)
+    func test_contactKeyRecord_canEncryptTo_revoked_returnsFalse() {
+        let keyRecord = makeContactKeyRecord(hasEncryptionSubkey: true, isRevoked: true, isExpired: false)
+        XCTAssertFalse(keyRecord.canEncryptTo)
     }
 
-    func test_contact_canEncryptTo_noSubkey_returnsFalse() {
-        let contact = makeContact(hasEncryptionSubkey: false, isRevoked: false, isExpired: false)
-        XCTAssertFalse(contact.canEncryptTo)
+    func test_contactKeyRecord_canEncryptTo_noSubkey_returnsFalse() {
+        let keyRecord = makeContactKeyRecord(hasEncryptionSubkey: false, isRevoked: false, isExpired: false)
+        XCTAssertFalse(keyRecord.canEncryptTo)
     }
 
     // MARK: - PGPKeyIdentity: Computed Properties
@@ -529,14 +529,14 @@ final class ModelTests: XCTestCase {
     }
 
     func test_signatureVerification_signerIdentity_prefersVerifiedContact() {
-        let contact = makeContact(
+        let contact = makeContactKeyRecord(
             fingerprint: "abcdef1234567890abcdef1234567890",
             userId: "Alice <alice@example.com>"
         )
 
         let identity = SignatureVerification.SignerIdentity.resolve(
             fingerprint: contact.fingerprint,
-            contactKeys: [makeContactKeyRecord(from: contact)],
+            contactKeys: [contact],
             ownKeys: []
         )
 
@@ -741,57 +741,34 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(coordinator.guidedTutorialCompletionState, .completedPreviousVersion)
     }
 
-    // MARK: - Contact: Formatted Fingerprint
-
-    func test_contact_formattedFingerprint_groupsOf4() {
-        let contact = makeContact(fingerprint: "abcdef1234567890")
-        XCTAssertEqual(contact.formattedFingerprint, "abcd ef12 3456 7890")
-    }
-
     // MARK: - Factory Helpers
 
-    private func makeContact(
+    private func makeContactKeyRecord(
         fingerprint: String = "abc123",
         userId: String? = "Test <test@example.com>",
         hasEncryptionSubkey: Bool = true,
         isRevoked: Bool = false,
         isExpired: Bool = false
-    ) -> Contact {
-        Contact(
+    ) -> ContactKeyRecord {
+        ContactKeyRecord(
+            keyId: fingerprint,
+            contactId: fingerprint,
             fingerprint: fingerprint,
+            primaryUserId: userId,
+            displayName: IdentityPresentation.displayName(from: userId),
+            email: IdentityPresentation.email(from: userId),
             keyVersion: 4,
             profile: .universal,
-            userId: userId,
+            primaryAlgo: "Ed25519",
+            subkeyAlgo: "X25519",
+            hasEncryptionSubkey: hasEncryptionSubkey,
             isRevoked: isRevoked,
             isExpired: isExpired,
-            hasEncryptionSubkey: hasEncryptionSubkey,
-            verificationState: .verified,
-            publicKeyData: Data(),
-            primaryAlgo: "Ed25519",
-            subkeyAlgo: "X25519"
-        )
-    }
-
-    private func makeContactKeyRecord(from contact: Contact) -> ContactKeyRecord {
-        ContactKeyRecord(
-            keyId: contact.fingerprint,
-            contactId: contact.contactId ?? contact.fingerprint,
-            fingerprint: contact.fingerprint,
-            primaryUserId: contact.userId,
-            displayName: contact.displayName,
-            email: contact.email,
-            keyVersion: contact.keyVersion,
-            profile: contact.profile,
-            primaryAlgo: contact.primaryAlgo,
-            subkeyAlgo: contact.subkeyAlgo,
-            hasEncryptionSubkey: contact.hasEncryptionSubkey,
-            isRevoked: contact.isRevoked,
-            isExpired: contact.isExpired,
-            manualVerificationState: contact.verificationState,
-            usageState: contact.usageState ?? .preferred,
+            manualVerificationState: .verified,
+            usageState: .preferred,
             certificationProjection: .empty,
             certificationArtifactIds: [],
-            publicKeyData: contact.publicKeyData,
+            publicKeyData: Data(),
             createdAt: Date(),
             updatedAt: Date()
         )

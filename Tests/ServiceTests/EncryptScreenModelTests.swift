@@ -487,7 +487,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let tag = try opened.service.addTag(named: "Partial Team", toContactId: selectableContactId)
         _ = try opened.service.addTag(named: "Partial Team", toContactId: missingPreferredContactId)
 
-        var snapshot = try opened.service.currentCompatibilitySnapshot()
+        var snapshot = try opened.service.currentContactsDomainSnapshot()
         for index in snapshot.keyRecords.indices
             where snapshot.keyRecords[index].contactId == missingPreferredContactId {
             snapshot.keyRecords[index].usageState = .historical
@@ -988,13 +988,12 @@ final class EncryptScreenModelTests: XCTestCase {
             domainKeyManager: opened.harness.domainKeyManager,
             currentWrappingRootKey: { opened.harness.wrappingRootKey },
             initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain should not rebuild from legacy source.")
+                XCTFail("Committed Contacts domain should not recreate its initial snapshot.")
                 return ContactsDomainSnapshot.empty()
             }
         )
         let locked = ContactService(
             engine: stack.engine,
-            contactsDirectory: opened.contactsDirectory,
             contactsDomainStore: lockedStore
         )
         XCTAssertEqual(locked.contactsAvailability, .locked)
@@ -1016,7 +1015,6 @@ final class EncryptScreenModelTests: XCTestCase {
         )
         let service = ContactService(
             engine: stack.engine,
-            contactsDirectory: directory,
             contactsDomainStore: harness.store
         )
         let availability = await service.openContactsAfterPostUnlock(
@@ -1037,13 +1035,12 @@ final class EncryptScreenModelTests: XCTestCase {
             domainKeyManager: harness.domainKeyManager,
             currentWrappingRootKey: { harness.wrappingRootKey },
             initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain should not rebuild from legacy source.")
+                XCTFail("Committed Contacts domain should not recreate its initial snapshot.")
                 return ContactsDomainSnapshot.empty()
             }
         )
         let service = ContactService(
             engine: stack.engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(
@@ -1074,18 +1071,11 @@ final class EncryptScreenModelTests: XCTestCase {
 
         let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
         let wrappingRootKey = Data(repeating: 0xB5, count: 32)
-        let migrationSource = ContactsLegacyMigrationSource(
-            engine: stack.engine,
-            repository: ContactRepository(contactsDirectory: contactsDirectory)
-        )
         let store = ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
         return (
             storageRoot: storageRoot,

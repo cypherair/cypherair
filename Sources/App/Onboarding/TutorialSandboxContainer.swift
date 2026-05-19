@@ -111,14 +111,11 @@ final class TutorialSandboxContainer {
         self.contactsWrappingRootKey = contactsWrappingRootKey
         let contactsDomainStore = try Self.makeContactsDomainStore(
             baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
-            contactsDirectory: contactsDirectory,
-            contactImportAdapter: contactImportAdapter,
             wrappingRootKey: contactsWrappingRootKey
         )
         self.contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: contactsDomainStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
@@ -193,8 +190,6 @@ final class TutorialSandboxContainer {
 
     private static func makeContactsDomainStore(
         baseDirectory: URL,
-        contactsDirectory: URL,
-        contactImportAdapter: PGPContactImportAdapter,
         wrappingRootKey: Data
     ) throws -> ContactsDomainStore {
         let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
@@ -211,19 +206,11 @@ final class TutorialSandboxContainer {
             try registryStore.saveRegistry(registry)
         }
 
-        let repository = ContactRepository(contactsDirectory: contactsDirectory)
-        let migrationSource = ContactsLegacyMigrationSource(
-            contactImportAdapter: contactImportAdapter,
-            repository: repository
-        )
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
     }
 }

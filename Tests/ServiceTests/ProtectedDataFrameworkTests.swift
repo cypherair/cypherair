@@ -1474,11 +1474,9 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let config = AppConfiguration(defaults: defaults)
         let protectedDataBaseDirectory = makeTemporaryDirectory("ProtectedDataStartup")
         let documentDirectory = makeTemporaryDirectory("ProtectedDataStartupDocuments")
-        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
         let legacySelfTestReportsDirectory = documentDirectory.appendingPathComponent("self-test", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: protectedDataBaseDirectory) }
         defer { try? FileManager.default.removeItem(at: documentDirectory) }
-        try FileManager.default.createDirectory(at: contactsDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: legacySelfTestReportsDirectory, withIntermediateDirectories: true)
         try Data("legacy self-test report".utf8).write(
             to: legacySelfTestReportsDirectory.appendingPathComponent("self-test-legacy.txt")
@@ -1564,10 +1562,18 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
+        let contactsDomainStore = ContactsDomainStore(
+            storageRoot: storageRoot,
+            registryStore: registryStore,
+            domainKeyManager: domainKeyManager,
+            currentWrappingRootKey: {
+                try protectedDataSessionCoordinator.wrappingRootKeyData()
+            }
+        )
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactsDirectory
+            contactsDomainStore: contactsDomainStore
         )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
@@ -1602,7 +1608,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             protectedDataStorageRoot: storageRoot,
-            contactsDirectory: contactsDirectory,
             defaults: defaults,
             defaultsDomainName: defaultsSuiteName,
             config: config,
@@ -1630,6 +1635,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             protectedDomainRecoveryCoordinator: recoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             privateKeyControlStore: privateKeyControlStore,
+            contactsDomainStore: contactsDomainStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
             appSessionOrchestrator: appSessionOrchestrator,
@@ -1644,7 +1650,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             qrService: qrService,
             selfTestService: selfTestService,
             localDataResetService: localDataResetService,
-            contactsDirectory: contactsDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: defaultsSuiteName
         )

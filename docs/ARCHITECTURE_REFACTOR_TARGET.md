@@ -184,14 +184,13 @@ The target Contacts runtime is person-centered and domain-snapshot-backed. Norma
 
 The legacy flat `Contact` projection is not a primary runtime model in the target architecture. It may remain only behind explicit compatibility boundaries, such as:
 
-- old-install migration input
-- legacy repository reads required to build the initial protected-domain snapshot
+- protected-domain schema migration input
 - temporary compatibility adapters while a call site is being migrated
-- focused tests proving migration behavior
+- focused tests proving protected-domain recovery behavior
 
 Ordinary Contacts flows should not depend on `[Contact]`. This includes recipient selection, signer resolution, contact detail, import confirmation, merge, tags, verification context, certification artifacts, and certificate-signature screens.
 
-Compatibility code should be named and placed so its purpose is obvious. `ContactsCompatibilityMapper`, legacy migration sources, and legacy repositories are adapter boundaries; they should not be mixed into normal protected-domain runtime mutation paths.
+After the Phase 3 PR3D support cutoff, production code must not reintroduce flat `Contact`, `ContactRepository`, `ContactsLegacyMigrationSource`, or `ContactsCompatibilityMapper` code. First protected `contacts` domain creation starts empty; supported Contacts state lives in the protected domain only.
 
 ## Target Acceptance Markers
 
@@ -206,6 +205,6 @@ The refactor can be considered aligned with this target when these checks hold f
 - Core Models do not import SwiftUI for `Color`, icons, or view-specific display policy.
 - Core Models do not depend on Security stores, ProtectedData coordinators, migration sources, or generated UniFFI types.
 - `CypherAirError` remains app-owned, while `PgpError -> CypherAirError` conversion is outside Models.
-- Normal Contacts runtime does not depend on `[Contact]`; legacy `Contact` appears only in migration or compatibility adapters.
+- Normal Contacts runtime does not depend on `[Contact]`; legacy flat `Contact` no longer appears in production sources.
 - App composition wires concrete dependencies without becoming the owner of operation policy.
 - Sensitive boundaries in `Security.md` remain preserved, including AEAD hard-fail, two-phase decrypt authentication, private-key zeroization, ProtectedData fail-closed behavior, and zero network access.

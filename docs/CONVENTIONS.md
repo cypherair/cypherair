@@ -187,7 +187,7 @@ Sources/
 │   ├── SigningService.swift
 │   ├── KeyManagementService.swift
 │   ├── ContactService.swift
-│   ├── ContactsCompatibilityMapper.swift
+│   ├── ContactSnapshotMutator.swift
 │   ├── QRService.swift
 │   ├── SelfTestService.swift
 │   ├── FileProgressReporter.swift

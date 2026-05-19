@@ -293,9 +293,6 @@ final class ProtectedDataStorageRootTests: XCTestCase {
     }
 
     private func cleanupUITestContainer(_ container: AppAppContainer) {
-        if let contactsDirectory = container.contactsDirectory {
-            try? fileManager.removeItem(at: contactsDirectory)
-        }
         try? fileManager.removeItem(at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent())
         if let defaultsSuiteName = container.defaultsSuiteName {
             UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)

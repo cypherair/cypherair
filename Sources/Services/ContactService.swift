@@ -2,14 +2,10 @@ import Foundation
 
 /// Manages contacts (imported public keys).
 /// Production persistence lives in the protected contacts app-data domain after post-auth unlock.
-/// The legacy Documents/contacts repository is retained only for first-open migration,
-/// quarantine, and cleanup.
 @Observable
 final class ContactService: @unchecked Sendable {
     private let contactImportAdapter: PGPContactImportAdapter
     private let certificateAdapter: PGPCertificateOperationAdapter
-    private let repository: ContactRepository
-    private let legacyMigrationSource: ContactsLegacyMigrationSource
     private let contactsDomainStore: ContactsDomainStore?
     private let recipientResolver = ContactRecipientResolver()
     private let summaryProjector = ContactSummaryProjector()
@@ -17,31 +13,14 @@ final class ContactService: @unchecked Sendable {
     private(set) var contactsAvailability: ContactsAvailability = .locked
     private var runtimeSnapshot: ContactsDomainSnapshot?
     private var contactsSearchIndex: ContactsSearchIndex?
-    private(set) var protectedDomainMigrationWarning: String?
 
     init(
         contactImportAdapter: PGPContactImportAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
-        contactsDirectory: URL? = nil,
         contactsDomainStore: ContactsDomainStore? = nil
     ) {
         self.contactImportAdapter = contactImportAdapter
         self.certificateAdapter = certificateAdapter
-        let resolvedContactsDirectory: URL
-        if let contactsDirectory {
-            resolvedContactsDirectory = contactsDirectory
-        } else {
-            let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            resolvedContactsDirectory = documentsDir.appendingPathComponent(
-                "contacts",
-                isDirectory: true
-            )
-        }
-        repository = ContactRepository(contactsDirectory: resolvedContactsDirectory)
-        legacyMigrationSource = ContactsLegacyMigrationSource(
-            contactImportAdapter: contactImportAdapter,
-            repository: repository
-        )
         snapshotMutator = ContactSnapshotMutator(contactImportAdapter: contactImportAdapter)
         self.contactsDomainStore = contactsDomainStore
     }
@@ -63,8 +42,6 @@ final class ContactService: @unchecked Sendable {
         }
 
         clearContactsRuntimeState(availability: .opening)
-        let activeLegacyExistedAtOpenStart = repository.activeLegacySourceExists()
-        let quarantineExistedAtOpenStart = repository.quarantineExists()
         do {
             var wrappingKey = try wrappingRootKey()
             defer {
@@ -73,7 +50,7 @@ final class ContactService: @unchecked Sendable {
             try await contactsDomainStore.ensureCommittedIfNeeded(
                 wrappingRootKey: wrappingKey,
                 initialSnapshotProvider: {
-                    try legacyMigrationSource.makeInitialSnapshot()
+                    ContactsDomainSnapshot.empty()
                 }
             )
             let openedSnapshot = try await contactsDomainStore.openDomainIfNeeded(
@@ -84,10 +61,6 @@ final class ContactService: @unchecked Sendable {
                 try contactsDomainStore.replaceSnapshot(reconciledSnapshot)
             }
             try applyProtectedRuntimeSnapshot(reconciledSnapshot)
-            retireLegacySourceAfterProtectedOpen(
-                activeLegacyExistedAtOpenStart: activeLegacyExistedAtOpenStart,
-                quarantineExistedAtOpenStart: quarantineExistedAtOpenStart
-            )
             return contactsAvailability
         } catch {
             clearContactsRuntimeState(availability: .recoveryNeeded)
@@ -278,7 +251,7 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
-    func currentCompatibilitySnapshot() throws -> ContactsDomainSnapshot {
+    func currentContactsDomainSnapshot() throws -> ContactsDomainSnapshot {
         try requireContactsAvailable()
         if let runtimeSnapshot {
             try runtimeSnapshot.validateContract()
@@ -840,28 +813,10 @@ final class ContactService: @unchecked Sendable {
         contactsAvailability = .availableProtectedDomain
     }
 
-    private func retireLegacySourceAfterProtectedOpen(
-        activeLegacyExistedAtOpenStart: Bool,
-        quarantineExistedAtOpenStart: Bool
-    ) {
-        protectedDomainMigrationWarning = nil
-        do {
-            if quarantineExistedAtOpenStart {
-                try repository.deleteQuarantineIfPresent()
-            }
-            if activeLegacyExistedAtOpenStart || repository.activeLegacySourceExists() {
-                try repository.moveActiveLegacySourceToQuarantine()
-            }
-        } catch {
-            protectedDomainMigrationWarning = Self.protectedDomainMigrationWarningMessage()
-        }
-    }
-
     private func withProtectedRuntimeRollback<T>(_ operation: () throws -> T) throws -> T {
         let previousAvailability = contactsAvailability
         let previousRuntimeSnapshot = runtimeSnapshot
         let previousSearchIndex = contactsSearchIndex
-        let previousMigrationWarning = protectedDomainMigrationWarning
 
         do {
             return try operation()
@@ -869,7 +824,6 @@ final class ContactService: @unchecked Sendable {
             contactsAvailability = previousAvailability
             runtimeSnapshot = previousRuntimeSnapshot
             contactsSearchIndex = previousSearchIndex
-            protectedDomainMigrationWarning = previousMigrationWarning
             if let snapshot = contactsDomainStore?.snapshot {
                 try? applyProtectedRuntimeSnapshot(snapshot)
             }
@@ -881,14 +835,6 @@ final class ContactService: @unchecked Sendable {
         contactsAvailability = availability
         runtimeSnapshot = nil
         contactsSearchIndex = nil
-        protectedDomainMigrationWarning = nil
-    }
-
-    private static func protectedDomainMigrationWarningMessage() -> String {
-        String(
-            localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
-        )
     }
 }
 

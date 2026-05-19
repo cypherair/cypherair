@@ -200,74 +200,9 @@ final class ContactServiceTests: XCTestCase {
         }
     }
 
-    func test_contactsPR4MigratesLegacyIntoProtectedDomainAndDeletesQuarantineOnLaterOpen() async throws {
-        let generated = try engine.generateKey(
-            name: "PR4 Migration",
-            email: "pr4-migration@example.invalid",
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
-        try repository.saveVerificationStates([generated.fingerprint: .unverified])
-        let quarantineDirectory = repository.quarantineDirectory
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsPR4Migration",
-            contactsDirectory: tempDir
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let protectedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: harness.store
-        )
-
-        let availability = await protectedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(availability, .availableProtectedDomain)
-        XCTAssertEqual(protectedService.testContactFingerprints, [generated.fingerprint])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: quarantineDirectory.path))
-
-        try await protectedService.relockProtectedData()
-        let reopenedStore = ContactsDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey },
-            initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain should not rebuild from legacy quarantine.")
-                return ContactsDomainSnapshot.empty()
-            }
-        )
-        let reopenedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: reopenedStore
-        )
-
-        let reopenedAvailability = await reopenedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
-        XCTAssertEqual(reopenedService.testContactFingerprints, [generated.fingerprint])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: quarantineDirectory.path))
-    }
-
-    func test_contactsPR4FreshInstallCreatesEmptyProtectedDomainWithoutLegacyDirectory() async throws {
-        let documentDirectory = FileManager.default.temporaryDirectory
+    func test_contactsFreshInstallCreatesEmptyProtectedDomain() async throws {
+        let contactsDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsFresh-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: documentDirectory) }
-        let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4Fresh",
             contactsDirectory: contactsDirectory
@@ -277,7 +212,6 @@ final class ContactServiceTests: XCTestCase {
         }
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: harness.store
         )
 
@@ -288,10 +222,11 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertEqual(availability, .availableProtectedDomain)
         XCTAssertTrue(protectedService.testContactKeyRecords.isEmpty)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
-        XCTAssertFalse(FileManager.default.fileExists(
-            atPath: ContactRepository(contactsDirectory: contactsDirectory).quarantineDirectory.path
-        ))
+        XCTAssertNil(try harness.registryStore.loadRegistry().pendingMutation)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
+            .active
+        )
     }
 
     func test_contactsDomainStoreInitialSnapshotValidationMapsToProtectedDataInvalidEnvelope() async throws {
@@ -341,7 +276,7 @@ final class ContactServiceTests: XCTestCase {
         _ = try service.importContact(publicKeyData: generated.publicKeyData, verificationState: .verified)
         let contactId = try XCTUnwrap(service.contactId(forFingerprint: generated.fingerprint))
         let tag = try service.addTag(named: "Migrated Tag", toContactId: contactId)
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         try attachCertificationArtifact(
             artifactId: "artifact-v1-migration",
             toKeyWithFingerprint: generated.fingerprint,
@@ -378,7 +313,7 @@ final class ContactServiceTests: XCTestCase {
             harness: opened.harness,
             contactsDirectory: opened.contactsDirectory
         )
-        let migratedSnapshot = try reopened.service.currentCompatibilitySnapshot()
+        let migratedSnapshot = try reopened.service.currentContactsDomainSnapshot()
         let metadata = try XCTUnwrap(
             ProtectedDomainBootstrapStore(storageRoot: opened.harness.storageRoot)
                 .loadMetadata(for: ContactsDomainStore.domainID)
@@ -405,47 +340,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(envelope.generationIdentifier, metadataGenerationIdentifier)
     }
 
-    func test_contactsPR4CorruptLegacySourceDoesNotPartiallyCutOver() async throws {
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        try Data("not-a-public-certificate".utf8).write(
-            to: tempDir.appendingPathComponent("corrupt.gpg")
-        )
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsPR4CorruptLegacy",
-            contactsDirectory: tempDir
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let protectedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: harness.store
-        )
-
-        let availability = await protectedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(availability, .recoveryNeeded)
-        XCTAssertTrue(protectedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertFalse(FileManager.default.fileExists(
-            atPath: ContactRepository(contactsDirectory: tempDir).quarantineDirectory.path
-        ))
-        XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID])
-    }
-
-    func test_contactsPR4PreCutoverProtectedCreateFailureLeavesLegacySourceForRetry() async throws {
-        let generated = try engine.generateKey(
-            name: "PR4 Pre Cutover Retry",
-            email: "pr4-pre-cutover-retry@example.invalid",
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
+    func test_contactsProtectedCreateFailureLeavesNoCommittedDomain() async throws {
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4PreCutoverRetry",
             contactsDirectory: tempDir
@@ -461,7 +356,6 @@ final class ContactServiceTests: XCTestCase {
         try harness.registryStore.saveRegistry(registry)
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: tempDir,
             contactsDomainStore: harness.store
         )
 
@@ -472,198 +366,64 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertEqual(availability, .recoveryNeeded)
         XCTAssertTrue(protectedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
         XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID])
     }
 
-    func test_contactsPR4CorruptProtectedDomainAfterCutoverRequiresRecoveryAndDoesNotReadQuarantine() async throws {
+    func test_contactsCorruptProtectedDomainRequiresRecovery() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCorruptProtected")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
         let generated = try engine.generateKey(
-            name: "PR4 Corruption",
-            email: "pr4-corruption@example.invalid",
+            name: "Protected Corruption",
+            email: "protected-corruption@example.invalid",
             expirySeconds: nil,
             profile: .universal
         )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsPR4CorruptProtected",
-            contactsDirectory: tempDir
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let protectedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: harness.store
-        )
-        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-        try harness.storageRoot.writeProtectedData(
+        _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
+        try await opened.service.relockProtectedData()
+        try opened.harness.storageRoot.writeProtectedData(
             Data("not-a-readable-contacts-envelope".utf8),
-            to: harness.storageRoot.domainEnvelopeURL(
+            to: opened.harness.storageRoot.domainEnvelopeURL(
                 for: ContactsDomainStore.domainID,
                 slot: .current
             )
         )
 
         let reopenedStore = ContactsDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey },
+            storageRoot: opened.harness.storageRoot,
+            registryStore: opened.harness.registryStore,
+            domainKeyManager: opened.harness.domainKeyManager,
+            currentWrappingRootKey: { opened.harness.wrappingRootKey },
             initialSnapshotProvider: {
-                XCTFail("Corrupt committed Contacts domain must not rebuild from quarantine.")
+                XCTFail("Committed Contacts domain must not be recreated after current-state corruption.")
                 return ContactsDomainSnapshot.empty()
             }
         )
         let reopenedService = ContactService(
             engine: engine,
-            contactsDirectory: tempDir,
             contactsDomainStore: reopenedStore
         )
 
         let availability = await reopenedService.openContactsAfterPostUnlock(
             gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
+            wrappingRootKey: { opened.harness.wrappingRootKey }
         )
 
         XCTAssertEqual(availability, .recoveryNeeded)
         XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-    }
-
-    func test_contactsPR4CommittedDomainIgnoresCorruptRecreatedActiveLegacy() async throws {
-        let generated = try engine.generateKey(
-            name: "PR4 Stale Legacy",
-            email: "pr4-stale-legacy@example.invalid",
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsPR4CommittedIgnoresLegacy",
-            contactsDirectory: tempDir
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let protectedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: harness.store
-        )
-        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        try Data("not-a-public-certificate".utf8).write(
-            to: tempDir.appendingPathComponent("corrupt.gpg")
-        )
-        let reopenedStore = ContactsDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey }
-        )
-        let reopenedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: reopenedStore
-        )
-
-        let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(availability, .availableProtectedDomain)
-        XCTAssertEqual(reopenedService.testContactFingerprints, [generated.fingerprint])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-    }
-
-    func test_contactsPR4CommittedProtectedFailureDoesNotFallbackToActiveLegacy() async throws {
-        let generated = try engine.generateKey(
-            name: "PR4 No Fallback",
-            email: "pr4-no-fallback@example.invalid",
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsPR4CommittedNoFallback",
-            contactsDirectory: tempDir
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let protectedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: harness.store
-        )
-        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
-        try harness.storageRoot.writeProtectedData(
-            Data("not-a-readable-contacts-envelope".utf8),
-            to: harness.storageRoot.domainEnvelopeURL(
-                for: ContactsDomainStore.domainID,
-                slot: .current
-            )
-        )
-
-        let reopenedStore = ContactsDomainStore(
-            storageRoot: harness.storageRoot,
-            registryStore: harness.registryStore,
-            domainKeyManager: harness.domainKeyManager,
-            currentWrappingRootKey: { harness.wrappingRootKey }
-        )
-        let reopenedService = ContactService(
-            engine: engine,
-            contactsDirectory: tempDir,
-            contactsDomainStore: reopenedStore
-        )
-
-        let availability = await reopenedService.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(availability, .recoveryNeeded)
-        XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
         XCTAssertEqual(
-            try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
+            try opened.harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
             .recoveryNeeded
         )
     }
 
-    func test_contactsPR4ProtectedMutationsPersistWithoutWritingActiveLegacy() async throws {
+    func test_contactsProtectedMutationsPersistAcrossReopen() async throws {
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsMutation-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: documentDirectory) }
         let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
-        let repository = ContactRepository(contactsDirectory: contactsDirectory)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4Mutation",
             contactsDirectory: contactsDirectory
@@ -673,7 +433,6 @@ final class ContactServiceTests: XCTestCase {
         }
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
@@ -694,8 +453,6 @@ final class ContactServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(protectedService.testContactFingerprints, [generated.fingerprint])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
         try await protectedService.relockProtectedData()
         XCTAssertTrue(protectedService.contactsDomainRuntimeStateIsClearedForTests)
 
@@ -707,7 +464,6 @@ final class ContactServiceTests: XCTestCase {
         )
         let reopenedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: reopenedStore
         )
 
@@ -718,16 +474,14 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(reopenedAvailability, .availableProtectedDomain)
         XCTAssertEqual(reopenedService.testContactFingerprints, [generated.fingerprint])
         XCTAssertEqual(reopenedService.testContactKeyRecords.first?.manualVerificationState, .unverified)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: contactsDirectory.path))
     }
 
-    func test_contactsPR4CorruptCurrentGenerationAfterMutationRequiresRecovery() async throws {
+    func test_contactsCorruptCurrentGenerationAfterMutationRequiresRecovery() async throws {
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsCorruptCurrent-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: documentDirectory) }
         let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
-        let repository = ContactRepository(contactsDirectory: contactsDirectory)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4CorruptCurrent",
             contactsDirectory: contactsDirectory
@@ -737,7 +491,6 @@ final class ContactServiceTests: XCTestCase {
         }
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
@@ -752,7 +505,6 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
         _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: harness.storageRoot.domainEnvelopeURL(
                 for: ContactsDomainStore.domainID,
@@ -775,7 +527,6 @@ final class ContactServiceTests: XCTestCase {
         )
         let reopenedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: reopenedStore
         )
 
@@ -786,20 +537,18 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertEqual(availability, .recoveryNeeded)
         XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: contactsDirectory.path))
         XCTAssertEqual(
             try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
             .recoveryNeeded
         )
     }
 
-    func test_contactsPR4MissingCurrentGenerationAfterMutationRequiresRecovery() async throws {
+    func test_contactsMissingCurrentGenerationAfterMutationRequiresRecovery() async throws {
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsMissingCurrent-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: documentDirectory) }
         let contactsDirectory = documentDirectory.appendingPathComponent("contacts", isDirectory: true)
-        let repository = ContactRepository(contactsDirectory: contactsDirectory)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4MissingCurrent",
             contactsDirectory: contactsDirectory
@@ -809,7 +558,6 @@ final class ContactServiceTests: XCTestCase {
         }
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: harness.store
         )
         let initialAvailability = await protectedService.openContactsAfterPostUnlock(
@@ -824,7 +572,6 @@ final class ContactServiceTests: XCTestCase {
             profile: .universal
         )
         _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
         let currentURL = harness.storageRoot.domainEnvelopeURL(
             for: ContactsDomainStore.domainID,
             slot: .current
@@ -844,7 +591,6 @@ final class ContactServiceTests: XCTestCase {
         )
         let reopenedService = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: reopenedStore
         )
 
@@ -855,22 +601,19 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertEqual(availability, .recoveryNeeded)
         XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: contactsDirectory.path))
         XCTAssertEqual(
             try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
             .recoveryNeeded
         )
     }
 
-    func test_contactsPR4MissingBootstrapMetadataRequiresRecoveryWithoutLegacyFallback() async throws {
+    func test_contactsMissingBootstrapMetadataRequiresRecovery() async throws {
         let generated = try engine.generateKey(
             name: "Missing Bootstrap",
             email: "missing-bootstrap@example.invalid",
             expirySeconds: nil,
             profile: .universal
         )
-        let repository = ContactRepository(contactsDirectory: tempDir)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
         let harness = try makeContactsProtectedHarness(
             prefix: "ContactsPR4MissingBootstrap",
             contactsDirectory: tempDir
@@ -880,20 +623,18 @@ final class ContactServiceTests: XCTestCase {
         }
         let protectedService = ContactService(
             engine: engine,
-            contactsDirectory: tempDir,
             contactsDomainStore: harness.store
         )
-        let cutoverAvailability = await protectedService.openContactsAfterPostUnlock(
+        let openAvailability = await protectedService.openContactsAfterPostUnlock(
             gateDecision: authorizedContactsGate(),
             wrappingRootKey: { harness.wrappingRootKey }
         )
-        XCTAssertEqual(cutoverAvailability, .availableProtectedDomain)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
+        XCTAssertEqual(openAvailability, .availableProtectedDomain)
+        _ = try protectedService.importContact(publicKeyData: generated.publicKeyData)
+        try await protectedService.relockProtectedData()
         try ProtectedDomainBootstrapStore(
             storageRoot: harness.storageRoot
         ).removeMetadata(for: ContactsDomainStore.domainID)
-        try repository.savePublicKey(generated.publicKeyData, fingerprint: generated.fingerprint)
 
         let reopenedStore = ContactsDomainStore(
             storageRoot: harness.storageRoot,
@@ -901,13 +642,12 @@ final class ContactServiceTests: XCTestCase {
             domainKeyManager: harness.domainKeyManager,
             currentWrappingRootKey: { harness.wrappingRootKey },
             initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain must not rebuild from legacy when bootstrap metadata is missing.")
+                XCTFail("Committed Contacts domain must not be recreated when bootstrap metadata is missing.")
                 return ContactsDomainSnapshot.empty()
             }
         )
         let reopenedService = ContactService(
             engine: engine,
-            contactsDirectory: tempDir,
             contactsDomainStore: reopenedStore
         )
 
@@ -918,8 +658,6 @@ final class ContactServiceTests: XCTestCase {
 
         XCTAssertEqual(availability, .recoveryNeeded)
         XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tempDir.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
         XCTAssertEqual(
             try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
             .recoveryNeeded
@@ -1510,7 +1248,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         _ = try service.importContact(publicKeyData: generated.publicKeyData)
-        let beforeSnapshot = try service.currentCompatibilitySnapshot()
+        let beforeSnapshot = try service.currentContactsDomainSnapshot()
         let beforeRecord = try XCTUnwrap(beforeSnapshot.keyRecords.first)
 
         let updateResult = try service.importContact(publicKeyData: refreshed.publicKeyData)
@@ -1518,7 +1256,7 @@ final class ContactServiceTests: XCTestCase {
             return XCTFail("Expected .updated, got \(updateResult)")
         }
 
-        let afterSnapshot = try service.currentCompatibilitySnapshot()
+        let afterSnapshot = try service.currentContactsDomainSnapshot()
         let afterRecord = try XCTUnwrap(afterSnapshot.keyRecords.first)
         XCTAssertEqual(updatedContact.contactId, beforeRecord.contactId)
         XCTAssertEqual(afterRecord.contactId, beforeRecord.contactId)
@@ -1601,7 +1339,7 @@ final class ContactServiceTests: XCTestCase {
         let sourceContactId = try XCTUnwrap(service.contactId(forFingerprint: sourceKey.fingerprint))
 
         let now = Date()
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         snapshot.tags = [
             ContactTag(
                 tagId: "tag-target",
@@ -1636,7 +1374,7 @@ final class ContactServiceTests: XCTestCase {
 
         _ = try reopenedService.mergeContact(sourceContactId: sourceContactId, into: targetContactId)
 
-        let mergedSnapshot = try reopenedService.currentCompatibilitySnapshot()
+        let mergedSnapshot = try reopenedService.currentContactsDomainSnapshot()
         let mergedIdentity = try XCTUnwrap(
             mergedSnapshot.identities.first { $0.contactId == targetContactId }
         )
@@ -1682,7 +1420,7 @@ final class ContactServiceTests: XCTestCase {
         )
         XCTAssertEqual(try reopenedService.publicKeysForRecipientContactIDs([targetContactId]), [secondKey.publicKeyData])
 
-        var unresolvedSnapshot = try reopenedService.currentCompatibilitySnapshot()
+        var unresolvedSnapshot = try reopenedService.currentContactsDomainSnapshot()
         for index in unresolvedSnapshot.keyRecords.indices
             where unresolvedSnapshot.keyRecords[index].contactId == targetContactId {
             unresolvedSnapshot.keyRecords[index].usageState = .additionalActive
@@ -2438,55 +2176,6 @@ final class ContactServiceTests: XCTestCase {
                       "Loading from empty directory should produce no contacts")
     }
 
-    func test_legacyMigration_secretCertificateSourceFailsClosed() async throws {
-        let legacyContactsDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CypherAirSecretLegacyContacts-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: legacyContactsDirectory) }
-        let repository = ContactRepository(contactsDirectory: legacyContactsDirectory)
-        let valid = try engine.generateKey(
-            name: "Stored Valid",
-            email: nil,
-            expirySeconds: nil,
-            profile: .universal
-        )
-        let secretBearing = try engine.generateKey(
-            name: "Stored Secret",
-            email: nil,
-            expirySeconds: nil,
-            profile: .advanced
-        )
-
-        try repository.savePublicKey(valid.publicKeyData, fingerprint: valid.fingerprint)
-        try repository.savePublicKey(secretBearing.certData, fingerprint: secretBearing.fingerprint)
-        try repository.saveVerificationStates([
-            valid.fingerprint: .verified,
-            secretBearing.fingerprint: .verified,
-        ])
-        let harness = try makeContactsProtectedHarness(
-            prefix: "ContactsSecretLegacySource",
-            contactsDirectory: legacyContactsDirectory
-        )
-        defer {
-            try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent())
-        }
-        let service = ContactService(
-            engine: engine,
-            contactsDirectory: legacyContactsDirectory,
-            contactsDomainStore: harness.store
-        )
-
-        let availability = await service.openContactsAfterPostUnlock(
-            gateDecision: authorizedContactsGate(),
-            wrappingRootKey: { harness.wrappingRootKey }
-        )
-
-        XCTAssertEqual(availability, .recoveryNeeded)
-        XCTAssertTrue(service.testContactKeyRecords.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyContactsDirectory.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: repository.quarantineDirectory.path))
-        XCTAssertNil(try harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID])
-    }
-
     // MARK: - Add Contact
 
     func test_addContact_validPublicKey_returnsAdded() throws {
@@ -3075,7 +2764,7 @@ final class ContactServiceTests: XCTestCase {
         )
     }
 
-    func test_protectedDomainCompatibilitySnapshot_usesProtectedRuntimeIdsForImports() throws {
+    func test_contactsDomainSnapshot_usesProtectedRuntimeIdsForImports() throws {
         let generated = try engine.generateKey(
             name: "Projection", email: "projection@example.com",
             expirySeconds: nil, profile: .universal
@@ -3088,7 +2777,7 @@ final class ContactServiceTests: XCTestCase {
             return XCTFail("Expected .added")
         }
 
-        let snapshot = try contactService.currentCompatibilitySnapshot()
+        let snapshot = try contactService.currentContactsDomainSnapshot()
         XCTAssertEqual(snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
         XCTAssertEqual(snapshot.identities.map(\.contactId), [key.contactId])
         XCTAssertFalse(key.contactId.hasPrefix("legacy-contact-"))
@@ -3101,53 +2790,6 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertEqual(record.profile, key.profile)
         XCTAssertEqual(record.primaryUserId, key.primaryUserId)
         XCTAssertEqual(record.manualVerificationState, .unverified)
-    }
-
-    func test_contactsCompatibilityMapperBuildsInitialSnapshotFromLegacyContacts() throws {
-        let mapper = ContactsCompatibilityMapper()
-        let contact = Contact(
-            fingerprint: "dddddddddddddddddddddddddddddddddddddddd",
-            keyVersion: 4,
-            profile: .universal,
-            userId: "Legacy <legacy@example.com>",
-            isRevoked: false,
-            isExpired: false,
-            hasEncryptionSubkey: true,
-            verificationState: .unverified,
-            publicKeyData: Data([0x09]),
-            primaryAlgo: "Ed25519",
-            subkeyAlgo: "X25519"
-        )
-
-        let snapshot = try mapper.makeCompatibilitySnapshot(from: [contact])
-
-        XCTAssertEqual(snapshot.identities.map(\.contactId), ["legacy-contact-\(contact.fingerprint)"])
-        XCTAssertEqual(snapshot.keyRecords.map(\.keyId), ["legacy-key-\(contact.fingerprint)"])
-        XCTAssertEqual(snapshot.keyRecords.first?.fingerprint, contact.fingerprint)
-        XCTAssertEqual(snapshot.keyRecords.first?.manualVerificationState, contact.verificationState)
-        XCTAssertEqual(snapshot.keyRecords.first?.publicKeyData, contact.publicKeyData)
-    }
-
-    func test_protectedDomainCompatibilitySnapshot_marksNonEncryptableLegacyContactHistorical() throws {
-        let mapper = ContactsCompatibilityMapper()
-        let contact = Contact(
-            fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-            keyVersion: 4,
-            profile: .universal,
-            userId: "Historical <history@example.com>",
-            isRevoked: false,
-            isExpired: false,
-            hasEncryptionSubkey: false,
-            verificationState: .verified,
-            publicKeyData: Data([0x01]),
-            primaryAlgo: "Ed25519",
-            subkeyAlgo: nil
-        )
-
-        let snapshot = try mapper.makeCompatibilitySnapshot(from: [contact])
-
-        XCTAssertEqual(snapshot.keyRecords.first?.usageState, .historical)
-        XCTAssertNoThrow(try snapshot.validateContract())
     }
 
     func test_protectedDomainRelockClearsContactsRuntimeState() async throws {
@@ -3177,9 +2819,6 @@ final class ContactServiceTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
             )
-            if let contactsDirectory = container.contactsDirectory {
-                try? FileManager.default.removeItem(at: contactsDirectory.deletingLastPathComponent())
-            }
             if let defaultsSuiteName = container.defaultsSuiteName {
                 UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
             }
@@ -3306,7 +2945,7 @@ final class ContactServiceTests: XCTestCase {
         let saved = try service.saveCertificationArtifact(artifact)
         let duplicate = try service.saveCertificationArtifact(duplicateArtifact)
         let export = try service.exportCertificationArtifact(artifactId: saved.artifactId)
-        let snapshot = try service.currentCompatibilitySnapshot()
+        let snapshot = try service.currentContactsDomainSnapshot()
         let projectedKey = try XCTUnwrap(
             snapshot.keyRecords.first { $0.keyId == keyRecord.keyId }
         )
@@ -3391,7 +3030,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        let before = try service.currentCompatibilitySnapshot()
+        let before = try service.currentContactsDomainSnapshot()
         var snapshot = before
         let staleArtifact = makeValidCertificationArtifact(
             artifactId: "artifact-pr6-stale-target",
@@ -3429,7 +3068,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         let artifact = makeValidCertificationArtifact(
             artifactId: "artifact-pr6-backfilled-target",
             keyRecord: keyRecord,
@@ -3470,7 +3109,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         let oldCreatedAt = Date(timeIntervalSince1970: 1_000)
         let signatureData = Data([0x5a, 0x5b])
         let staleArtifact = makeValidCertificationArtifact(
@@ -3542,7 +3181,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         let lastValidatedAt = Date(timeIntervalSince1970: 10)
         let updatedAt = Date(timeIntervalSince1970: 20)
         let artifact = makeValidCertificationArtifact(
@@ -3593,7 +3232,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         let lastValidatedAt = Date(timeIntervalSince1970: 30)
         let updatedAt = Date(timeIntervalSince1970: 40)
         let artifact = makeValidCertificationArtifact(
@@ -3645,7 +3284,7 @@ final class ContactServiceTests: XCTestCase {
         let keyRecord = try XCTUnwrap(
             service.availableContactKeyRecord(contactId: contactId, preferredKeyId: nil)
         )
-        var snapshot = try service.currentCompatibilitySnapshot()
+        var snapshot = try service.currentContactsDomainSnapshot()
         let artifact = makeValidCertificationArtifact(
             artifactId: "artifact-pr6-recompute-valid-digest",
             keyRecord: keyRecord,
@@ -3696,7 +3335,6 @@ final class ContactServiceTests: XCTestCase {
         )
         let service = ContactService(
             engine: engine,
-            contactsDirectory: directory,
             contactsDomainStore: harness.store
         )
 
@@ -3719,13 +3357,12 @@ final class ContactServiceTests: XCTestCase {
             domainKeyManager: harness.domainKeyManager,
             currentWrappingRootKey: { harness.wrappingRootKey },
             initialSnapshotProvider: {
-                XCTFail("Committed Contacts domain should not rebuild from legacy source.")
+                XCTFail("Committed Contacts domain should not recreate its initial snapshot.")
                 return ContactsDomainSnapshot.empty()
             }
         )
         let service = ContactService(
             engine: engine,
-            contactsDirectory: contactsDirectory,
             contactsDomainStore: store
         )
         let availability = await service.openContactsAfterPostUnlock(
@@ -3885,18 +3522,11 @@ final class ContactServiceTests: XCTestCase {
 
         let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
         let wrappingRootKey = Data(repeating: 0xA4, count: 32)
-        let migrationSource = ContactsLegacyMigrationSource(
-            engine: engine,
-            repository: ContactRepository(contactsDirectory: contactsDirectory)
-        )
         let store = ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey },
-            initialSnapshotProvider: {
-                try migrationSource.makeInitialSnapshot()
-            }
+            currentWrappingRootKey: { wrappingRootKey }
         )
 
         return (
@@ -3993,9 +3623,6 @@ final class ContactServiceTests: XCTestCase {
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let contactsDirectory = container.contactsDirectory {
-            try? FileManager.default.removeItem(at: contactsDirectory.deletingLastPathComponent())
-        }
         if let defaultsSuiteName = container.defaultsSuiteName {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
         }

@@ -231,14 +231,14 @@ Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and
 
 Protected app data is a separate security domain for CypherAir-owned local state outside private-key material. It must not be conflated with the Secure Enclave wrapping path that protects OpenPGP secret key bytes.
 
-Protected app-data scope and per-surface classification live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This security model records the rules and invariants; the inventory records the row-level domains, paths, cleanup-only legacy surfaces, and export/temp exceptions.
+Protected app-data scope and per-surface classification live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This security model records the rules and invariants; the inventory records the row-level domains, paths, current support cutoffs, and export/temp exceptions.
 
 Security invariants for protected app data:
 
 - Protected domains open only after app privacy authentication and the shared ProtectedData authorization path.
 - ProtectedData is separate from the private-key material domain; permanent and pending SE-wrapped private-key bundle rows remain under the Keychain / Secure Enclave private-key-material boundary.
 - `appSessionAuthenticationPolicy` remains the documented early-readable boot-authentication exception.
-- Legacy Contacts files and metadata are migration/quarantine cleanup sources only after protected cutover and must not become a fallback source of truth.
+- Legacy flat Contacts files under `Documents/contacts` are outside the supported app-state model. CypherAir no longer reads, migrates, quarantines, or reset-cleans them.
 - Contacts production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.
 - Manual Contacts verification is a local fingerprint-check assertion and is not OpenPGP certification. Saved certification artifacts stay under app custody until the user explicitly exports or shares a certification signature.
 - Contacts does not provide multi-contact package exchange or social-graph export. Any future complete Contacts backup or device migration must be mandatory encrypted.

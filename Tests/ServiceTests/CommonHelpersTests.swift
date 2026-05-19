@@ -907,45 +907,39 @@ final class CommonHelpersTests: XCTestCase {
         ))
     }
 
-    func test_postUnlockRecoveryWarningAppend_surfacesContactsCleanupWarningAndClears() {
+    func test_postUnlockRecoveryWarningAppend_surfacesCustomWarningAndClears() {
         let suiteName = "com.cypherair.postUnlockContactsWarning.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let config = AppConfiguration(defaults: defaults)
-        let contactsWarning = String(
-            localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
-        )
+        let customWarning = "Retry loading protected data after unlocking again."
 
-        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+        config.appendPostUnlockRecoveryLoadWarning(customWarning)
 
-        XCTAssertEqual(config.postUnlockRecoveryLoadWarning, contactsWarning)
+        XCTAssertEqual(config.postUnlockRecoveryLoadWarning, customWarning)
         config.clearPostUnlockRecoveryLoadWarning()
         XCTAssertNil(config.postUnlockRecoveryLoadWarning)
     }
 
-    func test_postUnlockRecoveryWarningAppend_preservesContactsAndKeyWarningsWithoutDuplicates() throws {
+    func test_postUnlockRecoveryWarningAppend_preservesDistinctWarningsWithoutDuplicates() throws {
         let suiteName = "com.cypherair.postUnlockCombinedWarning.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let config = AppConfiguration(defaults: defaults)
-        let contactsWarning = String(
-            localized: "app.loadWarning.contactsMigration",
-            defaultValue: "Contacts were opened from protected app data, but legacy contact files could not be fully retired. Restart CypherAir X and unlock again to retry cleanup."
-        )
+        let customWarning = "Retry loading protected data after unlocking again."
         let keyWarning = AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
             modifyExpiryOutcome: nil
         )
 
-        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+        config.appendPostUnlockRecoveryLoadWarning(customWarning)
         config.appendPostUnlockRecoveryLoadWarning(keyWarning)
-        config.appendPostUnlockRecoveryLoadWarning(contactsWarning)
+        config.appendPostUnlockRecoveryLoadWarning(customWarning)
 
         let warning = try XCTUnwrap(config.postUnlockRecoveryLoadWarning)
-        XCTAssertTrue(warning.contains(contactsWarning))
+        XCTAssertTrue(warning.contains(customWarning))
         XCTAssertTrue(warning.contains("retry"))
         XCTAssertEqual(warning.components(separatedBy: "\n").count, 2)
     }
@@ -1291,10 +1285,14 @@ final class CommonHelpersTests: XCTestCase {
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
+        let contactsDomainStore = try TestHelpers.makeContactsDomainStore(
+            engine: engine,
+            contactsDirectory: contactDirectory
+        )
         let contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
             certificateAdapter: certificateAdapter,
-            contactsDirectory: contactDirectory
+            contactsDomainStore: contactsDomainStore
         )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
@@ -1329,7 +1327,6 @@ final class CommonHelpersTests: XCTestCase {
         let localDataResetService = LocalDataResetService(
             keychain: mockKC,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            contactsDirectory: contactDirectory,
             defaults: defaults,
             defaultsDomainName: suiteName,
             config: config,
@@ -1371,7 +1368,6 @@ final class CommonHelpersTests: XCTestCase {
             qrService: qrService,
             selfTestService: selfTestService,
             localDataResetService: localDataResetService,
-            contactsDirectory: contactDirectory,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
