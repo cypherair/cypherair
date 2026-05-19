@@ -145,26 +145,27 @@ Purpose: make the protected, person-centered Contacts domain the ordinary runtim
 - **PR 3C: Legacy compatibility isolation**
   - Keep old-install migration and compatibility behavior behind explicit migration or compatibility boundaries.
   - Ensure legacy/quarantine sources are not ordinary fallback state after protected-domain cutover.
-  - Status note: Phase 3 PR3C removed the flat Contacts runtime fallback, legacy availability state, and legacy key-replacement import path. The retained legacy path is first protected-domain creation from active old-install `Documents/contacts`; after cutover, active/quarantine files are cleanup-only.
+  - Status note: Phase 3 PR3C removed the flat Contacts runtime fallback, legacy availability state, and legacy key-replacement import path while temporarily retaining first protected-domain creation from active old-install `Documents/contacts`.
+  - Completion note: PR3D superseded the retained old-install Contacts path by cutting off legacy flat Contacts support entirely.
 
 - **PR 3D: Legacy runtime projection removal**
-  - Remove ordinary runtime dependence on `[Contact]` after current call sites have moved and retained migration paths are isolated.
-  - Keep compatibility tests only where they prove migration or explicitly retained support behavior.
-  - Status note: PR3C closed most PR3D runtime-projection debt for production sources; remaining follow-up should focus on any test-only naming cleanup and eventual migration-support cutoff work.
+  - Completed: production no longer defines or reads flat `Contact`, `ContactRepository`, `ContactsLegacyMigrationSource`, or `ContactsCompatibilityMapper`.
+  - Completed: first protected `contacts` domain creation uses `ContactsDomainSnapshot.empty()`.
+  - Completed: Reset All Local Data no longer manages legacy flat Contacts files; existing unmanaged files may remain on disk but are not treated as app state.
 
 ### Exit Markers
 
 - Normal Contacts runtime uses person-centered protected-domain models as the source of truth.
 - Ordinary Contacts flows do not depend on `[Contact]`.
 - Recipient selection, import/update, merge, tags, verification context, certification artifacts, and certificate-signature screens use current Contacts-domain vocabulary.
-- Legacy flat `Contact` appears only in migration, compatibility adapters, or focused tests with documented purpose.
+- Legacy flat `Contact` does not appear in production sources.
 
 ### Validation
 
-- Prove protected-domain authority, no legacy/quarantine fallback, migration safety, relock cleanup, schema compatibility, and recovery behavior.
+- Prove protected-domain authority, empty first-domain creation, relock cleanup, schema compatibility, and recovery behavior.
 - Preserve search ranking, tag normalization, per-key verification/certification state, recipient selection, and certification artifact behavior.
 - Run Contacts service and ScreenModel tests affected by each PR.
-- Use source-audit checks to track remaining `[Contact]` production dependencies and approved exceptions.
+- Use source-audit checks to block `[Contact]` production dependencies and legacy flat Contacts projection types.
 
 ## Phase 4: UI And ScreenModel Ownership
 

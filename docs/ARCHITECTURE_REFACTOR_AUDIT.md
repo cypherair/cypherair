@@ -47,10 +47,10 @@ domain. The current codebase still has material architecture debt around layer
 boundaries, Contacts runtime shape, and security workflow placement.
 
 The most persistent problem is not one isolated file. It is that generated
-UniFFI interaction still requires a well-maintained adapter boundary, legacy
-compatibility projections remain ordinary runtime vocabulary in Contacts, and
-several App and ScreenModel flows still coordinate Security implementation
-details directly. That makes code harder to reason about because changes to Rust
+UniFFI interaction still requires a well-maintained adapter boundary, Contacts
+protected-domain coordination remains concentrated in the facade, and several
+App and ScreenModel flows still coordinate Security implementation details
+directly. That makes code harder to reason about because changes to Rust
 bindings, Contacts storage, or security authorization rules can ripple into
 ScreenModels, UI, services, and tests.
 
@@ -82,9 +82,11 @@ Representative search snapshot:
   to `ContactDetailScreenModel`, closing the direct view-level mutation gap for
   contact delete, merge, tags, manual verification, preferred key, and key usage.
 - Phase 3 PR3C removed the flat `[Contact]` runtime projection from
-  `ContactService` and `ContactImportMatcher`. Flat `Contact` is now limited to
-  explicit old-install migration input handled by `ContactsLegacyMigrationSource`
-  and `ContactsCompatibilityMapper`.
+  `ContactService` and `ContactImportMatcher`.
+- Phase 3 PR3D cut off legacy flat Contacts support entirely. Production no
+  longer defines or reads flat `Contact`, `ContactRepository`,
+  `ContactsLegacyMigrationSource`, or `ContactsCompatibilityMapper`; first
+  protected `contacts` domain creation starts empty.
 - Several UI routes and ScreenModels still call concrete services or security
   workflows directly, while other routes already use more focused ScreenModels.
 
@@ -110,9 +112,8 @@ Representative search snapshot:
 | Models SwiftUI presentation policy is extracted | Phase 2 PR2C source inspection found no `import SwiftUI` in `Sources/Models`. `ColorTheme` now stays a persisted enum in [Sources/Models/ColorTheme.swift](../Sources/Models/ColorTheme.swift), while display names, tint colors, action colors, and swatches live in [Sources/App/Common/ColorTheme+Presentation.swift](../Sources/App/Common/ColorTheme+Presentation.swift). `SignatureVerification` keeps app-owned verification state in [Sources/Models/SignatureVerification.swift](../Sources/Models/SignatureVerification.swift), while SF Symbols, status colors, and localized status text live in [Sources/App/Common/SignatureVerification+Presentation.swift](../Sources/App/Common/SignatureVerification+Presentation.swift). | The former SwiftUI import and color/icon policy debt is resolved for current production code. The active concern is regression prevention: core Models should not regain SwiftUI presentation dependencies. | Low residual risk, guarded by source-audit tests for SwiftUI imports in Models. |
 | Models localized display text is extracted | Phase 2 PR2C source inspection found no `String(localized:)` or `String.localizedStringWithFormat` in `Sources/Models`. Profile labels, Contacts availability text, contact key-count text, grace-period picker labels, signature identity text, and `CypherAirError` localized descriptions moved to App-layer presentation helpers. `AppConfiguration` keeps only numeric grace-period values, and `IdentityPresentation.displayName(from:)` now uses a stable nonlocalized domain fallback for compatibility. | The former Models-layer localized presentation debt is resolved for current production code. The remaining concern is keeping future display text in App presentation helpers or ScreenModel-prepared display state. | Low residual risk, guarded by source-audit tests for localized presentation calls in Models. |
 | Models Security vocabulary is extracted | Phase 2 PR2D source inspection found no production `Sources/Models` references to `ProtectedDataError`, `ProtectedDataPostUnlockOutcome`, `ProtectedDataFrameworkState`, `ProtectedSettingsStore`, `ProtectedSettingsDomainState`, `LAContext`, Keychain, Secure Enclave, or `AuthenticationManager` code symbols. Contacts validation uses [Sources/Models/Contacts/ContactsDomainValidationError.swift](../Sources/Models/Contacts/ContactsDomainValidationError.swift), while ProtectedData storage files map that app-owned error back to protected-domain envelope failures. Contacts post-auth gate decisions live in [Sources/Services/ContactsPostAuthGateDecision.swift](../Sources/Services/ContactsPostAuthGateDecision.swift), and the protected-settings ordinary-settings adapter lives in [Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift](../Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift). | The former Models-layer ProtectedData/Security vocabulary debt is resolved for current production code. The active concern is regression prevention: app-owned Models should keep expressing validation and availability without storing Security implementation state. | Low residual risk, guarded by source-audit tests for ProtectedData and Security implementation vocabulary in Models. |
-| Legacy `Contact` projection is migration-only | `ContactService` no longer stores `contacts: [Contact]` or rebuilds runtime state from legacy/quarantine files. `ContactImportMatcher` no longer performs legacy flat key-replacement checks. `ContactsLegacyMigrationSource.makeInitialSnapshot()` is the remaining production legacy read path, and `ContactsCompatibilityMapper` maps that flat migration input into `ContactsDomainSnapshot`. | Phase 3 PR3C removed the ordinary runtime projection and legacy runtime fallback while retaining old-install migration from active `Documents/contacts`. | Medium. The retained risk is now migration-source correctness rather than runtime drift between two Contacts representations. |
-| Contacts compatibility mapper is migration-only | Protected imports return summary/key result contracts, and verification/signature flows use `ContactKeyRecord` rather than flat contacts. The mapper no longer converts protected snapshots back into `[Contact]`; it only converts legacy flat contacts into the initial protected-domain snapshot. | The former app-facing `AddContactResult`/flat-contact import contract, legacy availability result, and legacy key-replacement result path are removed. Remaining work is primarily follow-up simplification of test-only helper names and eventual old-install migration cutoff work. | Low to Medium. Compatibility is narrow and guarded by source-audit checks, but retained migration code still needs focused tests. |
-| ContactService owns too many Contacts responsibilities | `ContactService` constructs legacy repository and migration source, opens the protected domain after post-auth, performs imports/updates/removals, exposes summaries and verification contexts, manages search/tag/certification behavior, performs protected snapshot rollback/persistence, and owns relock cleanup. | The facade no longer owns legacy runtime fallback or flat projection state, but it still coordinates migration, availability, mutation, search/tag summaries, certification artifacts, and persistence coordination. | High. The file remains a high-coupling center where migration, runtime, and current product behavior are hard to separate, even after the major runtime-projection cleanup. |
+| Legacy `Contact` projection is removed | `ContactService` no longer stores `contacts: [Contact]` or rebuilds runtime state from legacy/quarantine files. `ContactImportMatcher` no longer performs legacy flat key-replacement checks. PR3D deleted `Contact`, `ContactRepository`, `ContactsLegacyMigrationSource`, and `ContactsCompatibilityMapper`. | Phase 3 PR3D removed the ordinary runtime projection and the retained old-install migration path from active `Documents/contacts`. First protected-domain creation now uses `ContactsDomainSnapshot.empty()`. | Low to Medium. The current risk is regression prevention and protected-domain recovery behavior, guarded by source-audit coverage. |
+| ContactService owns too many Contacts responsibilities | `ContactService` opens the protected domain after post-auth, performs imports/updates/removals, exposes summaries and verification contexts, manages search/tag/certification behavior, performs protected snapshot rollback/persistence, and owns relock cleanup. | The facade no longer owns legacy runtime fallback, flat projection state, or legacy migration cleanup, but it still coordinates availability, mutation, search/tag summaries, certification artifacts, and persistence coordination. | High. The file remains a high-coupling center where current product behavior and protected persistence coordination are hard to separate, even after the major runtime-projection cleanup. |
 | UI / ScreenModel adoption is uneven | Newer flows use ScreenModels, for example `DecryptView` constructs `DecryptScreenModel` in [Sources/App/Decrypt/DecryptView.swift:119](../Sources/App/Decrypt/DecryptView.swift#L119). Phase 3 PR3B moved Contact Detail mutations into [Sources/App/Contacts/ContactDetailScreenModel.swift](../Sources/App/Contacts/ContactDetailScreenModel.swift). Other views still orchestrate services directly: `KeyGenerationView.generate()` calls the captured key-management service in [Sources/App/Keys/KeyGenerationView.swift:196](../Sources/App/Keys/KeyGenerationView.swift#L196), `BackupKeyView.exportBackup()` calls `exportKeyBackupData(...)` in [Sources/App/Keys/BackupKeyView.swift:194](../Sources/App/Keys/BackupKeyView.swift#L194), and `QRDisplayView.generateQR()` calls `qrService.generateQRCode(...)` in [Sources/App/Contacts/QRDisplayView.swift:68](../Sources/App/Contacts/QRDisplayView.swift#L68). | Contact Detail no longer keeps delete, merge, tag, verification, or key-usage mutation handling in the view. Some remaining routes still keep async workflow, service calls, mutation handling, and error presentation inside views for later phases. | Medium. Behavior remains localized, but repeated view-level orchestration makes future workflow changes harder to test consistently. |
 | ScreenModels expose concrete service and workflow infrastructure | `DecryptScreenModel` action types expose `DecryptionService.Phase1Result`, `FileProgressReporter`, and `AppTemporaryArtifact` in [Sources/App/Decrypt/DecryptScreenModel.swift:6](../Sources/App/Decrypt/DecryptScreenModel.swift#L6). Contact certificate ScreenModels now expose app-owned `OpenPGPCertificationKind` and `CertificateSignatureVerification` state in [Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift](../Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift) and [Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift](../Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift). | ScreenModels improve UI separation, but some public state and action signatures still carry service internals and file/progress infrastructure that Phase 4 can narrow. The former generated certification enum exposure is resolved. | Medium. Tests and views remain coupled to implementation details that could otherwise be hidden behind app-owned request/result models. |
 | Services are injected as observable UI environment dependencies | Primary services such as `EncryptionService`, `DecryptionService`, `SigningService`, `KeyManagementService`, `ContactService`, `QRService`, and `SelfTestService` are marked `@Observable`. Views read services from environment, for example [Sources/App/Encrypt/EncryptView.swift:106](../Sources/App/Encrypt/EncryptView.swift#L106), [Sources/App/Contacts/AddContactView.swift:38](../Sources/App/Contacts/AddContactView.swift#L38), and [Sources/App/Settings/SelfTestView.swift:6](../Sources/App/Settings/SelfTestView.swift#L6). | Services act as both business workflow owners and observable UI dependencies. This keeps direct service access natural even on screens that would benefit from ScreenModel-only interaction. | Medium. It blurs service and presentation state ownership and makes it harder to enforce view-thinness consistently. |
@@ -132,8 +133,8 @@ Representative search snapshot:
   implementation types as composition roots. The concern is policy breadth and
   duplicated construction knowledge, not the existence of composition code.
 - The protected Contacts domain exists and is documented as implemented in
-  current-state docs. The audit finding is that ordinary runtime still relies on
-  the legacy `Contact` compatibility projection.
+  current-state docs. The remaining audit finding is high coupling in
+  protected-domain coordination, not a flat `Contact` runtime projection.
 - This audit did not attempt to re-validate cryptographic correctness, AEAD
   hard-fail behavior, zero network access, or release packaging. Those remain
   governed by `SECURITY.md`, `TESTING.md`, and existing tests.
@@ -147,7 +148,7 @@ The audit was prepared from targeted source inspection and searches focused on:
 - direct `PgpEngine` ownership
 - SwiftUI and localized presentation policy inside `Sources/Models`
 - ProtectedData and Security implementation vocabulary inside `Sources/Models`
-- `Contact` / `[Contact]` runtime references
+- `Contact` / `[Contact]` runtime references and legacy flat Contacts projection types
 - direct service calls from views
 - Security and ProtectedData types inside App and ScreenModel code
 
@@ -175,6 +176,10 @@ The 2026-05-18 PR3C refresh checked that production `[Contact]` exceptions are
 limited to explicit migration files, and that production sources contain no
 legacy Contacts runtime vocabulary for legacy availability, compatibility open,
 or key-replacement import outcomes.
+The 2026-05-18 PR3D refresh checked that production `Sources/` have zero
+`[Contact]` exceptions and no `ContactRepository`,
+`ContactsLegacyMigrationSource`, `ContactsCompatibilityMapper`, or production
+`struct Contact` reintroductions.
 
 Because this audit can be updated together with code changes, validation should
 follow the touched surfaces. Documentation-only changes do not require Rust or

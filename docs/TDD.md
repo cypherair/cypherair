@@ -391,10 +391,10 @@ Migration and exception rules:
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
-- Contacts production data remains in the protected `contacts` domain, while legacy Contacts sources remain cleanup/quarantine only after cutover.
+- Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.
 - Contacts schema v1 payloads are migration-only. The v1 decoder preserves identities, key records, tags, and certification artifacts, deliberately drops `recipientLists` without converting list names to tags, validates the resulting schema v2 snapshot, and the store must write back a verified v2 generation before continuing.
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
-- After cutover, legacy sources are cleanup/quarantine only and must not become fallback sources of truth.
+- Unsupported legacy flat Contacts files must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
 - Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed.
 
