@@ -13,9 +13,9 @@ final class KeyDetailScreenModelTests: XCTestCase {
     private var config: AppConfiguration!
     private var defaultsSuiteName: String!
 
-    override func setUp() {
-        super.setUp()
-        stack = TestHelpers.makeServiceStack()
+    override func setUp() async throws {
+        try await super.setUp()
+        stack = await TestHelpers.makeServiceStack()
         defaultsSuiteName = "com.cypherair.tests.keydetailscreen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)

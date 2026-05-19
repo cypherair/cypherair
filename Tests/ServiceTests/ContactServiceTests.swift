@@ -16,10 +16,10 @@ final class ContactServiceTests: XCTestCase {
     private var contactService: ContactService!
     private var tempDir: URL!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         engine = PgpEngine()
-        let result = TestHelpers.makeContactService(engine: engine)
+        let result = await TestHelpers.makeContactService(engine: engine)
         contactService = result.service
         tempDir = result.tempDir
     }
@@ -1554,7 +1554,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNil(service.contactTagSummaries().first { $0.tagId == renamed.tagId })
     }
 
-    func test_tagManagementOperationsRequireProtectedContacts() throws {
+    func test_tagManagementOperationsRequireProtectedContacts() async throws {
         contactService.resetInMemoryStateAfterLocalDataReset()
 
         XCTAssertThrowsError(try contactService.createTag(named: "Locked Tag")) { error in
@@ -1563,7 +1563,7 @@ final class ContactServiceTests: XCTestCase {
             }
         }
 
-        try contactService.openProtectedContactsForTests()
+        try await contactService.openProtectedContactsForTests()
         XCTAssertNoThrow(try contactService.createTag(named: "Protected Tag"))
     }
 
@@ -2170,8 +2170,8 @@ final class ContactServiceTests: XCTestCase {
 
     // MARK: - Load Contacts
 
-    func test_loadContacts_emptyDirectory_returnsEmpty() throws {
-        try contactService.openProtectedContactsForTests()
+    func test_loadContacts_emptyDirectory_returnsEmpty() async throws {
+        try await contactService.openProtectedContactsForTests()
         XCTAssertTrue(contactService.testContactKeyRecords.isEmpty,
                       "Loading from empty directory should produce no contacts")
     }
@@ -2305,7 +2305,7 @@ final class ContactServiceTests: XCTestCase {
                        "Duplicate should not increase contact count")
     }
 
-    func test_addContact_sameFingerprintMaterialUpdate_returnsUpdated() throws {
+    func test_addContact_sameFingerprintMaterialUpdate_returnsUpdated() async throws {
         let generated = try engine.generateKey(
             name: "Update", email: "update@example.com",
             expirySeconds: nil, profile: .universal
@@ -2335,7 +2335,7 @@ final class ContactServiceTests: XCTestCase {
         ))
 
         let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
-        try restarted.openProtectedContactsForTests()
+        try await restarted.openProtectedContactsForTests()
         XCTAssertEqual(restarted.testContactKeyRecords.count, 1)
         XCTAssertEqual(
             try engine.parseKeyInfo(keyData: restarted.testContactKeyRecords[0].publicKeyData).expiryTimestamp,
@@ -2343,7 +2343,7 @@ final class ContactServiceTests: XCTestCase {
         )
     }
 
-    func test_addContact_sameFingerprintMaterialUpdate_preservesUnverifiedState() throws {
+    func test_addContact_sameFingerprintMaterialUpdate_preservesUnverifiedState() async throws {
         let generated = try engine.generateKey(
             name: "Update Unverified", email: "update-unverified@example.com",
             expirySeconds: nil, profile: .universal
@@ -2369,7 +2369,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(updatedKey.isVerified)
 
         let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
-        try restarted.openProtectedContactsForTests()
+        try await restarted.openProtectedContactsForTests()
         XCTAssertFalse(restarted.testContactKeyRecords[0].manualVerificationState == .verified)
     }
 
@@ -2456,7 +2456,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertNotNil(contactService.availableContactKeyRecord(fingerprint: conflictingKey.fingerprint))
     }
 
-    func test_addContact_sameFingerprintRevocationUpdate_profileA_refreshesRevocationState() throws {
+    func test_addContact_sameFingerprintRevocationUpdate_profileA_refreshesRevocationState() async throws {
         let base = try loadFixture("merge_revocation_profile_a_base")
         let update = try loadFixture("merge_revocation_profile_a_update")
 
@@ -2471,7 +2471,7 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(updatedKey.canEncryptTo)
 
         let restarted = ContactService(engine: engine, contactsDirectory: tempDir)
-        try restarted.openProtectedContactsForTests()
+        try await restarted.openProtectedContactsForTests()
         XCTAssertTrue(restarted.testContactKeyRecords[0].isRevoked)
     }
 
@@ -2665,7 +2665,7 @@ final class ContactServiceTests: XCTestCase {
 
     // MARK: - M5: Contact Persistence Across Restart
 
-    func test_contactPersistence_survivesServiceRestart() throws {
+    func test_contactPersistence_survivesServiceRestart() async throws {
         let generated = try engine.generateKey(
             name: "Persist Test", email: "persist@example.com",
             expirySeconds: nil, profile: .universal
@@ -2680,14 +2680,14 @@ final class ContactServiceTests: XCTestCase {
 
         // Create a NEW service instance pointing to the same temp directory
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
-        try newService.openProtectedContactsForTests()
+        try await newService.openProtectedContactsForTests()
 
         XCTAssertEqual(newService.testContactKeyRecords.count, 1, "Contact should survive service restart")
         XCTAssertEqual(newService.testContactKeyRecords.first?.fingerprint, originalFingerprint,
                        "Fingerprint should match after restart")
     }
 
-    func test_addContact_unverified_persistsAcrossRestart() throws {
+    func test_addContact_unverified_persistsAcrossRestart() async throws {
         let generated = try engine.generateKey(
             name: "Unverified Persist", email: "pending@example.com",
             expirySeconds: nil, profile: .universal
@@ -2703,14 +2703,14 @@ final class ContactServiceTests: XCTestCase {
         XCTAssertFalse(key.isVerified)
 
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
-        try newService.openProtectedContactsForTests()
+        try await newService.openProtectedContactsForTests()
 
         XCTAssertEqual(newService.testContactKeyRecords.count, 1)
         XCTAssertEqual(newService.testContactKeyRecords.first?.fingerprint, key.fingerprint)
         XCTAssertNotEqual(newService.testContactKeyRecords.first?.manualVerificationState, .verified)
     }
 
-    func test_setVerificationState_promotesContactToVerified_andPersists() throws {
+    func test_setVerificationState_promotesContactToVerified_andPersists() async throws {
         let generated = try engine.generateKey(
             name: "Manual Verify", email: "manual@example.com",
             expirySeconds: nil, profile: .universal
@@ -2731,7 +2731,7 @@ final class ContactServiceTests: XCTestCase {
         )
 
         let newService = ContactService(engine: engine, contactsDirectory: tempDir)
-        try newService.openProtectedContactsForTests()
+        try await newService.openProtectedContactsForTests()
         XCTAssertEqual(
             newService.availableContactKeyRecord(fingerprint: key.fingerprint)?.manualVerificationState,
             .verified
