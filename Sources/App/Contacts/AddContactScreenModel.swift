@@ -1,6 +1,4 @@
 import Foundation
-import PhotosUI
-import SwiftUI
 
 struct AddContactScreenHostActions {
     let presentImportConfirmation: @MainActor (ImportConfirmationRequest) -> Void
@@ -13,7 +11,7 @@ struct AddContactScreenHostActions {
 final class AddContactScreenModel {
     typealias InspectKeyDataAction = @MainActor (Data) throws -> PublicKeyImportInspection
     typealias LoadFileAction = @MainActor (URL) throws -> LoadedPublicKeyFile
-    typealias QRPhotoKeyDataLoader = @MainActor (PhotosPickerItem) async throws -> Data
+    typealias QRPhotoKeyDataLoader = @MainActor (AddContactQRPhotoSelection) async throws -> Data
 
     private(set) var configuration: AddContactView.Configuration
 
@@ -58,8 +56,8 @@ final class AddContactScreenModel {
                 )
             )
         }
-        self.qrPhotoKeyDataLoader = qrPhotoKeyDataLoader ?? { item in
-            try await importLoader.loadKeyDataFromQRPhoto(item)
+        self.qrPhotoKeyDataLoader = qrPhotoKeyDataLoader ?? { selection in
+            try await selection.loadKeyData()
         }
     }
 
@@ -90,6 +88,7 @@ final class AddContactScreenModel {
 
     func handleDisappear() {
         fileImportRequestGate.invalidate()
+        cancelQRProcessing()
     }
 
     func updateConfiguration(_ configuration: AddContactView.Configuration) {
@@ -152,12 +151,13 @@ final class AddContactScreenModel {
         }
     }
 
-    func processSelectedQRPhoto(_ item: PhotosPickerItem) {
+    func processSelectedQRPhoto(_ selection: AddContactQRPhotoSelection) {
         qrProcessingTask?.cancel()
         qrProcessingGeneration &+= 1
         let generation = qrProcessingGeneration
+        let loadKeyData = qrPhotoKeyDataLoader
         isProcessingQR = true
-        qrProcessingTask = Task { @MainActor [weak self, generation, item] in
+        qrProcessingTask = Task { @MainActor [weak self, generation, selection, loadKeyData] in
             defer {
                 if let self, generation == self.qrProcessingGeneration {
                     self.isProcessingQR = false
@@ -166,12 +166,9 @@ final class AddContactScreenModel {
             }
 
             do {
-                guard let self else {
-                    return
-                }
-                let publicKeyData = try await self.qrPhotoKeyDataLoader(item)
+                let publicKeyData = try await loadKeyData(selection)
                 try Task.checkCancellation()
-                guard generation == self.qrProcessingGeneration else {
+                guard let self, generation == self.qrProcessingGeneration else {
                     return
                 }
                 if let armoredString = String(data: publicKeyData, encoding: .utf8) {
@@ -235,11 +232,8 @@ final class AddContactScreenModel {
     }
 
     func clearTransientInput() {
-        qrProcessingTask?.cancel()
-        qrProcessingGeneration &+= 1
+        cancelQRProcessing()
         fileImportRequestGate.invalidate()
-        qrProcessingTask = nil
-        isProcessingQR = false
         armoredText = ""
         clearImportedKeyData()
         showFileImporter = false
@@ -253,6 +247,13 @@ final class AddContactScreenModel {
         }
         importedKeyData = nil
         importedFileName = nil
+    }
+
+    private func cancelQRProcessing() {
+        qrProcessingTask?.cancel()
+        qrProcessingGeneration &+= 1
+        qrProcessingTask = nil
+        isProcessingQR = false
     }
 
     private static func shouldIgnore(_ error: Error) -> Bool {

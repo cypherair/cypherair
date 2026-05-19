@@ -113,11 +113,12 @@ Safety is enforced by narrow host boundaries:
 
 | Family | Swift service owner | Current app owner | Status |
 |--------|---------------------|-------------------|--------|
-| Certificate Merge / Update | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Shipped |
-| Revocation Construction | `KeyManagementService` | `KeyDetailScreenModel`, `SelectiveRevocationScreenModel`, `KeyDetailView`, `SelectiveRevocationView` | Shipped |
+| Certificate Merge / Update | `ContactService` | `AddContactScreenModel`, `ContactImportWorkflow`, `ImportConfirmationCoordinator`, `IncomingURLImportCoordinator`, URL import handoff in `CypherAirApp` | Shipped |
+| Contact QR Encode / Decode | `QRService` | `QRDisplayScreenModel`, `AddContactScreenModel` through `PublicKeyImportLoader`, `IncomingURLImportCoordinator` | Shipped |
+| Revocation Construction | `KeyManagementService` | `KeyDetailScreenModel`, `SelectiveRevocationScreenModel` | Shipped |
 | Password / SKESK Symmetric Messages | `PasswordMessageService` | None | Service-only |
-| Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped |
-| Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
+| Certification And Binding Verification | `CertificateSignatureService` | `ContactDetailScreenModel`, `ContactCertificateSignaturesScreenModel`, `ContactCertificationDetailsScreenModel` | Shipped |
+| Richer Signature Results | `SigningService` and `DecryptionService` | `VerifyScreenModel`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped |
 
 Current app-surface workflows call the owning Swift service rather than `PgpEngine`
 directly. Key-management helpers avoid direct engine ownership through

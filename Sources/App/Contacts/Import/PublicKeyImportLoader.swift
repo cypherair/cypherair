@@ -30,6 +30,12 @@ struct PublicKeyImportLoader {
         try inspect(keyData: qrService.parseImportURL(url))
     }
 
+    func makeQRPhotoSelection(from item: PhotosPickerItem) -> AddContactQRPhotoSelection {
+        AddContactQRPhotoSelection(identifier: item.itemIdentifier) { [self, item] in
+            try await loadKeyDataFromQRPhoto(item)
+        }
+    }
+
     func loadKeyDataFromQRPhoto(_ item: PhotosPickerItem) async throws -> Data {
         guard let data = try await item.loadTransferable(type: Data.self) else {
             throw CypherAirError.invalidQRCode

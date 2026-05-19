@@ -58,6 +58,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment)
     }
 
+    func test_screenModelsDoNotExposePhotosUIPickerTypes() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.screenModelPhotosUIContainment)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -246,6 +250,52 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .isEmpty
         )
 
+        let screenModelPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/NewScreenModel.swift",
+            contents: """
+            import PhotosUI
+            final class NewScreenModel {
+                func run(_ item: PhotosPickerItem) {}
+            }
+            """
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [screenModelPhotosUISource])
+                .map(\.path),
+            [screenModelPhotosUISource.path]
+        )
+
+        let loaderPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/Import/PublicKeyImportLoader.swift",
+            contents: """
+            import PhotosUI
+            struct PublicKeyImportLoader {
+                func load(_ item: PhotosPickerItem) {}
+            }
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [loaderPhotosUISource])
+                .isEmpty
+        )
+
+        let viewPhotosUISource = AuditedSource(
+            path: "Sources/App/Contacts/AddContactView.swift",
+            contents: """
+            import PhotosUI
+            struct AddContactView {
+                let selectedPhotoItem: PhotosPickerItem?
+            }
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment
+                .violations(in: [viewPhotosUISource])
+                .isEmpty
+        )
+
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
@@ -309,6 +359,18 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.modelsSecurityImplementationVocabulary.violations(in: [modelsSource]).isEmpty
+        )
+
+        let screenModelSource = AuditedSource(
+            path: "Sources/App/Contacts/NewScreenModel.swift",
+            contents: """
+            // PhotosPickerItem and import PhotosUI should be ignored in comments.
+            let message = "PhotosPickerItem import PhotosUI"
+            final class NewScreenModel {}
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPhotosUIContainment.violations(in: [screenModelSource]).isEmpty
         )
     }
 
@@ -725,6 +787,18 @@ private enum ArchitectureSourceAuditRules {
             isContactsViewPath(path)
         },
         stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let screenModelPhotosUIContainment = ArchitectureSourceAuditRule(
+        name: "ScreenModel PhotosUI containment",
+        failureSummary: "ScreenModels should expose app-owned selection values instead of PhotosUI picker types.",
+        pattern: #"^\s*import\s+PhotosUI\b|\bPhotosPickerItem\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/App/") && path.hasSuffix("ScreenModel.swift")
+        },
+        stripsCommentsAndStrings: true,
+        expressionOptions: [.anchorsMatchLines],
         temporaryExceptions: temporaryExceptions([])
     )
 

@@ -93,6 +93,7 @@
 				App/Common/SignatureIdentityCardView.swift,
 				"App/Common/SignatureVerification+Presentation.swift",
 				App/Common/TextImport/ImportedTextInputState.swift,
+				App/Contacts/AddContactQRPhotoSelection.swift,
 				App/Contacts/AddContactScreenModel.swift,
 				App/Contacts/AddContactView.swift,
 				App/Contacts/ContactCertificateSignaturesScreenModel.swift,
