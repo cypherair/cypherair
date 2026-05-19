@@ -346,5 +346,8 @@ private struct KeyDetailScreenHostView: View {
         .onAppear {
             model.prepareIfNeeded()
         }
+        .onDisappear {
+            model.handleDisappear()
+        }
     }
 }

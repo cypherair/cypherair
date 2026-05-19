@@ -7,41 +7,57 @@ struct ImportKeyView: View {
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
     @Environment(\.dismiss) private var dismiss
 
-    @State private var armoredText = ""
-    @State private var passphrase = ""
-    @State private var isImporting = false
-    @State private var error: CypherAirError?
-    @State private var showError = false
-    @State private var showFileImporter = false
-    /// Raw key data for binary .gpg/.pgp files that cannot be represented as a String.
-    @State private var importedKeyData: Data?
-    @State private var importedFileName: String?
-    @State private var importTask: Task<Void, Never>?
-    @State private var importToken: UInt64 = 0
-    @State private var fileImportRequestGate = FileImportRequestGate()
+    var body: some View {
+        ImportKeyScreenHostView(
+            keyManagement: keyManagement,
+            appSessionOrchestrator: appSessionOrchestrator,
+            dismissAction: { dismiss() }
+        )
+    }
+}
+
+private struct ImportKeyScreenHostView: View {
+    let appSessionOrchestrator: AppSessionOrchestrator
+
+    @State private var model: ImportKeyScreenModel
+
+    init(
+        keyManagement: KeyManagementService,
+        appSessionOrchestrator: AppSessionOrchestrator,
+        dismissAction: @escaping @MainActor () -> Void
+    ) {
+        self.appSessionOrchestrator = appSessionOrchestrator
+        _model = State(
+            initialValue: ImportKeyScreenModel(
+                keyManagement: keyManagement,
+                dismissAction: dismissAction
+            )
+        )
+    }
 
     var body: some View {
-        let fileImportRequestToken = fileImportRequestGate.currentToken
+        @Bindable var model = model
+        let fileImportRequestToken = model.fileImportRequestToken
 
         Form {
             Section {
-                if let fileName = importedFileName, importedKeyData != nil {
+                if let fileName = model.importedFileName, model.importedKeyData != nil {
                     CypherImportedFileRow(
                         fileName: fileName,
                         clearAccessibilityLabel: String(localized: "import.clearFile", defaultValue: "Clear file")
                     ) {
-                        clearImportedKeyData()
+                        model.clearImportedFile()
                     }
                 } else {
                     CypherMultilineTextInput(
-                        text: $armoredText,
+                        text: $model.armoredText,
                         mode: .machineText
                     )
-                        .frame(
-                            minHeight: editorHeightRange.min,
-                            idealHeight: editorHeightRange.ideal,
-                            maxHeight: editorHeightRange.max
-                        )
+                    .frame(
+                        minHeight: editorHeightRange.min,
+                        idealHeight: editorHeightRange.ideal,
+                        maxHeight: editorHeightRange.max
+                    )
                 }
             } header: {
                 Text(String(localized: "import.paste.header", defaultValue: "Paste armored private key"))
@@ -49,7 +65,7 @@ struct ImportKeyView: View {
 
             Section {
                 Button {
-                    requestFileImport()
+                    model.requestFileImport()
                 } label: {
                     Label(
                         String(localized: "import.fromFile", defaultValue: "Import from File"),
@@ -63,7 +79,7 @@ struct ImportKeyView: View {
             Section {
                 CypherSecureTextField(
                     String(localized: "import.passphrase", defaultValue: "Passphrase"),
-                    text: $passphrase
+                    text: $model.passphrase
                 )
             } header: {
                 Text(String(localized: "import.passphrase.header", defaultValue: "Key Passphrase"))
@@ -71,9 +87,9 @@ struct ImportKeyView: View {
 
             Section {
                 Button {
-                    importKey()
+                    model.importKey()
                 } label: {
-                    if isImporting {
+                    if model.isImporting {
                         ProgressView()
                             .cypherPrimaryActionLabelFrame()
                     } else {
@@ -82,7 +98,7 @@ struct ImportKeyView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled((armoredText.isEmpty && importedKeyData == nil) || passphrase.isEmpty || isImporting)
+                .disabled(model.importButtonDisabled)
             }
         }
         .scrollDismissesKeyboardInteractivelyIfAvailable()
@@ -93,15 +109,20 @@ struct ImportKeyView: View {
         .navigationTitle(String(localized: "import.title", defaultValue: "Import Key"))
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
         } message: { err in
             Text(err.localizedDescription)
         }
         .fileImporter(
-            isPresented: $showFileImporter,
+            isPresented: $model.showFileImporter,
             allowedContentTypes: [
                 UTType(filenameExtension: "asc") ?? .plainText,
                 UTType(filenameExtension: "gpg") ?? .data,
@@ -110,13 +131,13 @@ struct ImportKeyView: View {
             ],
             allowsMultipleSelection: false
         ) { result in
-            handleFileImporterResult(result, token: fileImportRequestToken)
+            model.handleFileImporterResult(result, token: fileImportRequestToken)
         }
         .onDisappear {
-            cancelImportAndClearTransientInput()
+            model.handleDisappear()
         }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
-            cancelImportAndClearTransientInput()
+            model.handleContentClearGenerationChange()
         }
     }
 
@@ -126,129 +147,5 @@ struct ImportKeyView: View {
         #else
         return (120, 170, 240)
         #endif
-    }
-
-    private func requestFileImport() {
-        fileImportRequestGate.begin()
-        showFileImporter = true
-    }
-
-    private func handleFileImporterResult(
-        _ result: Result<[URL], Error>,
-        token: FileImportRequestGate.Token?
-    ) {
-        guard fileImportRequestGate.consumeIfCurrent(token) else {
-            return
-        }
-
-        if case .success(let urls) = result, let url = urls.first {
-            loadFileContents(from: url)
-        }
-    }
-
-    private func loadFileContents(from url: URL) {
-        do {
-            let data = try SecurityScopedFileAccess.withAccess(
-                to: url,
-                failure: .invalidKeyData(
-                    reason: String(localized: "import.file.readFailed", defaultValue: "Could not read key file")
-                )
-            ) {
-                try Data(contentsOf: url)
-            }
-
-            if let text = String(data: data, encoding: .utf8) {
-                clearImportedKeyData()
-                armoredText = text
-            } else {
-                // Binary .gpg/.pgp key — store raw Data, bypass String conversion
-                clearImportedKeyData()
-                importedKeyData = data
-                importedFileName = url.lastPathComponent
-                armoredText = ""
-            }
-        } catch {
-            self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-            showError = true
-        }
-    }
-
-    private func importKey() {
-        importTask?.cancel()
-        importToken &+= 1
-        let token = importToken
-        isImporting = true
-        let service = keyManagement
-        let importedKeyDataSnapshot = importedKeyData
-        let armoredTextSnapshot = armoredText
-        let pass = passphrase
-
-        importTask = Task { @MainActor in
-            defer {
-                if token == importToken {
-                    isImporting = false
-                    importTask = nil
-                }
-            }
-
-            do {
-                var data = importedKeyDataSnapshot ?? Data(armoredTextSnapshot.utf8)
-                defer {
-                    data.resetBytes(in: 0..<data.count)
-                }
-                _ = try await service.importKey(
-                    armoredData: data,
-                    passphrase: pass
-                )
-                try Task.checkCancellation()
-                guard token == importToken else {
-                    return
-                }
-                // Clear sensitive state before dismiss.
-                // Note: Swift String cannot be reliably zeroized (SECURITY.md §7.1),
-                // but we minimize lifetime by clearing references immediately.
-                clearTransientInput()
-                dismiss()
-            } catch {
-                guard !Self.shouldIgnore(error), token == importToken else {
-                    return
-                }
-                self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
-                showError = true
-            }
-        }
-    }
-
-    private func cancelImportAndClearTransientInput() {
-        importTask?.cancel()
-        importToken &+= 1
-        importTask = nil
-        isImporting = false
-        clearTransientInput()
-    }
-
-    private func clearTransientInput() {
-        armoredText = ""
-        passphrase = ""
-        showFileImporter = false
-        fileImportRequestGate.invalidate()
-        clearImportedKeyData()
-    }
-
-    private func clearImportedKeyData() {
-        importedKeyData?.resetBytes(in: 0..<(importedKeyData?.count ?? 0))
-        importedKeyData = nil
-        importedFileName = nil
-    }
-
-    private static func shouldIgnore(_ error: Error) -> Bool {
-        if error is CancellationError {
-            return true
-        }
-        if let cypherAirError = error as? CypherAirError,
-           case .operationCancelled = cypherAirError {
-            return true
-        }
-        return false
     }
 }

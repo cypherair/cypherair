@@ -30,6 +30,8 @@ final class KeyDetailScreenModel {
     private let clipboardCopyAction: ClipboardCopyAction
 
     private var hasPrepared = false
+    private var revocationExportTask: Task<Void, Never>?
+    private var revocationExportGeneration: UInt64 = 0
 
     var armoredPublicKey: Data?
     var showDeleteConfirmation = false
@@ -138,27 +140,42 @@ final class KeyDetailScreenModel {
             return
         }
 
+        revocationExportTask?.cancel()
+        revocationExportGeneration &+= 1
+        let generation = revocationExportGeneration
         isPreparingRevocationExport = true
 
-        Task {
+        revocationExportTask = Task { [weak self, generation] in
+            guard let self else { return }
             defer {
-                isPreparingRevocationExport = false
+                if generation == self.revocationExportGeneration {
+                    self.isPreparingRevocationExport = false
+                    self.revocationExportTask = nil
+                }
             }
 
             do {
-                let exported = try await revocationExportAction(fingerprint)
-                if try configuration.outputInterceptionPolicy.interceptDataExport?(
+                let exported = try await self.revocationExportAction(self.fingerprint)
+                try Task.checkCancellation()
+                guard generation == self.revocationExportGeneration else {
+                    return
+                }
+                if try self.configuration.outputInterceptionPolicy.interceptDataExport?(
                     exported,
-                    exportFilename(for: .revocation),
+                    self.exportFilename(for: .revocation),
                     .revocation
                 ) != true {
-                    try exportController.prepareDataExport(
+                    try self.exportController.prepareDataExport(
                         exported,
-                        suggestedFilename: exportFilename(for: .revocation)
+                        suggestedFilename: self.exportFilename(for: .revocation)
                     )
                 }
             } catch {
-                presentMappedError(error)
+                guard !Self.shouldIgnore(error),
+                      generation == self.revocationExportGeneration else {
+                    return
+                }
+                self.presentMappedError(error)
             }
         }
     }
@@ -211,6 +228,14 @@ final class KeyDetailScreenModel {
         presentMappedError(error)
     }
 
+    func handleDisappear() {
+        revocationExportGeneration &+= 1
+        revocationExportTask?.cancel()
+        revocationExportTask = nil
+        isPreparingRevocationExport = false
+        exportController.finish()
+    }
+
     private func makeModifyExpiryRequest() -> ModifyExpiryRequest {
         ModifyExpiryRequest(
             fingerprint: fingerprint,
@@ -232,6 +257,17 @@ final class KeyDetailScreenModel {
     private func presentMappedError(_ error: Error) {
         self.error = CypherAirError.from(error) { .keychainError($0) }
         showError = true
+    }
+
+    private static func shouldIgnore(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let cypherAirError = error as? CypherAirError,
+           case .operationCancelled = cypherAirError {
+            return true
+        }
+        return false
     }
 
     private func exportFilename(for exportType: ExportType) -> String {

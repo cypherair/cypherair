@@ -24,23 +24,45 @@ struct ModifyExpirySheetView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(\.dismiss) private var dismiss
 
-    @State private var newExpiryDate: Date
-    @State private var isModifyingExpiry = false
-    @State private var error: CypherAirError?
-    @State private var showError = false
-
     init(request: ModifyExpiryRequest) {
         self.request = request
-        _newExpiryDate = State(initialValue: request.initialDate)
     }
 
     var body: some View {
+        ModifyExpiryScreenHostView(
+            request: request,
+            keyManagement: keyManagement,
+            dismissAction: { dismiss() }
+        )
+    }
+}
+
+private struct ModifyExpiryScreenHostView: View {
+    @State private var model: ModifyExpiryScreenModel
+
+    init(
+        request: ModifyExpiryRequest,
+        keyManagement: KeyManagementService,
+        dismissAction: @escaping @MainActor () -> Void
+    ) {
+        _model = State(
+            initialValue: ModifyExpiryScreenModel(
+                request: request,
+                keyManagement: keyManagement,
+                dismissAction: dismissAction
+            )
+        )
+    }
+
+    var body: some View {
+        @Bindable var model = model
+
         Form {
             Section {
                 DatePicker(
                     String(localized: "keydetail.expiry.newDate", defaultValue: "New Expiry Date"),
-                    selection: $newExpiryDate,
-                    in: (Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())...(Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()),
+                    selection: $model.newExpiryDate,
+                    in: expiryDateRange,
                     displayedComponents: .date
                 )
             } header: {
@@ -49,7 +71,7 @@ struct ModifyExpirySheetView: View {
 
             Section {
                 Button {
-                    performModifyExpiry(seconds: nil)
+                    model.removeExpiry()
                 } label: {
                     Label(
                         String(localized: "keydetail.expiry.removeExpiry", defaultValue: "Remove Expiry (Never Expire)"),
@@ -68,54 +90,49 @@ struct ModifyExpirySheetView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button(String(localized: "keydetail.expiry.cancel", defaultValue: "Cancel")) {
+                    model.handleDisappear()
                     dismiss()
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button(String(localized: "keydetail.expiry.save", defaultValue: "Save")) {
-                    let seconds = UInt64(max(0, newExpiryDate.timeIntervalSinceNow))
-                    performModifyExpiry(seconds: seconds)
+                    model.saveSelectedExpiryDate()
                 }
                 .accessibilityIdentifier("modifyexpiry.save")
-                .disabled(isModifyingExpiry)
+                .disabled(model.isModifyingExpiry)
             }
         }
         .overlay {
-            if isModifyingExpiry {
+            if model.isModifyingExpiry {
                 ProgressView()
             }
         }
-        .disabled(isModifyingExpiry)
+        .disabled(model.isModifyingExpiry)
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
-            isPresented: $showError,
-            presenting: error
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
         ) { _ in
-            Button(String(localized: "error.ok", defaultValue: "OK")) {}
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
         } message: { err in
             Text(err.localizedDescription)
         }
         .authenticationShieldHost()
-    }
-
-    private func performModifyExpiry(seconds: UInt64?) {
-        isModifyingExpiry = true
-        let service = keyManagement
-        let fingerprint = request.fingerprint
-
-        Task {
-            do {
-                _ = try await service.modifyExpiry(
-                    fingerprint: fingerprint,
-                    newExpirySeconds: seconds
-                )
-                request.onComplete()
-                dismiss()
-            } catch {
-                self.error = CypherAirError.from(error) { .keychainError($0) }
-                showError = true
-            }
-            isModifyingExpiry = false
+        .onDisappear {
+            model.handleDisappear()
         }
     }
+
+    private var expiryDateRange: ClosedRange<Date> {
+        let minimum = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        let maximum = Calendar.current.date(byAdding: .year, value: 10, to: Date()) ?? Date()
+        return minimum...maximum
+    }
+
+    @Environment(\.dismiss) private var dismiss
 }
