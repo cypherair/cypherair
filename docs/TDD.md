@@ -131,7 +131,7 @@ intentionally tracks the branch so local branch status/docs updates are not
 left behind; `pgp-mobile/Cargo.lock` records the resolved git commit for
 repeatable builds.
 
-The current deployment baseline for the app targets is `iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+`.
+The current deployment baseline for the app targets is `iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+`.
 
 ---
 
@@ -196,7 +196,7 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 ### 2.5 Build Pipeline
 
 1. `cargo +stable build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim` refreshes ordinary stable `arm64` archives when you only need target-specific Rust outputs
-2. `./build-xcframework.sh --release` refreshes stable `arm64` and patched `arm64e` release archives, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
+2. `./build-xcframework.sh --release` is the packaging entrypoint; for local app-side validation, run it as `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` so it refreshes stable `arm64` and patched `arm64e` release archives from the latest attested stage1, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 
@@ -402,7 +402,7 @@ Migration and exception rules:
 
 ## 7. UI Framework
 
-SwiftUI (iOS 26.4+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
+SwiftUI (iOS 26.5+). UIKit: UIActivityViewController, UIDocumentPickerViewController, PHPickerViewController, beginBackgroundTask.
 
 ---
 
@@ -410,7 +410,7 @@ SwiftUI (iOS 26.4+). UIKit: UIActivityViewController, UIDocumentPickerViewContro
 
 ### 8.1 Overview
 
-Memory Integrity Enforcement is Apple's hardware-level memory safety system, built right into Apple hardware and software in all models of iPhone 17 and iPhone Air (A19/A19 Pro chips). It combines Enhanced Memory Tagging Extension (EMTE), secure typed memory allocators, and Tag Confidentiality Enforcement to detect and block memory corruption (buffer overflows, use-after-free) in real time.
+Memory Integrity Enforcement is Apple's hardware-level memory safety system, built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It combines Enhanced Memory Tagging Extension (EMTE), secure typed memory allocators, and Tag Confidentiality Enforcement to detect and block memory corruption (buffer overflows, use-after-free) in real time.
 
 ### 8.2 Why MIE Matters for CypherAir
 
@@ -430,14 +430,14 @@ Xcode manages Enhanced Security via the `ENABLE_ENHANCED_SECURITY = YES` build s
 
 ### 8.4 Compatibility
 
-- **All models of iPhone 17 and iPhone Air (A19/A19 Pro):** Full MIE protection active.
-- **Older devices (A15, A16, A17, A18):** App runs normally. Enhanced Security capability is ignored. No hardware memory tagging.
+- **Supported A19/A19 Pro-or-newer devices, including current iPhone 17 and iPhone Air models:** Full MIE protection active.
+- **Older unsupported devices:** App runs normally. Enhanced Security capability is ignored. No hardware memory tagging.
 
 The Enhanced Security capability is additive and does not affect compatibility with older devices.
 
 ### 8.5 Testing
 
-- Run the App on an A19 device with Hardware Memory Tagging enabled. Perform full workflow (both profiles: key gen, encrypt/decrypt, sign/verify).
+- Run the App on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enabled. Perform full workflow (both profiles: key gen, encrypt/decrypt, sign/verify).
 - Verify no tag mismatch terminations occur (check Console.app and Xcode crash logs).
 - Test under Xcode Instruments "Memory Tag Violations" instrument if available.
 

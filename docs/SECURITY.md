@@ -300,16 +300,16 @@ This prevents iOS Jetsam from killing the app. The 75% threshold provides a safe
 
 ### What It Protects
 
-MIE is built right into Apple hardware and software in all models of iPhone 17 and iPhone Air (A19/A19 Pro). It provides hardware-level defense against buffer overflows and use-after-free in all C/C++ code, including vendored OpenSSL. The system allocator assigns 4-bit tags to heap allocations. Every memory access is checked by hardware in real time. Tag mismatch = immediate process termination.
+MIE is built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It provides hardware-level defense against buffer overflows and use-after-free in all C/C++ code, including vendored OpenSSL. The system allocator assigns 4-bit tags to heap allocations. Every memory access is checked by hardware in real time. Tag mismatch = immediate process termination.
 
 ### Enablement
 
 Enhanced Security is enabled via Signing & Capabilities → Add Capability → Enhanced Security → enable Hardware Memory Tagging. When this capability is added, Xcode writes the required entitlement keys into `CypherAir.entitlements`:
 
 - `com.apple.security.hardened-process` → `true`
-- `com.apple.security.hardened-process.enhanced-security-version` → `1`
+- `com.apple.security.hardened-process.enhanced-security-version-string` → `1`
 - `com.apple.security.hardened-process.hardened-heap` → `true`
-- `com.apple.security.hardened-process.platform-restrictions` → `2`
+- `com.apple.security.hardened-process.platform-restrictions-string` → `2`
 - `com.apple.security.hardened-process.dyld-ro` → `true`
 - `com.apple.security.hardened-process.checked-allocations` → `true` (Hardware Memory Tagging)
 - `com.apple.security.hardened-process.checked-allocations.enable-pure-data` → `true`
@@ -321,7 +321,7 @@ Additionally, verify `ENABLE_ENHANCED_SECURITY = YES` in both Debug and Release 
 
 ### Testing Workflow
 
-1. **Xcode diagnostics:** Enable Hardware Memory Tagging in Scheme → Run → Diagnostics. Run full test suite on A19 device. Any tag mismatch surfaces as a crash with exact location.
+1. **Xcode diagnostics:** Enable Hardware Memory Tagging in Scheme → Run → Diagnostics. Run full test suite on supported A19/A19 Pro-or-newer hardware. Any tag mismatch surfaces as a crash with exact location.
 2. **Production:** Tag mismatches terminate the process immediately. This is the desired behavior — it converts silent corruption into a detectable, non-exploitable crash.
 
 ### Impact on Vendored OpenSSL
@@ -332,8 +332,8 @@ The `openssl-src` crate compiles OpenSSL from C source. Any undiscovered buffer 
 
 | Device | MIE Behavior |
 |--------|-------------|
-| All models of iPhone 17 and iPhone Air (A19/A19 Pro) | Full hardware memory tagging active |
-| Older devices (A15–A18) | Software-only typed allocator. No hardware tagging. |
+| Supported A19/A19 Pro-or-newer devices, including current iPhone 17 and iPhone Air models | Full hardware memory tagging active |
+| Older unsupported devices | Software-only typed allocator. No hardware tagging. |
 
 The Enhanced Security capability is additive. It never breaks compatibility with older devices.
 
@@ -355,7 +355,7 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 - **Short lifetime:** The passphrase `String` is only alive for the duration of the active import/export or password-message call. It is not stored in any persistent state, UserDefaults, or Keychain.
 - **Rust-side zeroize:** The `zeroize` crate ensures the Rust copy of the passphrase is overwritten after use.
-- **iOS memory protections:** ASLR, sandboxing, and MIE (on A19+ devices) make memory scanning attacks significantly harder.
+- **iOS memory protections:** ASLR, sandboxing, and MIE (on supported A19/A19 Pro-or-newer devices) make memory scanning attacks significantly harder.
 - **Immediate Rust conversion:** Password-message APIs convert the Swift `String` into Sequoia `Password` at the FFI boundary so the Rust-side representation is encrypted in memory and only decrypted on demand.
 
 **Rejected alternatives:**

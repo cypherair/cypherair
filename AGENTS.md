@@ -4,9 +4,7 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 ## Apple arm64e Status
 
-`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support status, related fork paths and branch posture, Rust stage1 toolchain provenance, OpenSSL carry chain, release manifest shape, and app-side readiness.
-
-Keep that file current whenever the Rust stage1 pin, OpenSSL carry chain, release manifest shape, related fork posture, or app-side arm64e readiness changes.
+`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support. It summarizes app-side readiness, Rust stage1 provenance, the OpenSSL carry chain, XCFramework manifest/release validation, and the update triggers for that status record.
 
 ## Documentation Scope
 
@@ -20,7 +18,7 @@ CypherAir is a fully offline OpenPGP encryption app for iOS, iPadOS, macOS, and 
 - Privacy model: zero network access
 - Permissions model: minimal permissions, only biometric usage description
 - Cryptography: Sequoia PGP via Rust + UniFFI + Swift
-- Platforms: iOS 26.4+, iPadOS 26.4+, macOS 26.4+, visionOS 26.4+
+- Platforms: iOS 26.5+, iPadOS 26.5+, macOS 26.5+, visionOS 26.5+
 
 ## Tech Stack
 
@@ -204,7 +202,6 @@ After editing:
 - Run the relevant tests
 - Verify no generated file was unintentionally hand-modified
 - Check `git diff --stat` and `git diff`
-- Update `docs/ARM64E_STATUS.md` if the arm64e toolchain chain, branch relationships, or progress changed
 
 ## Workflow Reminders
 
@@ -225,7 +222,6 @@ After editing:
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
-- Keep `docs/ARM64E_STATUS.md` synchronized with the current patched Rust toolchain pin, the OpenSSL carry-chain pin, and the experiment-vs-main branch posture.
 
 ## Key References
 

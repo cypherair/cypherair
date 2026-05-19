@@ -218,8 +218,9 @@ Snapshot date: 2026-05-13
 - GitHub-hosted `PR Checks` run `25292443966` passed `rust-full-tests` and
   `xcframework-package`. At that point the overall workflow conclusion was
   failure only because `swift-unit-tests-hosted-preview` ran on hosted macOS
-  26.3 while `CypherAirTests` required macOS 26.4; current workflows preflight
-  that hosted environment mismatch and skip the preview with a warning.
+  26.3 while `CypherAirTests` required a newer macOS deployment target; current
+  workflows preflight that hosted environment mismatch and skip the preview with
+  a warning.
 
 ## Update Rules
 

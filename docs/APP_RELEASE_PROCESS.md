@@ -37,7 +37,7 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   the workflow publishes with `gh release create --verify-tag`.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
-- The stable workflow includes an independent `rust-dependency-audit` job that runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
+- The stable workflow includes an independent `rust-dependency-audit` job that selects the official stable Rust toolchain and runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.

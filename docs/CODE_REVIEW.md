@@ -3,16 +3,18 @@
 > Purpose: Review criteria for PRs, organized by change type.
 > Audience: Human reviewers and AI coding tools.
 
-## All PRs
+## All Code PRs
 
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
 - [ ] For Rust / UniFFI-visible behavior changes, `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` has been run before any Xcode validation
-- [ ] `cargo test`, local `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`, and the native visionOS build probe pass
+- [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, local `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`, and the native visionOS build probe pass
 - [ ] If `swift-unit-tests-hosted-preview` is warning-skipped by hosted environment preflight, rely on local macOS validation for Swift test signal
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)
 - [ ] No force-unwrap (`!`) in production code
 - [ ] Commit messages follow conventional format (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`)
+
+Documentation-only PRs that do not touch code, generated files, project files, entitlements, release metadata, or build settings may use the documentation consistency checks described in [TESTING.md](TESTING.md) instead of Rust/Xcode test runs.
 
 ## Security-Related PRs
 

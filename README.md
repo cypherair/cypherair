@@ -1,13 +1,13 @@
 # CypherAir
 
-**Fully offline OpenPGP encryption for Apple platforms — zero network, zero permissions.**
+**Fully offline OpenPGP encryption for Apple platforms — zero network, minimal permissions.**
 
-CypherAir is an open-source OpenPGP encryption tool for iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and requests no system permissions — data leakage is eliminated at the architectural level.
+CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. It enables everyday users to communicate securely with friends, preventing message content from being monitored by third parties. The app operates with absolutely zero network access and uses only the biometric usage description needed for local authentication — data leakage is eliminated at the architectural level.
 
 ## Key Features
 
 - **Truly Offline** — No HTTP(S), no networked SDKs, no update checks. Works fully in airplane mode.
-- **Zero Permissions** — No camera, photo library, or any other system permission requested. All I/O goes through system-provided pickers and the Share Sheet.
+- **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system-provided pickers and the Share Sheet.
 - **Dual Encryption Profiles** — Profile A (Universal Compatible) for GnuPG interoperability; Profile B (Advanced Security) using the latest RFC 9580 standard with stronger algorithms.
 - **Secure Enclave Protection** — Private keys are hardware-bound via P-256 key wrapping (CryptoKit ECDH + AES-GCM) with biometric authentication.
 - **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with SwiftUI, using iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere.
@@ -44,12 +44,12 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 
 | Layer | Technology |
 |-------|------------|
-| Platform | iOS 26.4+ / iPadOS 26.4+ / macOS 26.4+ / visionOS 26.4+, minimum 8 GB RAM |
-| Language | Apple Swift 6.3.1, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
-| OpenPGP Engine | Sequoia PGP 2.2.0 (Rust), `crypto-openssl` backend (vendored) |
+| Platform | iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+, minimum 8 GB RAM |
+| Language | Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
+| OpenPGP Engine | Sequoia PGP 2.3.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
-| Build | Xcode 26.4.1, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`; `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release |
+| Build | Xcode 26.5, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`; `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release |
 | Localization | English + Simplified Chinese (.xcstrings) |
 
 ## Architecture
@@ -82,32 +82,35 @@ docs/                 # Design documents
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
-## Recent Internal Improvements
+## Current Internal Architecture
 
-Recent refactors focused on maintainability and safety without changing the app's user-facing cryptographic behavior:
+The current app structure keeps maintainability and safety work behind stable user-facing cryptographic behavior:
 
 - **Shared recovery infrastructure** — Secure Enclave / Keychain migration and crash-recovery logic now runs through shared transaction helpers instead of being duplicated across services.
 - **Safer recovery semantics** — Crash recovery now explicitly prefers complete bundles over partial ones, distinguishes retryable vs unrecoverable recovery failures, and feeds generic startup diagnostics into the existing warning surface.
 - **Shared operation controllers** — Encrypt, decrypt, sign, and verify flows now reuse common helpers for security-scoped file access, export, cancellation, progress, and clipboard behavior.
 - **Cleaner startup wiring** — App dependency construction and startup recovery live in a dedicated container/coordinator instead of the app entry point.
 - **Shared identity presentation helpers** — Fingerprint formatting and accessibility labels are defined once and reused across the UI.
-- **Expanded validation** — Recovery-specific tests now cover stale pending cleanup, partial permanent replacement, retryable Keychain failures, startup diagnostics, and generalized warning hygiene.
+- **Focused validation** — Recovery, tutorial, routing, protected-data, and warning-hygiene tests cover the current safety-critical app workflows.
 
 ## Build
 
 ### Prerequisites
 
-- macOS (Apple Silicon) with Xcode 26.4.1
+- macOS (Apple Silicon) with Xcode 26.5
 - Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 
 ### Commands
 
 ```bash
 # 1. Validate Rust behavior
-cargo test --manifest-path pgp-mobile/Cargo.toml
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
-# 2. Refresh the XCFramework artifact and generated bindings used by Xcode
-./build-xcframework.sh --release
+# 2. Refresh the XCFramework artifact and generated bindings used by Xcode.
+# For local validation, force-download the latest attested arm64e stage1
+# prerelease so the result matches GitHub-hosted packaging.
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+    ./build-xcframework.sh --release
 
 # 3. Validate Swift unit + FFI behavior locally
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -139,11 +142,11 @@ For the full Rust / UniFFI / Xcode workflow, including XCFramework artifact refr
 
 ### CI Note
 
-The GitHub Actions workflows in this repository currently target `macos-26`, but GitHub's hosted runner image may still lag the project's minimum deployment target. At the time of writing, the hosted image reports **macOS 26.3**, while the project and test targets require **macOS 26.4**. In that situation:
+The GitHub Actions workflows in this repository currently target `macos-26`, but GitHub's hosted runner image may still lag the project's minimum deployment target or expose Xcode before all matching platform runtimes are usable. In that situation:
 
 - Rust CI can still pass normally.
-- The hosted Swift unit-test preview job may fail before tests start because the runner OS is older than the app's deployment target.
-- That preview remains observational / non-blocking until GitHub's hosted macOS image catches up or the repository adopts a self-hosted macOS runner.
+- The hosted Swift unit-test preview and Apple platform probes use repository preflight scripts to skip known hosted-image/runtime mismatches with explicit warnings.
+- Project, build, link, or test failures after preflight readiness remain real failure signals.
 - Local validation using `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` should be treated as the source of truth until GitHub's hosted macOS image catches up.
 
 ### XCFramework Prerelease
@@ -158,7 +161,7 @@ CypherAir's security design centers around several layers of protection:
 - **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, protected settings schema v2, protected Contacts domain data, and the framework sentinel.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.
 - **Authentication Modes** — Standard Mode (Face ID / Touch ID with passcode fallback) or High Security Mode (biometric only, inspired by Apple's Stolen Device Protection).
-- **Memory Safety** — Sensitive data is zeroed from memory after use. MIE (Memory Integrity Enforcement) is enabled via Xcode's Enhanced Security capability, providing hardware memory tagging on A19+ devices.
+- **Memory Safety** — Sensitive data is zeroed from memory after use. MIE (Memory Integrity Enforcement) is enabled via Xcode's Enhanced Security capability, providing hardware memory tagging on supported A19/A19 Pro-or-newer devices.
 - **Privacy Screen** — Blur overlay when the app enters background. Configurable re-authentication grace period.
 - **AEAD Hard-Fail** — Authentication failures in encrypted messages result in immediate failure with no plaintext fragments exposed.
 
