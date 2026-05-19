@@ -183,18 +183,24 @@ selection.
 
 Purpose: make route views thin and make ScreenModels the owner of user-driven workflow state.
 
+> Close-out status: Accepted and closed on 2026-05-19 for PR4A through
+> PR4C. The Phase 4-owned key-management, Contacts/QR, and
+> Encrypt/Decrypt/Sign/Verify ScreenModel public-API scope meets the exit
+> markers below. Settings security, reset, ProtectedData orchestration, and
+> broader App composition policy remain Phase 5 work.
+
 ### Candidate PRs
 
 - **PR 4A: Remaining key-management route ScreenModels**
-  - Status: Implemented on 2026-05-19.
+  - Status: Accepted and closed on 2026-05-19.
   - Move workflow-heavy key generation, import, backup, key detail, expiry, and selective-revocation behavior into ScreenModel-owned actions and state where not already complete.
 
 - **PR 4B: Contacts and QR route ScreenModels**
-  - Status: Implemented on 2026-05-19.
+  - Status: Accepted and closed on 2026-05-19.
   - Move QR display/generation, contact detail mutations, import confirmation, and tag/contact route workflow state behind ScreenModels or narrow presentation coordinators.
 
 - **PR 4C: ScreenModel public API cleanup**
-  - Status: Implemented on 2026-05-19.
+  - Status: Accepted and closed on 2026-05-19.
   - Replace concrete service internals, generated enums, and low-level file/progress infrastructure in ScreenModel public state with app-owned request/result/display models where practical.
   - Exclude Settings security, reset, and ProtectedData orchestration cleanup; that work depends on Phase 5 service-level workflow boundaries.
 
@@ -227,6 +233,12 @@ replaced Encrypt, Decrypt, Sign, and Verify ScreenModel file-operation seams
 with app-owned request/result wrappers, and added source-audit coverage to block
 service phase, progress, and temporary-artifact internals from ScreenModel
 sources.
+
+Phase 4 close-out validation on 2026-05-19 re-ran the architecture source-audit
+guardrails, PR4A-PR4C ScreenModel tests, Contacts route/coordinator tests, and
+tutorial output/configuration tests. No blocking Phase 4 gaps were found. A
+targeted macOS UI smoke pass remains the release-review validation gate for
+route ownership and tutorial-host behavior when preparing the close-out PR.
 
 ## Phase 5: Security And App Composition Boundary
 
