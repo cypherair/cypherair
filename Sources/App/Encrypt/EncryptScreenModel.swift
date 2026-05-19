@@ -18,6 +18,14 @@ struct RecipientTagSelectionOption: Identifiable, Hashable, Sendable {
     let skippedContactCount: Int
 }
 
+struct EncryptFileRequest {
+    let fileURL: URL
+    let recipientContactIds: [String]
+    let signerFingerprint: String?
+    let encryptToSelf: Bool
+    let encryptToSelfFingerprint: String?
+}
+
 @MainActor
 @Observable
 final class EncryptScreenModel {
@@ -29,13 +37,8 @@ final class EncryptScreenModel {
         String?
     ) async throws -> Data
     typealias FileEncryptionAction = @MainActor (
-        URL,
-        [String],
-        String?,
-        Bool,
-        String?,
-        FileProgressReporter
-    ) async throws -> AppTemporaryArtifact
+        EncryptFileRequest
+    ) async throws -> TemporaryFileOutput
     typealias ClipboardNoticeDecision = @MainActor () async -> Bool
     typealias ClipboardWriter = @MainActor (String, Bool) -> Void
 
@@ -50,10 +53,10 @@ final class EncryptScreenModel {
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
-    private let fileEncryptionAction: FileEncryptionAction
+    private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
-    @ObservationIgnored private var encryptedFileArtifact: AppTemporaryArtifact?
+    @ObservationIgnored private var encryptedFileOutput: TemporaryFileOutput?
     @ObservationIgnored private var lastAppliedInitialRecipientSelectionSignature: InitialRecipientSelectionSignature?
     @ObservationIgnored private var clipboardTask: Task<Void, Never>?
     private var clipboardToken: UInt64 = 0
@@ -73,8 +76,9 @@ final class EncryptScreenModel {
     var selectedFileName: String?
     var encryptedFileURL: URL? {
         didSet {
-            if encryptedFileURL != encryptedFileArtifact?.fileURL {
-                encryptedFileArtifact = encryptedFileURL.map { AppTemporaryArtifact(fileURL: $0) }
+            if encryptedFileURL != encryptedFileOutput?.fileURL {
+                encryptedFileOutput?.cleanup()
+                encryptedFileOutput = encryptedFileURL.map { TemporaryFileOutput(fileURL: $0) }
             }
         }
     }
@@ -129,17 +133,11 @@ final class EncryptScreenModel {
                 encryptToSelfFingerprint: encryptToSelfFingerprint
             )
         }
-        self.fileEncryptionAction = fileEncryptionAction ?? {
-            fileURL,
-            recipients,
-            signerFingerprint,
-            encryptToSelf,
-            encryptToSelfFingerprint,
-            progress in
+        self.fileEncryptionAction = FileOperationAction(injectedAction: fileEncryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
-                        resource: fileURL,
+                        resource: request.fileURL,
                         failure: .corruptData(
                             reason: String(
                                 localized: "fileEncrypt.cannotAccess",
@@ -150,13 +148,13 @@ final class EncryptScreenModel {
                 ]
             ) {
                 try await encryptionService.encryptFileStreaming(
-                    inputURL: fileURL,
-                    recipientContactIds: recipients,
-                    signWithFingerprint: signerFingerprint,
-                    encryptToSelf: encryptToSelf,
-                    encryptToSelfFingerprint: encryptToSelfFingerprint,
+                    inputURL: request.fileURL,
+                    recipientContactIds: request.recipientContactIds,
+                    signWithFingerprint: request.signerFingerprint,
+                    encryptToSelf: request.encryptToSelf,
+                    encryptToSelfFingerprint: request.encryptToSelfFingerprint,
                     progress: progress
-                )
+                ).temporaryFileOutput
             }
         }
     }
@@ -495,21 +493,23 @@ final class EncryptScreenModel {
         )
 
         operation.runFileOperation(mapError: mapEncryptionError) { [self] progress in
-            let artifact = try await self.fileEncryptionAction(
-                fileURL,
-                recipients,
-                signerFingerprint,
-                encryptToSelf,
-                encryptToSelfFingerprint,
-                progress
+            let output = try await self.fileEncryptionAction(
+                EncryptFileRequest(
+                    fileURL: fileURL,
+                    recipientContactIds: recipients,
+                    signerFingerprint: signerFingerprint,
+                    encryptToSelf: encryptToSelf,
+                    encryptToSelfFingerprint: encryptToSelfFingerprint
+                ),
+                progress: progress
             )
-            var pendingArtifact: AppTemporaryArtifact? = artifact
+            var pendingOutput: TemporaryFileOutput? = output
             defer {
-                pendingArtifact?.cleanup()
+                pendingOutput?.cleanup()
             }
             try Task.checkCancellation()
-            self.adoptEncryptedFileArtifact(artifact)
-            pendingArtifact = nil
+            self.adoptEncryptedFileOutput(output)
+            pendingOutput = nil
             self.authLifecycleTraceStore?.record(
                 category: .operation,
                 name: "encrypt.file.finish",
@@ -711,15 +711,15 @@ final class EncryptScreenModel {
         }
     }
 
-    private func adoptEncryptedFileArtifact(_ artifact: AppTemporaryArtifact) {
+    private func adoptEncryptedFileOutput(_ output: TemporaryFileOutput) {
         cleanupTemporaryEncryptedFile()
-        encryptedFileArtifact = artifact
-        encryptedFileURL = artifact.fileURL
+        encryptedFileOutput = output
+        encryptedFileURL = output.fileURL
     }
 
     private func cleanupTemporaryEncryptedFile() {
-        encryptedFileArtifact?.cleanup()
-        encryptedFileArtifact = nil
+        encryptedFileOutput?.cleanup()
+        encryptedFileOutput = nil
         encryptedFileURL = nil
     }
 

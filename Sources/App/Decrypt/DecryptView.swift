@@ -8,14 +8,14 @@ import UniformTypeIdentifiers
 struct DecryptView: View {
     struct Configuration {
         var prefilledCiphertext: String?
-        var initialPhase1Result: DecryptionService.Phase1Result?
+        var initialPhase1Result: DecryptionPhase1Result?
         var allowsTextFileImport = true
         var allowsFileInput = true
         var allowsFileResultExport = true
         var textFileRestrictionMessage: String?
         var fileRestrictionMessage: String?
         var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough
-        var onParsed: (@MainActor (DecryptionService.Phase1Result) -> Void)?
+        var onParsed: (@MainActor (DecryptionPhase1Result) -> Void)?
         var onDecrypted: (@MainActor (Data, DetailedSignatureVerification) -> Void)?
 
         static let `default` = Configuration()
@@ -27,7 +27,7 @@ struct DecryptView: View {
             let matchedKeyFingerprint: String?
             let ciphertext: Data
 
-            init(_ result: DecryptionService.Phase1Result) {
+            init(_ result: DecryptionPhase1Result) {
                 recipientKeyIds = result.recipientKeyIds
                 matchedKeyFingerprint = result.matchedKey?.fingerprint
                 ciphertext = result.ciphertext

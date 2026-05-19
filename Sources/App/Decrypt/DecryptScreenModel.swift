@@ -3,18 +3,26 @@ import Foundation
 @MainActor
 @Observable
 final class DecryptScreenModel {
-    typealias ParseTextRecipientsAction = @MainActor (Data) async throws -> DecryptionService.Phase1Result
-    typealias ParseFileRecipientsAction = @MainActor (URL) async throws -> DecryptionService.FilePhase1Result
+    struct FileDecryptionRequest {
+        let fileURL: URL
+        let phase1Result: FileDecryptionPhase1Result
+    }
+
+    struct FileDecryptionResult {
+        let output: TemporaryFileOutput
+        let verification: DetailedSignatureVerification
+    }
+
+    typealias ParseTextRecipientsAction = @MainActor (Data) async throws -> DecryptionPhase1Result
+    typealias ParseFileRecipientsAction = @MainActor (URL) async throws -> FileDecryptionPhase1Result
     typealias TextCiphertextFileImportAction = @MainActor (URL) throws -> (data: Data, text: String)
     typealias CiphertextFileInspectionAction = @MainActor (URL) throws -> (data: Data, text: String)?
     typealias TextDecryptionAction = @MainActor (
-        DecryptionService.Phase1Result
+        DecryptionPhase1Result
     ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification)
     typealias FileDecryptionAction = @MainActor (
-        URL,
-        DecryptionService.FilePhase1Result,
-        FileProgressReporter
-    ) async throws -> (artifact: AppTemporaryArtifact, verification: DetailedSignatureVerification)
+        FileDecryptionRequest
+    ) async throws -> FileDecryptionResult
 
     private(set) var configuration: DecryptView.Configuration
     let operation: OperationController
@@ -25,9 +33,9 @@ final class DecryptScreenModel {
     private let textCiphertextFileImportAction: TextCiphertextFileImportAction
     private let ciphertextFileInspectionAction: CiphertextFileInspectionAction
     private let textDecryptionAction: TextDecryptionAction
-    private let fileDecryptionAction: FileDecryptionAction
+    private let fileDecryptionAction: FileOperationAction<FileDecryptionRequest, FileDecryptionResult>
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
-    @ObservationIgnored private var decryptedFileArtifact: AppTemporaryArtifact?
+    @ObservationIgnored private var decryptedFileOutput: TemporaryFileOutput?
     private var fileImportRequestGate = FileImportRequestGate()
 
     private struct PendingTextModeImport {
@@ -41,19 +49,20 @@ final class DecryptScreenModel {
     var ciphertextInput = ""
     var decryptedText: String?
     var detailedSignatureVerification: DetailedSignatureVerification?
-    var phase1Result: DecryptionService.Phase1Result?
+    var phase1Result: DecryptionPhase1Result?
     var showFileImporter = false
     var fileImportTarget: DecryptView.FileImportTarget?
     var selectedFileURL: URL?
     var selectedFileName: String?
     var decryptedFileURL: URL? {
         didSet {
-            if decryptedFileURL != decryptedFileArtifact?.fileURL {
-                decryptedFileArtifact = decryptedFileURL.map { AppTemporaryArtifact(fileURL: $0) }
+            if decryptedFileURL != decryptedFileOutput?.fileURL {
+                decryptedFileOutput?.cleanup()
+                decryptedFileOutput = decryptedFileURL.map { TemporaryFileOutput(fileURL: $0) }
             }
         }
     }
-    var filePhase1Result: DecryptionService.FilePhase1Result?
+    var filePhase1Result: FileDecryptionPhase1Result?
     var importedCiphertext = ImportedTextInputState()
     private var pendingTextModeImport: PendingTextModeImport?
     var showTextModeSuggestion = false
@@ -150,11 +159,11 @@ final class DecryptScreenModel {
         self.textDecryptionAction = textDecryptionAction ?? { phase1 in
             try await decryptionService.decryptDetailed(phase1: phase1)
         }
-        self.fileDecryptionAction = fileDecryptionAction ?? { fileURL, phase1, progress in
+        self.fileDecryptionAction = FileOperationAction(injectedAction: fileDecryptionAction) { request, progress in
             try await SecurityScopedFileAccess.withAccess(
                 to: [
                     SecurityScopedAccessRequest(
-                        resource: fileURL,
+                        resource: request.fileURL,
                         failure: .corruptData(
                             reason: String(
                                 localized: "fileDecrypt.cannotAccess",
@@ -164,9 +173,13 @@ final class DecryptScreenModel {
                     )
                 ]
             ) {
-                try await decryptionService.decryptFileStreamingDetailed(
-                    phase1: phase1,
+                let result = try await decryptionService.decryptFileStreamingDetailed(
+                    phase1: request.phase1Result,
                     progress: progress
+                )
+                return FileDecryptionResult(
+                    output: result.artifact.temporaryFileOutput,
+                    verification: result.verification
                 )
             }
         }
@@ -388,17 +401,19 @@ final class DecryptScreenModel {
 
         operation.runFileOperation(mapError: mapDecryptError) { [self] progress in
             let result = try await self.fileDecryptionAction(
-                fileURL,
-                filePhase1Result,
-                progress
+                FileDecryptionRequest(
+                    fileURL: fileURL,
+                    phase1Result: filePhase1Result
+                ),
+                progress: progress
             )
-            var pendingArtifact: AppTemporaryArtifact? = result.artifact
+            var pendingOutput: TemporaryFileOutput? = result.output
             defer {
-                pendingArtifact?.cleanup()
+                pendingOutput?.cleanup()
             }
             try Task.checkCancellation()
-            self.adoptDecryptedFileArtifact(result.artifact)
-            pendingArtifact = nil
+            self.adoptDecryptedFileOutput(result.output)
+            pendingOutput = nil
             self.replaceDetailedSignatureVerification(with: result.verification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
@@ -576,15 +591,15 @@ final class DecryptScreenModel {
     }
 
     private func deleteTemporaryDecryptedFile() {
-        decryptedFileArtifact?.cleanup()
-        decryptedFileArtifact = nil
+        decryptedFileOutput?.cleanup()
+        decryptedFileOutput = nil
         decryptedFileURL = nil
     }
 
-    private func adoptDecryptedFileArtifact(_ artifact: AppTemporaryArtifact) {
+    private func adoptDecryptedFileOutput(_ output: TemporaryFileOutput) {
         deleteTemporaryDecryptedFile()
-        decryptedFileArtifact = artifact
-        decryptedFileURL = artifact.fileURL
+        decryptedFileOutput = output
+        decryptedFileURL = output.fileURL
     }
 
     private func applyPrefilledCiphertextIfNeeded(from configuration: DecryptView.Configuration) {
@@ -605,7 +620,7 @@ final class DecryptScreenModel {
     }
 
     private static func phase1Seed(
-        from result: DecryptionService.Phase1Result?
+        from result: DecryptionPhase1Result?
     ) -> Phase1Seed? {
         result.map(Phase1Seed.init)
     }
@@ -620,7 +635,7 @@ private struct Phase1Seed: Equatable {
     let matchedKeyFingerprint: String?
     let ciphertext: Data
 
-    init(_ result: DecryptionService.Phase1Result) {
+    init(_ result: DecryptionPhase1Result) {
         recipientKeyIds = result.recipientKeyIds
         matchedKeyFingerprint = result.matchedKey?.fingerprint
         ciphertext = result.ciphertext

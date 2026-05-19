@@ -260,7 +260,7 @@ final class DecryptScreenModelTests: XCTestCase {
         )
         let phase1Result = makePhase1Result(matchedKey: identity)
         let gate = DecryptOperationGate()
-        var parsedResult: DecryptionService.Phase1Result?
+        var parsedResult: DecryptionPhase1Result?
         var configuration = DecryptView.Configuration()
         configuration.onParsed = { parsedResult = $0 }
 
@@ -571,10 +571,13 @@ final class DecryptScreenModelTests: XCTestCase {
                 XCTAssertEqual(url, inputURL)
                 return filePhase1Result
             },
-            fileDecryptionAction: { url, phase1, _ in
-                XCTAssertEqual(url, inputURL)
-                XCTAssertEqual(phase1.inputPath, inputURL.path)
-                return (CypherAir.AppTemporaryArtifact(fileURL: outputURL), detailedVerification)
+            fileDecryptionAction: { request in
+                XCTAssertEqual(request.fileURL, inputURL)
+                XCTAssertEqual(request.phase1Result.inputPath, inputURL.path)
+                return DecryptScreenModel.FileDecryptionResult(
+                    output: TemporaryFileOutput(fileURL: outputURL),
+                    verification: detailedVerification
+                )
             }
         )
         model.decryptMode = .file
@@ -620,12 +623,22 @@ final class DecryptScreenModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
         let gate = DecryptOperationGate()
+        var capturedProgress: FileProgressReporter?
+        let operation = OperationController(progressFactory: {
+            let reporter = FileProgressReporter()
+            capturedProgress = reporter
+            return reporter
+        })
         let model = makeModel(
-            fileDecryptionAction: { _, _, progress in
-                _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
+            operation: operation,
+            fileDecryptionAction: { _ in
+                _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return (CypherAir.AppTemporaryArtifact(fileURL: inputURL), self.makeDetailedVerification(status: .valid))
+                return DecryptScreenModel.FileDecryptionResult(
+                    output: TemporaryFileOutput(fileURL: inputURL),
+                    verification: self.makeDetailedVerification(status: .valid)
+                )
             }
         )
         model.decryptMode = .file
@@ -683,11 +696,11 @@ final class DecryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             operation: operation,
-            fileDecryptionAction: { _, _, _ in
+            fileDecryptionAction: { _ in
                 operation.cancel()
-                return (
-                    CypherAir.AppTemporaryArtifact(fileURL: outputURL),
-                    self.makeDetailedVerification(status: .valid)
+                return DecryptScreenModel.FileDecryptionResult(
+                    output: TemporaryFileOutput(fileURL: outputURL),
+                    verification: self.makeDetailedVerification(status: .valid)
                 )
             }
         )
@@ -858,8 +871,8 @@ final class DecryptScreenModelTests: XCTestCase {
     private func makePhase1Result(
         matchedKey: PGPKeyIdentity? = nil,
         ciphertext: Data = Data("ciphertext".utf8)
-    ) -> DecryptionService.Phase1Result {
-        DecryptionService.Phase1Result(
+    ) -> DecryptionPhase1Result {
+        DecryptionPhase1Result(
             recipientKeyIds: ["ABCD1234"],
             matchedKey: matchedKey,
             ciphertext: ciphertext
@@ -869,8 +882,8 @@ final class DecryptScreenModelTests: XCTestCase {
     private func makeFilePhase1Result(
         matchedKey: PGPKeyIdentity?,
         inputURL: URL
-    ) -> DecryptionService.FilePhase1Result {
-        DecryptionService.FilePhase1Result(
+    ) -> FileDecryptionPhase1Result {
+        FileDecryptionPhase1Result(
             recipientKeyIds: ["ABCD1234"],
             matchedKey: matchedKey,
             inputPath: inputURL.path

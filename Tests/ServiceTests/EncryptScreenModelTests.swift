@@ -773,7 +773,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            fileEncryptionAction: { _, _, _, _, _, _ in CypherAir.AppTemporaryArtifact(fileURL: outputURL) }
+            fileEncryptionAction: { _ in TemporaryFileOutput(fileURL: outputURL) }
         )
         model.encryptMode = .file
         model.handleAppear()
@@ -805,6 +805,12 @@ final class EncryptScreenModelTests: XCTestCase {
         let recipientContactId = try importContactAndResolveContactId(for: recipientIdentity)
 
         let gate = EncryptOperationGate()
+        var capturedProgress: FileProgressReporter?
+        let operation = OperationController(progressFactory: {
+            let reporter = FileProgressReporter()
+            capturedProgress = reporter
+            return reporter
+        })
         let inputURL = try makeTemporaryFile(
             named: "cancel.txt",
             contents: Data("cancel".utf8)
@@ -816,11 +822,12 @@ final class EncryptScreenModelTests: XCTestCase {
 
         let model = makeModel(
             configuration: configuration,
-            fileEncryptionAction: { _, _, _, _, _, progress in
-                _ = progress.onProgress(bytesProcessed: 5, totalBytes: 10)
+            operation: operation,
+            fileEncryptionAction: { _ in
+                _ = capturedProgress?.onProgress(bytesProcessed: 5, totalBytes: 10)
                 await gate.suspend()
                 try Task.checkCancellation()
-                return CypherAir.AppTemporaryArtifact(fileURL: inputURL)
+                return TemporaryFileOutput(fileURL: inputURL)
             }
         )
         model.encryptMode = .file
@@ -879,9 +886,9 @@ final class EncryptScreenModelTests: XCTestCase {
         let model = makeModel(
             configuration: configuration,
             operation: operation,
-            fileEncryptionAction: { _, _, _, _, _, _ in
+            fileEncryptionAction: { _ in
                 operation.cancel()
-                return CypherAir.AppTemporaryArtifact(fileURL: outputURL)
+                return TemporaryFileOutput(fileURL: outputURL)
             }
         )
         model.encryptMode = .file

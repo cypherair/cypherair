@@ -355,7 +355,7 @@ final class TutorialSessionStore {
         complete(.encryptDemoMessage)
     }
 
-    func noteParsed(_ result: DecryptionService.Phase1Result) {
+    func noteParsed(_ result: DecryptionPhase1Result) {
         session.artifacts.parseResult = result
     }
 

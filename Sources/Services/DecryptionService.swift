@@ -10,28 +10,6 @@ import Foundation
 /// Changes to this file require human review. See SECURITY.md Section 7.
 @Observable
 final class DecryptionService {
-
-    /// Result of Phase 1 analysis.
-    struct Phase1Result {
-        /// Recipient key IDs found in the ciphertext header.
-        let recipientKeyIds: [String]
-        /// Matched local key identity, if any.
-        let matchedKey: PGPKeyIdentity?
-        /// The ciphertext data (passed through for Phase 2).
-        let ciphertext: Data
-    }
-
-    /// Result of Phase 1 analysis for file-based decryption.
-    /// Unlike Phase1Result, this stores the file path instead of ciphertext Data.
-    struct FilePhase1Result {
-        /// Recipient key IDs found in the ciphertext header.
-        let recipientKeyIds: [String]
-        /// Matched local key identity, if any.
-        let matchedKey: PGPKeyIdentity?
-        /// Path to the encrypted input file (passed through for Phase 2).
-        let inputPath: String
-    }
-
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
@@ -55,9 +33,9 @@ final class DecryptionService {
     /// This phase does NOT require authentication — no private key is accessed.
     ///
     /// - Parameter ciphertext: The encrypted message (armored or binary).
-    /// - Returns: Phase1Result with matched key info.
+    /// - Returns: DecryptionPhase1Result with matched key info.
     /// - Throws: CypherAirError.noMatchingKey if no local key matches.
-    func parseRecipients(ciphertext: Data) async throws -> Phase1Result {
+    func parseRecipients(ciphertext: Data) async throws -> DecryptionPhase1Result {
         let binaryData = try await messageAdapter.dearmorIfNeeded(ciphertext)
 
         // Match PKESK recipients against local certificates.
@@ -78,7 +56,7 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
-        return Phase1Result(
+        return DecryptionPhase1Result(
             recipientKeyIds: matchedFingerprints,
             matchedKey: matchedKey,
             ciphertext: binaryData
@@ -94,9 +72,9 @@ final class DecryptionService {
     /// keeping memory usage constant regardless of file size.
     ///
     /// - Parameter fileURL: URL of the encrypted file.
-    /// - Returns: FilePhase1Result with matched key info.
+    /// - Returns: FileDecryptionPhase1Result with matched key info.
     /// - Throws: CypherAirError.noMatchingKey if no local key matches.
-    func parseRecipientsFromFile(fileURL: URL) async throws -> FilePhase1Result {
+    func parseRecipientsFromFile(fileURL: URL) async throws -> FileDecryptionPhase1Result {
         let inputPath = fileURL.path
         let localCerts = keyManagement.keys.map { $0.publicKeyData }
 
@@ -113,7 +91,7 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
-        return FilePhase1Result(
+        return FileDecryptionPhase1Result(
             recipientKeyIds: matchedFingerprints,
             matchedKey: matchedKey,
             inputPath: inputPath
@@ -128,7 +106,7 @@ final class DecryptionService {
     /// SECURITY: This method must only be called after Phase 1 has identified the key.
     /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
     func decryptDetailed(
-        phase1: Phase1Result
+        phase1: DecryptionPhase1Result
     ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
         guard let matchedKey = phase1.matchedKey else {
             throw CypherAirError.noMatchingKey
@@ -161,7 +139,7 @@ final class DecryptionService {
     /// SECURITY: This method must only be called after Phase 1 has identified the key.
     /// The private key exists in memory only during the decrypt call and is zeroized immediately after.
     func decryptFileStreamingDetailed(
-        phase1: FilePhase1Result,
+        phase1: FileDecryptionPhase1Result,
         progress: FileProgressReporter?
     ) async throws -> (artifact: AppTemporaryArtifact, verification: DetailedSignatureVerification) {
         guard let matchedKey = phase1.matchedKey else {

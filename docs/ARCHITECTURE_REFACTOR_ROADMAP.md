@@ -194,6 +194,7 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
   - Move QR display/generation, contact detail mutations, import confirmation, and tag/contact route workflow state behind ScreenModels or narrow presentation coordinators.
 
 - **PR 4C: ScreenModel public API cleanup**
+  - Status: Implemented on 2026-05-19.
   - Replace concrete service internals, generated enums, and low-level file/progress infrastructure in ScreenModel public state with app-owned request/result/display models where practical.
   - Exclude Settings security, reset, and ProtectedData orchestration cleanup; that work depends on Phase 5 service-level workflow boundaries.
 
@@ -220,6 +221,12 @@ Contact QR-photo loader ownership, accepted existing Contact Detail, Contacts,
 tag, import-confirmation, and incoming-URL coordinators for the Contacts route
 scope, and added source-audit coverage to block contact/QR workflow calls from
 Contacts route Views.
+
+PR4C validation promoted decryption Phase 1 results to app-owned models,
+replaced Encrypt, Decrypt, Sign, and Verify ScreenModel file-operation seams
+with app-owned request/result wrappers, and added source-audit coverage to block
+service phase, progress, and temporary-artifact internals from ScreenModel
+sources.
 
 ## Phase 5: Security And App Composition Boundary
 

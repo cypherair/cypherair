@@ -117,7 +117,7 @@ struct TutorialArtifacts {
     var bobArmoredPublicKey: String?
     var bobContact: ContactIdentitySummary?
     var encryptedMessage: String?
-    var parseResult: DecryptionService.Phase1Result?
+    var parseResult: DecryptionPhase1Result?
     var decryptedMessage: String?
     var decryptedVerification: DetailedSignatureVerification?
     var backupArmoredKey: String?
