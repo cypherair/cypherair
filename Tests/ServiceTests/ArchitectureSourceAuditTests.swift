@@ -62,6 +62,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.screenModelPhotosUIContainment)
     }
 
+    func test_screenModelPublicAPIsDoNotExposeServiceFileInternals() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.screenModelPublicAPIContainment)
+    }
+
     func test_appContainerUITestContactsBootstrapDoesNotBlockSynchronously() throws {
         let contents = try RepositoryAuditLoader.loadString(relativePath: "Sources/App/AppContainer.swift")
 
@@ -296,6 +300,38 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 .isEmpty
         )
 
+        let screenModelPhase1Source = AuditedSource(
+            path: "Sources/App/Decrypt/NewDecryptScreenModel.swift",
+            contents: "final class NewDecryptScreenModel { var result: DecryptionService.Phase1Result? }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelPublicAPIContainment
+                .violations(in: [screenModelPhase1Source])
+                .map(\.path),
+            [screenModelPhase1Source.path]
+        )
+
+        let screenModelProgressSource = AuditedSource(
+            path: "Sources/App/Sign/NewSignScreenModel.swift",
+            contents: "final class NewSignScreenModel { typealias Action = (FileProgressReporter) -> AppTemporaryArtifact }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.screenModelPublicAPIContainment
+                .violations(in: [screenModelProgressSource])
+                .map(\.path),
+            [screenModelProgressSource.path]
+        )
+
+        let appCommonFileOutputSource = AuditedSource(
+            path: "Sources/App/Common/TemporaryFileOutput.swift",
+            contents: "extension AppTemporaryArtifact { var output: TemporaryFileOutput { fatalError() } }"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPublicAPIContainment
+                .violations(in: [appCommonFileOutputSource])
+                .isEmpty
+        )
+
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
@@ -371,6 +407,18 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.screenModelPhotosUIContainment.violations(in: [screenModelSource]).isEmpty
+        )
+
+        let screenModelAPISource = AuditedSource(
+            path: "Sources/App/Sign/NewScreenModel.swift",
+            contents: """
+            // FileProgressReporter, AppTemporaryArtifact, and DecryptionService.Phase1Result should be ignored in comments.
+            let message = "FileProgressReporter AppTemporaryArtifact DecryptionService.Phase1Result"
+            final class NewScreenModel {}
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.screenModelPublicAPIContainment.violations(in: [screenModelAPISource]).isEmpty
         )
     }
 
@@ -799,6 +847,17 @@ private enum ArchitectureSourceAuditRules {
         },
         stripsCommentsAndStrings: true,
         expressionOptions: [.anchorsMatchLines],
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let screenModelPublicAPIContainment = ArchitectureSourceAuditRule(
+        name: "ScreenModel public API containment",
+        failureSummary: "ScreenModels should expose app-owned request/result values instead of service phase, progress, or temporary-artifact internals.",
+        pattern: #"\bDecryptionService\s*\.\s*(?:Phase1Result|FilePhase1Result)\b|\b(?:FileProgressReporter|AppTemporaryArtifact)\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/App/") && path.hasSuffix("ScreenModel.swift")
+        },
+        stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([])
     )
 

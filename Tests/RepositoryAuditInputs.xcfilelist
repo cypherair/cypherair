@@ -33,6 +33,7 @@ $(SRCROOT)/Sources/App/Common/PrivacyScreenModifier.swift
 $(SRCROOT)/Sources/App/Common/SecurityScopedFileAccess.swift
 $(SRCROOT)/Sources/App/Common/SignatureIdentityCardView.swift
 $(SRCROOT)/Sources/App/Common/SignatureVerification+Presentation.swift
+$(SRCROOT)/Sources/App/Common/TemporaryFileOutput.swift
 $(SRCROOT)/Sources/App/Common/TextImport/ImportedTextInputState.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactQRPhotoSelection.swift
 $(SRCROOT)/Sources/App/Contacts/AddContactScreenModel.swift
@@ -188,8 +189,10 @@ $(SRCROOT)/Sources/Models/Contacts/ContactsDomainSnapshot.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactsDomainValidationError.swift
 $(SRCROOT)/Sources/Models/Contacts/ContactsVerificationContext.swift
 $(SRCROOT)/Sources/Models/CypherAirError.swift
+$(SRCROOT)/Sources/Models/DecryptionPhase1Result.swift
 $(SRCROOT)/Sources/Models/DetailedSignatureVerification.swift
 $(SRCROOT)/Sources/Models/ExportableFile.swift
+$(SRCROOT)/Sources/Models/FileDecryptionPhase1Result.swift
 $(SRCROOT)/Sources/Models/IdentityPresentation.swift
 $(SRCROOT)/Sources/Models/MessageSignatureStatus.swift
 $(SRCROOT)/Sources/Models/OpenPGPCertificationKind.swift
