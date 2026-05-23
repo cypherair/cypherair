@@ -82,7 +82,24 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 - **Decryption:** The App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
 - **Multiple keys:** A user may have keys of different profiles (e.g., a Profile A key for GnuPG contacts and a Profile B key for security-conscious contacts).
 
-### 3.4 Security Hard Rules
+### 3.4 Future Apple Secure Enclave Profile
+
+Apple Secure Enclave Profile is a planned high-security key custody mode, not a
+shipped replacement for Profile A or Profile B. Its goal is to generate and hold
+P-256 private keys inside Apple Secure Enclave so signing and ECDH private-key
+operations happen in hardware and the long-term private key does not enter
+CypherAir's Swift or Rust plaintext memory.
+
+This mode has a different product tradeoff from ordinary software-key profiles:
+the private key is device-bound, not exportable, and cannot be fully migrated or
+restored from a normal backup. Device loss, Secure Enclave/key-handle loss, or
+loss of the required authentication factor may make the key permanently
+unusable. Any future UI must present this as an explicit opt-in with a strong
+availability warning, a distinct key status, and no "private key backed up"
+badge. Planning details live in
+[APPLE_SECURE_ENCLAVE_PROFILE](APPLE_SECURE_ENCLAVE_PROFILE.md).
+
+### 3.5 Security Hard Rules
 
 - AEAD auth failure → hard-fail; no plaintext fragments shown.
 - All failures produce user-understandable error messages.
