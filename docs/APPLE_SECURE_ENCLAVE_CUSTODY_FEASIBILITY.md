@@ -47,9 +47,15 @@ This roadmap does not decide:
 - whether production should use Sequoia `Signer` / `Decryptor`, a
   fixed-session-key path, or a different narrow boundary
 - which `SecAccessControl` policy is final for each app security mode
-- which lifecycle operations are supported in v1, including expiry changes,
-  selective revocation, contact certification, or secret-key export
+- which non-secret lifecycle operations are supported in v1, including expiry
+  changes, selective revocation, contact certification, public-certificate
+  export, revocation artifact export, or UI / error semantics for unsupported
+  private-key export requests
 - whether any prototype code is acceptable for production without redesign
+
+Private-key export is not in the decision set for this custody mode. Secure
+Enclave Custody must never export private-key material; later phases may decide
+only how unsupported private-key export requests are presented or reported.
 
 ## Validation Principles
 
@@ -190,8 +196,9 @@ needed for a later production plan. It should not implement the feature.
 Exit markers:
 
 - v4/v6 certificate recommendation, Swift/Rust boundary recommendation,
-  lifecycle-operation support set, and access-control policy recommendation are
-  recorded as evidence-backed decisions or explicit open issues.
+  supported non-secret lifecycle operations and export/error semantics, and
+  access-control policy recommendation are recorded as evidence-backed decisions
+  or explicit open issues.
 - No-go conditions are checked and documented.
 - If feasible, the next step is a dedicated production-design plan.
 
@@ -215,8 +222,8 @@ following:
 
 - importing an existing private key into Secure Enclave
 - storing a software private key fallback for a Secure Enclave custody key
-- exporting Secure Enclave private-key material or representing a key handle as
-  a private-key backup
+- exporting, backing up, or representing Secure Enclave private-key material or a
+  key handle as a recoverable private-key backup
 - reusing one Secure Enclave key for both signing and ECDH
 - accepting a decrypt path that can expose unauthenticated partial plaintext
 - shipping behavior whose critical failure modes cannot be tested
