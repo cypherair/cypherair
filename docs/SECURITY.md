@@ -93,15 +93,16 @@ Deletion:
 
 The Secure Enclave supports only P-256. Private keys (Ed25519, X25519, Ed448, or X448) are protected via an indirect wrapping scheme. The wrapping scheme is identical for all key algorithms — the SE wraps raw private key bytes regardless of algorithm.
 
-**Future Apple Secure Enclave Profile note:** This section describes the current
+**Future Apple Secure Enclave Custody note:** This section describes the current
 shipped wrapping model, where CypherAir unwraps a complete OpenPGP secret
 certificate into application memory for signing, decryption, export, and key
-mutation. The proposed Apple Secure Enclave Profile is a separate future key
-custody mode in which P-256 signing and ECDH private-key operations are performed
-by Secure Enclave and the long-term private scalar is never exported to
-CypherAir. Do not conflate that future mode with this wrapping scheme. Its
-planning security model lives in
-[APPLE_SECURE_ENCLAVE_PROFILE_SECURITY](APPLE_SECURE_ENCLAVE_PROFILE_SECURITY.md).
+mutation. The proposed Apple Secure Enclave Custody mode is separate future
+private-key custody, not a third OpenPGP algorithm profile. In that mode,
+separate P-256 signing and key-agreement private-key operations are performed by
+Secure Enclave and long-term private scalars are never exported to CypherAir. Do
+not conflate that future mode with this wrapping scheme. Its planning security
+model lives in
+[APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md).
 
 ### ProtectedData Device-Binding Note
 
