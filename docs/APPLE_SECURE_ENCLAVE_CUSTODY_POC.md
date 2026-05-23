@@ -7,7 +7,8 @@
 > Audience: Swift/Rust implementers, security reviewers, test owners, and AI
 > coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
-> [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md), and
+> [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
+> [Feasibility Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY.md), and
 > [Architecture](ARCHITECTURE.md).
 
 ## 1. POC Objective

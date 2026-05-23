@@ -7,8 +7,9 @@
 > Audience: Security reviewers, Swift/Rust implementers, product engineers,
 > and AI coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
-> [POC Plan](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md), and current
-> [Security](SECURITY.md).
+> [POC Plan](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md),
+> [Feasibility Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY.md), and
+> current [Security](SECURITY.md).
 
 ## 1. Security Goal
 
