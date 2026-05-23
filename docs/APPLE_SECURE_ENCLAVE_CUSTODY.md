@@ -8,6 +8,7 @@
 > AI coding tools.
 > Related: [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
 > [POC Plan](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md),
+> [Feasibility Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY.md),
 > [PRD](PRD.md), [Security](SECURITY.md), and
 > [Architecture](ARCHITECTURE.md).
 
