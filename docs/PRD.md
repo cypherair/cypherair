@@ -82,7 +82,30 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 - **Decryption:** The App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
 - **Multiple keys:** A user may have keys of different profiles (e.g., a Profile A key for GnuPG contacts and a Profile B key for security-conscious contacts).
 
-### 3.4 Security Hard Rules
+### 3.4 Future Apple Secure Enclave Custody
+
+Apple Secure Enclave Custody is a planned hardware-backed private-key custody
+mode, not a shipped replacement for Profile A or Profile B and not a third
+`PGPKeyProfile`. Its goal is to generate and hold P-256 private keys inside
+Apple Secure Enclave so signing and ECDH private-key operations happen in
+hardware and the long-term private scalar does not enter CypherAir's Swift or
+Rust plaintext memory.
+
+Future key creation should treat algorithm/profile and private-key custody as
+separate dimensions. A capability resolver must expose only combinations that
+the current platform, OpenPGP rules, Sequoia support, CypherAir implementation,
+and product policy can support.
+
+This mode has a different product tradeoff from ordinary software-key custody:
+the private key is device-bound, not exportable, and cannot be fully migrated or
+restored from a normal backup. Device loss, Secure Enclave/key-handle loss, or
+loss of the required authentication factor may make the key permanently
+unusable. Any future UI must present this as an explicit opt-in with a strong
+availability warning, a distinct custody/status display, and no "private key
+backed up" badge. Planning details live in
+[APPLE_SECURE_ENCLAVE_CUSTODY](APPLE_SECURE_ENCLAVE_CUSTODY.md).
+
+### 3.5 Security Hard Rules
 
 - AEAD auth failure → hard-fail; no plaintext fragments shown.
 - All failures produce user-understandable error messages.

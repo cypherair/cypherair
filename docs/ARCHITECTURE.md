@@ -130,6 +130,21 @@ generated-error normalization, progress bridging where applicable, and generated
 result mapping. `PasswordMessageService` remains intentionally service-only until
 product scope adds a dedicated route and plaintext-handling contract.
 
+### Future Apple Secure Enclave Custody Boundary
+
+The current Security layer uses Secure Enclave as a device-bound wrapper around
+complete OpenPGP secret certificate bytes. The proposed Apple Secure Enclave
+Custody mode is a future boundary change: Secure Enclave would own distinct
+P-256 signing and key-agreement private-key operations directly, while software
+keeps owning OpenPGP packet construction, KDF / AES Key Wrap processing,
+session-key handling, payload decryption, and signature verification. Future key
+creation should model algorithm/profile and private-key custody as separate
+dimensions, with a capability resolver exposing only supported combinations.
+Sequoia 2.3's `Signer` and `Decryptor` traits are the likely Rust-side seam for
+this external private-key custody model, but the production API shape remains
+undecided pending the macOS-first POC described in
+[APPLE_SECURE_ENCLAVE_CUSTODY_POC](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md).
+
 ### Security Layer (`Sources/Security/`)
 
 Manages all hardware-backed security operations. This is the most sensitive module.
