@@ -150,6 +150,7 @@ Exit markers:
 
 Purpose: prove that Secure Enclave ECDSA output can be used as OpenPGP
 signatures accepted by the app's verification stack.
+POC evidence: [Phase 3 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE3.md).
 
 Prototype a Secure Enclave-backed OpenPGP signer path that:
 
