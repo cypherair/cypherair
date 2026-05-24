@@ -88,6 +88,7 @@ Exit markers:
 
 Purpose: prove the Apple platform primitive behavior needed by the custody
 model.
+POC evidence: [Phase 1 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE1.md).
 
 The first validation target is macOS on Secure Enclave-capable hardware because
 local builds, temporary harnesses, and debugging are easier than on iOS devices.
