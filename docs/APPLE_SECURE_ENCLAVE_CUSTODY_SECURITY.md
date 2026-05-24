@@ -7,8 +7,7 @@
 > Audience: Security reviewers, Swift/Rust implementers, product engineers,
 > and AI coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
-> [POC Plan](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md),
-> [Feasibility Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY.md), and
+> [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md), and
 > current [Security](SECURITY.md).
 
 ## 1. Security Goal
@@ -105,9 +104,9 @@ uses in-memory `KeyPair` values created from unwrapped secret certificates in
 `pgp-mobile/src/sign.rs` and `pgp-mobile/src/decrypt.rs`.
 
 The existing `decrypt_with_fixed_session_key_detailed` helper may be useful for
-POC work after a Secure Enclave path recovers an OpenPGP session key. It should
-not be treated as a required production design until POC results show where the
-cleanest boundary belongs.
+validation work after a Secure Enclave path recovers an OpenPGP session key. It
+should not be treated as a required production design until validation results
+show where the cleanest boundary belongs.
 
 ## 6. Recovery And Availability Risks
 
@@ -128,9 +127,10 @@ must not claim to restore the private key. A revocation artifact should be
 created while the key is available; the product must not imply that it can be
 created after the device-bound private keys are lost.
 
-## 7. POC Security Questions
+## 7. Validation Security Questions
 
-The POC must answer these questions before production planning proceeds:
+The validation track must answer these questions before production planning
+proceeds:
 
 - Can CypherAir construct valid OpenPGP P-256 public certificates without
   storing private scalars?
@@ -158,5 +158,5 @@ Do not implement any of the following:
 - Falling back to current secret-certificate unwrap when a Secure Enclave
   Custody operation fails.
 - Mutating existing Profile A/B behavior while experimenting with this mode.
-- Treating POC-only packet construction or test hooks as production-ready
+- Treating proof-only packet construction or test hooks as production-ready
   security architecture.
