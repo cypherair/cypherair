@@ -7,8 +7,7 @@
 > Audience: Product, design, security, Swift/Rust implementers, reviewers, and
 > AI coding tools.
 > Related: [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
-> [POC Plan](APPLE_SECURE_ENCLAVE_CUSTODY_POC.md),
-> [Feasibility Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY.md),
+> [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
 > [PRD](PRD.md), [Security](SECURITY.md), and
 > [Architecture](ARCHITECTURE.md).
 
@@ -150,7 +149,8 @@ A safer status model is:
 
 ## 7. Deferred Lifecycle Questions
 
-The following decisions are deferred until the POC produces evidence:
+The following decisions are deferred until the validation track produces
+evidence:
 
 - Whether the production OpenPGP certificate should be v4 or v6.
 - Which certificate creation, expiry modification, selective revocation, contact
