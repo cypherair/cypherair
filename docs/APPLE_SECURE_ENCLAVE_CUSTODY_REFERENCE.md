@@ -189,6 +189,8 @@ Exit markers:
 Purpose: prove that Secure Enclave P-256 ECDH can recover an OpenPGP session
 key and preserve CypherAir decrypt security behavior.
 
+POC evidence: [Phase 4 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE4.md).
+
 Prototype a Secure Enclave-backed ECDH decrypt path that:
 
 - Generates or imports a test message encrypted to the P-256 OpenPGP public key

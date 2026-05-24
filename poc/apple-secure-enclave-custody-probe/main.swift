@@ -6,8 +6,10 @@ private let bundleIdentifier = Bundle.main.bundleIdentifier
     ?? "com.chentianren.cypherair.poc.secureenclavecustody.probe"
 private let fixtureSchema = "com.cypherair.poc.secure-enclave-custody.phase3.fixture.v1"
 private let stateSchema = "com.cypherair.poc.secure-enclave-custody.phase3.state.v1"
-private let requestSchema = "com.cypherair.poc.secure-enclave-custody.phase3.request.v1"
+private let phase3RequestSchema = "com.cypherair.poc.secure-enclave-custody.phase3.request.v1"
+private let phase4RequestSchema = "com.cypherair.poc.secure-enclave-custody.phase4.request.v1"
 private let responseSchema = "com.cypherair.poc.secure-enclave-custody.phase3.response.v1"
+private let deriveSharedResponseSchema = "com.cypherair.poc.secure-enclave-custody.phase4.derive-shared.response.v1"
 private let signingRole = "signing"
 private let keyAgreementRole = "keyAgreement"
 private let sha256Name = "SHA256"
@@ -42,6 +44,14 @@ struct SignDigestRequest: Decodable {
     let hashAlgorithm: String
     let digestHex: String
     let expectedSigningPublicKeyX963Hex: String
+}
+
+struct DeriveSharedRequest: Decodable {
+    let schema: String?
+    let statePath: String
+    let responsePath: String
+    let peerPublicKeyX963Hex: String
+    let expectedAgreementPublicKeyX963Hex: String
 }
 
 struct CleanupRequest: Decodable {
@@ -120,6 +130,14 @@ struct SignResult {
     let s: Data
 }
 
+struct DeriveSharedResponse: Codable {
+    let schema: String
+    let status: String
+    let keyAgreementAlgorithm: String
+    let sharedSecretHex: String
+    let sharedSecretLength: Int
+}
+
 struct FailureCase: Codable {
     let name: String
     let rejected: Bool
@@ -135,6 +153,9 @@ func main() {
             printJSON(report)
         case "sign-digest":
             let report = try signDigestMode(requestPath: requestPath)
+            printJSON(report)
+        case "derive-shared":
+            let report = try deriveSharedMode(requestPath: requestPath)
             printJSON(report)
         case "cleanup":
             let report = try cleanup(requestPath: requestPath)
@@ -267,6 +288,28 @@ func signDigestMode(requestPath: String) throws -> [String: Any] {
     ]
 }
 
+func deriveSharedMode(requestPath: String) throws -> [String: Any] {
+    let request: DeriveSharedRequest = try readJSONFile(requestPath)
+    let sharedSecret = try deriveShared(request)
+    let response = DeriveSharedResponse(
+        schema: deriveSharedResponseSchema,
+        status: "passed",
+        keyAgreementAlgorithm: "ecdhKeyExchangeStandard",
+        sharedSecretHex: hex(sharedSecret),
+        sharedSecretLength: sharedSecret.count
+    )
+    try writeJSONExclusive(response, to: request.responsePath)
+    return [
+        "phase": "phase4",
+        "mode": "derive-shared",
+        "status": "passed",
+        "keyAgreementAlgorithm": "ecdhKeyExchangeStandard",
+        "sharedSecretLength": sharedSecret.count,
+        "sharedSecretWritten": true,
+        "materialsPrinted": false,
+    ]
+}
+
 func cleanup(requestPath: String) throws -> [String: Any] {
     let request: CleanupRequest = try readJSONFile(requestPath)
     try validateRequestSchema(request.schema)
@@ -310,12 +353,12 @@ func failureMode(requestPath: String) throws -> [String: Any] {
 
     cases.append(runFailureCase("unsupportedHash") {
         var req = validSignRequest(statePath: request.statePath, workDirectory: request.workDirectory, publicKeyHex: signing.publicKeyX963Hex)
-        req = SignDigestRequest(schema: requestSchema, statePath: req.statePath, responsePath: req.responsePath, hashAlgorithm: "SHA512", digestHex: req.digestHex, expectedSigningPublicKeyX963Hex: req.expectedSigningPublicKeyX963Hex)
+        req = SignDigestRequest(schema: phase3RequestSchema, statePath: req.statePath, responsePath: req.responsePath, hashAlgorithm: "SHA512", digestHex: req.digestHex, expectedSigningPublicKeyX963Hex: req.expectedSigningPublicKeyX963Hex)
         _ = try signDigest(req)
     })
     cases.append(runFailureCase("wrongDigestLength") {
         var req = validSignRequest(statePath: request.statePath, workDirectory: request.workDirectory, publicKeyHex: signing.publicKeyX963Hex)
-        req = SignDigestRequest(schema: requestSchema, statePath: req.statePath, responsePath: req.responsePath, hashAlgorithm: sha256Name, digestHex: "00", expectedSigningPublicKeyX963Hex: req.expectedSigningPublicKeyX963Hex)
+        req = SignDigestRequest(schema: phase3RequestSchema, statePath: req.statePath, responsePath: req.responsePath, hashAlgorithm: sha256Name, digestHex: "00", expectedSigningPublicKeyX963Hex: req.expectedSigningPublicKeyX963Hex)
         _ = try signDigest(req)
     })
     cases.append(runFailureCase("wrongExpectedPublic") {
@@ -398,6 +441,77 @@ func failureMode(requestPath: String) throws -> [String: Any] {
         let req = validSignRequest(statePath: path, workDirectory: request.workDirectory, publicKeyHex: signing.publicKeyX963Hex)
         _ = try signDigest(req)
     })
+    cases.append(runFailureCase("badPeerPublicKey") {
+        let req = validDeriveRequest(
+            statePath: request.statePath,
+            workDirectory: request.workDirectory,
+            peerPublicKeyHex: String(repeating: "00", count: 65),
+            publicKeyHex: agreement.publicKeyX963Hex
+        )
+        _ = try deriveShared(req)
+    })
+    cases.append(runFailureCase("wrongExpectedAgreementPublic") {
+        let req = validDeriveRequest(
+            statePath: request.statePath,
+            workDirectory: request.workDirectory,
+            peerPublicKeyHex: signing.publicKeyX963Hex,
+            publicKeyHex: signing.publicKeyX963Hex
+        )
+        _ = try deriveShared(req)
+    })
+    cases.append(runFailureCase("missingAgreementKeychainRow") {
+        var modified = state
+        modified.keys = state.keys.map { key in
+            var copy = key
+            if copy.role == keyAgreementRole {
+                copy.applicationTagHex = hex(Data("\(tagPrefix).missing.\(UUID().uuidString)".utf8))
+            }
+            return copy
+        }
+        let path = try writeFailureState(modified, in: request.workDirectory)
+        let req = validDeriveRequest(statePath: path, workDirectory: request.workDirectory, peerPublicKeyHex: signing.publicKeyX963Hex, publicKeyHex: agreement.publicKeyX963Hex)
+        _ = try deriveShared(req)
+    })
+    cases.append(runFailureCase("substitutedAgreementSigningTag") {
+        var modified = state
+        modified.keys = state.keys.map { key in
+            var copy = key
+            if copy.role == keyAgreementRole {
+                copy.applicationTagHex = signing.applicationTagHex
+                copy.label = signing.label
+            }
+            return copy
+        }
+        let path = try writeFailureState(modified, in: request.workDirectory)
+        let req = validDeriveRequest(statePath: path, workDirectory: request.workDirectory, peerPublicKeyHex: signing.publicKeyX963Hex, publicKeyHex: agreement.publicKeyX963Hex)
+        _ = try deriveShared(req)
+    })
+    cases.append(runFailureCase("nonSecureEnclaveAgreementKey") {
+        let softwareKey = try createSoftwareKey(role: keyAgreementRole, runId: state.runId, accessGroup: state.keychainAccessGroup)
+        defer {
+            _ = try? deleteKey(softwareKey, accessGroup: state.keychainAccessGroup)
+        }
+        var modified = state
+        modified.keys = state.keys.map { key in
+            key.role == keyAgreementRole ? softwareKey : key
+        }
+        let path = try writeFailureState(modified, in: request.workDirectory)
+        let req = validDeriveRequest(statePath: path, workDirectory: request.workDirectory, peerPublicKeyHex: signing.publicKeyX963Hex, publicKeyHex: softwareKey.publicKeyX963Hex)
+        _ = try deriveShared(req)
+    })
+    cases.append(runFailureCase("wrongAgreementSizeMetadata") {
+        var modified = state
+        modified.keys = state.keys.map { key in
+            var copy = key
+            if copy.role == keyAgreementRole {
+                copy.keySizeInBits = 384
+            }
+            return copy
+        }
+        let path = try writeFailureState(modified, in: request.workDirectory)
+        let req = validDeriveRequest(statePath: path, workDirectory: request.workDirectory, peerPublicKeyHex: signing.publicKeyX963Hex, publicKeyHex: agreement.publicKeyX963Hex)
+        _ = try deriveShared(req)
+    })
 
     let passed = cases.allSatisfy(\.rejected)
     return [
@@ -458,12 +572,57 @@ func signDigest(_ request: SignDigestRequest) throws -> SignResult {
     return SignResult(encoding: "ecdsa-x962-der", r: r, s: s)
 }
 
+func deriveShared(_ request: DeriveSharedRequest) throws -> Data {
+    try validateRequestSchema(request.schema)
+    let peerPublic = try hexDecode(request.peerPublicKeyX963Hex)
+    try validateX963(peerPublic)
+    let expectedPublic = try hexDecode(request.expectedAgreementPublicKeyX963Hex)
+    try validateX963(expectedPublic)
+
+    let state = try readState(request.statePath)
+    let signing = try state.key(role: signingRole)
+    let agreement = try state.key(role: keyAgreementRole)
+    guard agreement.publicKeyX963Hex == request.expectedAgreementPublicKeyX963Hex else {
+        throw ProbeError.keyBinding
+    }
+    guard signing.publicKeyX963Hex != agreement.publicKeyX963Hex else {
+        throw ProbeError.keyBinding
+    }
+
+    let privateKey = try copyPrivateKey(agreement, accessGroup: state.keychainAccessGroup)
+    try validateAgreementKey(
+        privateKey,
+        agreement: agreement,
+        signing: signing,
+        accessGroup: state.keychainAccessGroup
+    )
+    let peerKey = try publicKeyFromX963(peerPublic)
+    let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandard
+    guard SecKeyIsAlgorithmSupported(privateKey, .keyExchange, algorithm) else {
+        throw ProbeError.secureEnclave
+    }
+    var error: Unmanaged<CFError>?
+    guard let shared = SecKeyCopyKeyExchangeResult(
+        privateKey,
+        algorithm,
+        peerKey,
+        [:] as CFDictionary,
+        &error
+    ) as Data? else {
+        throw ProbeError.secureEnclave
+    }
+    guard shared.count == 32 else {
+        throw ProbeError.keyBinding
+    }
+    return shared
+}
+
 func createSecureEnclaveKey(role: String, runId: String, accessGroup: String) throws -> StoredKey {
     try createKey(role: role, runId: runId, accessGroup: accessGroup, secureEnclave: true, keySize: 256)
 }
 
-func createSoftwareKey(runId: String, accessGroup: String) throws -> StoredKey {
-    try createKey(role: signingRole, runId: runId, accessGroup: accessGroup, secureEnclave: false, keySize: 256)
+func createSoftwareKey(role: String = signingRole, runId: String, accessGroup: String) throws -> StoredKey {
+    try createKey(role: role, runId: runId, accessGroup: accessGroup, secureEnclave: false, keySize: 256)
 }
 
 func createKey(
@@ -486,6 +645,8 @@ func createKey(
     ]
     if role == signingRole {
         privateAttributes[kSecAttrCanSign] = true
+    } else if role == keyAgreementRole {
+        privateAttributes[kSecAttrCanDerive] = true
     }
     var attributes: [CFString: Any] = [
         kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
@@ -622,6 +783,44 @@ func validatePrivateKey(
     _ = accessGroup
 }
 
+func validateAgreementKey(
+    _ privateKey: SecKey,
+    agreement: StoredKey,
+    signing: StoredKey,
+    accessGroup: String
+) throws {
+    guard signing.role == signingRole,
+          agreement.role == keyAgreementRole,
+          signing.algorithm == "ECDSA",
+          agreement.algorithm == "ECDH",
+          signing.curve == "NIST P-256",
+          agreement.curve == "NIST P-256",
+          agreement.keySizeInBits == 256,
+          agreement.tokenID == "SecureEnclave",
+          signing.publicKeyX963Hex != agreement.publicKeyX963Hex else {
+        throw ProbeError.keyBinding
+    }
+    let publicKey = try publicX963(from: privateKey)
+    guard hex(publicKey) == agreement.publicKeyX963Hex else {
+        throw ProbeError.keyBinding
+    }
+    guard publicKey.count == 65 else {
+        throw ProbeError.keyBinding
+    }
+
+    guard let attributes = SecKeyCopyAttributes(privateKey) as? [CFString: Any] else {
+        throw ProbeError.keychain
+    }
+    guard cfStringEquals(attributes[kSecAttrKeyType], kSecAttrKeyTypeECSECPrimeRandom),
+          intValue(attributes[kSecAttrKeySizeInBits]) == 256,
+          cfStringEquals(attributes[kSecAttrTokenID], kSecAttrTokenIDSecureEnclave),
+          boolValue(attributes[kSecAttrCanDerive]) != false else {
+        throw ProbeError.keyBinding
+    }
+
+    _ = accessGroup
+}
+
 func publicX963(from privateKey: SecKey) throws -> Data {
     guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
         throw ProbeError.keychain
@@ -632,6 +831,20 @@ func publicX963(from privateKey: SecKey) throws -> Data {
     }
     try validateX963(representation)
     return representation
+}
+
+func publicKeyFromX963(_ x963: Data) throws -> SecKey {
+    try validateX963(x963)
+    let attributes: [CFString: Any] = [
+        kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+        kSecAttrKeyClass: kSecAttrKeyClassPublic,
+        kSecAttrKeySizeInBits: 256,
+    ]
+    var error: Unmanaged<CFError>?
+    guard let key = SecKeyCreateWithData(x963 as CFData, attributes as CFDictionary, &error) else {
+        throw ProbeError.keyBinding
+    }
+    return key
 }
 
 func createSignature(_ privateKey: SecKey, algorithm: SecKeyAlgorithm, digest: Data) throws -> Data {
@@ -721,12 +934,28 @@ func readState(_ path: String) throws -> ProbeState {
 func validSignRequest(statePath: String, workDirectory: String, publicKeyHex: String) -> SignDigestRequest {
     let responsePath = workDirectory + "/response-\(UUID().uuidString.lowercased()).json"
     return SignDigestRequest(
-        schema: requestSchema,
+        schema: phase3RequestSchema,
         statePath: statePath,
         responsePath: responsePath,
         hashAlgorithm: sha256Name,
         digestHex: String(repeating: "11", count: 32),
         expectedSigningPublicKeyX963Hex: publicKeyHex
+    )
+}
+
+func validDeriveRequest(
+    statePath: String,
+    workDirectory: String,
+    peerPublicKeyHex: String,
+    publicKeyHex: String
+) -> DeriveSharedRequest {
+    let responsePath = workDirectory + "/derive-response-\(UUID().uuidString.lowercased()).json"
+    return DeriveSharedRequest(
+        schema: phase4RequestSchema,
+        statePath: statePath,
+        responsePath: responsePath,
+        peerPublicKeyX963Hex: peerPublicKeyHex,
+        expectedAgreementPublicKeyX963Hex: publicKeyHex
     )
 }
 
@@ -853,7 +1082,7 @@ func requireInsideDirectory(_ path: String, directory: String) throws {
 }
 
 func validateRequestSchema(_ schema: String?) throws {
-    guard schema == nil || schema == requestSchema else {
+    guard schema == nil || schema == phase3RequestSchema || schema == phase4RequestSchema else {
         throw ProbeError.requestSchema
     }
 }
@@ -893,6 +1122,16 @@ func intValue(_ value: Any?) -> Int? {
     }
     if let number = value as? NSNumber {
         return number.intValue
+    }
+    return nil
+}
+
+func boolValue(_ value: Any?) -> Bool? {
+    if let bool = value as? Bool {
+        return bool
+    }
+    if let number = value as? NSNumber {
+        return number.boolValue
     }
     return nil
 }
