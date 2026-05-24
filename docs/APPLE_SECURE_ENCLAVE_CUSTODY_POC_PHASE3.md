@@ -40,9 +40,10 @@ included these entitlement classes:
 - Apple-injected application and team identifiers
 
 `codesign -d --entitlements -` successfully showed the expected entitlements on
-the built `.app`. `codesign --verify` still reported `CSSMERR_TP_NOT_TRUSTED`
-in this local shell, but the signed probe launched and completed the Secure
-Enclave, Keychain, and signing runtime checks below.
+the built `.app`; `CSSMERR_TP_NOT_TRUSTED` appeared only inside the ordinary
+Codex command sandbox, while `codesign --verify --strict --verbose=4` passed
+outside that sandbox, so it is classified as a Codex keychain/trust visibility
+artifact rather than a probe entitlement or app-sandbox failure.
 
 ## Secure Enclave Runtime Evidence
 
