@@ -83,6 +83,35 @@ for the v6 candidate. Public certificate lengths remained 639 bytes for v4 and
 AES Key Wrap unwrap, payload decrypt, signature verification, and zeroization of
 plaintext buffers after comparison.
 
+## Phase 4.5 GnuPG Interop Control
+
+The Phase 4 Rust harness now includes a GnuPG-focused compatibility control for
+Secure Enclave shaped v4 material. `gnupg-mock-control` uses a software P-256
+v4 control certificate with the same public OpenPGP shape expected from the SE
+path: ECDSA P-256 primary key with certify/sign flags, ECDH P-256 subkey with
+SHA256 KDF and AES256 KEK, and user-id features limited to SEIPDv1/MDC.
+
+On the tested machine, isolated `GNUPGHOME` execution with GnuPG 2.5.19 passed
+for:
+
+- importing the v4 P-256 public certificate into GnuPG;
+- confirming primary algorithm 19, subkey algorithm 18, `nistp256`, and matching
+  fingerprint through `--with-colons`;
+- verifying a Sequoia/SE-shaped detached ECDSA signature with `GOODSIG` and
+  `VALIDSIG`;
+- rejecting tampered signed data;
+- encrypting with GnuPG to the v4 P-256 ECDH certificate and confirming the
+  packet shape is PKESK v3 ECDH plus SEIPDv1/MDC, not AEAD/tag 20;
+- decrypting that GnuPG ciphertext through the external decryptor seam; and
+- rejecting tampered encrypted data without accepting partial plaintext.
+
+The companion `gnupg-interop --request <0600 json>` mode uses the signed Swift
+probe for the real Secure Enclave signing and ECDH operations and adds the
+bidirectional full-message scenarios: SE sign+encrypt to a temporary GnuPG
+P-256 recipient, and GnuPG sign+encrypt back to the SE v4 certificate. That mode
+is hardware/request-state dependent and was added as a manual evidence path; it
+must not be treated as CI-mandatory.
+
 ## Failure And Cleanup Evidence
 
 Swift failure coverage passed for invalid peer public key, wrong expected

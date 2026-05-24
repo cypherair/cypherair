@@ -206,6 +206,11 @@ This phase should evaluate whether Sequoia's `Decryptor` trait, a
 fixed-session-key route, or another boundary is most appropriate after the
 session key is recovered.
 
+Phase 4.5 compatibility addendum: the disposable harness should also keep a
+GnuPG-focused v4 control path for the Secure Enclave-specific public certificate,
+signature, and decrypt boundary. That evidence is supporting compatibility
+evidence, not a substitute for Phase 5 architecture validation.
+
 Exit markers:
 
 - At least one P-256 encrypted message decrypts through the proposed custody
