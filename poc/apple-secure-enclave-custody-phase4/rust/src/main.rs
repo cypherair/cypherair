@@ -5,7 +5,7 @@ use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -202,6 +202,7 @@ struct CertEvidence {
 
 struct GnuPGHarness {
     gpg: PathBuf,
+    gpg_agent: PathBuf,
     root: PathBuf,
     home: PathBuf,
     version: String,
@@ -1189,8 +1190,9 @@ where
 impl GnuPGHarness {
     fn new(start_agent: bool) -> ProbeResult<Self> {
         let gpg = find_gpg()?;
+        let gpg_agent = find_gpg_agent(&gpg)?;
         let version = gpg_version(&gpg)?;
-        let root = create_private_temp_dir("cypherair-phase45-gnupg")?;
+        let root = create_private_temp_dir_in(&short_temp_parent(), "ca-gpg")?;
         let home = root.join("gnupg");
         fs::create_dir(&home).map_err(|_| "gpgHomeCreate".to_string())?;
         fs::set_permissions(&home, fs::Permissions::from_mode(0o700))
@@ -1206,6 +1208,7 @@ impl GnuPGHarness {
         )?;
         let harness = Self {
             gpg,
+            gpg_agent,
             root,
             home,
             version,
@@ -1217,14 +1220,17 @@ impl GnuPGHarness {
     }
 
     fn start_agent(&self) -> ProbeResult<()> {
-        let output = Command::new("gpg-agent")
+        let status = Command::new(&self.gpg_agent)
             .env("GNUPGHOME", &self.home)
             .arg("--homedir")
             .arg(&self.home)
             .arg("--daemon")
-            .output()
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
             .map_err(|_| "gpgAgentLaunch".to_string())?;
-        if output.status.success() {
+        if status.success() {
             Ok(())
         } else {
             Err("gpgAgentUnavailable".to_string())
@@ -1500,12 +1506,44 @@ fn find_gpg() -> ProbeResult<PathBuf> {
         "/usr/local/bin/gpg",
         "/usr/bin/gpg",
     ] {
-        let output = Command::new(candidate).arg("--version").output();
-        if matches!(output, Ok(ref value) if value.status.success()) {
+        if command_version_ok(Path::new(candidate)) {
             return Ok(PathBuf::from(candidate));
         }
     }
     Err("gpgUnavailable".to_string())
+}
+
+fn find_gpg_agent(gpg: &Path) -> ProbeResult<PathBuf> {
+    if let Some(parent) = gpg.parent() {
+        if !parent.as_os_str().is_empty() {
+            let candidate = parent.join("gpg-agent");
+            if command_version_ok(&candidate) {
+                return Ok(candidate);
+            }
+        }
+    }
+    for candidate in [
+        "gpg-agent",
+        "/opt/homebrew/bin/gpg-agent",
+        "/usr/local/bin/gpg-agent",
+        "/usr/bin/gpg-agent",
+    ] {
+        if command_version_ok(Path::new(candidate)) {
+            return Ok(PathBuf::from(candidate));
+        }
+    }
+    Err("gpgAgentUnavailable".to_string())
+}
+
+fn command_version_ok(candidate: &Path) -> bool {
+    Command::new(candidate)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 fn gpg_version(gpg: &Path) -> ProbeResult<String> {
@@ -2287,13 +2325,22 @@ fn write_exclusive_0600(path: &Path, bytes: &[u8]) -> ProbeResult<()> {
     Ok(())
 }
 
-fn create_private_temp_dir(prefix: &str) -> ProbeResult<PathBuf> {
-    let path = unique_path(&env::temp_dir(), prefix, "d");
+fn create_private_temp_dir_in(parent: &Path, prefix: &str) -> ProbeResult<PathBuf> {
+    let path = unique_path(parent, prefix, "d");
     fs::create_dir(&path).map_err(|_| "tempDirCreate".to_string())?;
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
         .map_err(|_| "tempDirPolicy".to_string())?;
     validate_owned_dir(&path, 0o700)?;
     Ok(path)
+}
+
+fn short_temp_parent() -> PathBuf {
+    let private_tmp = Path::new("/private/tmp");
+    if cfg!(target_os = "macos") && private_tmp.is_dir() {
+        private_tmp.to_path_buf()
+    } else {
+        env::temp_dir()
+    }
 }
 
 fn unique_path(directory: &Path, prefix: &str, ext: &str) -> PathBuf {
