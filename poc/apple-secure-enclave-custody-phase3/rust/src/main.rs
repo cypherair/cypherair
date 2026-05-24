@@ -64,22 +64,35 @@ struct SwiftState {
     schema: String,
     #[serde(rename = "secureEnclaveAvailable")]
     secure_enclave_available: bool,
+    implementation: String,
+    #[serde(rename = "secKeyCreateRandomKeyAvailable")]
+    sec_key_create_random_key_available: bool,
+    #[serde(rename = "keychainAccessGroupSuffix")]
+    keychain_access_group_suffix: Option<String>,
+    #[serde(rename = "applicationTagPrefix")]
+    application_tag_prefix: Option<String>,
     keys: Vec<SwiftStateKey>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 struct SwiftStateKey {
     role: String,
+    #[serde(rename = "applicationTagHex")]
+    application_tag_hex: Option<String>,
     #[serde(rename = "publicKeyX963Hex")]
     public_key_x963_hex: String,
     #[serde(rename = "publicKeyX963Length")]
     public_key_x963_length: usize,
     #[serde(rename = "keyType")]
     key_type: String,
+    #[serde(rename = "keyClass")]
+    key_class: Option<String>,
     #[serde(rename = "keySizeBits")]
     key_size_bits: usize,
     #[serde(rename = "tokenID")]
     token_id: String,
+    #[serde(rename = "accessControl")]
+    access_control: Option<String>,
 }
 
 #[derive(Clone)]
@@ -887,7 +900,7 @@ impl ExternalSecKeySigner {
             return Err("wrongDigestLength".to_string());
         }
         validate_private_directory(&self.bridge.temp_dir)?;
-        validate_executable(&self.bridge.bridge_path)?;
+        validate_probe_executable(&self.bridge.bridge_path)?;
         let state_path = self.bridge.state_path.to_string_lossy().to_string();
         let request_name = format!(
             "phase3-bridge-request-{}-{}.json",
@@ -1007,7 +1020,7 @@ fn bridge_materials(request: &RustRequest) -> ProbeResult<(BridgeConfig, BoundPu
         .or_else(|| request.temp_dir_alias.clone())
         .ok_or_else(|| "missingTempDir".to_string())?;
     validate_private_directory(&temp_dir)?;
-    validate_executable(&bridge_path)?;
+    validate_probe_executable(&bridge_path)?;
     let state: SwiftState = serde_json::from_slice(&read_secure_file(&state_path)?)
         .map_err(|_| "stateJson".to_string())?;
     let bound = bound_publics_from_state(&state)?;
@@ -1029,10 +1042,22 @@ fn bound_publics_from_state(state: &SwiftState) -> ProbeResult<BoundPublics> {
     if !state.secure_enclave_available {
         return Err("secureEnclaveUnavailable".to_string());
     }
+    if state.implementation != "Security SecKey Secure Enclave permanent key"
+        || !state.sec_key_create_random_key_available
+    {
+        return Err("stateImplementationNotSecKey".to_string());
+    }
+    if state.keychain_access_group_suffix.as_deref()
+        != Some("com.chentianren.cypherair.poc.secureenclavecustody.probe")
+        || state.application_tag_prefix.as_deref()
+            != Some("com.cypherair.poc.secure-enclave-custody.probe.phase3")
+    {
+        return Err("stateLocatorMetadata".to_string());
+    }
     let signing = state_key(state, "signing")?;
     let agreement = state_key(state, "keyAgreement")?;
-    validate_state_key(signing, "SecureEnclave.P256.Signing.PrivateKey")?;
-    validate_state_key(agreement, "SecureEnclave.P256.KeyAgreement.PrivateKey")?;
+    validate_state_key(signing)?;
+    validate_state_key(agreement)?;
     Ok(BoundPublics {
         signing_x963: hex_decode(&signing.public_key_x963_hex)?,
         agreement_x963: hex_decode(&agreement.public_key_x963_hex)?,
@@ -1047,9 +1072,15 @@ fn state_key<'a>(state: &'a SwiftState, role: &str) -> ProbeResult<&'a SwiftStat
         .ok_or_else(|| format!("missingStateRole:{role}"))
 }
 
-fn validate_state_key(key: &SwiftStateKey, expected_type: &str) -> ProbeResult<()> {
-    if key.key_type != expected_type {
+fn validate_state_key(key: &SwiftStateKey) -> ProbeResult<()> {
+    if key.key_type != "SecKey.ECSECPrimeRandom.PrivateKey"
+        || key.key_class.as_deref() != Some("private")
+        || key.access_control.as_deref() != Some("privateKeyUsage")
+    {
         return Err("stateKeyType".to_string());
+    }
+    if key.application_tag_hex.as_deref().unwrap_or_default().is_empty() {
+        return Err("stateKeyLocator".to_string());
     }
     if key.key_size_bits != 256 || key.token_id != "SecureEnclave" {
         return Err("stateKeyAttributes".to_string());
@@ -1322,6 +1353,30 @@ fn validate_executable(path: &Path) -> ProbeResult<()> {
     }
     if metadata.mode() & 0o111 == 0 {
         return Err("bridgeNotExecutable".to_string());
+    }
+    Ok(())
+}
+
+fn validate_probe_executable(path: &Path) -> ProbeResult<()> {
+    validate_executable(path)?;
+    if path.file_name().and_then(|name| name.to_str()) != Some("SecureEnclaveCustodyProbe") {
+        return Err("bridgeExecutableName".to_string());
+    }
+    let macos_dir = path.parent().ok_or_else(|| "bridgeBundleShape".to_string())?;
+    if macos_dir.file_name().and_then(|name| name.to_str()) != Some("MacOS") {
+        return Err("bridgeBundleShape".to_string());
+    }
+    let contents_dir = macos_dir
+        .parent()
+        .ok_or_else(|| "bridgeBundleShape".to_string())?;
+    if contents_dir.file_name().and_then(|name| name.to_str()) != Some("Contents") {
+        return Err("bridgeBundleShape".to_string());
+    }
+    let app_dir = contents_dir
+        .parent()
+        .ok_or_else(|| "bridgeBundleShape".to_string())?;
+    if app_dir.file_name().and_then(|name| name.to_str()) != Some("SecureEnclaveCustodyProbe.app") {
+        return Err("bridgeBundleShape".to_string());
     }
     Ok(())
 }

@@ -24,14 +24,16 @@ Profile B behavior changes.
 
 The disposable probes live at:
 
-- `poc/apple-secure-enclave-custody-phase3/swift/`
+- `poc/apple-secure-enclave-custody-probe/`
 - `poc/apple-secure-enclave-custody-phase3/rust/`
 
-The Swift probe creates restricted local state and signs request-file digests
-through a Secure Enclave P-256 signing key. The Rust probe implements a
-disposable Sequoia `crypto::Signer` adapter that writes per-signature bridge
-request/response files, invokes the Swift bridge, converts fixed-width P-256
-`r`/`s` values into OpenPGP ECDSA MPIs, and deletes per-signature bridge files.
+The Xcode-signed `SecureEnclaveCustodyProbe` app target creates restricted
+local state, generates permanent Secure Enclave `SecKey` rows, and signs
+request-file digests through a Secure Enclave P-256 signing key. The Rust probe
+implements a disposable Sequoia `crypto::Signer` adapter that writes
+per-signature bridge request/response files, invokes the signed bridge,
+converts fixed-width P-256 `r`/`s` values into OpenPGP ECDSA MPIs, and deletes
+per-signature bridge files.
 
 ## 2. Tested Environment
 
@@ -40,60 +42,63 @@ request/response files, invokes the Swift bridge, converts fixed-width P-256
 - Swift: Apple Swift 6.3.2 (`swiftlang-6.3.2.1.108`), target
   `arm64-apple-macosx26.0`.
 - Rust: `rustc 1.95.0`, `cargo 1.95.0`.
+- Xcode: signed macOS `.app` target `SecureEnclaveCustodyProbe`, bundle id
+  `com.chentianren.cypherair.poc.secureenclavecustody.probe`.
 - Secure Enclave availability from the Swift bridge: `true`.
 - Sequoia: `sequoia-openpgp 2.3.0` with the same OpenSSL feature family used
   by CypherAir's Rust crate.
 
-SwiftPM and Secure Enclave bridge runs needed to execute outside the repository
-sandbox because the unsigned command-line process reconstructs Secure Enclave
-handles through local system services. The POC itself is repository-local and
-does not require network access at runtime.
+Secure Enclave bridge runs executed outside the repository sandbox because the
+signed app target creates Keychain rows and uses the app container for
+request/state/response files. The POC itself is repository-local and does not
+require network access at runtime.
 
 ## 3. Implementation Finding
 
-The original Phase 3 plan targeted `SecKeyCreateRandomKey` with
-`kSecAttrTokenIDSecureEnclave` so the bridge could address permanent Keychain
-items directly. On this host, the unsigned SwiftPM command-line environment
-returned `errSecMissingEntitlement` (`-34018`) for Secure Enclave `SecKey`
-generation, including attempts with permanent and non-permanent keys.
+The initial SwiftPM command-line bridge hit `errSecMissingEntitlement`
+(`-34018`) when trying to generate Secure Enclave `SecKey` keys. That earlier
+CryptoKit handle bridge is now superseded and is not final Phase 3 acceptance
+evidence.
 
-To keep Phase 3 focused on the OpenPGP external-signing question, the
-implemented hardware path uses CryptoKit `SecureEnclave.P256.Signing.PrivateKey`
-and `SecureEnclave.P256.KeyAgreement.PrivateKey` handles in a restricted local
-state file. This is still Secure Enclave-backed signing, not a software
-fallback, but it means this POC does not prove the final production `SecKey`
-Keychain-row lifecycle. Production planning must revalidate the `SecKey` path
-inside an entitled app or app-test context before choosing the final bridge.
+The follow-up implementation adds an isolated Xcode-signed macOS app-like POC
+target, `SecureEnclaveCustodyProbe`. Xcode automatic signing produced an
+embedded Mac Team provisioning profile and expanded the POC-only
+`keychain-access-groups` entitlement into the team-prefixed access group. The
+signed app target successfully created permanent Secure Enclave P-256 `SecKey`
+private-key rows with `SecKeyCreateRandomKey` and
+`kSecAttrTokenIDSecureEnclave`.
 
-The bridge still preserves the important Phase 3 security properties:
+The bridge preserves the important Phase 3 security properties:
 
 - digest bytes, hash algorithm, state path, and response path are carried in a
   private `0600` request file, not in `sign-digest` argv.
 - state/request/response/result files are opened with no-follow semantics and
   require a `0700` parent directory plus `0600` file mode.
-- each signing operation reconstructs the Secure Enclave handle and revalidates
-  the signing public X9.63 bytes against state before signing.
+- each signing operation reloads the Secure Enclave `SecKey` row from Keychain
+  and revalidates key type, key size, Secure Enclave token, role metadata, and
+  signing public X9.63 bytes against state before signing.
 - the signing public key must be distinct from the key-agreement public key.
 - stdout reports only sanitized booleans, byte lengths, algorithm names, key
   versions, artifact counts, and error classes.
 
 ## 4. Results
 
-### 4.1 Swift Secure Enclave Signing Bridge
+### 4.1 Signed Secure Enclave Custody Probe
 
-`Phase3SecureEnclaveSigningBridge` results:
+`SecureEnclaveCustodyProbe` results:
 
 | Mode | Result | Evidence |
 | --- | --- | --- |
-| `create-state` | pass | Generated distinct Secure Enclave P-256 signing and key-agreement handles; wrote sensitive state as `0600` in a `0700` directory. |
-| `sign-digest` | pass | Signed a SHA-256 digest from a `0600` request file; wrote DER-to-fixed-width `r`/`s` response as `0600`; did not print digest, paths, handles, or raw signature data. |
-| `failure` | pass | Rejected unsupported hash, wrong digest length, swapped role handle, public-key mismatch, corrupted handle, and symlinked request file. |
-| `cleanup` | pass | Removed 12 temporary capability files; the private temp directory had zero regular files afterward. |
+| Xcode build/signing | pass | Built `SecureEnclaveCustodyProbe.app`; final entitlements contained app sandbox and the expected team-prefixed keychain access group. |
+| `create-state` | pass | Generated distinct permanent Secure Enclave P-256 signing and key-agreement `SecKey` rows; wrote sensitive state as `0600` in a `0700` app-container directory. |
+| `sign-digest` | pass | Signed a SHA-256 digest from a `0600` request file; wrote DER-to-fixed-width `r`/`s` response as `0600`; `r` and `s` were 32 bytes each. |
+| `failure` | pass | Rejected unsupported hash, wrong digest length, corrupted state, substituted tags, public-key mismatch, missing row, non-SE row, wrong-size row, and symlinked request file. |
+| `cleanup` | pass | Removed probe Keychain rows and 13 temporary capability files; the private temp directory had zero regular files afterward. |
 
-State/request/result permissions were checked with `stat`; the observed files
-were `0600` and owned by the current user. Per-signature Rust bridge request
-and response files were also checked after SE runs; zero per-call bridge files
-remained.
+State/request/response/result permissions were checked with `stat`; the
+observed files were `0600` and owned by the current user. Per-signature Rust
+bridge request and response files were also checked after SE runs; zero
+per-call bridge files remained.
 
 ### 4.2 Software External Signer Control
 
@@ -116,8 +121,8 @@ Binding artifact sizes:
 ### 4.3 Secure Enclave Binding Signatures
 
 The Rust `secure-enclave-bindings` mode used Secure Enclave public keys from
-the Swift state file and the SE-backed bridge signer to construct v4 and v6
-candidate public certificates with:
+the signed probe state file and the SE-backed bridge signer to construct v4 and
+v6 candidate public certificates with:
 
 - direct-key metadata signature.
 - User ID self-certification.
@@ -167,9 +172,10 @@ The Rust `failure` mode passed seven negative cases:
 - symlinked request file.
 - missing bridge executable / bridge failure without software fallback.
 
-The Swift bridge failure mode additionally rejected role-handle substitution,
-public-key mismatch, corrupted handles, invalid hashes/digest lengths, and
-symlinked request files before signing.
+The signed Swift bridge failure mode additionally rejected substituted Keychain
+tags, public-key mismatch, corrupted state, missing Keychain rows, non-SE rows,
+wrong-size rows, invalid hashes/digest lengths, and symlinked request files
+before signing.
 
 ## 5. Security Findings
 
@@ -178,24 +184,25 @@ symlinked request files before signing.
   Enclave-backed signer, and accept the returned `r`/`s` MPIs as valid OpenPGP
   signatures.
 - The Phase 1 role-substitution risk remains real. Phase 3 mitigates it in the
-  POC by binding state role, expected X9.63 public key, key type metadata, key
-  size, token label, and distinct signing/agreement public keys before every
+  POC by reloading each `SecKey` row from Keychain and binding state role,
+  application tag, expected X9.63 public key, key type, key size, Secure
+  Enclave token, and distinct signing/agreement public keys before every
   signing operation.
 - The request-file transport avoids digest/hash/response-path exposure in the
   signer argv. Request, response, result, and state files are still local
   capability material and must be treated as sensitive.
-- The implemented CryptoKit bridge stores handle material in the state file,
-  so the state file is more sensitive than a pure public fixture. The POC
-  requires `0700`/`0600`, no-follow open checks, owner checks, and cleanup.
+- The state file contains Keychain locator material, so it is more sensitive
+  than a pure public fixture. The POC requires `0700`/`0600`, no-follow open
+  checks, owner checks, and cleanup.
 - The POC did not modify production app code, `Sources/Security/`,
-  `pgp-mobile/src/`, Xcode project files, entitlements, or current Profile A/B
-  behavior.
+  `pgp-mobile/src/`, production entitlements, or current Profile A/B behavior.
+  It adds only an isolated POC target/scheme and POC-only entitlements.
 
 ## 6. Residual Questions
 
-- The final production bridge still needs an entitled app-context validation of
-  the `SecKey` + permanent Keychain item path, including exact delete semantics
-  for Keychain rows and unavailable-item behavior.
+- Production integration still needs a design pass for app-owned custody
+  metadata, lifecycle UX, and how the POC bridge responsibilities map into
+  production modules.
 - This phase does not prove OpenPGP ECDH session-key recovery, AES Key Wrap
   unwrap, fixed-session-key decrypt integration, decrypt hard-fail behavior,
   or sensitive-buffer zeroization for recovered session keys.
@@ -208,20 +215,23 @@ symlinked request files before signing.
 ## 7. Commands Run
 
 ```bash
-xcrun swift build --package-path poc/apple-secure-enclave-custody-phase3/swift
-xcrun swift run --package-path poc/apple-secure-enclave-custody-phase3/swift Phase3SecureEnclaveSigningBridge -- --mode create-state --out <private-dir>/state.json
-xcrun swift run --package-path poc/apple-secure-enclave-custody-phase3/swift Phase3SecureEnclaveSigningBridge -- --mode sign-digest --request <private-dir>/sign-request.json
-xcrun swift run --package-path poc/apple-secure-enclave-custody-phase3/swift Phase3SecureEnclaveSigningBridge -- --mode failure --request <private-dir>/failure-request.json
+xcodebuild -list -project CypherAir.xcodeproj
+xcodebuild build -project CypherAir.xcodeproj -scheme SecureEnclaveCustodyProbe -destination 'platform=macOS'
+codesign -dvvv --entitlements - <built SecureEnclaveCustodyProbe.app>
+<built SecureEnclaveCustodyProbe.app>/Contents/MacOS/SecureEnclaveCustodyProbe --mode create-state --out <app-container-private-dir>/state.json
+<built SecureEnclaveCustodyProbe.app>/Contents/MacOS/SecureEnclaveCustodyProbe --mode sign-digest --request <app-container-private-dir>/sign-request.json
+<built SecureEnclaveCustodyProbe.app>/Contents/MacOS/SecureEnclaveCustodyProbe --mode failure --request <app-container-private-dir>/failure-request.json
 cargo test --manifest-path poc/apple-secure-enclave-custody-phase3/rust/Cargo.toml
 cargo run --manifest-path poc/apple-secure-enclave-custody-phase3/rust/Cargo.toml -- --mode external-signer-control
 cargo run --manifest-path poc/apple-secure-enclave-custody-phase3/rust/Cargo.toml -- --mode secure-enclave-bindings --request <private-dir>/rust-request-bindings.json
 cargo run --manifest-path poc/apple-secure-enclave-custody-phase3/rust/Cargo.toml -- --mode message-signatures --request <private-dir>/rust-request-messages.json
 cargo run --manifest-path poc/apple-secure-enclave-custody-phase3/rust/Cargo.toml -- --mode failure --request <private-dir>/rust-request-failure.json
-xcrun swift run --package-path poc/apple-secure-enclave-custody-phase3/swift Phase3SecureEnclaveSigningBridge -- --mode cleanup --request <private-dir>/cleanup-request.json
+<built SecureEnclaveCustodyProbe.app>/Contents/MacOS/SecureEnclaveCustodyProbe --mode cleanup --request <app-container-private-dir>/cleanup-request.json
 ```
 
-All commands passed. The SE-backed Rust modes required non-sandbox execution so
-their Swift bridge child process could reconstruct Secure Enclave handles.
+All commands passed. The SE-backed Rust modes used private request files under
+the signed probe app container so the sandboxed bridge could read/write
+capability files without exposing digest material in bridge argv.
 
 ## 8. Next Phase Entry Condition
 

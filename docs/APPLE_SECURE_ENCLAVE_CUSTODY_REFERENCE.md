@@ -147,6 +147,10 @@ Exit markers:
 Purpose: prove that Secure Enclave ECDSA output can be used as OpenPGP
 signatures accepted by the app's verification stack.
 POC evidence: [Phase 3 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE3.md).
+The final Phase 3 evidence uses the reusable Xcode-signed
+`SecureEnclaveCustodyProbe` app target and Security framework `SecKey`
+permanent Keychain rows; the earlier unsigned SwiftPM/CryptoKit bridge evidence
+is superseded.
 
 Prototype a Secure Enclave-backed OpenPGP signer path that:
 
@@ -241,17 +245,17 @@ Before production planning, the evidence record should include:
 - Tested macOS version and hardware class.
 - Whether v4, v6, or both certificate shapes worked.
 - Which Secure Enclave API path was used for signing and key agreement.
-- Proof that the signing and key-agreement handles refer to distinct Secure
-  Enclave keys.
+- Proof that the signing and key-agreement handles or Keychain rows refer to
+  distinct Secure Enclave keys.
 - Signature encoding details: DER versus raw representation, and how `r`/`s`
   were obtained.
 - ECDH details: public point encoding, shared secret bytes shape, KDF inputs,
   and AES Key Wrap compatibility.
 - Sequoia integration notes for `Signer`, `Decryptor`, fixed-session-key
   helpers, or any limitations encountered.
-- Failure-mode behavior for wrong handles, missing key handles, unavailable
-  hardware, user cancellation, lockout, authentication failures, and tampered
-  ciphertext.
+- Failure-mode behavior for wrong handles or Keychain locators, missing key
+  rows, unavailable hardware, user cancellation, lockout, authentication
+  failures, and tampered ciphertext.
 - Capability resolver behavior for unsupported algorithm/profile/custody
   combinations.
 - Regression evidence that current Profile A and Profile B behavior remains
