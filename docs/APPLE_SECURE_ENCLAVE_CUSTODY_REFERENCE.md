@@ -121,6 +121,7 @@ Exit markers:
 
 Purpose: determine whether valid OpenPGP P-256 public certificates can be built
 around Secure Enclave public keys while private scalars remain unavailable.
+POC evidence: [Phase 2 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE2.md).
 
 Use an isolated prototype to compare v4 and v6 certificate options without
 selecting the final product shape unless the evidence clearly forces a decision.

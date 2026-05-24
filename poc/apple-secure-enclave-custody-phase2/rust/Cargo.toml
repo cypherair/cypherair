@@ -1,0 +1,21 @@
+[package]
+name = "phase2-openpgp-cert-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "Phase2OpenPGPCertProbe"
+path = "src/main.rs"
+
+[dependencies]
+pgp-mobile = { path = "../../../pgp-mobile" }
+sequoia-openpgp = { version = "=2.3.0", default-features = false, features = [
+    "crypto-openssl",
+    "compression-deflate",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", branch = "carry/apple-arm64e-openssl-fork" }
