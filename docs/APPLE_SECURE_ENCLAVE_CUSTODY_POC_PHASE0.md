@@ -34,7 +34,20 @@ This phase confirms only that:
 Phase 1 still requires a separate phase-specific plan before any probe,
 harness, or production file is changed.
 
-## 2. Source Ownership
+## 2. POC Branch Policy
+
+Exploratory Apple Secure Enclave Custody POC work must be carried on the
+dedicated branch `poc/apple-secure-enclave-custody` unless a later approved
+plan explicitly names a different branch. Prototype code, disposable harnesses,
+and POC evidence commits should target that branch rather than ordinary topic
+branches, because the POC needs the app codebase but is not intended to enter
+`main` while validation remains exploratory.
+
+Production-bound work must be split into later dedicated production PRs only
+after the [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md) validation
+track produces enough evidence to support that decision.
+
+## 3. Source Ownership
 
 Do not duplicate or reinterpret the custody model here:
 
@@ -51,7 +64,7 @@ Do not duplicate or reinterpret the custody model here:
 This Phase 0 file only points to those authorities and records the POC starting
 context.
 
-## 3. Current Code Touchpoints
+## 4. Current Code Touchpoints
 
 The shipped app currently protects complete OpenPGP secret certificate bytes
 with Secure Enclave-backed wrapping. It does not yet implement direct Secure
@@ -76,7 +89,7 @@ These files are touchpoints for understanding the current boundary. They are
 not authorization to edit security-sensitive code without a later
 phase-specific plan.
 
-## 4. POC Reference Links
+## 5. POC Reference Links
 
 Apple documentation to cite during later proof work:
 
@@ -101,7 +114,7 @@ The current local dependency baseline is Sequoia OpenPGP 2.3.0 in
 [pgp-mobile/Cargo.lock](../pgp-mobile/Cargo.lock). If the dependency changes,
 later phase evidence must identify the exact version used.
 
-## 5. Later POC Evidence Checklist
+## 6. Later POC Evidence Checklist
 
 Later POC notes should stay phase-specific and short. At minimum, record:
 
@@ -116,7 +129,7 @@ Later POC notes should stay phase-specific and short. At minimum, record:
 Do not copy the hard requirements or red lines into each POC note unless a
 phase has a specific result that changes how reviewers should read them.
 
-## 6. POC Question Index
+## 7. POC Question Index
 
 Use the [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md) as the phase
 map, especially Phase 1 through Phase 6. Use the [Security Model validation
@@ -132,7 +145,7 @@ Phase 0 adds only these orientation reminders:
   production decisions.
 - Keep current Profile A and Profile B behavior outside the POC blast radius.
 
-## 7. Exit Markers
+## 8. Exit Markers
 
 Phase 0 is complete when:
 
