@@ -515,11 +515,13 @@ func failureMode(requestPath: String) throws -> [String: Any] {
 
     let passed = cases.allSatisfy(\.rejected)
     return [
-        "phase": "phase3",
+        "phase": "phase4",
         "mode": "failure",
         "status": passed ? "passed" : "failed",
         "caseCount": cases.count,
         "cases": try jsonObject(cases),
+        "includesPhase3SigningFailures": true,
+        "includesPhase4DeriveFailures": true,
         "materialsPrinted": false,
     ]
 }

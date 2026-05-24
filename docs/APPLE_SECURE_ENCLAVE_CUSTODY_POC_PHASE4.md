@@ -56,6 +56,15 @@ No shared secrets, session keys, KEKs, plaintext, Keychain locators, stable
 fingerprints, raw certificates, or temp capability paths were printed in probe
 summaries.
 
+Residual POC boundary: the raw shared secret crossed from the signed Swift probe
+to Rust through a `0600` JSON response file in the private `0700` run directory
+as hex-encoded `sharedSecretHex`. The probe did not print the value and normal
+successful runs clean up the response file, but Swift `Data` and JSON/hex
+intermediates are not explicitly zeroized, and malformed response read/parse
+failures may leave the private response file behind for diagnosis. This is
+acceptable only for Phase 4 POC evidence; Phase 5 and any production design must
+narrow or remove this disk and heap exposure boundary.
+
 ## OpenPGP Evidence
 
 Rust `mock-control` passed first, proving the Sequoia decryptor plumbing without
@@ -84,7 +93,7 @@ metadata, in addition to the existing Phase 3 signing failures.
 Rust failure coverage passed for duplicate public keys, swapped public keys,
 wrong agreement public key, bad ephemeral point, bridge failure without
 fallback, corrupted shared-secret response, symlinked request files, invalid
-request permissions, corrupt wrapped session keys, and tampered SEIPDv1/SEIPDv2
+request permissions, tampered PKESK/recipient material, and tampered SEIPDv1/SEIPDv2
 ciphertexts. Tampered messages were rejected without returning accepted
 plaintext.
 

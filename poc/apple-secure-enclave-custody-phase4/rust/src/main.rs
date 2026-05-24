@@ -480,7 +480,7 @@ fn failure(request: &ProbeRequest) -> ProbeResult<Value> {
             )
             .map(|_| ())
         }));
-        cases.push(failure_case(&format!("corruptWrappedSessionKeyV{version}"), || {
+        cases.push(failure_case(&format!("tamperedPkeskMaterialV{version}"), || {
             let corrupted = tamper_pkesk_byte(&ciphertext)?;
             decrypt_candidate(
                 version,
@@ -508,7 +508,7 @@ fn failure(request: &ProbeRequest) -> ProbeResult<Value> {
         "caseCount": cases.len(),
         "cases": cases,
         "materialsPrinted": false,
-        "summary": "Rust-side decryptor probe rejects unsafe files, role/public mismatches, bridge failures, corrupt wrapped session keys, and tampered payloads without fallback."
+        "summary": "Rust-side decryptor probe rejects unsafe files, role/public mismatches, bridge failures, tampered PKESK material, and tampered payloads without fallback."
     });
     write_optional_result(request, &report)?;
     Ok(report)
@@ -1023,6 +1023,9 @@ fn bridge_derive(bridge: &BridgeConfig, peer_public_x963: &[u8]) -> ProbeResult<
         let _ = fs::remove_file(&response_path);
         return Err("bridgeFailure".to_string());
     }
+    // POC boundary: success and bridge-failure paths remove the response file, but a
+    // malformed 0600 response may remain after read/JSON failures for diagnosis.
+    // Phase 5/production must use a narrower fail-clean shared-secret handoff.
     let response: BridgeDeriveResponse =
         serde_json::from_slice(&read_strict_file(&response_path)?)
             .map_err(|_| "bridgeResponseJson".to_string())?;
@@ -1209,6 +1212,8 @@ fn tamper_last_byte(input: &[u8]) -> ProbeResult<Vec<u8>> {
 }
 
 fn tamper_pkesk_byte(input: &[u8]) -> ProbeResult<Vec<u8>> {
+    // POC-level recipient/PKESK material tamper test. This intentionally does
+    // not prove precise corruption of the AES-wrapped session-key field.
     let mut out = input.to_vec();
     let index = out.len().min(40).saturating_sub(1);
     if out.is_empty() {
