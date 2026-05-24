@@ -56,6 +56,10 @@ only how unsupported private-key export requests are presented or reported.
   AEAD/MDC hard-fail behavior, the zero-network model, no-secret-logging rules,
   the no-software-fallback requirement, or the no-private-key-export
   requirement.
+- POC evidence should prefer the path closest to a plausible future production
+  custody boundary. Disposable shortcuts can support compatibility findings,
+  but they must be labeled as such and must not be used as
+  production-proximate acceptance evidence.
 - Prototype code, disposable bridges, and proof-only packet construction may
   prove compatibility, but they must not be treated as production architecture.
 - Canonical current-state docs such as [Architecture](ARCHITECTURE.md),
@@ -149,8 +153,10 @@ signatures accepted by the app's verification stack.
 
 Prototype a Secure Enclave-backed OpenPGP signer path that:
 
-- Lets Sequoia or a narrow prototype compute the OpenPGP signature digest.
-- Delegates P-256 ECDSA signing to the Secure Enclave signing key.
+- Lets the OpenPGP layer own packet construction, hashing, and signature
+  preimage details through a real signer seam where practical.
+- Delegates only the P-256 ECDSA private-key operation to the Secure Enclave
+  signing key.
 - Converts Secure Enclave ECDSA output into OpenPGP ECDSA `r` and `s` MPIs.
 - Verifies the produced signature with Sequoia using only public certificate
   material.
@@ -158,8 +164,15 @@ Prototype a Secure Enclave-backed OpenPGP signer path that:
   successful.
 
 This phase should evaluate an external-signer seam such as Sequoia's `Signer`
-trait where practical, but may use a narrower disposable bridge to prove
-cryptographic compatibility first.
+trait where practical. A narrower disposable bridge may be used for debugging
+or supporting compatibility evidence, but it cannot replace Phase 3 acceptance
+evidence unless it exercises the same custody boundary expected of the
+production candidate.
+
+The evidence note must state whether Secure Enclave key creation, persistence,
+lookup, access control, and signing call paths represent the production
+candidate boundary. If they do not, the conclusion must be downgraded from
+production-proximate feasibility to compatibility evidence.
 
 Exit markers:
 

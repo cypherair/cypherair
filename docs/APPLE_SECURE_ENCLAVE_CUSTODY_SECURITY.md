@@ -103,6 +103,15 @@ private-key operations can be delegated. The current CypherAir Rust code still
 uses in-memory `KeyPair` values created from unwrapped secret certificates in
 `pgp-mobile/src/sign.rs` and `pgp-mobile/src/decrypt.rs`.
 
+Validation evidence must distinguish cryptographic compatibility from
+production-candidate custody boundary evidence. A prototype that proves packet
+or signature compatibility through a shortcut path is useful, but it must not
+be accepted as evidence that the custody boundary is feasible unless it also
+uses a representative Secure Enclave key lifecycle and private-operation call
+path. The no-software-fallback and no secret-certificate-unwrap fallback
+requirements apply to POC acceptance criteria, not only to later production
+code.
+
 The existing `decrypt_with_fixed_session_key_detailed` helper may be useful for
 validation work after a Secure Enclave path recovers an OpenPGP session key. It
 should not be treated as a required production design until validation results
