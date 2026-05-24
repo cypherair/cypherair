@@ -11,6 +11,7 @@
 		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
+		CE3F00012FC0000000000001 /* swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3F00022FC0000000000002 /* swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift */; };
 		CE5181B12FBB9EAA00D21B02 /* AppIconE.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE5181B02FBB9EAA00D21B02 /* AppIconE.icon */; };
 		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
@@ -42,6 +43,9 @@
 		CE0065222F676EBC008604AB /* AppIconA.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconA.icon; sourceTree = "<group>"; };
 		CE0065232F676EBC008604AB /* AppIconB.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconB.icon; sourceTree = "<group>"; };
 		CE0065242F676EBC008604AB /* AppIconC.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconC.icon; sourceTree = "<group>"; };
+		CE3F00022FC0000000000002 /* swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift; sourceTree = "<group>"; };
+		CE3F00032FC0000000000003 /* seckey-bridge/Phase3SecKeySigningBridge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "seckey-bridge/Phase3SecKeySigningBridge.entitlements"; sourceTree = "<group>"; };
+		CE3F00042FC0000000000004 /* Phase3SecKeySigningBridge */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Phase3SecKeySigningBridge; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE5181B02FBB9EAA00D21B02 /* AppIconE.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconE.icon; sourceTree = "<group>"; };
 		CE58C0002F96000000000001 /* PgpMobile.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = PgpMobile.xcframework; sourceTree = "<group>"; };
 		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
@@ -415,6 +419,7 @@
 				CE96A5E62F825DBA006CADE2 /* Sources */,
 				CE96A4AD2F825DB6006CADE2 /* Tests */,
 				E10000022F90000100000001 /* UITests */,
+				CE3F00052FC0000000000005 /* Phase 3 Secure Enclave POC */,
 				87A0C373A5702D60FD4DC48F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -425,8 +430,19 @@
 				9379668011500E781695A4AC /* CypherAir.app */,
 				108F8485D41E1065D3C9268A /* CypherAirTests.xctest */,
 				E10000012F90000100000001 /* CypherAirMacUITests.xctest */,
+				CE3F00042FC0000000000004 /* Phase3SecKeySigningBridge */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CE3F00052FC0000000000005 /* Phase 3 Secure Enclave POC */ = {
+			isa = PBXGroup;
+			children = (
+				CE3F00022FC0000000000002 /* swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift */,
+				CE3F00032FC0000000000003 /* seckey-bridge/Phase3SecKeySigningBridge.entitlements */,
+			);
+			name = "Phase 3 Secure Enclave POC";
+			path = "poc/apple-secure-enclave-custody-phase3";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -482,6 +498,23 @@
 			productReference = 108F8485D41E1065D3C9268A /* CypherAirTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		CE3F00072FC0000000000007 /* Phase3SecKeySigningBridge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE3F00082FC0000000000008 /* Build configuration list for PBXNativeTarget "Phase3SecKeySigningBridge" */;
+			buildPhases = (
+				CE3F00062FC0000000000006 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Phase3SecKeySigningBridge;
+			packageProductDependencies = (
+			);
+			productName = Phase3SecKeySigningBridge;
+			productReference = CE3F00042FC0000000000004 /* Phase3SecKeySigningBridge */;
+			productType = "com.apple.product-type.tool";
+		};
 		E10000042F90000100000001 /* CypherAirMacUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E10000082F90000100000001 /* Build configuration list for PBXNativeTarget "CypherAirMacUITests" */;
@@ -513,6 +546,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					CE3F00072FC0000000000007 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					E10000042F90000100000001 = {
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = 8054D4FD1FA30AED22F9BF1B;
@@ -537,6 +573,7 @@
 				8054D4FD1FA30AED22F9BF1B /* CypherAir */,
 				8561964DF0A7E2575A3799D6 /* CypherAirTests */,
 				E10000042F90000100000001 /* CypherAirMacUITests */,
+				CE3F00072FC0000000000007 /* Phase3SecKeySigningBridge */,
 			);
 		};
 /* End PBXProject section */
@@ -715,6 +752,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE3F00062FC0000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE3F00012FC0000000000001 /* swift/Sources/Phase3SecureEnclaveSigningBridge/main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1333,6 +1378,113 @@
 			};
 			name = "AppStore Candidate Release";
 		};
+		CE3F00092FC0000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-phase3/seckey-bridge/Phase3SecKeySigningBridge.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.phase3.seckeybridge;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		CE3F000A2FC000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-phase3/seckey-bridge/Phase3SecKeySigningBridge.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.phase3.seckeybridge;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		CE3F000B2FC000000000000B /* AppStore Candidate Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-phase3/seckey-bridge/Phase3SecKeySigningBridge.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.phase3.seckeybridge;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "AppStore Candidate Release";
+		};
 		E10000092F90000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1412,6 +1564,16 @@
 				C323F444EE97F048F7C4938B /* Debug */,
 				AA45A02A118F55C4CF92A72A /* Release */,
 				CE381AB62F95DDAA00A6C06A /* AppStore Candidate Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CE3F00082FC0000000000008 /* Build configuration list for PBXNativeTarget "Phase3SecKeySigningBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CE3F00092FC0000000000009 /* Debug */,
+				CE3F000A2FC000000000000A /* Release */,
+				CE3F000B2FC000000000000B /* AppStore Candidate Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

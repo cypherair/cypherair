@@ -28,6 +28,9 @@ const RUST_REQUEST_SCHEMA: &str = "cypherair.se-custody.phase3.rust-request.v1";
 const SWIFT_SIGNING_REQUEST_SCHEMA: &str = "cypherair.se-custody.phase3.signing-request.v1";
 const SWIFT_SIGNING_RESPONSE_SCHEMA: &str = "cypherair.se-custody.phase3.signing-response.v1";
 const SWIFT_STATE_SCHEMA: &str = "cypherair.se-custody.phase3.signing-state.v1";
+const SWIFT_SECKEY_SIGNING_KEY_TYPE: &str = "SecKey.ECSECPrimeRandom.SecureEnclave.Signing";
+const SWIFT_SECKEY_AGREEMENT_KEY_TYPE: &str =
+    "SecKey.ECSECPrimeRandom.SecureEnclave.KeyAgreement";
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -64,6 +67,9 @@ struct SwiftState {
     schema: String,
     #[serde(rename = "secureEnclaveAvailable")]
     secure_enclave_available: bool,
+    implementation: String,
+    #[serde(rename = "secKeyCreateRandomKeyAvailable")]
+    sec_key_create_random_key_available: bool,
     keys: Vec<SwiftStateKey>,
 }
 
@@ -1031,8 +1037,13 @@ fn bound_publics_from_state(state: &SwiftState) -> ProbeResult<BoundPublics> {
     }
     let signing = state_key(state, "signing")?;
     let agreement = state_key(state, "keyAgreement")?;
-    validate_state_key(signing, "SecureEnclave.P256.Signing.PrivateKey")?;
-    validate_state_key(agreement, "SecureEnclave.P256.KeyAgreement.PrivateKey")?;
+    if state.implementation != "Security SecKey Secure Enclave P-256 permanent Keychain row"
+        || !state.sec_key_create_random_key_available
+    {
+        return Err("stateImplementation".to_string());
+    }
+    validate_state_key(signing, SWIFT_SECKEY_SIGNING_KEY_TYPE)?;
+    validate_state_key(agreement, SWIFT_SECKEY_AGREEMENT_KEY_TYPE)?;
     Ok(BoundPublics {
         signing_x963: hex_decode(&signing.public_key_x963_hex)?,
         agreement_x963: hex_decode(&agreement.public_key_x963_hex)?,
