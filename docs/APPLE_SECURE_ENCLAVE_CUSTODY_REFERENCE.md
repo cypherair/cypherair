@@ -221,6 +221,8 @@ Exit markers:
 
 ### Phase 5: App Architecture Integration Feasibility
 
+POC evidence: [Phase 5 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE5.md).
+
 Purpose: validate that the custody concept can fit the app architecture without
 collapsing existing boundaries.
 
