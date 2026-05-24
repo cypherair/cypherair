@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		252C0E6B4F3B5F87B6E050CA /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC00FF03CD65D11B584FE95D /* Cocoa.framework */; };
+		B9FE0B74BEE52B064288E2D8 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F41A7340F809EC25269B1316 /* main.swift */; };
 		CE0065172F652334008604AB /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065122F651C44008604AB /* AppIcon.icon */; };
 		CE0065252F676EBC008604AB /* AppIconB.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065232F676EBC008604AB /* AppIconB.icon */; };
 		CE0065262F676EBC008604AB /* AppIconC.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065242F676EBC008604AB /* AppIconC.icon */; };
@@ -35,7 +37,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		032F79BC785C3B11051DA0C2 /* SecureEnclaveCustodyProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SecureEnclaveCustodyProbe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		108F8485D41E1065D3C9268A /* CypherAirTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2EA14515DBD9CB2BA01AF697 /* SecureEnclaveCustodyProbe.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = SecureEnclaveCustodyProbe.entitlements; path = "poc/apple-secure-enclave-custody-probe/SecureEnclaveCustodyProbe.entitlements"; sourceTree = "<group>"; };
 		9379668011500E781695A4AC /* CypherAir.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CypherAir.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE0065102F6502B4008604AB /* CypherAir-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "CypherAir-Info.plist"; sourceTree = "<group>"; };
 		CE0065122F651C44008604AB /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -50,6 +54,8 @@
 		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CEF297612F7612DF00DB6BF6 /* AppIconD.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconD.icon; sourceTree = "<group>"; };
 		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC00FF03CD65D11B584FE95D /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		F41A7340F809EC25269B1316 /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = main.swift; path = "poc/apple-secure-enclave-custody-probe/main.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -367,6 +373,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CE96A4AD2F825DB6006CADE2 /* Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Tests;
 			sourceTree = "<group>";
 		};
@@ -380,12 +388,22 @@
 		};
 		E10000022F90000100000001 /* UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = UITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		03F9EECB5E44AE575003DF90 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				252C0E6B4F3B5F87B6E050CA /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CE58C0022F96000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -397,6 +415,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		452D85B3FB5B044211472C06 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D37A2C2447AE740C5298F6C6 /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		7C9F769E62E925ECA46373E6 = {
 			isa = PBXGroup;
 			children = (
@@ -416,6 +442,9 @@
 				CE96A4AD2F825DB6006CADE2 /* Tests */,
 				E10000022F90000100000001 /* UITests */,
 				87A0C373A5702D60FD4DC48F /* Products */,
+				452D85B3FB5B044211472C06 /* Frameworks */,
+				F41A7340F809EC25269B1316 /* main.swift */,
+				2EA14515DBD9CB2BA01AF697 /* SecureEnclaveCustodyProbe.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -425,13 +454,41 @@
 				9379668011500E781695A4AC /* CypherAir.app */,
 				108F8485D41E1065D3C9268A /* CypherAirTests.xctest */,
 				E10000012F90000100000001 /* CypherAirMacUITests.xctest */,
+				032F79BC785C3B11051DA0C2 /* SecureEnclaveCustodyProbe.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D37A2C2447AE740C5298F6C6 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				EC00FF03CD65D11B584FE95D /* Cocoa.framework */,
+			);
+			name = "OS X";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		09BEDC19CF519370DF7F7344 /* SecureEnclaveCustodyProbe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2FF7C58B7798AF28136A8007 /* Build configuration list for PBXNativeTarget "SecureEnclaveCustodyProbe" */;
+			buildPhases = (
+				2C5C7673FED4D66570FBA803 /* Sources */,
+				03F9EECB5E44AE575003DF90 /* Frameworks */,
+				82D5AA3230198F3E0312F95C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SecureEnclaveCustodyProbe;
+			packageProductDependencies = (
+			);
+			productName = SecureEnclaveCustodyProbe;
+			productReference = 032F79BC785C3B11051DA0C2 /* SecureEnclaveCustodyProbe.app */;
+			productType = "com.apple.product-type.application";
+		};
 		8054D4FD1FA30AED22F9BF1B /* CypherAir */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
@@ -537,11 +594,19 @@
 				8054D4FD1FA30AED22F9BF1B /* CypherAir */,
 				8561964DF0A7E2575A3799D6 /* CypherAirTests */,
 				E10000042F90000100000001 /* CypherAirMacUITests */,
+				09BEDC19CF519370DF7F7344 /* SecureEnclaveCustodyProbe */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		82D5AA3230198F3E0312F95C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CE0065162F65232F008604AB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -708,6 +773,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2C5C7673FED4D66570FBA803 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B9FE0B74BEE52B064288E2D8 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -895,6 +968,41 @@
 			};
 			name = Release;
 		};
+		A7BB7C75A0980FFA8CAFBFA6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-probe/SecureEnclaveCustodyProbe.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
+				ENABLE_C_BOUNDS_SAFETY = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.secureenclavecustody.probe;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
 		AA45A02A118F55C4CF92A72A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -968,6 +1076,41 @@
 				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
+		};
+		C1D58EA8FEFFAA33AD4C3C09 /* AppStore Candidate Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-probe/SecureEnclaveCustodyProbe.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
+				ENABLE_C_BOUNDS_SAFETY = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.secureenclavecustody.probe;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "AppStore Candidate Release";
 		};
 		C323F444EE97F048F7C4938B /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1383,6 +1526,41 @@
 			};
 			name = Release;
 		};
+		E875D61979049485105ED47B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "poc/apple-secure-enclave-custody-probe/SecureEnclaveCustodyProbe.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 7P9PPXP2SF;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
+				ENABLE_C_BOUNDS_SAFETY = YES;
+				ENABLE_ENHANCED_SECURITY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_POINTER_AUTHENTICATION = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.poc.secureenclavecustody.probe;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1395,6 +1573,16 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		2FF7C58B7798AF28136A8007 /* Build configuration list for PBXNativeTarget "SecureEnclaveCustodyProbe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E875D61979049485105ED47B /* Release */,
+				A7BB7C75A0980FFA8CAFBFA6 /* Debug */,
+				C1D58EA8FEFFAA33AD4C3C09 /* AppStore Candidate Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		5587EF2BB001B4E86E85C261 /* Build configuration list for PBXNativeTarget "CypherAirTests" */ = {
 			isa = XCConfigurationList;
