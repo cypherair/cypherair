@@ -1,14 +1,10 @@
+import CryptoKit
 import Darwin
 import Foundation
-import Security
 
 private let schema = "cypherair.se-custody.phase3.signing-state.v1"
 private let requestSchema = "cypherair.se-custody.phase3.signing-request.v1"
 private let responseSchema = "cypherair.se-custody.phase3.signing-response.v1"
-private let keychainTagPrefix = "com.cypherair.poc.secure-enclave-custody.phase3.seckey."
-private let keychainLabelPrefix = "CypherAir Phase 3 SecKey Bridge "
-private let signingStateKeyType = "SecKey.ECSECPrimeRandom.SecureEnclave.Signing"
-private let agreementStateKeyType = "SecKey.ECSECPrimeRandom.SecureEnclave.KeyAgreement"
 
 private enum Mode: String {
     case createState = "create-state"
@@ -38,8 +34,7 @@ private struct StateFile: Codable {
 
 private struct StateKey: Codable {
     let role: String
-    let applicationTagHex: String
-    let applicationLabel: String
+    let handleRepresentationHex: String
     let publicKeyX963Hex: String
     let publicKeyX963Length: Int
     let keyType: String
@@ -59,7 +54,6 @@ private struct SigningRequest: Codable {
     let hashAlgorithm: String?
     let digestHex: String?
     let responsePath: String?
-    let resultPath: String?
     let cleanupPaths: [String]?
 }
 
@@ -99,9 +93,8 @@ private enum ProbeError: Error, CustomStringConvertible {
     case invalidState
     case invalidRequest
     case secureEnclaveUnavailable
-    case missingEntitlement
     case keyGenerationFailed
-    case keychainLookupFailed
+    case keyReconstructionFailed
     case keyValidationFailed
     case unsupportedHash
     case wrongDigestLength
@@ -116,9 +109,8 @@ private enum ProbeError: Error, CustomStringConvertible {
         case .invalidState: "invalidState"
         case .invalidRequest: "invalidRequest"
         case .secureEnclaveUnavailable: "secureEnclaveUnavailable"
-        case .missingEntitlement: "missingEntitlement"
         case .keyGenerationFailed: "keyGenerationFailed"
-        case .keychainLookupFailed: "keychainLookupFailed"
+        case .keyReconstructionFailed: "keyReconstructionFailed"
         case .keyValidationFailed: "keyValidationFailed"
         case .unsupportedHash: "unsupportedHash"
         case .wrongDigestLength: "wrongDigestLength"
@@ -141,14 +133,54 @@ private enum HashChoice: String {
         case .sha512: 64
         }
     }
+}
 
-    var secKeyAlgorithm: SecKeyAlgorithm {
-        switch self {
-        case .sha256: .ecdsaSignatureDigestX962SHA256
-        case .sha384: .ecdsaSignatureDigestX962SHA384
-        case .sha512: .ecdsaSignatureDigestX962SHA512
-        }
+private struct ExternalSHA256Digest: Digest {
+    static let byteCount = 32
+    let bytes: [UInt8]
+    init(_ data: Data) throws {
+        guard data.count == Self.byteCount else { throw ProbeError.wrongDigestLength }
+        bytes = Array(data)
     }
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try bytes.withUnsafeBytes(body)
+    }
+    var description: String { "ExternalSHA256Digest" }
+    func hash(into hasher: inout Hasher) { hasher.combine(bytes) }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.bytes == rhs.bytes }
+    func makeIterator() -> Array<UInt8>.Iterator { bytes.makeIterator() }
+}
+
+private struct ExternalSHA384Digest: Digest {
+    static let byteCount = 48
+    let bytes: [UInt8]
+    init(_ data: Data) throws {
+        guard data.count == Self.byteCount else { throw ProbeError.wrongDigestLength }
+        bytes = Array(data)
+    }
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try bytes.withUnsafeBytes(body)
+    }
+    var description: String { "ExternalSHA384Digest" }
+    func hash(into hasher: inout Hasher) { hasher.combine(bytes) }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.bytes == rhs.bytes }
+    func makeIterator() -> Array<UInt8>.Iterator { bytes.makeIterator() }
+}
+
+private struct ExternalSHA512Digest: Digest {
+    static let byteCount = 64
+    let bytes: [UInt8]
+    init(_ data: Data) throws {
+        guard data.count == Self.byteCount else { throw ProbeError.wrongDigestLength }
+        bytes = Array(data)
+    }
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try bytes.withUnsafeBytes(body)
+    }
+    var description: String { "ExternalSHA512Digest" }
+    func hash(into hasher: inout Hasher) { hasher.combine(bytes) }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.bytes == rhs.bytes }
+    func makeIterator() -> Array<UInt8>.Iterator { bytes.makeIterator() }
 }
 
 private func parseArguments() throws -> Arguments {
@@ -208,85 +240,85 @@ private func run() throws -> SummaryReport {
 private func createState(outPath: String) throws -> SummaryReport {
     try validatePrivateParentDirectory(for: outPath)
 
-    let instanceId = UUID().uuidString.lowercased()
-    let signingTag = "\(keychainTagPrefix)\(instanceId).signing"
-    let agreementTag = "\(keychainTagPrefix)\(instanceId).agreement"
-    let signingLabel = "\(keychainLabelPrefix)\(instanceId) signing"
-    let agreementLabel = "\(keychainLabelPrefix)\(instanceId) keyAgreement"
-
-    let signingTagData = Data(signingTag.utf8)
-    let agreementTagData = Data(agreementTag.utf8)
-
-    try? deleteKey(applicationTag: signingTagData)
-    try? deleteKey(applicationTag: agreementTagData)
-
-    do {
-        let signingKey = try createSecureEnclavePrivateKey(
-            applicationTag: signingTagData,
-            label: signingLabel
-        )
-        let agreementKey = try createSecureEnclavePrivateKey(
-            applicationTag: agreementTagData,
-            label: agreementLabel
-        )
-        let signingPublic = try publicX963(for: signingKey)
-        let agreementPublic = try publicX963(for: agreementKey)
-        guard signingPublic != agreementPublic else { throw ProbeError.keyValidationFailed }
-
+    guard SecureEnclave.isAvailable else {
         let state = StateFile(
             schema: schema,
             phase: "phase3",
             createdAt: isoNow(),
-            secureEnclaveAvailable: true,
+            secureEnclaveAvailable: false,
             environment: environment(),
-            instanceId: instanceId,
-            implementation: "Security SecKey Secure Enclave P-256 permanent Keychain row",
-            secKeyCreateRandomKeyAvailable: true,
-            keys: [
-                StateKey(
-                    role: "signing",
-                    applicationTagHex: signingTagData.hexEncodedString(),
-                    applicationLabel: signingLabel,
-                    publicKeyX963Hex: signingPublic.hexEncodedString(),
-                    publicKeyX963Length: signingPublic.count,
-                    keyType: signingStateKeyType,
-                    keySizeBits: 256,
-                    tokenID: "SecureEnclave"
-                ),
-                StateKey(
-                    role: "keyAgreement",
-                    applicationTagHex: agreementTagData.hexEncodedString(),
-                    applicationLabel: agreementLabel,
-                    publicKeyX963Hex: agreementPublic.hexEncodedString(),
-                    publicKeyX963Length: agreementPublic.count,
-                    keyType: agreementStateKeyType,
-                    keySizeBits: 256,
-                    tokenID: "SecureEnclave"
-                )
-            ],
-            notes: [
-                "State is local capability material and must remain 0600 in a 0700 directory.",
-                "Keychain application tags and labels are intentionally present only in this state file and never printed to stdout.",
-                "Each signing operation reloads the SecKey from Keychain and revalidates type, size, Secure Enclave token, role, and public key binding."
-            ]
+            instanceId: nil,
+            implementation: "CryptoKit SecureEnclave P-256 handle",
+            secKeyCreateRandomKeyAvailable: false,
+            keys: [],
+            notes: ["Secure Enclave unavailable; no software fallback attempted."]
         )
-
         try writeJSONExclusive(state, to: outPath)
-    } catch {
-        try? deleteKey(applicationTag: signingTagData)
-        try? deleteKey(applicationTag: agreementTagData)
-        throw error
+        return SummaryReport(
+            phase: "phase3",
+            mode: "create-state",
+            status: "skipped",
+            secureEnclaveAvailable: false,
+            checksPassed: 1,
+            checksFailed: 0,
+            materialsPrinted: false,
+            summary: "Secure Enclave unavailable; state records no fallback."
+        )
     }
+
+    let signingKey = try SecureEnclave.P256.Signing.PrivateKey(compactRepresentable: false)
+    let agreementKey = try SecureEnclave.P256.KeyAgreement.PrivateKey(compactRepresentable: false)
+    let signingPublic = signingKey.publicKey.x963Representation
+    let agreementPublic = agreementKey.publicKey.x963Representation
+    guard signingPublic != agreementPublic else { throw ProbeError.keyValidationFailed }
+
+    let state = StateFile(
+        schema: schema,
+        phase: "phase3",
+        createdAt: isoNow(),
+        secureEnclaveAvailable: true,
+        environment: environment(),
+        instanceId: UUID().uuidString.lowercased(),
+        implementation: "CryptoKit SecureEnclave P-256 handle",
+        secKeyCreateRandomKeyAvailable: false,
+        keys: [
+            StateKey(
+                role: "signing",
+                handleRepresentationHex: signingKey.dataRepresentation.hexEncodedString(),
+                publicKeyX963Hex: signingPublic.hexEncodedString(),
+                publicKeyX963Length: signingPublic.count,
+                keyType: "SecureEnclave.P256.Signing.PrivateKey",
+                keySizeBits: 256,
+                tokenID: "SecureEnclave"
+            ),
+            StateKey(
+                role: "keyAgreement",
+                handleRepresentationHex: agreementKey.dataRepresentation.hexEncodedString(),
+                publicKeyX963Hex: agreementPublic.hexEncodedString(),
+                publicKeyX963Length: agreementPublic.count,
+                keyType: "SecureEnclave.P256.KeyAgreement.PrivateKey",
+                keySizeBits: 256,
+                tokenID: "SecureEnclave"
+            )
+        ],
+        notes: [
+            "State is local capability material and must remain 0600 in a 0700 directory.",
+            "The local SwiftPM command-line environment returned errSecMissingEntitlement for SecKeyCreateRandomKey with Secure Enclave token, so this bridge uses CryptoKit SecureEnclave handles while retaining the Phase 3 no-argv-digest and per-signature public-key revalidation requirements.",
+            "Stdout intentionally omits handles, paths, digests, signatures, and stable fingerprints."
+        ]
+    )
+
+    try writeJSONExclusive(state, to: outPath)
 
     return SummaryReport(
         phase: "phase3",
         mode: "create-state",
         status: "passed",
         secureEnclaveAvailable: true,
-        checksPassed: 7,
+        checksPassed: 5,
         checksFailed: 0,
         materialsPrinted: false,
-        summary: "Permanent Secure Enclave SecKey rows created; restricted state written without printing locator material."
+        summary: "Secure Enclave signing and agreement handles created; sensitive state written with restricted permissions."
     )
 }
 
@@ -300,10 +332,10 @@ private func signDigest(requestPath: String) throws -> SummaryReport {
         mode: "sign-digest",
         status: "passed",
         secureEnclaveAvailable: true,
-        checksPassed: 8,
+        checksPassed: 6,
         checksFailed: 0,
         materialsPrinted: false,
-        summary: "Digest signed through a revalidated Secure Enclave SecKey row; response written to a restricted file."
+        summary: "Digest signed through a revalidated Secure Enclave handle; response written to a restricted file."
     )
 }
 
@@ -321,29 +353,26 @@ private func performSignDigest(request: SigningRequest) throws -> SigningRespons
     guard digest.count == hash.digestByteLength else { throw ProbeError.wrongDigestLength }
 
     let state: StateFile = try readJSONSecurely(from: request.statePath)
-    let (signingKey, signingPublic, agreementPublic) = try loadAndValidateSigningKey(state: state)
+    let (key, signingPublic, agreementPublic) = try loadAndValidateSigningKey(state: state)
     guard signingPublic != agreementPublic else { throw ProbeError.keyValidationFailed }
-    guard SecKeyIsAlgorithmSupported(signingKey, .sign, hash.secKeyAlgorithm) else {
-        throw ProbeError.unsupportedHash
+
+    let signature: P256.Signing.ECDSASignature
+    switch hash {
+    case .sha256:
+        signature = try key.signature(for: ExternalSHA256Digest(digest))
+    case .sha384:
+        signature = try key.signature(for: ExternalSHA384Digest(digest))
+    case .sha512:
+        signature = try key.signature(for: ExternalSHA512Digest(digest))
     }
 
-    var error: Unmanaged<CFError>?
-    guard let der = SecKeyCreateSignature(
-        signingKey,
-        hash.secKeyAlgorithm,
-        digest as CFData,
-        &error
-    ) as Data? else {
-        throw securityError(error) ?? ProbeError.signatureFailed
-    }
-
-    let (r, s) = try parseECDSADER(der)
+    let (r, s) = try parseECDSADER(signature.derRepresentation)
     return SigningResponse(
         schema: responseSchema,
         status: "passed",
         hashAlgorithm: hash.rawValue,
         digestByteLength: digest.count,
-        derSignatureByteLength: der.count,
+        derSignatureByteLength: signature.derRepresentation.count,
         rHex: r.hexEncodedString(),
         sHex: s.hexEncodedString(),
         rByteLength: r.count,
@@ -362,7 +391,6 @@ private func runFailure(requestPath: String) throws -> SummaryReport {
     let request: SigningRequest = try readJSONSecurely(from: requestPath)
     let state: StateFile = try readJSONSecurely(from: request.statePath)
     let scratchDir = URL(fileURLWithPath: requestPath).deletingLastPathComponent().path
-    var cleanupTags: [Data] = []
     var passed = 0
     var failed = 0
 
@@ -383,7 +411,6 @@ private func runFailure(requestPath: String) throws -> SummaryReport {
             hashAlgorithm: "sha999",
             digestHex: goodDigest,
             responsePath: "\(scratchDir)/phase3-bad-response-unsupported.json",
-            resultPath: nil,
             cleanupPaths: nil
         )
         _ = try performSignDigest(request: bad)
@@ -395,105 +422,95 @@ private func runFailure(requestPath: String) throws -> SummaryReport {
             hashAlgorithm: "sha256",
             digestHex: "abcd",
             responsePath: "\(scratchDir)/phase3-bad-response-length.json",
-            resultPath: nil,
             cleanupPaths: nil
         )
         _ = try performSignDigest(request: bad)
     }
     expectFailure {
+        var swapped = state
         let signing = try stateKey(state, role: "signing")
-        let missingTag = Data("\(keychainTagPrefix)\(UUID().uuidString.lowercased()).missing".utf8)
-        let badSigning = StateKey(
-            role: signing.role,
-            applicationTagHex: missingTag.hexEncodedString(),
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: signing.publicKeyX963Hex,
-            publicKeyX963Length: signing.publicKeyX963Length,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
+        let agreement = try stateKey(state, role: "keyAgreement")
+        swapped = StateFile(
+            schema: state.schema,
+            phase: state.phase,
+            createdAt: state.createdAt,
+            secureEnclaveAvailable: state.secureEnclaveAvailable,
+            environment: state.environment,
+            instanceId: state.instanceId,
+            implementation: state.implementation,
+            secKeyCreateRandomKeyAvailable: state.secKeyCreateRandomKeyAvailable,
+            keys: [
+                StateKey(
+                    role: "signing",
+                    handleRepresentationHex: agreement.handleRepresentationHex,
+                    publicKeyX963Hex: signing.publicKeyX963Hex,
+                    publicKeyX963Length: signing.publicKeyX963Length,
+                    keyType: signing.keyType,
+                    keySizeBits: signing.keySizeBits,
+                    tokenID: signing.tokenID
+                ),
+                agreement
+            ],
+            notes: state.notes
         )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: badSigning))
+        _ = try loadAndValidateSigningKey(state: swapped)
+    }
+    expectFailure {
+        var mismatched = state
+        let signing = try stateKey(state, role: "signing")
+        let agreement = try stateKey(state, role: "keyAgreement")
+        mismatched = StateFile(
+            schema: state.schema,
+            phase: state.phase,
+            createdAt: state.createdAt,
+            secureEnclaveAvailable: state.secureEnclaveAvailable,
+            environment: state.environment,
+            instanceId: state.instanceId,
+            implementation: state.implementation,
+            secKeyCreateRandomKeyAvailable: state.secKeyCreateRandomKeyAvailable,
+            keys: [
+                StateKey(
+                    role: "signing",
+                    handleRepresentationHex: signing.handleRepresentationHex,
+                    publicKeyX963Hex: agreement.publicKeyX963Hex,
+                    publicKeyX963Length: agreement.publicKeyX963Length,
+                    keyType: signing.keyType,
+                    keySizeBits: signing.keySizeBits,
+                    tokenID: signing.tokenID
+                ),
+                agreement
+            ],
+            notes: state.notes
+        )
+        _ = try loadAndValidateSigningKey(state: mismatched)
     }
     expectFailure {
         let signing = try stateKey(state, role: "signing")
         let agreement = try stateKey(state, role: "keyAgreement")
-        let badSigning = StateKey(
-            role: signing.role,
-            applicationTagHex: agreement.applicationTagHex,
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: signing.publicKeyX963Hex,
-            publicKeyX963Length: signing.publicKeyX963Length,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
+        let corrupted = StateFile(
+            schema: state.schema,
+            phase: state.phase,
+            createdAt: state.createdAt,
+            secureEnclaveAvailable: state.secureEnclaveAvailable,
+            environment: state.environment,
+            instanceId: state.instanceId,
+            implementation: state.implementation,
+            secKeyCreateRandomKeyAvailable: state.secKeyCreateRandomKeyAvailable,
+            keys: [
+                StateKey(
+                    role: "signing",
+                    handleRepresentationHex: "00",
+                    publicKeyX963Hex: signing.publicKeyX963Hex,
+                    publicKeyX963Length: signing.publicKeyX963Length,
+                    keyType: signing.keyType,
+                    keySizeBits: signing.keySizeBits,
+                    tokenID: signing.tokenID
+                ),
+                agreement
+            ],
+            notes: state.notes
         )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: badSigning))
-    }
-    expectFailure {
-        let signing = try stateKey(state, role: "signing")
-        let agreement = try stateKey(state, role: "keyAgreement")
-        let badSigning = StateKey(
-            role: signing.role,
-            applicationTagHex: signing.applicationTagHex,
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: agreement.publicKeyX963Hex,
-            publicKeyX963Length: agreement.publicKeyX963Length,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
-        )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: badSigning))
-    }
-    expectFailure {
-        let signing = try stateKey(state, role: "signing")
-        let corrupted = StateKey(
-            role: signing.role,
-            applicationTagHex: "00",
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: signing.publicKeyX963Hex,
-            publicKeyX963Length: signing.publicKeyX963Length,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
-        )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: corrupted))
-    }
-    expectFailure {
-        let softwareTag = Data("\(keychainTagPrefix)\(UUID().uuidString.lowercased()).software-non-se".utf8)
-        cleanupTags.append(softwareTag)
-        let softwareKey = try createSoftwarePrivateKey(applicationTag: softwareTag, label: "phase3 non-se failure key", size: 256)
-        let softwarePublic = try publicX963(for: softwareKey)
-        let signing = try stateKey(state, role: "signing")
-        let badSigning = StateKey(
-            role: signing.role,
-            applicationTagHex: softwareTag.hexEncodedString(),
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: softwarePublic.hexEncodedString(),
-            publicKeyX963Length: softwarePublic.count,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
-        )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: badSigning))
-    }
-    expectFailure {
-        let wrongSizeTag = Data("\(keychainTagPrefix)\(UUID().uuidString.lowercased()).software-wrong-size".utf8)
-        cleanupTags.append(wrongSizeTag)
-        let wrongSizeKey = try createSoftwarePrivateKey(applicationTag: wrongSizeTag, label: "phase3 wrong-size failure key", size: 384)
-        let wrongSizePublic = try publicX963(for: wrongSizeKey)
-        let signing = try stateKey(state, role: "signing")
-        let badSigning = StateKey(
-            role: signing.role,
-            applicationTagHex: wrongSizeTag.hexEncodedString(),
-            applicationLabel: signing.applicationLabel,
-            publicKeyX963Hex: wrongSizePublic.hexEncodedString(),
-            publicKeyX963Length: wrongSizePublic.count,
-            keyType: signing.keyType,
-            keySizeBits: signing.keySizeBits,
-            tokenID: signing.tokenID
-        )
-        _ = try loadAndValidateSigningKey(state: replacingStateKey(state, role: "signing", with: badSigning))
+        _ = try loadAndValidateSigningKey(state: corrupted)
     }
     expectFailure {
         let target = "\(scratchDir)/phase3-symlink-target.json"
@@ -509,10 +526,6 @@ private func runFailure(requestPath: String) throws -> SummaryReport {
         let _: SigningRequest = try readJSONSecurely(from: symlink)
     }
 
-    for tag in cleanupTags {
-        try? deleteKey(applicationTag: tag)
-    }
-
     let status = failed == 0 ? "passed" : "failed"
     return SummaryReport(
         phase: "phase3",
@@ -522,25 +535,14 @@ private func runFailure(requestPath: String) throws -> SummaryReport {
         checksPassed: passed,
         checksFailed: failed,
         materialsPrinted: false,
-        summary: "Failure checks exercised restricted files, missing rows, role/tag substitution, invalid digests, public-key mismatch, non-SE/wrong-size keys, corrupted state, and symlink rejection."
+        summary: "Failure checks exercised restricted files, role substitution, invalid digests, public-key mismatch, corrupted handles, and symlink rejection."
     )
 }
 
 private func cleanup(requestPath: String) throws -> SummaryReport {
     let request: SigningRequest = try readJSONSecurely(from: requestPath)
     var deleted = 0
-
-    if let state = try? readJSONSecurely(from: request.statePath) as StateFile {
-        for key in state.keys {
-            if let tag = try? validatedApplicationTag(from: key) {
-                try? deleteKey(applicationTag: tag)
-            }
-        }
-    }
-    deleted += deleteProbeKeysByPrefix()
-
-    let paths = [request.statePath, request.responsePath, request.resultPath].compactMap { $0 } + (request.cleanupPaths ?? [])
-    for path in paths {
+    for path in ([request.statePath, request.responsePath].compactMap { $0 } + (request.cleanupPaths ?? [])) {
         if let attrs = try? secureFileMetadata(path), attrs.isRegularFile {
             try? FileManager.default.removeItem(atPath: path)
             deleted += 1
@@ -558,116 +560,49 @@ private func cleanup(requestPath: String) throws -> SummaryReport {
         checksPassed: deleted,
         checksFailed: 0,
         materialsPrinted: false,
-        summary: "Probe Keychain rows and temp capability files were removed where present."
+        summary: "Temp capability files were removed where present."
     )
 }
 
-private func createSecureEnclavePrivateKey(applicationTag: Data, label: String) throws -> SecKey {
-    var accessError: Unmanaged<CFError>?
-    guard let access = SecAccessControlCreateWithFlags(
-        nil,
-        kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-        [.privateKeyUsage],
-        &accessError
-    ) else {
-        throw securityError(accessError) ?? ProbeError.keyGenerationFailed
-    }
-
-    let attributes: [String: Any] = [
-        kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-        kSecAttrKeySizeInBits as String: 256,
-        kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-        kSecPrivateKeyAttrs as String: [
-            kSecAttrIsPermanent as String: true,
-            kSecAttrApplicationTag as String: applicationTag,
-            kSecAttrLabel as String: label,
-            kSecAttrAccessControl as String: access
-        ]
-    ]
-
-    var error: Unmanaged<CFError>?
-    guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-        throw securityError(error) ?? ProbeError.keyGenerationFailed
-    }
-    return key
-}
-
-private func createSoftwarePrivateKey(applicationTag: Data, label: String, size: Int) throws -> SecKey {
-    try? deleteKey(applicationTag: applicationTag)
-    let attributes: [String: Any] = [
-        kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-        kSecAttrKeySizeInBits as String: size,
-        kSecPrivateKeyAttrs as String: [
-            kSecAttrIsPermanent as String: true,
-            kSecAttrApplicationTag as String: applicationTag,
-            kSecAttrLabel as String: label
-        ]
-    ]
-
-    var error: Unmanaged<CFError>?
-    guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-        throw securityError(error) ?? ProbeError.keyGenerationFailed
-    }
-    return key
-}
-
-private func loadAndValidateSigningKey(state: StateFile) throws -> (SecKey, Data, Data) {
-    guard state.schema == schema,
-          state.secureEnclaveAvailable,
-          state.secKeyCreateRandomKeyAvailable,
-          state.implementation == "Security SecKey Secure Enclave P-256 permanent Keychain row" else {
+private func loadAndValidateSigningKey(state: StateFile) throws -> (
+    SecureEnclave.P256.Signing.PrivateKey,
+    Data,
+    Data
+) {
+    guard state.schema == schema, state.secureEnclaveAvailable else { throw ProbeError.invalidState }
+    let signing = try stateKey(state, role: "signing")
+    let agreement = try stateKey(state, role: "keyAgreement")
+    guard signing.keyType == "SecureEnclave.P256.Signing.PrivateKey",
+          agreement.keyType == "SecureEnclave.P256.KeyAgreement.PrivateKey",
+          signing.keySizeBits == 256,
+          agreement.keySizeBits == 256,
+          signing.tokenID == "SecureEnclave",
+          agreement.tokenID == "SecureEnclave",
+          signing.publicKeyX963Length == 65,
+          agreement.publicKeyX963Length == 65,
+          signing.publicKeyX963Hex != agreement.publicKeyX963Hex else {
         throw ProbeError.invalidState
     }
 
-    let signing = try stateKey(state, role: "signing")
-    let agreement = try stateKey(state, role: "keyAgreement")
-    let signingKey = try loadPrivateKey(applicationTag: try validatedApplicationTag(from: signing))
-    let agreementKey = try loadPrivateKey(applicationTag: try validatedApplicationTag(from: agreement))
-    let signingPublic = try validatePrivateKey(signingKey, expected: signing, role: "signing")
-    let agreementPublic = try validatePrivateKey(agreementKey, expected: agreement, role: "keyAgreement")
-    guard signingPublic != agreementPublic,
-          signingPublic.hexEncodedString() == signing.publicKeyX963Hex,
-          agreementPublic.hexEncodedString() == agreement.publicKeyX963Hex else {
+    let signingHandle = try hexDecode(signing.handleRepresentationHex)
+    let agreementHandle = try hexDecode(agreement.handleRepresentationHex)
+    let signingKey: SecureEnclave.P256.Signing.PrivateKey
+    let agreementKey: SecureEnclave.P256.KeyAgreement.PrivateKey
+    do {
+        signingKey = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: signingHandle)
+        agreementKey = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: agreementHandle)
+    } catch {
+        throw ProbeError.keyReconstructionFailed
+    }
+
+    let signingPublic = signingKey.publicKey.x963Representation
+    let agreementPublic = agreementKey.publicKey.x963Representation
+    guard signingPublic.hexEncodedString() == signing.publicKeyX963Hex,
+          agreementPublic.hexEncodedString() == agreement.publicKeyX963Hex,
+          signingPublic != agreementPublic else {
         throw ProbeError.keyValidationFailed
     }
     return (signingKey, signingPublic, agreementPublic)
-}
-
-private func validatePrivateKey(_ key: SecKey, expected: StateKey, role: String) throws -> Data {
-    guard expected.role == role,
-          expected.keyType == expectedStateKeyType(for: role),
-          expected.keySizeBits == 256,
-          expected.tokenID == "SecureEnclave" else {
-        throw ProbeError.invalidState
-    }
-
-    let attributes = try secKeyAttributes(key)
-    guard stringAttribute(attributes[kSecAttrKeyType as String]) == (kSecAttrKeyTypeECSECPrimeRandom as String) else {
-        throw ProbeError.keyValidationFailed
-    }
-    guard intAttribute(attributes[kSecAttrKeySizeInBits as String]) == 256 else {
-        throw ProbeError.keyValidationFailed
-    }
-    guard stringAttribute(attributes[kSecAttrTokenID as String]) == (kSecAttrTokenIDSecureEnclave as String) else {
-        throw ProbeError.keyValidationFailed
-    }
-
-    let publicBytes = try publicX963(for: key)
-    let expectedPublic = try hexDecode(expected.publicKeyX963Hex)
-    guard publicBytes.count == 65,
-          publicBytes.count == expected.publicKeyX963Length,
-          publicBytes == expectedPublic else {
-        throw ProbeError.keyValidationFailed
-    }
-    return publicBytes
-}
-
-private func expectedStateKeyType(for role: String) -> String {
-    switch role {
-    case "signing": signingStateKeyType
-    case "keyAgreement": agreementStateKeyType
-    default: ""
-    }
 }
 
 private func stateKey(_ state: StateFile, role: String) throws -> StateKey {
@@ -675,137 +610,6 @@ private func stateKey(_ state: StateFile, role: String) throws -> StateKey {
         throw ProbeError.invalidState
     }
     return key
-}
-
-private func replacingStateKey(_ state: StateFile, role: String, with replacement: StateKey) -> StateFile {
-    StateFile(
-        schema: state.schema,
-        phase: state.phase,
-        createdAt: state.createdAt,
-        secureEnclaveAvailable: state.secureEnclaveAvailable,
-        environment: state.environment,
-        instanceId: state.instanceId,
-        implementation: state.implementation,
-        secKeyCreateRandomKeyAvailable: state.secKeyCreateRandomKeyAvailable,
-        keys: state.keys.map { $0.role == role ? replacement : $0 },
-        notes: state.notes
-    )
-}
-
-private func validatedApplicationTag(from key: StateKey) throws -> Data {
-    let tag = try hexDecode(key.applicationTagHex)
-    guard let tagString = String(data: tag, encoding: .utf8),
-          tagString.hasPrefix(keychainTagPrefix) else {
-        throw ProbeError.invalidState
-    }
-    return tag
-}
-
-private func loadPrivateKey(applicationTag: Data) throws -> SecKey {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
-        kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-        kSecAttrApplicationTag as String: applicationTag,
-        kSecReturnRef as String: true,
-        kSecMatchLimit as String: kSecMatchLimitOne
-    ]
-
-    var item: CFTypeRef?
-    let status = SecItemCopyMatching(query as CFDictionary, &item)
-    guard status == errSecSuccess, let key = item as! SecKey? else {
-        throw securityError(status) ?? ProbeError.keychainLookupFailed
-    }
-    return key
-}
-
-private func deleteKey(applicationTag: Data) throws {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
-        kSecAttrApplicationTag as String: applicationTag
-    ]
-    let status = SecItemDelete(query as CFDictionary)
-    guard status == errSecSuccess || status == errSecItemNotFound else {
-        throw securityError(status) ?? ProbeError.keychainLookupFailed
-    }
-}
-
-private func deleteProbeKeysByPrefix() -> Int {
-    let query: [String: Any] = [
-        kSecClass as String: kSecClassKey,
-        kSecReturnAttributes as String: true,
-        kSecMatchLimit as String: kSecMatchLimitAll
-    ]
-    var item: CFTypeRef?
-    let status = SecItemCopyMatching(query as CFDictionary, &item)
-    guard status == errSecSuccess, let rows = item as? [[String: Any]] else {
-        return 0
-    }
-
-    var deleted = 0
-    for row in rows {
-        guard let tag = row[kSecAttrApplicationTag as String] as? Data,
-              let tagString = String(data: tag, encoding: .utf8),
-              tagString.hasPrefix(keychainTagPrefix) else {
-            continue
-        }
-        if (try? deleteKey(applicationTag: tag)) != nil {
-            deleted += 1
-        }
-    }
-    return deleted
-}
-
-private func secKeyAttributes(_ key: SecKey) throws -> [String: Any] {
-    guard let attributes = SecKeyCopyAttributes(key) as? [String: Any] else {
-        throw ProbeError.keyValidationFailed
-    }
-    return attributes
-}
-
-private func publicX963(for privateKey: SecKey) throws -> Data {
-    guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-        throw ProbeError.keyValidationFailed
-    }
-    var error: Unmanaged<CFError>?
-    guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-        throw securityError(error) ?? ProbeError.keyValidationFailed
-    }
-    return data
-}
-
-private func stringAttribute(_ value: Any?) -> String? {
-    if let string = value as? String { return string }
-    return nil
-}
-
-private func intAttribute(_ value: Any?) -> Int? {
-    if let int = value as? Int { return int }
-    if let number = value as? NSNumber { return number.intValue }
-    return nil
-}
-
-private func securityError(_ error: Unmanaged<CFError>?) -> ProbeError? {
-    guard let error else { return nil }
-    let retained = (error.takeRetainedValue() as Error) as NSError
-    if retained.domain == NSOSStatusErrorDomain {
-        return securityError(OSStatus(retained.code))
-    }
-    return ProbeError.keyGenerationFailed
-}
-
-private func securityError(_ status: OSStatus) -> ProbeError? {
-    switch status {
-    case errSecMissingEntitlement:
-        return .missingEntitlement
-    case errSecItemNotFound:
-        return .keychainLookupFailed
-    case errSecUnimplemented, errSecNotAvailable:
-        return .secureEnclaveUnavailable
-    default:
-        return nil
-    }
 }
 
 private func parseECDSADER(_ der: Data) throws -> (Data, Data) {
