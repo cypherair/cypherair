@@ -183,7 +183,14 @@ plaintext acceptance, or secret logging.
 | Secret private-key export/backup | Unsupported for SE custody | Must be shown as non-exportable; no software recovery key fallback. |
 | Import existing private key into SE | Unsupported | Apple Secure Enclave private keys must be generated in the Secure Enclave. |
 | Device-loss decrypt recovery | Unsupported | Product copy must not imply decryptability after device/Keychain/SE-handle loss. |
-| Auth-mode switching rewrap | Needs product decision | Current rewrap model applies to wrapped software secret certs, not SE-owned OpenPGP private operations. |
+| Auth-mode switching rewrap | Needs product decision | SE custody should not use in-place rewrap; any future access-policy change should be a new key or lifecycle design. |
+
+## Secure Enclave Access-Control Direction
+
+Production planning should keep the existing Standard/High Security mode and
+rewrap model for software custody only. Secure Enclave custody v1 should default
+to a biometrics-only private-key policy equivalent to `privateKeyUsage +
+biometryAny`, without device-passcode fallback.
 
 ## Future Code Organization Rules
 
