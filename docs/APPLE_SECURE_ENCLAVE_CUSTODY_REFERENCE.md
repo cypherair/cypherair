@@ -69,15 +69,16 @@ only how unsupported private-key export requests are presented or reported.
 ### Phase 0: Baseline And Evidence Rules
 
 Purpose: establish a shared validation record before prototype work begins.
+POC baseline: [Phase 0 POC Baseline](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE0.md).
 
-This phase should confirm source references, current code boundaries, and the
-evidence-note format. It should also restate which existing security invariants
-must be treated as non-negotiable by later phases, using links rather than
-copying the full requirement set.
+This phase should confirm source references, current code boundaries, and
+baseline POC evidence expectations. It should also restate which existing
+security invariants must be treated as non-negotiable by later phases, using
+links rather than copying the full requirement set.
 
 Exit markers:
 
-- The evidence-note format is available for later phases.
+- The evidence checklist is available for later phases.
 - The current shipped wrapping model and proposed custody model are clearly
   separated for reviewers.
 - Later phases can refer to one shared list of validation questions without
