@@ -96,11 +96,11 @@ also documents `privateKeyUsage` as necessary for private-key operations and
 `kSecAttrTokenIDSecureEnclave` as the Secure Enclave storage token.
 
 The tested macOS path used Security framework `SecKey` operations for signing
-and key agreement. Phase 4 confirmed `SecKeyCopyKeyExchangeResult` with the
-standard ECDH algorithm returned a 32-byte raw P-256 shared secret on the signed
-Secure Enclave key-agreement key. Rust, not Swift, then performed OpenPGP ECDH
-KDF, AES Key Wrap unwrap, session-key validation, payload decrypt, and
-signature verification.
+and key agreement. Phase 4 confirmed that the signed probe could load the
+Secure Enclave key-agreement `SecKey` and use `SecKeyCopyKeyExchangeResult`
+with the standard ECDH algorithm to obtain a 32-byte raw P-256 shared secret.
+Rust, not Swift, then performed OpenPGP ECDH KDF, AES Key Wrap unwrap,
+session-key validation, payload decrypt, and signature verification.
 
 Sequoia 2.3.0 provides the right conceptual seams:
 
@@ -108,8 +108,12 @@ Sequoia 2.3.0 provides the right conceptual seams:
   private signing operations.
 - `crypto::Decryptor` lets software decrypt OpenPGP session keys while
   delegating private decrypt/ECDH operations.
-- `parse::stream::DecryptionHelper` keeps session-key selection and payload
-  authentication under OpenPGP policy.
+- `parse::stream::DecryptionHelper` is the recipient/session-key acquisition
+  seam used by Sequoia's streaming decryptor.
+
+Payload decryption and MDC/AEAD authentication remain owned by Sequoia's
+streaming `Decryptor` and by the caller's read-to-completion /
+`message_processed` policy, not by the Secure Enclave bridge.
 
 These seams are consistent with the desired production boundary: Security owns
 Apple platform private-key operations, Rust/Sequoia owns OpenPGP semantics, and
@@ -140,9 +144,14 @@ Production planning should preserve these architecture decisions:
   secret certificate bytes.
 - Phase 5 records an access-control planning direction: the current
   Standard/High Security rewrap model should remain a software-custody concept,
-  while Secure Enclave custody v1 should evaluate a biometrics-only
-  private-key policy without device-passcode fallback. The final policy belongs
-  in the later security-validation document.
+  while Secure Enclave custody v1 should default to a biometrics-only
+  `privateKeyUsage + biometryAny` private-key policy without device-passcode
+  fallback. `biometryAny` keeps the key usable after biometric enrollment
+  changes. `biometryCurrentSet` binds access to the currently enrolled
+  biometrics and is invalidated when Touch ID fingers are added or removed, or
+  Face ID is re-enrolled; it is therefore a stronger but higher-loss-risk
+  advanced option for later evaluation, not the v1 default. The final policy
+  belongs in the later product-design and security-validation documents.
 
 ## Product Implications
 
