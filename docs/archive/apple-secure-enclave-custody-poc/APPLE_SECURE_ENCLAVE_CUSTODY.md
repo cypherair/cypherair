@@ -1,5 +1,15 @@
 # Apple Secure Enclave Custody
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC validation completed and handed off to active planning docs.
+> Successor: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Current planning: [Product Design](../../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+> [Architecture Plan](../../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md), and
+> [Security Requirements](../../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md).
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Proposal planning draft. This document describes proposed future
 > behavior and does not describe shipped behavior.
 > Purpose: Define the product model, user-visible semantics, recovery posture,
@@ -8,8 +18,8 @@
 > AI coding tools.
 > Related: [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
 > [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
-> [PRD](PRD.md), [Security](SECURITY.md), and
-> [Architecture](ARCHITECTURE.md).
+> [PRD](../../PRD.md), [Security](../../SECURITY.md), and
+> [Architecture](../../ARCHITECTURE.md).
 
 ## 1. Goal
 

@@ -100,9 +100,11 @@ mutation. The proposed Apple Secure Enclave Custody mode is separate future
 private-key custody, not a third OpenPGP algorithm profile. In that mode,
 separate P-256 signing and key-agreement private-key operations are performed by
 Secure Enclave and long-term private scalars are never exported to CypherAir. Do
-not conflate that future mode with this wrapping scheme. Its planning security
-model lives in
-[APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md).
+not conflate that future mode with this wrapping scheme. Current security
+planning lives in
+[APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md);
+the POC security notes are archived as historical context in
+[APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md).
 
 ### ProtectedData Device-Binding Note
 

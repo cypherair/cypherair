@@ -1,5 +1,15 @@
 # Apple Secure Enclave Custody Reference
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC validation completed and handed off to active planning docs.
+> Successor: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Current planning: [Product Design](../../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+> [Architecture Plan](../../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md), and
+> [Security Requirements](../../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md).
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Proposal planning draft. This document describes future-facing
 > validation and decision work; it does not describe shipped behavior.
 > Purpose: Provide the single validation reference for deciding whether Apple
@@ -11,12 +21,13 @@
 > and AI coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
-> [Architecture](ARCHITECTURE.md), [Security](SECURITY.md),
-> [Testing](TESTING.md), and
-> [Documentation Governance](DOCUMENTATION_GOVERNANCE.md).
+> [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md),
+> [Testing](../../TESTING.md), and
+> [Documentation Governance](../../DOCUMENTATION_GOVERNANCE.md).
 > Current-state note: This reference is not a production implementation plan,
 > not a statement of shipped architecture, and not authorization to change
 > security-sensitive code without a phase-specific plan.
+> Planning handoff: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
 
 ## 1. Document Boundaries
 
@@ -56,10 +67,14 @@ only how unsupported private-key export requests are presented or reported.
   AEAD/MDC hard-fail behavior, the zero-network model, no-secret-logging rules,
   the no-software-fallback requirement, or the no-private-key-export
   requirement.
+- POC evidence should prefer the path closest to a plausible future production
+  custody boundary. Disposable shortcuts can support compatibility findings,
+  but they must be labeled as such and must not be used as
+  production-proximate acceptance evidence.
 - Prototype code, disposable bridges, and proof-only packet construction may
   prove compatibility, but they must not be treated as production architecture.
-- Canonical current-state docs such as [Architecture](ARCHITECTURE.md),
-  [Security](SECURITY.md), and [Testing](TESTING.md) should be updated only
+- Canonical current-state docs such as [Architecture](../../ARCHITECTURE.md),
+  [Security](../../SECURITY.md), and [Testing](../../TESTING.md) should be updated only
   after behavior ships or after validation requirements become durable.
 - Hardware validation and mockable contract validation should remain separate.
   Secure Enclave availability cannot be assumed on CI runners.
@@ -88,6 +103,7 @@ Exit markers:
 
 Purpose: prove the Apple platform primitive behavior needed by the custody
 model.
+POC evidence: [Phase 1 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE1.md).
 
 The first validation target is macOS on Secure Enclave-capable hardware because
 local builds, temporary harnesses, and debugging are easier than on iOS devices.
@@ -120,6 +136,7 @@ Exit markers:
 
 Purpose: determine whether valid OpenPGP P-256 public certificates can be built
 around Secure Enclave public keys while private scalars remain unavailable.
+POC evidence: [Phase 2 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE2.md).
 
 Use an isolated prototype to compare v4 and v6 certificate options without
 selecting the final product shape unless the evidence clearly forces a decision.
@@ -144,11 +161,14 @@ Exit markers:
 
 Purpose: prove that Secure Enclave ECDSA output can be used as OpenPGP
 signatures accepted by the app's verification stack.
+POC evidence: [Phase 3 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE3.md).
 
 Prototype a Secure Enclave-backed OpenPGP signer path that:
 
-- Lets Sequoia or a narrow prototype compute the OpenPGP signature digest.
-- Delegates P-256 ECDSA signing to the Secure Enclave signing key.
+- Lets the OpenPGP layer own packet construction, hashing, and signature
+  preimage details through a real signer seam where practical.
+- Delegates only the P-256 ECDSA private-key operation to the Secure Enclave
+  signing key.
 - Converts Secure Enclave ECDSA output into OpenPGP ECDSA `r` and `s` MPIs.
 - Verifies the produced signature with Sequoia using only public certificate
   material.
@@ -156,8 +176,15 @@ Prototype a Secure Enclave-backed OpenPGP signer path that:
   successful.
 
 This phase should evaluate an external-signer seam such as Sequoia's `Signer`
-trait where practical, but may use a narrower disposable bridge to prove
-cryptographic compatibility first.
+trait where practical. A narrower disposable bridge may be used for debugging
+or supporting compatibility evidence, but it cannot replace Phase 3 acceptance
+evidence unless it exercises the same custody boundary expected of the
+production candidate.
+
+The evidence note must state whether Secure Enclave key creation, persistence,
+lookup, access control, and signing call paths represent the production
+candidate boundary. If they do not, the conclusion must be downgraded from
+production-proximate feasibility to compatibility evidence.
 
 Exit markers:
 
@@ -172,6 +199,8 @@ Exit markers:
 
 Purpose: prove that Secure Enclave P-256 ECDH can recover an OpenPGP session
 key and preserve CypherAir decrypt security behavior.
+
+POC evidence: [Phase 4 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE4.md).
 
 Prototype a Secure Enclave-backed ECDH decrypt path that:
 
@@ -188,6 +217,11 @@ This phase should evaluate whether Sequoia's `Decryptor` trait, a
 fixed-session-key route, or another boundary is most appropriate after the
 session key is recovered.
 
+Phase 4.5 compatibility addendum: the disposable harness should also keep a
+GnuPG-focused v4 control path for the Secure Enclave-specific public certificate,
+signature, and decrypt boundary. That evidence is supporting compatibility
+evidence, not a substitute for Phase 5 architecture validation.
+
 Exit markers:
 
 - At least one P-256 encrypted message decrypts through the proposed custody
@@ -197,6 +231,8 @@ Exit markers:
   remaining memory-exposure and zeroization concerns.
 
 ### Phase 5: App Architecture Integration Feasibility
+
+POC evidence: [Phase 5 POC Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE5.md).
 
 Purpose: validate that the custody concept can fit the app architecture without
 collapsing existing boundaries.
@@ -306,7 +342,7 @@ Documentation-only changes to this reference should use docs-level validation:
 - `git diff --check`
 - manual review of relative links
 
-Later implementation phases should choose validation from [Testing](TESTING.md)
+Later implementation phases should choose validation from [Testing](../../TESTING.md)
 based on the changed surfaces. Rust / UniFFI-visible behavior, Swift security
 services, Secure Enclave access control, device-only behavior, and UI workflow
 changes each require their own phase-specific validation plan.

@@ -142,8 +142,10 @@ creation should model algorithm/profile and private-key custody as separate
 dimensions, with a capability resolver exposing only supported combinations.
 Sequoia 2.3's `Signer` and `Decryptor` traits are the likely Rust-side seam for
 this external private-key custody model, but the production API shape remains
-undecided pending the unified validation track described in
-[APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
+undecided. Current integration planning lives in
+[APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md);
+the completed POC validation track is archived as historical context in
+[APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
 
 ### Security Layer (`Sources/Security/`)
 
