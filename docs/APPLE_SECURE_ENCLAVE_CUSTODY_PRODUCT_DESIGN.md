@@ -3,172 +3,179 @@
 > Status: Active product proposal. This document describes proposed future
 > behavior and does not describe shipped behavior.
 > Date: 2026-05-25.
-> Purpose: Define the high-level product direction for Apple Secure
-> Enclave-backed OpenPGP private-key custody after the Phase 0-5 feasibility
-> work.
+> Purpose: Define the product direction for Apple Secure Enclave-backed
+> OpenPGP private-key custody after the Phase 0-5 feasibility work.
 > Audience: Product, design, security reviewers, Swift/Rust implementers,
 > reviewers, and AI coding tools.
 > Related: [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md),
 > [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md),
 > [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md),
-> [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md), [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
-> [Architecture](ARCHITECTURE.md), and [Security](SECURITY.md).
+> [PRD](PRD.md), [Architecture](ARCHITECTURE.md), and
+> [Security](SECURITY.md).
 
 ## Product Decision
 
-Apple Secure Enclave Custody should move from POC feasibility into product
-planning as an explicit device-bound private-key custody option. It should not
-replace the current portable software-key model and should not be presented as
-an upgrade path for existing private keys.
+Apple Secure Enclave Custody should become a planned device-bound private-key
+custody capability. It is not a replacement for portable software keys and is
+not an upgrade path for existing private keys. A user chooses it when they want
+the long-term private operation to stay bound to the current device.
 
-The first product direction should plan four user-visible configuration
-families:
+The future key-generation product model should move away from presenting
+Profile A and Profile B as the primary user-facing shape. Instead, users should
+see complete, valid configuration families that combine two product dimensions:
 
-- portable compatible software custody;
-- portable modern software custody;
-- device-bound compatible Secure Enclave custody;
-- device-bound modern Secure Enclave custody.
+- portability: portable software custody or device-bound Secure Enclave
+  custody;
+- compatibility target: compatible OpenPGP or modern OpenPGP.
 
-These are product families, not final UI copy or implementation type names.
-The default key-generation experience should remain portable compatible to
-preserve current behavior. Device-bound compatible Secure Enclave custody should
-be the recommended device-bound option because the POC showed GnuPG
-interoperability for the v4 P-256 shape. Device-bound modern Secure Enclave
-custody remains a first-version product candidate for RFC 9580 / AEAD users,
-but it must not claim GnuPG compatibility.
+The initial product families are:
 
-## Product Positioning
+| Product family | Current or new behavior | Product meaning |
+| --- | --- | --- |
+| Portable compatible software custody | Current Profile A behavior | Exportable software private key, broad GnuPG compatibility. |
+| Portable modern software custody | Current Profile B behavior | Exportable software private key, modern RFC 9580 behavior. |
+| Device-bound compatible Secure Enclave custody | New SE v4 P-256 candidate | Non-exportable device-bound key, GnuPG-oriented compatibility. |
+| Device-bound modern Secure Enclave custody | New SE v6 P-256 candidate | Non-exportable device-bound key, RFC 9580 / AEAD-oriented behavior. |
 
-The feature should be described as private-key isolation and device binding,
-not as universally stronger cryptography. Secure Enclave P-256 protects the
-long-term private operation from export, but P-256 is not stronger than the
-existing Ed448/X448 software-key profile.
+These names describe product families, not final UI strings or implementation
+type names. The default key-generation choice should remain portable compatible
+software custody so current user expectations are preserved.
 
-User-facing copy must make these points clear before key generation:
+## Migration From Profile A/B Language
 
-- the private keys are generated on this device;
+Existing keys must keep their cryptographic behavior. Product migration changes
+how the app describes key choices; it must not rewrite an existing key's
+algorithm, packet format, export behavior, or interoperability semantics.
+
+The migration mapping is:
+
+- existing Profile A keys become portable compatible software-custody keys in
+  product surfaces;
+- existing Profile B keys become portable modern software-custody keys in
+  product surfaces;
+- new Secure Enclave keys are generated as new device-bound compatible or
+  device-bound modern keys.
+
+Profile A/B may remain visible in legacy explanations, migration notes, or
+technical detail views if needed, but they should not remain the primary product
+choice once the new model ships. The product should never imply that an existing
+software key can be converted into Secure Enclave custody.
+
+## Configuration Experience
+
+Key generation should present complete product choices, not a free-form matrix
+of low-level algorithm, packet format, custody, access-control, and export
+settings. A resolver-backed product surface should show only choices that are
+valid under the current product and security design.
+
+Each available choice should communicate:
+
+- compatibility target, for example GnuPG-oriented compatibility or modern
+  OpenPGP;
+- custody model, for example portable private-key backup or device-bound Secure
+  Enclave custody;
+- backup and recovery consequence;
+- whether private-key export is supported.
+
+The configuration surface should not include a platform or device-capability
+warning as a normal choice attribute. CypherAir's supported modern Apple
+platforms are assumed to provide the required local security capabilities for a
+shipped Secure Enclave custody feature. Operational failures, missing local
+state, and authentication failures are key-status or error states, not
+configuration marketing copy.
+
+## User Commitments
+
+Before creating a Secure Enclave custody key, the product must communicate:
+
+- the private keys are generated for this device-bound custody mode;
 - the private keys cannot be exported or backed up;
-- existing private keys cannot be imported into Secure Enclave;
-- losing the device, Secure Enclave state, Keychain handles, or required
+- existing private keys cannot be imported into Secure Enclave custody;
+- losing the device, Secure Enclave private-operation handles, or required
   biometric access can permanently remove signing and decrypt capability;
 - revocation artifacts and public certificates can be exported, but they are
   not private-key backups.
 
-The product should target users who value device-bound private-key isolation
-over portability. It should not be framed as the right default for every user.
+This should be clear enough that the user understands the portability tradeoff
+before generation, without turning normal key generation into a long security
+tutorial.
 
-## Configuration Experience
+## Generation And Completion
 
-Key generation should use a product configuration surface backed by capability
-resolution. The UI should show only valid, supported combinations. Users should
-not be asked to freely combine low-level algorithm, packet-format, custody, and
-access-control choices.
+Portable software-key generation should remain familiar. Secure Enclave custody
+generation should add the device-bound consequences at the moment where the user
+is committing to a non-exportable key.
 
-The configuration surface should communicate each available option using:
+For Secure Enclave custody, successful generation should produce:
 
-- compatibility target, such as broad GnuPG compatibility or modern OpenPGP;
-- custody model, such as portable private-key backup or device-bound Secure
-  Enclave custody;
-- backup and recovery consequence;
-- availability limits, including platform and hardware requirements;
-- whether private-key export is supported.
+- an OpenPGP public certificate;
+- distinct Secure Enclave private-operation handles for signing and key
+  agreement;
+- key metadata that lets the app present the configuration and custody model;
+- a key-level revocation artifact available for later export.
 
-The UI may present these as cards or another guided selection pattern. The
-important product requirement is that each choice represents a complete valid
-configuration and that unsupported combinations are not exposed as selectable.
-
-## User Journey
-
-The generation journey should remain familiar for portable software keys and
-become more explicit for Secure Enclave custody:
-
-1. Choose a complete key configuration.
-2. Enter identity and validity details.
-3. For Secure Enclave custody, show device-bound and no-private-key-backup
-   consequences before generation completes.
-4. Generate the public certificate, Secure Enclave private-operation handles,
-   and key-level revocation artifact.
-5. Show a post-generation page with information and actions.
-
-For Secure Enclave custody, the post-generation page should use an
+The post-generation surface for Secure Enclave custody should use an
 information-plus-actions pattern:
 
-- explain that the private key cannot be exported or backed up;
+- explain that private-key backup and private-key export are unavailable;
 - offer revocation artifact export;
-- offer public key sharing, including QR where supported;
-- offer key detail navigation;
-- avoid "backup complete" language for the private key.
+- offer public-key sharing;
+- offer key-detail navigation;
+- avoid language such as "private-key backup complete."
 
-The post-generation page should not require revocation export before completion
-in this high-level product direction. Later usability testing may strengthen
-the prompt if users misunderstand the recovery boundary.
+Revocation artifact export should be strongly visible, but this proposal does
+not make export a hard requirement before the user can complete key generation.
 
-## Key Detail And Availability
+## Key Detail Product Requirements
 
-Key detail UI should separate these concepts:
+Key detail should separate product concepts that are currently compressed into
+profile labels:
 
-- OpenPGP configuration and compatibility;
-- private-key custody model;
+- compatibility target;
+- OpenPGP configuration;
+- custody model;
 - public certificate state;
-- Secure Enclave handle availability;
-- revocation artifact availability;
-- private-key backup/export availability.
+- revocation artifact state;
+- private-key export or non-exportability;
+- current private-operation availability.
 
-Secure Enclave custody should have explicit unavailable states. Examples
-include hardware unavailable, biometric authentication unavailable, handle
-missing, public-certificate/handle mismatch, and operation unsupported. These
-states should fail closed and should not invite software fallback.
+For Secure Enclave custody keys, unavailable private operations must be explicit
+and fail closed. Examples include missing handles, authentication cancellation,
+biometric lockout, public-certificate mismatch, and operations that are not yet
+implemented for this custody model. The UI must not suggest that a software
+private key can be used as a fallback.
 
-Portable software keys can continue to show private-key backup/export status.
-Secure Enclave custody should instead show that private-key backup is not
-available, while revocation artifact export and public key sharing remain
-available when the relevant artifacts exist.
-
-## First-Version Workflow Target
-
-The first product target should plan feature parity for private operations
-where Secure Enclave can perform the private signing or ECDH operation without
-exporting private scalars:
-
-- message signing;
-- message decryption;
-- sign plus encrypt;
-- password-message signing;
-- streaming file sign, decrypt, and encrypt-plus-sign;
-- expiry modification;
-- selective revocation;
-- contact certification.
-
-This target does not include private-key export, private-key backup, importing
-an existing private key into Secure Enclave, or device-loss decrypt recovery.
-If any workflow cannot satisfy the security requirements, it must remain
-unavailable for Secure Enclave custody until redesigned.
+Public-key sharing, public-certificate inspection, and contact-import style
+operations remain public-material workflows. Their product copy should not make
+private-key custody sound relevant when the operation does not need private
+material.
 
 ## Compatibility Language
 
-The compatible Secure Enclave option should be described as the GnuPG-oriented
-device-bound option only after production validation confirms the Phase 4.5
-interop result under production boundaries.
+The compatible Secure Enclave option may be described as GnuPG-oriented only if
+production validation preserves the Phase 4.5 interop result under production
+boundaries.
 
-The modern Secure Enclave option should be described as an RFC 9580 / AEAD
-device-bound option. It should not imply GnuPG compatibility unless a later
-GnuPG version supports the needed v6 behavior and the app validates that path.
+The modern Secure Enclave option should be described as RFC 9580 / AEAD-oriented
+OpenPGP. It must not claim GnuPG interoperability unless a later validated GnuPG
+path supports that behavior.
 
-Existing portable software-key behavior remains unchanged by this proposal.
-Future copy may retire the Profile A / Profile B labels in favor of clearer
-product language, but the underlying cryptographic behavior must remain stable
-unless a separate migration plan changes it.
+Software portable compatible and software portable modern keys keep the current
+Profile A/B cryptographic behavior. Any future text change should make the
+product model clearer without changing that behavior.
 
-## Non-Goals
+## Product Boundaries
 
-This product design does not approve production implementation. It does not
-define exact UI layouts, Swift/Rust type names, strings, migrations, or release
-timelines.
+This document does not approve implementation, final naming, final UI layout,
+or release timing. Architecture requirements live in
+[Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md). Security
+requirements and release gates live in
+[Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md).
 
 The product must not promise:
 
 - private-key export for Secure Enclave custody;
-- importing existing private keys into Secure Enclave;
+- importing existing private keys into Secure Enclave custody;
 - recovery after device or handle loss;
-- passcode fallback for Secure Enclave private-key operations;
+- passcode fallback for Secure Enclave private operations;
 - software fallback for a Secure Enclave custody key.

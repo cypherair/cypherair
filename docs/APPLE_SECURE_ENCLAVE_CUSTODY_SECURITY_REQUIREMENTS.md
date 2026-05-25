@@ -3,8 +3,8 @@
 > Status: Active security proposal. This document describes proposed future
 > requirements and does not describe shipped behavior.
 > Date: 2026-05-25.
-> Purpose: Define the security requirements and validation gates for turning
-> Apple Secure Enclave Custody POC evidence into production planning.
+> Purpose: Define security constraints and validation gates for turning Apple
+> Secure Enclave Custody POC evidence into production work.
 > Audience: Security reviewers, Swift/Rust implementers, test owners, product
 > owners, reviewers, and AI coding tools.
 > Related: [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md),
@@ -15,34 +15,38 @@
 
 ## Security Decision
 
-Apple Secure Enclave Custody may proceed to production planning only if the
-production design preserves the POC's core security properties:
+Secure Enclave Custody can proceed toward production only if the design keeps
+the long-term P-256 private signing and key-agreement operations inside Secure
+Enclave-owned private keys. Software may orchestrate OpenPGP operations, but it
+must not gain a complete secret certificate or a software fallback for this
+custody mode.
 
-- Secure Enclave owns the long-term P-256 private signing and ECDH operations;
-- software never stores or unwraps a complete secret certificate for this
-  custody mode;
-- software fallback is impossible for Secure Enclave custody keys;
-- OpenPGP payload authentication hard-fails without partial plaintext exposure;
-- persisted state follows existing ProtectedData and Keychain protection rules.
+This document defines security requirements and release gates. Product semantics
+are defined in [Product Design](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+and architecture ownership is defined in
+[Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md).
 
-This document is a requirement proposal, not implementation approval.
+## Access-Control Requirement
 
-## Access-Control Policy
+The default Secure Enclave private-operation policy is:
 
-The first production design should use a biometrics-only Secure Enclave private
-operation policy equivalent to `privateKeyUsage + biometryAny`, without
-device-passcode fallback.
+- `privateKeyUsage`;
+- `biometryAny`;
+- no device-passcode fallback.
 
-`biometryCurrentSet` is not planned as a first-version or later user-selectable
-option. It binds access to the currently enrolled biometric set and can
-invalidate access when Touch ID fingers are added or removed or Face ID is
-re-enrolled. That creates a high permanent-loss risk for a custody mode whose
-private keys cannot be exported. The product should avoid exposing that risk as
-a user setting.
+`biometryAny` keeps the key usable when the enrolled biometric set changes,
+while still requiring biometric authentication for private-key use. This is the
+planned product policy for Secure Enclave custody private operations.
 
-The current Standard/High Security rewrap model remains a software-custody
-concept. Secure Enclave custody should not be rewrapped in place to change
-access policy.
+`biometryCurrentSet` must not be exposed as a first-version or later
+user-selectable option. It can invalidate access when Touch ID fingers are added
+or removed, or when Face ID is re-enrolled. For non-exportable private keys,
+that creates a high permanent-loss risk that should not be offered as a normal
+setting.
+
+The existing Standard/High Security private-key rewrap model remains a
+software-custody model. Secure Enclave custody must not use in-place rewrap to
+change access policy.
 
 ## Required Red Lines
 
@@ -50,125 +54,129 @@ Production design must return to security review if it requires any of the
 following:
 
 - exporting Secure Enclave private-key material;
-- importing an existing OpenPGP private key into Secure Enclave;
+- importing an existing OpenPGP private key into Secure Enclave custody;
 - storing a software private-key fallback for a Secure Enclave custody key;
 - unwrapping or storing a complete secret certificate for the Secure Enclave
   custody path;
-- using a single Secure Enclave private key for both signing and ECDH;
-- treating a Keychain handle or locator as a recoverable private-key backup;
+- treating a Keychain handle, public key, or locator as a recoverable
+  private-key backup;
+- using one Secure Enclave private key for both signing and key agreement;
+- accepting a signing handle for ECDH, or an ECDH handle for signing;
+- accepting a handle whose public key does not match the stored OpenPGP public
+  certificate association;
 - accepting partial plaintext after MDC or AEAD authentication failure;
 - logging plaintext, private-key material, session keys, ECDH shared secrets,
   KEKs, Keychain locators, stable fingerprints, or temporary capability paths;
-- weakening existing portable software-key behavior to make integration easier.
+- weakening current portable software-key behavior to make integration easier.
 
-## Operation Requirements
+## Private-Operation Security
 
-The first-version product target covers the full set of private operations that
-can be expressed through Secure Enclave signing or ECDH:
+Signing and key agreement must use distinct Secure Enclave private keys. Each
+operation must bind the requested OpenPGP key role to the expected Secure
+Enclave handle role and public key.
 
-- cleartext and detached signing;
-- text and file decryption;
-- sign plus encrypt;
-- password-message optional signing;
-- streaming file sign, decrypt, and encrypt-plus-sign;
-- expiry modification;
-- key-level revocation artifact generation and export;
-- selective subkey and User ID revocation;
-- contact certification.
+For signing, Rust/Sequoia should construct the OpenPGP signature context, and
+Apple platform code should perform only the private ECDSA operation. A failure
+to load, authenticate, or validate the signing handle must fail closed.
 
-Every supported operation must use the Secure Enclave private operation
-directly or fail closed. If an operation cannot preserve no-fallback behavior,
-secret-output policy, and OpenPGP hard-fail semantics, it must remain
-unavailable for Secure Enclave custody until redesigned.
+For decryption, Rust/Sequoia should own PKESK matching, OpenPGP ECDH KDF, AES
+Key Wrap unwrap, session-key validation, payload decrypt, MDC/AEAD
+authentication, and signature verification. Apple platform code should perform
+only the Secure Enclave P-256 ECDH private operation. A failure to load,
+authenticate, or validate the key-agreement handle must fail closed.
 
-Private-key export, private-key backup, importing existing private keys into
-Secure Enclave, and device-loss decrypt recovery are explicitly unsupported.
+No private-operation boundary may write shared secrets, session keys, KEKs, or
+plaintext to temporary files, diagnostics, stdout, or persistent logs.
 
-## OpenPGP Format Requirements
+## Payload Hard-Fail Requirement
 
-The production validation matrix must cover both Secure Enclave P-256
-configurations planned for first-version product scope:
+Secure Enclave custody must preserve the existing OpenPGP authentication
+contract:
 
-- v4 P-256 / PKESK v3 ECDH / SEIPDv1/MDC for GnuPG-oriented compatibility;
-- v6 P-256 / SEIPDv2/AEAD for RFC 9580-oriented behavior.
+- v4 SEIPDv1/MDC tampering fails closed;
+- v6 SEIPDv2/AEAD tampering fails closed;
+- streaming file decrypt writes only through a success-only output contract;
+- cancellation and authentication errors do not expose partial plaintext;
+- mixed-recipient format behavior remains consistent with the project's current
+  message-format policy unless a later canonical policy changes it.
 
-The v4 path must keep GnuPG interoperability as a release gate for import,
-verify, encrypt-to-SE, decrypt/verify, and bidirectional sign-plus-encrypt
-scenarios. The v6 path must not claim GnuPG interoperability unless later
-GnuPG support and production validation justify that claim.
+The private-operation route may recover a session key, but final plaintext
+release remains gated by Sequoia payload authentication and the caller's
+read-to-completion / message-processed contract.
 
-Mixed-recipient message-format behavior must continue to preserve the existing
-project rule: v4 recipient output uses SEIPDv1, v6 recipient output uses
-SEIPDv2, and mixed output uses SEIPDv1 unless a later canonical policy changes
-that rule.
+## Persistent-State Security
 
-## Persistent-State Requirements
+Secure Enclave custody persistent state must follow the canonical state
+classification in [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md) and
+the security invariants in [Security](SECURITY.md). This document does not
+define a separate storage policy.
 
-Secure Enclave custody metadata and handle state must follow the existing data
-protection model:
+Production implementation must classify and document every new persisted item in
+the same change that introduces it. At minimum:
 
-- non-secret key metadata belongs in the protected key-metadata model or an
-  equivalent ProtectedData migration;
-- Secure Enclave signing and key-agreement handles belong in Keychain-protected
-  private-operation-handle storage;
-- no new persistent state may be introduced in plaintext app storage unless it
-  is a documented exception;
-- implementation must update [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md)
-  and related canonical docs when new persisted state is added.
+- non-secret key configuration and custody projection belong in the protected
+  key-metadata model or an equivalent migrated protected domain;
+- Secure Enclave signing and key-agreement handles belong in the private-key
+  material / private-operation-handle boundary;
+- plaintext app storage is allowed only when the canonical inventory records an
+  explicit exception;
+- local reset, recovery, and cleanup behavior must be documented with the
+  persisted-state entry.
 
-Key metadata must not store the Secure Enclave access policy. Metadata may
-record non-secret configuration, custody kind, public certificate association,
-availability projection, revocation artifact state, and private-key export
-state. Access policy is enforced by Secure Enclave handle creation and Security
-layer ownership.
+Key metadata must not store the Secure Enclave access-control policy. Metadata
+may store non-secret configuration, custody kind, public certificate
+association, public-key binding material, operation availability projection,
+revocation artifact state, and private-key export state.
 
-Handle storage must preserve role separation and public-key binding. A signing
-handle must not be accepted for ECDH, an ECDH handle must not be accepted for
-signing, and a handle whose public key does not match the stored OpenPGP public
-certificate must fail closed.
+## Mockable Validation Requirements
 
-## Validation Requirements
+Automated mockable tests must cover the contracts that should not require real
+Secure Enclave hardware:
 
-Production validation should be split into mockable contract tests and hardware
-evidence.
-
-Mockable tests should cover:
-
-- capability resolution for valid and invalid configuration/custody
-  combinations;
+- legal and illegal OpenPGP configuration plus custody combinations;
+- migration of existing Profile A/B metadata into the successor configuration
+  plus software custody representation;
+- metadata corruption and recovery behavior;
+- resolver output for supported and unsupported operations;
+- operation-router dispatch without workflow-local custody switches;
 - no software fallback and no secret-cert unwrap fallback;
-- missing handle, wrong role, wrong public key, and unavailable hardware;
-- key metadata migration and recovery behavior;
-- workflow services requesting private-operation routes rather than unwrapped
-  secret cert bytes;
+- wrong role, wrong public key, missing handle, and metadata/handle mismatch;
 - no partial plaintext after MDC/AEAD failure;
-- no secret material in logs, stdout, errors, or persisted diagnostics.
+- no secret material in logs, errors, diagnostics, or persisted state.
 
-Hardware evidence should cover:
+These tests should prove the architecture contracts before hardware-specific
+tests run.
 
-- macOS, iPhone, iPadOS, and visionOS availability and failure behavior;
-- Secure Enclave signing and ECDH for distinct keys;
-- v4 and v6 message decrypt and signing;
-- v4 GnuPG interoperability;
-- authentication cancellation, lockout, unavailable biometrics, missing
-  handles, and local reset cleanup.
+## Hardware Evidence Requirements
 
-Hardware tests should not become mandatory default CI checks. They should be
-owned as release evidence or manually triggered validation lanes with sanitized
-output.
+Hardware evidence must cover real Secure Enclave private operations on the
+supported Apple platform families before release. Evidence should be run through
+manual or release-validation lanes, not mandatory default CI.
 
-## Memory And Boundary Requirements
+The evidence set must include:
 
-The Phase 4 raw shared-secret JSON bridge is not production acceptable.
-Production design must use a narrower boundary that avoids temporary-file
-transfer of ECDH shared secrets and minimizes shared-secret lifetime in Swift
-and Rust memory.
+- generation and persistence of distinct signing and key-agreement handles;
+- signing for v4 and v6 Secure Enclave custody certificates;
+- ECDH/session-key recovery and decrypt for v4 SEIPDv1/MDC and v6
+  SEIPDv2/AEAD;
+- v4 GnuPG interoperability for import, verify, encrypt-to-SE,
+  decrypt/verify, and bidirectional sign-plus-encrypt;
+- v6 RFC 9580 / AEAD behavior without claiming GnuPG interoperability;
+- authentication cancellation, biometric lockout, missing handle, wrong role,
+  wrong public binding, and local reset cleanup.
 
-Rust/Sequoia should own OpenPGP KDF, AES Key Wrap unwrap, session-key
-validation, payload decrypt, and verification. Swift/Security should own Apple
-platform private operations and Keychain access. Product services should own
-workflow decisions and user-visible errors.
+Hardware test output must be sanitized. It must not print plaintext, private-key
+material, shared secrets, session keys, KEKs, Keychain locators, stable
+fingerprints, or temporary paths.
 
-Sensitive buffers must be zeroized where the platform allows it. Known platform
-limitations must be documented explicitly and must not become justification for
-persisting secrets outside protected storage.
+## Release Gate
+
+Secure Enclave custody must remain unavailable in product UI until the product,
+architecture, and security documents agree on:
+
+- configuration and custody migration behavior;
+- persisted-state classification and migration;
+- private-operation router and Rust/UniFFI boundary;
+- mockable security tests;
+- hardware evidence;
+- user-facing recovery and non-exportability language.

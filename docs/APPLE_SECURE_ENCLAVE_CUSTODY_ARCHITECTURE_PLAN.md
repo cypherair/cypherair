@@ -3,8 +3,8 @@
 > Status: Active architecture proposal. This document describes proposed future
 > architecture and does not describe shipped behavior.
 > Date: 2026-05-25.
-> Purpose: Define the high-level architecture direction for integrating Apple
-> Secure Enclave-backed OpenPGP private-key custody after the Phase 0-5 POC.
+> Purpose: Define architecture requirements for integrating Apple Secure
+> Enclave-backed OpenPGP private-key custody after the Phase 0-5 POC.
 > Audience: Swift/Rust implementers, security reviewers, architecture
 > reviewers, product owners, test owners, and AI coding tools.
 > Related: [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md),
@@ -14,183 +14,226 @@
 > [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md), and
 > [Testing](TESTING.md).
 
-## Architecture Decision
+## Architecture Goal
 
-Production planning should separate OpenPGP algorithm/format configuration from
-private-key custody. P-256 v4 and P-256 v6 are OpenPGP configuration candidates.
-Apple Secure Enclave is a custody model. It must not be modeled as a profile by
-itself.
+Production Secure Enclave Custody must fit CypherAir by separating three
+concepts that the current software-key model partly compresses:
 
-This document intentionally avoids locking concrete Swift/Rust type names or
-file layout. A later implementation plan should choose names and migration
-steps after product and security requirements are complete.
+- OpenPGP configuration: key version, algorithm family, packet/message-format
+  preferences, interoperability target, and software export/S2K behavior;
+- private-key custody: software secret certificate or Apple Secure Enclave
+  private-operation handles;
+- operation capability: what the key can do now for sign, decrypt, certify,
+  mutate certificate state, export public material, export revocation material,
+  or report unsupported.
 
-## Model Boundaries
+The final implementation may choose specific type names later. The architecture
+requirement is that these concepts must be represented separately.
 
-Future production design should have at least these conceptual dimensions:
+## Profile Successor Model
 
-- OpenPGP configuration: key version, algorithm family, message-format
-  preferences, export/S2K behavior for software keys, and interoperability
-  target.
-- Custody kind: software secret certificate, Apple Secure Enclave, or future
-  external custody.
-- Operation capability: sign, decrypt, certify, mutate certificate state,
-  export public material, export revocation artifact, or unsupported.
+The current `PGPKeyProfile` vocabulary is not sufficient as the long-term model.
+It describes the current software-key algorithm/profile choices, but it cannot
+express P-256 v4, P-256 v6, or a custody dimension without becoming misleading.
 
-Existing Profile A/B metadata should remain readable. Production work may keep
-the current profile vocabulary as a compatibility layer or migration source,
-but the new model should be able to represent P-256 v4 and P-256 v6
-configurations without pretending that custody is a profile.
+Production work must introduce a profile successor model, or an equivalent
+configuration model, that can represent at least:
 
-## Persistent State Direction
+- OpenPGP key version, including v4 and v6;
+- primary signing/certification algorithm and encryption subkey algorithm;
+- message-format preferences and advertised feature flags;
+- interoperability target, including GnuPG-oriented and RFC 9580-oriented
+  choices;
+- software private-key export/S2K behavior where software custody supports
+  private-key export;
+- whether the OpenPGP configuration is valid with software custody, Secure
+  Enclave custody, or both.
 
-Secure Enclave custody should extend the existing protected key-metadata model
-through metadata v2 or an equivalent migration. A new ProtectedData domain is
-not the preferred direction for the first production design.
+`PGPKeyProfile` must not gain a Secure Enclave case. It may be used as a
+migration source or temporary read adapter for existing Profile A/B data, but it
+should not remain the primary persisted model after the migration. New writes
+for production Secure Enclave custody should use the successor configuration
+model or an equivalent representation.
 
-Protected key metadata should contain non-secret state needed for app behavior,
-such as:
+The required migration mapping is:
 
+| Existing source | New configuration meaning | New custody meaning |
+| --- | --- | --- |
+| Profile A | Compatible v4 software-key configuration | Software secret-certificate custody |
+| Profile B | Modern v6 software-key configuration | Software secret-certificate custody |
+| New SE v4 generation | Compatible P-256 v4 configuration | Apple Secure Enclave custody |
+| New SE v6 generation | Modern P-256 v6 configuration | Apple Secure Enclave custody |
+
+This migration must preserve existing key behavior. It changes how the app
+models and displays keys; it does not convert existing private keys into Secure
+Enclave custody.
+
+## Custody Model
+
+Custody must be an independent model dimension. At minimum, production planning
+needs these custody kinds:
+
+- software secret-certificate custody, matching today's portable private-key
+  storage and export behavior;
+- Apple Secure Enclave custody, where signing and key agreement are performed
+  through non-exportable device-bound P-256 private-operation handles.
+
+The custody model should answer whether a private operation route exists. It
+should not define OpenPGP packet format, algorithm suite, or compatibility
+target. Those belong to the OpenPGP configuration model.
+
+The model must explicitly represent unsupported routes. For example, private-key
+export is valid for software custody and unsupported for Secure Enclave custody.
+
+## Metadata Migration And Persistent State
+
+Secure Enclave custody requires metadata v2, or an equivalent versioned
+migration, for the protected key-metadata model. The migrated metadata must
+normalize old Profile A/B records into the new OpenPGP configuration plus
+software custody representation, and it must support newly generated Secure
+Enclave custody records.
+
+Protected key metadata should contain only non-secret state needed for app
+behavior, such as:
+
+- OpenPGP configuration identity;
+- custody kind;
+- public certificate association and validation digest;
+- public signing/agreement key association needed to bind metadata to handles;
+- operation availability projection needed by UI and workflow services;
+- revocation artifact presence;
+- private-key export state, including non-exportability for Secure Enclave
+  custody.
+
+Protected key metadata must not record the Secure Enclave access-control policy.
+That policy is a Security-layer handle-creation requirement, not user-owned key
+metadata.
+
+Persistent-state classification must follow the existing canonical rules in
+[Persisted State Inventory](PERSISTED_STATE_INVENTORY.md) and
+[Security](SECURITY.md). Production work that adds Secure Enclave custody state
+must update the inventory and companion architecture, security, and testing
+documents in the same implementation change. Do not create a new local storage
+rule in this document.
+
+## Secure Enclave Handle Storage
+
+Secure Enclave custody handle storage must be separate from the current
+`se-key` / `salt` / `sealed-key` bundle. The current bundle protects complete
+software secret-certificate bytes. It is not a private-operation-handle model.
+
+The production handle boundary must provide distinct storage and lifecycle for:
+
+- signing private-operation handle;
+- key-agreement private-operation handle;
+- role binding for each handle;
+- public-key binding for each handle;
+- cleanup and local reset participation;
+- recovery classification when metadata and handles disagree.
+
+The Keychain/Secure Enclave boundary owns private-operation handles. Protected
+metadata owns only the non-secret projection and public association needed for
+app behavior. Rust should not persist Apple handle locators or treat them as
+OpenPGP secret-key material.
+
+## Capability Resolver
+
+The capability resolver is a policy component. It must answer which complete
+product configurations and which operations are valid before a workflow starts.
+
+Inputs may include:
+
+- product policy;
 - OpenPGP configuration;
 - custody kind;
-- public certificate association;
-- durable availability or recovery projection needed by the UI;
-- revocation artifact presence;
-- private-key backup/export state, including "not exportable" for Secure
-  Enclave custody.
+- migrated key metadata;
+- recorded public-certificate and handle association;
+- runtime authentication and local-state availability as reduced,
+  user-displayable status.
 
-Protected key metadata should not record Secure Enclave access policy. The
-access policy is a security design requirement for how Secure Enclave handles
-are created and used, not user-owned key metadata.
+Outputs should be complete capabilities, not low-level choices. The UI should
+use resolver output to show only valid key-generation choices. Workflow services
+should use resolver output to decide whether an operation can be offered.
 
-Secure Enclave signing and key-agreement handles should live in Keychain-owned
-storage under a private-key-material / private-operation-handle boundary. They
-must be separate from the current `se-key` / `salt` / `sealed-key` bundle used
-to wrap complete software secret certificates. The handle storage must preserve
-role separation and public-key binding so signing and key-agreement handles
-cannot be swapped silently.
+The resolver must not perform private-key operations, call Sequoia packet
+decrypt, mutate Keychain rows, or own workflow-specific side effects.
 
-Any implementation that adds persisted state must update
-[Persisted State Inventory](PERSISTED_STATE_INVENTORY.md), [Architecture](ARCHITECTURE.md),
-[Security](SECURITY.md), [Testing](TESTING.md), and other required governance
-docs in the same production change. New persistent state should default to
-ProtectedData or Keychain protection. Plaintext storage is allowed only for
-documented boot, test, ephemeral cleanup, legacy cleanup, framework bootstrap,
-or out-of-app-custody exceptions.
+## Private-Key Operation Router
 
-## Resolver And Router
+The private-key operation router is an execution component. It receives a
+resolved operation request from a workflow service and returns one of these
+routes:
 
-Production architecture should use two small concepts with separate
-responsibilities.
+- software secret-certificate route for existing portable keys;
+- Secure Enclave signer route for signing/certification operations;
+- Secure Enclave ECDH/session-key route for recipient-key decryption;
+- explicit unsupported route.
 
-The capability resolver is a policy and availability component. It decides
-which complete product configurations and operation capabilities are valid for
-the current app build, platform, hardware state, stored metadata, and product
-policy. It should be usable by UI and services before an operation starts.
-
-The private-key operation router is an execution component. Given a resolved
-operation request, it routes the private operation to either:
-
-- the existing software secret-certificate path;
-- a Secure Enclave external signer path;
-- a Secure Enclave external ECDH/decryptor path;
-- an explicit unsupported result.
-
-The resolver should not perform private-key operations. The router should not
-own product workflows or UI policy.
+The router must not own product workflows, UI wording, metadata migration, or
+OpenPGP packet semantics. It centralizes custody-specific dispatch so signing,
+decryption, encryption, password-message, key-management, and certificate
+services do not each grow their own custody switch.
 
 ## Dependency Direction
 
-Workflow services should continue to own workflows. They should ask the
-resolver what is available and should ask the router for the private-operation
-route when execution begins. Custody switches should not be scattered through
-every workflow service.
+Workflow services own user-visible workflows. They may ask the resolver for
+availability and the router for a private-operation route, but they should not
+know Keychain row details or Secure Enclave access-control flags.
 
-The Security layer should own Apple platform primitives:
+The Security layer owns Apple platform primitives:
 
-- Secure Enclave key generation and loading;
+- Secure Enclave key creation and loading;
 - Keychain handle storage and deletion;
 - access-control enforcement;
 - role and public-key binding checks;
-- hardware availability checks;
 - cleanup and local reset participation.
 
-The Rust/OpenPGP layer should own OpenPGP semantics:
+The Rust/OpenPGP layer owns OpenPGP semantics:
 
 - certificate construction and parsing;
 - packet construction;
-- ECDH KDF and AES Key Wrap handling;
+- ECDH KDF and AES Key Wrap processing;
 - session-key validation;
-- payload decrypt and MDC/AEAD hard-fail behavior;
-- signature and certification verification.
+- streaming payload decrypt and MDC/AEAD hard-fail behavior;
+- signature, revocation, and certification verification.
 
-The Swift service layer should own user-visible workflows:
+The service layer owns orchestration across those layers. It must not force
+Secure Enclave custody through APIs that require complete secret certificate
+bytes.
 
-- key generation and catalog updates;
-- message signing and decryption;
-- encryption and sign-plus-encrypt;
-- password-message optional signing;
-- key detail actions;
-- revocation artifact export;
-- expiry modification;
-- selective revocation;
-- contact certification.
+## Sequoia And UniFFI Boundary
 
-## Rust And UniFFI Direction
+Production Rust/UniFFI work must add an external private-operation boundary for
+Secure Enclave custody. The boundary should let Rust and Sequoia keep OpenPGP
+semantics while delegating only the private signing or ECDH operation to Apple
+platform code.
 
-The current production FFI accepts complete secret certificate bytes for private
-operations. Secure Enclave custody needs a different external
-private-operation boundary. Production work should add a route that lets Rust
-and Sequoia keep OpenPGP semantics while delegating only the private signing or
-ECDH operation to Apple platform code.
+The signing path should use a Sequoia `crypto::Signer`-style seam: Rust builds
+the OpenPGP signature context, then delegates the private ECDSA operation.
 
-The Phase 4 POC proved the conceptual shape using Sequoia external signer and
-decryptor seams. Production design must remove the POC raw shared-secret JSON
-bridge and replace it with a narrower boundary that does not expose shared
-secrets through temporary files.
+The decrypt path has two separate pieces:
 
-The production boundary must not introduce:
+- a PKESK/session-key acquisition seam, where a Sequoia `crypto::Decryptor`-
+  compatible path delegates P-256 ECDH to Apple platform code and Rust performs
+  the OpenPGP ECDH KDF, AES Key Wrap unwrap, and session-key validation;
+- the streaming payload decrypt path, where Sequoia's parse/decrypt pipeline
+  consumes the recovered session key, decrypts the payload, verifies MDC/AEAD,
+  and only succeeds when the caller completes the message-processing contract.
 
-- software fallback for a Secure Enclave custody key;
-- secret-cert unwrap fallback;
-- partial plaintext acceptance;
-- secret logging;
-- network or keyserver behavior.
+`parse::stream::DecryptionHelper` belongs to the recipient/session-key
+acquisition part of the chain. It must not be described as replacing the
+streaming payload decryptor or owning payload authentication by itself.
 
-## Workflow Architecture Target
+## Migration And Failure Rules
 
-First-version product planning targets all private operations that can be
-expressed through Secure Enclave signing or ECDH without exporting private
-scalars:
+Metadata migration must be fail closed:
 
-- message signing and verification context integration;
-- message and streaming-file decryption;
-- sign-plus-encrypt and streaming encrypt-plus-sign;
-- password-message signing;
-- expiry modification;
-- selective revocation;
-- contact certification;
-- key-level revocation artifact generation and export.
-
-Private-key export, importing existing private keys into Secure Enclave, and
-device-loss decrypt recovery remain unsupported. Public-key export and contact
-import remain custody-agnostic public-certificate workflows.
-
-## Migration Direction
-
-Production implementation should migrate existing software-key metadata without
-changing current key behavior. Existing Profile A/B keys remain software
-custody unless the user creates a new Secure Enclave custody key.
-
-There is no migration path that converts an existing software private key into
-Secure Enclave custody. Apple Secure Enclave private keys must be generated in
-the Secure Enclave.
-
-Metadata migration must be fail-closed and follow ProtectedData migration
-rules:
-
-- preserve readable source state until the protected destination is validated;
-- never silently reset unreadable committed state;
+- preserve readable source state until the migrated destination is validated;
+- never silently reset unreadable committed state to empty data;
 - make corrupt committed protected state a recovery surface;
 - avoid pre-auth key-list reads or empty-key-list flashes;
-- keep private-key material and handle material outside plaintext app storage.
+- keep private-key material and private-operation handles outside plaintext app
+  storage.
+
+Existing software keys remain software custody. There is no architecture path
+that converts an existing software private key into Secure Enclave custody.
