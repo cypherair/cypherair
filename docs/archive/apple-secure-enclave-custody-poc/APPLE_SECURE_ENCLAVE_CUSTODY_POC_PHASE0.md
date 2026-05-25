@@ -1,5 +1,15 @@
 # Apple Secure Enclave Custody POC Phase 0
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC validation completed and handed off to active planning docs.
+> Successor: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Current planning: [Product Design](../../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+> [Architecture Plan](../../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md), and
+> [Security Requirements](../../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md).
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Validation snapshot for a proposal planning track.
 > Date: 2026-05-24.
 > Purpose: Provide the Phase 0 POC baseline and reference index before any
@@ -9,8 +19,8 @@
 > Truth sources: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md), and
 > [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
-> Evidence roots: [Architecture](ARCHITECTURE.md), [Security](SECURITY.md),
-> [Testing](TESTING.md), current Swift and Rust implementation files, Apple
+> Evidence roots: [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md),
+> [Testing](../../TESTING.md), current Swift and Rust implementation files, Apple
 > Secure Enclave documentation, RFC 9580, RFC 6637, and Sequoia 2.3
 > documentation/source.
 > Current-state note: This file is an evidence baseline for proposed future
@@ -58,8 +68,8 @@ Do not duplicate or reinterpret the custody model here:
 - Phase ordering, evidence requirements, decision gates, and no-go conditions
   live in the [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
 - Current shipped architecture, security, and validation expectations remain
-  governed by [Architecture](ARCHITECTURE.md), [Security](SECURITY.md), and
-  [Testing](TESTING.md).
+  governed by [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md), and
+  [Testing](../../TESTING.md).
 
 This Phase 0 file only points to those authorities and records the POC starting
 context.
@@ -72,17 +82,17 @@ Enclave P-256 private-key custody.
 
 Useful starting points for POC orientation:
 
-- [pgp-mobile/src/keys/generation.rs](../pgp-mobile/src/keys/generation.rs)
+- [pgp-mobile/src/keys/generation.rs](../../../pgp-mobile/src/keys/generation.rs)
   currently generates full OpenPGP secret certificate material.
-- [Sources/Security/SecureEnclaveManager.swift](../Sources/Security/SecureEnclaveManager.swift)
+- [Sources/Security/SecureEnclaveManager.swift](../../../Sources/Security/SecureEnclaveManager.swift)
   owns the shipped Secure Enclave wrapping primitive.
-- [Sources/Services/KeyManagement/PrivateKeyAccessService.swift](../Sources/Services/KeyManagement/PrivateKeyAccessService.swift)
+- [Sources/Services/KeyManagement/PrivateKeyAccessService.swift](../../../Sources/Services/KeyManagement/PrivateKeyAccessService.swift)
   owns unwrapping complete secret certificate material for callers.
-- [Sources/Services/SigningService.swift](../Sources/Services/SigningService.swift)
-  and [Sources/Services/DecryptionService.swift](../Sources/Services/DecryptionService.swift)
+- [Sources/Services/SigningService.swift](../../../Sources/Services/SigningService.swift)
+  and [Sources/Services/DecryptionService.swift](../../../Sources/Services/DecryptionService.swift)
   currently unwrap secret material before Rust signing/decryption calls.
-- [pgp-mobile/src/sign.rs](../pgp-mobile/src/sign.rs) and
-  [pgp-mobile/src/decrypt.rs](../pgp-mobile/src/decrypt.rs) currently use
+- [pgp-mobile/src/sign.rs](../../../pgp-mobile/src/sign.rs) and
+  [pgp-mobile/src/decrypt.rs](../../../pgp-mobile/src/decrypt.rs) currently use
   in-memory Sequoia `KeyPair` values.
 
 These files are touchpoints for understanding the current boundary. They are
@@ -110,8 +120,8 @@ OpenPGP and Sequoia references:
 - [Sequoia ECDH module](https://docs.rs/sequoia-openpgp/latest/sequoia_openpgp/crypto/ecdh/index.html)
 
 The current local dependency baseline is Sequoia OpenPGP 2.3.0 in
-[pgp-mobile/Cargo.toml](../pgp-mobile/Cargo.toml) and
-[pgp-mobile/Cargo.lock](../pgp-mobile/Cargo.lock). If the dependency changes,
+[pgp-mobile/Cargo.toml](../../../pgp-mobile/Cargo.toml) and
+[pgp-mobile/Cargo.lock](../../../pgp-mobile/Cargo.lock). If the dependency changes,
 later phase evidence must identify the exact version used.
 
 ## 6. Later POC Evidence Checklist

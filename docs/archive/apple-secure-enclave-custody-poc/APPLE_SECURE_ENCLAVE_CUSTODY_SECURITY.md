@@ -1,5 +1,15 @@
 # Apple Secure Enclave Custody Security Model
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC validation completed and handed off to active planning docs.
+> Successor: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Current planning: [Product Design](../../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+> [Architecture Plan](../../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md), and
+> [Security Requirements](../../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md).
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Proposal planning draft. This document records intended security
 > goals and feasibility questions for a proposed future custody mode.
 > Purpose: Define the security boundary between Secure Enclave private-key
@@ -8,7 +18,7 @@
 > and AI coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md), and
-> current [Security](SECURITY.md).
+> current [Security](../../SECURITY.md).
 
 ## 1. Security Goal
 
@@ -102,6 +112,15 @@ design, because it allows Sequoia to keep owning OpenPGP packet semantics while
 private-key operations can be delegated. The current CypherAir Rust code still
 uses in-memory `KeyPair` values created from unwrapped secret certificates in
 `pgp-mobile/src/sign.rs` and `pgp-mobile/src/decrypt.rs`.
+
+Validation evidence must distinguish cryptographic compatibility from
+production-candidate custody boundary evidence. A prototype that proves packet
+or signature compatibility through a shortcut path is useful, but it must not
+be accepted as evidence that the custody boundary is feasible unless it also
+uses a representative Secure Enclave key lifecycle and private-operation call
+path. The no-software-fallback and no secret-certificate-unwrap fallback
+requirements apply to POC acceptance criteria, not only to later production
+code.
 
 The existing `decrypt_with_fixed_session_key_detailed` helper may be useful for
 validation work after a Secure Enclave path recovers an OpenPGP session key. It
