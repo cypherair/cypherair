@@ -52,29 +52,42 @@ design, and durable test ownership.
 
 ## Evidence Matrix
 
-| Phase | What the POC proved | Not proven yet | Key caveat |
-| --- | --- | --- | --- |
-| Phase 0: Baseline | Existing architecture, security invariants, branch policy, and POC evidence rules were recorded before experiments. | No cryptographic or product behavior was validated. | Phase 0 is an orientation snapshot only. |
-| Phase 1: Apple primitive validation | Secure Enclave P-256 signing and ECDH keys can be generated, persisted, reconstructed, and used on the tested macOS hardware; role-substitution risk was identified. | OpenPGP certificate construction, signing packets, decrypt, product UI, and production storage were not tested. | Role and expected-public-key binding must be a production requirement. |
-| Phase 2: OpenPGP public certificate feasibility | P-256 v4 and v6 public certificate candidates can be built and parsed; recipient selection and capability-resolver controls are feasible. | SE-backed OpenPGP signatures, ECDH session-key recovery, and lifecycle UX were not tested. | Public-only evidence was not sufficient for custody-bound acceptance. |
-| Phase 3: External signing feasibility | SE-backed P-256 ECDSA signing works through a Sequoia `Signer`-style seam for v4 and v6 candidates; failure paths reject wrong or missing handles without fallback. | Decrypt and session-key recovery were not tested. | Production must preserve distinct signing and key-agreement handles. |
-| Phase 4: ECDH and decrypt feasibility | SE-backed P-256 ECDH recovered OpenPGP session keys and decrypted v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages while preserving tamper hard-fail behavior. | Production memory and IPC boundaries were not designed. | The POC passed raw shared secrets through a private `0600` JSON response file; that boundary is not production acceptable. |
-| Phase 4.5: GnuPG v4 interop | A v4 P-256 SE-shaped certificate imported into GnuPG; SE-shaped signatures verified; GnuPG encryption produced PKESK v3 ECDH plus SEIPDv1/MDC; bidirectional sign+encrypt scenarios passed. | GnuPG interop was not shown for v6, because GnuPG is not the v6/AEAD compatibility target. | This strengthens v4 as the first product candidate, not as the only possible technical format. |
-| Phase 5: Architecture compatibility | The concept can fit the app if custody is separated from `PGPKeyProfile`, metadata gains custody state, private-key operation routing is centralized, and Rust uses external signer/decryptor seams. | No production code, metadata migration, UI, or UniFFI callback design was implemented. | The main remaining risk is product and lifecycle scope, not the core cryptographic operation. |
+| Phase | What the POC proved | Key caveat |
+| --- | --- | --- |
+| Phase 0: Baseline | Existing architecture, security invariants, branch policy, and POC evidence rules were recorded before experiments. | Phase 0 is an orientation snapshot only. |
+| Phase 1: Apple primitive validation | Secure Enclave P-256 signing and ECDH keys can be generated, persisted, reconstructed, and used on the tested macOS hardware; role-substitution risk was identified. | Role and expected-public-key binding must be a production requirement. |
+| Phase 2: OpenPGP public certificate feasibility | P-256 v4 and v6 public certificate candidates can be built and parsed; recipient selection and capability-resolver controls are feasible. | Public-only evidence was not sufficient for custody-bound acceptance. |
+| Phase 3: External signing feasibility | SE-backed P-256 ECDSA signing works through a Sequoia `Signer`-style seam for v4 and v6 candidates; failure paths reject wrong or missing handles without fallback. | Production must preserve distinct signing and key-agreement handles. |
+| Phase 4: ECDH and decrypt feasibility | SE-backed P-256 ECDH recovered OpenPGP session keys and decrypted v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages while preserving tamper hard-fail behavior. | The POC passed raw shared secrets through a private `0600` JSON response file; that boundary is not production acceptable. |
+| Phase 4.5: GnuPG v4 interop | A v4 P-256 SE-shaped certificate imported into GnuPG; SE-shaped signatures verified; GnuPG encryption produced PKESK v3 ECDH plus SEIPDv1/MDC; bidirectional sign+encrypt scenarios passed. | This strengthens v4 as the recommended device-bound compatible candidate, not as the only possible technical format. |
+| Phase 5: Architecture compatibility | The concept can fit the app if custody is separated from algorithm/profile configuration, metadata gains custody state, private-key operation routing is centralized, and Rust uses external signer/decryptor seams. | The main remaining risk is product and lifecycle scope, not the core cryptographic operation. |
+
+Remaining gaps after Phase 0-5:
+
+- Production Rust/UniFFI external private-operation APIs are not designed.
+- Production metadata migration and Keychain handle schema are not designed.
+- iPhone, iPadOS, and visionOS hardware validation has not been run.
+- Product UX for configuration choice, generation, key detail, recovery copy,
+  unavailable states, and error surfaces is not designed.
+- Production security validation, mock/hardware test ownership, and release
+  gates are not defined.
+- The POC raw shared-secret response-file bridge remains non-production.
 
 ## Format Recommendation
 
 Both v4 and v6 remain technically viable candidates after the POC:
 
-- v4 P-256 Secure Enclave Custody: strongest first-version candidate because
-  Phase 4.5 showed GnuPG interoperability with PKESK v3 ECDH and SEIPDv1/MDC.
+- v4 P-256 Secure Enclave Custody: recommended device-bound compatible
+  candidate because Phase 4.5 showed GnuPG interoperability with PKESK v3 ECDH
+  and SEIPDv1/MDC.
 - v6 P-256 Secure Enclave Custody: technically feasible in the POC for
   SEIPDv2/AEAD decrypt and signing, but not a GnuPG compatibility path.
 
-The next product-design documents should plan both formats as possible product
-shapes, while defaulting the first production candidate to v4 P-256 /
-GnuPG-compatible Secure Enclave Custody unless later product or security review
-chooses otherwise.
+The next product-design documents should plan both formats as first-version
+product candidates. v4 P-256 / GnuPG-compatible Secure Enclave Custody should
+be the recommended device-bound compatible option; v6 P-256 / AEAD Secure
+Enclave Custody should remain a device-bound modern option that does not claim
+GnuPG compatibility.
 
 This recommendation does not change existing Profile A or Profile B
 cryptographic behavior. The current software-key profiles remain:
@@ -123,8 +136,9 @@ Swift services own product workflows.
 
 Production planning should preserve these architecture decisions:
 
-- `PGPKeyProfile` remains algorithm/profile vocabulary only. Secure Enclave
-  custody must be modeled as a separate custody dimension.
+- Secure Enclave custody must not be modeled as a `PGPKeyProfile` case. P-256
+  v4/v6 may require a successor algorithm/format configuration concept, but
+  custody must remain a separate dimension.
 - `PGPKeyIdentity` and the `key-metadata` protected domain need a versioned way
   to record custody kind, Secure Enclave availability state, and public
   certificate association.
@@ -149,9 +163,9 @@ Production planning should preserve these architecture decisions:
   fallback. `biometryAny` keeps the key usable after biometric enrollment
   changes. `biometryCurrentSet` binds access to the currently enrolled
   biometrics and is invalidated when Touch ID fingers are added or removed, or
-  Face ID is re-enrolled; it is therefore a stronger but higher-loss-risk
-  advanced option for later evaluation, not the v1 default. The final policy
-  belongs in the later product-design and security-validation documents.
+  Face ID is re-enrolled; because that creates high permanent-loss risk, it is
+  not planned as a user-selectable option. The final policy belongs in the
+  later product-design and security-requirements documents.
 
 ## Product Implications
 
@@ -219,17 +233,20 @@ the current POC evidence documents as day-to-day guidance. Until all five are
 written, the existing POC documents remain active evidence roots and should be
 cited when they support a decision.
 
-The next documents should be:
+The next documents are:
 
-- `APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md`: product shape, user-visible
-  entry points, naming, defaults, recovery language, backup/export semantics,
-  and first-version workflow scope.
-- `APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md`: Swift/Rust/Security
-  integration design, custody metadata, capability resolver, operation router,
-  handle storage, and API migration plan.
-- `APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_VALIDATION.md`: production security
-  model, validation requirements, access-control policy, hardware/mock test
-  split, no-fallback tests, tamper tests, and platform validation gates.
+- [Product Design](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md): high-level
+  product direction, user-visible semantics, configuration presentation,
+  recovery language, backup/export semantics, availability states, and
+  first-version workflow scope.
+- [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md):
+  high-level Swift/Rust/Security integration direction, algorithm/configuration
+  separation, custody metadata, capability resolver, operation router, handle
+  storage boundary, and future API migration constraints.
+- [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md):
+  production security requirements, access-control policy, hardware/mock test
+  split, no-fallback tests, tamper tests, full private-operation validation, and
+  platform validation gates.
 - `APPLE_SECURE_ENCLAVE_CUSTODY_ROADMAP.md`: staged path from POC closeout to
   production implementation, including when to archive the old POC documents
   and close the POC PR.
