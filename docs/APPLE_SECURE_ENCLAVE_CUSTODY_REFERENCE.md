@@ -17,6 +17,7 @@
 > Current-state note: This reference is not a production implementation plan,
 > not a statement of shipped architecture, and not authorization to change
 > security-sensitive code without a phase-specific plan.
+> Planning handoff: [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
 
 ## 1. Document Boundaries
 
