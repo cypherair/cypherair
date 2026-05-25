@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody POC Phase 3 Evidence
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 Status: passed for production-proximate external signing feasibility on the
 tested macOS machine. Phase 4 is still required before Apple Secure Enclave
 custody can become product-selectable.
@@ -127,3 +134,10 @@ environment:
 
 Apple Secure Enclave custody remains non-selectable for product use until
 Phase 4 proves ECDH session-key recovery and decrypt hard-fail behavior.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

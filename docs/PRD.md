@@ -102,8 +102,8 @@ restored from a normal backup. Device loss, Secure Enclave/key-handle loss, or
 loss of the required authentication factor may make the key permanently
 unusable. Any future UI must present this as an explicit opt-in with a strong
 availability warning, a distinct custody/status display, and no "private key
-backed up" badge. Planning details live in
-[APPLE_SECURE_ENCLAVE_CUSTODY](APPLE_SECURE_ENCLAVE_CUSTODY.md).
+backed up" badge. Historical POC planning details are archived in
+[APPLE_SECURE_ENCLAVE_CUSTODY](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY.md).
 
 ### 3.5 Security Hard Rules
 

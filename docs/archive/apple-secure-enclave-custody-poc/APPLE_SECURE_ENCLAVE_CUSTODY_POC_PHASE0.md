@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody POC Phase 0
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Validation snapshot for a proposal planning track.
 > Date: 2026-05-24.
 > Purpose: Provide the Phase 0 POC baseline and reference index before any
@@ -9,8 +16,8 @@
 > Truth sources: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md), and
 > [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
-> Evidence roots: [Architecture](ARCHITECTURE.md), [Security](SECURITY.md),
-> [Testing](TESTING.md), current Swift and Rust implementation files, Apple
+> Evidence roots: [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md),
+> [Testing](../../TESTING.md), current Swift and Rust implementation files, Apple
 > Secure Enclave documentation, RFC 9580, RFC 6637, and Sequoia 2.3
 > documentation/source.
 > Current-state note: This file is an evidence baseline for proposed future
@@ -58,8 +65,8 @@ Do not duplicate or reinterpret the custody model here:
 - Phase ordering, evidence requirements, decision gates, and no-go conditions
   live in the [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
 - Current shipped architecture, security, and validation expectations remain
-  governed by [Architecture](ARCHITECTURE.md), [Security](SECURITY.md), and
-  [Testing](TESTING.md).
+  governed by [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md), and
+  [Testing](../../TESTING.md).
 
 This Phase 0 file only points to those authorities and records the POC starting
 context.
@@ -156,3 +163,10 @@ Phase 0 is complete when:
 - Documentation-only checks pass.
 
 This is POC documentation only and does not authorize production implementation.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

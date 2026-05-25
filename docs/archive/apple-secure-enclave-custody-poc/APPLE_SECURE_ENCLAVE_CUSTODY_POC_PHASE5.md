@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody POC Phase 5 Evidence
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 Status: passed as an architecture compatibility audit. This phase did not
 implement production Secure Enclave custody, change entitlements, change UniFFI
 APIs, or make the custody mode product-selectable.
@@ -271,3 +278,10 @@ signer/decryptor boundaries.
 The main remaining risk is not cryptographic feasibility; it is product and
 lifecycle scope. Phase 6 should decide the first supported product surface and
 which lifecycle operations are explicitly deferred.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

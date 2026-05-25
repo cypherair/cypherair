@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody POC Phase 2
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: macOS OpenPGP public-certificate feasibility evidence for a proposal
 > planning track.
 > Date: 2026-05-24.
@@ -197,3 +204,10 @@ All commands passed.
 Phase 2 should enter Phase 3 only if the evidence shows that P-256 public
 certificate shapes are viable enough to justify Secure Enclave-backed OpenPGP
 signature generation for User ID self-certification and subkey binding.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

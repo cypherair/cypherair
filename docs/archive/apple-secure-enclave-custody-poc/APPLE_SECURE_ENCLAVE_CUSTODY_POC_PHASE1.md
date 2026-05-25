@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody POC Phase 1
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: macOS primitive validation evidence for a proposal planning track.
 > Date: 2026-05-24.
 > Purpose: Record Phase 1 Apple Secure Enclave primitive validation results
@@ -116,3 +123,10 @@ certificate feasibility in an isolated prototype. Phase 2 must carry forward
 the role-substitution finding and explicitly validate that stored Secure
 Enclave handles, expected public keys, and generated OpenPGP certificate
 material cannot be mismatched or substituted.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

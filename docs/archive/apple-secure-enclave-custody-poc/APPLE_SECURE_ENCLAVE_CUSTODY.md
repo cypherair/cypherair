@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Proposal planning draft. This document describes proposed future
 > behavior and does not describe shipped behavior.
 > Purpose: Define the product model, user-visible semantics, recovery posture,
@@ -8,8 +15,8 @@
 > AI coding tools.
 > Related: [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
 > [Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
-> [PRD](PRD.md), [Security](SECURITY.md), and
-> [Architecture](ARCHITECTURE.md).
+> [PRD](../../PRD.md), [Security](../../SECURITY.md), and
+> [Architecture](../../ARCHITECTURE.md).
 
 ## 1. Goal
 
@@ -171,3 +178,10 @@ evidence:
 - [Apple: kSecAttrTokenIDSecureEnclave](https://developer.apple.com/documentation/security/ksecattrtokenidsecureenclave)
 - [RFC 9580: OpenPGP](https://www.rfc-editor.org/rfc/rfc9580.html)
 - [RFC 6637: ECC in OpenPGP](https://www.rfc-editor.org/rfc/rfc6637.html)
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+

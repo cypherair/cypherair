@@ -1,5 +1,12 @@
 # Apple Secure Enclave Custody Reference
 
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
+
 > Status: Proposal planning draft. This document describes future-facing
 > validation and decision work; it does not describe shipped behavior.
 > Purpose: Provide the single validation reference for deciding whether Apple
@@ -11,9 +18,9 @@
 > and AI coding tools.
 > Related: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
-> [Architecture](ARCHITECTURE.md), [Security](SECURITY.md),
-> [Testing](TESTING.md), and
-> [Documentation Governance](DOCUMENTATION_GOVERNANCE.md).
+> [Architecture](../../ARCHITECTURE.md), [Security](../../SECURITY.md),
+> [Testing](../../TESTING.md), and
+> [Documentation Governance](../../DOCUMENTATION_GOVERNANCE.md).
 > Current-state note: This reference is not a production implementation plan,
 > not a statement of shipped architecture, and not authorization to change
 > security-sensitive code without a phase-specific plan.
@@ -63,8 +70,8 @@ only how unsupported private-key export requests are presented or reported.
   production-proximate acceptance evidence.
 - Prototype code, disposable bridges, and proof-only packet construction may
   prove compatibility, but they must not be treated as production architecture.
-- Canonical current-state docs such as [Architecture](ARCHITECTURE.md),
-  [Security](SECURITY.md), and [Testing](TESTING.md) should be updated only
+- Canonical current-state docs such as [Architecture](../../ARCHITECTURE.md),
+  [Security](../../SECURITY.md), and [Testing](../../TESTING.md) should be updated only
   after behavior ships or after validation requirements become durable.
 - Hardware validation and mockable contract validation should remain separate.
   Secure Enclave availability cannot be assumed on CI runners.
@@ -332,7 +339,14 @@ Documentation-only changes to this reference should use docs-level validation:
 - `git diff --check`
 - manual review of relative links
 
-Later implementation phases should choose validation from [Testing](TESTING.md)
+Later implementation phases should choose validation from [Testing](../../TESTING.md)
 based on the changed surfaces. Rust / UniFFI-visible behavior, Swift security
 services, Secure Enclave access control, device-only behavior, and UI workflow
 changes each require their own phase-specific validation plan.
+
+> Status: Archived historical Secure Enclave Custody POC material.
+> Archived: 2026-05-25.
+> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
+> Successor: None yet.
+> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
+
