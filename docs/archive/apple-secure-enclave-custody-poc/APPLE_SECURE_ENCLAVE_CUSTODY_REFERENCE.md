@@ -24,7 +24,7 @@
 > Current-state note: This reference is not a production implementation plan,
 > not a statement of shipped architecture, and not authorization to change
 > security-sensitive code without a phase-specific plan.
-> Planning handoff: [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Planning handoff: [Feasibility Summary](../../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
 
 ## 1. Document Boundaries
 
@@ -343,10 +343,3 @@ Later implementation phases should choose validation from [Testing](../../TESTIN
 based on the changed surfaces. Rust / UniFFI-visible behavior, Swift security
 services, Secure Enclave access control, device-only behavior, and UI workflow
 changes each require their own phase-specific validation plan.
-
-> Status: Archived historical Secure Enclave Custody POC material.
-> Archived: 2026-05-25.
-> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
-> Successor: None yet.
-> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
-

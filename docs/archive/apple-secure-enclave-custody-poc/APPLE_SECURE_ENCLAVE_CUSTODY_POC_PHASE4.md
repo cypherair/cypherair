@@ -151,10 +151,3 @@ environment:
 
 Apple Secure Enclave custody remains non-selectable for product use until
 Phase 5 validates app architecture, lifecycle, routing, and CI-test boundaries.
-
-> Status: Archived historical Secure Enclave Custody POC material.
-> Archived: 2026-05-25.
-> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
-> Successor: None yet.
-> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
-

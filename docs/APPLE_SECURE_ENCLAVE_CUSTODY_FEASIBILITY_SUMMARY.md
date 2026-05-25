@@ -1,12 +1,5 @@
 # Apple Secure Enclave Custody Feasibility Summary
 
-> Status: Archived historical Secure Enclave Custody POC material.
-> Archived: 2026-05-25.
-> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
-> Successor: None yet.
-> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
-
-
 > Status: Active proposal summary / POC feasibility summary. This document
 > summarizes completed validation work and does not describe shipped behavior.
 > Date: 2026-05-24.
@@ -18,15 +11,15 @@
 > implementation approval, not a current app behavior statement, and not
 > authorization to change
 > security-sensitive code without a later implementation plan.
-> Evidence roots: [Product Model](APPLE_SECURE_ENCLAVE_CUSTODY.md),
-> [Security Model](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
-> [Validation Reference](APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
-> [Phase 0](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE0.md),
-> [Phase 1](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE1.md),
-> [Phase 2](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE2.md),
-> [Phase 3](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE3.md),
-> [Phase 4](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE4.md), and
-> [Phase 5](APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE5.md).
+> Evidence roots: archived [Product Model](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY.md),
+> [Security Model](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
+> [Validation Reference](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
+> [Phase 0](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE0.md),
+> [Phase 1](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE1.md),
+> [Phase 2](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE2.md),
+> [Phase 3](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE3.md),
+> [Phase 4](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE4.md), and
+> [Phase 5](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_POC_PHASE5.md).
 
 ## Executive Decision
 
@@ -235,36 +228,23 @@ the following:
 
 ## Next Planning Documents
 
-This summary is the first of five active planning documents intended to replace
-the current POC evidence documents as day-to-day guidance. Until all five are
-written, the existing POC documents remain active evidence roots and should be
-cited when they support a decision.
+This summary remains the active handoff from POC evidence into future product,
+architecture, security, and roadmap planning. The detailed POC evidence roots
+are now archived historical context, not day-to-day implementation guidance.
 
-The next documents are:
+The next documents still need to be written separately:
 
-- [Product Design](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md): high-level
-  product direction, user-visible semantics, configuration presentation,
-  recovery language, backup/export semantics, availability states, and
-  first-version workflow scope.
-- [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md):
-  high-level Swift/Rust/Security integration direction, algorithm/configuration
-  separation, custody metadata, capability resolver, operation router, handle
-  storage boundary, and future API migration constraints.
-- [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md):
-  production security requirements, access-control policy, hardware/mock test
-  split, no-fallback tests, tamper tests, full private-operation validation, and
-  platform validation gates.
+- `APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md`: product direction,
+  user-visible semantics, configuration presentation, recovery language,
+  backup/export semantics, availability states, and first-version workflow
+  scope.
+- `APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md`: Swift/Rust/Security
+  integration direction, algorithm/configuration separation, custody metadata,
+  capability resolver, operation router, handle storage boundary, and future API
+  migration constraints.
+- `APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md`: production security
+  requirements, access-control policy, hardware/mock test split, no-fallback
+  tests, tamper tests, full private-operation validation, and platform
+  validation gates.
 - `APPLE_SECURE_ENCLAVE_CUSTODY_ROADMAP.md`: staged path from POC closeout to
-  production implementation, including when to archive the old POC documents
-  and close the POC PR.
-
-After these documents are complete, the current POC documents should move under
-`docs/archive/` with archive banners and successor links. They should remain
-historical evidence, not current implementation guidance.
-
-> Status: Archived historical Secure Enclave Custody POC material.
-> Archived: 2026-05-25.
-> Archive reason: Secure Enclave Custody POC closeout; future product, architecture, and security docs will be rewritten separately.
-> Successor: None yet.
-> Current-state note: Current code and active docs outrank this archived file; use it only as historical evidence and context.
-
+  production implementation and final POC PR closure.
