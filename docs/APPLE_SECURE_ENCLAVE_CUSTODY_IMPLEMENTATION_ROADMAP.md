@@ -70,11 +70,6 @@ Recommended PR grouping:
   plan identifies measurable boundaries that can be checked without blocking
   planned transitional states.
 
-Entry conditions:
-
-- Product Design, Architecture Plan, Security Requirements, and Feasibility
-  Summary are active.
-
 Exit conditions:
 
 - Future phase plans can cite one implementation reference and one roadmap.
