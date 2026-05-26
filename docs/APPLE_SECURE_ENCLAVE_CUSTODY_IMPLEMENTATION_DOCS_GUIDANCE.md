@@ -64,10 +64,16 @@ They should not decide exact APIs, final persisted schemas, Keychain naming,
 UniFFI representation, signing result representation, localized UI copy, test
 fixture file names, or hardware runner implementation details.
 
-They also should not avoid useful implementation detail. Avoiding premature
-implementation choices is not the same as avoiding implementation guidance.
-When a concrete constraint is needed to prevent later confusion, include it and
-link to the owning source document when appropriate.
+They also should not avoid useful reference detail. Avoiding premature
+implementation choices does not mean avoiding every concrete value. Concrete
+values may be included as reference material for later implementation planning
+when they help clarify what a later plan needs to decide or verify.
+
+Reference detail should remain selective. It should not become a way to list
+every possible value, repeat requirements already covered by active source
+documents, or settle low-level choices that belong to later implementation
+plans. Include concrete reference values when they reduce a real risk of later
+misunderstanding, not merely because a detailed value is available.
 
 Good middle-contract content includes:
 
@@ -84,10 +90,10 @@ Good middle-contract content includes:
   vague;
 - phase entry conditions, exit conditions, validation expectations, and rollback
   rules;
-- explicit defaults or guardrails when a vague phrase would hide an important
-  decision, such as naming `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` when
-  that is the intended Keychain accessibility default rather than only saying
-  "item accessibility."
+- concrete reference values or guardrails when a vague phrase would hide an
+  important decision, such as naming `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+  as a reference value when discussing Keychain item accessibility, rather than
+  only saying "item accessibility."
 
 Poor middle-contract content includes:
 
@@ -176,6 +182,10 @@ Do not dilute important requirements into generic words. If the important point
 is a concrete default, failure mode, phase gate, or test scenario, state it
 plainly. A useful implementation reference should not make reviewers guess what
 "availability," "accessibility," "route," "policy," or "state" means.
+
+If a specific value is useful mainly as reference for later implementation
+planning, label it as reference material and keep it at the level needed to
+reduce planning ambiguity.
 
 Do not lock down low-level implementation choices too early. If a future PR
 must choose exact type names, schemas, function signatures, generated binding
