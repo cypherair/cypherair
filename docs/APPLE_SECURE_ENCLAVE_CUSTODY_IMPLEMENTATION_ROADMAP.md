@@ -56,89 +56,53 @@ gate.
 Goal: establish implementation reference material, roadmap sequencing, and any
 non-invasive guardrails needed before production code work begins.
 
-Phase status: completed by PR #363. PR 0A documentation acceptance passed, and
-PR 0B read-only source baseline review completed. No
-`ArchitectureSourceAuditTests` or other guardrail code was added because Phase
-1/2 have not yet defined stable measurable boundaries. Current-state docs were
-not updated because no shipped behavior, storage classification, security
-boundary, or validation workflow changed.
+Phase status: completed by PR #363. Documentation acceptance passed, and
+read-only source baseline review completed. No `ArchitectureSourceAuditTests`
+or other guardrail code was added because Phase 1/2 had not yet defined stable
+measurable boundaries. Current-state docs were not updated because no shipped
+behavior, storage classification, security boundary, or validation workflow
+changed.
 
-Recommended PR grouping:
+Completion anchor:
 
-- PR 0A: add the implementation reference and roadmap.
-- PR 0B: add or update source-audit guardrails only if a later implementation
-  plan identifies measurable boundaries that can be checked without blocking
-  planned transitional states.
-
-Exit conditions:
-
-- Future phase plans can cite one implementation reference and one roadmap.
-- The docs clearly state that Secure Enclave custody is proposed future work,
-  not shipped behavior.
-- Any added guardrails have explicit temporary-exception mechanics for staged
-  work.
-
-Validation:
-
-- Documentation-only validation may use `git diff --check` and review of the
-  rendered Markdown diff.
-- Guardrail PRs must include positive and negative tests for the guardrail.
-
-Rollback:
-
-- Revert documentation or guardrail additions. No product behavior should have
-  changed in this phase.
+- Future phase plans can cite the implementation reference and this roadmap.
+- Secure Enclave custody remains proposed future work, not shipped behavior.
+- Any later guardrail work still needs a phase-specific plan and temporary
+  exception mechanics for staged transitional states.
 
 ## Phase 1: Model And Metadata Foundation
 
 Goal: introduce the app-owned model vocabulary and protected metadata migration
 needed to represent configuration, custody, and operation capability separately.
 
-Recommended PR grouping:
+Phase status: completed in the current implementation. Closeout confirmed that
+the model vocabulary, protected `key-metadata` schema v2 migration, resolver
+behavior, and failure-category taxonomy exist behind current software-key
+behavior.
 
-- PR 1A: introduce the successor configuration/custody/capability vocabulary
-  behind existing software-key behavior.
-- PR 1B: add protected metadata migration support that normalizes existing
-  Profile A/Profile B keys into software custody.
-- PR 1C: add resolver-level model tests for valid and invalid configuration plus
-  custody combinations.
-- PR 1D: define shared failure categories for resolver, router, Security, Rust,
-  workflow services, and UI mapping without choosing final error type names.
+Completion anchor:
 
-Entry conditions:
+- `PGPKeyConfiguration`, `PGPPrivateKeyCustodyKind`, and `PGPKeyIdentity`
+  separate OpenPGP configuration from private-key custody. Current Profile
+  A/Profile B identities default to software secret-certificate custody.
+- `PGPKeyCapabilityResolver` keeps current software-key operations supported,
+  rejects invalid configuration/custody combinations, and leaves P-256 Secure
+  Enclave custody unavailable in production policy and not implemented in
+  test-only policy.
+- `PGPKeyOperationFailureCategory` and `PGPKeyOperationResolution` provide the
+  shared sanitized support/failure vocabulary for later router, Security,
+  Rust/UniFFI, workflow-service, and UI mapping work.
+- `KeyMetadataDomainStore` stores protected `key-metadata` schema v2 payloads,
+  migrates schema v1 / legacy Profile A/Profile B metadata into software
+  custody, validates representable P-256 Secure Enclave metadata as future
+  state, and sends corrupt or mismatched committed metadata to recovery.
 
-- Phase 0 docs are available.
-- The phase-specific plan identifies persisted-state classification and
-  migration ownership before editing protected metadata code.
+Deferred scope:
 
-Exit conditions:
-
-- Existing software keys still behave as before.
-- Existing Profile A/Profile B records can be read through the new model
-  without becoming Secure Enclave custody.
-- Secure Enclave custody state can be represented as future or hidden state
-  without exposing a product choice.
-- Migration fails closed and does not silently reset corrupt committed protected
-  state.
-- Shared failure categories are stable enough for later workflow integration
-  phases to map authentication, missing handle, binding mismatch, unsupported,
-  not-yet-implemented, migration/recovery, and payload-authentication failures
-  consistently.
-
-Validation:
-
-- Metadata migration and recovery tests.
-- Resolver tests for legal, illegal, unavailable, and unsupported combinations.
-- Persisted State Inventory and companion docs updated only if current
-  persisted-state classification changes.
-
-Rollback:
-
-- Disable new Secure Enclave custody state creation and keep existing software
-  metadata readers active. Rollback must leave software keys readable, preserve
-  readable source state until migrated destination state is validated, classify
-  partially migrated Secure Enclave state as recovery/cleanup state, and keep
-  metadata/handle mismatches fail-closed.
+- Secure Enclave custody remains hidden, unavailable in production policy, and
+  not product-selectable.
+- Rust external private-operation APIs, Security-layer handle storage, workflow
+  routing, and product UI exposure remain deferred to later phases.
 
 ## Phase 2: Rust External-Operation Boundary Proving
 
@@ -158,8 +122,8 @@ Recommended PR grouping:
 
 Entry conditions:
 
-- Phase 1 model work can describe Secure Enclave custody keys and operation
-  intent.
+- Completed Phase 1 model work can describe Secure Enclave custody keys and
+  operation intent.
 - The phase-specific plan names the boundary between private operation,
   session-key processing, and payload processing.
 
