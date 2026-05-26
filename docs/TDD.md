@@ -83,6 +83,8 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Profile A `set_features` rationale:** Sequoia 2.3.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
 
+**Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Current Profile A/B identities normalize to software custody; P-256 Secure Enclave custody is representable only as future/hidden vocabulary. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`.
+
 ### 1.4 Encryption Format Auto-Selection
 
 When encrypting, the message format is determined by the recipient's key version, not the sender's profile:

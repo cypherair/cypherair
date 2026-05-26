@@ -35,6 +35,11 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
 
         private static func validateIdentityContract(_ identity: PGPKeyIdentity) throws {
             let configuration = identity.openPGPConfiguration
+            guard identity.profile.keyVersion == identity.keyVersion else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata profile does not match key version."
+                )
+            }
             guard identity.keyVersion == configuration.keyVersion else {
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata configuration does not match key version."
@@ -413,6 +418,14 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
         }
 
+        let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()
+        let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
+        guard try storageRoot.managedItemExists(at: currentURL) else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata current generation is missing."
+            )
+        }
+
         var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
@@ -423,64 +436,44 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 domainMasterKey.protectedDataZeroize()
             }
         }
-        var candidates: [OpenedSnapshot] = []
-        var highestObservedGenerationIdentifier: Int?
-
-        for slot in ProtectedDomainGenerationSlot.allCases {
-            let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
-            guard try storageRoot.managedItemExists(at: url) else {
-                continue
-            }
-
-            do {
-                let data = try storageRoot.readManagedData(at: url)
-                let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
-                highestObservedGenerationIdentifier = max(
-                    highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
-                    envelope.generationIdentifier
-                )
-                var plaintext = try ProtectedDomainEnvelopeCodec.open(
-                    envelope: envelope,
-                    domainMasterKey: domainMasterKey
-                )
-                defer {
-                    plaintext.protectedDataZeroize()
-                }
-                let decodedPayload = try decodePayload(
-                    plaintext: plaintext,
-                    schemaVersion: envelope.schemaVersion
-                )
-                candidates.append(
-                    OpenedSnapshot(
-                        payload: decodedPayload.payload,
-                        generationIdentifier: envelope.generationIdentifier,
-                        sourceSchemaVersion: decodedPayload.sourceSchemaVersion
-                    )
-                )
-            } catch {
-                if slot == .current {
-                    throw error
-                }
-                continue
-            }
-        }
-
-        guard let selectedSnapshot = candidates.max(by: {
-            $0.generationIdentifier < $1.generationIdentifier
-        }) else {
+        let data = try storageRoot.readManagedData(at: currentURL)
+        let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+        guard envelope.generationIdentifier == expectedCurrentGenerationIdentifier else {
             throw ProtectedDataError.invalidEnvelope(
-                "Key metadata does not contain a readable authoritative generation."
+                "Key metadata current generation does not match bootstrap metadata."
             )
         }
-        if let highestObservedGenerationIdentifier,
-           selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
-            throw ProtectedDataError.invalidEnvelope(
-                "Key metadata highest observed generation is not readable."
-            )
+        var plaintext = try ProtectedDomainEnvelopeCodec.open(
+            envelope: envelope,
+            domainMasterKey: domainMasterKey
+        )
+        defer {
+            plaintext.protectedDataZeroize()
         }
+        let decodedPayload = try decodePayload(
+            plaintext: plaintext,
+            schemaVersion: envelope.schemaVersion
+        )
+        let snapshot = OpenedSnapshot(
+            payload: decodedPayload.payload,
+            generationIdentifier: envelope.generationIdentifier,
+            sourceSchemaVersion: decodedPayload.sourceSchemaVersion
+        )
 
         shouldReturnDomainMasterKey = true
-        return (selectedSnapshot, domainMasterKey)
+        return (snapshot, domainMasterKey)
+    }
+
+    private func expectedCurrentGenerationIdentifier() throws -> Int {
+        guard let metadata = try bootstrapStore.loadMetadata(for: Self.domainID),
+              let value = metadata.expectedCurrentGenerationIdentifier,
+              let generationIdentifier = Int(value),
+              generationIdentifier > 0 else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata bootstrap metadata is missing expected current generation."
+            )
+        }
+        return generationIdentifier
     }
 
     private func decodePayload(
