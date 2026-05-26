@@ -56,6 +56,13 @@ gate.
 Goal: establish implementation reference material, roadmap sequencing, and any
 non-invasive guardrails needed before production code work begins.
 
+Phase status: completed by PR #363. PR 0A documentation acceptance passed, and
+PR 0B read-only source baseline review completed. No
+`ArchitectureSourceAuditTests` or other guardrail code was added because Phase
+1/2 have not yet defined stable measurable boundaries. Current-state docs were
+not updated because no shipped behavior, storage classification, security
+boundary, or validation workflow changed.
+
 Recommended PR grouping:
 
 - PR 0A: add the implementation reference and roadmap.
