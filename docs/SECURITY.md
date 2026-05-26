@@ -114,6 +114,17 @@ store Apple handle locators, use response files, add a Security-layer handle
 store, expose a UniFFI API, or fall back to secret-certificate material when the
 external signer fails.
 
+**Rust external ECDH proof note:** The Phase 2B Rust proof keeps external P-256
+key agreement behind an internal test-backed adapter only. The adapter sends
+only public key-agreement material to the external operation and accepts only a
+fixed-shape raw 32-byte shared secret before handing it to Sequoia for OpenPGP
+ECDH KDF, AES Key Wrap unwrap, session-key validation, and payload
+authentication. It does not store Apple handle locators, use response files, add
+a Security-layer handle store, expose a UniFFI API, or fall back to
+secret-certificate material when the external ECDH operation fails. Diagnostics
+must not include shared secrets, session keys, KEKs, plaintext, fingerprints, or
+temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

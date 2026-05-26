@@ -206,22 +206,7 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
         collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
     };
 
-    let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
-        .map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?
-        .with_policy(&policy, None, helper)
-        .map_err(|e| classify_decrypt_error(e))?;
-
-    let mut plaintext = Vec::new();
-    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
-        // SECURITY: Zeroize partial plaintext on error to prevent leaking fragments.
-        // This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
-        plaintext.zeroize();
-        return Err(classify_decrypt_error(e.into()));
-    }
-
-    let helper = decryptor.into_helper();
+    let (plaintext, helper) = decrypt_with_helper(ciphertext, &policy, helper)?;
     let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
         helper.collector.into_parts();
 
@@ -233,6 +218,33 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
         signatures,
         plaintext,
     })
+}
+
+pub(crate) fn decrypt_with_helper<'a, H>(
+    ciphertext: &'a [u8],
+    policy: &'a StandardPolicy<'a>,
+    helper: H,
+) -> Result<(Vec<u8>, H), PgpError>
+where
+    H: VerificationHelper + DecryptionHelper,
+{
+    let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
+        .map_err(|e| PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        })?
+        .with_policy(policy, None, helper)
+        .map_err(|e| classify_decrypt_error(e))?;
+
+    let mut plaintext = Vec::new();
+    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
+        // SECURITY: Zeroize partial plaintext on error to prevent leaking fragments.
+        // This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
+        plaintext.zeroize();
+        return Err(classify_decrypt_error(e.into()));
+    }
+
+    let helper = decryptor.into_helper();
+    Ok((plaintext, helper))
 }
 
 pub(crate) fn decrypt_with_fixed_session_key_detailed(
@@ -249,20 +261,7 @@ pub(crate) fn decrypt_with_fixed_session_key_detailed(
         session_key_algo,
     };
 
-    let mut decryptor = DecryptorBuilder::from_bytes(ciphertext)
-        .map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?
-        .with_policy(&policy, None, helper)
-        .map_err(classify_decrypt_error)?;
-
-    let mut plaintext = Vec::new();
-    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
-        plaintext.zeroize();
-        return Err(classify_decrypt_error(e.into()));
-    }
-
-    let helper = decryptor.into_helper();
+    let (plaintext, helper) = decrypt_with_helper(ciphertext, &policy, helper)?;
     let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
         helper.collector.into_parts();
 
