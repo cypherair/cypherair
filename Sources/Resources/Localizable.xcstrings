@@ -3569,23 +3569,6 @@
         }
       }
     },
-    "contacts.metadata.corrupt" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unable to read contact metadata."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法读取联系人元数据。"
-          }
-        }
-      }
-    },
     "contacts.moreTags" : {
       "localizations" : {
         "en" : {
