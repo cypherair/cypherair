@@ -201,7 +201,13 @@ where
 mod tests {
     use super::*;
 
-    use std::io::Write;
+    use std::{
+        io::Write,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Mutex,
+        },
+    };
 
     use openpgp::crypto::{mpi, Signer};
     use openpgp::packet::{key, signature, Packet, UserID};
@@ -260,6 +266,30 @@ mod tests {
         agreement_scalar: Vec<u8>,
     }
 
+    #[derive(Clone, Default)]
+    struct ExternalDecryptTelemetry {
+        recovered_session_keys: Arc<AtomicUsize>,
+        accepted_payload_keys: Arc<AtomicUsize>,
+    }
+
+    impl ExternalDecryptTelemetry {
+        fn record_recovered_session_key(&self) {
+            self.recovered_session_keys.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn record_accepted_payload_key(&self) {
+            self.accepted_payload_keys.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn recovered_session_key_count(&self) -> usize {
+            self.recovered_session_keys.load(Ordering::SeqCst)
+        }
+
+        fn accepted_payload_key_count(&self) -> usize {
+            self.accepted_payload_keys.load(Ordering::SeqCst)
+        }
+    }
+
     struct ExternalDecryptHelper<F>
     where
         F: FnMut(
@@ -270,6 +300,7 @@ mod tests {
         verifier_certs: Vec<openpgp::Cert>,
         key_agreement_operation: F,
         collector: SignatureCollector,
+        telemetry: ExternalDecryptTelemetry,
     }
 
     impl<F> VerificationHelper for ExternalDecryptHelper<F>
@@ -327,7 +358,9 @@ mod tests {
                             &mut self.key_agreement_operation,
                         )?;
                         if let Some((algo, session_key)) = pkesk.decrypt(&mut decryptor, sym_algo) {
+                            self.telemetry.record_recovered_session_key();
                             if decrypt(algo, &session_key) {
+                                self.telemetry.record_accepted_payload_key();
                                 return Ok(None);
                             }
                         }
@@ -510,6 +543,17 @@ mod tests {
         deriver.derive_to_vec()
     }
 
+    fn public_point_for(key: &Key<key::PublicParts, key::UnspecifiedRole>) -> Vec<u8> {
+        match key.mpis() {
+            mpi::PublicKey::ECDH {
+                curve: Curve::NistP256,
+                q,
+                ..
+            } => q.value().to_vec(),
+            _ => panic!("expected ECDH P-256 public key"),
+        }
+    }
+
     fn decrypt_with_external_oracle(
         ciphertext: &[u8],
         material: &CandidateMaterial,
@@ -528,6 +572,29 @@ mod tests {
         ),
         PgpError,
     > {
+        decrypt_with_external_operation(
+            ciphertext,
+            material,
+            verification_certs,
+            oracle_for(material.agreement_scalar.clone()),
+            ExternalDecryptTelemetry::default(),
+        )
+    }
+
+    fn decrypt_with_external_operation<F>(
+        ciphertext: &[u8],
+        material: &CandidateMaterial,
+        verification_certs: &[openpgp::Cert],
+        key_agreement_operation: F,
+        telemetry: ExternalDecryptTelemetry,
+    ) -> Result<(Vec<u8>, ExternalDecryptHelper<F>), PgpError>
+    where
+        F: FnMut(
+                ExternalP256KeyAgreementRequest,
+            ) -> Result<ExternalP256SharedSecret, ExternalP256DecryptorError>
+            + Send
+            + Sync,
+    {
         let policy = StandardPolicy::new();
         let recipient_cert = openpgp::Cert::from_bytes(&material.public_cert).map_err(|e| {
             PgpError::InvalidKeyData {
@@ -537,8 +604,9 @@ mod tests {
         let helper = ExternalDecryptHelper {
             recipient_certs: vec![recipient_cert],
             verifier_certs: verification_certs.to_vec(),
-            key_agreement_operation: oracle_for(material.agreement_scalar.clone()),
+            key_agreement_operation,
             collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+            telemetry,
         };
 
         decrypt_with_helper(ciphertext, &policy, helper)
@@ -636,6 +704,17 @@ mod tests {
         }
     }
 
+    fn tamper_near_payload_tail(ciphertext: &[u8]) -> Vec<u8> {
+        assert!(
+            ciphertext.len() > 16,
+            "ciphertext should be long enough to tamper near payload tail"
+        );
+        let mut tampered = ciphertext.to_vec();
+        let tamper_pos = tampered.len().saturating_sub(8);
+        tampered[tamper_pos] ^= 0x01;
+        tampered
+    }
+
     #[test]
     fn test_external_decryptor_builds_valid_public_only_p256_certificates() {
         for version in CandidateVersion::all() {
@@ -684,6 +763,60 @@ mod tests {
     }
 
     #[test]
+    fn test_external_decryptor_request_binds_recipient_and_ephemeral_public_points() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let plaintext = b"request binding proof";
+        let ciphertext =
+            encrypt::encrypt_binary(plaintext, &[material.public_cert.clone()], None, None)
+                .expect("encryption to public-only candidate should succeed");
+        let expected_recipient = public_point_for(&material.agreement_public_key);
+        let expected_recipient_for_operation = expected_recipient.clone();
+        let captured_request = Arc::new(Mutex::new(None));
+        let captured_request_for_operation = Arc::clone(&captured_request);
+        let mut oracle = oracle_for(material.agreement_scalar.clone());
+
+        let operation = move |request: ExternalP256KeyAgreementRequest| {
+            assert_eq!(
+                request.recipient_public_key(),
+                expected_recipient_for_operation.as_slice()
+            );
+            assert_eq!(request.recipient_public_key().len(), P256_PUBLIC_KEY_LENGTH);
+            assert_eq!(request.ephemeral_public_key().len(), P256_PUBLIC_KEY_LENGTH);
+            assert_eq!(
+                request.recipient_public_key().first().copied(),
+                Some(P256_UNCOMPRESSED_POINT_TAG)
+            );
+            assert_eq!(
+                request.ephemeral_public_key().first().copied(),
+                Some(P256_UNCOMPRESSED_POINT_TAG)
+            );
+            assert_ne!(
+                request.recipient_public_key(),
+                request.ephemeral_public_key()
+            );
+            *captured_request_for_operation.lock().unwrap() = Some(request.clone());
+            oracle(request)
+        };
+
+        let (decrypted, _) = decrypt_with_external_operation(
+            &ciphertext,
+            &material,
+            &[],
+            operation,
+            ExternalDecryptTelemetry::default(),
+        )
+        .expect("external decryptor should recover plaintext");
+        assert_eq!(decrypted, plaintext);
+
+        let captured = captured_request
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("external operation should receive a request");
+        assert_eq!(captured.recipient_public_key(), expected_recipient);
+    }
+
+    #[test]
     fn test_external_decryptor_failure_does_not_fallback_to_secret_certificate_decryption() {
         let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
         let ciphertext = encrypt::encrypt_binary(
@@ -705,6 +838,7 @@ mod tests {
                 ))
             },
             collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+            telemetry: ExternalDecryptTelemetry::default(),
         };
 
         let result = decrypt_with_helper(&ciphertext, &policy, helper);
@@ -712,7 +846,7 @@ mod tests {
     }
 
     #[test]
-    fn test_external_decryptor_rejects_unsupported_keys_and_invalid_response_shape() {
+    fn test_external_decryptor_rejects_signing_role() {
         let signing_material =
             build_candidate(CandidateVersion::V4).expect("candidate should build");
         assert!(
@@ -721,6 +855,10 @@ mod tests {
             ),)
             .is_err()
         );
+    }
+
+    #[test]
+    fn test_external_decryptor_rejects_unsupported_keys_and_invalid_response_shape() {
         let x25519_agreement: Key<key::SecretParts, key::SubordinateRole> =
             key::Key4::generate_ecc(false, Curve::Cv25519)
                 .expect("X25519 key should generate")
@@ -766,5 +904,139 @@ mod tests {
         };
 
         assert!(decryptor.decrypt(&ciphertext, None).is_err());
+    }
+
+    #[test]
+    fn test_external_decryptor_wrong_public_binding_fails_closed() {
+        for version in CandidateVersion::all() {
+            let material = build_candidate(version).expect("candidate should build");
+            let other = build_candidate(version).expect("other candidate should build");
+            let plaintext = format!("wrong public binding {}", version.label()).into_bytes();
+            let ciphertext =
+                encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                    .expect("encryption to public-only candidate should succeed");
+            let other_public = public_point_for(&other.agreement_public_key);
+            let other_scalar = other.agreement_scalar.clone();
+            let telemetry = ExternalDecryptTelemetry::default();
+            let telemetry_for_assertion = telemetry.clone();
+            let operation_calls = Arc::new(AtomicUsize::new(0));
+            let operation_calls_for_assertion = Arc::clone(&operation_calls);
+
+            let operation = move |request: ExternalP256KeyAgreementRequest| {
+                operation_calls.fetch_add(1, Ordering::SeqCst);
+                derive_shared_secret_with_openssl(
+                    &other_scalar,
+                    &other_public,
+                    request.ephemeral_public_key(),
+                )
+                .map(ExternalP256SharedSecret::new)
+                .map_err(|_| {
+                    ExternalP256DecryptorError::ExternalFailure("external P-256 ECDH oracle failed")
+                })
+            };
+
+            let result =
+                decrypt_with_external_operation(&ciphertext, &material, &[], operation, telemetry);
+            assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+            assert!(
+                operation_calls_for_assertion.load(Ordering::SeqCst) > 0,
+                "wrong public binding should exercise the external ECDH operation"
+            );
+            assert_eq!(
+                telemetry_for_assertion.recovered_session_key_count(),
+                0,
+                "wrong public binding must not produce a usable OpenPGP session key"
+            );
+        }
+    }
+
+    #[test]
+    fn test_external_decryptor_session_key_validation_failure_fails_closed() {
+        for version in CandidateVersion::all() {
+            let material = build_candidate(version).expect("candidate should build");
+            let plaintext = format!("session key validation {}", version.label()).into_bytes();
+            let ciphertext =
+                encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                    .expect("encryption to public-only candidate should succeed");
+            let telemetry = ExternalDecryptTelemetry::default();
+            let telemetry_for_assertion = telemetry.clone();
+            let operation_calls = Arc::new(AtomicUsize::new(0));
+            let operation_calls_for_assertion = Arc::clone(&operation_calls);
+
+            let result = decrypt_with_external_operation(
+                &ciphertext,
+                &material,
+                &[],
+                move |_request| {
+                    operation_calls.fetch_add(1, Ordering::SeqCst);
+                    Ok(ExternalP256SharedSecret::new(vec![
+                        0x42;
+                        P256_SHARED_SECRET_LENGTH
+                    ]))
+                },
+                telemetry,
+            );
+
+            assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+            assert!(
+                operation_calls_for_assertion.load(Ordering::SeqCst) > 0,
+                "session-key validation failure should exercise the external ECDH operation"
+            );
+            assert_eq!(
+                telemetry_for_assertion.recovered_session_key_count(),
+                0,
+                "shape-valid but wrong ECDH output must fail PKESK/session-key validation"
+            );
+        }
+    }
+
+    #[test]
+    fn test_external_decryptor_payload_authentication_hard_fails_after_session_key_acceptance() {
+        for version in CandidateVersion::all() {
+            let material = build_candidate(version).expect("candidate should build");
+            let plaintext = format!("payload hard fail {}", version.label())
+                .repeat(600)
+                .into_bytes();
+            let ciphertext =
+                encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                    .expect("encryption to public-only candidate should succeed");
+            assert_message_format(version, &ciphertext);
+
+            let tampered = tamper_near_payload_tail(&ciphertext);
+            let telemetry = ExternalDecryptTelemetry::default();
+            let telemetry_for_assertion = telemetry.clone();
+            let result = decrypt_with_external_operation(
+                &tampered,
+                &material,
+                &[],
+                oracle_for(material.agreement_scalar.clone()),
+                telemetry,
+            );
+
+            assert!(
+                telemetry_for_assertion.recovered_session_key_count() > 0,
+                "tampered {} payload should reach accepted PKESK/session-key recovery",
+                version.label()
+            );
+            assert!(
+                telemetry_for_assertion.accepted_payload_key_count() > 0,
+                "tampered {} payload should fail after payload decrypt starts",
+                version.label()
+            );
+            match result {
+                Err(PgpError::AeadAuthenticationFailed)
+                | Err(PgpError::IntegrityCheckFailed)
+                | Err(PgpError::NoMatchingKey)
+                | Err(PgpError::CorruptData { .. }) => {}
+                Err(other) => panic!(
+                    "tampered {} payload should fail as payload authentication/corruption, got: {other:?}",
+                    version.label()
+                ),
+                Ok((decrypted, _)) => panic!(
+                    "tampered {} payload must not release plaintext: {decrypted:?}",
+                    version.label()
+                ),
+            }
+        }
     }
 }

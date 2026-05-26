@@ -109,8 +109,10 @@ the POC security notes are archived as historical context in
 **Rust external signer proof note:** The Phase 2A Rust proof keeps external
 P-256 signing behind an internal test-backed adapter only. The adapter sees the
 public key, requested hash algorithm, and digest, and accepts only fixed-shape
-ECDSA `r/s` output that verifies against that public key and digest. It does not
-store Apple handle locators, use response files, add a Security-layer handle
+ECDSA `r/s` output that verifies against that public key and digest. Phase 2C
+negative tests also reject key-agreement-role keys, wrong digest signatures,
+wrong public-key signatures, malformed responses, and external failures. It does
+not store Apple handle locators, use response files, add a Security-layer handle
 store, expose a UniFFI API, or fall back to secret-certificate material when the
 external signer fails.
 
@@ -119,8 +121,11 @@ key agreement behind an internal test-backed adapter only. The adapter sends
 only public key-agreement material to the external operation and accepts only a
 fixed-shape raw 32-byte shared secret before handing it to Sequoia for OpenPGP
 ECDH KDF, AES Key Wrap unwrap, session-key validation, and payload
-authentication. It does not store Apple handle locators, use response files, add
-a Security-layer handle store, expose a UniFFI API, or fall back to
+authentication. Phase 2C negative tests also reject signing-role keys,
+unsupported key/ciphertext shapes, wrong public-key bindings, shape-valid but
+wrong shared secrets, and tampered SEIPDv1/MDC or SEIPDv2/AEAD payloads after
+session-key acceptance. It does not store Apple handle locators, use response
+files, add a Security-layer handle store, expose a UniFFI API, or fall back to
 secret-certificate material when the external ECDH operation fails. Diagnostics
 must not include shared secrets, session keys, KEKs, plaintext, fingerprints, or
 temporary capability paths.

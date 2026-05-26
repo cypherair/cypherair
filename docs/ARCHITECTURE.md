@@ -154,18 +154,23 @@ future boundary. The proof adapter is crate-private, signing-only, and receives
 only a public key plus SHA-256 digest material; returned ECDSA `r/s` values must
 verify against that public key and digest before Sequoia accepts them. Tests
 provide the external operation with a software oracle while Sequoia still owns
-OpenPGP packet construction, signature context, hashing, and verification. It is
-not a UniFFI API, response-file bridge, Security handle store, or fallback to
-stored secret-certificate signing.
+OpenPGP packet construction, signature context, hashing, and verification. The
+negative matrix rejects key-agreement-role keys, wrong digest bindings, wrong
+public-key bindings, malformed responses, and signer failures without falling
+back to stored secret-certificate signing. It is not a UniFFI API,
+response-file bridge, or Security handle store.
 
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256
 public key plus the PKESK ephemeral public key; tests supply a software OpenSSL
 oracle for the raw 32-byte shared secret while Sequoia still owns OpenPGP ECDH
 KDF, AES Key Wrap unwrap, PKESK/session-key validation, payload authentication,
-and read-to-completion decryption. It is not a UniFFI API, response-file bridge,
-Security handle store, real Secure Enclave route, or fallback to stored
-secret-certificate decryption.
+and read-to-completion decryption. The negative matrix rejects signing-role
+keys, unsupported key/ciphertext shapes, wrong public-key bindings, shape-valid
+but wrong shared secrets, and tampered SEIPDv1/MDC or SEIPDv2/AEAD payloads
+without returning plaintext or falling back to stored secret-certificate
+decryption. It is not a UniFFI API, response-file bridge, Security handle store,
+or real Secure Enclave route.
 
 ### Security Layer (`Sources/Security/`)
 
