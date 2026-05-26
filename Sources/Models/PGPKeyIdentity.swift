@@ -70,4 +70,12 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     static func formatFingerprint(_ hex: String) -> String {
         IdentityPresentation.formattedFingerprint(hex)
     }
+
+    var openPGPConfiguration: PGPKeyConfiguration {
+        profile.openPGPConfiguration
+    }
+
+    var privateKeyCustodyKind: PGPPrivateKeyCustodyKind {
+        profile.defaultCustodyKind
+    }
 }

@@ -16,4 +16,17 @@ enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
         case .advanced: 6
         }
     }
+
+    var openPGPConfiguration: PGPKeyConfiguration {
+        switch self {
+        case .universal:
+            .compatibleSoftwareV4
+        case .advanced:
+            .modernSoftwareV6
+        }
+    }
+
+    var defaultCustodyKind: PGPPrivateKeyCustodyKind {
+        .softwareSecretCertificate
+    }
 }

@@ -392,6 +392,86 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_pgpKeyProfile_successorConfigurationMappings_preserveSoftwareCustody() {
+        let universal = PGPKeyProfile.universal.openPGPConfiguration
+        XCTAssertEqual(universal.identity, .compatibleSoftwareV4)
+        XCTAssertEqual(universal.keyVersion, 4)
+        XCTAssertEqual(universal.algorithmSuite, .ed25519X25519)
+        XCTAssertEqual(universal.compatibilityTarget, .gnupgOriented)
+        XCTAssertEqual(universal.messageFormatPreference, .seipdV1)
+        XCTAssertEqual(universal.softwareExportProtection, .iteratedSaltedS2K)
+        XCTAssertEqual(PGPKeyProfile.universal.defaultCustodyKind, .softwareSecretCertificate)
+
+        let advanced = PGPKeyProfile.advanced.openPGPConfiguration
+        XCTAssertEqual(advanced.identity, .modernSoftwareV6)
+        XCTAssertEqual(advanced.keyVersion, 6)
+        XCTAssertEqual(advanced.algorithmSuite, .ed448X448)
+        XCTAssertEqual(advanced.compatibilityTarget, .rfc9580Oriented)
+        XCTAssertEqual(advanced.messageFormatPreference, .seipdV2Aead)
+        XCTAssertEqual(advanced.softwareExportProtection, .argon2idS2K)
+        XCTAssertEqual(PGPKeyProfile.advanced.defaultCustodyKind, .softwareSecretCertificate)
+    }
+
+    func test_pgpKeyIdentity_successorVocabulary_isComputedWithoutChangingCodableShape() throws {
+        let identity = makeIdentity(fingerprint: "abababababababababababababababababababab")
+
+        XCTAssertEqual(identity.openPGPConfiguration, .compatibleSoftwareV4)
+        XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
+
+        let encoded = try JSONEncoder().encode(identity)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+        XCTAssertEqual(
+            Set(object.keys),
+            [
+                "fingerprint",
+                "keyVersion",
+                "profile",
+                "userId",
+                "hasEncryptionSubkey",
+                "isRevoked",
+                "isExpired",
+                "isDefault",
+                "isBackedUp",
+                "publicKeyData",
+                "revocationCert",
+                "primaryAlgo",
+                "subkeyAlgo",
+            ]
+        )
+        XCTAssertNil(object["openPGPConfiguration"])
+        XCTAssertNil(object["privateKeyCustodyKind"])
+    }
+
+    func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {
+        let compatibleP256 = PGPKeyConfiguration.compatibleP256V4
+        XCTAssertEqual(compatibleP256.identity, .compatibleP256V4)
+        XCTAssertEqual(compatibleP256.keyVersion, 4)
+        XCTAssertEqual(compatibleP256.algorithmSuite, .p256)
+        XCTAssertEqual(compatibleP256.compatibilityTarget, .gnupgOriented)
+        XCTAssertEqual(compatibleP256.softwareExportProtection, .notAvailable)
+
+        let modernP256 = PGPKeyConfiguration.modernP256V6
+        XCTAssertEqual(modernP256.identity, .modernP256V6)
+        XCTAssertEqual(modernP256.keyVersion, 6)
+        XCTAssertEqual(modernP256.algorithmSuite, .p256)
+        XCTAssertEqual(modernP256.messageFormatPreference, .seipdV2Aead)
+        XCTAssertEqual(modernP256.softwareExportProtection, .notAvailable)
+
+        for profile in PGPKeyProfile.allCases {
+            XCTAssertNotEqual(profile.openPGPConfiguration, .compatibleP256V4)
+            XCTAssertNotEqual(profile.openPGPConfiguration, .modernP256V6)
+            XCTAssertNotEqual(profile.defaultCustodyKind, .appleSecureEnclavePrivateOperations)
+        }
+
+        XCTAssertEqual(
+            Set(PGPPrivateOperationRole.allCases),
+            [.signing, .keyAgreement]
+        )
+        XCTAssertTrue(PGPKeyOperationKind.allCases.contains(.exportPrivateMaterial))
+        XCTAssertEqual(PGPKeyOperationSupport.notImplemented.rawValue, "notImplemented")
+    }
+
     // MARK: - OpenPGPCertificationKind
 
     func test_openPGPCertificationKind_decode_historicalRawValues() throws {
