@@ -7,6 +7,19 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         case modernSoftwareV6
         case compatibleP256V4
         case modernP256V6
+
+        var configuration: PGPKeyConfiguration {
+            switch self {
+            case .compatibleSoftwareV4:
+                .compatibleSoftwareV4
+            case .modernSoftwareV6:
+                .modernSoftwareV6
+            case .compatibleP256V4:
+                .compatibleP256V4
+            case .modernP256V6:
+                .modernP256V6
+            }
+        }
     }
 
     enum AlgorithmSuite: String, CaseIterable, Codable, Hashable, Sendable {

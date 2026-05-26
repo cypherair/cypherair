@@ -4,7 +4,7 @@ import Security
 
 final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockParticipant, @unchecked Sendable {
     struct Payload: Codable, Equatable {
-        static let currentSchemaVersion = 1
+        static let currentSchemaVersion = 2
 
         var schemaVersion: Int
         var identities: [PGPKeyIdentity]
@@ -28,14 +28,51 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                     "Key metadata payload contains duplicate fingerprints."
                 )
             }
+            for identity in identities {
+                try Self.validateIdentityContract(identity)
+            }
+        }
+
+        private static func validateIdentityContract(_ identity: PGPKeyIdentity) throws {
+            let configuration = identity.openPGPConfiguration
+            guard identity.keyVersion == configuration.keyVersion else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata configuration does not match key version."
+                )
+            }
+
+            switch (configuration.algorithmSuite, identity.privateKeyCustodyKind) {
+            case (.p256, .softwareSecretCertificate):
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata cannot use software custody for a P-256 configuration."
+                )
+            case (.ed25519X25519, .appleSecureEnclavePrivateOperations),
+                 (.ed448X448, .appleSecureEnclavePrivateOperations):
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata cannot use Secure Enclave custody for a non-P-256 configuration."
+                )
+            default:
+                return
+            }
         }
     }
 
     static let domainID: ProtectedDataDomainID = "key-metadata"
 
+    private struct PayloadV1: Codable {
+        let schemaVersion: Int
+        let identities: [PGPKeyIdentity]
+    }
+
+    private struct DecodedPayload {
+        let payload: Payload
+        let sourceSchemaVersion: Int
+    }
+
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
+        let sourceSchemaVersion: Int
     }
 
     private let legacyMetadataStore: KeyMetadataStore
@@ -163,13 +200,26 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         do {
-            let (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+            var (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
                 wrappingRootKey: wrappingRootKey
             )
+            defer {
+                unwrappedDomainMasterKey.protectedDataZeroize()
+            }
+            if openedSnapshot.sourceSchemaVersion < Payload.currentSchemaVersion {
+                let migratedGenerationIdentifier = openedSnapshot.generationIdentifier + 1
+                try writePayloadGeneration(
+                    openedSnapshot.payload,
+                    generationIdentifier: migratedGenerationIdentifier,
+                    domainMasterKey: unwrappedDomainMasterKey
+                )
+                unwrappedDomainMasterKey.protectedDataZeroize()
+                (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+                    wrappingRootKey: wrappingRootKey
+                )
+            }
             let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
-            var mutableDomainMasterKey = unwrappedDomainMasterKey
-            mutableDomainMasterKey.protectedDataZeroize()
             payload = openedSnapshot.payload
             unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
             domainState = .loaded
@@ -367,7 +417,14 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
+        var shouldReturnDomainMasterKey = false
+        defer {
+            if !shouldReturnDomainMasterKey {
+                domainMasterKey.protectedDataZeroize()
+            }
+        }
         var candidates: [OpenedSnapshot] = []
+        var highestObservedGenerationIdentifier: Int?
 
         for slot in ProtectedDomainGenerationSlot.allCases {
             let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
@@ -378,6 +435,10 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             do {
                 let data = try storageRoot.readManagedData(at: url)
                 let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+                highestObservedGenerationIdentifier = max(
+                    highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
+                    envelope.generationIdentifier
+                )
                 var plaintext = try ProtectedDomainEnvelopeCodec.open(
                     envelope: envelope,
                     domainMasterKey: domainMasterKey
@@ -385,15 +446,21 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 defer {
                     plaintext.protectedDataZeroize()
                 }
-                let payload = try PropertyListDecoder().decode(Payload.self, from: plaintext)
-                try payload.validateContract()
+                let decodedPayload = try decodePayload(
+                    plaintext: plaintext,
+                    schemaVersion: envelope.schemaVersion
+                )
                 candidates.append(
                     OpenedSnapshot(
-                        payload: payload,
-                        generationIdentifier: envelope.generationIdentifier
+                        payload: decodedPayload.payload,
+                        generationIdentifier: envelope.generationIdentifier,
+                        sourceSchemaVersion: decodedPayload.sourceSchemaVersion
                     )
                 )
             } catch {
+                if slot == .current {
+                    throw error
+                }
                 continue
             }
         }
@@ -401,13 +468,46 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         guard let selectedSnapshot = candidates.max(by: {
             $0.generationIdentifier < $1.generationIdentifier
         }) else {
-            domainMasterKey.protectedDataZeroize()
             throw ProtectedDataError.invalidEnvelope(
                 "Key metadata does not contain a readable authoritative generation."
             )
         }
+        if let highestObservedGenerationIdentifier,
+           selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata highest observed generation is not readable."
+            )
+        }
 
+        shouldReturnDomainMasterKey = true
         return (selectedSnapshot, domainMasterKey)
+    }
+
+    private func decodePayload(
+        plaintext: Data,
+        schemaVersion: Int
+    ) throws -> DecodedPayload {
+        let decoder = PropertyListDecoder()
+        switch schemaVersion {
+        case Payload.currentSchemaVersion:
+            let payload = try decoder.decode(Payload.self, from: plaintext)
+            try payload.validateContract()
+            return DecodedPayload(payload: payload, sourceSchemaVersion: schemaVersion)
+        case 1:
+            let legacyPayload = try decoder.decode(PayloadV1.self, from: plaintext)
+            guard legacyPayload.schemaVersion == 1 else {
+                throw ProtectedDataError.invalidEnvelope(
+                    "Key metadata v1 migration received an unexpected schema version."
+                )
+            }
+            let payload = Payload.initial(identities: legacyPayload.identities)
+            try payload.validateContract()
+            return DecodedPayload(payload: payload, sourceSchemaVersion: schemaVersion)
+        default:
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata payload has unsupported schema version \(schemaVersion)."
+            )
+        }
     }
 
     private func activeDomainMasterKey() throws -> Data {

@@ -270,6 +270,45 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         var clipboardNotice: Bool
     }
 
+    private struct KeyMetadataPayloadV1: Encodable {
+        var schemaVersion: Int
+        var identities: [KeyMetadataIdentityV1]
+    }
+
+    private struct KeyMetadataIdentityV1: Encodable {
+        let fingerprint: String
+        let keyVersion: UInt8
+        let profile: PGPKeyProfile
+        let userId: String?
+        let hasEncryptionSubkey: Bool
+        let isRevoked: Bool
+        let isExpired: Bool
+        let isDefault: Bool
+        let isBackedUp: Bool
+        let publicKeyData: Data
+        let revocationCert: Data
+        let primaryAlgo: String
+        let subkeyAlgo: String?
+        let expiryDate: Date?
+
+        init(_ identity: PGPKeyIdentity) {
+            fingerprint = identity.fingerprint
+            keyVersion = identity.keyVersion
+            profile = identity.profile
+            userId = identity.userId
+            hasEncryptionSubkey = identity.hasEncryptionSubkey
+            isRevoked = identity.isRevoked
+            isExpired = identity.isExpired
+            isDefault = identity.isDefault
+            isBackedUp = identity.isBackedUp
+            publicKeyData = identity.publicKeyData
+            revocationCert = identity.revocationCert
+            primaryAlgo = identity.primaryAlgo
+            subkeyAlgo = identity.subkeyAlgo
+            expiryDate = identity.expiryDate
+        }
+    }
+
     private let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
 
     private func makeTemporaryDirectory(_ prefix: String) -> URL {
@@ -437,6 +476,68 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             ),
             for: ProtectedSettingsStore.domainID
         )
+    }
+
+    private func writeKeyMetadataEnvelope<P: Encodable>(
+        payload: P,
+        schemaVersion: Int,
+        generationIdentifier: Int,
+        storageRoot: AppProtectedDataStorageRoot,
+        domainKeyManager: AppProtectedDomainKeyManager,
+        wrappingRootKey: Data
+    ) throws {
+        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
+            for: AppKeyMetadataDomainStore.domainID
+        ) else {
+            throw ProtectedDataError.missingWrappedDomainMasterKey(AppKeyMetadataDomainStore.domainID)
+        }
+        var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
+            from: wrappedRecord,
+            wrappingRootKey: wrappingRootKey
+        )
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        var plaintext = try encoder.encode(payload)
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        let envelope = try ProtectedDomainEnvelopeCodec.seal(
+            plaintext: plaintext,
+            domainID: AppKeyMetadataDomainStore.domainID,
+            schemaVersion: schemaVersion,
+            generationIdentifier: generationIdentifier,
+            domainMasterKey: domainMasterKey
+        )
+        let envelopeData = try encoder.encode(envelope)
+        let pendingURL = storageRoot.domainEnvelopeURL(for: AppKeyMetadataDomainStore.domainID, slot: .pending)
+        try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
+        let currentURL = storageRoot.domainEnvelopeURL(for: AppKeyMetadataDomainStore.domainID, slot: .current)
+        let previousURL = storageRoot.domainEnvelopeURL(for: AppKeyMetadataDomainStore.domainID, slot: .previous)
+        if try storageRoot.managedItemExists(at: currentURL) {
+            try storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
+        }
+        try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
+        try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: schemaVersion,
+                expectedCurrentGenerationIdentifier: String(generationIdentifier),
+                coarseRecoveryReason: nil,
+                wrappedDomainMasterKeyRecordVersion: AppWrappedDomainMasterKeyRecord.currentFormatVersion
+            ),
+            for: AppKeyMetadataDomainStore.domainID
+        )
+    }
+
+    private func loadCurrentKeyMetadataEnvelope(
+        storageRoot: AppProtectedDataStorageRoot
+    ) throws -> ProtectedDomainEnvelope {
+        let url = storageRoot.domainEnvelopeURL(for: AppKeyMetadataDomainStore.domainID, slot: .current)
+        let data = try storageRoot.readManagedData(at: url)
+        return try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
     }
 
     private func makeKeyMetadataDomainHarness(
@@ -4724,6 +4825,229 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(harness.store.domainState, .locked)
         XCTAssertNil(harness.store.payload)
         XCTAssertThrowsError(try harness.store.loadAll())
+    }
+
+    func test_keyMetadataDomain_committedSchemaV1MigratesAndWritesSchemaV2() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataSchemaV1Migration")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let legacyIdentity = makeMetadataIdentity(
+            fingerprint: "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            userId: "Legacy V1 <legacy-v1@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        try writeKeyMetadataEnvelope(
+            payload: KeyMetadataPayloadV1(
+                schemaVersion: 1,
+                identities: [KeyMetadataIdentityV1(legacyIdentity)]
+            ),
+            schemaVersion: 1,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        let payload = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+
+        XCTAssertEqual(payload.schemaVersion, 2)
+        XCTAssertEqual(payload.identities.count, 1)
+        XCTAssertEqual(payload.identities.first?.openPGPConfigurationIdentity, .compatibleSoftwareV4)
+        XCTAssertEqual(payload.identities.first?.privateKeyCustodyKind, .softwareSecretCertificate)
+
+        let currentEnvelope = try loadCurrentKeyMetadataEnvelope(storageRoot: harness.storageRoot)
+        XCTAssertEqual(currentEnvelope.schemaVersion, 2)
+        XCTAssertEqual(currentEnvelope.generationIdentifier, 3)
+        let bootstrap = try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot)
+            .loadMetadata(for: AppKeyMetadataDomainStore.domainID)
+        XCTAssertEqual(bootstrap?.schemaVersion, 2)
+        XCTAssertEqual(bootstrap?.expectedCurrentGenerationIdentifier, "3")
+    }
+
+    func test_keyMetadataDomain_v2MismatchedConfigurationCustodyRequiresRecovery() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataMismatchedConfigCustody")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let invalidIdentity = PGPKeyIdentity(
+            fingerprint: "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+            keyVersion: 4,
+            profile: .universal,
+            userId: "Invalid <invalid@example.invalid>",
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data([0x10, 0x11]),
+            revocationCert: Data([0x12]),
+            primaryAlgo: "P-256",
+            subkeyAlgo: "P-256",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleP256V4,
+            privateKeyCustodyKind: .softwareSecretCertificate
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        try writeKeyMetadataEnvelope(
+            payload: AppKeyMetadataDomainStore.Payload(
+                schemaVersion: 2,
+                identities: [invalidIdentity]
+            ),
+            schemaVersion: 2,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        let reopenedStore = AppKeyMetadataDomainStore(
+            legacyMetadataStore: harness.legacyStore,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: LAContext()
+            )
+            XCTFail("Expected mismatched key metadata configuration and custody to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertNil(reopenedStore.payload)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[AppKeyMetadataDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_keyMetadataDomain_corruptCurrentGenerationDoesNotFallbackToPrevious() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataCorruptCurrentNoFallback")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+            userId: "Readable Previous <previous@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        try writeKeyMetadataEnvelope(
+            payload: AppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
+            schemaVersion: 2,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try harness.storageRoot.writeProtectedData(
+            Data("corrupt-current-key-metadata".utf8),
+            to: harness.storageRoot.domainEnvelopeURL(
+                for: AppKeyMetadataDomainStore.domainID,
+                slot: .current
+            )
+        )
+        let reopenedStore = AppKeyMetadataDomainStore(
+            legacyMetadataStore: harness.legacyStore,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: LAContext()
+            )
+            XCTFail("Expected corrupt current key metadata to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[AppKeyMetadataDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_keyMetadataDomain_unsupportedFutureSchemaFailsClosed() async throws {
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataFutureSchema")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4",
+            userId: "Future <future@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey,
+            authenticationContext: LAContext()
+        )
+        try writeKeyMetadataEnvelope(
+            payload: AppKeyMetadataDomainStore.Payload(
+                schemaVersion: 99,
+                identities: [identity]
+            ),
+            schemaVersion: 99,
+            generationIdentifier: 2,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        let reopenedStore = AppKeyMetadataDomainStore(
+            legacyMetadataStore: harness.legacyStore,
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey,
+                authenticationContext: LAContext()
+            )
+            XCTFail("Expected unsupported key metadata schema to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[AppKeyMetadataDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_keyMetadataPayloadValidationAcceptsRepresentableSecureEnclaveP256() throws {
+        let identity = PGPKeyIdentity(
+            fingerprint: "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+            keyVersion: 4,
+            profile: .universal,
+            userId: "P-256 <p256@example.invalid>",
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data([0x20, 0x21]),
+            revocationCert: Data([0x22]),
+            primaryAlgo: "P-256",
+            subkeyAlgo: "P-256",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleP256V4,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        let payload = AppKeyMetadataDomainStore.Payload.initial(identities: [identity])
+
+        XCTAssertNoThrow(try payload.validateContract())
     }
 
     func test_keyMetadataDomain_migratesDedicatedMetadataAccountAndCleansSource() async throws {
