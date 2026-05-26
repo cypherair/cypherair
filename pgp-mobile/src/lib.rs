@@ -9,9 +9,9 @@ pub mod cert_signature;
 pub mod decrypt;
 pub mod encrypt;
 pub mod error;
-#[allow(dead_code)]
+#[cfg(test)]
 mod external_decryptor;
-#[allow(dead_code)]
+#[cfg(test)]
 mod external_signer;
 pub mod keys;
 pub mod password;

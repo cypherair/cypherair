@@ -32,7 +32,6 @@ impl ExternalP256KeyAgreementRequest {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct ExternalP256SharedSecret {
     raw: Zeroizing<Vec<u8>>,
 }
@@ -1032,8 +1031,8 @@ mod tests {
                     "tampered {} payload should fail as payload authentication/corruption, got: {other:?}",
                     version.label()
                 ),
-                Ok((decrypted, _)) => panic!(
-                    "tampered {} payload must not release plaintext: {decrypted:?}",
+                Ok((_decrypted, _)) => panic!(
+                    "tampered {} payload must not release plaintext",
                     version.label()
                 ),
             }
