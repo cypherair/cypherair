@@ -33,22 +33,6 @@
         }
       }
     },
-    "about.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fully offline OpenPGP encryption tool. Zero network access. Minimal permissions."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完全离线的 OpenPGP 加密工具。零网络访问。最小权限。"
-          }
-        }
-      }
-    },
     "about.cypherAirX.description" : {
       "localizations" : {
         "en" : {
@@ -61,6 +45,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CypherAir X 是 CypherAir 的探索产品线，用来承载仍在评估中的新方向，例如新的加密方式、外观和交互改进。这些探索不会改变 CypherAir 完全离线、无网络访问的隐私模型。"
+          }
+        }
+      }
+    },
+    "about.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fully offline OpenPGP encryption tool. Zero network access. Minimal permissions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完全离线的 OpenPGP 加密工具。零网络访问。最小权限。"
           }
         }
       }
@@ -3570,6 +3570,7 @@
       }
     },
     "contacts.metadata.corrupt" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
