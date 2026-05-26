@@ -21,6 +21,9 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         for identity in identities {
             XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
             for operation in PGPKeyOperationKind.allCases {
+                let resolution = resolver.resolution(for: operation, identity: identity)
+                XCTAssertEqual(resolution, .supported)
+                XCTAssertNil(resolution.failureCategory)
                 XCTAssertEqual(
                     resolver.support(for: operation, identity: identity),
                     .supported,
@@ -45,6 +48,13 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 custody: custody
             ))
             for operation in PGPKeyOperationKind.allCases {
+                let resolution = resolver.resolution(
+                    for: operation,
+                    configuration: configuration,
+                    custody: custody
+                )
+                XCTAssertEqual(resolution.support, .unsupported)
+                XCTAssertEqual(resolution.failureCategory, .invalidConfigurationCustody)
                 XCTAssertEqual(
                     resolver.support(
                         for: operation,
@@ -66,12 +76,28 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             custody: .appleSecureEnclavePrivateOperations
         ))
         XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable(.operationUnavailableByPolicy)
+        )
+        XCTAssertEqual(
             resolver.support(
                 for: .generate,
                 configuration: .compatibleP256V4,
                 custody: .appleSecureEnclavePrivateOperations
             ),
             .unavailable
+        )
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .sign,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable(.operationUnavailableByPolicy)
         )
         XCTAssertEqual(
             resolver.support(
@@ -96,6 +122,15 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
 
         for operation in privateOperations {
             XCTAssertEqual(
+                resolver.resolution(
+                    for: operation,
+                    configuration: .modernP256V6,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .notImplemented(.operationNotImplementedForCustody),
+                "Expected \(operation) to remain a test-only not-implemented future path."
+            )
+            XCTAssertEqual(
                 resolver.support(
                     for: operation,
                     configuration: .modernP256V6,
@@ -105,6 +140,14 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 "Expected \(operation) to remain a test-only not-implemented future path."
             )
         }
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .modernP256V6,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable(.operationUnavailableByPolicy)
+        )
         XCTAssertEqual(
             resolver.support(
                 for: .generate,
@@ -118,6 +161,14 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
     func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
         let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
 
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .exportPrivateMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unsupported(.operationUnsupportedForCustody)
+        )
         XCTAssertEqual(
             resolver.support(
                 for: .exportPrivateMaterial,
@@ -150,7 +201,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             hasRevocationArtifact: false
         )
         XCTAssertEqual(
-            resolver.support(
+            resolver.resolution(
                 for: .exportPublicMaterial,
                 configuration: .compatibleP256V4,
                 custody: .appleSecureEnclavePrivateOperations,
@@ -160,12 +211,44 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         )
         XCTAssertEqual(
             resolver.support(
+                for: .exportPublicMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: publicOnly
+            ),
+            .supported
+        )
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .exportRevocationArtifact,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: publicOnly
+            ),
+            .unavailable(.revocationArtifactUnavailable)
+        )
+        XCTAssertEqual(
+            resolver.support(
                 for: .exportRevocationArtifact,
                 configuration: .compatibleP256V4,
                 custody: .appleSecureEnclavePrivateOperations,
                 metadataAvailability: publicOnly
             ),
             .unavailable
+        )
+
+        let revocationOnly = PGPKeyCapabilityResolver.MetadataAvailability(
+            hasPublicMaterial: false,
+            hasRevocationArtifact: true
+        )
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .exportPublicMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: revocationOnly
+            ),
+            .unavailable(.publicMaterialUnavailable)
         )
     }
 

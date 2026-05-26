@@ -34,7 +34,31 @@ struct PGPKeyCapabilityResolver: Sendable {
         for operation: PGPKeyOperationKind,
         identity: PGPKeyIdentity
     ) -> PGPKeyOperationSupport {
-        support(
+        resolution(
+            for: operation,
+            identity: identity
+        ).support
+    }
+
+    func support(
+        for operation: PGPKeyOperationKind,
+        configuration: PGPKeyConfiguration,
+        custody: PGPPrivateKeyCustodyKind,
+        metadataAvailability: MetadataAvailability = .present
+    ) -> PGPKeyOperationSupport {
+        resolution(
+            for: operation,
+            configuration: configuration,
+            custody: custody,
+            metadataAvailability: metadataAvailability
+        ).support
+    }
+
+    func resolution(
+        for operation: PGPKeyOperationKind,
+        identity: PGPKeyIdentity
+    ) -> PGPKeyOperationResolution {
+        resolution(
             for: operation,
             configuration: identity.openPGPConfiguration,
             custody: identity.privateKeyCustodyKind,
@@ -45,24 +69,24 @@ struct PGPKeyCapabilityResolver: Sendable {
         )
     }
 
-    func support(
+    func resolution(
         for operation: PGPKeyOperationKind,
         configuration: PGPKeyConfiguration,
         custody: PGPPrivateKeyCustodyKind,
         metadataAvailability: MetadataAvailability = .present
-    ) -> PGPKeyOperationSupport {
+    ) -> PGPKeyOperationResolution {
         guard isValidConfigurationCustodyPair(
             configuration: configuration,
             custody: custody
         ) else {
-            return .unsupported
+            return .unsupported(.invalidConfigurationCustody)
         }
 
         switch custody {
         case .softwareSecretCertificate:
             return .supported
         case .appleSecureEnclavePrivateOperations:
-            return supportForSecureEnclaveCustody(
+            return resolutionForSecureEnclaveCustody(
                 operation: operation,
                 metadataAvailability: metadataAvailability
             )
@@ -85,26 +109,45 @@ struct PGPKeyCapabilityResolver: Sendable {
         }
     }
 
-    private func supportForSecureEnclaveCustody(
+    private func resolutionForSecureEnclaveCustody(
         operation: PGPKeyOperationKind,
         metadataAvailability: MetadataAvailability
-    ) -> PGPKeyOperationSupport {
+    ) -> PGPKeyOperationResolution {
         switch operation {
         case .generate:
-            return .unavailable
+            return .unavailable(.operationUnavailableByPolicy)
         case .sign,
              .decrypt,
              .certify,
              .revoke,
              .modifyExpiry,
              .refreshBinding:
-            return policy.secureEnclavePrivateOperationSupport
+            return resolutionForPolicySupport(policy.secureEnclavePrivateOperationSupport)
         case .exportPrivateMaterial:
-            return .unsupported
+            return .unsupported(.operationUnsupportedForCustody)
         case .exportPublicMaterial:
-            return metadataAvailability.hasPublicMaterial ? .supported : .unavailable
+            return metadataAvailability.hasPublicMaterial
+                ? .supported
+                : .unavailable(.publicMaterialUnavailable)
         case .exportRevocationArtifact:
-            return metadataAvailability.hasRevocationArtifact ? .supported : .unavailable
+            return metadataAvailability.hasRevocationArtifact
+                ? .supported
+                : .unavailable(.revocationArtifactUnavailable)
+        }
+    }
+
+    private func resolutionForPolicySupport(
+        _ support: PGPKeyOperationSupport
+    ) -> PGPKeyOperationResolution {
+        switch support {
+        case .supported:
+            return .supported
+        case .unsupported:
+            return .unsupported(.operationUnsupportedForCustody)
+        case .notImplemented:
+            return .notImplemented(.operationNotImplementedForCustody)
+        case .unavailable:
+            return .unavailable(.operationUnavailableByPolicy)
         }
     }
 }

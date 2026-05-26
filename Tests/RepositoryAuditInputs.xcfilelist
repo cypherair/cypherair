@@ -200,10 +200,12 @@ $(SRCROOT)/Sources/Models/OpenPGPCertificationKind.swift
 $(SRCROOT)/Sources/Models/PasswordMessageDetailedDecryptOutcome.swift
 $(SRCROOT)/Sources/Models/PasswordMessageEnvelopeFormat.swift
 $(SRCROOT)/Sources/Models/PGPKeyConfiguration.swift
+$(SRCROOT)/Sources/Models/PGPKeyOperationFailureCategory.swift
 $(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
 $(SRCROOT)/Sources/Models/PGPKeyImportS2KInfo.swift
 $(SRCROOT)/Sources/Models/PGPKeyOperationKind.swift
+$(SRCROOT)/Sources/Models/PGPKeyOperationResolution.swift
 $(SRCROOT)/Sources/Models/PGPKeyOperationSupport.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
 $(SRCROOT)/Sources/Models/PGPPrivateKeyCustodyKind.swift

@@ -509,6 +509,136 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(PGPKeyOperationSupport.notImplemented.rawValue, "notImplemented")
     }
 
+    func test_pgpKeyOperationFailureCategory_rawValuesCoverSecureEnclaveTaxonomy() throws {
+        let expected: [PGPKeyOperationFailureCategory] = [
+            .invalidConfigurationCustody,
+            .operationUnsupportedForCustody,
+            .operationNotImplementedForCustody,
+            .operationUnavailableByPolicy,
+            .hardwareUnavailable,
+            .localAuthenticationRequired,
+            .localAuthenticationCancelled,
+            .localAuthenticationFailed,
+            .localAuthenticationUnavailable,
+            .localAuthenticationLockedOut,
+            .privateHandleMissing,
+            .privateHandleInaccessible,
+            .privateHandleUnauthorized,
+            .privateOperationRoleMismatch,
+            .handlePublicKeyBindingMismatch,
+            .metadataAssociationMismatch,
+            .publicCertificateAssociationMismatch,
+            .publicMaterialUnavailable,
+            .revocationArtifactUnavailable,
+            .externalOperationInvalidRequest,
+            .externalOperationInvalidResponse,
+            .externalOperationFailed,
+            .openPGPSemanticFailure,
+            .payloadAuthenticationFailure,
+            .migrationOrRecoveryRequired,
+            .prohibitedFallbackAttempted,
+            .cleanupOrRollbackFailure,
+        ]
+
+        XCTAssertEqual(PGPKeyOperationFailureCategory.allCases, expected)
+        XCTAssertEqual(
+            expected.map(\.rawValue),
+            [
+                "invalidConfigurationCustody",
+                "operationUnsupportedForCustody",
+                "operationNotImplementedForCustody",
+                "operationUnavailableByPolicy",
+                "hardwareUnavailable",
+                "localAuthenticationRequired",
+                "localAuthenticationCancelled",
+                "localAuthenticationFailed",
+                "localAuthenticationUnavailable",
+                "localAuthenticationLockedOut",
+                "privateHandleMissing",
+                "privateHandleInaccessible",
+                "privateHandleUnauthorized",
+                "privateOperationRoleMismatch",
+                "handlePublicKeyBindingMismatch",
+                "metadataAssociationMismatch",
+                "publicCertificateAssociationMismatch",
+                "publicMaterialUnavailable",
+                "revocationArtifactUnavailable",
+                "externalOperationInvalidRequest",
+                "externalOperationInvalidResponse",
+                "externalOperationFailed",
+                "openPGPSemanticFailure",
+                "payloadAuthenticationFailure",
+                "migrationOrRecoveryRequired",
+                "prohibitedFallbackAttempted",
+                "cleanupOrRollbackFailure",
+            ]
+        )
+
+        let encoded = try JSONEncoder().encode(PGPKeyOperationFailureCategory.payloadAuthenticationFailure)
+        let decoded = try JSONDecoder().decode(PGPKeyOperationFailureCategory.self, from: encoded)
+        XCTAssertEqual(decoded, .payloadAuthenticationFailure)
+    }
+
+    func test_pgpKeyOperationResolution_factoriesSetSupportAndFailureCategory() throws {
+        let supported = PGPKeyOperationResolution.supported
+        XCTAssertEqual(supported.support, .supported)
+        XCTAssertNil(supported.failureCategory)
+
+        let unsupported = PGPKeyOperationResolution.unsupported(.invalidConfigurationCustody)
+        XCTAssertEqual(unsupported.support, .unsupported)
+        XCTAssertEqual(unsupported.failureCategory, .invalidConfigurationCustody)
+
+        let notImplemented = PGPKeyOperationResolution.notImplemented(.operationNotImplementedForCustody)
+        XCTAssertEqual(notImplemented.support, .notImplemented)
+        XCTAssertEqual(notImplemented.failureCategory, .operationNotImplementedForCustody)
+
+        let unavailable = PGPKeyOperationResolution.unavailable(.operationUnavailableByPolicy)
+        XCTAssertEqual(unavailable.support, .unavailable)
+        XCTAssertEqual(unavailable.failureCategory, .operationUnavailableByPolicy)
+
+        let supportedObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(supported)) as? [String: Any]
+        )
+        XCTAssertEqual(Set(supportedObject.keys), ["support"])
+        XCTAssertEqual(supportedObject["support"] as? String, "supported")
+        XCTAssertNil(supportedObject["failureCategory"])
+
+        let roundTrip = try JSONDecoder().decode(
+            PGPKeyOperationResolution.self,
+            from: JSONEncoder().encode(unavailable)
+        )
+        XCTAssertEqual(roundTrip, unavailable)
+    }
+
+    func test_pgpKeyOperationResolution_decodeRejectsInvalidSupportCategoryPairs() throws {
+        let decoder = JSONDecoder()
+
+        let supportedWithCategory = Data(
+            """
+            {
+              "support": "supported",
+              "failureCategory": "invalidConfigurationCustody"
+            }
+            """.utf8
+        )
+        XCTAssertThrowsError(
+            try decoder.decode(PGPKeyOperationResolution.self, from: supportedWithCategory)
+        )
+
+        for support in ["unsupported", "notImplemented", "unavailable"] {
+            let missingCategory = Data(
+                """
+                {
+                  "support": "\(support)"
+                }
+                """.utf8
+            )
+            XCTAssertThrowsError(
+                try decoder.decode(PGPKeyOperationResolution.self, from: missingCategory)
+            )
+        }
+    }
+
     // MARK: - OpenPGPCertificationKind
 
     func test_openPGPCertificationKind_decode_historicalRawValues() throws {
