@@ -72,9 +72,8 @@ Recommended PR grouping:
 
 Entry conditions:
 
-- Product Design, Architecture Plan, Security Requirements, Feasibility Summary,
-  and Implementation Docs Guidance were active for Phase 0 authoring. The
-  guidance is now archived as historical authoring context after PR #363.
+- Product Design, Architecture Plan, Security Requirements, and Feasibility
+  Summary are active.
 
 Exit conditions:
 

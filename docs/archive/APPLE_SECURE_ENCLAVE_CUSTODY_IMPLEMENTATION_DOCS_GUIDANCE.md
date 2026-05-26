@@ -27,6 +27,10 @@
 > [Persisted State Inventory](../PERSISTED_STATE_INVENTORY.md), and
 > [Testing](../TESTING.md).
 
+Historical note: the content below is preserved as authoring context for the
+successor implementation reference and roadmap. It is not active planning
+guidance for future Secure Enclave custody phases.
+
 ## Role
 
 This document guides the creation of two implementation-preparation documents:
