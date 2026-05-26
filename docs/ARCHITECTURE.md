@@ -149,6 +149,15 @@ undecided. Current integration planning lives in
 the completed POC validation track is archived as historical context in
 [APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
 
+The Rust crate now carries a test-backed external P-256 signer proof for this
+future boundary. The proof adapter is crate-private, signing-only, and receives
+only a public key plus SHA-256 digest material; returned ECDSA `r/s` values must
+verify against that public key and digest before Sequoia accepts them. Tests
+provide the external operation with a software oracle while Sequoia still owns
+OpenPGP packet construction, signature context, hashing, and verification. It is
+not a UniFFI API, response-file bridge, Security handle store, ECDH/session-key
+path, or fallback to stored secret-certificate signing.
+
 ### Security Layer (`Sources/Security/`)
 
 Manages all hardware-backed security operations. This is the most sensitive module.

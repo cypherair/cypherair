@@ -85,6 +85,8 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Current Profile A/B identities normalize to software custody; P-256 Secure Enclave custody is representable only as future/hidden vocabulary. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`. Key operation resolution adds non-persistent sanitized failure categories so resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping plans can distinguish unsupported, unavailable, not-yet-implemented, local-authentication, handle, binding, OpenPGP semantic, payload-authentication, migration/recovery, fallback, and cleanup failures without storing private-operation state.
 
+**Rust external signer proof:** Phase 2A adds a Rust-only, test-backed P-256 external signer boundary proof. The proof builds v4/v6 public-only Secure Enclave-shaped certificates and signs cleartext/detached data through the same Sequoia stream-signing path, while the test substitute performs only the private ECDSA operation. It does not change shipped software-key behavior, add response-file bridging, expose UniFFI APIs, store Security handles, cover ECDH/session-key operations, or permit secret-certificate fallback in the proof path.
+
 ### 1.4 Encryption Format Auto-Selection
 
 When encrypting, the message format is determined by the recipient's key version, not the sender's profile:
