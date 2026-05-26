@@ -199,10 +199,15 @@ $(SRCROOT)/Sources/Models/MessageSignatureStatus.swift
 $(SRCROOT)/Sources/Models/OpenPGPCertificationKind.swift
 $(SRCROOT)/Sources/Models/PasswordMessageDetailedDecryptOutcome.swift
 $(SRCROOT)/Sources/Models/PasswordMessageEnvelopeFormat.swift
+$(SRCROOT)/Sources/Models/PGPKeyConfiguration.swift
 $(SRCROOT)/Sources/Models/PGPKeyMetadata.swift
 $(SRCROOT)/Sources/Models/PGPKeyIdentity.swift
 $(SRCROOT)/Sources/Models/PGPKeyImportS2KInfo.swift
+$(SRCROOT)/Sources/Models/PGPKeyOperationKind.swift
+$(SRCROOT)/Sources/Models/PGPKeyOperationSupport.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
+$(SRCROOT)/Sources/Models/PGPPrivateKeyCustodyKind.swift
+$(SRCROOT)/Sources/Models/PGPPrivateOperationRole.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsAvailability.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsPersistence.swift
