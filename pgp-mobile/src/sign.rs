@@ -42,6 +42,16 @@ pub fn sign_cleartext(text: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, P
     let policy = StandardPolicy::new();
     let signing_keypair = extract_signing_keypair(signer_cert_data, &policy)?;
 
+    sign_cleartext_with_signer(text, signing_keypair)
+}
+
+pub(crate) fn sign_cleartext_with_signer<S>(
+    text: &[u8],
+    signing_keypair: S,
+) -> Result<Vec<u8>, PgpError>
+where
+    S: openpgp::crypto::Signer + Send + Sync,
+{
     let mut sink = Vec::new();
     let message = Message::new(&mut sink);
 
@@ -79,6 +89,16 @@ pub fn sign_detached(data: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, Pg
     let policy = StandardPolicy::new();
     let signing_keypair = extract_signing_keypair(signer_cert_data, &policy)?;
 
+    sign_detached_with_signer(data, signing_keypair)
+}
+
+pub(crate) fn sign_detached_with_signer<S>(
+    data: &[u8],
+    signing_keypair: S,
+) -> Result<Vec<u8>, PgpError>
+where
+    S: openpgp::crypto::Signer + Send + Sync,
+{
     let mut sink = Vec::new();
     let message = Message::new(&mut sink);
 
