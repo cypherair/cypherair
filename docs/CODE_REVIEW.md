@@ -32,6 +32,7 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Crash recovery distinguishes safe cleanup, retryable failure, and unrecoverable failure correctly
 - [ ] Retryable recovery failures keep retry flags set; unrecoverable states clear flags and surface a generic warning
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
+- [ ] Secure Enclave custody failure mapping uses shared key operation failure categories and does not leak plaintext, private material, session keys, KEKs, Keychain locators, fingerprints, or temporary capability paths
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
 - [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed
