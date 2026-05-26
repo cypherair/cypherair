@@ -110,6 +110,30 @@ Goal: prove production-shaped Rust/OpenPGP seams for external signing and
 ECDH/session-key acquisition without choosing product UI or hardware-runner
 details.
 
+Phase status: completed in the current implementation. Closeout confirmed the
+Rust-only, test-only proof shape for external P-256 signing and
+ECDH/session-key acquisition. The proof remains unavailable to Swift, UniFFI,
+product UI, hardware handle storage, and normal workflow services.
+
+Completion anchor:
+
+- Phase 2A proves v4 and v6 public-only P-256 certificate candidates can sign
+  through an external signer substitute while Sequoia owns OpenPGP signature
+  construction and verification.
+- Phase 2B proves v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages can recover
+  session keys through an external ECDH substitute while Sequoia owns OpenPGP
+  ECDH KDF, AES Key Wrap unwrap, session-key validation, payload
+  authentication, and signature-status folding.
+- Phase 2C proves wrong-role, wrong-public-binding, session-key validation
+  failure, malformed external responses, external-operation failure, no
+  software secret-certificate fallback, and payload authentication hard-fail
+  negative coverage.
+- The POC response-file/shared-secret bridge was not promoted. No public API,
+  UniFFI surface, Swift workflow route, product exposure, hardware handle
+  store, or software fallback was added.
+- Validation passed with
+  `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`.
+
 Recommended PR grouping:
 
 - PR 2A: add test-backed external signer behavior for v4 and v6 Secure
