@@ -89,6 +89,8 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Rust external ECDH proof:** Phase 2B adds a Rust-only, test-backed P-256 external ECDH/session-key boundary proof. The proof decrypts v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages for public-only Secure Enclave-shaped candidates through the same Sequoia payload path, while the test substitute performs only raw P-256 shared-secret derivation with OpenSSL. Sequoia still owns the OpenPGP ECDH KDF, AES Key Wrap unwrap, session-key validation, signature verification, and payload authentication. It does not add response-file bridging, expose UniFFI APIs, store Security handles, use real Secure Enclave hardware, or permit secret-certificate fallback in the proof path.
 
+**Rust external-operation negative matrix:** Phase 2C closes the Rust proof matrix around wrong roles, wrong public bindings, session-key validation failure, and payload authentication hard-fail. Signer tests reject key-agreement-role keys and unverified `r/s` responses; decryptor tests reject signing-role keys, unsupported key/ciphertext shapes, wrong public-key bindings, and shape-valid but wrong shared secrets. Tampered public-only v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages must fail after session-key acceptance without returning plaintext or falling back to secret-certificate material.
+
 ### 1.4 Encryption Format Auto-Selection
 
 When encrypting, the message format is determined by the recipient's key version, not the sender's profile:

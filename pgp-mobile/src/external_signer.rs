@@ -401,6 +401,23 @@ mod tests {
     }
 
     #[test]
+    fn test_external_signer_rejects_key_agreement_role() {
+        let agreement: Key<key::SecretParts, key::SubordinateRole> =
+            key::Key4::generate_ecc(false, Curve::NistP256)
+                .expect("P-256 ECDH key should generate")
+                .into();
+
+        assert!(ExternalP256Signer::new(
+            agreement.parts_as_public().role_as_unspecified().clone(),
+            |_hash, _digest| Ok(ExternalP256Signature::new(
+                vec![1u8; P256_SCALAR_LENGTH],
+                vec![1u8; P256_SCALAR_LENGTH],
+            )),
+        )
+        .is_err());
+    }
+
+    #[test]
     fn test_external_signer_rejects_unsupported_hash_and_invalid_shapes() {
         let mut material = build_candidate(CandidateVersion::V4).expect("candidate should build");
 
