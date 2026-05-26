@@ -7,11 +7,11 @@ enum PGPKeyOperationFailureCategory: String, CaseIterable, Codable, Hashable, Se
     case operationNotImplementedForCustody
     case operationUnavailableByPolicy
     case hardwareUnavailable
-    case authenticationRequired
-    case authenticationCancelled
-    case authenticationFailed
-    case authenticationUnavailable
-    case authenticationLockedOut
+    case localAuthenticationRequired
+    case localAuthenticationCancelled
+    case localAuthenticationFailed
+    case localAuthenticationUnavailable
+    case localAuthenticationLockedOut
     case privateHandleMissing
     case privateHandleInaccessible
     case privateHandleUnauthorized

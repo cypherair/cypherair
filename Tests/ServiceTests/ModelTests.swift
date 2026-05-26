@@ -516,11 +516,11 @@ final class ModelTests: XCTestCase {
             .operationNotImplementedForCustody,
             .operationUnavailableByPolicy,
             .hardwareUnavailable,
-            .authenticationRequired,
-            .authenticationCancelled,
-            .authenticationFailed,
-            .authenticationUnavailable,
-            .authenticationLockedOut,
+            .localAuthenticationRequired,
+            .localAuthenticationCancelled,
+            .localAuthenticationFailed,
+            .localAuthenticationUnavailable,
+            .localAuthenticationLockedOut,
             .privateHandleMissing,
             .privateHandleInaccessible,
             .privateHandleUnauthorized,
@@ -549,11 +549,11 @@ final class ModelTests: XCTestCase {
                 "operationNotImplementedForCustody",
                 "operationUnavailableByPolicy",
                 "hardwareUnavailable",
-                "authenticationRequired",
-                "authenticationCancelled",
-                "authenticationFailed",
-                "authenticationUnavailable",
-                "authenticationLockedOut",
+                "localAuthenticationRequired",
+                "localAuthenticationCancelled",
+                "localAuthenticationFailed",
+                "localAuthenticationUnavailable",
+                "localAuthenticationLockedOut",
                 "privateHandleMissing",
                 "privateHandleInaccessible",
                 "privateHandleUnauthorized",
@@ -608,6 +608,35 @@ final class ModelTests: XCTestCase {
             from: JSONEncoder().encode(unavailable)
         )
         XCTAssertEqual(roundTrip, unavailable)
+    }
+
+    func test_pgpKeyOperationResolution_decodeRejectsInvalidSupportCategoryPairs() throws {
+        let decoder = JSONDecoder()
+
+        let supportedWithCategory = Data(
+            """
+            {
+              "support": "supported",
+              "failureCategory": "invalidConfigurationCustody"
+            }
+            """.utf8
+        )
+        XCTAssertThrowsError(
+            try decoder.decode(PGPKeyOperationResolution.self, from: supportedWithCategory)
+        )
+
+        for support in ["unsupported", "notImplemented", "unavailable"] {
+            let missingCategory = Data(
+                """
+                {
+                  "support": "\(support)"
+                }
+                """.utf8
+            )
+            XCTAssertThrowsError(
+                try decoder.decode(PGPKeyOperationResolution.self, from: missingCategory)
+            )
+        }
     }
 
     // MARK: - OpenPGPCertificationKind
