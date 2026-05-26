@@ -11,7 +11,7 @@ CypherAir has four test layers, each with different runtime requirements.
 ### Layer 1: Rust Unit Tests
 
 **Run on:** macOS (host), CI.
-**What they cover:** Sequoia PGP operations in isolation — key generation (both profiles), recipient-key encrypt/decrypt, password/SKESK encrypt/decrypt, sign/verify, armor encode/decode, error mapping, and S2K (Iterated+Salted and Argon2id) export/import. They also cover the Rust-only Phase 2A external P-256 signer proof: v4/v6 public-only certificate construction, cleartext and detached signing through the shared Sequoia signing stream, selector/public-certificate validation, signer failure without software secret-certificate fallback, and fail-closed hash/digest/signature-shape checks.
+**What they cover:** Sequoia PGP operations in isolation — key generation (both profiles), recipient-key encrypt/decrypt, password/SKESK encrypt/decrypt, sign/verify, armor encode/decode, error mapping, and S2K (Iterated+Salted and Argon2id) export/import. They also cover the Rust-only Phase 2A external P-256 signer proof: v4/v6 public-only certificate construction, cleartext and detached signing through the shared Sequoia signing stream, selector/public-certificate validation, signer failure without software secret-certificate fallback, and fail-closed hash/digest/signature-shape/public-binding checks.
 **No device needed.** These test the `pgp-mobile` crate without any iOS dependency.
 
 ```bash

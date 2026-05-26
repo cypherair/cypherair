@@ -90,6 +90,9 @@ where
     }
 
     fn validate_response(
+        public_key: &Key<key::PublicParts, key::UnspecifiedRole>,
+        hash_algo: HashAlgorithm,
+        digest: &[u8],
         signature: ExternalP256Signature,
     ) -> Result<mpi::Signature, ExternalP256SignerError> {
         if signature.r.len() != P256_SCALAR_LENGTH || signature.s.len() != P256_SCALAR_LENGTH {
@@ -104,10 +107,20 @@ where
             ));
         }
 
-        Ok(mpi::Signature::ECDSA {
+        let signature = mpi::Signature::ECDSA {
             r: mpi::MPI::new(&signature.r),
             s: mpi::MPI::new(&signature.s),
-        })
+        };
+
+        public_key
+            .verify(&signature, hash_algo, digest)
+            .map_err(|_| {
+                ExternalP256SignerError::InvalidResponse(
+                    "external P-256 signer returned an unverified signature",
+                )
+            })?;
+
+        Ok(signature)
     }
 }
 
@@ -134,7 +147,7 @@ where
             openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
         })?;
 
-        Self::validate_response(signature).map_err(|error| {
+        Self::validate_response(&self.public_key, hash_algo, digest, signature).map_err(|error| {
             openpgp::Error::InvalidOperation(error.sanitized_reason().to_string()).into()
         })
     }
@@ -419,6 +432,75 @@ mod tests {
             .expect("external signer should initialize");
         assert!(invalid_response_signer
             .sign(HashAlgorithm::SHA256, &[0u8; P256_SCALAR_LENGTH])
+            .is_err());
+    }
+
+    #[test]
+    fn test_external_signer_rejects_wrong_digest_signature() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let mut oracle = material.signing_keypair;
+        let mut signer =
+            ExternalP256Signer::new(material.signing_public_key, move |hash, digest| {
+                let mut wrong_digest = digest.to_vec();
+                wrong_digest[0] ^= 1;
+                match oracle.sign(hash, &wrong_digest) {
+                    Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
+                        r.value_padded(P256_SCALAR_LENGTH)
+                            .map_err(|_| {
+                                ExternalP256SignerError::ExternalFailure(
+                                    "external P-256 oracle failed",
+                                )
+                            })?
+                            .into_owned(),
+                        s.value_padded(P256_SCALAR_LENGTH)
+                            .map_err(|_| {
+                                ExternalP256SignerError::ExternalFailure(
+                                    "external P-256 oracle failed",
+                                )
+                            })?
+                            .into_owned(),
+                    )),
+                    _ => Err(ExternalP256SignerError::ExternalFailure(
+                        "external P-256 oracle failed",
+                    )),
+                }
+            })
+            .expect("external signer should initialize");
+
+        assert!(signer
+            .sign(HashAlgorithm::SHA256, &[7u8; P256_SCALAR_LENGTH])
+            .is_err());
+    }
+
+    #[test]
+    fn test_external_signer_rejects_wrong_public_key_signature() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let other = build_candidate(CandidateVersion::V4).expect("other candidate should build");
+        let mut oracle = other.signing_keypair;
+        let mut signer = ExternalP256Signer::new(
+            material.signing_public_key,
+            move |hash, digest| match oracle.sign(hash, digest) {
+                Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
+                    r.value_padded(P256_SCALAR_LENGTH)
+                        .map_err(|_| {
+                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
+                        })?
+                        .into_owned(),
+                    s.value_padded(P256_SCALAR_LENGTH)
+                        .map_err(|_| {
+                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
+                        })?
+                        .into_owned(),
+                )),
+                _ => Err(ExternalP256SignerError::ExternalFailure(
+                    "external P-256 oracle failed",
+                )),
+            },
+        )
+        .expect("external signer should initialize");
+
+        assert!(signer
+            .sign(HashAlgorithm::SHA256, &[9u8; P256_SCALAR_LENGTH])
             .is_err());
     }
 }

@@ -109,9 +109,10 @@ the POC security notes are archived as historical context in
 **Rust external signer proof note:** The Phase 2A Rust proof keeps external
 P-256 signing behind an internal test-backed adapter only. The adapter sees the
 public key, requested hash algorithm, and digest, and accepts only fixed-shape
-ECDSA `r/s` output. It does not store Apple handle locators, use response files,
-add a Security-layer handle store, expose a UniFFI API, or fall back to
-secret-certificate material when the external signer fails.
+ECDSA `r/s` output that verifies against that public key and digest. It does not
+store Apple handle locators, use response files, add a Security-layer handle
+store, expose a UniFFI API, or fall back to secret-certificate material when the
+external signer fails.
 
 ### ProtectedData Device-Binding Note
 
