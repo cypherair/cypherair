@@ -412,10 +412,11 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(PGPKeyProfile.advanced.defaultCustodyKind, .softwareSecretCertificate)
     }
 
-    func test_pgpKeyIdentity_successorVocabulary_isComputedWithoutChangingCodableShape() throws {
+    func test_pgpKeyIdentity_persistsSuccessorVocabulary() throws {
         let identity = makeIdentity(fingerprint: "abababababababababababababababababababab")
 
         XCTAssertEqual(identity.openPGPConfiguration, .compatibleSoftwareV4)
+        XCTAssertEqual(identity.openPGPConfigurationIdentity, .compatibleSoftwareV4)
         XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
 
         let encoded = try JSONEncoder().encode(identity)
@@ -427,6 +428,8 @@ final class ModelTests: XCTestCase {
                 "fingerprint",
                 "keyVersion",
                 "profile",
+                "openPGPConfigurationIdentity",
+                "privateKeyCustodyKind",
                 "userId",
                 "hasEncryptionSubkey",
                 "isRevoked",
@@ -439,8 +442,42 @@ final class ModelTests: XCTestCase {
                 "subkeyAlgo",
             ]
         )
+        XCTAssertEqual(object["openPGPConfigurationIdentity"] as? String, "compatibleSoftwareV4")
+        XCTAssertEqual(object["privateKeyCustodyKind"] as? String, "softwareSecretCertificate")
         XCTAssertNil(object["openPGPConfiguration"])
-        XCTAssertNil(object["privateKeyCustodyKind"])
+    }
+
+    func test_pgpKeyIdentity_decodesLegacyJSONWithSoftwareCustodyDefaults() throws {
+        let fixtures: [(String, UInt8, String, String, PGPKeyConfiguration.Identity, PGPKeyConfiguration)] = [
+            ("abababababababababababababababababababab", 4, "universal", "Ed25519", .compatibleSoftwareV4, .compatibleSoftwareV4),
+            ("babababababababababababababababababababa", 6, "advanced", "Ed448", .modernSoftwareV6, .modernSoftwareV6)
+        ]
+
+        for (fingerprint, keyVersion, profile, primaryAlgo, expectedIdentity, expectedConfiguration) in fixtures {
+            let legacyJSON = Data("""
+            {
+              "fingerprint": "\(fingerprint)",
+              "keyVersion": \(keyVersion),
+              "profile": "\(profile)",
+              "userId": "Legacy",
+              "hasEncryptionSubkey": true,
+              "isRevoked": false,
+              "isExpired": false,
+              "isDefault": false,
+              "isBackedUp": false,
+              "publicKeyData": "",
+              "revocationCert": "",
+              "primaryAlgo": "\(primaryAlgo)",
+              "subkeyAlgo": "X"
+            }
+            """.utf8)
+
+            let identity = try JSONDecoder().decode(PGPKeyIdentity.self, from: legacyJSON)
+
+            XCTAssertEqual(identity.openPGPConfigurationIdentity, expectedIdentity)
+            XCTAssertEqual(identity.openPGPConfiguration, expectedConfiguration)
+            XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
+        }
     }
 
     func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {

@@ -1,0 +1,194 @@
+import Foundation
+import XCTest
+@testable import CypherAir
+
+final class PGPKeyCapabilityResolverTests: XCTestCase {
+    func test_currentSoftwareProfileCombinationsAreSupported() {
+        let resolver = PGPKeyCapabilityResolver()
+        let identities = [
+            makeIdentity(
+                fingerprint: "1111111111111111111111111111111111111111",
+                keyVersion: 4,
+                profile: .universal
+            ),
+            makeIdentity(
+                fingerprint: "2222222222222222222222222222222222222222",
+                keyVersion: 6,
+                profile: .advanced
+            )
+        ]
+
+        for identity in identities {
+            XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
+            for operation in PGPKeyOperationKind.allCases {
+                XCTAssertEqual(
+                    resolver.support(for: operation, identity: identity),
+                    .supported,
+                    "Expected \(operation) to be supported for \(identity.profile)."
+                )
+            }
+        }
+    }
+
+    func test_invalidCustodyConfigurationCombinationsAreUnsupported() {
+        let resolver = PGPKeyCapabilityResolver()
+        let invalidPairs: [(PGPKeyConfiguration, PGPPrivateKeyCustodyKind)] = [
+            (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
+            (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+            (.compatibleP256V4, .softwareSecretCertificate),
+            (.modernP256V6, .softwareSecretCertificate)
+        ]
+
+        for (configuration, custody) in invalidPairs {
+            XCTAssertFalse(resolver.isValidConfigurationCustodyPair(
+                configuration: configuration,
+                custody: custody
+            ))
+            for operation in PGPKeyOperationKind.allCases {
+                XCTAssertEqual(
+                    resolver.support(
+                        for: operation,
+                        configuration: configuration,
+                        custody: custody
+                    ),
+                    .unsupported,
+                    "Expected \(operation) to be unsupported for \(configuration.identity) + \(custody)."
+                )
+            }
+        }
+    }
+
+    func test_secureEnclaveGenerationIsUnavailableByProductionPolicy() {
+        let resolver = PGPKeyCapabilityResolver()
+
+        XCTAssertTrue(resolver.isValidConfigurationCustodyPair(
+            configuration: .compatibleP256V4,
+            custody: .appleSecureEnclavePrivateOperations
+        ))
+        XCTAssertEqual(
+            resolver.support(
+                for: .generate,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable
+        )
+        XCTAssertEqual(
+            resolver.support(
+                for: .sign,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable
+        )
+    }
+
+    func test_testOnlyP256SecureEnclavePrivateOperationsAreNotImplemented() {
+        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
+        let privateOperations: [PGPKeyOperationKind] = [
+            .sign,
+            .decrypt,
+            .certify,
+            .revoke,
+            .modifyExpiry,
+            .refreshBinding
+        ]
+
+        for operation in privateOperations {
+            XCTAssertEqual(
+                resolver.support(
+                    for: operation,
+                    configuration: .modernP256V6,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .notImplemented,
+                "Expected \(operation) to remain a test-only not-implemented future path."
+            )
+        }
+        XCTAssertEqual(
+            resolver.support(
+                for: .generate,
+                configuration: .modernP256V6,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable
+        )
+    }
+
+    func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
+        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
+
+        XCTAssertEqual(
+            resolver.support(
+                for: .exportPrivateMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unsupported
+        )
+        XCTAssertEqual(
+            resolver.support(
+                for: .exportPublicMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: .present
+            ),
+            .supported
+        )
+        XCTAssertEqual(
+            resolver.support(
+                for: .exportRevocationArtifact,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: .present
+            ),
+            .supported
+        )
+
+        let publicOnly = PGPKeyCapabilityResolver.MetadataAvailability(
+            hasPublicMaterial: true,
+            hasRevocationArtifact: false
+        )
+        XCTAssertEqual(
+            resolver.support(
+                for: .exportPublicMaterial,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: publicOnly
+            ),
+            .supported
+        )
+        XCTAssertEqual(
+            resolver.support(
+                for: .exportRevocationArtifact,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations,
+                metadataAvailability: publicOnly
+            ),
+            .unavailable
+        )
+    }
+
+    private func makeIdentity(
+        fingerprint: String,
+        keyVersion: UInt8,
+        profile: PGPKeyProfile
+    ) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: fingerprint,
+            keyVersion: keyVersion,
+            profile: profile,
+            userId: "Test <test@example.invalid>",
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data([0x01, 0x02]),
+            revocationCert: Data([0x03]),
+            primaryAlgo: profile == .universal ? "Ed25519" : "Ed448",
+            subkeyAlgo: profile == .universal ? "X25519" : "X448",
+            expiryDate: nil
+        )
+    }
+}

@@ -357,6 +357,7 @@
 				Services/KeyManagement/KeyMutationService.swift,
 				Services/KeyManagement/KeyProvisioningInvalidationGate.swift,
 				Services/KeyManagement/KeyProvisioningService.swift,
+				Services/KeyManagement/PGPKeyCapabilityResolver.swift,
 				Services/KeyManagement/PrivateKeyAccessService.swift,
 				Services/KeyManagement/SelectiveRevocationService.swift,
 				Services/KeyManagementService.swift,
