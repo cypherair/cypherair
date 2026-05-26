@@ -88,6 +88,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers and key/certificate FFI adapters |
+| `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, and operation-support vocabulary. Current Profile A/B software-key operations are supported; Secure Enclave private-key custody remains hidden/unavailable or test-only until handle storage and Rust external-operation APIs exist. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -137,9 +138,10 @@ complete OpenPGP secret certificate bytes. The proposed Apple Secure Enclave
 Custody mode is a future boundary change: Secure Enclave would own distinct
 P-256 signing and key-agreement private-key operations directly, while software
 keeps owning OpenPGP packet construction, KDF / AES Key Wrap processing,
-session-key handling, payload decryption, and signature verification. Future key
-creation should model algorithm/profile and private-key custody as separate
-dimensions, with a capability resolver exposing only supported combinations.
+session-key handling, payload decryption, and signature verification. Current key
+metadata already models algorithm/profile and private-key custody as separate
+app-owned dimensions, with a capability resolver exposing only supported
+combinations.
 Sequoia 2.3's `Signer` and `Decryptor` traits are the likely Rust-side seam for
 this external private-key custody model, but the production API shape remains
 undecided. Current integration planning lives in
@@ -166,7 +168,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
-| `KeyMetadataDomainStore` | ProtectedData `key-metadata` domain for `PGPKeyIdentity` payloads opened after app privacy authentication; legacy Keychain metadata rows are migration sources only |
+| `KeyMetadataDomainStore` | ProtectedData `key-metadata` schema v2 domain for `PGPKeyIdentity` payloads opened after app privacy authentication; legacy Keychain metadata rows are migration sources only |
 | `KeyMetadataStore` | Legacy Keychain metadata helper retained for migration from the dedicated metadata account and older default-account rows |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
@@ -186,7 +188,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
 - `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
-- `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores `schemaVersion` plus `identities: [PGPKeyIdentity]`, migrates legacy Keychain metadata rows after unlock, and participates in relock/recovery
+- `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores schema v2 `PGPKeyIdentity` metadata including explicit OpenPGP configuration identity and private-key custody kind, migrates schema v1 / legacy Keychain metadata rows after unlock, and participates in relock/recovery. It does not store Apple handle locators, access-control policy, or private material.
 
 ProtectedData component ownership:
 

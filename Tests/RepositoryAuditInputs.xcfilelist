@@ -293,6 +293,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/KeyExportService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyMutationService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningInvalidationGate.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyAccessService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SelectiveRevocationService.swift
 $(SRCROOT)/Sources/Services/KeyManagementService.swift
