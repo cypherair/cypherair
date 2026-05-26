@@ -11,6 +11,7 @@
 > [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md),
 > [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md),
 > and [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md).
+> Related: [Implementation Roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md).
 > Companion current-state references: [Architecture](ARCHITECTURE.md),
 > [Security](SECURITY.md), [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
 > and [Testing](TESTING.md).

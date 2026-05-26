@@ -72,8 +72,8 @@ Recommended PR grouping:
 
 Entry conditions:
 
-- Product Design, Architecture Plan, Security Requirements, Feasibility Summary,
-  and Implementation Docs Guidance are active.
+- Product Design, Architecture Plan, Security Requirements, and Feasibility
+  Summary are active.
 
 Exit conditions:
 

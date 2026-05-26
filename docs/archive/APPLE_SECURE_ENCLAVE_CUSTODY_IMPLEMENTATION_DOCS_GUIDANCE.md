@@ -1,21 +1,35 @@
 # Apple Secure Enclave Custody Implementation Docs Guidance
 
-> Status: Active authoring guidance. This document guides the creation of two
-> future Apple Secure Enclave Custody implementation documents and does not
-> describe shipped behavior.
+> Status: Archived authoring guidance.
+> Archival reason: Phase 0 implementation documentation was completed by PR
+> #363, which added the successor implementation reference and roadmap.
+> Successors:
+> [Implementation Reference](../APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_REFERENCE.md)
+> and
+> [Implementation Roadmap](../APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md).
+> Current code and active docs outrank this archived guidance.
+>
+> Historical status: This document guided the creation of two future Apple
+> Secure Enclave Custody implementation documents and does not describe shipped
+> behavior.
 > Date: 2026-05-25.
 > Purpose: Define the responsibilities, scope, and writing standards for the
 > Secure Enclave Custody Implementation Reference and Implementation Roadmap.
 > Audience: Document authors, Swift/Rust implementers, security reviewers,
 > architecture reviewers, product owners, test owners, reviewers, and AI coding
 > tools.
-> Related: [Product Design](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
-> [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md),
-> [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md),
-> [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md),
-> [Architecture](ARCHITECTURE.md), [Security](SECURITY.md),
-> [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md), and
-> [Testing](TESTING.md).
+> Related:
+> [Product Design](../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
+> [Architecture Plan](../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md),
+> [Security Requirements](../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md),
+> [Feasibility Summary](../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md),
+> [Architecture](../ARCHITECTURE.md), [Security](../SECURITY.md),
+> [Persisted State Inventory](../PERSISTED_STATE_INVENTORY.md), and
+> [Testing](../TESTING.md).
+
+Historical note: the content below is preserved as authoring context for the
+successor implementation reference and roadmap. It is not active planning
+guidance for future Secure Enclave custody phases.
 
 ## Role
 
@@ -30,10 +44,10 @@ documents:
 
 | Source | Owns |
 | --- | --- |
-| [Product Design](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md) | Product semantics, user commitments, MVP scope, compatibility language, and user-facing consequences. |
-| [Architecture Plan](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md) | Model separation, layer ownership, metadata/handle split, resolver/router architecture, and Rust/Swift ownership direction. |
-| [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md) | Security red lines, access policy, private-operation requirements, validation categories, evidence gates, and release gates. |
-| [Feasibility Summary](APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md) | Feasibility evidence, caveats, POC boundaries, and remaining production-readiness gaps. |
+| [Product Design](../APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md) | Product semantics, user commitments, MVP scope, compatibility language, and user-facing consequences. |
+| [Architecture Plan](../APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md) | Model separation, layer ownership, metadata/handle split, resolver/router architecture, and Rust/Swift ownership direction. |
+| [Security Requirements](../APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md) | Security red lines, access policy, private-operation requirements, validation categories, evidence gates, and release gates. |
+| [Feasibility Summary](../APPLE_SECURE_ENCLAVE_CUSTODY_FEASIBILITY_SUMMARY.md) | Feasibility evidence, caveats, POC boundaries, and remaining production-readiness gaps. |
 
 The implementation documents should add practical guidance that the source
 documents do not fully provide. They should not become second copies of Product
