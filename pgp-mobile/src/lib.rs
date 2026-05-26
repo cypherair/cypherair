@@ -10,6 +10,8 @@ pub mod decrypt;
 pub mod encrypt;
 pub mod error;
 #[allow(dead_code)]
+mod external_decryptor;
+#[allow(dead_code)]
 mod external_signer;
 pub mod keys;
 pub mod password;
