@@ -111,6 +111,19 @@ for unauthorized interaction and handle-state mismatch. It does not change
 current software-key generation, ProtectedData schemas, UI, Rust/UniFFI, or
 certificate construction.
 
+**Hidden Secure Enclave custody generation:** Phase 4A adds a hidden/test-only
+generation seam that creates Security-owned P-256 signing and key-agreement
+handles, then asks Rust/Sequoia to construct a public-only v4/v6 certificate and
+key-level revocation artifact through an in-process external P-256 signer
+callback. Rust validates P-256 public points, enforces SHA-256 digests and
+fixed-width nonzero ECDSA `r/s`, verifies the response against the signing
+public key and digest, and rejects wrong-digest/wrong-public-key/malformed
+responses without secret-certificate fallback. Swift persists only
+`PGPKeyIdentity` metadata with P-256 configuration and Secure Enclave custody;
+it does not store a secret cert, Apple handle locator, access-control policy,
+or response-file bridge. More complete interrupted-generation recovery remains
+future work.
+
 ### 1.4 Encryption Format Auto-Selection
 
 When encrypting, the message format is determined by the recipient's key version, not the sender's profile:
