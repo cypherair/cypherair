@@ -66,7 +66,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 # Device-only tests
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
-    -destination 'platform=iOS,name=<DEVICE_NAME>'
+    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
 
 # Targeted macOS UI smoke coverage for routes, settings, and tutorial flows
 xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
