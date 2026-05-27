@@ -136,12 +136,17 @@ boundary for future custody. It creates two separate permanent Secure Enclave
 P-256 `SecKey` private-key rows using
 `kSecAttrTokenIDSecureEnclave`, `kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, and
 `kSecAttrAccessControl` with `WhenUnlockedThisDeviceOnly + .privateKeyUsage +
-.biometryAny`. The custody store must not use `.devicePasscode`, `.or`, or the
-current `AuthenticationMode.createAccessControl()` helper. Application tags use
-a random local handle-set id plus role and must not include fingerprints. Load
-and inspect paths fail closed unless the stored role and public P-256 binding
-match the expected values. Reset All Local Data inventories and deletes only
-app-owned custody `kSecClassKey` rows, including malformed app-owned tags, and
+.biometryAny`. Creation, load, inventory, and delete paths use the data-protection
+Keychain domain consistently. Creation also sets role capability hints:
+signing handles can sign and cannot derive, while key-agreement handles can
+derive and cannot sign; load-time trust still comes from role plus public-key
+binding rather than platform capability echo. The custody store must not use
+`.devicePasscode`, `.or`, or the current `AuthenticationMode.createAccessControl()`
+helper. Application tags use a random local handle-set id plus role and must not
+include fingerprints. Load and inspect paths fail closed unless the stored role
+and uncompressed X9.63 public-key binding shape match the expected values. Reset
+All Local Data inventories and deletes only app-owned custody `kSecClassKey`
+rows, including malformed app-owned tags identified by raw prefix bytes, and
 treats list/delete/remaining-row failures as sanitized cleanup or recovery
 failures. Logs, errors, UI, ProtectedData, and Rust must not expose raw
 application tags, handle-set identifiers, fingerprints, public-key bytes, or

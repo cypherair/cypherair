@@ -7,7 +7,7 @@ struct SecureEnclaveCustodyHandlePublicBinding: Equatable, Sendable {
     let publicKeyX963: Data
 
     init(reference: SecureEnclaveCustodyHandleReference, publicKeyX963: Data) throws {
-        guard Self.isValidP256X963PublicKey(publicKeyX963) else {
+        guard Self.hasUncompressedP256X963PublicKeyShape(publicKeyX963) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(reference.role)
         }
         self.reference = reference
@@ -18,7 +18,7 @@ struct SecureEnclaveCustodyHandlePublicBinding: Equatable, Sendable {
         reference.role
     }
 
-    static func isValidP256X963PublicKey(_ data: Data) -> Bool {
+    static func hasUncompressedP256X963PublicKeyShape(_ data: Data) -> Bool {
         guard data.count == p256X963PublicKeyByteCount,
               data.first == 0x04 else {
             return false

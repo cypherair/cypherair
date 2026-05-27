@@ -95,14 +95,17 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 handle-store, cleanup, and recovery-classification contract for future Secure
 Enclave custody. It creates two distinct permanent P-256 Secure Enclave `SecKey`
 handles (`signing` and `keyAgreement`) with a custody-specific biometrics-only
-private-key usage access policy, records only Security-private random role tags,
-validates 65-byte uncompressed public-key bindings on load, rolls back partial
-creation, inventories app-owned custody rows, cleans complete/partial/malformed
-rows during Reset All Local Data, treats missing deletes as idempotent cleanup,
-and classifies wrong-role, wrong-public binding, missing, partial, ambiguous,
-inaccessible, reset-cleanup, and metadata/handle-disagreement failures through
-shared sanitized categories. It does not change current software-key generation,
-ProtectedData schemas, UI, Rust/UniFFI, or certificate construction.
+private-key usage access policy, the data-protection Keychain domain, and
+role-specific creation hints (`signing` can sign, `keyAgreement` can derive).
+It records only Security-private random role tags, validates 65-byte
+uncompressed public-key binding shape on load, rolls back partial creation,
+inventories app-owned custody rows by raw application-tag prefix, cleans
+complete/partial/malformed rows during Reset All Local Data, treats missing
+deletes as idempotent cleanup, and classifies wrong-role, wrong-public binding,
+missing, partial, ambiguous, inaccessible, reset-cleanup, and
+metadata/handle-disagreement failures through shared sanitized categories. It
+does not change current software-key generation, ProtectedData schemas, UI,
+Rust/UniFFI, or certificate construction.
 
 ### 1.4 Encryption Format Auto-Selection
 

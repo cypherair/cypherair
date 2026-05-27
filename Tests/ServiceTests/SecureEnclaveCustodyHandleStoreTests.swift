@@ -1,4 +1,5 @@
 import XCTest
+import Security
 @testable import CypherAir
 
 final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
@@ -42,7 +43,47 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertFalse(policy.permitsDevicePasscodeFallback)
     }
 
-    func test_createHandlePair_secondCreateFailureRollsBackSigningHandle() throws {
+    func test_systemKeyCreationAttributesUseDataProtectionKeychainAndRoleCapabilities() throws {
+        let accessControl = try SecureEnclaveCustodyAccessControlPolicy
+            .privateKeyUsageBiometryAny
+            .makeSecAccessControl()
+        let signingReference = try reference("attributes", .signing)
+        let keyAgreementReference = try reference("attributes", .keyAgreement)
+
+        let signingAttributes = SystemSecureEnclaveCustodyKeyStore.keyCreationAttributes(
+            reference: signingReference,
+            accessControl: accessControl
+        )
+        let signingPrivateAttributes = try XCTUnwrap(
+            signingAttributes[kSecPrivateKeyAttrs as String] as? [String: Any]
+        )
+        XCTAssertEqual(signingAttributes[kSecAttrKeyType as String] as? String, kSecAttrKeyTypeECSECPrimeRandom as String)
+        XCTAssertEqual(signingAttributes[kSecAttrKeySizeInBits as String] as? Int, 256)
+        XCTAssertEqual(signingAttributes[kSecAttrTokenID as String] as? String, kSecAttrTokenIDSecureEnclave as String)
+        XCTAssertEqual(signingAttributes[kSecUseDataProtectionKeychain as String] as? Bool, true)
+        XCTAssertEqual(signingPrivateAttributes[kSecAttrIsPermanent as String] as? Bool, true)
+        XCTAssertEqual(signingPrivateAttributes[kSecAttrApplicationTag as String] as? Data, signingReference.applicationTagData)
+        XCTAssertNotNil(signingPrivateAttributes[kSecAttrAccessControl as String])
+        XCTAssertEqual(signingPrivateAttributes[kSecAttrCanSign as String] as? Bool, true)
+        XCTAssertEqual(signingPrivateAttributes[kSecAttrCanDerive as String] as? Bool, false)
+
+        let keyAgreementAttributes = SystemSecureEnclaveCustodyKeyStore.keyCreationAttributes(
+            reference: keyAgreementReference,
+            accessControl: accessControl
+        )
+        let keyAgreementPrivateAttributes = try XCTUnwrap(
+            keyAgreementAttributes[kSecPrivateKeyAttrs as String] as? [String: Any]
+        )
+        XCTAssertEqual(keyAgreementAttributes[kSecUseDataProtectionKeychain as String] as? Bool, true)
+        XCTAssertEqual(
+            keyAgreementPrivateAttributes[kSecAttrApplicationTag as String] as? Data,
+            keyAgreementReference.applicationTagData
+        )
+        XCTAssertEqual(keyAgreementPrivateAttributes[kSecAttrCanSign as String] as? Bool, false)
+        XCTAssertEqual(keyAgreementPrivateAttributes[kSecAttrCanDerive as String] as? Bool, true)
+    }
+
+    func test_createHandlePair_secondCreateFailureRollsBackBothReferences() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failCreateRole = .keyAgreement
         let store = makeStore(keyStore: keyStore, handleSetIdentifier: "rollback")
@@ -55,7 +96,24 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         }
 
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing])
+        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
+    }
+
+    func test_createHandlePair_pairAssemblyFailureRollsBackBothCreatedHandles() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let duplicatePublicKey = makePublicKey(byte: 0x31)
+        keyStore.publicKeyResponses = [duplicatePublicKey, duplicatePublicKey]
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "pairfail")
+
+        XCTAssertThrowsError(try store.createHandlePair()) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .handlePublicKeyBindingMismatch
+            )
+        }
+
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
     }
 
     func test_loadHandlePair_requiresRoleAndPublicKeyBinding() throws {
@@ -119,6 +177,25 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
                 .handlePublicKeyBindingMismatch
             )
         }
+    }
+
+    func test_publicBindingUsesUncompressedP256X963ShapeCheckOnly() {
+        XCTAssertTrue(
+            SecureEnclaveCustodyHandlePublicBinding
+                .hasUncompressedP256X963PublicKeyShape(makePublicKey(byte: 0x17))
+        )
+        XCTAssertFalse(
+            SecureEnclaveCustodyHandlePublicBinding
+                .hasUncompressedP256X963PublicKeyShape(Data(repeating: 0x17, count: 65))
+        )
+        XCTAssertFalse(
+            SecureEnclaveCustodyHandlePublicBinding
+                .hasUncompressedP256X963PublicKeyShape(Data([UInt8(0x04)] + Array(repeating: UInt8(0x00), count: 64)))
+        )
+        XCTAssertFalse(
+            SecureEnclaveCustodyHandlePublicBinding
+                .hasUncompressedP256X963PublicKeyShape(Data([UInt8(0x04)] + Array(repeating: UInt8(0x17), count: 63)))
+        )
     }
 
     func test_missingAndPartialHandlePairsAreClassified() throws {
@@ -275,6 +352,52 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertEqual(result.deletedHandleCount, 4)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
         XCTAssertTrue(store.cleanupAllHandlesForLocalDataReset().succeeded)
+    }
+
+    func test_inventoryAndCleanupIncludeRawOwnedNonUTF8MalformedTags() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let applicationTagData = nonUTF8OwnedApplicationTagData()
+        keyStore.insertMalformedApplicationTagData(applicationTagData)
+
+        let summary = try store.inventorySummaryForLocalRecovery()
+
+        XCTAssertEqual(summary.totalHandleCount, 1)
+        XCTAssertEqual(summary.malformedHandleCount, 1)
+
+        let result = store.cleanupAllHandlesForLocalDataReset()
+
+        XCTAssertTrue(result.succeeded)
+        XCTAssertEqual(result.inspectedHandleCount, 1)
+        XCTAssertEqual(result.deletedHandleCount, 1)
+        XCTAssertFalse(keyStore.containsMalformedApplicationTagData(applicationTagData))
+    }
+
+    func test_cleanupAllHandlesForLocalDataResetCountsDuplicateRowsButDeletesUniqueTagsOnce() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let signingReference = try reference("duplicatecleanup", .signing)
+        keyStore.insert(
+            SecureEnclaveCustodyLoadedHandle(
+                binding: try binding(signingReference, byte: 0x81),
+                privateKey: nil
+            )
+        )
+        keyStore.insert(
+            SecureEnclaveCustodyLoadedHandle(
+                binding: try binding(signingReference, byte: 0x82),
+                privateKey: nil
+            ),
+            allowingDuplicate: true
+        )
+
+        let result = store.cleanupAllHandlesForLocalDataReset()
+
+        XCTAssertTrue(result.succeeded)
+        XCTAssertEqual(result.inspectedHandleCount, 2)
+        XCTAssertEqual(result.deletedHandleCount, 2)
+        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing])
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
     }
 
     func test_cleanupAllHandlesForLocalDataResetFailsClosedForListOrDeleteFailure() throws {
@@ -467,6 +590,12 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
     private func makePublicKey(byte: UInt8) -> Data {
         var data = Data([0x04])
         data.append(Data(repeating: byte, count: 64))
+        return data
+    }
+
+    private func nonUTF8OwnedApplicationTagData() -> Data {
+        var data = Data("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).".utf8)
+        data.append(contentsOf: [0xFF, 0x00])
         return data
     }
 }

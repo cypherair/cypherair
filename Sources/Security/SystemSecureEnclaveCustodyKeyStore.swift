@@ -19,22 +19,10 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
             metadata: ["serviceKind": serviceKind]
         )
         let accessControl = try accessPolicy.makeSecAccessControl()
-        var privateKeyAttributes: [String: Any] = [
-            kSecAttrIsPermanent as String: true,
-            kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecAttrAccessControl as String: accessControl
-        ]
-
-        #if os(macOS)
-        privateKeyAttributes[kSecAttrSynchronizable as String] = false
-        #endif
-
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecPrivateKeyAttrs as String: privateKeyAttributes
-        ]
+        let attributes = Self.keyCreationAttributes(
+            reference: reference,
+            accessControl: accessControl
+        )
 
         var error: Unmanaged<CFError>?
         guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
@@ -59,7 +47,11 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
             )
             return loaded
         } catch {
-            let mappedError = error as? SecureEnclaveCustodyHandleError
+            let finalError = cleanupCreatedKeyAfterValidationFailure(
+                reference: reference,
+                originalError: error
+            )
+            let mappedError = finalError as? SecureEnclaveCustodyHandleError
                 ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
             traceStore?.record(
                 category: .operation,
@@ -70,8 +62,33 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
                     "failureCategory": mappedError.failureCategory.rawValue
                 ]
             )
-            throw error
+            throw finalError
         }
+    }
+
+    static func keyCreationAttributes(
+        reference: SecureEnclaveCustodyHandleReference,
+        accessControl: SecAccessControl
+    ) -> [String: Any] {
+        var privateKeyAttributes: [String: Any] = [
+            kSecAttrIsPermanent as String: true,
+            kSecAttrApplicationTag as String: reference.applicationTagData,
+            kSecAttrAccessControl as String: accessControl,
+            kSecAttrCanSign as String: reference.role == .signing,
+            kSecAttrCanDerive as String: reference.role == .keyAgreement
+        ]
+
+        #if os(macOS)
+        privateKeyAttributes[kSecAttrSynchronizable as String] = false
+        #endif
+
+        return [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+            kSecUseDataProtectionKeychain as String: true,
+            kSecPrivateKeyAttrs as String: privateKeyAttributes
+        ]
     }
 
     func loadKeys(reference: SecureEnclaveCustodyHandleReference) throws -> [SecureEnclaveCustodyLoadedHandle] {
@@ -339,6 +356,20 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
             binding: binding,
             privateKey: privateKey
         )
+    }
+
+    private func cleanupCreatedKeyAfterValidationFailure(
+        reference: SecureEnclaveCustodyHandleReference,
+        originalError: Error
+    ) -> Error {
+        do {
+            try deleteKey(reference: reference)
+            return originalError
+        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
+            return originalError
+        } catch {
+            return SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+        }
     }
 
     private func validatePrivateKeyAttributes(_ privateKey: SecKey, role: PGPPrivateOperationRole) throws {

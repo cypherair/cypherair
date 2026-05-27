@@ -14,6 +14,7 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     var failDeleteRole: PGPPrivateOperationRole?
     var failLoadError: SecureEnclaveCustodyHandleError?
     var failInventory = false
+    var publicKeyResponses: [Data] = []
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
@@ -100,7 +101,11 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     }
 
     func insertMalformedApplicationTag(_ applicationTagString: String) {
-        malformedApplicationTags.insert(Data(applicationTagString.utf8))
+        insertMalformedApplicationTagData(Data(applicationTagString.utf8))
+    }
+
+    func insertMalformedApplicationTagData(_ applicationTagData: Data) {
+        malformedApplicationTags.insert(applicationTagData)
     }
 
     func contains(reference: SecureEnclaveCustodyHandleReference) -> Bool {
@@ -108,7 +113,11 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     }
 
     func containsMalformedApplicationTag(_ applicationTagString: String) -> Bool {
-        malformedApplicationTags.contains(Data(applicationTagString.utf8))
+        containsMalformedApplicationTagData(Data(applicationTagString.utf8))
+    }
+
+    func containsMalformedApplicationTagData(_ applicationTagData: Data) -> Bool {
+        malformedApplicationTags.contains(applicationTagData)
     }
 
     func storedHandleCount() -> Int {
@@ -129,6 +138,9 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     }
 
     private func nextPublicKey() -> Data {
+        if !publicKeyResponses.isEmpty {
+            return publicKeyResponses.removeFirst()
+        }
         defer { publicKeyCounter = publicKeyCounter &+ 1 }
         var data = Data([0x04])
         data.append(Data(repeating: publicKeyCounter, count: 64))

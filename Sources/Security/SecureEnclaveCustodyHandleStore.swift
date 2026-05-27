@@ -41,7 +41,7 @@ struct SecureEnclaveCustodyHandleStore {
             )
         } catch {
             do {
-                try keyStore.deleteKey(reference: signingReference)
+                try deleteReferences([signingReference, keyAgreementReference])
             } catch {
                 throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
             }
@@ -68,7 +68,7 @@ struct SecureEnclaveCustodyHandleStore {
         reference: SecureEnclaveCustodyHandleReference,
         expectedPublicKeyX963: Data
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        guard SecureEnclaveCustodyHandlePublicBinding.isValidP256X963PublicKey(expectedPublicKeyX963) else {
+        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(expectedPublicKeyX963) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(reference.role)
         }
 
@@ -228,16 +228,16 @@ struct SecureEnclaveCustodyHandleStore {
             )
         }
 
+        let groupedByTag = Dictionary(grouping: items, by: \.applicationTagData)
         var deletedCount = 0
         var cleanupFailed = false
-        var seenTags = Set<Data>()
-        for item in items where seenTags.insert(item.applicationTagData).inserted {
+        for (applicationTagData, tagItems) in groupedByTag {
             do {
                 try keyStore.deleteKey(
-                    applicationTagData: item.applicationTagData,
-                    roleHint: item.role
+                    applicationTagData: applicationTagData,
+                    roleHint: tagItems.compactMap(\.role).first
                 )
-                deletedCount += 1
+                deletedCount += tagItems.count
             } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
                 continue
             } catch {
@@ -246,7 +246,7 @@ struct SecureEnclaveCustodyHandleStore {
         }
 
         return SecureEnclaveCustodyHandleCleanupResult(
-            inspectedHandleCount: seenTags.count,
+            inspectedHandleCount: items.count,
             deletedHandleCount: deletedCount,
             failureCategory: cleanupFailed ? .cleanupOrRollbackFailure : nil
         )
