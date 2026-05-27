@@ -391,6 +391,9 @@ final class LocalDataResetService {
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
+                || hasDeviceBindingKey
+                || hasFormatFloor
+                || hasLegacyCleanup
                 || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
                 || !remainingMetadataAccountServices.isEmpty
@@ -521,6 +524,9 @@ final class LocalDataResetService {
         }
         do {
             return try secureEnclaveCustodyHandleStore.remainingHandleCountForLocalDataReset()
+        } catch let error as SecureEnclaveCustodyHandleError {
+            failures.append("keychain.remaining.secureEnclaveCustodyHandle.\(error.failureCategory.rawValue)")
+            return 0
         } catch {
             failures.append("keychain.remaining.secureEnclaveCustodyHandle.\(Self.failureName(for: error))")
             return 0
