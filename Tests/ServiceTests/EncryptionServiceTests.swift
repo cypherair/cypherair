@@ -1,8 +1,8 @@
 import XCTest
 @testable import CypherAir
 
-/// Tests for EncryptionService — text and file encryption orchestration,
-/// file size validation, encrypt-to-self, and cross-profile behavior.
+/// Tests for EncryptionService — text encryption orchestration,
+/// encrypt-to-self, and cross-profile behavior.
 final class EncryptionServiceTests: XCTestCase {
 
     private var stack: TestHelpers.ServiceStack!
@@ -263,77 +263,6 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - File Encryption: Size Validation
-
-    func test_encryptFile_underLimit_succeeds() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
-
-        // Create a 1 KB file
-        let fileData = Data(repeating: 0xAB, count: 1024)
-        let ciphertext = try await stack.encryptionService.encryptFile(
-            fileData,
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: nil,
-            encryptToSelf: false
-        )
-
-        XCTAssertFalse(ciphertext.isEmpty)
-    }
-
-    func test_encryptFile_over100MB_throwsFileTooLarge() async {
-        do {
-            let identity = try await generateKeyAndContact(profile: .universal)
-
-            // Create data slightly over 100 MB
-            let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
-            _ = try await stack.encryptionService.encryptFile(
-                fileData,
-                recipientContactIds: [try contactId(for: identity)],
-                signWithFingerprint: nil,
-                encryptToSelf: false
-            )
-            XCTFail("Expected fileTooLarge error")
-        } catch let error as CypherAirError {
-            if case .fileTooLarge = error {
-                // Expected
-            } else {
-                XCTFail("Expected .fileTooLarge, got \(error)")
-            }
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-    }
-
-    func test_encryptFile_exactly100MB_succeeds() async throws {
-        let identity = try await generateKeyAndContact(profile: .universal)
-
-        // Exactly 100 MB — should be within the limit
-        let fileData = Data(repeating: 0xCC, count: 100 * 1024 * 1024)
-        let ciphertext = try await stack.encryptionService.encryptFile(
-            fileData,
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: nil,
-            encryptToSelf: false
-        )
-
-        XCTAssertFalse(ciphertext.isEmpty)
-    }
-
-    func test_encryptFile_profileB_underLimit_succeeds() async throws {
-        let identity = try await generateKeyAndContact(profile: .advanced)
-
-        // Create a 1 KB file
-        let fileData = Data(repeating: 0xAB, count: 1024)
-        let ciphertext = try await stack.encryptionService.encryptFile(
-            fileData,
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: nil,
-            encryptToSelf: false
-        )
-
-        XCTAssertFalse(ciphertext.isEmpty)
-    }
-
     // MARK: - Cross-Profile
 
     func test_encryptText_profileBSender_profileARecipient_succeeds() async throws {
@@ -581,32 +510,6 @@ final class EncryptionServiceTests: XCTestCase {
             }
         } catch {
             XCTFail("Unexpected error type: \(error)")
-        }
-    }
-
-    // MARK: - File Size: Rounding
-
-    func test_encryptFile_slightlyOver100MB_reportsCeiledSize() async {
-        do {
-            let identity = try await generateKeyAndContact(profile: .universal)
-            // 100 MB + 1 byte → should report 101 MB (ceiling), not 100 MB (truncated)
-            let fileData = Data(repeating: 0xFF, count: 100 * 1024 * 1024 + 1)
-            _ = try await stack.encryptionService.encryptFile(
-                fileData,
-                recipientContactIds: [try contactId(for: identity)],
-                signWithFingerprint: nil,
-                encryptToSelf: false
-            )
-            XCTFail("Expected fileTooLarge error")
-        } catch let error as CypherAirError {
-            if case .fileTooLarge(let sizeMB) = error {
-                XCTAssertEqual(sizeMB, 101,
-                               "File size should be ceiling-rounded to 101 MB, not truncated to 100")
-            } else {
-                XCTFail("Expected .fileTooLarge, got \(error)")
-            }
-        } catch {
-            XCTFail("Unexpected error: \(error)")
         }
     }
 

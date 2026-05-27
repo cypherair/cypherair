@@ -198,7 +198,6 @@ final class ModelTests: XCTestCase {
             .invalidQRCode,
             .unsupportedQRVersion,
             .contactImportRequiresPublicCertificate,
-            .fileTooLarge(sizeMB: 200),
             .noKeySelected,
             .noRecipientsSelected,
             .biometricsUnavailable,

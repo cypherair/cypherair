@@ -114,9 +114,9 @@ The project uses Apple Swift 6.3.2 with `SWIFT_VERSION = 6.0` and `SWIFT_DEFAULT
 
 ```swift
 @concurrent
-func encryptFile(data: Data, recipients: [PublicKey]) async throws -> Data {
-    // Runs off main actor — safe for long operations
-    return try pgpBridge.encrypt(data: data, recipients: recipients)
+func encryptFile(inputURL: URL, outputURL: URL, recipients: [PublicKey]) async throws {
+    // Runs off main actor and keeps file payloads on the streaming path.
+    try pgpBridge.encryptFile(inputURL: inputURL, outputURL: outputURL, recipients: recipients)
 }
 ```
 

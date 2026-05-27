@@ -44,30 +44,6 @@ final class SigningService {
         )
     }
 
-    /// Create a detached signature for file data.
-    /// Triggers device authentication via SE unwrap.
-    ///
-    /// - Parameters:
-    ///   - data: The file data to sign.
-    ///   - signerFingerprint: Fingerprint of the signing key.
-    /// - Returns: The detached signature data (.sig).
-    func signDetached(_ data: Data, signerFingerprint: String) async throws -> Data {
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        return try await messageAdapter.signDetached(
-            data: data,
-            signerCert: secretKey
-        )
-    }
-
     // MARK: - Streaming File Signing
 
     /// Create a detached signature for a file using streaming I/O.
@@ -112,20 +88,6 @@ final class SigningService {
         let context = verificationContext()
         return try await messageAdapter.verifyCleartextDetailed(
             signedMessage: signedMessage,
-            verificationContext: context
-        )
-    }
-
-    /// Verify a detached signature against the original data while preserving
-    /// per-signature detailed results.
-    func verifyDetachedDetailed(
-        data: Data,
-        signature: Data
-    ) async throws -> DetailedSignatureVerification {
-        let context = verificationContext()
-        return try await messageAdapter.verifyDetachedDetailed(
-            data: data,
-            signature: signature,
             verificationContext: context
         )
     }

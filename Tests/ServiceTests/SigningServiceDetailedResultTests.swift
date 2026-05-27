@@ -49,7 +49,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.verification.signatures[1].signerIdentity?.source, .contact)
     }
 
-    func test_verifyDetachedDetailed_fixtureKnownPlusUnknown_preservesUnknownAndKnownEntries()
+    func test_verifyDetachedStreamingDetailed_fixtureKnownPlusUnknown_preservesUnknownAndKnownEntries()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -59,7 +59,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         try addContact(signerA)
 
-        let detailed = try await stack.signingService.verifyDetachedDetailed(
+        let detailed = try await verifyDetachedStreamingDetailed(
             data: data,
             signature: signature
         )
@@ -79,7 +79,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
     }
 
-    func test_verifyDetachedDetailed_fixtureRepeatedSigner_preservesRepeatedEntries()
+    func test_verifyDetachedStreamingDetailed_fixtureRepeatedSigner_preservesRepeatedEntries()
         async throws
     {
         let signerA = try loadFixture("ffi_detailed_signer_a")
@@ -89,7 +89,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         try addContact(signerA)
 
-        let detailed = try await stack.signingService.verifyDetachedDetailed(
+        let detailed = try await verifyDetachedStreamingDetailed(
             data: data,
             signature: signature
         )
@@ -109,7 +109,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
     }
 
-    func test_verifyDetachedDetailed_fixtureExpiredUnknown_preservesDetailedFold()
+    func test_verifyDetachedStreamingDetailed_fixtureExpiredUnknown_preservesDetailedFold()
         async throws
     {
         let expiredSigner = try loadFixture("ffi_detailed_mixedfold_expired_signer")
@@ -119,7 +119,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         try addContact(expiredSigner)
 
-        let detailed = try await stack.signingService.verifyDetachedDetailed(
+        let detailed = try await verifyDetachedStreamingDetailed(
             data: data,
             signature: signature
         )
@@ -139,7 +139,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertEqual(detailed.signatures[1].signerIdentity?.source, .contact)
     }
 
-    func test_verifyDetachedDetailed_fixtureExpiredBad_preservesDetailedFold()
+    func test_verifyDetachedStreamingDetailed_fixtureExpiredBad_preservesDetailedFold()
         async throws
     {
         let expiredSigner = try loadFixture("ffi_detailed_mixedfold_expired_signer")
@@ -151,7 +151,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         try addContact(expiredSigner)
         try addContact(badSigner)
 
-        let detailed = try await stack.signingService.verifyDetachedDetailed(
+        let detailed = try await verifyDetachedStreamingDetailed(
             data: data,
             signature: signature
         )
@@ -185,14 +185,16 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             signature: signature,
             progress: nil
         )
-        let inMemoryDetailed = try await stack.signingService.verifyDetachedDetailed(
-            data: data,
-            signature: signature
-        )
 
-        XCTAssertEqual(detailed.signatures, inMemoryDetailed.signatures)
-        XCTAssertEqual(detailed.legacyStatus, inMemoryDetailed.legacyStatus)
-        XCTAssertEqual(detailed.legacySignerFingerprint, inMemoryDetailed.legacySignerFingerprint)
+        XCTAssertEqual(detailed.legacyStatus, .valid)
+        XCTAssertNotNil(detailed.legacySignerFingerprint)
+        XCTAssertEqual(detailed.signatures.count, 2)
+        XCTAssertTrue(detailed.signatures.contains {
+            $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
+        })
+        XCTAssertTrue(detailed.signatures.contains {
+            $0.status == .valid && $0.signerIdentity?.source == .contact
+        })
     }
 
     func test_verifyDetachedStreamingDetailed_cancellation_throwsOperationCancelled() async throws {
@@ -240,6 +242,23 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
     private func addContact(_ publicKeyData: Data) throws {
         _ = try stack.contactService.importContact(publicKeyData: publicKeyData)
+    }
+
+    private func verifyDetachedStreamingDetailed(
+        data: Data,
+        signature: Data
+    ) async throws -> DetailedSignatureVerification {
+        let fileURL = try makeTemporaryFile(
+            named: "detached-verification.txt",
+            contents: data
+        )
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        return try await stack.signingService.verifyDetachedStreamingDetailed(
+            fileURL: fileURL,
+            signature: signature,
+            progress: nil
+        )
     }
 
     private func makeTemporaryFile(named name: String, contents: Data) throws -> URL {
