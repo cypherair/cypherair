@@ -241,6 +241,7 @@ $(SRCROOT)/Sources/Security/Mocks/MockAuthenticator.swift
 $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockMemoryInfo.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
+$(SRCROOT)/Sources/Security/Mocks/MockSecureEnclaveCustodyKeyStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift
@@ -266,8 +267,19 @@ $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainKeyManager.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedSettingsOrdinarySettingsPersistence.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedSettingsStore.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyAccessControlPolicy.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleError.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandlePair.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandlePublicBinding.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleReference.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleState.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleStore.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyKeyStoring.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyLoadedHandle.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyLoadedHandlePair.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManageable.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManager.swift
+$(SRCROOT)/Sources/Security/SystemSecureEnclaveCustodyKeyStore.swift
 $(SRCROOT)/Sources/Services/CertificateSignatureService.swift
 $(SRCROOT)/Sources/Services/ContactImportMatcher.swift
 $(SRCROOT)/Sources/Services/ContactRecipientResolver.swift
