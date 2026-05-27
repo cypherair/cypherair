@@ -161,6 +161,18 @@ Recommended PR grouping:
 - PR 3C: add mock and guarded device tests for access-control and handle-state
   failures.
 
+Current implementation status:
+
+- PR 3A is implemented: the Security layer can create, load, inspect, and delete
+  distinct signing/key-agreement P-256 Secure Enclave custody handles behind
+  hidden interfaces.
+- PR 3B is implemented: the Security layer can inventory and reset-clean
+  app-owned custody handles, including malformed owned tags, validate remaining
+  handle count after Reset All Local Data, and classify expected metadata/handle
+  disagreement through shared sanitized failure categories.
+- PR 3C remains future work for guarded device/access-control evidence and
+  platform-specific handle-state behavior.
+
 Entry conditions:
 
 - Phase 1 can represent custody state without product exposure.
