@@ -508,6 +508,93 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         )
     }
 
+    func test_locateHandlePairFindsUniqueExactPublicBinding() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "lookup")
+        let pair = try store.createHandlePair()
+
+        let located = try store.locateHandlePair(
+            signingPublicKeyX963: pair.signing.publicKeyX963,
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+        )
+
+        XCTAssertEqual(located, pair)
+    }
+
+    func test_locateHandlePairFailsClosedForMissingPartialWrongPublicAndAmbiguousMatches() throws {
+        let missingStore = SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+        XCTAssertThrowsError(
+            try missingStore.locateHandlePair(
+                signingPublicKeyX963: makePublicKey(byte: 0xA1),
+                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA2)
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .privateHandleMissing(.signing)
+            )
+        }
+
+        let partialKeyStore = MockSecureEnclaveCustodyKeyStore()
+        let partialStore = SecureEnclaveCustodyHandleStore(keyStore: partialKeyStore)
+        let partialSigningReference = try reference("lookuppartial", .signing)
+        let partialSigningBinding = try binding(partialSigningReference, byte: 0xA3)
+        partialKeyStore.insert(SecureEnclaveCustodyLoadedHandle(
+            binding: partialSigningBinding,
+            privateKey: nil
+        ))
+        XCTAssertThrowsError(
+            try partialStore.locateHandlePair(
+                signingPublicKeyX963: partialSigningBinding.publicKeyX963,
+                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA4)
+            )
+        ) { error in
+            XCTAssertEqual(error as? SecureEnclaveCustodyHandleError, .partialHandlePair)
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .migrationOrRecoveryRequired
+            )
+        }
+
+        let wrongPublicKeyStore = MockSecureEnclaveCustodyKeyStore()
+        let wrongPublicStore = makeStore(
+            keyStore: wrongPublicKeyStore,
+            handleSetIdentifier: "lookupwrongpublic"
+        )
+        let wrongPublicPair = try wrongPublicStore.createHandlePair()
+        XCTAssertThrowsError(
+            try wrongPublicStore.locateHandlePair(
+                signingPublicKeyX963: wrongPublicPair.signing.publicKeyX963,
+                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA5)
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .handlePublicKeyBindingMismatch(.keyAgreement)
+            )
+        }
+
+        let ambiguousKeyStore = MockSecureEnclaveCustodyKeyStore()
+        let ambiguousStore = makeStore(
+            keyStore: ambiguousKeyStore,
+            handleSetIdentifier: "lookupambiguous"
+        )
+        let ambiguousPair = try ambiguousStore.createHandlePair()
+        let duplicateSigningHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try binding(ambiguousPair.signing.reference, byte: 0xA6),
+            privateKey: nil
+        )
+        ambiguousKeyStore.insert(duplicateSigningHandle, allowingDuplicate: true)
+        XCTAssertThrowsError(
+            try ambiguousStore.locateHandlePair(
+                signingPublicKeyX963: ambiguousPair.signing.publicKeyX963,
+                keyAgreementPublicKeyX963: ambiguousPair.keyAgreement.publicKeyX963
+            )
+        ) { error in
+            XCTAssertEqual(error as? SecureEnclaveCustodyHandleError, .ambiguousPrivateHandle(.signing))
+        }
+    }
+
     func test_storeDoesNotUseLegacySoftwareWrappingServiceNames() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let store = makeStore(keyStore: keyStore, handleSetIdentifier: "nolegacy")
