@@ -54,43 +54,7 @@ final class EncryptionService {
             recipientContactIds: recipientContactIds,
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: false
-        )
-    }
-
-    // MARK: - File Encryption
-
-    /// Encrypt file data for the specified contact identities.
-    /// Returns binary .gpg ciphertext.
-    ///
-    /// File size is validated against the 100 MB limit.
-    ///
-    /// - Parameters:
-    ///   - fileData: The file content to encrypt.
-    ///   - recipientContactIds: Contact identity identifiers to encrypt to.
-    ///   - signWithFingerprint: Fingerprint of the signing key (nil = don't sign).
-    ///   - encryptToSelf: Whether to also encrypt to the sender's own key.
-    /// - Returns: Binary ciphertext data (.gpg format).
-    func encryptFile(
-        _ fileData: Data,
-        recipientContactIds: [String],
-        signWithFingerprint: String?,
-        encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil
-    ) async throws -> Data {
-        let maxSize = 100 * 1024 * 1024
-        guard fileData.count <= maxSize else {
-            throw CypherAirError.fileTooLarge(sizeMB: (fileData.count + 1024 * 1024 - 1) / (1024 * 1024))
-        }
-
-        return try await encrypt(
-            plaintext: fileData,
-            recipientContactIds: recipientContactIds,
-            signWithFingerprint: signWithFingerprint,
-            encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: true
+            encryptToSelfFingerprint: encryptToSelfFingerprint
         )
     }
 
@@ -211,8 +175,7 @@ final class EncryptionService {
         recipientContactIds: [String],
         signWithFingerprint: String?,
         encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil,
-        binary: Bool
+        encryptToSelfFingerprint: String? = nil
     ) async throws -> Data {
         guard !recipientContactIds.isEmpty else {
             throw CypherAirError.noRecipientsSelected
@@ -223,8 +186,7 @@ final class EncryptionService {
             recipientKeys: try contactService.publicKeysForRecipientContactIDs(recipientContactIds),
             signWithFingerprint: signWithFingerprint,
             encryptToSelf: encryptToSelf,
-            encryptToSelfFingerprint: encryptToSelfFingerprint,
-            binary: binary
+            encryptToSelfFingerprint: encryptToSelfFingerprint
         )
     }
 
@@ -233,8 +195,7 @@ final class EncryptionService {
         recipientKeys: [Data],
         signWithFingerprint: String?,
         encryptToSelf: Bool,
-        encryptToSelfFingerprint: String? = nil,
-        binary: Bool
+        encryptToSelfFingerprint: String? = nil
     ) async throws -> Data {
         guard !recipientKeys.isEmpty else {
             throw CypherAirError.noRecipientsSelected
@@ -276,7 +237,7 @@ final class EncryptionService {
             recipientKeys: recipientKeys,
             signingKey: signingKey,
             selfKey: selfKey,
-            binary: binary
+            binary: false
         )
 
         // Primary zeroing: immediately after engine call returns, signingKey is most

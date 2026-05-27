@@ -33,6 +33,15 @@ final class SigningServiceTests: XCTestCase {
         return identity
     }
 
+    private func makeTemporaryFile(
+        contents: Data,
+        name: String = "signing-service-\(UUID().uuidString).bin"
+    ) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try contents.write(to: url, options: .atomic)
+        return url
+    }
+
     // MARK: - Cleartext Signing
 
     func test_signCleartext_profileA_producesSignedMessage() async throws {
@@ -64,23 +73,31 @@ final class SigningServiceTests: XCTestCase {
 
     // MARK: - Detached Signing
 
-    func test_signDetached_profileA_producesDetachedSignature() async throws {
+    func test_signDetachedStreaming_profileA_producesDetachedSignature() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("File content for signing".utf8)
+        let fileURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: fileURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
         XCTAssertFalse(signature.isEmpty, "Detached signature should not be empty")
     }
 
-    func test_signDetached_profileB_producesDetachedSignature() async throws {
+    func test_signDetachedStreaming_profileB_producesDetachedSignature() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("File content for Profile B signing".utf8)
+        let fileURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: fileURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
         XCTAssertFalse(signature.isEmpty)
@@ -205,62 +222,92 @@ final class SigningServiceTests: XCTestCase {
 
     // MARK: - Detached Verification
 
-    func test_verifyDetached_validSignature_returnsValid() async throws {
+    func test_verifyDetachedStreaming_validSignature_returnsValid() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("Detached verify data".utf8)
+        let fileURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: fileURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
-        let result = try await stack.signingService.verifyDetachedDetailed(
-            data: data, signature: signature
+        let result = try await stack.signingService.verifyDetachedStreamingDetailed(
+            fileURL: fileURL,
+            signature: signature,
+            progress: nil
         )
         XCTAssertEqual(result.legacyStatus, .valid)
         XCTAssertEqual(result.summaryState, .verified)
     }
 
-    func test_verifyDetached_profileB_validSignature_returnsValid() async throws {
+    func test_verifyDetachedStreaming_profileB_validSignature_returnsValid() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("Detached verify Profile B data".utf8)
+        let fileURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: fileURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
-        let result = try await stack.signingService.verifyDetachedDetailed(
-            data: data, signature: signature
+        let result = try await stack.signingService.verifyDetachedStreamingDetailed(
+            fileURL: fileURL,
+            signature: signature,
+            progress: nil
         )
         XCTAssertEqual(result.legacyStatus, .valid)
     }
 
-    func test_verifyDetached_tamperedData_returnsBad() async throws {
+    func test_verifyDetachedStreaming_tamperedData_returnsBad() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("Original detached data".utf8)
+        let originalURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: originalURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: originalURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
         let tamperedData = Data("Tampered detached data".utf8)
-        let result = try await stack.signingService.verifyDetachedDetailed(
-            data: tamperedData, signature: signature
+        let tamperedURL = try makeTemporaryFile(contents: tamperedData)
+        defer { try? FileManager.default.removeItem(at: tamperedURL) }
+
+        let result = try await stack.signingService.verifyDetachedStreamingDetailed(
+            fileURL: tamperedURL,
+            signature: signature,
+            progress: nil
         )
         XCTAssertEqual(result.legacyStatus, .bad,
                        "Tampered data should fail detached verification")
     }
 
-    func test_verifyDetached_profileB_tamperedData_returnsBad() async throws {
+    func test_verifyDetachedStreaming_profileB_tamperedData_returnsBad() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
         let data = Data("Original detached Profile B data".utf8)
+        let originalURL = try makeTemporaryFile(contents: data)
+        defer { try? FileManager.default.removeItem(at: originalURL) }
 
-        let signature = try await stack.signingService.signDetached(
-            data, signerFingerprint: identity.fingerprint
+        let signature = try await stack.signingService.signDetachedStreaming(
+            fileURL: originalURL,
+            signerFingerprint: identity.fingerprint,
+            progress: nil
         )
 
         let tamperedData = Data("Tampered detached Profile B data".utf8)
-        let result = try await stack.signingService.verifyDetachedDetailed(
-            data: tamperedData, signature: signature
+        let tamperedURL = try makeTemporaryFile(contents: tamperedData)
+        defer { try? FileManager.default.removeItem(at: tamperedURL) }
+
+        let result = try await stack.signingService.verifyDetachedStreamingDetailed(
+            fileURL: tamperedURL,
+            signature: signature,
+            progress: nil
         )
         XCTAssertEqual(result.legacyStatus, .bad,
                        "Tampered data should fail Profile B detached verification")

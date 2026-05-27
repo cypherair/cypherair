@@ -4977,22 +4977,6 @@
         }
       }
     },
-    "error.fileTooLarge" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "File is too large (%lld MB). Maximum size is 100 MB."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文件过大（%lld MB）。最大限制为 100 MB。"
-          }
-        }
-      }
-    },
     "error.generic" : {
       "localizations" : {
         "en" : {
