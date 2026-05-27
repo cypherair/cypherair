@@ -130,10 +130,10 @@ secret-certificate material when the external ECDH operation fails. Diagnostics
 must not include shared secrets, session keys, KEKs, plaintext, fingerprints, or
 temporary capability paths.
 
-**Secure Enclave custody handle-store note:** Phase 3A/3B introduce a
-Security-owned, hidden handle lifecycle, cleanup, and recovery-classification
-boundary for future custody. It creates two separate permanent Secure Enclave
-P-256 `SecKey` private-key rows using
+**Secure Enclave custody handle-store note:** Phase 3A/3B/3C introduce a
+Security-owned, hidden handle lifecycle, cleanup, recovery-classification, and
+guarded device-evidence boundary for future custody. It creates two separate
+permanent Secure Enclave P-256 `SecKey` private-key rows using
 `kSecAttrTokenIDSecureEnclave`, `kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, and
 `kSecAttrAccessControl` with `WhenUnlockedThisDeviceOnly + .privateKeyUsage +
 .biometryAny`. Creation, load, inventory, and delete paths use the data-protection
@@ -150,7 +150,10 @@ rows, including malformed app-owned tags identified by raw prefix bytes, and
 treats list/delete/remaining-row failures as sanitized cleanup or recovery
 failures. Logs, errors, UI, ProtectedData, and Rust must not expose raw
 application tags, handle-set identifiers, fingerprints, public-key bytes, or
-Keychain locators. These handles are not exposed to UI, Rust/UniFFI, or
+Keychain locators. Guarded device tests now validate real hardware
+creation/load/delete, biometric signing/ECDH private operations, unauthorized
+interaction failure, missing/partial/wrong-public handle states, cleanup, and
+sanitized traces. These handles are not exposed to UI, Rust/UniFFI, or
 ProtectedData metadata in Phase 3.
 
 ### ProtectedData Device-Binding Note

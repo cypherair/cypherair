@@ -158,8 +158,7 @@ Recommended PR grouping:
   deletion behind Security-owned interfaces.
 - PR 3B: add cleanup, local reset participation, and recovery classification for
   metadata/handle disagreement.
-- PR 3C: add mock and guarded device tests for access-control and handle-state
-  failures.
+- PR 3C: add guarded device tests for access-control and handle-state failures.
 
 Current implementation status:
 
@@ -170,8 +169,11 @@ Current implementation status:
   app-owned custody handles, including malformed owned tags, validate remaining
   handle count after Reset All Local Data, and classify expected metadata/handle
   disagreement through shared sanitized failure categories.
-- PR 3C remains future work for guarded device/access-control evidence and
-  platform-specific handle-state behavior.
+- PR 3C is implemented: guarded device tests exercise the production
+  Security-owned custody handle store on real Secure Enclave hardware, covering
+  handle creation/persistence, biometric private-operation access control,
+  missing/partial/wrong-public handle-state failures, cleanup, and sanitized
+  diagnostics.
 
 Entry conditions:
 

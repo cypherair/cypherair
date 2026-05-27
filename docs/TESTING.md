@@ -80,7 +80,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 **Run on:** Physical iOS device only. Cannot run in simulator.
 **What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain behavior through authenticated `LAContext` handoff. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second Face ID prompt. Envelope format and migration state-machine coverage should remain in the macOS unit lane through mocks.
 
-Phase 3A/3B custody handle-store tests stay in the macOS unit lane because the PRs are the Security boundary, local-reset cleanup, and mockable recovery-classification contract. Guarded device evidence for real Secure Enclave access-control prompts, handle-state failures, and hardware-specific cleanup belongs to the later PR 3C lane.
+Phase 3A/3B custody handle-store tests stay in the macOS unit lane because those PRs are the Security boundary, local-reset cleanup, and mockable recovery-classification contract. Phase 3C adds guarded device evidence for real Secure Enclave handle creation/load/delete, biometric access-control private operations, unauthorized interaction failure, handle-state failures, hardware cleanup, and sanitized diagnostics.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
@@ -112,7 +112,7 @@ When adding, moving, or deleting Swift source files that should be visible to bu
 
 `TutorialSessionStoreTests` are the canonical unit-level coverage for the guided tutorial contract. They verify sandbox storage and mocks, the seven-module artifact flow, completion-version persistence, onboarding-to-tutorial handoff, replay unlock rules, unsafe-route blocklisting, output interception, production-page configuration seams, guidance resolver behavior, and source-audit guards that keep tutorial output handling out of production page implementations.
 
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
+**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, Secure Enclave custody handle-store evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
 
 ProtectedData device-test isolation rules:
 
