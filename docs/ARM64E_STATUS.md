@@ -136,9 +136,11 @@ Snapshot date: 2026-05-13
   - App Store candidate validation requires the stable release to include a
     valid arm64e manifest before archiving is allowed
   - hosted macOS Swift unit-test preview runs after a hosted macOS/Xcode/macOS
-    SDK readiness preflight; hosted runner environment mismatches warn and skip
-    the preview, while build, link, and test failures after readiness remain
-    regular failure signals
+    SDK readiness preflight that requires an `arm64e` macOS destination; the
+    preview runs `CypherAir-UnitTests` on `platform=macOS,arch=arm64e`, hosted
+    runner environment mismatches warn and skip the preview, while signing
+    profile, build, link, and test failures after readiness remain regular
+    failure signals
 - `cypherair/openssl-src-rs`:
   - `arm64e-carry-chain.yml` checks that the OpenSSL submodule URL, branch, and
     pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,
@@ -221,7 +223,9 @@ Snapshot date: 2026-05-13
   failure only because `swift-unit-tests-hosted-preview` ran on hosted macOS
   26.3 while `CypherAirTests` required a newer macOS deployment target; current
   workflows preflight that hosted environment mismatch and skip the preview with
-  a warning.
+  a warning. Hosted Swift unit-test preview now targets `arm64e`; missing Mac
+  App Development provisioning profiles remain regular CI failures until CI
+  signing is configured.
 
 ## Update Rules
 

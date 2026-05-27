@@ -27,7 +27,7 @@ Ineligible destinations for the "CypherAir" scheme:
 
 MACOS_READY_DESTINATIONS = """\
 Available destinations for the "CypherAir" scheme:
-    { platform:macOS, arch:arm64, id:00008142-001C31D02609401C, name:My Mac }
+    { platform:macOS, arch:arm64e, id:00008142-001C31D02609401C, name:My Mac }
     { platform:macOS, name:Any Mac }
 """
 
@@ -167,6 +167,19 @@ Available destinations for the "CypherAir" scheme:
         self.assertEqual(result.process.returncode, 0, result.combined_output)
         self.assertEqual(result.outputs["ready"], "true")
 
+    def test_macos_unit_rejects_arm64_only_host_destination(self) -> None:
+        result = self.run_preflight(
+            args=["macos-unit-test-preflight"],
+            destinations="""\
+Available destinations for the "CypherAir" scheme:
+    { platform:macOS, arch:arm64, id:00008142-001C31D02609401C, name:My Mac }
+""",
+        )
+
+        self.assertEqual(result.process.returncode, 1, result.combined_output)
+        self.assertNotIn("ready", result.outputs)
+        self.assertIn("macOS arm64e test destination is not eligible", result.combined_output)
+
     def test_macos_unit_host_below_deployment_target_is_skippable(self) -> None:
         result = self.run_preflight(
             args=["macos-unit-test-preflight"],
@@ -206,7 +219,7 @@ Available destinations for the "CypherAir" scheme:
 
         self.assertEqual(result.process.returncode, 1, result.combined_output)
         self.assertNotIn("ready", result.outputs)
-        self.assertIn("macOS arm64 test destination is not eligible", result.combined_output)
+        self.assertIn("macOS arm64e test destination is not eligible", result.combined_output)
 
     def test_macos_unit_showdestinations_failure_is_blocking(self) -> None:
         result = self.run_preflight(
