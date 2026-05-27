@@ -4,6 +4,15 @@ import Security
 
 enum AuthTraceMetadata {
     static func keychainServiceKind(for service: String) -> String {
+        if service.hasPrefix("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).") {
+            if service.hasSuffix(".signing") {
+                return "secureEnclaveCustodySigningHandle"
+            }
+            if service.hasSuffix(".keyAgreement") {
+                return "secureEnclaveCustodyKeyAgreementHandle"
+            }
+            return "secureEnclaveCustodyHandle"
+        }
         if service.hasPrefix(KeychainConstants.metadataPrefix) {
             return "metadata"
         }
@@ -41,6 +50,10 @@ enum AuthTraceMetadata {
     }
 
     static func keychainServiceKind(forPrefix servicePrefix: String) -> String {
+        if servicePrefix == SecureEnclaveCustodyHandleReference.applicationTagPrefix
+            || servicePrefix.hasPrefix("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).") {
+            return "secureEnclaveCustodyHandle"
+        }
         if servicePrefix == KeychainConstants.metadataPrefix {
             return "metadata"
         }

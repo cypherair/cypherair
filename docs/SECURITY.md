@@ -130,6 +130,18 @@ secret-certificate material when the external ECDH operation fails. Diagnostics
 must not include shared secrets, session keys, KEKs, plaintext, fingerprints, or
 temporary capability paths.
 
+**Secure Enclave custody handle-store note:** Phase 3A introduces a
+Security-owned, hidden handle lifecycle boundary for future custody. It creates
+two separate permanent Secure Enclave P-256 `SecKey` private-key rows using
+`kSecAttrTokenIDSecureEnclave`, `kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, and
+`kSecAttrAccessControl` with `WhenUnlockedThisDeviceOnly + .privateKeyUsage +
+.biometryAny`. The custody store must not use `.devicePasscode`, `.or`, or the
+current `AuthenticationMode.createAccessControl()` helper. Application tags use
+a random local handle-set id plus role and must not include fingerprints. Load
+and inspect paths fail closed unless the stored role and public P-256 binding
+match the expected values. These handles are not exposed to UI, Rust/UniFFI, or
+ProtectedData metadata in Phase 3A.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
@@ -413,6 +425,7 @@ The following files and functions are security-critical. Claude Code must **stop
 | File | Reason |
 |------|--------|
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
+| `Sources/Security/SecureEnclaveCustody*` | Future Secure Enclave custody handle lifecycle, access-control policy, role/public-key binding, and sanitized failure mapping. |
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
 | `Sources/Security/ProtectedData/` | App-data root-secret authorization, SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
@@ -430,6 +443,7 @@ The following files and functions are security-critical. Claude Code must **stop
 ### Functions Requiring Human Review
 
 - Any function that calls `SecAccessControlCreateWithFlags`
+- Any function that calls `SecKeyCreateRandomKey`, `SecItemCopyMatching`, or `SecItemDelete` for `kSecClassKey`
 - Any function that calls `SecureEnclave.P256.KeyAgreement.PrivateKey()`
 - Any function that calls `AES.GCM.seal()` or `AES.GCM.open()` on key material
 - Any function that calls `HKDF<SHA256>.deriveKey()`

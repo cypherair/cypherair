@@ -172,6 +172,19 @@ without returning plaintext or falling back to stored secret-certificate
 decryption. It is not a UniFFI API, response-file bridge, Security handle store,
 or real Secure Enclave route.
 
+Phase 3A adds the first Security-layer store for that future custody model. It
+uses permanent `SecKey` / `kSecClassKey` rows with
+`kSecAttrTokenIDSecureEnclave` to create two distinct P-256 private-operation
+handles per handle set: `.signing` and `.keyAgreement`. The application tag is
+Security-private (`com.cypherair.v1.secure-enclave-custody.<random-id>.<role>`)
+and intentionally contains no fingerprint. ProtectedData `key-metadata` still
+does not store Apple handle locators, access-control policy, or private
+material. Loading is authoritative only when the expected role and 65-byte
+uncompressed P-256 public key both match; wrong-role, wrong-public-binding,
+missing, partial, ambiguous, inaccessible, and cleanup failures fail closed using
+shared key-operation failure categories. The store is not yet connected to key
+generation, workflow services, UI, Rust/UniFFI, or real private operations.
+
 ### Security Layer (`Sources/Security/`)
 
 Manages all hardware-backed security operations. This is the most sensitive module.
@@ -188,6 +201,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
+| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, idempotent delete, and sanitized failure-category mapping. Not wired to shipped workflows yet. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
@@ -507,6 +521,11 @@ Keychain (kSecClassGenericPassword, data-protection Keychain):
 ├── Metadata account (`com.cypherair.metadata`):
 │   └── com.cypherair.v1.metadata.<fingerprint>       → Legacy PGPKeyIdentity JSON migration source
 
+Keychain (kSecClassKey, Secure Enclave token):
+└── com.cypherair.v1.secure-enclave-custody.<random-id>.<role>
+    ├── role = signing       → P-256 Secure Enclave signing private operation
+    └── role = keyAgreement  → Distinct P-256 Secure Enclave ECDH private operation
+
 App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Public key files (.gpg binary)
@@ -548,6 +567,7 @@ App Sandbox:
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - Legacy metadata items use `metadata.` prefix under the dedicated metadata account, with older rows possible in the default account. They store `PGPKeyIdentity` as JSON only for migration/cleanup; new production metadata writes go to ProtectedData domain `key-metadata`.
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
+- Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust.
 - The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a normal software-ephemeral P-256 ECDH envelope, not the private-key self-ECDH wrapping pattern.
 - The v2 root-secret envelope is guarded against downgrade by registry state plus the ThisDeviceOnly `format-floor` marker. If either marker says v2 and the root-secret row later looks like v1 raw bytes, ProtectedData fails closed.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, legacy-cleanup, or out-of-app-custody exception.
