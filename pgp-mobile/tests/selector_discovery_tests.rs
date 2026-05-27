@@ -98,11 +98,7 @@ fn duplicate_userid_raw_with_signature(
         .into_keypair()
         .expect("keypair conversion should succeed");
     let binding = userid
-        .bind(
-            &mut signer,
-            &cert,
-            template,
-        )
+        .bind(&mut signer, &cert, template)
         .expect("userid binding should succeed");
     let mut userid_bytes = Vec::new();
     Packet::from(userid)
@@ -113,8 +109,8 @@ fn duplicate_userid_raw_with_signature(
         .serialize(&mut binding_bytes)
         .expect("binding packet should serialize");
 
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
-        .expect("raw secret cert should parse");
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
     let mut duplicated = Vec::new();
     let mut inserted = false;
 
@@ -147,8 +143,8 @@ fn revoke_userid_occurrence_with_signature(
     validity_period: Option<Duration>,
 ) -> Vec<u8> {
     let cert = openpgp::Cert::from_bytes(secret_cert).expect("secret cert should parse");
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
-        .expect("raw secret cert should parse");
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
     let user_id = raw_cert
         .packets()
         .filter(|packet| packet.tag() == Tag::UserID)
@@ -192,8 +188,8 @@ fn revoke_userid_occurrence_with_signature(
         .serialize(&mut revocation_bytes)
         .expect("revocation packet should serialize");
 
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
-        .expect("raw secret cert should parse");
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
     let mut revoked = Vec::new();
     let mut seen_user_ids = 0usize;
     let mut target_open = false;
@@ -256,7 +252,11 @@ fn test_discover_certificate_selectors_profile_a_generated_cert_exposes_selector
         .expect("selector discovery should succeed");
 
     assert_eq!(discovered.certificate_fingerprint, generated.fingerprint);
-    assert_eq!(discovered.user_ids.len(), 1, "generated cert should expose one User ID");
+    assert_eq!(
+        discovered.user_ids.len(),
+        1,
+        "generated cert should expose one User ID"
+    );
     assert_eq!(discovered.user_ids[0].occurrence_index, 0);
     assert_eq!(
         discovered.user_ids[0].display_text,
@@ -288,8 +288,14 @@ fn test_discover_certificate_selectors_profile_a_generated_cert_exposes_selector
             .any(|subkey| subkey.is_currently_transport_encryption_capable),
         "generated cert should expose at least one currently transport-capable subkey"
     );
-    assert!(discovered.subkeys.iter().all(|subkey| !subkey.is_currently_revoked));
-    assert!(discovered.subkeys.iter().all(|subkey| !subkey.is_currently_expired));
+    assert!(discovered
+        .subkeys
+        .iter()
+        .all(|subkey| !subkey.is_currently_revoked));
+    assert!(discovered
+        .subkeys
+        .iter()
+        .all(|subkey| !subkey.is_currently_expired));
 }
 
 #[test]
@@ -318,8 +324,14 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_order_and_occ
     assert_eq!(discovered.user_ids.len(), 2);
     assert_eq!(discovered.user_ids[0].occurrence_index, 0);
     assert_eq!(discovered.user_ids[1].occurrence_index, 1);
-    assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
-    assert_eq!(discovered.user_ids[0].display_text, discovered.user_ids[1].display_text);
+    assert_eq!(
+        discovered.user_ids[0].user_id_data,
+        discovered.user_ids[1].user_id_data
+    );
+    assert_eq!(
+        discovered.user_ids[0].display_text,
+        discovered.user_ids[1].display_text
+    );
 }
 
 #[test]
@@ -332,7 +344,10 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
         .expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
-    assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
+    assert_eq!(
+        discovered.user_ids[0].user_id_data,
+        discovered.user_ids[1].user_id_data
+    );
     assert!(
         discovered.user_ids[0].is_currently_primary,
         "original occurrence should remain primary"
@@ -355,7 +370,10 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
         keys::discover_certificate_selectors(&revoked).expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
-    assert_eq!(discovered.user_ids[0].user_id_data, discovered.user_ids[1].user_id_data);
+    assert_eq!(
+        discovered.user_ids[0].user_id_data,
+        discovered.user_ids[1].user_id_data
+    );
     assert!(
         !discovered.user_ids[0].is_currently_revoked,
         "first occurrence should remain valid"
@@ -369,8 +387,10 @@ fn test_discover_certificate_selectors_duplicate_user_ids_preserve_per_occurrenc
 #[test]
 fn test_discover_certificate_selectors_duplicate_user_ids_future_dated_binding_is_not_current() {
     let now = SystemTime::now();
-    let generated =
-        generate_backdated_universal_secret_cert("Duplicate Future Primary", now - Duration::from_secs(14_400));
+    let generated = generate_backdated_universal_secret_cert(
+        "Duplicate Future Primary",
+        now - Duration::from_secs(14_400),
+    );
     let original_user_id = first_user_id_text(&generated);
     let secret_cert = duplicate_userid_raw_with_signature(
         &generated,
@@ -460,8 +480,8 @@ fn test_discover_certificate_selectors_duplicate_user_ids_expired_revocation_is_
         Some(Duration::from_secs(60)),
     );
 
-    let discovered = keys::discover_certificate_selectors(&revoked)
-        .expect("selector discovery should succeed");
+    let discovered =
+        keys::discover_certificate_selectors(&revoked).expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
     assert!(
@@ -492,8 +512,8 @@ fn test_discover_certificate_selectors_newer_binding_clears_older_revocation() {
         None,
     );
 
-    let discovered = keys::discover_certificate_selectors(&revoked)
-        .expect("selector discovery should succeed");
+    let discovered =
+        keys::discover_certificate_selectors(&revoked).expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
     assert!(
@@ -524,8 +544,8 @@ fn test_discover_certificate_selectors_newer_revocation_beats_older_binding() {
         None,
     );
 
-    let discovered = keys::discover_certificate_selectors(&revoked)
-        .expect("selector discovery should succeed");
+    let discovered =
+        keys::discover_certificate_selectors(&revoked).expect("selector discovery should succeed");
 
     assert_eq!(discovered.user_ids.len(), 2);
     assert!(
@@ -591,11 +611,9 @@ fn test_discover_certificate_selectors_catalog_selectors_drive_revocation_apis()
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
         .expect("selector discovery should succeed");
 
-    let subkey_revocation = keys::generate_subkey_revocation(
-        &generated.cert_data,
-        &discovered.subkeys[0].fingerprint,
-    )
-    .expect("subkey revocation should accept discovered subkey fingerprint");
+    let subkey_revocation =
+        keys::generate_subkey_revocation(&generated.cert_data, &discovered.subkeys[0].fingerprint)
+            .expect("subkey revocation should accept discovered subkey fingerprint");
     let user_id = &discovered.user_ids[0];
     let user_id_revocation = keys::generate_user_id_revocation_by_selector(
         &generated.cert_data,

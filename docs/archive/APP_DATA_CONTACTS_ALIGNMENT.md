@@ -1,7 +1,7 @@
 # App Data / Contacts Alignment (Archived)
 
-> **Version:** Archived v1.1  
-> **Status:** Archived historical bridge. This document is no longer an active design or precedence source.  
+> **Version:** Archived v1.1
+> **Status:** Archived historical bridge. This document is no longer an active design or precedence source.
 > **Purpose:** Preserve a short record that the temporary app-data / Contacts alignment bridge has been superseded by the active Contacts and shared-framework documents.
 > **Successor documents:** [PRD](../PRD.md) · [TDD](../TDD.md) · [ARCHITECTURE](../ARCHITECTURE.md) · [SECURITY](../SECURITY.md) · [PERSISTED_STATE_INVENTORY](../PERSISTED_STATE_INVENTORY.md)
 

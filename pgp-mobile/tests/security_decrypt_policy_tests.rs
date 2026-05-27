@@ -128,13 +128,13 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
         }
     }
 
-    assert!(replaced, "Failed to locate SEIP packet header in ciphertext");
+    assert!(
+        replaced,
+        "Failed to locate SEIP packet header in ciphertext"
+    );
 
     let result = decrypt::decrypt_detailed(&tampered, &[key.cert_data.clone()], &[]);
-    assert!(
-        result.is_err(),
-        "Legacy SEIPD without MDC must be rejected"
-    );
+    assert!(result.is_err(), "Legacy SEIPD without MDC must be rejected");
 }
 
 // ── H1: AeadAuthenticationFailed exercisability analysis ──────────────────

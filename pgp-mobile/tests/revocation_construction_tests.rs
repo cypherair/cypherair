@@ -104,8 +104,8 @@ fn duplicate_userid(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> {
         .serialize(&mut binding_bytes)
         .expect("binding packet should serialize");
 
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
-        .expect("raw secret cert should parse");
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
     let mut duplicated = Vec::new();
     let mut inserted = false;
 
@@ -388,8 +388,8 @@ fn test_generate_user_id_revocation_by_selector_accepts_duplicate_occurrence_sel
 }
 
 #[test]
-fn test_generate_user_id_revocation_by_selector_occurrence_index_out_of_range_returns_invalid_key_data()
-{
+fn test_generate_user_id_revocation_by_selector_occurrence_index_out_of_range_returns_invalid_key_data(
+) {
     let generated = generate_key(KeyProfile::Universal, "OutOfRangeUserid");
     let user_id_data = first_user_id_bytes(&generated.cert_data);
 

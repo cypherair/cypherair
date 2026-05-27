@@ -272,6 +272,13 @@ cargo clean --manifest-path pgp-mobile/Cargo.toml
 
 Target-specific `libpgp_mobile.dylib` files must **not** exist next to those intermediate static archives. They are stale build state from older direct-link flows and can shadow the intended static archive if stale project settings or manual linker flags are used. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
 
+Before submitting Rust or generated-binding work, keep the repository hygiene gates clean:
+
+```bash
+cargo +stable fmt --manifest-path pgp-mobile/Cargo.toml --all -- --check
+python3 scripts/check_text_hygiene.py
+```
+
 This means there are three distinct workflows:
 
 ### A. Rust behavior validation only
@@ -309,6 +316,8 @@ ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
 ```
 
 Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with nightly Cargo plus explicit `RUSTC`, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+
+The sync script normalizes generated Swift bindings, C headers, and modulemaps by stripping trailing whitespace before copying them into `bindings/` and `Sources/PgpMobile/`. Do not hand-edit generated binding whitespace; rerun the sync path instead.
 
 For local packaging, prefer the same force-download mode used by GitHub Actions. It downloads the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged checksum, and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup state. `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked `stage1-arm64e-patch` toolchain remain supported for Rust-fork development and diagnostics, but release-candidate app artifact refreshes should use the force-download path unless you are deliberately testing a local compiler build.
 
@@ -578,18 +587,18 @@ Every crypto operation must have a round-trip test proving reversibility.
 func test_encryptDecrypt_profileA_roundTrip_returnsOriginalPlaintext() throws {
     let plaintext = "Hello, 你好, 🔐"
     let keyPair = try pgpMobile.generateKeyPair(name: "Test", email: nil, expiry: nil, profile: .universal)
-    
+
     let ciphertext = try pgpMobile.encrypt(
         plaintext: Data(plaintext.utf8),
         recipients: [keyPair.publicKey],
         signingKey: keyPair.privateKey
     )
-    
+
     let decrypted = try pgpMobile.decrypt(
         ciphertext: ciphertext,
         privateKey: keyPair.privateKey
     )
-    
+
     XCTAssertEqual(String(data: decrypted.plaintext, encoding: .utf8), plaintext)
 }
 
@@ -629,11 +638,11 @@ func test_decrypt_withTamperedCiphertext_throwsAEADError() throws {
         recipients: [keyPair.publicKey],
         signingKey: nil
     )
-    
+
     // Flip one bit near the middle of the ciphertext
     let midpoint = ciphertext.count / 2
     ciphertext[midpoint] ^= 0x01
-    
+
     XCTAssertThrowsError(try pgpMobile.decrypt(ciphertext: ciphertext, privateKey: keyPair.privateKey)) { error in
         guard let pgpError = error as? PgpError else { return XCTFail("Wrong error type") }
         XCTAssertEqual(pgpError, .AeadAuthenticationFailed)
@@ -647,9 +656,9 @@ func test_decrypt_withTamperedCiphertext_throwsAEADError() throws {
 func test_decrypt_highSecurityMode_biometricsUnavailable_throwsAuthError() async throws {
     let mockAuth = MockAuthenticator()
     mockAuth.biometricsAvailable = false
-    
+
     let service = DecryptionService(authenticator: mockAuth, ...)
-    
+
     await XCTAssertThrowsError(try await service.decrypt(ciphertext: someCiphertext)) { error in
         // Should fail without attempting decryption
     }
@@ -673,10 +682,10 @@ Crash-recovery logic now distinguishes safe cleanup, successful promotion, retry
 func test_privateKeyBytes_zeroedAfterDecrypt() throws {
     var keyBytes = try loadTestPrivateKey()
     let originalCount = keyBytes.count
-    
+
     // Perform operation that should zeroize
     _ = try decryptionService.decryptAndZeroize(using: &keyBytes)
-    
+
     // Verify all bytes are zero
     XCTAssertTrue(keyBytes.allSatisfy { $0 == 0 }, "Key bytes not zeroed")
     XCTAssertEqual(keyBytes.count, originalCount, "Buffer should not be deallocated, just zeroed")

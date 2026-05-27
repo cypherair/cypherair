@@ -191,13 +191,28 @@ EOF
     fi
 }
 
+strip_trailing_whitespace() {
+    local file="$1"
+    if [ ! -f "$file" ]; then
+        return
+    fi
+    perl -pi -e 's/[ \t]+$//' "$file"
+}
+
 patch_generated_swift_bindings() {
     local swift_file="$1"
     if [ ! -f "$swift_file" ]; then
         return
     fi
     perl -0pi -e 's/\n    static let vtablePtr: UnsafePointer<(UniffiVTableCallbackInterface[A-Za-z0-9_]+)> = \{/\n    nonisolated(unsafe) static let vtablePtr: UnsafePointer<$1> = {/g' "$swift_file"
-    perl -pi -e 's/[ \t]+$//' "$swift_file"
+    strip_trailing_whitespace "$swift_file"
+}
+
+normalize_generated_bindings() {
+    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/module.modulemap"
+    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap"
+    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h"
+    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobile.swift"
 }
 
 sync_file_if_changed() {
@@ -308,6 +323,7 @@ generate_bindings() {
     if [ -f "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" ]; then
         cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$GENERATED_BINDINGS_DIR/module.modulemap"
     fi
+    normalize_generated_bindings
 
     sync_file_if_changed "$GENERATED_BINDINGS_DIR/module.modulemap" "$BINDINGS_DIR/module.modulemap"
     sync_file_if_changed "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$BINDINGS_DIR/pgp_mobileFFI.modulemap"

@@ -248,8 +248,9 @@ fn test_verify_detached_file_cancellation_returns_operation_cancelled() {
     let data_path = dir.path().join("document.bin");
     fs::write(&data_path, &data).unwrap();
 
-    let signature = streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
-        .expect("Signing should succeed");
+    let signature =
+        streaming::sign_detached_file(data_path.to_str().unwrap(), &key.cert_data, None)
+            .expect("Signing should succeed");
     let reporter = Arc::new(TestProgressReporter::with_cancel_after(32 * 1024));
 
     let result = streaming::verify_detached_file_detailed(

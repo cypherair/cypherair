@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 from pathlib import Path
 
@@ -20,12 +21,28 @@ def load_script_module(name: str, relative_path: str):
 
 
 def run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if args and args[0] == "git":
+        env.update(
+            {
+                "GIT_AUTHOR_NAME": "Codex Tests",
+                "GIT_AUTHOR_EMAIL": "codex-tests@example.com",
+                "GIT_COMMITTER_NAME": "Codex Tests",
+                "GIT_COMMITTER_EMAIL": "codex-tests@example.com",
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": "commit.gpgSign",
+                "GIT_CONFIG_VALUE_0": "false",
+                "GIT_CONFIG_KEY_1": "tag.gpgSign",
+                "GIT_CONFIG_VALUE_1": "false",
+            }
+        )
     return subprocess.run(
         args,
         cwd=cwd,
         check=True,
         text=True,
         capture_output=True,
+        env=env,
     )
 
 
@@ -37,6 +54,8 @@ def init_repo_with_remote(root: Path) -> tuple[Path, Path]:
     run(["git", "init", "-b", "main", str(repo_root)])
     run(["git", "config", "user.name", "Codex Tests"], cwd=repo_root)
     run(["git", "config", "user.email", "codex-tests@example.com"], cwd=repo_root)
+    run(["git", "config", "commit.gpgSign", "false"], cwd=repo_root)
+    run(["git", "config", "tag.gpgSign", "false"], cwd=repo_root)
 
     tracked_file = repo_root / "tracked.txt"
     tracked_file.write_text("base\n", encoding="utf-8")

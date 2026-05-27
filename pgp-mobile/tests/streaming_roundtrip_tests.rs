@@ -4,11 +4,11 @@
 
 mod common;
 
-use std::fs;
 use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::streaming;
+use std::fs;
 
 /// Helper to generate a key pair for testing.
 fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {

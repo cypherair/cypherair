@@ -99,13 +99,9 @@ fn test_export_profile_b_uses_argon2id() {
 /// Fix #3 verification: expired Profile B key detected.
 #[test]
 fn test_expired_key_detected_profile_b() {
-    let key = keys::generate_key_with_profile(
-        "Alice".to_string(),
-        None,
-        Some(1),
-        KeyProfile::Advanced,
-    )
-    .expect("Key gen should succeed");
+    let key =
+        keys::generate_key_with_profile("Alice".to_string(), None, Some(1), KeyProfile::Advanced)
+            .expect("Key gen should succeed");
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -228,11 +224,8 @@ fn test_modify_expiry_profile_b_extend() {
     )
     .expect("Key generation should succeed");
 
-    let result = keys::modify_expiry(
-        &generated.cert_data,
-        Some(3 * 365 * 24 * 3600),
-    )
-    .expect("modify_expiry should succeed for Profile B");
+    let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
+        .expect("modify_expiry should succeed for Profile B");
 
     assert!(!result.cert_data.is_empty());
     assert!(!result.public_key_data.is_empty());
