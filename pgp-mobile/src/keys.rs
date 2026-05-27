@@ -237,8 +237,8 @@ mod profile;
 mod public_certificates;
 mod revocation;
 mod s2k;
-mod secure_enclave_generation;
 mod secret_transfer;
+mod secure_enclave_generation;
 mod selector_discovery;
 
 pub use expiry::{modify_expiry, ModifyExpiryResult};
@@ -251,8 +251,8 @@ pub use revocation::{
     parse_revocation_cert,
 };
 pub use s2k::{parse_s2k_params, S2kInfo};
-pub use secure_enclave_generation::generate_secure_enclave_public_certificate;
 pub use secret_transfer::{export_secret_key, extract_secret_key_bytes, import_secret_key};
+pub use secure_enclave_generation::generate_secure_enclave_public_certificate;
 pub use selector_discovery::discover_certificate_selectors;
 
 fn select_display_user_id(

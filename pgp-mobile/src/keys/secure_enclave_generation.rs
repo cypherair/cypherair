@@ -3,16 +3,13 @@ use super::*;
 use openpgp::crypto::mpi;
 use openpgp::packet::{key, signature, Key, Packet, UserID};
 use openpgp::types::{
-    Curve, Features, HashAlgorithm, KeyFlags, PublicKeyAlgorithm, SignatureType,
-    SymmetricAlgorithm,
+    Curve, Features, HashAlgorithm, KeyFlags, PublicKeyAlgorithm, SignatureType, SymmetricAlgorithm,
 };
 use openssl::bn::BigNumContext;
 use openssl::ec::{EcGroup, EcPoint};
 use openssl::nid::Nid;
 
-use crate::external_signer::{
-    ExternalP256Signature, ExternalP256Signer, ExternalP256SignerError,
-};
+use crate::external_signer::{ExternalP256Signature, ExternalP256Signer, ExternalP256SignerError};
 
 const P256_X963_PUBLIC_KEY_LENGTH: usize = 65;
 #[cfg(test)]
@@ -65,22 +62,24 @@ pub fn generate_secure_enclave_public_certificate(
             }
         })?;
 
-    let mut cert = openpgp::Cert::try_from(vec![Packet::from(signing_key)])
-        .map_err(|error| PgpError::KeyGenerationFailed {
+    let mut cert = openpgp::Cert::try_from(vec![Packet::from(signing_key)]).map_err(|error| {
+        PgpError::KeyGenerationFailed {
             reason: format!("Failed to create public certificate: {error}"),
-        })?;
+        }
+    })?;
 
     let user_id_packet = UserID::from(user_id);
-    let mut user_id_builder = signature::SignatureBuilder::new(SignatureType::PositiveCertification)
-        .set_hash_algo(HashAlgorithm::SHA256)
-        .set_key_flags(KeyFlags::empty().set_certification().set_signing())
-        .map_err(|error| PgpError::KeyGenerationFailed {
-            reason: format!("Failed to set user ID key flags: {error}"),
-        })?
-        .set_key_validity_period(validity)
-        .map_err(|error| PgpError::KeyGenerationFailed {
-            reason: format!("Failed to set key validity period: {error}"),
-        })?;
+    let mut user_id_builder =
+        signature::SignatureBuilder::new(SignatureType::PositiveCertification)
+            .set_hash_algo(HashAlgorithm::SHA256)
+            .set_key_flags(KeyFlags::empty().set_certification().set_signing())
+            .map_err(|error| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to set user ID key flags: {error}"),
+            })?
+            .set_key_validity_period(validity)
+            .map_err(|error| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to set key validity period: {error}"),
+            })?;
     if matches!(input.version, SecureEnclaveCertificateVersion::V4) {
         user_id_builder = user_id_builder
             .set_features(Features::empty().set_seipdv1())
@@ -214,10 +213,7 @@ fn signer_for_provider(
     provider: Arc<dyn ExternalP256SigningProvider>,
 ) -> openpgp::Result<
     ExternalP256Signer<
-        impl FnMut(
-                HashAlgorithm,
-                &[u8],
-            ) -> Result<ExternalP256Signature, ExternalP256SignerError>
+        impl FnMut(HashAlgorithm, &[u8]) -> Result<ExternalP256Signature, ExternalP256SignerError>
             + Send
             + Sync,
     >,
@@ -228,9 +224,9 @@ fn signer_for_provider(
                 "external P-256 signer supports SHA-256 only",
             ));
         }
-        let signature = provider
-            .sign_sha256_digest(digest.to_vec())
-            .map_err(|_| ExternalP256SignerError::ExternalFailure("external P-256 signer failed"))?;
+        let signature = provider.sign_sha256_digest(digest.to_vec()).map_err(|_| {
+            ExternalP256SignerError::ExternalFailure("external P-256 signer failed")
+        })?;
         Ok(ExternalP256Signature::new(signature.r, signature.s))
     })
 }
@@ -255,17 +251,17 @@ fn validate_public_key_point(public_key_x963: &[u8], label: &str) -> Result<(), 
     let mut context = BigNumContext::new().map_err(|error| PgpError::InternalError {
         reason: format!("Failed to initialize P-256 context: {error}"),
     })?;
-    let point =
-        EcPoint::from_bytes(&group, public_key_x963, &mut context).map_err(|_| {
-            PgpError::InvalidKeyData {
-                reason: format!("{label} is not a valid P-256 public point"),
-            }
-        })?;
-    let on_curve = point
-        .is_on_curve(&group, &mut context)
-        .map_err(|_| PgpError::InvalidKeyData {
+    let point = EcPoint::from_bytes(&group, public_key_x963, &mut context).map_err(|_| {
+        PgpError::InvalidKeyData {
             reason: format!("{label} is not a valid P-256 public point"),
-        })?;
+        }
+    })?;
+    let on_curve =
+        point
+            .is_on_curve(&group, &mut context)
+            .map_err(|_| PgpError::InvalidKeyData {
+                reason: format!("{label} is not a valid P-256 public point"),
+            })?;
     if !on_curve {
         return Err(PgpError::InvalidKeyData {
             reason: format!("{label} is not a valid P-256 public point"),
@@ -301,14 +297,12 @@ mod tests {
             })?;
             match keypair.sign(HashAlgorithm::SHA256, &digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(P256EcdsaSignature {
-                    r: r
-                        .value_padded(P256_SCALAR_LENGTH)
+                    r: r.value_padded(P256_SCALAR_LENGTH)
                         .map_err(|error| PgpError::SigningFailed {
                             reason: error.to_string(),
                         })?
                         .into_owned(),
-                    s: s
-                        .value_padded(P256_SCALAR_LENGTH)
+                    s: s.value_padded(P256_SCALAR_LENGTH)
                         .map_err(|error| PgpError::SigningFailed {
                             reason: error.to_string(),
                         })?
@@ -357,14 +351,12 @@ mod tests {
             })?;
             match keypair.sign(HashAlgorithm::SHA256, &digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(P256EcdsaSignature {
-                    r: r
-                        .value_padded(P256_SCALAR_LENGTH)
+                    r: r.value_padded(P256_SCALAR_LENGTH)
                         .map_err(|error| PgpError::SigningFailed {
                             reason: error.to_string(),
                         })?
                         .into_owned(),
-                    s: s
-                        .value_padded(P256_SCALAR_LENGTH)
+                    s: s.value_padded(P256_SCALAR_LENGTH)
                         .map_err(|error| PgpError::SigningFailed {
                             reason: error.to_string(),
                         })?
@@ -383,7 +375,9 @@ mod tests {
         signing_keypair: openpgp::crypto::KeyPair,
     }
 
-    fn public_material(version: SecureEnclaveCertificateVersion) -> openpgp::Result<PublicMaterial> {
+    fn public_material(
+        version: SecureEnclaveCertificateVersion,
+    ) -> openpgp::Result<PublicMaterial> {
         let signing: Key<key::SecretParts, key::PrimaryRole> = match version {
             SecureEnclaveCertificateVersion::V4 => {
                 key::Key4::generate_ecc(true, Curve::NistP256)?.into()
@@ -415,11 +409,12 @@ mod tests {
         key: &Key<key::PublicParts, key::UnspecifiedRole>,
     ) -> openpgp::Result<Vec<u8>> {
         match key.mpis() {
-            mpi::PublicKey::ECDSA { q, .. } | mpi::PublicKey::ECDH { q, .. } => Ok(q.value().into()),
-            _ => Err(openpgp::Error::InvalidOperation(
-                "expected P-256 public point".to_string(),
-            )
-            .into()),
+            mpi::PublicKey::ECDSA { q, .. } | mpi::PublicKey::ECDH { q, .. } => {
+                Ok(q.value().into())
+            }
+            _ => Err(
+                openpgp::Error::InvalidOperation("expected P-256 public point".to_string()).into(),
+            ),
         }
     }
 
@@ -468,7 +463,11 @@ mod tests {
         );
         assert_eq!(
             result.signing_key_fingerprint,
-            cert.primary_key().key().fingerprint().to_hex().to_lowercase()
+            cert.primary_key()
+                .key()
+                .fingerprint()
+                .to_hex()
+                .to_lowercase()
         );
 
         let primary = cert.primary_key().key();
@@ -480,7 +479,12 @@ mod tests {
             _ => panic!("primary key should be ECDSA P-256"),
         }
 
-        let subkey = cert.keys().subkeys().next().expect("subkey should exist").key();
+        let subkey = cert
+            .keys()
+            .subkeys()
+            .next()
+            .expect("subkey should exist")
+            .key();
         match subkey.mpis() {
             mpi::PublicKey::ECDH {
                 curve: Curve::NistP256,
@@ -524,9 +528,8 @@ mod tests {
             let input = input_for(version, &material);
             let signing_public_key_x963 = material.signing_public_key_x963.clone();
             let key_agreement_public_key_x963 = material.key_agreement_public_key_x963.clone();
-            let result =
-                generate_secure_enclave_public_certificate(input, provider_for(material))
-                    .expect("certificate should generate");
+            let result = generate_secure_enclave_public_certificate(input, provider_for(material))
+                .expect("certificate should generate");
             assert_valid_result(
                 version,
                 &result,
@@ -550,11 +553,9 @@ mod tests {
 
         let mut duplicate = input_for(SecureEnclaveCertificateVersion::V4, &material);
         duplicate.key_agreement_public_key_x963 = duplicate.signing_public_key_x963.clone();
-        assert!(generate_secure_enclave_public_certificate(
-            duplicate,
-            provider_for(material),
-        )
-        .is_err());
+        assert!(
+            generate_secure_enclave_public_certificate(duplicate, provider_for(material),).is_err()
+        );
     }
 
     #[test]
