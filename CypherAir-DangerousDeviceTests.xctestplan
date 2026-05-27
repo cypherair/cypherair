@@ -1,8 +1,8 @@
 {
   "configurations" : [
     {
-      "id" : "1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D",
-      "name" : "Device Configuration",
+      "id" : "9B2C3D4E-5F6A-7B8C-9D0E-1F2A3B4C5D6E",
+      "name" : "Dangerous Device Configuration",
       "options" : {
 
       }
@@ -21,14 +21,7 @@
         "includeXCTests" : true
       },
       "selectedTests" : [
-        "DeviceSecureEnclaveTests",
-        "DeviceSecureEnclaveCustodyHandleStoreTests",
-        "DeviceAuthenticationManagerTests",
-        "DeviceModeSwitchTests",
-        "DeviceProtectedDataRootSecretStoreTests",
-        "DeviceMIETests",
-        "DeviceSystemMemoryTests",
-        "DevicePerformanceTests"
+        "DeviceDangerousSecureEnclaveCustodyResetCleanupTests"
       ],
       "target" : {
         "containerPath" : "container:CypherAir.xcodeproj",

@@ -172,10 +172,11 @@ without returning plaintext or falling back to stored secret-certificate
 decryption. It is not a UniFFI API, response-file bridge, Security handle store,
 or real Secure Enclave route.
 
-Phase 3A/3B add the first Security-layer store and cleanup/recovery seams for
-that future custody model. The store uses permanent `SecKey` / `kSecClassKey` rows with
-`kSecAttrTokenIDSecureEnclave` to create two distinct P-256 private-operation
-handles per handle set: `.signing` and `.keyAgreement`. The application tag is
+Phase 3A/3B/3C add the first Security-layer store, cleanup/recovery seams, and
+guarded device evidence for that future custody model. The store uses permanent
+`SecKey` / `kSecClassKey` rows with `kSecAttrTokenIDSecureEnclave` to create two
+distinct P-256 private-operation handles per handle set: `.signing` and
+`.keyAgreement`. The application tag is
 Security-private (`com.cypherair.v1.secure-enclave-custody.<random-id>.<role>`)
 and intentionally contains no fingerprint. ProtectedData `key-metadata` still
 does not store Apple handle locators, access-control policy, or private
