@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use openpgp::cert::prelude::*;
@@ -48,6 +49,65 @@ pub struct GeneratedKey {
     pub key_version: u8,
     /// The profile used to generate this key.
     pub profile: KeyProfile,
+}
+
+/// OpenPGP certificate version for Secure Enclave custody public-certificate construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SecureEnclaveCertificateVersion {
+    /// RFC 4880-compatible v4 P-256 certificate shape.
+    V4,
+    /// RFC 9580-oriented v6 P-256 certificate shape.
+    V6,
+}
+
+/// Public-only input for Secure Enclave custody OpenPGP certificate construction.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclavePublicCertificateInput {
+    /// Display name for the self-certified User ID.
+    pub name: String,
+    /// Optional email address for the User ID.
+    pub email: Option<String>,
+    /// Validity period from now in seconds. Defaults to two years when omitted.
+    pub expiry_seconds: Option<u64>,
+    /// Desired OpenPGP certificate version.
+    pub version: SecureEnclaveCertificateVersion,
+    /// 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+    pub signing_public_key_x963: Vec<u8>,
+    /// 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+    pub key_agreement_public_key_x963: Vec<u8>,
+}
+
+/// Fixed-width P-256 ECDSA signature returned by an external private-operation provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct P256EcdsaSignature {
+    /// 32-byte ECDSA r scalar.
+    pub r: Vec<u8>,
+    /// 32-byte ECDSA s scalar.
+    pub s: Vec<u8>,
+}
+
+/// Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+#[uniffi::export(with_foreign)]
+pub trait ExternalP256SigningProvider: Send + Sync {
+    /// Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
+    fn sign_sha256_digest(&self, digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError>;
+}
+
+/// Public-only Secure Enclave custody certificate generation result.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclaveGeneratedPublicCertificate {
+    /// Binary OpenPGP public certificate. This never contains secret key material.
+    pub public_key_data: Vec<u8>,
+    /// Binary key-level revocation signature.
+    pub revocation_cert: Vec<u8>,
+    /// Certificate fingerprint as lowercase hex.
+    pub fingerprint: String,
+    /// OpenPGP key version.
+    pub key_version: u8,
+    /// Primary signing key fingerprint as lowercase hex.
+    pub signing_key_fingerprint: String,
+    /// Key-agreement subkey fingerprint as lowercase hex.
+    pub key_agreement_subkey_fingerprint: String,
 }
 
 /// Information extracted from a parsed key.
@@ -177,6 +237,7 @@ mod profile;
 mod public_certificates;
 mod revocation;
 mod s2k;
+mod secure_enclave_generation;
 mod secret_transfer;
 mod selector_discovery;
 
@@ -190,6 +251,7 @@ pub use revocation::{
     parse_revocation_cert,
 };
 pub use s2k::{parse_s2k_params, S2kInfo};
+pub use secure_enclave_generation::generate_secure_enclave_public_certificate;
 pub use secret_transfer::{export_secret_key, extract_secret_key_bytes, import_secret_key};
 pub use selector_discovery::discover_certificate_selectors;
 

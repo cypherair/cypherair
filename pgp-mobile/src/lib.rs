@@ -11,7 +11,6 @@ pub mod encrypt;
 pub mod error;
 #[cfg(test)]
 mod external_decryptor;
-#[cfg(test)]
 mod external_signer;
 pub mod keys;
 pub mod password;
@@ -31,8 +30,10 @@ use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::error::PgpError;
 use crate::keys::{
-    CertificateMergeResult, DiscoveredCertificateSelectors, GeneratedKey, KeyInfo, KeyProfile,
-    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo, UserIdSelectorInput,
+    CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256SigningProvider,
+    GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, PublicCertificateValidationResult,
+    S2kInfo, SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicCertificateInput,
+    UserIdSelectorInput,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -70,6 +71,19 @@ impl PgpEngine {
         profile: KeyProfile,
     ) -> Result<GeneratedKey, PgpError> {
         keys::generate_key_with_profile(name, email, expiry_seconds, profile)
+    }
+
+    /// Build a public-only P-256 OpenPGP certificate whose private operations are external.
+    ///
+    /// The external signer only receives SHA-256 certificate-signing digests and returns
+    /// fixed-width ECDSA r/s scalars. Packet construction, hashing, binding signatures,
+    /// revocation construction, and public-key verification remain Rust/Sequoia-owned.
+    pub fn generate_secure_enclave_public_certificate(
+        &self,
+        input: SecureEnclavePublicCertificateInput,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+    ) -> Result<SecureEnclaveGeneratedPublicCertificate, PgpError> {
+        keys::generate_secure_enclave_public_certificate(input, signer)
     }
 
     // ── Key Information ─────────────────────────────────────────────
