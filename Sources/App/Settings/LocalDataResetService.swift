@@ -36,6 +36,7 @@ final class LocalDataResetService {
     private let legacySelfTestReportsDirectory: URL
     private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let protectedDataRootSecretExists: () -> Bool
+    private let secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore?
     private let traceStore: AuthLifecycleTraceStore?
 
     init(
@@ -56,6 +57,7 @@ final class LocalDataResetService {
         fileManager: FileManager = .default,
         legacySelfTestReportsDirectory: URL? = nil,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.keychain = keychain
@@ -83,6 +85,7 @@ final class LocalDataResetService {
                 authenticationContext: nil
             )
         }
+        self.secureEnclaveCustodyHandleStore = secureEnclaveCustodyHandleStore
         self.traceStore = traceStore
     }
 
@@ -137,6 +140,10 @@ final class LocalDataResetService {
             account: KeychainConstants.defaultAccount,
             authenticationContext: authenticationContext,
             failureKey: "keychain.protectedDataRootSecretLegacyCleanup",
+            failures: &failures
+        )
+        cleanupSecureEnclaveCustodyHandles(
+            deletedKeychainItemCount: &deletedKeychainItemCount,
             failures: &failures
         )
 
@@ -377,6 +384,9 @@ final class LocalDataResetService {
                 authenticationContext: authenticationContext,
                 failures: &failures
             )
+            let remainingSecureEnclaveCustodyHandleCount = remainingSecureEnclaveCustodyHandleCount(
+                failures: &failures
+            )
             let remainingTemporaryTargets = temporaryResetTargetsRemaining()
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             let hasRemainingData = hasProtectedArtifacts
@@ -384,6 +394,7 @@ final class LocalDataResetService {
                 || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
                 || !remainingMetadataAccountServices.isEmpty
+                || remainingSecureEnclaveCustodyHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
                 || !keyManagement.keys.isEmpty
                 || remainingContactRuntimeCount > 0
@@ -401,6 +412,7 @@ final class LocalDataResetService {
                     "legacySelfTestReportsDirectoryExists": legacySelfTestReportsDirectoryExists ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
                     "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
+                    "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
                     "keyCount": String(keyManagement.keys.count),
                     "contactCount": String(remainingContactRuntimeCount)
@@ -430,6 +442,9 @@ final class LocalDataResetService {
             if !remainingMetadataAccountServices.isEmpty {
                 failures.append("keychain.metadata.remaining.\(remainingMetadataAccountServices.count)")
             }
+            if remainingSecureEnclaveCustodyHandleCount > 0 {
+                failures.append("keychain.secureEnclaveCustodyHandle.remaining.\(remainingSecureEnclaveCustodyHandleCount)")
+            }
             if !remainingTemporaryTargets.isEmpty {
                 failures.append("temporary.remaining.\(remainingTemporaryTargets.count)")
             }
@@ -452,6 +467,37 @@ final class LocalDataResetService {
         }
     }
 
+    private func cleanupSecureEnclaveCustodyHandles(
+        deletedKeychainItemCount: inout Int,
+        failures: inout [String]
+    ) {
+        guard let secureEnclaveCustodyHandleStore else {
+            return
+        }
+        traceStore?.record(
+            category: .operation,
+            name: "localDataReset.secureEnclaveCustody.cleanup.start",
+            metadata: ["serviceKind": "secureEnclaveCustodyHandle"]
+        )
+        let result = secureEnclaveCustodyHandleStore.cleanupAllHandlesForLocalDataReset()
+        deletedKeychainItemCount += result.deletedHandleCount
+        var metadata = [
+            "serviceKind": "secureEnclaveCustodyHandle",
+            "result": result.succeeded ? "success" : "failed",
+            "inspectedHandleCount": String(result.inspectedHandleCount),
+            "deletedHandleCount": String(result.deletedHandleCount)
+        ]
+        if let failureCategory = result.failureCategory {
+            metadata["failureCategory"] = failureCategory.rawValue
+            failures.append("keychain.secureEnclaveCustodyHandle.\(failureCategory.rawValue)")
+        }
+        traceStore?.record(
+            category: .operation,
+            name: "localDataReset.secureEnclaveCustody.cleanup.finish",
+            metadata: metadata
+        )
+    }
+
     private func remainingKeychainServices(
         account: String,
         authenticationContext: LAContext?,
@@ -466,6 +512,18 @@ final class LocalDataResetService {
         } catch {
             failures.append("keychain.remaining.\(AuthTraceMetadata.keychainAccountKind(for: account)).\(String(describing: type(of: error)))")
             return []
+        }
+    }
+
+    private func remainingSecureEnclaveCustodyHandleCount(failures: inout [String]) -> Int {
+        guard let secureEnclaveCustodyHandleStore else {
+            return 0
+        }
+        do {
+            return try secureEnclaveCustodyHandleStore.remainingHandleCountForLocalDataReset()
+        } catch {
+            failures.append("keychain.remaining.secureEnclaveCustodyHandle.\(Self.failureName(for: error))")
+            return 0
         }
     }
 

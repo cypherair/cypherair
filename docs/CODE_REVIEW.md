@@ -34,6 +34,7 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 - [ ] Secure Enclave custody failure mapping uses shared key operation failure categories and does not leak plaintext, private material, session keys, KEKs, Keychain locators, fingerprints, or temporary capability paths
 - [ ] Secure Enclave custody handle changes keep signing and key-agreement handles distinct, use `kSecClassKey`/`kSecAttrTokenIDSecureEnclave`, preserve biometrics-only private-key usage access control, and never reuse the legacy `se-key` / `salt` / `sealed-key` wrapping bundle
+- [ ] Secure Enclave custody inventory, cleanup, and local reset paths delete only app-owned custody handles, treat missing handles as idempotent cleanup, fail closed on list/delete/remaining-row errors, and expose only sanitized role/category/count metadata
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
 - [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed
