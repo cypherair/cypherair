@@ -174,15 +174,17 @@ fn test_cross_profile_signature_verification() {
     // Profile A signs, Profile B verifies
     let signed_a =
         sign::sign_cleartext(text, &key_a.cert_data).expect("Profile A signing should succeed");
-    let verify_a_by_b = verify::verify_cleartext_detailed(&signed_a, &[key_a.public_key_data.clone()])
-        .expect("Profile B should verify Profile A signature");
+    let verify_a_by_b =
+        verify::verify_cleartext_detailed(&signed_a, &[key_a.public_key_data.clone()])
+            .expect("Profile B should verify Profile A signature");
     assert_eq!(verify_a_by_b.legacy_status, SignatureStatus::Valid);
 
     // Profile B signs, Profile A verifies
     let signed_b =
         sign::sign_cleartext(text, &key_b.cert_data).expect("Profile B signing should succeed");
-    let verify_b_by_a = verify::verify_cleartext_detailed(&signed_b, &[key_b.public_key_data.clone()])
-        .expect("Profile A should verify Profile B signature");
+    let verify_b_by_a =
+        verify::verify_cleartext_detailed(&signed_b, &[key_b.public_key_data.clone()])
+            .expect("Profile A should verify Profile B signature");
     assert_eq!(verify_b_by_a.legacy_status, SignatureStatus::Valid);
 }
 

@@ -141,9 +141,12 @@ fn test_unicode_passphrase_export_import_profile_b() {
             encrypt::encrypt_binary(plaintext, &[key.public_key_data.clone()], None, None)
                 .expect("Encrypt should succeed");
 
-        let result = decrypt::decrypt_detailed(&ciphertext, &[imported.clone()], &[]).unwrap_or_else(|e| {
-            panic!("Decrypt with reimported key (passphrase '{passphrase}') should succeed: {e}")
-        });
+        let result = decrypt::decrypt_detailed(&ciphertext, &[imported.clone()], &[])
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Decrypt with reimported key (passphrase '{passphrase}') should succeed: {e}"
+                )
+            });
 
         assert_eq!(
             result.plaintext, plaintext,

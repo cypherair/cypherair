@@ -49,6 +49,7 @@ jobs:
           rustup set profile minimal
           rustup toolchain install stable
           rustup default stable
+          rustup component add rustfmt --toolchain stable
           rustc +stable --version
           cargo +stable --version
       - name: Audit Rust dependencies
@@ -79,6 +80,7 @@ jobs:
           rustup default stable
           # Keep ordinary Rust validation and release metadata on the official stable channel.
           # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustup component add rustfmt --toolchain stable
           rustc +stable --version
           cargo +stable --version
 
@@ -156,6 +158,11 @@ jobs:
             echo "MARKETING_VERSION=$MARKETING_VERSION"
             echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER"
           } >> "$GITHUB_ENV"
+
+      - name: Check formatting and text hygiene
+        run: |
+          cargo +stable fmt --manifest-path pgp-mobile/Cargo.toml --all -- --check
+          python3 scripts/check_text_hygiene.py
 
       - name: Run full Rust suite
         run: |

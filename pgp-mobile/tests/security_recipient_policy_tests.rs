@@ -228,7 +228,10 @@ fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
         None,
         Some(&self_key.public_key_data),
     );
-    assert!(result.is_ok(), "encrypt-to-self should allow empty recipient list");
+    assert!(
+        result.is_ok(),
+        "encrypt-to-self should allow empty recipient list"
+    );
 }
 
 /// Encrypting to a signing-only cert (no encryption subkey) must fail (Profile B / v6).

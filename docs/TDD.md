@@ -186,7 +186,7 @@ The wrapper exposes profile-aware operations. Accept/return `Vec<u8>` for crypto
 #[uniffi::export]
 impl PgpEngine {
     fn generate_key(&self, user_id: String, profile: KeyProfile) -> Result<GeneratedKey, PgpError>;
-    fn encrypt(&self, plaintext: Vec<u8>, recipients: Vec<Vec<u8>>, 
+    fn encrypt(&self, plaintext: Vec<u8>, recipients: Vec<Vec<u8>>,
                signing_key: Option<Vec<u8>>, encrypt_to_self: Option<Vec<u8>>) -> Result<Vec<u8>, PgpError>;
     fn decrypt_detailed(&self, ciphertext: Vec<u8>, secret_keys: Vec<Vec<u8>>,
                         verification_keys: Vec<Vec<u8>>) -> Result<DecryptDetailedResult, PgpError>;

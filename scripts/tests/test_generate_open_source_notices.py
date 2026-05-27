@@ -62,6 +62,20 @@ class GenerateOpenSourceNoticesTests(unittest.TestCase):
         self.assertNotIn("wasm32-unknown-unknown", module.APPLE_NOTICE_TARGETS)
         self.assertNotIn("x86_64-pc-windows-msvc", module.APPLE_NOTICE_TARGETS)
 
+    def test_combine_license_texts_strips_trailing_whitespace(self) -> None:
+        combined = module.combine_license_texts(
+            [
+                ("LICENSE-A", "alpha  \n\nbeta\t\n"),
+                ("LICENSE-B", "gamma  "),
+            ]
+        )
+
+        for line in combined.splitlines():
+            self.assertEqual(line, line.rstrip(" \t"))
+        self.assertIn("alpha\n\nbeta\n", combined)
+        self.assertIn("gamma\n", combined)
+        self.assertTrue(combined.endswith("\n"))
+
     def metadata(
         self,
         *,

@@ -148,13 +148,13 @@ TabView {
     ToolbarItem(placement: .primaryAction) {
         Button("Encrypt", systemImage: "lock.fill") { ... }
     }
-    
+
     // Grouped under shared glass background
     ToolbarItemGroup(placement: .secondaryAction) {
         Button("Copy") { ... }
         Button("Share") { ... }
     }
-    
+
     // Split into separate glass groups
     ToolbarItem(placement: .primaryAction) {
         Button("Action A") { ... }

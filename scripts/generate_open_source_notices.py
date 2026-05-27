@@ -350,14 +350,18 @@ def render_license_text(package: PackageRecord) -> tuple[str, LicenseSource]:
 
 def combine_license_texts(texts: list[tuple[str, str]]) -> str:
     if len(texts) == 1:
-        return texts[0][1]
+        return normalize_text_hygiene(texts[0][1])
 
     chunks = []
     for index, (name, text) in enumerate(texts):
         if index > 0:
             chunks.append("\n\n")
-        chunks.append(f"===== {name} =====\n\n{text}")
-    return "".join(chunks)
+        chunks.append(f"===== {name} =====\n\n{normalize_text_hygiene(text)}")
+    return normalize_text_hygiene("".join(chunks))
+
+
+def normalize_text_hygiene(text: str) -> str:
+    return "\n".join(line.rstrip(" \t") for line in text.splitlines()) + "\n"
 
 
 def resource_file_name(package: PackageRecord) -> str:

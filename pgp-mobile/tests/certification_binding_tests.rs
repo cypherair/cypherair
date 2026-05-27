@@ -87,8 +87,8 @@ fn duplicate_userid(secret_cert: &[u8], duplicate_user_id: &str) -> Vec<u8> {
         .serialize(&mut binding_bytes)
         .expect("binding packet should serialize");
 
-    let raw_cert = openpgp::cert::raw::RawCert::from_bytes(secret_cert)
-        .expect("raw secret cert should parse");
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
     let mut duplicated = Vec::new();
     let mut inserted = false;
 
@@ -501,8 +501,8 @@ fn test_generate_and_verify_user_id_certification_preserves_kind_for_all_profile
 }
 
 #[test]
-fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_occurrence_selector()
-{
+fn test_generate_and_verify_user_id_certification_by_selector_accepts_duplicate_occurrence_selector(
+) {
     let signer = generated_key(KeyProfile::Advanced, "SelectorKindSigner");
     let target = generated_key(KeyProfile::Advanced, "SelectorKindTarget");
     let duplicated = duplicate_userid(

@@ -245,7 +245,7 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureRes
 #endif
 #ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_PROGRESS_REPORTER_METHOD0
 #define UNIFFI_FFIDEF_CALLBACK_INTERFACE_PROGRESS_REPORTER_METHOD0
-typedef void (*UniffiCallbackInterfaceProgressReporterMethod0)(uint64_t, uint64_t, uint64_t, int8_t* _Nonnull, 
+typedef void (*UniffiCallbackInterfaceProgressReporterMethod0)(uint64_t, uint64_t, uint64_t, int8_t* _Nonnull,
         RustCallStatus *_Nonnull uniffiCallStatus
     );
 
@@ -272,7 +272,7 @@ void uniffi_pgp_mobile_fn_free_pgpengine(uint64_t handle, RustCallStatus *_Nonnu
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CONSTRUCTOR_PGPENGINE_NEW
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_CONSTRUCTOR_PGPENGINE_NEW
 uint64_t uniffi_pgp_mobile_fn_constructor_pgpengine_new(RustCallStatus *_Nonnull out_status
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_FN_METHOD_PGPENGINE_ARMOR
@@ -748,247 +748,247 @@ void ffi_pgp_mobile_rust_future_complete_void(uint64_t handle, RustCallStatus *_
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ARMOR
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ARMOR
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_armor(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ARMOR_PUBLIC_KEY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ARMOR_PUBLIC_KEY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_armor_public_key(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DEARMOR
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DEARMOR
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_dearmor(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECODE_QR_URL
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECODE_QR_URL
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_FILE_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DECRYPT_WITH_PASSWORD
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DETECT_PROFILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_detect_profile(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DISCOVER_CERTIFICATE_SELECTORS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_DISCOVER_CERTIFICATE_SELECTORS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCODE_QR_URL
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCODE_QR_URL
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_BINARY_WITH_PASSWORD
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_FILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_ENCRYPT_WITH_PASSWORD
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_EXPORT_SECRET_KEY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_EXPORT_SECRET_KEY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_KEY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_KEY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_generate_key(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_KEY_REVOCATION
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_KEY_REVOCATION
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_SUBKEY_REVOCATION
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_SUBKEY_REVOCATION
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_USER_ID_CERTIFICATION_BY_SELECTOR
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_USER_ID_CERTIFICATION_BY_SELECTOR
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_USER_ID_REVOCATION_BY_SELECTOR
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GENERATE_USER_ID_REVOCATION_BY_SELECTOR
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GET_KEY_VERSION
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_GET_KEY_VERSION
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_IMPORT_SECRET_KEY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_IMPORT_SECRET_KEY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MATCH_RECIPIENTS_FROM_FILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients_from_file(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MERGE_PUBLIC_CERTIFICATE_UPDATE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MERGE_PUBLIC_CERTIFICATE_UPDATE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MODIFY_EXPIRY
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_MODIFY_EXPIRY
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_KEY_INFO
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_KEY_INFO
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_RECIPIENTS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_RECIPIENTS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_REVOCATION_CERT
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_REVOCATION_CERT
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_S2K_PARAMS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_PARSE_S2K_PARAMS
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_CLEARTEXT
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_CLEARTEXT
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_DETACHED_FILE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_SIGN_DETACHED_FILE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VALIDATE_PUBLIC_CERTIFICATE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VALIDATE_PUBLIC_CERTIFICATE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_CLEARTEXT_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DETACHED_FILE_DETAILED
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DIRECT_KEY_SIGNATURE
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_DIRECT_KEY_SIGNATURE
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_USER_ID_BINDING_SIGNATURE_BY_SELECTOR
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PGPENGINE_VERIFY_USER_ID_BINDING_SIGNATURE_BY_SELECTOR
 uint16_t uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PROGRESSREPORTER_ON_PROGRESS
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_METHOD_PROGRESSREPORTER_ON_PROGRESS
 uint16_t uniffi_pgp_mobile_checksum_method_progressreporter_on_progress(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_CONSTRUCTOR_PGPENGINE_NEW
 #define UNIFFI_FFIDEF_UNIFFI_PGP_MOBILE_CHECKSUM_CONSTRUCTOR_PGPENGINE_NEW
 uint16_t uniffi_pgp_mobile_checksum_constructor_pgpengine_new(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_PGP_MOBILE_UNIFFI_CONTRACT_VERSION
 #define UNIFFI_FFIDEF_FFI_PGP_MOBILE_UNIFFI_CONTRACT_VERSION
 uint32_t ffi_pgp_mobile_uniffi_contract_version(void
-    
+
 );
 #endif
 

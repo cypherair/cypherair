@@ -43,8 +43,13 @@ jobs:
           rustup default stable
           # Keep ordinary Rust validation on the official stable channel.
           # The arm64e stage1 compiler is resolved explicitly by build-xcframework.sh.
+          rustup component add rustfmt --toolchain stable
           rustc +stable --version
           cargo +stable --version
+      - name: Check formatting and text hygiene
+        run: |
+          cargo +stable fmt --manifest-path pgp-mobile/Cargo.toml --all -- --check
+          python3 scripts/check_text_hygiene.py
       - name: Run full Rust suite
         run: |
           cargo +stable test --manifest-path pgp-mobile/Cargo.toml
