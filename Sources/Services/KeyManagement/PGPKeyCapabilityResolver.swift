@@ -3,13 +3,21 @@ import Foundation
 /// Pure policy resolver for OpenPGP configuration, custody, and operation support.
 struct PGPKeyCapabilityResolver: Sendable {
     struct Policy: Equatable, Sendable {
+        var secureEnclaveGenerationSupport: PGPKeyOperationSupport
         var secureEnclavePrivateOperationSupport: PGPKeyOperationSupport
 
         static let production = Policy(
+            secureEnclaveGenerationSupport: .unavailable,
             secureEnclavePrivateOperationSupport: .unavailable
         )
 
         static let testSecureEnclavePrivateOperations = Policy(
+            secureEnclaveGenerationSupport: .unavailable,
+            secureEnclavePrivateOperationSupport: .notImplemented
+        )
+
+        static let testSecureEnclaveGeneration = Policy(
+            secureEnclaveGenerationSupport: .supported,
             secureEnclavePrivateOperationSupport: .notImplemented
         )
     }
@@ -115,7 +123,7 @@ struct PGPKeyCapabilityResolver: Sendable {
     ) -> PGPKeyOperationResolution {
         switch operation {
         case .generate:
-            return .unavailable(.operationUnavailableByPolicy)
+            return resolutionForPolicySupport(policy.secureEnclaveGenerationSupport)
         case .sign,
              .decrypt,
              .certify,

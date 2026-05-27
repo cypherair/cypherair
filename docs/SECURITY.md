@@ -157,6 +157,20 @@ interaction failure, missing/partial/wrong-public handle states, cleanup, and
 sanitized traces. These handles are not exposed to UI, Rust/UniFFI, or
 ProtectedData metadata in Phase 3.
 
+**Hidden Secure Enclave custody generation note:** Phase 4A adds an internal
+hidden/test-only generation path. It creates the two role-tagged Secure Enclave
+P-256 handles, loads the signing handle for digest signing, and asks Rust to
+build a public-only v4/v6 OpenPGP certificate plus key-level revocation
+artifact. Rust receives only public X9.63 points and SHA-256 digest-signing
+callbacks; it verifies each returned fixed-width ECDSA `r/s` response against
+the signing public key and digest. The resulting `PGPKeyIdentity` persists
+P-256 configuration and `.appleSecureEnclavePrivateOperations` custody in
+`key-metadata` schema v2, but still does not persist Apple application tags,
+handle-set identifiers, access-control policy, private material, digests, or
+signatures. Current software-key generation and UI exposure remain unchanged,
+and production capability resolution still reports Secure Enclave generation as
+policy-unavailable unless the internal hidden/test policy is explicitly used.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
