@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-05-13
+Snapshot date: 2026-05-27
 
 ## Repo Identity
 
@@ -164,8 +164,6 @@ Snapshot date: 2026-05-13
 - openssl-src-rs fork:
   - remote `cypherair/openssl-src-rs`
   - carry branch `carry/apple-arm64e-openssl-fork`
-- Related but currently unconfirmed in the active chain:
-  - remote `cypherair/rust-openssl`
 
 ## Upstreaming Posture
 
@@ -235,7 +233,7 @@ Update this file whenever any of the following changes:
   remote stage1 prerelease consumption policy
 - the `pgp-mobile/Cargo.toml` `openssl-src` patch target, branch, or lockfile
   policy
-- the role of `openssl`, `openssl-src-rs`, or `rust-openssl` in the chain
+- the role of `openssl` or `openssl-src-rs` in the chain
 - the app-side arm64e readiness status
 - the Rust stage1 prerelease workflow contract or arm64e release manifest shape
 - the edge, drill, stable release, or App Store candidate validation contract
