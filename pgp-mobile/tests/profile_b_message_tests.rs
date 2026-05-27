@@ -8,7 +8,15 @@ use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::streaming;
 use pgp_mobile::verify;
+use tempfile::NamedTempFile;
+
+fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
+    let input = NamedTempFile::new().expect("temp input should be created");
+    std::fs::write(input.path(), data).expect("temp input should be written");
+    input
+}
 
 /// C2B.1: Generate Ed448+X448 v6 key pair.
 /// Pass: key version is 6, algo is Ed448/X448.
@@ -79,7 +87,10 @@ fn test_sign_verify_text_profile_b() {
         .expect("Verification should succeed");
 
     assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint, Some(key.fingerprint.clone()));
+    assert_eq!(
+        result.legacy_signer_fingerprint,
+        Some(key.fingerprint.clone())
+    );
 }
 
 /// C2B.3: Encrypt + decrypt text (SEIPDv2 AEAD OCB).
@@ -154,8 +165,9 @@ fn test_encrypt_to_self_profile_b() {
     .expect("Encryption should succeed");
 
     // Both can decrypt
-    let result_recipient = decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data.clone()], &[])
-        .expect("Recipient should decrypt");
+    let result_recipient =
+        decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data.clone()], &[])
+            .expect("Recipient should decrypt");
     assert_eq!(result_recipient.plaintext, plaintext);
 
     let result_sender = decrypt::decrypt_detailed(&ciphertext, &[sender.cert_data.clone()], &[])
@@ -274,10 +286,18 @@ fn test_detached_signature_profile_b() {
 
     let data = b"File content for Profile B.";
 
-    let signature = sign::sign_detached(data, &key.cert_data).expect("Signing should succeed");
+    let input = write_temp_data_file(data);
+    let signature =
+        streaming::sign_detached_file(input.path().to_str().unwrap(), &key.cert_data, None)
+            .expect("Signing should succeed");
 
-    let result = verify::verify_detached_detailed(data, &signature, &[key.public_key_data.clone()])
-        .expect("Verification should succeed");
+    let result = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[key.public_key_data.clone()],
+        None,
+    )
+    .expect("Verification should succeed");
 
     assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }
@@ -322,8 +342,8 @@ fn test_concurrent_encrypt_decrypt_profile_b() {
     let handle1 = std::thread::spawn(move || {
         let ct = encrypt::encrypt(b"concurrent-msg-1", &[k1_pub], None, None)
             .expect("Concurrent encrypt should succeed");
-        let result =
-            decrypt::decrypt_detailed(&ct, &[k1_cert], &[]).expect("Concurrent decrypt should succeed");
+        let result = decrypt::decrypt_detailed(&ct, &[k1_cert], &[])
+            .expect("Concurrent decrypt should succeed");
         assert_eq!(result.plaintext, b"concurrent-msg-1");
     });
 
@@ -331,8 +351,8 @@ fn test_concurrent_encrypt_decrypt_profile_b() {
     let handle2 = std::thread::spawn(move || {
         let ct = encrypt::encrypt(b"concurrent-msg-2", &[k2_pub], None, None)
             .expect("Concurrent encrypt should succeed");
-        let result =
-            decrypt::decrypt_detailed(&ct, &[k2_cert], &[]).expect("Concurrent decrypt should succeed");
+        let result = decrypt::decrypt_detailed(&ct, &[k2_cert], &[])
+            .expect("Concurrent decrypt should succeed");
         assert_eq!(result.plaintext, b"concurrent-msg-2");
     });
 
@@ -393,8 +413,8 @@ fn test_multi_recipient_encrypt_decrypt_profile_b() {
     assert_eq!(result_alice.plaintext, plaintext);
 
     // Bob decrypts
-    let result_bob =
-        decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]).expect("Bob should decrypt");
+    let result_bob = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[])
+        .expect("Bob should decrypt");
     assert_eq!(result_bob.plaintext, plaintext);
 }
 

@@ -728,14 +728,13 @@ final class ModelTests: XCTestCase {
             verificationCertificateFingerprint: nil
         )
 
-        let detailed = PGPMessageResultMapper.detachedVerifyDetailedResult(
-            VerifyDetailedResult(
+        let detailed = PGPMessageResultMapper.fileVerifyDetailedResult(
+            FileVerifyDetailedResult(
                 legacyStatus: .unknownSigner,
                 legacySignerFingerprint: nil,
                 summaryState: .signerCertificateUnavailable,
                 summaryEntryIndex: 0,
-                signatures: [entry],
-                content: nil
+                signatures: [entry]
             ),
             context: PGPMessageVerificationContext(
                 verificationKeys: [],

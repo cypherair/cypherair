@@ -14,15 +14,16 @@ use std::time::Duration;
 use openpgp::packet::signature::subpacket::SubpacketTag;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::Serialize;
 use openpgp::serialize::stream::{Armorer, Encryptor, LiteralWriter, Message, Signer};
+use openpgp::serialize::Serialize;
 use openpgp::types::SignatureType;
 use pgp_mobile::armor::{self, ArmorKind};
 use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::keys::{self, KeyProfile};
-use pgp_mobile::signature_details::DetailedSignatureStatus;
-use pgp_mobile::verify;
+use pgp_mobile::signature_details::{DetailedSignatureStatus, FileVerifyDetailedResult};
+use pgp_mobile::streaming;
 use sequoia_openpgp as openpgp;
+use tempfile::NamedTempFile;
 
 fn extract_signing_keypair(cert_data: &[u8]) -> openpgp::crypto::KeyPair {
     let policy = StandardPolicy::new();
@@ -110,6 +111,21 @@ fn sign_detached_multi_binary(data: &[u8], signer_certs: &[&[u8]]) -> Vec<u8> {
         .expect("detached signer should accept data");
     signer.finalize().expect("detached signer should finalize");
     sink
+}
+
+fn verify_detached_file(
+    data: &[u8],
+    signature: &[u8],
+    verification_keys: &[Vec<u8>],
+) -> Result<FileVerifyDetailedResult, Box<dyn std::error::Error>> {
+    let input = NamedTempFile::new()?;
+    fs::write(input.path(), data)?;
+    Ok(streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        signature,
+        verification_keys,
+        None,
+    )?)
 }
 
 fn serialize_packet_pile(pile: &openpgp::PacketPile) -> Vec<u8> {
@@ -249,12 +265,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let expired_unknown = armor::encode_armor(&expired_unknown_binary, ArmorKind::Signature)?;
     let expired_bad = armor::encode_armor(&expired_bad_binary, ArmorKind::Signature)?;
 
-    let expired_unknown_verify = verify::verify_detached_detailed(
+    let expired_unknown_verify = verify_detached_file(
         &mixedfold_data,
         &expired_unknown,
         &[expired_signer.public_key_data.clone()],
     )?;
-    assert_eq!(expired_unknown_verify.legacy_status, SignatureStatus::Expired);
+    assert_eq!(
+        expired_unknown_verify.legacy_status,
+        SignatureStatus::Expired
+    );
     assert_eq!(expired_unknown_verify.signatures.len(), 2);
     assert_eq!(
         expired_unknown_verify.signatures[0].status,
@@ -265,7 +284,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DetailedSignatureStatus::Expired
     );
 
-    let expired_bad_verify = verify::verify_detached_detailed(
+    let expired_bad_verify = verify_detached_file(
         &mixedfold_data,
         &expired_bad,
         &[

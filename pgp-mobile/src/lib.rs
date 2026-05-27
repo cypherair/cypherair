@@ -273,12 +273,6 @@ impl PgpEngine {
         sign::sign_cleartext(&text, &signer_cert)
     }
 
-    /// Create a detached signature for data (files).
-    pub fn sign_detached(&self, data: Vec<u8>, signer_cert: Vec<u8>) -> Result<Vec<u8>, PgpError> {
-        let signer_cert = Zeroizing::new(signer_cert);
-        sign::sign_detached(&data, &signer_cert)
-    }
-
     // ── Verification ────────────────────────────────────────────────
 
     /// Verify a cleartext-signed message and preserve per-signature detailed results.
@@ -288,16 +282,6 @@ impl PgpEngine {
         verification_keys: Vec<Vec<u8>>,
     ) -> Result<VerifyDetailedResult, PgpError> {
         verify::verify_cleartext_detailed(&signed_message, &verification_keys)
-    }
-
-    /// Verify a detached signature and preserve per-signature detailed results.
-    pub fn verify_detached_detailed(
-        &self,
-        data: Vec<u8>,
-        signature: Vec<u8>,
-        verification_keys: Vec<Vec<u8>>,
-    ) -> Result<VerifyDetailedResult, PgpError> {
-        verify::verify_detached_detailed(&data, &signature, &verification_keys)
     }
 
     // ── Certificate Signature Verification ────────────────────────

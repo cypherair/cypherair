@@ -9,7 +9,15 @@ use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::streaming;
 use pgp_mobile::verify;
+use tempfile::NamedTempFile;
+
+fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
+    let input = NamedTempFile::new().expect("temp input should be created");
+    std::fs::write(input.path(), data).expect("temp input should be written");
+    input
+}
 
 /// C2A.1: Generate Ed25519+X25519 v4 key pair.
 /// Pass: key version is 4.
@@ -81,7 +89,10 @@ fn test_sign_verify_text_profile_a() {
         .expect("Verification should succeed");
 
     assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint, Some(key.fingerprint.clone()));
+    assert_eq!(
+        result.legacy_signer_fingerprint,
+        Some(key.fingerprint.clone())
+    );
 }
 
 /// C2A.3: Encrypt + decrypt text (SEIPDv1).
@@ -134,7 +145,10 @@ fn test_encrypt_decrypt_signed_profile_a() {
 
     assert_eq!(result.plaintext, plaintext);
     assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint, Some(sender.fingerprint.clone()));
+    assert_eq!(
+        result.legacy_signer_fingerprint,
+        Some(sender.fingerprint.clone())
+    );
 }
 
 /// C2A.4: Encrypt-to-self — sender decrypts own ciphertext.
@@ -160,8 +174,9 @@ fn test_encrypt_to_self_profile_a() {
     .expect("Encryption should succeed");
 
     // Recipient can decrypt
-    let result_recipient = decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data.clone()], &[])
-        .expect("Recipient should decrypt");
+    let result_recipient =
+        decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data.clone()], &[])
+            .expect("Recipient should decrypt");
     assert_eq!(result_recipient.plaintext, plaintext);
 
     // Sender can also decrypt (encrypt-to-self)
@@ -272,10 +287,18 @@ fn test_detached_signature_profile_a() {
 
     let data = b"File content to sign.";
 
-    let signature = sign::sign_detached(data, &key.cert_data).expect("Signing should succeed");
+    let input = write_temp_data_file(data);
+    let signature =
+        streaming::sign_detached_file(input.path().to_str().unwrap(), &key.cert_data, None)
+            .expect("Signing should succeed");
 
-    let result = verify::verify_detached_detailed(data, &signature, &[key.public_key_data.clone()])
-        .expect("Verification should succeed");
+    let result = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[key.public_key_data.clone()],
+        None,
+    )
+    .expect("Verification should succeed");
 
     assert_eq!(result.legacy_status, SignatureStatus::Valid);
 }
@@ -404,16 +427,16 @@ fn test_concurrent_encrypt_profile_a() {
     let handle1 = std::thread::spawn(move || {
         let ct = encrypt::encrypt(b"msg1", &[k1_pub], None, None)
             .expect("Concurrent encrypt 1 should succeed");
-        let result =
-            decrypt::decrypt_detailed(&ct, &[k1_cert], &[]).expect("Concurrent decrypt 1 should succeed");
+        let result = decrypt::decrypt_detailed(&ct, &[k1_cert], &[])
+            .expect("Concurrent decrypt 1 should succeed");
         assert_eq!(result.plaintext, b"msg1");
     });
 
     let handle2 = std::thread::spawn(move || {
         let ct = encrypt::encrypt(b"msg2", &[k2_pub], None, None)
             .expect("Concurrent encrypt 2 should succeed");
-        let result =
-            decrypt::decrypt_detailed(&ct, &[k2_cert], &[]).expect("Concurrent decrypt 2 should succeed");
+        let result = decrypt::decrypt_detailed(&ct, &[k2_cert], &[])
+            .expect("Concurrent decrypt 2 should succeed");
         assert_eq!(result.plaintext, b"msg2");
     });
 

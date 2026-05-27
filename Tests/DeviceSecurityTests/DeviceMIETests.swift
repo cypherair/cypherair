@@ -6,6 +6,12 @@ import LocalAuthentication
 
 /// C8: Hardware memory tagging and crypto workflow tests on device.
 final class DeviceMIETests: DeviceSecurityTestCase {
+    private func writeTemporaryFile(_ data: Data, name: String = "mie-\(UUID().uuidString).bin") throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try data.write(to: url)
+        return url
+    }
+
     // MARK: - C8.1: MIE Smoke Tests (SE Wrap/Unwrap)
 
     func test_mie_singleWrapUnwrapCycle_noTagMismatch() throws {
@@ -99,17 +105,22 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(verifyResult.legacyStatus, .valid,
             "Profile A cleartext signature must verify")
 
-        // 6. Detached sign.
-        let detachedSig = try engine.signDetached(
-            data: plaintext, signerCert: key.certData
+        // 6. Detached file sign.
+        let detachedURL = try writeTemporaryFile(plaintext)
+        defer { try? FileManager.default.removeItem(at: detachedURL) }
+        let detachedSig = try engine.signDetachedFile(
+            inputPath: detachedURL.path,
+            signerCert: key.certData,
+            progress: nil
         )
         XCTAssertFalse(detachedSig.isEmpty, "Detached signature must not be empty")
 
-        // 7. Verify detached signature.
-        let detachedVerify = try engine.verifyDetachedDetailed(
-            data: plaintext,
+        // 7. Verify detached file signature.
+        let detachedVerify = try engine.verifyDetachedFileDetailed(
+            dataPath: detachedURL.path,
             signature: detachedSig,
-            verificationKeys: [key.publicKeyData]
+            verificationKeys: [key.publicKeyData],
+            progress: nil
         )
         XCTAssertEqual(detachedVerify.legacyStatus, .valid,
             "Profile A detached signature must verify")
@@ -165,17 +176,22 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         XCTAssertEqual(verifyResult.legacyStatus, .valid,
             "Profile B cleartext signature must verify")
 
-        // 6. Detached sign.
-        let detachedSig = try engine.signDetached(
-            data: plaintext, signerCert: key.certData
+        // 6. Detached file sign.
+        let detachedURL = try writeTemporaryFile(plaintext)
+        defer { try? FileManager.default.removeItem(at: detachedURL) }
+        let detachedSig = try engine.signDetachedFile(
+            inputPath: detachedURL.path,
+            signerCert: key.certData,
+            progress: nil
         )
         XCTAssertFalse(detachedSig.isEmpty, "Profile B detached signature must not be empty")
 
-        // 7. Verify detached signature.
-        let detachedVerify = try engine.verifyDetachedDetailed(
-            data: plaintext,
+        // 7. Verify detached file signature.
+        let detachedVerify = try engine.verifyDetachedFileDetailed(
+            dataPath: detachedURL.path,
             signature: detachedSig,
-            verificationKeys: [key.publicKeyData]
+            verificationKeys: [key.publicKeyData],
+            progress: nil
         )
         XCTAssertEqual(detachedVerify.legacyStatus, .valid,
             "Profile B detached signature must verify")
@@ -402,16 +418,33 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertFalse(imported.isEmpty, "Argon2id S2K import must succeed")
 
-        // 9. Detached signatures (exercises Ed25519/Ed448 + SHA-512 in detached mode).
-        let detSigA = try engine.signDetached(data: plaintext, signerCert: keyA.certData)
-        let detVerifyA = try engine.verifyDetachedDetailed(
-            data: plaintext, signature: detSigA, verificationKeys: [keyA.publicKeyData]
+        // 9. Detached file signatures (exercises Ed25519/Ed448 + SHA-512 in detached mode).
+        let detachedURL = try writeTemporaryFile(plaintext)
+        defer { try? FileManager.default.removeItem(at: detachedURL) }
+
+        let detSigA = try engine.signDetachedFile(
+            inputPath: detachedURL.path,
+            signerCert: keyA.certData,
+            progress: nil
+        )
+        let detVerifyA = try engine.verifyDetachedFileDetailed(
+            dataPath: detachedURL.path,
+            signature: detSigA,
+            verificationKeys: [keyA.publicKeyData],
+            progress: nil
         )
         XCTAssertEqual(detVerifyA.legacyStatus, .valid, "Ed25519 detached sign/verify failed")
 
-        let detSigB = try engine.signDetached(data: plaintext, signerCert: keyB.certData)
-        let detVerifyB = try engine.verifyDetachedDetailed(
-            data: plaintext, signature: detSigB, verificationKeys: [keyB.publicKeyData]
+        let detSigB = try engine.signDetachedFile(
+            inputPath: detachedURL.path,
+            signerCert: keyB.certData,
+            progress: nil
+        )
+        let detVerifyB = try engine.verifyDetachedFileDetailed(
+            dataPath: detachedURL.path,
+            signature: detSigB,
+            verificationKeys: [keyB.publicKeyData],
+            progress: nil
         )
         XCTAssertEqual(detVerifyB.legacyStatus, .valid, "Ed448 detached sign/verify failed")
     }

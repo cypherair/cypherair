@@ -289,8 +289,8 @@ pgp-mobile/
 │   ├── decrypt.rs    # SEIPDv1 + SEIPDv2 (OCB/GCM), AEAD hard-fail
 │   ├── password.rs   # Password / SKESK message encrypt/decrypt
 │   ├── qr_url.rs     # QR URL scheme encode/decode validation
-│   ├── sign.rs       # Signing (cleartext + detached)
-│   ├── verify.rs     # Signature verification with graded results
+│   ├── sign.rs       # Cleartext signing and shared signer helpers
+│   ├── verify.rs     # Cleartext verification helpers with graded results
 │   ├── streaming.rs  # File-path-based streaming I/O with progress reporting and cancellation
 │   ├── armor.rs      # ASCII armor encode/decode
 │   └── error.rs      # PgpError enum (maps 1:1 to Swift throwing functions)

@@ -15,10 +15,18 @@ use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::streaming;
 use pgp_mobile::verify;
+use tempfile::NamedTempFile;
 
 mod common;
 use common::{detect_message_format, expected_plaintext, load_fixture};
+
+fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
+    let input = NamedTempFile::new().expect("temp input should be created");
+    std::fs::write(input.path(), data).expect("temp input should be written");
+    input
+}
 
 // ── C3.1: Export Profile A pubkey → gpg --import succeeds ──────────────────
 // This is verified during fixture generation (gpg imports our key).
@@ -122,10 +130,7 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     .expect("Should decrypt with GnuPG secret key");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(
-        result.legacy_status,
-        decrypt::SignatureStatus::Valid
-    );
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
 
 // ── C3.3: App (Profile A) sign → gpg --verify "Good signature" ────────────
@@ -220,9 +225,15 @@ fn test_c3_5_verify_gpg_detached_signature_armored() {
     let signature = load_fixture("gpg_detached_sig.asc");
     let pubkey = load_fixture("gpg_pubkey.asc");
     let data = expected_plaintext();
+    let input = write_temp_data_file(&data);
 
-    let result = verify::verify_detached_detailed(&data, &signature, &[pubkey])
-        .expect("Should verify GnuPG detached signature");
+    let result = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[pubkey],
+        None,
+    )
+    .expect("Should verify GnuPG detached signature");
 
     assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
@@ -233,9 +244,15 @@ fn test_c3_5_verify_gpg_detached_signature_binary() {
     let signature = load_fixture("gpg_detached_sig.sig");
     let pubkey = load_fixture("gpg_pubkey.gpg");
     let data = expected_plaintext();
+    let input = write_temp_data_file(&data);
 
-    let result = verify::verify_detached_detailed(&data, &signature, &[pubkey])
-        .expect("Should verify binary GnuPG detached signature");
+    let result = streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        &signature,
+        &[pubkey],
+        None,
+    )
+    .expect("Should verify binary GnuPG detached signature");
 
     assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
@@ -356,10 +373,7 @@ fn test_c3_7_full_roundtrip_signed() {
     .expect("Decrypt+verify should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(
-        result.legacy_status,
-        decrypt::SignatureStatus::Valid
-    );
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
 
 // ── C3.8: Profile B pubkey → gpg (GnuPG 2.4.x) ───────────────────────────
@@ -404,8 +418,9 @@ fn test_c3_8_profile_b_encryption_not_gnupg_compatible() {
         .expect("Encrypt should succeed");
 
     // Verify Sequoia can decrypt it (Profile B → Profile B works)
-    let result = decrypt::decrypt_detailed(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
-        .expect("Profile B self-decrypt should succeed");
+    let result =
+        decrypt::decrypt_detailed(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
+            .expect("Profile B self-decrypt should succeed");
     assert_eq!(result.plaintext, plaintext);
 
     // GnuPG would fail to decrypt this because:
@@ -628,10 +643,7 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     .expect("GnuPG recipient should decrypt SEIPDv1 message");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(
-        result.legacy_status,
-        decrypt::SignatureStatus::Valid
-    );
+    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
 }
 
 // ── Signed+compressed fixture test ──────────────────────────────────────
