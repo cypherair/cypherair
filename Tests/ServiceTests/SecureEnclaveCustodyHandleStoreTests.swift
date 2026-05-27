@@ -43,7 +43,7 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertFalse(policy.permitsDevicePasscodeFallback)
     }
 
-    func test_systemKeyCreationAttributesUseDataProtectionKeychainAndRoleCapabilities() throws {
+    func test_systemKeyCreationAttributesUseAppleSecureEnclaveCreationContract() throws {
         let accessControl = try SecureEnclaveCustodyAccessControlPolicy
             .privateKeyUsageBiometryAny
             .makeSecAccessControl()
@@ -64,8 +64,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertEqual(signingPrivateAttributes[kSecAttrIsPermanent as String] as? Bool, true)
         XCTAssertEqual(signingPrivateAttributes[kSecAttrApplicationTag as String] as? Data, signingReference.applicationTagData)
         XCTAssertNotNil(signingPrivateAttributes[kSecAttrAccessControl as String])
-        XCTAssertEqual(signingPrivateAttributes[kSecAttrCanSign as String] as? Bool, true)
-        XCTAssertEqual(signingPrivateAttributes[kSecAttrCanDerive as String] as? Bool, false)
+        XCTAssertNil(signingPrivateAttributes[kSecAttrCanSign as String])
+        XCTAssertNil(signingPrivateAttributes[kSecAttrCanDerive as String])
 
         let keyAgreementAttributes = SystemSecureEnclaveCustodyKeyStore.keyCreationAttributes(
             reference: keyAgreementReference,
@@ -79,8 +79,9 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
             keyAgreementPrivateAttributes[kSecAttrApplicationTag as String] as? Data,
             keyAgreementReference.applicationTagData
         )
-        XCTAssertEqual(keyAgreementPrivateAttributes[kSecAttrCanSign as String] as? Bool, false)
-        XCTAssertEqual(keyAgreementPrivateAttributes[kSecAttrCanDerive as String] as? Bool, true)
+        XCTAssertNotNil(keyAgreementPrivateAttributes[kSecAttrAccessControl as String])
+        XCTAssertNil(keyAgreementPrivateAttributes[kSecAttrCanSign as String])
+        XCTAssertNil(keyAgreementPrivateAttributes[kSecAttrCanDerive as String])
     }
 
     func test_createHandlePair_secondCreateFailureRollsBackBothReferences() throws {
