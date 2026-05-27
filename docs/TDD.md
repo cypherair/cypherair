@@ -95,8 +95,9 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 handle-store, cleanup, recovery-classification, and guarded device-evidence
 contract for future Secure Enclave custody. It creates two distinct permanent P-256 Secure Enclave `SecKey`
 handles (`signing` and `keyAgreement`) with a custody-specific biometrics-only
-private-key usage access policy, the data-protection Keychain domain, and
-role-specific creation hints (`signing` can sign, `keyAgreement` can derive).
+private-key usage access policy and the data-protection Keychain domain. It does
+not set `kSecAttrCanSign` or `kSecAttrCanDerive` creation flags; role isolation is
+an app-level handle-reference, public-binding, and future router-policy contract.
 It records only Security-private random role tags, validates 65-byte
 uncompressed public-key binding shape on load, rolls back partial creation,
 inventories app-owned custody rows by raw application-tag prefix, cleans

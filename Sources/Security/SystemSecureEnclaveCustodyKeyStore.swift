@@ -73,9 +73,7 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         var privateKeyAttributes: [String: Any] = [
             kSecAttrIsPermanent as String: true,
             kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecAttrAccessControl as String: accessControl,
-            kSecAttrCanSign as String: reference.role == .signing,
-            kSecAttrCanDerive as String: reference.role == .keyAgreement
+            kSecAttrAccessControl as String: accessControl
         ]
 
         #if os(macOS)

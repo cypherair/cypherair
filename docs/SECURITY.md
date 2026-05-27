@@ -137,10 +137,11 @@ permanent Secure Enclave P-256 `SecKey` private-key rows using
 `kSecAttrTokenIDSecureEnclave`, `kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, and
 `kSecAttrAccessControl` with `WhenUnlockedThisDeviceOnly + .privateKeyUsage +
 .biometryAny`. Creation, load, inventory, and delete paths use the data-protection
-Keychain domain consistently. Creation also sets role capability hints:
-signing handles can sign and cannot derive, while key-agreement handles can
-derive and cannot sign; load-time trust still comes from role plus public-key
-binding rather than platform capability echo. The custody store must not use
+Keychain domain consistently. Creation does not set Keychain usage flags such as
+`kSecAttrCanSign` or `kSecAttrCanDerive`; SEP-backed key creation rejects false
+usage-flag values, and Apple's Secure Enclave creation example relies on access
+control plus key attributes instead. Role trust comes from separate role-tagged
+handles, public-key binding, and future router policy. The custody store must not use
 `.devicePasscode`, `.or`, or the current `AuthenticationMode.createAccessControl()`
 helper. Application tags use a random local handle-set id plus role and must not
 include fingerprints. Load and inspect paths fail closed unless the stored role
