@@ -91,6 +91,17 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Rust external-operation negative matrix:** Phase 2C closes the Rust proof matrix around wrong roles, wrong public bindings, session-key validation failure, and payload authentication hard-fail. Signer tests reject key-agreement-role keys and unverified `r/s` responses; decryptor tests reject signing-role keys, unsupported key/ciphertext shapes, wrong public-key bindings, and shape-valid but wrong shared secrets. Tampered public-only v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages must fail after session-key acceptance without returning plaintext or falling back to secret-certificate material.
 
+**Security custody handle store:** Phase 3A adds a Swift Security-layer
+handle-store contract for future Secure Enclave custody. It creates two
+distinct permanent P-256 Secure Enclave `SecKey` handles (`signing` and
+`keyAgreement`) with a custody-specific biometrics-only private-key usage access
+policy, records only Security-private random role tags, validates 65-byte
+uncompressed public-key bindings on load, rolls back partial creation, treats
+missing deletes as idempotent cleanup, and classifies wrong-role, wrong-public
+binding, missing, partial, ambiguous, inaccessible, and cleanup failures through
+shared sanitized categories. It does not change current software-key generation,
+ProtectedData schemas, UI, Rust/UniFFI, or certificate construction.
+
 ### 1.4 Encryption Format Auto-Selection
 
 When encrypting, the message format is determined by the recipient's key version, not the sender's profile:
