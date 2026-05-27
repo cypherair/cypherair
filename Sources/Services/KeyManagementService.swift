@@ -17,6 +17,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
+    private let secureEnclaveCustodyGenerationService: SecureEnclaveCustodyGenerationService?
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
@@ -47,7 +48,11 @@ final class KeyManagementService: @unchecked Sendable {
         identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        secureEnclaveCustodyGenerationServiceFactory: ((
+            KeyCatalogStore,
+            KeyProvisioningInvalidationGate
+        ) -> SecureEnclaveCustodyGenerationService)? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -82,6 +87,10 @@ final class KeyManagementService: @unchecked Sendable {
             afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
             afterIdentityStoreCheckpoint: identityStoreCheckpoint,
             commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+        )
+        self.secureEnclaveCustodyGenerationService = secureEnclaveCustodyGenerationServiceFactory?(
+            catalogStore,
+            provisioningInvalidationGate
         )
         self.exportService = KeyExportService(
             keyAdapter: keyAdapter,
@@ -264,6 +273,33 @@ final class KeyManagementService: @unchecked Sendable {
             expirySeconds: expirySeconds,
             profile: profile,
             authMode: authMode,
+            invalidationToken: token
+        )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try provisioningInvalidationGate.checkValid(token)
+        syncKeys()
+        return identity
+    }
+
+    func generateHiddenSecureEnclaveCustodyKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        configurationIdentity: PGPKeyConfiguration.Identity
+    ) async throws -> PGPKeyIdentity {
+        guard let secureEnclaveCustodyGenerationService else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: PGPKeyOperationFailureCategory.operationUnavailableByPolicy.rawValue
+            )
+        }
+        let token = provisioningInvalidationGate.makeToken()
+        let identity = try await secureEnclaveCustodyGenerationService.generateHiddenKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            configurationIdentity: configurationIdentity,
             invalidationToken: token
         )
         if let postProvisioningCheckpoint {

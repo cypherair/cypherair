@@ -158,6 +158,46 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         )
     }
 
+    func test_hiddenSecureEnclaveGenerationPolicySupportsOnlyP256Generation() {
+        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration)
+
+        for configuration in [PGPKeyConfiguration.compatibleP256V4, .modernP256V6] {
+            XCTAssertEqual(
+                resolver.resolution(
+                    for: .generate,
+                    configuration: configuration,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .supported
+            )
+            XCTAssertEqual(
+                resolver.support(
+                    for: .generate,
+                    configuration: configuration,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .supported
+            )
+        }
+
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .compatibleSoftwareV4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unsupported(.invalidConfigurationCustody)
+        )
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .sign,
+                configuration: .modernP256V6,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .notImplemented(.operationNotImplementedForCustody)
+        )
+    }
+
     func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
         let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
 
