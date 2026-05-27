@@ -191,12 +191,12 @@ EOF
     fi
 }
 
-strip_trailing_whitespace() {
+normalize_generated_text_file() {
     local file="$1"
     if [ ! -f "$file" ]; then
         return
     fi
-    perl -pi -e 's/[ \t]+$//' "$file"
+    perl -0pi -e 's/[ \t]+$//mg; s/\n+\z/\n/' "$file"
 }
 
 patch_generated_swift_bindings() {
@@ -205,14 +205,14 @@ patch_generated_swift_bindings() {
         return
     fi
     perl -0pi -e 's/\n    static let vtablePtr: UnsafePointer<(UniffiVTableCallbackInterface[A-Za-z0-9_]+)> = \{/\n    nonisolated(unsafe) static let vtablePtr: UnsafePointer<$1> = {/g' "$swift_file"
-    strip_trailing_whitespace "$swift_file"
+    normalize_generated_text_file "$swift_file"
 }
 
 normalize_generated_bindings() {
-    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/module.modulemap"
-    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap"
-    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h"
-    strip_trailing_whitespace "$GENERATED_BINDINGS_DIR/pgp_mobile.swift"
+    normalize_generated_text_file "$GENERATED_BINDINGS_DIR/module.modulemap"
+    normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap"
+    normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h"
+    normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobile.swift"
 }
 
 sync_file_if_changed() {
