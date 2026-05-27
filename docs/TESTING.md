@@ -77,21 +77,21 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 
 ### Layer 4: Device-Only Tests
 
-**Run on:** Physical iOS device only. Cannot run in simulator.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain behavior through authenticated `LAContext` handoff. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second Face ID prompt. Envelope format and migration state-machine coverage should remain in the macOS unit lane through mocks.
+**Run on:** Physical device only. Cannot run in simulator.
+**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain/Data Protection behavior through authenticated `LAContext` handoff on real hardware. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second biometric prompt. Envelope format and migration state-machine coverage should remain in the macOS unit lane through mocks.
 
 Phase 3A/3B custody handle-store tests stay in the macOS unit lane because those PRs are the Security boundary, local-reset cleanup, and mockable recovery-classification contract. Phase 3C adds guarded device evidence for real Secure Enclave handle creation/load/delete, biometric access-control private operations, unauthorized interaction failure, handle-state failures, and sanitized diagnostics. The destructive real-hardware Reset All Local Data cleanup proof is isolated in `CypherAir-DangerousDeviceTests` because it deletes every app-owned Secure Enclave custody handle for the current app bundle, not only handles created by the test.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
-    -destination 'platform=iOS,name=<DEVICE_NAME>'
+    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
 ```
 
 Dangerous custody reset-cleanup evidence is manual-only and must run only on a disposable install or device state:
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DangerousDeviceTests \
-    -destination 'platform=iOS,name=<DEVICE_NAME>'
+    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
 ```
 
 Guard all SE-dependent tests:
