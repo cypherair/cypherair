@@ -163,25 +163,6 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: DeviceSecurityTestCase {
         XCTAssertEqual(store.classifyHandleAvailability(expected: pair), .unavailable(.privateHandleMissing))
     }
 
-    func test_custodyResetCleanupDeletesRealCustodyKeyRows_onDevice() throws {
-        try requireSecureEnclaveCustodyHardware()
-
-        let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
-        defer {
-            try? store.deleteHandlePair(pair)
-        }
-        XCTAssertGreaterThanOrEqual(try store.remainingHandleCountForLocalDataReset(), 2)
-
-        let result = store.cleanupAllHandlesForLocalDataReset()
-        XCTAssertNil(result.failureCategory)
-        XCTAssertGreaterThanOrEqual(result.inspectedHandleCount, 2)
-        XCTAssertGreaterThanOrEqual(result.deletedHandleCount, 2)
-        XCTAssertEqual(try store.remainingHandleCountForLocalDataReset(), 0)
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
-    }
-
     func test_custodyTraceMetadataDoesNotLeakHandleLocators_onDevice() throws {
         try requireSecureEnclaveCustodyHardware()
 

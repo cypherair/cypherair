@@ -1,0 +1,34 @@
+{
+  "configurations" : [
+    {
+      "id" : "9B2C3D4E-5F6A-7B8C-9D0E-1F2A3B4C5D6E",
+      "name" : "Dangerous Device Configuration",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:CypherAir.xcodeproj",
+      "identifier" : "CypherAirTests",
+      "name" : "CypherAirTests"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTags" : {
+        "includeXCTests" : true
+      },
+      "selectedTests" : [
+        "DeviceDangerousSecureEnclaveCustodyResetCleanupTests"
+      ],
+      "target" : {
+        "containerPath" : "container:CypherAir.xcodeproj",
+        "identifier" : "CypherAirTests",
+        "name" : "CypherAirTests"
+      }
+    }
+  ],
+  "version" : 1
+}
