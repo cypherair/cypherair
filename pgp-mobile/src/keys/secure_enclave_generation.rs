@@ -80,13 +80,18 @@ pub fn generate_secure_enclave_public_certificate(
             .map_err(|error| PgpError::KeyGenerationFailed {
                 reason: format!("Failed to set key validity period: {error}"),
             })?;
-    if matches!(input.version, SecureEnclaveCertificateVersion::V4) {
-        user_id_builder = user_id_builder
+    user_id_builder = match input.version {
+        SecureEnclaveCertificateVersion::V4 => user_id_builder
             .set_features(Features::empty().set_seipdv1())
             .map_err(|error| PgpError::KeyGenerationFailed {
                 reason: format!("Failed to set v4 features: {error}"),
-            })?;
-    }
+            })?,
+        SecureEnclaveCertificateVersion::V6 => user_id_builder
+            .set_features(Features::empty().set_seipdv2())
+            .map_err(|error| PgpError::KeyGenerationFailed {
+                reason: format!("Failed to set v6 features: {error}"),
+            })?,
+    };
 
     let user_id_binding = user_id_packet
         .bind(&mut external_signer, &cert, user_id_builder)
@@ -498,7 +503,25 @@ mod tests {
             result.key_agreement_subkey_fingerprint,
             subkey.fingerprint().to_hex().to_lowercase()
         );
-        assert!(cert.with_policy(&StandardPolicy::new(), None).is_ok());
+        let policy = StandardPolicy::new();
+        let valid_cert = cert
+            .with_policy(&policy, None)
+            .expect("certificate should validate with standard policy");
+        let features = valid_cert
+            .primary_userid()
+            .expect("primary user ID should exist")
+            .binding_signature()
+            .features()
+            .expect("primary user ID binding should advertise features");
+        match version {
+            SecureEnclaveCertificateVersion::V4 => {
+                assert!(features.supports_seipdv1());
+                assert!(!features.supports_seipdv2());
+            }
+            SecureEnclaveCertificateVersion::V6 => {
+                assert!(features.supports_seipdv2());
+            }
+        }
 
         let validation = validate_public_certificate(&result.public_key_data)
             .expect("public certificate should validate");
