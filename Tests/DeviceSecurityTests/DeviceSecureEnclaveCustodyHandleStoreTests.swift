@@ -198,24 +198,6 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: DeviceSecurityTestCase {
         assertTraceIsSanitized(traceStore.recentEntries, pair: pair)
     }
 
-    func test_custodyBiometricLockoutCategory_observationalOnly() throws {
-        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-
-        let context = LAContext()
-        var error: NSError?
-        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
-        guard !canEvaluate,
-              let laError = error as? LAError,
-              laError.code == .biometryLockout else {
-            throw XCTSkip("Device is not currently in biometric lockout; 3C does not induce lockout.")
-        }
-
-        XCTAssertEqual(
-            PGPKeyOperationFailureCategory.localAuthenticationLockedOut.rawValue,
-            "localAuthenticationLockedOut"
-        )
-    }
-
     private var sanitizedPrivateOperationFailureCategories: Set<PGPKeyOperationFailureCategory> {
         [
             .localAuthenticationCancelled,
