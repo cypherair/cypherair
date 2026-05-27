@@ -557,6 +557,213 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
+ * Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+ */
+public protocol ExternalP256SigningProvider: AnyObject, Sendable {
+
+    /**
+     * Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
+     */
+    func signSha256Digest(digest: Data) throws  -> P256EcdsaSignature
+
+}
+/**
+ * Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+ */
+open class ExternalP256SigningProviderImpl: ExternalP256SigningProvider, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_externalp256signingprovider(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_pgp_mobile_fn_free_externalp256signingprovider(handle, $0) }
+    }
+
+
+
+
+    /**
+     * Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
+     */
+open func signSha256Digest(digest: Data)throws  -> P256EcdsaSignature  {
+    return try  FfiConverterTypeP256EcdsaSignature_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_externalp256signingprovider_sign_sha256_digest(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(digest),$0
+    )
+})
+}
+
+
+
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceExternalP256SigningProvider {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceExternalP256SigningProvider = UniffiVTableCallbackInterfaceExternalP256SigningProvider(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeExternalP256SigningProvider.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ExternalP256SigningProvider: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeExternalP256SigningProvider.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ExternalP256SigningProvider: handle missing in uniffiClone")
+            }
+        },
+        signSha256Digest: { (
+            uniffiHandle: UInt64,
+            digest: RustBuffer,
+            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> P256EcdsaSignature in
+                guard let uniffiObj = try? FfiConverterTypeExternalP256SigningProvider.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try uniffiObj.signSha256Digest(
+                     digest: try FfiConverterData.lift(digest)
+                )
+            }
+
+
+            let writeReturn = { uniffiOutReturn.pointee = FfiConverterTypeP256EcdsaSignature_lower($0) }
+            uniffiTraitInterfaceCallWithError(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn,
+                lowerError: FfiConverterTypePgpError_lower
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceExternalP256SigningProvider> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceExternalP256SigningProvider>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitExternalP256SigningProvider() {
+    uniffi_pgp_mobile_fn_init_callback_vtable_externalp256signingprovider(UniffiCallbackInterfaceExternalP256SigningProvider.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256SigningProvider: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<ExternalP256SigningProvider>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = ExternalP256SigningProvider
+
+    public static func lift(_ handle: UInt64) throws -> ExternalP256SigningProvider {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExternalP256SigningProviderImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: ExternalP256SigningProvider) -> UInt64 {
+         if let rustImpl = value as? ExternalP256SigningProviderImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256SigningProvider {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExternalP256SigningProvider, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningProvider_lift(_ handle: UInt64) throws -> ExternalP256SigningProvider {
+    return try FfiConverterTypeExternalP256SigningProvider.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningProvider_lower(_ value: ExternalP256SigningProvider) -> UInt64 {
+    return FfiConverterTypeExternalP256SigningProvider.lower(value)
+}
+
+
+
+
+
+
+/**
  * The main PGP engine object exposed across the FFI boundary.
  * Stateless — all operations are pure functions on the input data.
  * Thread-safe (Send + Sync).
@@ -670,6 +877,15 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Generate a key-level revocation signature from an existing secret certificate.
      */
     func generateKeyRevocation(secretCert: Data) throws  -> Data
+
+    /**
+     * Build a public-only P-256 OpenPGP certificate whose private operations are external.
+     *
+     * The external signer only receives SHA-256 certificate-signing digests and returns
+     * fixed-width ECDSA r/s scalars. Packet construction, hashing, binding signatures,
+     * revocation construction, and public-key verification remain Rust/Sequoia-owned.
+     */
+    func generateSecureEnclavePublicCertificate(input: SecureEnclavePublicCertificateInput, signer: ExternalP256SigningProvider) throws  -> SecureEnclaveGeneratedPublicCertificate
 
     /**
      * Generate a subkey-specific revocation signature from an existing secret certificate.
@@ -1125,6 +1341,23 @@ open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
     uniffi_pgp_mobile_fn_method_pgpengine_generate_key_revocation(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),$0
+    )
+})
+}
+
+    /**
+     * Build a public-only P-256 OpenPGP certificate whose private operations are external.
+     *
+     * The external signer only receives SHA-256 certificate-signing digests and returns
+     * fixed-width ECDSA r/s scalars. Packet construction, hashing, binding signatures,
+     * revocation construction, and public-key verification remain Rust/Sequoia-owned.
+     */
+open func generateSecureEnclavePublicCertificate(input: SecureEnclavePublicCertificateInput, signer: ExternalP256SigningProvider)throws  -> SecureEnclaveGeneratedPublicCertificate  {
+    return try  FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_secure_enclave_public_certificate(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeSecureEnclavePublicCertificateInput_lower(input),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
     )
 })
 }
@@ -2763,6 +2996,75 @@ public func FfiConverterTypeModifyExpiryResult_lower(_ value: ModifyExpiryResult
 
 
 /**
+ * Fixed-width P-256 ECDSA signature returned by an external private-operation provider.
+ */
+public struct P256EcdsaSignature: Equatable, Hashable {
+    /**
+     * 32-byte ECDSA r scalar.
+     */
+    public var r: Data
+    /**
+     * 32-byte ECDSA s scalar.
+     */
+    public var s: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 32-byte ECDSA r scalar.
+         */r: Data,
+        /**
+         * 32-byte ECDSA s scalar.
+         */s: Data) {
+        self.r = r
+        self.s = s
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension P256EcdsaSignature: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeP256EcdsaSignature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> P256EcdsaSignature {
+        return
+            try P256EcdsaSignature(
+                r: FfiConverterData.read(from: &buf),
+                s: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: P256EcdsaSignature, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.r, into: &buf)
+        FfiConverterData.write(value.s, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeP256EcdsaSignature_lift(_ buf: RustBuffer) throws -> P256EcdsaSignature {
+    return try FfiConverterTypeP256EcdsaSignature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeP256EcdsaSignature_lower(_ value: P256EcdsaSignature) -> RustBuffer {
+    return FfiConverterTypeP256EcdsaSignature.lower(value)
+}
+
+
+/**
  * Result of password-based decryption.
  *
  * SECURITY: If `plaintext` is present, the Swift caller must zeroize the returned
@@ -3008,6 +3310,224 @@ public func FfiConverterTypeS2kInfo_lift(_ buf: RustBuffer) throws -> S2kInfo {
 #endif
 public func FfiConverterTypeS2kInfo_lower(_ value: S2kInfo) -> RustBuffer {
     return FfiConverterTypeS2kInfo.lower(value)
+}
+
+
+/**
+ * Public-only Secure Enclave custody certificate generation result.
+ */
+public struct SecureEnclaveGeneratedPublicCertificate: Equatable, Hashable {
+    /**
+     * Binary OpenPGP public certificate. This never contains secret key material.
+     */
+    public var publicKeyData: Data
+    /**
+     * Binary key-level revocation signature.
+     */
+    public var revocationCert: Data
+    /**
+     * Certificate fingerprint as lowercase hex.
+     */
+    public var fingerprint: String
+    /**
+     * OpenPGP key version.
+     */
+    public var keyVersion: UInt8
+    /**
+     * Primary signing key fingerprint as lowercase hex.
+     */
+    public var signingKeyFingerprint: String
+    /**
+     * Key-agreement subkey fingerprint as lowercase hex.
+     */
+    public var keyAgreementSubkeyFingerprint: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Binary OpenPGP public certificate. This never contains secret key material.
+         */publicKeyData: Data,
+        /**
+         * Binary key-level revocation signature.
+         */revocationCert: Data,
+        /**
+         * Certificate fingerprint as lowercase hex.
+         */fingerprint: String,
+        /**
+         * OpenPGP key version.
+         */keyVersion: UInt8,
+        /**
+         * Primary signing key fingerprint as lowercase hex.
+         */signingKeyFingerprint: String,
+        /**
+         * Key-agreement subkey fingerprint as lowercase hex.
+         */keyAgreementSubkeyFingerprint: String) {
+        self.publicKeyData = publicKeyData
+        self.revocationCert = revocationCert
+        self.fingerprint = fingerprint
+        self.keyVersion = keyVersion
+        self.signingKeyFingerprint = signingKeyFingerprint
+        self.keyAgreementSubkeyFingerprint = keyAgreementSubkeyFingerprint
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclaveGeneratedPublicCertificate: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclaveGeneratedPublicCertificate: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclaveGeneratedPublicCertificate {
+        return
+            try SecureEnclaveGeneratedPublicCertificate(
+                publicKeyData: FfiConverterData.read(from: &buf),
+                revocationCert: FfiConverterData.read(from: &buf),
+                fingerprint: FfiConverterString.read(from: &buf),
+                keyVersion: FfiConverterUInt8.read(from: &buf),
+                signingKeyFingerprint: FfiConverterString.read(from: &buf),
+                keyAgreementSubkeyFingerprint: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SecureEnclaveGeneratedPublicCertificate, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.publicKeyData, into: &buf)
+        FfiConverterData.write(value.revocationCert, into: &buf)
+        FfiConverterString.write(value.fingerprint, into: &buf)
+        FfiConverterUInt8.write(value.keyVersion, into: &buf)
+        FfiConverterString.write(value.signingKeyFingerprint, into: &buf)
+        FfiConverterString.write(value.keyAgreementSubkeyFingerprint, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lift(_ buf: RustBuffer) throws -> SecureEnclaveGeneratedPublicCertificate {
+    return try FfiConverterTypeSecureEnclaveGeneratedPublicCertificate.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lower(_ value: SecureEnclaveGeneratedPublicCertificate) -> RustBuffer {
+    return FfiConverterTypeSecureEnclaveGeneratedPublicCertificate.lower(value)
+}
+
+
+/**
+ * Public-only input for Secure Enclave custody OpenPGP certificate construction.
+ */
+public struct SecureEnclavePublicCertificateInput: Equatable, Hashable {
+    /**
+     * Display name for the self-certified User ID.
+     */
+    public var name: String
+    /**
+     * Optional email address for the User ID.
+     */
+    public var email: String?
+    /**
+     * Validity period from now in seconds. Defaults to two years when omitted.
+     */
+    public var expirySeconds: UInt64?
+    /**
+     * Desired OpenPGP certificate version.
+     */
+    public var version: SecureEnclaveCertificateVersion
+    /**
+     * 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+     */
+    public var signingPublicKeyX963: Data
+    /**
+     * 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+     */
+    public var keyAgreementPublicKeyX963: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Display name for the self-certified User ID.
+         */name: String,
+        /**
+         * Optional email address for the User ID.
+         */email: String?,
+        /**
+         * Validity period from now in seconds. Defaults to two years when omitted.
+         */expirySeconds: UInt64?,
+        /**
+         * Desired OpenPGP certificate version.
+         */version: SecureEnclaveCertificateVersion,
+        /**
+         * 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+         */signingPublicKeyX963: Data,
+        /**
+         * 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+         */keyAgreementPublicKeyX963: Data) {
+        self.name = name
+        self.email = email
+        self.expirySeconds = expirySeconds
+        self.version = version
+        self.signingPublicKeyX963 = signingPublicKeyX963
+        self.keyAgreementPublicKeyX963 = keyAgreementPublicKeyX963
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclavePublicCertificateInput: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclavePublicCertificateInput: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclavePublicCertificateInput {
+        return
+            try SecureEnclavePublicCertificateInput(
+                name: FfiConverterString.read(from: &buf),
+                email: FfiConverterOptionString.read(from: &buf),
+                expirySeconds: FfiConverterOptionUInt64.read(from: &buf),
+                version: FfiConverterTypeSecureEnclaveCertificateVersion.read(from: &buf),
+                signingPublicKeyX963: FfiConverterData.read(from: &buf),
+                keyAgreementPublicKeyX963: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SecureEnclavePublicCertificateInput, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.email, into: &buf)
+        FfiConverterOptionUInt64.write(value.expirySeconds, into: &buf)
+        FfiConverterTypeSecureEnclaveCertificateVersion.write(value.version, into: &buf)
+        FfiConverterData.write(value.signingPublicKeyX963, into: &buf)
+        FfiConverterData.write(value.keyAgreementPublicKeyX963, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclavePublicCertificateInput_lift(_ buf: RustBuffer) throws -> SecureEnclavePublicCertificateInput {
+    return try FfiConverterTypeSecureEnclavePublicCertificateInput.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclavePublicCertificateInput_lower(_ value: SecureEnclavePublicCertificateInput) -> RustBuffer {
+    return FfiConverterTypeSecureEnclavePublicCertificateInput.lower(value)
 }
 
 
@@ -4120,6 +4640,82 @@ public func FfiConverterTypePgpError_lower(_ value: PgpError) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * OpenPGP certificate version for Secure Enclave custody public-certificate construction.
+ */
+
+public enum SecureEnclaveCertificateVersion: Equatable, Hashable {
+
+    /**
+     * RFC 4880-compatible v4 P-256 certificate shape.
+     */
+    case v4
+    /**
+     * RFC 9580-oriented v6 P-256 certificate shape.
+     */
+    case v6
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclaveCertificateVersion: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclaveCertificateVersion: FfiConverterRustBuffer {
+    typealias SwiftType = SecureEnclaveCertificateVersion
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclaveCertificateVersion {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .v4
+
+        case 2: return .v6
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SecureEnclaveCertificateVersion, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .v4:
+            writeInt(&buf, Int32(1))
+
+
+        case .v6:
+            writeInt(&buf, Int32(2))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCertificateVersion_lift(_ buf: RustBuffer) throws -> SecureEnclaveCertificateVersion {
+    return try FfiConverterTypeSecureEnclaveCertificateVersion.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCertificateVersion_lower(_ value: SecureEnclaveCertificateVersion) -> RustBuffer {
+    return FfiConverterTypeSecureEnclaveCertificateVersion.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Signature verification status for decrypted messages.
  */
 
@@ -4653,6 +5249,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_public_certificate() != 11946) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4713,6 +5312,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 18125) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 45038) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_progressreporter_on_progress() != 45018) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4720,6 +5322,7 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
 
+    uniffiCallbackInitExternalP256SigningProvider()
     uniffiCallbackInitProgressReporter()
     return InitializationResult.ok
 }()
