@@ -179,7 +179,7 @@ These jobs must pass on pull requests and nightly validation:
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, runs the `./build-xcframework.sh --release` entrypoint with CI-provided GitHub credentials so the script resolves the arm64e stage1 compiler explicitly, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
 - `apple-platform-probes` downloads the uploaded XCFramework artifact and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
-- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, build, link, or test failures after readiness still fail the job
+- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, requires an `arm64e` macOS test destination, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, signing profile, build, link, or test failures after readiness still fail the job
 
 The repository also publishes unique edge XCFramework prereleases:
 
@@ -320,10 +320,10 @@ After refreshing the artifacts that apply to your change, validate Swift / FFI b
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
+    -destination 'platform=macOS,arch=arm64e'
 ```
 
-Treat this macOS-local path as the source of truth for Swift validation until GitHub's hosted macOS image catches up to the project's deployment target.
+Treat this macOS-local arm64e path as the source of truth for Swift validation until GitHub's hosted macOS image catches up to the project's deployment target and has the project provisioning profiles required for signed Keychain/ProtectedData coverage.
 
 For native visionOS validation, use a build probe rather than a dedicated XCTest plan:
 

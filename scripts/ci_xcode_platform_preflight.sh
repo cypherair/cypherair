@@ -353,8 +353,8 @@ check_macos_unit_test_readiness() {
 
   if [ "$destinations_status" -ne 0 ]; then
     record_failure blocking_failures "xcodebuild -showdestinations failed"
-  elif ! grep -Eq "platform:macOS.*(arch:arm64|arch:arm64e|name:Any Mac)" "$destinations_file"; then
-    record_failure blocking_failures "macOS arm64 test destination is not eligible"
+  elif ! grep -Eq "platform:macOS.*arch:arm64e" "$destinations_file"; then
+    record_failure blocking_failures "macOS arm64e test destination is not eligible"
   fi
 
   rm -f "$destinations_file"

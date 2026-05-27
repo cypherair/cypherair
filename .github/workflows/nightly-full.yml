@@ -154,7 +154,7 @@ jobs:
             -scheme CypherAir \
             -project CypherAir.xcodeproj \
             -testPlan CypherAir-UnitTests \
-            -destination 'platform=macOS,arch=arm64'
+            -destination 'platform=macOS,arch=arm64e'
       - name: Skip hosted Swift unit tests
         if: steps.swift_unit_preflight.outputs.ready != 'true'
         run: |
