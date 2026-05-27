@@ -154,6 +154,108 @@ struct SecureEnclaveCustodyHandleStore {
         }
     }
 
+    func classifyHandleAvailability(
+        expected pair: SecureEnclaveCustodyHandlePair
+    ) -> SecureEnclaveCustodyHandleAvailability {
+        switch inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier) {
+        case .missing:
+            return .unavailable(.privateHandleMissing)
+        case .partial:
+            return .unavailable(.migrationOrRecoveryRequired)
+        case .invalid(let error):
+            return .unavailable(error.failureCategory)
+        case .complete:
+            do {
+                _ = try loadHandlePair(expected: pair)
+                return .available
+            } catch let error as SecureEnclaveCustodyHandleError {
+                return .unavailable(error.failureCategory)
+            } catch {
+                return .unavailable(.privateHandleInaccessible)
+            }
+        }
+    }
+
+    func inventorySummaryForLocalRecovery() throws -> SecureEnclaveCustodyHandleInventorySummary {
+        let items = try keyStore.inventoryKeys()
+        guard !items.isEmpty else {
+            return .empty
+        }
+
+        var malformedCount = 0
+        var grouped: [String: [SecureEnclaveCustodyHandleInventoryItem]] = [:]
+        for item in items {
+            guard let reference = item.reference else {
+                malformedCount += 1
+                continue
+            }
+            grouped[reference.handleSetIdentifier, default: []].append(item)
+        }
+
+        var completeCount = 0
+        var partialCount = 0
+        var ambiguousCount = 0
+        for group in grouped.values {
+            let signingCount = group.filter { $0.role == .signing }.count
+            let keyAgreementCount = group.filter { $0.role == .keyAgreement }.count
+            if signingCount > 1 || keyAgreementCount > 1 {
+                ambiguousCount += 1
+            } else if signingCount == 1 && keyAgreementCount == 1 {
+                completeCount += 1
+            } else {
+                partialCount += 1
+            }
+        }
+
+        return SecureEnclaveCustodyHandleInventorySummary(
+            totalHandleCount: items.count,
+            completeSetCount: completeCount,
+            partialSetCount: partialCount,
+            ambiguousSetCount: ambiguousCount,
+            malformedHandleCount: malformedCount
+        )
+    }
+
+    func cleanupAllHandlesForLocalDataReset() -> SecureEnclaveCustodyHandleCleanupResult {
+        let items: [SecureEnclaveCustodyHandleInventoryItem]
+        do {
+            items = try keyStore.inventoryKeys()
+        } catch {
+            return SecureEnclaveCustodyHandleCleanupResult(
+                inspectedHandleCount: 0,
+                deletedHandleCount: 0,
+                failureCategory: .cleanupOrRollbackFailure
+            )
+        }
+
+        var deletedCount = 0
+        var cleanupFailed = false
+        var seenTags = Set<Data>()
+        for item in items where seenTags.insert(item.applicationTagData).inserted {
+            do {
+                try keyStore.deleteKey(
+                    applicationTagData: item.applicationTagData,
+                    roleHint: item.role
+                )
+                deletedCount += 1
+            } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
+                continue
+            } catch {
+                cleanupFailed = true
+            }
+        }
+
+        return SecureEnclaveCustodyHandleCleanupResult(
+            inspectedHandleCount: seenTags.count,
+            deletedHandleCount: deletedCount,
+            failureCategory: cleanupFailed ? .cleanupOrRollbackFailure : nil
+        )
+    }
+
+    func remainingHandleCountForLocalDataReset() throws -> Int {
+        try keyStore.inventoryKeys().count
+    }
+
     func deleteHandlePair(_ pair: SecureEnclaveCustodyHandlePair) throws {
         try deleteReferences(pair.references)
     }

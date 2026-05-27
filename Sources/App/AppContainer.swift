@@ -555,6 +555,9 @@ final class AppContainer: @unchecked Sendable {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+        )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
             legacyRightStoreClient: protectedDataRightStoreClient,
@@ -574,6 +577,7 @@ final class AppContainer: @unchecked Sendable {
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             traceStore: authLifecycleTraceStore
         )
 

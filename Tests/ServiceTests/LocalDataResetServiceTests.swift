@@ -197,6 +197,103 @@ final class LocalDataResetServiceTests: XCTestCase {
         XCTAssertEqual(UserDefaults(suiteName: unrelatedSuiteName)?.string(forKey: "marker"), "keep")
     }
 
+    func test_resetAllLocalData_removesSecureEnclaveCustodyHandles() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let handleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "resetcleanup" }
+        )
+        _ = try handleStore.createHandlePair()
+        keyStore.insertMalformedApplicationTag(
+            "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).reset-malformed"
+        )
+        let resetService = makeResetService(
+            from: container,
+            secureEnclaveCustodyHandleStore: handleStore
+        )
+
+        let summary = try await resetService.resetAllLocalData()
+
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        let cleanupEntry = try XCTUnwrap(
+            container.authLifecycleTraceStore?.recentEntries.last {
+                $0.name == "localDataReset.secureEnclaveCustody.cleanup.finish"
+            }
+        )
+        XCTAssertEqual(cleanupEntry.metadata["serviceKind"], "secureEnclaveCustodyHandle")
+        XCTAssertEqual(cleanupEntry.metadata["result"], "success")
+        XCTAssertEqual(cleanupEntry.metadata["deletedHandleCount"], "3")
+        XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("resetcleanup") })
+        XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("secure-enclave-custody") })
+    }
+
+    func test_resetAllLocalData_failsClosedWhenSecureEnclaveCustodyCleanupFails() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let handleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "sensitive-reset-id" }
+        )
+        _ = try handleStore.createHandlePair()
+        keyStore.failDeleteRole = .signing
+        let resetService = makeResetService(
+            from: container,
+            secureEnclaveCustodyHandleStore: handleStore
+        )
+
+        await XCTAssertThrowsErrorAsync({
+            try await resetService.resetAllLocalData()
+        }) { error in
+            guard let resetError = error as? LocalDataResetError else {
+                XCTFail("Expected LocalDataResetError, got \(type(of: error))")
+                return
+            }
+            XCTAssertTrue(
+                resetError.failures.contains("keychain.secureEnclaveCustodyHandle.cleanupOrRollbackFailure")
+            )
+            XCTAssertTrue(
+                resetError.failures.contains("keychain.secureEnclaveCustodyHandle.remaining.1")
+            )
+            XCTAssertFalse(resetError.failures.contains { $0.contains("sensitive-reset-id") })
+            XCTAssertFalse(resetError.failures.contains { $0.contains("secure-enclave-custody") })
+        }
+    }
+
+    func test_resetAllLocalData_failsClosedWhenSecureEnclaveCustodyInventoryFails() async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.failInventory = true
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let resetService = makeResetService(
+            from: container,
+            secureEnclaveCustodyHandleStore: handleStore
+        )
+
+        await XCTAssertThrowsErrorAsync({
+            try await resetService.resetAllLocalData()
+        }) { error in
+            guard let resetError = error as? LocalDataResetError else {
+                XCTFail("Expected LocalDataResetError, got \(type(of: error))")
+                return
+            }
+            XCTAssertTrue(
+                resetError.failures.contains("keychain.secureEnclaveCustodyHandle.cleanupOrRollbackFailure")
+            )
+            XCTAssertTrue(resetError.failures.contains { $0.hasPrefix("keychain.remaining.secureEnclaveCustodyHandle.") })
+        }
+    }
+
     func test_resetAllLocalData_failsWhenRootSecretStillExistsAfterReset() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
         defer {
@@ -320,7 +417,8 @@ final class LocalDataResetServiceTests: XCTestCase {
     private func makeResetService(
         from container: AppContainer,
         temporaryArtifactStore: CypherAir.AppTemporaryArtifactStore? = nil,
-        protectedDataRootSecretExists: @escaping () -> Bool = { false }
+        protectedDataRootSecretExists: @escaping () -> Bool = { false },
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) -> LocalDataResetService {
         let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
@@ -340,6 +438,7 @@ final class LocalDataResetServiceTests: XCTestCase {
             temporaryArtifactStore: temporaryArtifactStore,
             legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             traceStore: container.authLifecycleTraceStore
         )
     }

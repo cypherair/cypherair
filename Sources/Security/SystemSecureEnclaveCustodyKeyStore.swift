@@ -186,6 +186,118 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         }
     }
 
+    func inventoryKeys() throws -> [SecureEnclaveCustodyHandleInventoryItem] {
+        traceStore?.record(
+            category: .operation,
+            name: "secureEnclaveCustody.inventory.start",
+            metadata: ["serviceKind": "secureEnclaveCustodyHandle"]
+        )
+        var query = baseInventoryQuery()
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let attributes = result as? [[String: Any]] else {
+                traceStore?.record(
+                    category: .operation,
+                    name: "secureEnclaveCustody.inventory.finish",
+                    metadata: [
+                        "serviceKind": "secureEnclaveCustodyHandle",
+                        "result": "failed",
+                        "failureCategory": PGPKeyOperationFailureCategory.privateHandleInaccessible.rawValue
+                    ]
+                )
+                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
+            }
+            let items = attributes.compactMap { attribute -> SecureEnclaveCustodyHandleInventoryItem? in
+                Self.applicationTagData(from: attribute).flatMap(SecureEnclaveCustodyHandleInventoryItem.init)
+            }
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.inventory.finish",
+                metadata: [
+                    "serviceKind": "secureEnclaveCustodyHandle",
+                    "result": "success",
+                    "count": String(items.count)
+                ]
+            )
+            return items
+        case errSecItemNotFound:
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.inventory.finish",
+                metadata: [
+                    "serviceKind": "secureEnclaveCustodyHandle",
+                    "result": "success",
+                    "count": "0"
+                ]
+            )
+            return []
+        default:
+            let mappedError = Self.mapStatus(status, role: .signing)
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.inventory.finish",
+                metadata: [
+                    "serviceKind": "secureEnclaveCustodyHandle",
+                    "result": "failed",
+                    "failureCategory": mappedError.failureCategory.rawValue
+                ]
+            )
+            throw mappedError
+        }
+    }
+
+    func deleteKey(
+        applicationTagData: Data,
+        roleHint: PGPPrivateOperationRole?
+    ) throws {
+        let serviceKind = Self.serviceKind(forApplicationTagData: applicationTagData)
+        traceStore?.record(
+            category: .operation,
+            name: "secureEnclaveCustody.deleteInventoryKey.start",
+            metadata: ["serviceKind": serviceKind]
+        )
+        var query = baseInventoryQuery()
+        query[kSecAttrApplicationTag as String] = applicationTagData
+        let status = SecItemDelete(query as CFDictionary)
+        switch status {
+        case errSecSuccess:
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.deleteInventoryKey.finish",
+                metadata: ["serviceKind": serviceKind, "result": "success"]
+            )
+            return
+        case errSecItemNotFound:
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.deleteInventoryKey.finish",
+                metadata: [
+                    "serviceKind": serviceKind,
+                    "result": "failed",
+                    "failureCategory": PGPKeyOperationFailureCategory.privateHandleMissing.rawValue
+                ]
+            )
+            throw SecureEnclaveCustodyHandleError.privateHandleMissing(roleHint ?? .signing)
+        default:
+            let mappedError = Self.mapStatus(status, role: roleHint ?? .signing)
+            traceStore?.record(
+                category: .operation,
+                name: "secureEnclaveCustody.deleteInventoryKey.finish",
+                metadata: [
+                    "serviceKind": serviceKind,
+                    "result": "failed",
+                    "failureCategory": mappedError.failureCategory.rawValue
+                ]
+            )
+            throw mappedError
+        }
+    }
+
     private func baseQuery(reference: SecureEnclaveCustodyHandleReference) -> [String: Any] {
         [
             kSecClass as String: kSecClassKey,
@@ -193,6 +305,15 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
             kSecAttrKeySizeInBits as String: 256,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecAttrApplicationTag as String: reference.applicationTagData,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+    }
+
+    private func baseInventoryQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassKey,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecUseDataProtectionKeychain as String: true
         ]
     }
@@ -259,5 +380,22 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         default:
             return .privateHandleInaccessible(role)
         }
+    }
+
+    private static func applicationTagData(from attributes: [String: Any]) -> Data? {
+        if let data = attributes[kSecAttrApplicationTag as String] as? Data {
+            return data
+        }
+        if let string = attributes[kSecAttrApplicationTag as String] as? String {
+            return Data(string.utf8)
+        }
+        return nil
+    }
+
+    private static func serviceKind(forApplicationTagData data: Data) -> String {
+        guard let applicationTagString = String(data: data, encoding: .utf8) else {
+            return "secureEnclaveCustodyHandle"
+        }
+        return AuthTraceMetadata.keychainServiceKind(for: applicationTagString)
     }
 }
