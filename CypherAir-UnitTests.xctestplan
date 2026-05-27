@@ -19,6 +19,7 @@
     {
       "skippedTests" : [
         "DeviceSecureEnclaveTests",
+        "DeviceSecureEnclaveCustodyHandleStoreTests",
         "DeviceAuthenticationManagerTests",
         "DeviceModeSwitchTests",
         "DeviceMIETests",
