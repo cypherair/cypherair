@@ -10,7 +10,7 @@ use crate::error::PgpError;
 // from the Cert, and the KeyPair is consumed by the Signer, which handles cleanup.
 
 /// Extract a signing keypair from a certificate.
-/// Used by sign_cleartext, sign_detached, and streaming::sign_detached_file.
+/// Used by cleartext signing, streaming file signing, and external signer tests.
 pub(crate) fn extract_signing_keypair(
     cert_data: &[u8],
     policy: &StandardPolicy,
@@ -83,15 +83,7 @@ where
     Ok(sink)
 }
 
-/// Create a detached signature for file content.
-/// Returns the signature in binary OpenPGP format.
-pub fn sign_detached(data: &[u8], signer_cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
-    let policy = StandardPolicy::new();
-    let signing_keypair = extract_signing_keypair(signer_cert_data, &policy)?;
-
-    sign_detached_with_signer(data, signing_keypair)
-}
-
+#[cfg(test)]
 pub(crate) fn sign_detached_with_signer<S>(
     data: &[u8],
     signing_keypair: S,

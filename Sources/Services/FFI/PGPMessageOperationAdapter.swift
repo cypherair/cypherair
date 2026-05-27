@@ -205,21 +205,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func signDetached(
-        data: Data,
-        signerCert: Data
-    ) async throws -> Data {
-        do {
-            return try await Self.performSignDetached(
-                engine: engine,
-                data: data,
-                signerCert: signerCert
-            )
-        } catch {
-            throw PGPErrorMapper.map(error) { .signingFailed(reason: $0) }
-        }
-    }
-
     func signDetachedFile(
         inputPath: String,
         signerCert: Data,
@@ -249,27 +234,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
                 verificationKeys: verificationContext.verificationKeys
             )
             return PGPMessageResultMapper.verifyDetailedResult(
-                result,
-                context: verificationContext
-            )
-        } catch {
-            throw PGPErrorMapper.map(error) { .corruptData(reason: $0) }
-        }
-    }
-
-    func verifyDetachedDetailed(
-        data: Data,
-        signature: Data,
-        verificationContext: PGPMessageVerificationContext
-    ) async throws -> DetailedSignatureVerification {
-        do {
-            let result = try await Self.performVerifyDetachedDetailed(
-                engine: engine,
-                data: data,
-                signature: signature,
-                verificationKeys: verificationContext.verificationKeys
-            )
-            return PGPMessageResultMapper.detachedVerifyDetailedResult(
                 result,
                 context: verificationContext
             )
@@ -451,15 +415,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     }
 
     @concurrent
-    private static func performSignDetached(
-        engine: PgpEngine,
-        data: Data,
-        signerCert: Data
-    ) async throws -> Data {
-        try engine.signDetached(data: data, signerCert: signerCert)
-    }
-
-    @concurrent
     private static func performSignDetachedFile(
         engine: PgpEngine,
         inputPath: String,
@@ -481,20 +436,6 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     ) async throws -> VerifyDetailedResult {
         try engine.verifyCleartextDetailed(
             signedMessage: signedMessage,
-            verificationKeys: verificationKeys
-        )
-    }
-
-    @concurrent
-    private static func performVerifyDetachedDetailed(
-        engine: PgpEngine,
-        data: Data,
-        signature: Data,
-        verificationKeys: [Data]
-    ) async throws -> VerifyDetailedResult {
-        try engine.verifyDetachedDetailed(
-            data: data,
-            signature: signature,
             verificationKeys: verificationKeys
         )
     }

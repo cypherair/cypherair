@@ -21,6 +21,7 @@ use pgp_mobile::armor;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::streaming;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -302,13 +303,12 @@ fn test_gpg_verifies_sequoia_detached_signature() {
 
     // Sign data with Sequoia (detached)
     let data = b"File content signed by Sequoia with detached signature.";
-    let signature =
-        sign::sign_detached(data, &signer.cert_data).expect("Detached signing should succeed");
-
-    // Write data and signature to temp files
     let data_file = gnupghome.path().join("data.txt");
     let sig_file = gnupghome.path().join("data.txt.sig");
     std::fs::write(&data_file, data).expect("Failed to write data file");
+    let signature =
+        streaming::sign_detached_file(data_file.to_str().unwrap(), &signer.cert_data, None)
+            .expect("Detached signing should succeed");
     std::fs::write(&sig_file, &signature).expect("Failed to write signature file");
 
     // gpg --verify <sig> <data>

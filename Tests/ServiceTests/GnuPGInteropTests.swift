@@ -49,6 +49,12 @@ final class GnuPGInteropTests: XCTestCase {
         return try loadArmoredFixtureAsBinary("gpg_pubkey")
     }
 
+    private func writeTemporaryFile(_ data: Data, name: String = "gpg-\(UUID().uuidString).txt") throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try data.write(to: url)
+        return url
+    }
+
     // MARK: - C3.1 Import GnuPG Public Key
 
     func test_c3_1_importGnuPGPublicKey_armored_parsesCorrectly() throws {
@@ -108,8 +114,15 @@ final class GnuPGInteropTests: XCTestCase {
         let signatureArmored = try FixtureLoader.loadData("gpg_detached_sig", ext: "asc")
         let signature = try engine.dearmor(armored: signatureArmored)
         let pubKey = try loadGpgPublicKey()
+        let plaintextURL = try writeTemporaryFile(plaintext)
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let result = try engine.verifyDetachedDetailed(data: plaintext, signature: signature, verificationKeys: [pubKey])
+        let result = try engine.verifyDetachedFileDetailed(
+            dataPath: plaintextURL.path,
+            signature: signature,
+            verificationKeys: [pubKey],
+            progress: nil
+        )
 
         XCTAssertEqual(result.legacyStatus, .valid, "GnuPG armored detached signature should be valid")
     }
@@ -118,8 +131,15 @@ final class GnuPGInteropTests: XCTestCase {
         let plaintext = try FixtureLoader.loadData("gpg_plaintext", ext: "txt")
         let signature = try FixtureLoader.loadData("gpg_detached_sig", ext: "sig")
         let pubKey = try loadGpgPublicKey()
+        let plaintextURL = try writeTemporaryFile(plaintext)
+        defer { try? FileManager.default.removeItem(at: plaintextURL) }
 
-        let result = try engine.verifyDetachedDetailed(data: plaintext, signature: signature, verificationKeys: [pubKey])
+        let result = try engine.verifyDetachedFileDetailed(
+            dataPath: plaintextURL.path,
+            signature: signature,
+            verificationKeys: [pubKey],
+            progress: nil
+        )
 
         XCTAssertEqual(result.legacyStatus, .valid, "GnuPG binary detached signature should be valid")
     }

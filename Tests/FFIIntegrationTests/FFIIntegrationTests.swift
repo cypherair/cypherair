@@ -1309,18 +1309,30 @@ final class FFIIntegrationTests: XCTestCase {
         )
 
         let originalData = Data("original data for detached sig".utf8)
-        let signature = try engine.signDetached(
-            data: originalData,
-            signerCert: key.certData
+        let originalURL = try writeTempFile(
+            originalData,
+            filename: "ffi-detached-original-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: originalURL) }
+        let signature = try engine.signDetachedFile(
+            inputPath: originalURL.path,
+            signerCert: key.certData,
+            progress: nil
         )
 
         // Verify with tampered data
         let tamperedData = Data("tampered data for detached sig".utf8)
+        let tamperedURL = try writeTempFile(
+            tamperedData,
+            filename: "ffi-detached-tampered-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: tamperedURL) }
 
-        let result = try engine.verifyDetachedDetailed(
-            data: tamperedData,
+        let result = try engine.verifyDetachedFileDetailed(
+            dataPath: tamperedURL.path,
             signature: signature,
-            verificationKeys: [key.publicKeyData]
+            verificationKeys: [key.publicKeyData],
+            progress: nil
         )
 
         XCTAssertEqual(
@@ -1731,11 +1743,17 @@ final class FFIIntegrationTests: XCTestCase {
         let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
         let data = try loadTextFixture("ffi_detailed_detached_data")
         let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
+        let inputURL = try writeTempFile(
+            data,
+            filename: "ffi-detailed-known-unknown-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
 
-        let detailed = try engine.verifyDetachedDetailed(
-            data: data,
+        let detailed = try engine.verifyDetachedFileDetailed(
+            dataPath: inputURL.path,
             signature: signature,
-            verificationKeys: [signerA]
+            verificationKeys: [signerA],
+            progress: nil
         )
 
         XCTAssertEqual(detailed.signatures.count, 2)
@@ -1752,11 +1770,17 @@ final class FFIIntegrationTests: XCTestCase {
         let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
         let data = try loadTextFixture("ffi_detailed_detached_data")
         let signature = try loadArmoredFixture("ffi_detailed_repeated_detached", ext: "sig")
+        let inputURL = try writeTempFile(
+            data,
+            filename: "ffi-detailed-repeated-\(UUID().uuidString).txt"
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
 
-        let detailed = try engine.verifyDetachedDetailed(
-            data: data,
+        let detailed = try engine.verifyDetachedFileDetailed(
+            dataPath: inputURL.path,
             signature: signature,
-            verificationKeys: [signerA]
+            verificationKeys: [signerA],
+            progress: nil
         )
 
         XCTAssertEqual(detailed.legacyStatus, .valid)
@@ -1829,8 +1853,9 @@ final class FFIIntegrationTests: XCTestCase {
         XCTAssertEqual(detailed.signatures.count, 2)
     }
 
-    func test_detailedVerifyDetachedFile_fixtureKnownPlusUnknown_matchesInMemoryDetailed() throws {
+    func test_detailedVerifyDetachedFile_fixtureKnownPlusUnknown_preservesDetails() throws {
         let signerA = try loadFixture("ffi_detailed_signer_a")
+        let signerAInfo = try engine.parseKeyInfo(keyData: signerA)
         let data = try loadTextFixture("ffi_detailed_detached_data")
         let signature = try loadArmoredFixture("ffi_detailed_multisig_detached", ext: "sig")
         let inputURL = try writeTempFile(
@@ -1845,16 +1870,13 @@ final class FFIIntegrationTests: XCTestCase {
             verificationKeys: [signerA],
             progress: nil
         )
-        let inMemoryDetailed = try engine.verifyDetachedDetailed(
-            data: data,
-            signature: signature,
-            verificationKeys: [signerA]
-        )
 
-        XCTAssertEqual(fileDetailed.legacyStatus, inMemoryDetailed.legacyStatus)
-        XCTAssertEqual(fileDetailed.legacySignerFingerprint, inMemoryDetailed.legacySignerFingerprint)
-        XCTAssertEqual(fileDetailed.signatures, inMemoryDetailed.signatures)
+        XCTAssertEqual(fileDetailed.legacyStatus, .valid)
+        XCTAssertEqual(fileDetailed.legacySignerFingerprint, signerAInfo.fingerprint)
         XCTAssertEqual(fileDetailed.signatures.count, 2)
+        XCTAssertTrue(fileDetailed.signatures.contains {
+            $0.status == .valid && $0.signerPrimaryFingerprint == Optional(signerAInfo.fingerprint)
+        })
         XCTAssertTrue(fileDetailed.signatures.contains {
             $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
         })

@@ -107,6 +107,11 @@ provided maintainers accept the stated triggers:
   methods for those APIs; simple-result records used only by that surface; and
   Swift/app APIs that exposed `SignatureVerification` as the primary
   verification result were removed.
+- The in-memory detached file API cleanup removed Swift service entries first,
+  then removed Rust/UniFFI `sign_detached` and `verify_detached_detailed`
+  exports plus generated Swift engine methods. Valuable detached sign/verify
+  coverage now runs through file-path streaming APIs; internal signer and
+  verifier helpers remain for current streaming and external-signer tests.
 - Legacy folded-summary comparison tests are Phase 3 deletion targets, not
   retained compatibility coverage. This includes tests whose only purpose is
   detailed-vs-legacy equivalence, legacy bridge preservation, or legacy-only
@@ -122,6 +127,7 @@ provided maintainers accept the stated triggers:
 | Fingerprint-recipient tests | `EncryptionServiceTests`, `StreamingServiceTests`, `DecryptionServiceTests`, `PasswordMessageServiceTests`, `TutorialSessionStoreTests` formerly using `recipientFingerprints`; former `ContactServiceTests` explicit resolver compatibility coverage | Completed Rewrite/Cleanup Candidate | Service and tutorial coverage now uses contact-ID recipient APIs. Explicit legacy resolver compatibility coverage was removed with PR 2E. |
 | Legacy Contacts flat-runtime tests | Former `ContactServiceTests` migration/cutover/quarantine cases and reset cleanup assertions | Completed Cleanup Candidate | Removed with PR3D. Current Contacts tests cover protected-domain creation, persistence, schema migration, search/tags, certification artifacts, signer resolution via `ContactKeyRecord`, and relock/recovery behavior. |
 | Simple FFI / legacy verification tests | `SigningServiceTests`, `SigningServiceDetailedResultTests`, `DecryptionServiceTests`, `StreamingServiceTests`, `GnuPGInteropTests`, `DeviceMIETests`, `FFIIntegrationTests`, `SelfTestServiceTests`, Rust verification/decrypt tests | Completed Cleanup Candidate | Important behavior now uses detailed APIs, including Device MIE, GnuPG interop, file streaming artifact cleanup, High Security decrypt auth failure, and normal valid/tamper/unknown-signer/contact-resolution scenarios. Tests that only verified simple API compatibility or legacy bridge equivalence were retired. |
+| In-memory detached file API tests | Former direct `signDetached(data:)`, `verifyDetachedDetailed(data:)`, `sign::sign_detached`, and `verify::verify_detached_detailed` coverage | Completed Rewrite / Export Cleanup | Useful detached valid/tamper/expired/unknown-signer/GnuPG coverage now uses temp files and streaming file APIs. Internal helper coverage remains only where it proves current external-signer behavior. |
 | Raw User ID first-match tests | `FFIIntegrationTests`, `pgp-mobile/tests/certification_binding_tests.rs`, `pgp-mobile/tests/revocation_construction_tests.rs`, `pgp-mobile/tests/selector_discovery_tests.rs` | Completed Rewrite / Export Cleanup | Selector coverage is preserved through by-selector APIs. Direct raw first-match calls and first-match-only duplicate compatibility tests were removed in Phase 4A-D; raw exports/helpers and generated Swift raw engine methods were removed in Phase 4E. |
 | Historical script tests | Current script tests for `scripts/build_apple_arm64e_xcframework.sh` | Not cleanup debt | Keep current build script tests. Experiment-script tests were not identified in this pass. |
 

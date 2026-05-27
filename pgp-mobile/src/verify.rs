@@ -68,60 +68,6 @@ pub fn verify_cleartext_detailed(
     })
 }
 
-/// Verify a detached signature and preserve detailed per-signature results.
-pub fn verify_detached_detailed(
-    data: &[u8],
-    signature: &[u8],
-    verification_keys: &[Vec<u8>],
-) -> Result<VerifyDetailedResult, PgpError> {
-    let policy = StandardPolicy::new();
-    let certs = parse_verification_certs(verification_keys)?;
-    let helper = VerifyHelper::new(&certs);
-
-    let verifier_result = DetachedVerifierBuilder::from_bytes(signature)
-        .map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse signature: {e}"),
-        })?
-        .with_policy(&policy, None, helper);
-
-    let mut verifier = match verifier_result {
-        Ok(v) => v,
-        Err(e) => {
-            let status = if is_expired_error(&e) {
-                SignatureStatus::Expired
-            } else {
-                SignatureStatus::Bad
-            };
-            return Ok(empty_detailed_result(status));
-        }
-    };
-
-    if verifier.verify_bytes(data).is_err() {
-        let helper = verifier.into_helper();
-        return Ok(VerifyDetailedResult {
-            legacy_status: SignatureStatus::Bad,
-            legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
-            summary_state: helper.collector.summary_state(),
-            summary_entry_index: helper.collector.summary_entry_index(),
-            signatures: helper.collector.signatures(),
-            content: None,
-        });
-    }
-
-    let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
-
-    Ok(VerifyDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
-        summary_state,
-        summary_entry_index,
-        signatures,
-        content: None,
-    })
-}
-
 /// Helper struct for Sequoia's verification API.
 /// `pub(crate)` so that `streaming.rs` can construct this for file-based verification.
 pub(crate) struct VerifyHelper<'a> {

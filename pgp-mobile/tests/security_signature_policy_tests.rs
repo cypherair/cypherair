@@ -4,7 +4,37 @@ use pgp_mobile::decrypt::{self, SignatureStatus};
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, GeneratedKey, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::signature_details::FileVerifyDetailedResult;
+use pgp_mobile::streaming;
 use pgp_mobile::verify;
+use tempfile::NamedTempFile;
+
+fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
+    let input = NamedTempFile::new().expect("temp input should be created");
+    std::fs::write(input.path(), data).expect("temp input should be written");
+    input
+}
+
+fn sign_detached_file_for_test(data: &[u8], signer_cert: &[u8]) -> Vec<u8> {
+    let input = write_temp_data_file(data);
+    streaming::sign_detached_file(input.path().to_str().unwrap(), signer_cert, None)
+        .expect("Detached file signing should succeed")
+}
+
+fn verify_detached_file_for_test(
+    data: &[u8],
+    signature: &[u8],
+    verification_keys: &[Vec<u8>],
+) -> FileVerifyDetailedResult {
+    let input = write_temp_data_file(data);
+    streaming::verify_detached_file_detailed(
+        input.path().to_str().unwrap(),
+        signature,
+        verification_keys,
+        None,
+    )
+    .expect("Detached file verification should return a graded result, not throw")
+}
 
 /// Tampered cleartext-signed message must produce SignatureStatus::Bad.
 #[test]
@@ -42,15 +72,13 @@ fn test_verify_tampered_detached_returns_bad() {
             .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
-    let signature =
-        sign::sign_detached(data, &key.cert_data).expect("Detached signing should succeed");
+    let signature = sign_detached_file_for_test(data, &key.cert_data);
 
     let mut tampered_data = data.to_vec();
     tampered_data[0] ^= 0x01;
 
     let result =
-        verify::verify_detached_detailed(&tampered_data, &signature, &[key.public_key_data.clone()])
-            .expect("Verification should return a graded result, not throw");
+        verify_detached_file_for_test(&tampered_data, &signature, &[key.public_key_data.clone()]);
 
     assert_eq!(
         result.legacy_status,
@@ -62,19 +90,14 @@ fn test_verify_tampered_detached_returns_bad() {
 /// Helper: generate a key with 1-second expiry, sign immediately (while valid),
 /// then return the signed artifact and the key. The caller sleeps before verifying.
 fn make_expired_signer(profile: KeyProfile) -> (GeneratedKey, Vec<u8>, Vec<u8>) {
-    let signer = keys::generate_key_with_profile(
-        "Expiring Signer".to_string(),
-        None,
-        Some(1),
-        profile,
-    )
-    .expect("Key gen should succeed");
+    let signer =
+        keys::generate_key_with_profile("Expiring Signer".to_string(), None, Some(1), profile)
+            .expect("Key gen should succeed");
 
     let cleartext_signed = sign::sign_cleartext(b"Signed while key was valid", &signer.cert_data)
         .expect("Cleartext signing should succeed while key is valid");
 
-    let detached_sig = sign::sign_detached(b"Data for detached sig", &signer.cert_data)
-        .expect("Detached signing should succeed while key is valid");
+    let detached_sig = sign_detached_file_for_test(b"Data for detached sig", &signer.cert_data);
 
     (signer, cleartext_signed, detached_sig)
 }
@@ -86,8 +109,9 @@ fn test_verify_cleartext_expired_signer_profile_a() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
-        .expect("Verification should return a graded result, not throw");
+    let result =
+        verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
+            .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.legacy_status,
@@ -103,8 +127,9 @@ fn test_verify_cleartext_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
-        .expect("Verification should return a graded result, not throw");
+    let result =
+        verify::verify_cleartext_detailed(&cleartext_signed, &[signer.public_key_data.clone()])
+            .expect("Verification should return a graded result, not throw");
 
     assert_eq!(
         result.legacy_status,
@@ -120,12 +145,11 @@ fn test_verify_detached_expired_signer_profile_a() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_detached_detailed(
+    let result = verify_detached_file_for_test(
         b"Data for detached sig",
         &detached_sig,
         &[signer.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    );
 
     assert_eq!(
         result.legacy_status,
@@ -141,12 +165,11 @@ fn test_verify_detached_expired_signer_profile_b() {
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
-    let result = verify::verify_detached_detailed(
+    let result = verify_detached_file_for_test(
         b"Data for detached sig",
         &detached_sig,
         &[signer.public_key_data.clone()],
-    )
-    .expect("Verification should return a graded result, not throw");
+    );
 
     assert_eq!(
         result.legacy_status,
@@ -280,15 +303,13 @@ fn test_verify_tampered_detached_returns_bad_profile_a() {
             .expect("Key gen should succeed");
 
     let data = b"Original file content for detached signing";
-    let signature =
-        sign::sign_detached(data, &key.cert_data).expect("Detached signing should succeed");
+    let signature = sign_detached_file_for_test(data, &key.cert_data);
 
     let mut tampered_data = data.to_vec();
     tampered_data[0] ^= 0x01;
 
     let result =
-        verify::verify_detached_detailed(&tampered_data, &signature, &[key.public_key_data.clone()])
-            .expect("Verification should return a graded result, not throw");
+        verify_detached_file_for_test(&tampered_data, &signature, &[key.public_key_data.clone()]);
 
     assert_eq!(
         result.legacy_status,
@@ -307,13 +328,9 @@ fn test_sign_with_expired_key_not_accepted_as_valid() {
         (KeyProfile::Universal, "Profile A"),
         (KeyProfile::Advanced, "Profile B"),
     ] {
-        let key = keys::generate_key_with_profile(
-            "Expiring Signer".to_string(),
-            None,
-            Some(1),
-            profile,
-        )
-        .expect("Key gen should succeed");
+        let key =
+            keys::generate_key_with_profile("Expiring Signer".to_string(), None, Some(1), profile)
+                .expect("Key gen should succeed");
 
         std::thread::sleep(std::time::Duration::from_secs(3));
 

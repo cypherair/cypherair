@@ -165,7 +165,8 @@ mod tests {
 
     use crate::decrypt::SignatureStatus;
     use crate::error::PgpError;
-    use crate::{keys, sign, verify};
+    use crate::{keys, sign, streaming, verify};
+    use tempfile::NamedTempFile;
 
     #[derive(Clone, Copy, Debug)]
     enum CandidateVersion {
@@ -343,6 +344,12 @@ mod tests {
         assert_eq!(selectors.subkeys.len(), 1);
     }
 
+    fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
+        let input = NamedTempFile::new().expect("temp input should be created");
+        std::fs::write(input.path(), data).expect("temp input should be written");
+        input
+    }
+
     #[test]
     fn test_external_signer_builds_valid_public_only_p256_certificates() {
         for version in CandidateVersion::all() {
@@ -378,10 +385,15 @@ mod tests {
             let data = format!("detached external signer {}", version.label()).into_bytes();
             let signature =
                 sign::sign_detached_with_signer(&data, signer).expect("detached signing succeeds");
+            let input = write_temp_data_file(&data);
 
-            let result =
-                verify::verify_detached_detailed(&data, &signature, &[material.public_cert])
-                    .expect("external detached signature should verify");
+            let result = streaming::verify_detached_file_detailed(
+                input.path().to_str().unwrap(),
+                &signature,
+                &[material.public_cert],
+                None,
+            )
+            .expect("external detached signature should verify");
             assert_eq!(result.legacy_status, SignatureStatus::Valid);
         }
     }

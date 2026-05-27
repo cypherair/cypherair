@@ -89,22 +89,6 @@ enum PGPMessageResultMapper {
         )
     }
 
-    static func detachedVerifyDetailedResult(
-        _ result: VerifyDetailedResult,
-        context: PGPMessageVerificationContext
-    ) -> DetailedSignatureVerification {
-        detailedVerification(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
-            summaryState: result.summaryState,
-            summaryEntryIndex: result.summaryEntryIndex,
-            signatures: result.signatures,
-            contactKeys: context.contactKeys,
-            ownKeys: context.ownKeys,
-            contactsAvailability: context.contactsAvailability
-        )
-    }
-
     static func fileVerifyDetailedResult(
         _ result: FileVerifyDetailedResult,
         context: PGPMessageVerificationContext

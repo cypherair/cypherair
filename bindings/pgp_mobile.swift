@@ -764,11 +764,6 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func signCleartext(text: Data, signerCert: Data) throws  -> Data
 
     /**
-     * Create a detached signature for data (files).
-     */
-    func signDetached(data: Data, signerCert: Data) throws  -> Data
-
-    /**
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
@@ -785,11 +780,6 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Verify a cleartext-signed message and preserve per-signature detailed results.
      */
     func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
-
-    /**
-     * Verify a detached signature and preserve per-signature detailed results.
-     */
-    func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: [Data]) throws  -> VerifyDetailedResult
 
     /**
      * Verify a detached file signature using streaming I/O and preserve per-signature details.
@@ -1342,19 +1332,6 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
 }
 
     /**
-     * Create a detached signature for data (files).
-     */
-open func signDetached(data: Data, signerCert: Data)throws  -> Data  {
-    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_sign_detached(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(data),
-        FfiConverterData.lower(signerCert),$0
-    )
-})
-}
-
-    /**
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
@@ -1391,20 +1368,6 @@ open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])
     uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext_detailed(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signedMessage),
-        FfiConverterSequenceData.lower(verificationKeys),$0
-    )
-})
-}
-
-    /**
-     * Verify a detached signature and preserve per-signature detailed results.
-     */
-open func verifyDetachedDetailed(data: Data, signature: Data, verificationKeys: [Data])throws  -> VerifyDetailedResult  {
-    return try  FfiConverterTypeVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
-    uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_detailed(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(data),
-        FfiConverterData.lower(signature),
         FfiConverterSequenceData.lower(verificationKeys),$0
     )
 })
@@ -4732,9 +4695,6 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached() != 61044) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 18095) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4742,9 +4702,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed() != 33764) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_detailed() != 60053) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 64315) {
