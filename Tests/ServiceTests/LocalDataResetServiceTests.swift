@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import Security
 import XCTest
 @testable import CypherAir
 
@@ -290,8 +291,36 @@ final class LocalDataResetServiceTests: XCTestCase {
             XCTAssertTrue(
                 resetError.failures.contains("keychain.secureEnclaveCustodyHandle.cleanupOrRollbackFailure")
             )
-            XCTAssertTrue(resetError.failures.contains { $0.hasPrefix("keychain.remaining.secureEnclaveCustodyHandle.") })
+            XCTAssertTrue(
+                resetError.failures.contains(
+                    "keychain.remaining.secureEnclaveCustodyHandle.privateHandleInaccessible"
+                )
+            )
         }
+    }
+
+    func test_resetAllLocalData_reportsRemainingDataWhenDeviceBindingKeyRowRemains() async throws {
+        try await assertResetValidationReportsRemainingProtectedRow(
+            service: KeychainConstants.protectedDataDeviceBindingKeyService,
+            metadataKey: "hasDeviceBindingKey",
+            expectedFailure: "keychain.protectedDataDeviceBindingKey.remaining"
+        )
+    }
+
+    func test_resetAllLocalData_reportsRemainingDataWhenFormatFloorRowRemains() async throws {
+        try await assertResetValidationReportsRemainingProtectedRow(
+            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
+            metadataKey: "hasFormatFloor",
+            expectedFailure: "keychain.protectedDataRootSecretFormatFloor.remaining"
+        )
+    }
+
+    func test_resetAllLocalData_reportsRemainingDataWhenLegacyCleanupRowRemains() async throws {
+        try await assertResetValidationReportsRemainingProtectedRow(
+            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
+            metadataKey: "hasLegacyCleanup",
+            expectedFailure: "keychain.protectedDataRootSecretLegacyCleanup.remaining"
+        )
     }
 
     func test_resetAllLocalData_failsWhenRootSecretStillExistsAfterReset() async throws {
@@ -416,6 +445,7 @@ final class LocalDataResetServiceTests: XCTestCase {
 
     private func makeResetService(
         from container: AppContainer,
+        keychain: (any KeychainManageable)? = nil,
         temporaryArtifactStore: CypherAir.AppTemporaryArtifactStore? = nil,
         protectedDataRootSecretExists: @escaping () -> Bool = { false },
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil
@@ -423,7 +453,7 @@ final class LocalDataResetServiceTests: XCTestCase {
         let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         return LocalDataResetService(
-            keychain: container.keychain,
+            keychain: keychain ?? container.keychain,
             protectedDataStorageRoot: container.protectedDataStorageRoot,
             defaults: defaults,
             defaultsDomainName: defaultsSuiteName,
@@ -461,6 +491,51 @@ final class LocalDataResetServiceTests: XCTestCase {
         try FileManager.default.createDirectory(at: tutorialDir, withIntermediateDirectories: true)
         try Data("export".utf8).write(to: exportURL, options: .atomic)
     }
+
+    private func assertResetValidationReportsRemainingProtectedRow(
+        service: String,
+        metadataKey: String,
+        expectedFailure: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        defer {
+            cleanup(container)
+        }
+        let residualKeychain = ResidualProtectedResetRowKeychain(
+            base: container.keychain,
+            residualService: service
+        )
+        let resetService = makeResetService(
+            from: container,
+            keychain: residualKeychain
+        )
+        var thrownResetError: LocalDataResetError?
+
+        await XCTAssertThrowsErrorAsync({
+            try await resetService.resetAllLocalData()
+        }) { error in
+            guard let resetError = error as? LocalDataResetError else {
+                XCTFail("Expected LocalDataResetError, got \(type(of: error))", file: file, line: line)
+                return
+            }
+            thrownResetError = resetError
+        }
+
+        let resetError = try XCTUnwrap(thrownResetError, file: file, line: line)
+        XCTAssertTrue(resetError.failures.contains(expectedFailure), file: file, line: line)
+        let validationEntry = try XCTUnwrap(
+            container.authLifecycleTraceStore?.recentEntries.last {
+                $0.name == "localDataReset.validation.finish"
+            },
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(validationEntry.metadata["result"], "remainingData", file: file, line: line)
+        XCTAssertEqual(validationEntry.metadata[metadataKey], "true", file: file, line: line)
+        XCTAssertEqual(validationEntry.metadata["remainingDefaultKeychainItemCount"], "0", file: file, line: line)
+    }
 }
 
 private final class ProtectedDataRootSecretFlag: @unchecked Sendable {
@@ -468,6 +543,52 @@ private final class ProtectedDataRootSecretFlag: @unchecked Sendable {
 
     init(exists: Bool) {
         self.exists = exists
+    }
+}
+
+private final class ResidualProtectedResetRowKeychain: KeychainManageable {
+    private let base: any KeychainManageable
+    private let residualService: String
+
+    init(base: any KeychainManageable, residualService: String) {
+        self.base = base
+        self.residualService = residualService
+    }
+
+    func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws {
+        try base.save(data, service: service, account: account, accessControl: accessControl)
+    }
+
+    func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
+        try base.load(service: service, account: account, authenticationContext: authenticationContext)
+    }
+
+    func delete(service: String, account: String, authenticationContext: LAContext?) throws {
+        guard !isResidualRow(service: service, account: account) else {
+            return
+        }
+        try base.delete(service: service, account: account, authenticationContext: authenticationContext)
+    }
+
+    func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool {
+        if isResidualRow(service: service, account: account) {
+            return true
+        }
+        return base.exists(service: service, account: account, authenticationContext: authenticationContext)
+    }
+
+    func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String] {
+        try base.listItems(
+            servicePrefix: servicePrefix,
+            account: account,
+            authenticationContext: authenticationContext
+        ).filter { service in
+            !isResidualRow(service: service, account: account)
+        }
+    }
+
+    private func isResidualRow(service: String, account: String) -> Bool {
+        service == residualService && account == KeychainConstants.defaultAccount
     }
 }
 
