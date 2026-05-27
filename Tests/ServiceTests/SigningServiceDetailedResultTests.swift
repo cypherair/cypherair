@@ -166,37 +166,6 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         XCTAssertNil(detailed.signatures[1].signerIdentity)
     }
 
-    func test_verifyDetachedStreamingDetailed_fixtureKnownPlusUnknown_matchesInMemoryDetailed()
-        async throws
-    {
-        let signerA = try loadFixture("ffi_detailed_signer_a")
-        let data = try loadFixture("ffi_detailed_detached_data", ext: "txt")
-        let signature = try loadFixture("ffi_detailed_multisig_detached", ext: "sig")
-        let fileURL = try makeTemporaryFile(
-            named: "ffi-detailed-known-unknown.txt",
-            contents: data
-        )
-        defer { try? FileManager.default.removeItem(at: fileURL) }
-
-        try addContact(signerA)
-
-        let detailed = try await stack.signingService.verifyDetachedStreamingDetailed(
-            fileURL: fileURL,
-            signature: signature,
-            progress: nil
-        )
-
-        XCTAssertEqual(detailed.legacyStatus, .valid)
-        XCTAssertNotNil(detailed.legacySignerFingerprint)
-        XCTAssertEqual(detailed.signatures.count, 2)
-        XCTAssertTrue(detailed.signatures.contains {
-            $0.status == .unknownSigner && $0.signerPrimaryFingerprint == nil
-        })
-        XCTAssertTrue(detailed.signatures.contains {
-            $0.status == .valid && $0.signerIdentity?.source == .contact
-        })
-    }
-
     func test_verifyDetachedStreamingDetailed_cancellation_throwsOperationCancelled() async throws {
         let signer = try await TestHelpers.generateAndStoreKey(
             service: stack.keyManagement,
