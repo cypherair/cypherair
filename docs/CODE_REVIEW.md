@@ -3,6 +3,11 @@
 > Purpose: Review criteria for PRs, organized by change type.
 > Audience: Human reviewers and AI coding tools.
 
+## Review Cautions
+
+- [ ] When a review concern intersects with an established pattern, reviewers should examine the broader context around that pattern, including relevant call chains, active documentation, comparable implementations, and other relevant evidence. Established patterns are context to evaluate, not proof that the behavior is correct; feedback should address the pattern itself when the evidence shows the design or its application is risky.
+- [ ] Review findings should match the evidence. When the evidence supports a possible risk, describe the risk and the checks behind it; avoid presenting it as a confirmed defect unless the evidence supports that conclusion.
+
 ## All Code PRs
 
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
