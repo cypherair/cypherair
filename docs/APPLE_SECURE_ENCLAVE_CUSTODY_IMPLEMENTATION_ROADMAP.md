@@ -225,7 +225,14 @@ Recommended PR grouping:
   P-256 Secure Enclave custody metadata only, and leaves software-key behavior
   and UI exposure unchanged.
 - PR 4B: add generation cleanup, partial-failure recovery, and local reset
-  behavior.
+  behavior. **Implemented:** stored hidden Secure Enclave public certificates
+  can be inspected for signing/key-agreement P-256 public bindings, and
+  KeyManagement now maintains a sanitized in-memory recovery report that
+  classifies metadata-only, handle-only, partial, ambiguous, wrong-public,
+  public-certificate mismatch, metadata mismatch, missing revocation, and
+  inventory/list-failure states. Reset All Local Data continues to delete
+  hidden metadata and all app-owned custody handles, while startup/load
+  classification does not silently delete orphan handles.
 - PR 4C: add public certificate and revocation artifact export coverage for
   generated hidden keys.
 

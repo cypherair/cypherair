@@ -173,6 +173,19 @@ signatures. Current software-key generation and UI exposure remain unchanged,
 and production capability resolution still reports Secure Enclave generation as
 policy-unavailable unless the internal hidden/test policy is explicitly used.
 
+Phase 4B adds hidden recovery classification for generated custody identities.
+Rust/UniFFI can inspect a stored public-only P-256 Secure Enclave-shaped
+certificate and return only the public signing/key-agreement X9.63 bindings plus
+fingerprint/version metadata. Swift compares those public bindings with
+Security-owned inventory through `SecureEnclaveCustodyHandleStore` and stores
+only an in-memory sanitized report. Missing, partial, ambiguous, wrong-public,
+public-certificate mismatch, metadata mismatch, missing-revocation, and
+inventory/list failures are classified with shared categories. The report must
+not contain Apple application tags, handle-set identifiers, Keychain locators,
+fingerprints, public key bytes, digests, signatures, plaintext, or temp paths.
+Startup/load classification does not delete orphan handles; Reset All Local
+Data remains the cleanup path for app-owned custody rows.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
