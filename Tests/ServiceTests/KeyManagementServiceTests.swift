@@ -299,6 +299,22 @@ private struct HiddenGenerationTestDigestSigner: SecureEnclaveCustodyDigestSigni
     }
 }
 
+private final class RecordingSecureEnclaveCustodyRecoveryClassifier: SecureEnclaveCustodyGenerationRecoveryClassifying, @unchecked Sendable {
+    private let report: SecureEnclaveCustodyGenerationRecoveryReport
+    private(set) var requestedIdentityFingerprints: [String] = []
+
+    init(report: SecureEnclaveCustodyGenerationRecoveryReport) {
+        self.report = report
+    }
+
+    func classify(
+        identities: [PGPKeyIdentity]
+    ) -> SecureEnclaveCustodyGenerationRecoveryReport {
+        requestedIdentityFingerprints = identities.map(\.fingerprint)
+        return report
+    }
+}
+
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
 
@@ -1165,6 +1181,66 @@ final class KeyManagementServiceTests: XCTestCase {
         XCTAssertEqual(target.metadataPersistence.deleteCallCount, 1)
         XCTAssertEqual(target.keyStore.storedHandleCount(), 0)
         XCTAssertEqual(target.keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
+    }
+
+    func test_loadKeysRefreshesSecureEnclaveCustodyRecoveryReportAndRelockClearsIt() async throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let material = Self.hiddenGenerationMaterial(fingerprint: "hidden-recovery", keyVersion: 4)
+        let identity = PGPKeyIdentity(
+            fingerprint: material.metadata.fingerprint,
+            keyVersion: material.metadata.keyVersion,
+            profile: .universal,
+            userId: material.metadata.userId,
+            hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: true,
+            isBackedUp: false,
+            publicKeyData: material.publicKeyData,
+            revocationCert: material.revocationCert,
+            primaryAlgo: material.metadata.primaryAlgo,
+            subkeyAlgo: material.metadata.subkeyAlgo,
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleP256V4,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        metadataPersistence.seed([identity])
+        let expectedReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [
+                SecureEnclaveCustodyGenerationRecoveryAssessment(
+                    identityOrdinal: 0,
+                    configurationIdentity: .compatibleP256V4,
+                    publicMaterialAvailability: .available,
+                    revocationArtifactAvailability: .available,
+                    handleAvailability: .unavailable(.privateHandleMissing)
+                )
+            ],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+        let recoveryClassifier = RecordingSecureEnclaveCustodyRecoveryClassifier(
+            report: expectedReport
+        )
+        let targetService = KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
+            metadataPersistence: metadataPersistence,
+            secureEnclaveCustodyRecoveryService: recoveryClassifier
+        )
+
+        try targetService.loadKeys()
+
+        XCTAssertEqual(recoveryClassifier.requestedIdentityFingerprints, ["hidden-recovery"])
+        XCTAssertEqual(targetService.secureEnclaveCustodyRecoveryReport, expectedReport)
+
+        try await targetService.relockProtectedData()
+
+        XCTAssertEqual(targetService.secureEnclaveCustodyRecoveryReport, .empty)
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {

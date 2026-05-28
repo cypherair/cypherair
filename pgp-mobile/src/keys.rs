@@ -182,6 +182,23 @@ pub struct SecureEnclaveGeneratedPublicCertificate {
     pub key_agreement_subkey_fingerprint: String,
 }
 
+/// Public bindings extracted from a Secure Enclave custody OpenPGP certificate.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclavePublicBindingInspection {
+    /// Certificate fingerprint as lowercase hex.
+    pub fingerprint: String,
+    /// OpenPGP key version.
+    pub key_version: u8,
+    /// Primary signing key fingerprint as lowercase hex.
+    pub signing_key_fingerprint: String,
+    /// Key-agreement subkey fingerprint as lowercase hex.
+    pub key_agreement_subkey_fingerprint: String,
+    /// 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+    pub signing_public_key_x963: Vec<u8>,
+    /// 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+    pub key_agreement_public_key_x963: Vec<u8>,
+}
+
 /// Information extracted from a parsed key.
 #[derive(Debug, uniffi::Record)]
 pub struct KeyInfo {
@@ -324,7 +341,9 @@ pub use revocation::{
 };
 pub use s2k::{parse_s2k_params, S2kInfo};
 pub use secret_transfer::{export_secret_key, extract_secret_key_bytes, import_secret_key};
-pub use secure_enclave_generation::generate_secure_enclave_public_certificate;
+pub use secure_enclave_generation::{
+    generate_secure_enclave_public_certificate, inspect_secure_enclave_public_bindings,
+};
 pub use selector_discovery::discover_certificate_selectors;
 
 fn select_display_user_id(

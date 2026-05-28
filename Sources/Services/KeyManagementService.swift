@@ -18,6 +18,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
     private let secureEnclaveCustodyGenerationService: SecureEnclaveCustodyGenerationService?
+    private let secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)?
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
@@ -30,6 +31,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
+    private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
     init(
         keyAdapter: PGPKeyOperationAdapter,
@@ -55,7 +57,8 @@ final class KeyManagementService: @unchecked Sendable {
             KeyCatalogStore,
             KeyProvisioningInvalidationGate,
             KeyProvisioningCommitCoordinator
-        ) -> SecureEnclaveCustodyGenerationService)? = nil
+        ) -> SecureEnclaveCustodyGenerationService)? = nil,
+        secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -99,6 +102,7 @@ final class KeyManagementService: @unchecked Sendable {
             provisioningInvalidationGate,
             provisioningCommitCoordinator
         )
+        self.secureEnclaveCustodyRecoveryService = secureEnclaveCustodyRecoveryService
         self.exportService = KeyExportService(
             keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
@@ -132,10 +136,12 @@ final class KeyManagementService: @unchecked Sendable {
         do {
             try catalogStore.loadAll()
             syncKeys()
+            refreshSecureEnclaveCustodyRecoveryReport()
             metadataLoadState = .loaded
         } catch {
             catalogStore.clearInMemoryIdentities()
             keys = []
+            secureEnclaveCustodyRecoveryReport = .empty
             metadataLoadState = .recoveryNeeded
             throw error
         }
@@ -148,12 +154,14 @@ final class KeyManagementService: @unchecked Sendable {
     func markKeyMetadataLocked() {
         catalogStore.clearInMemoryIdentities()
         keys = []
+        secureEnclaveCustodyRecoveryReport = .empty
         metadataLoadState = .locked
     }
 
     func markKeyMetadataRecoveryNeeded() {
         catalogStore.clearInMemoryIdentities()
         keys = []
+        secureEnclaveCustodyRecoveryReport = .empty
         metadataLoadState = .recoveryNeeded
     }
 
@@ -192,6 +200,7 @@ final class KeyManagementService: @unchecked Sendable {
                 authenticationContext: authenticationContext
             )
             syncKeys()
+            refreshSecureEnclaveCustodyRecoveryReport()
             legacyMetadataMigrationCompletedInProcess = outcome.failedItemCount == 0
             legacyMetadataMigrationLoadWarning = outcome.failedItemCount == 0 ? nil : Self.legacyMetadataMigrationWarningMessage()
             traceStore?.record(
@@ -223,6 +232,7 @@ final class KeyManagementService: @unchecked Sendable {
         provisioningInvalidationGate.invalidate()
         catalogStore.clearInMemoryIdentities()
         keys = []
+        secureEnclaveCustodyRecoveryReport = .empty
         legacyMetadataMigrationCompletedInProcess = false
         legacyMetadataMigrationLoadWarning = nil
         metadataLoadState = .locked
@@ -287,6 +297,7 @@ final class KeyManagementService: @unchecked Sendable {
         }
         try provisioningInvalidationGate.checkValid(token)
         syncKeys()
+        refreshSecureEnclaveCustodyRecoveryReport()
         return identity
     }
 
@@ -314,6 +325,7 @@ final class KeyManagementService: @unchecked Sendable {
         }
         try provisioningInvalidationGate.checkValid(token)
         syncKeys()
+        refreshSecureEnclaveCustodyRecoveryReport()
         return identity
     }
 
@@ -602,6 +614,16 @@ final class KeyManagementService: @unchecked Sendable {
 
     private func syncKeys() {
         keys = catalogStore.keys
+    }
+
+    private func refreshSecureEnclaveCustodyRecoveryReport() {
+        guard let secureEnclaveCustodyRecoveryService else {
+            secureEnclaveCustodyRecoveryReport = .empty
+            return
+        }
+        secureEnclaveCustodyRecoveryReport = secureEnclaveCustodyRecoveryService.classify(
+            identities: keys
+        )
     }
 }
 

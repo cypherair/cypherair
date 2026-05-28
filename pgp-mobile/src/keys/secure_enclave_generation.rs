@@ -163,6 +163,101 @@ pub fn generate_secure_enclave_public_certificate(
     })
 }
 
+pub fn inspect_secure_enclave_public_bindings(
+    public_key_data: &[u8],
+) -> Result<SecureEnclavePublicBindingInspection, PgpError> {
+    reject_armored_certificate_input(public_key_data)?;
+
+    let cert =
+        openpgp::Cert::from_bytes(public_key_data).map_err(|error| PgpError::InvalidKeyData {
+            reason: format!("Invalid Secure Enclave custody public certificate: {error}"),
+        })?;
+    if cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Secure Enclave custody inspection requires public certificate material"
+                .to_string(),
+        });
+    }
+
+    let primary = cert.primary_key().key();
+    let signing_public_key_x963 = match primary.mpis() {
+        mpi::PublicKey::ECDSA {
+            curve: Curve::NistP256,
+            q,
+        } => q.value().to_vec(),
+        _ => {
+            return Err(PgpError::InvalidKeyData {
+                reason: "Secure Enclave custody primary key must be ECDSA P-256".to_string(),
+            })
+        }
+    };
+    validate_public_key_point(&signing_public_key_x963, "signing public key")?;
+
+    let mut raw_p256_ecdh_subkeys = cert
+        .keys()
+        .subkeys()
+        .filter_map(|subkey| match subkey.key().mpis() {
+            mpi::PublicKey::ECDH {
+                curve: Curve::NistP256,
+                q,
+                hash: HashAlgorithm::SHA256,
+                sym: SymmetricAlgorithm::AES256,
+            } => Some((
+                subkey.key().fingerprint().to_hex().to_lowercase(),
+                q.value().to_vec(),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if raw_p256_ecdh_subkeys.is_empty() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Secure Enclave custody certificate is missing a P-256 ECDH subkey".to_string(),
+        });
+    }
+    if raw_p256_ecdh_subkeys.len() != 1 {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Secure Enclave custody certificate must contain exactly one P-256 ECDH subkey"
+                .to_string(),
+        });
+    }
+    let (key_agreement_subkey_fingerprint, key_agreement_public_key_x963) =
+        raw_p256_ecdh_subkeys.remove(0);
+    validate_public_key_point(&key_agreement_public_key_x963, "key-agreement public key")?;
+    if signing_public_key_x963 == key_agreement_public_key_x963 {
+        return Err(PgpError::InvalidKeyData {
+            reason: "Secure Enclave custody roles require distinct public keys".to_string(),
+        });
+    }
+
+    let policy = StandardPolicy::new();
+    let is_transport_encryption_capable = cert
+        .keys()
+        .subkeys()
+        .with_policy(&policy, None)
+        .supported()
+        .for_transport_encryption()
+        .any(|subkey| {
+            subkey.key().fingerprint().to_hex().to_lowercase() == key_agreement_subkey_fingerprint
+        });
+    if !is_transport_encryption_capable {
+        return Err(PgpError::InvalidKeyData {
+            reason:
+                "Secure Enclave custody key-agreement subkey is not transport-encryption capable"
+                    .to_string(),
+        });
+    }
+
+    Ok(SecureEnclavePublicBindingInspection {
+        fingerprint: cert.fingerprint().to_hex().to_lowercase(),
+        key_version: primary.version(),
+        signing_key_fingerprint: primary.fingerprint().to_hex().to_lowercase(),
+        key_agreement_subkey_fingerprint,
+        signing_public_key_x963,
+        key_agreement_public_key_x963,
+    })
+}
+
 fn make_signing_key(
     version: SecureEnclaveCertificateVersion,
     created_at: SystemTime,
@@ -615,6 +710,24 @@ mod tests {
         assert_eq!(selectors.subkeys.len(), 1);
         parse_revocation_cert(&result.revocation_cert, &result.public_key_data)
             .expect("revocation should verify with public cert");
+
+        let inspection = inspect_secure_enclave_public_bindings(&result.public_key_data)
+            .expect("Secure Enclave bindings should inspect");
+        assert_eq!(inspection.fingerprint, result.fingerprint);
+        assert_eq!(inspection.key_version, result.key_version);
+        assert_eq!(
+            inspection.signing_key_fingerprint,
+            result.signing_key_fingerprint
+        );
+        assert_eq!(
+            inspection.key_agreement_subkey_fingerprint,
+            result.key_agreement_subkey_fingerprint
+        );
+        assert_eq!(inspection.signing_public_key_x963, signing_public_key_x963);
+        assert_eq!(
+            inspection.key_agreement_public_key_x963,
+            key_agreement_public_key_x963
+        );
     }
 
     #[test]
@@ -655,6 +768,86 @@ mod tests {
         assert!(
             generate_secure_enclave_public_certificate(duplicate, provider_for(material),).is_err()
         );
+    }
+
+    #[test]
+    fn test_secure_enclave_public_binding_inspection_rejects_non_se_certificates() {
+        let generated = generate_key_with_profile(
+            "Software".to_string(),
+            Some("software@example.test".to_string()),
+            Some(3600),
+            KeyProfile::Universal,
+        )
+        .expect("software key should generate");
+        assert!(inspect_secure_enclave_public_bindings(&generated.public_key_data).is_err());
+    }
+
+    #[test]
+    fn test_secure_enclave_public_binding_inspection_rejects_missing_or_wrong_role_material() {
+        let material =
+            public_material(SecureEnclaveCertificateVersion::V4).expect("material should generate");
+        let created_at = SystemTime::now();
+
+        let signing_key = make_signing_key(
+            SecureEnclaveCertificateVersion::V4,
+            created_at,
+            &material.signing_public_key_x963,
+        )
+        .expect("signing key should build");
+        let signing_only_cert = openpgp::Cert::try_from(vec![Packet::from(signing_key)])
+            .expect("signing-only cert should build");
+        let mut signing_only_data = Vec::new();
+        signing_only_cert
+            .serialize(&mut signing_only_data)
+            .expect("signing-only cert should serialize");
+        assert!(inspect_secure_enclave_public_bindings(&signing_only_data).is_err());
+
+        let ecdh_primary_mpis = mpi::PublicKey::ECDH {
+            curve: Curve::NistP256,
+            q: mpi::MPI::new(&material.key_agreement_public_key_x963),
+            hash: HashAlgorithm::SHA256,
+            sym: SymmetricAlgorithm::AES256,
+        };
+        let ecdh_primary: Key<key::PublicParts, key::PrimaryRole> =
+            key::Key4::new(created_at, PublicKeyAlgorithm::ECDH, ecdh_primary_mpis)
+                .expect("ECDH primary should build")
+                .into();
+        let wrong_role_cert = openpgp::Cert::try_from(vec![Packet::from(ecdh_primary)])
+            .expect("wrong-role cert should build");
+        let mut wrong_role_data = Vec::new();
+        wrong_role_cert
+            .serialize(&mut wrong_role_data)
+            .expect("wrong-role cert should serialize");
+        assert!(inspect_secure_enclave_public_bindings(&wrong_role_data).is_err());
+    }
+
+    #[test]
+    fn test_secure_enclave_public_binding_inspection_rejects_non_distinct_role_points() {
+        let material =
+            public_material(SecureEnclaveCertificateVersion::V4).expect("material should generate");
+        let created_at = SystemTime::now();
+        let signing_key = make_signing_key(
+            SecureEnclaveCertificateVersion::V4,
+            created_at,
+            &material.signing_public_key_x963,
+        )
+        .expect("signing key should build");
+        let key_agreement_key = make_key_agreement_key(
+            SecureEnclaveCertificateVersion::V4,
+            created_at,
+            &material.signing_public_key_x963,
+        )
+        .expect("key-agreement key should build");
+        let cert = openpgp::Cert::try_from(vec![
+            Packet::from(signing_key),
+            Packet::from(key_agreement_key),
+        ])
+        .expect("non-distinct role cert should build");
+        let mut data = Vec::new();
+        cert.serialize(&mut data)
+            .expect("non-distinct role cert should serialize");
+
+        assert!(inspect_secure_enclave_public_bindings(&data).is_err());
     }
 
     #[test]

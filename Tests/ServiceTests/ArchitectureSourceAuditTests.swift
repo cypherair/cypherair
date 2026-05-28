@@ -726,6 +726,7 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageResultMapper.swift",
                     "Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift",
+                    "Sources/Services/FFI/PGPSecureEnclaveCustodyPublicBindingInspector.swift",
                     "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
                 ]
             ),
@@ -767,6 +768,7 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPKeyOperationAdapter.swift",
                     "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
                     "Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift",
+                    "Sources/Services/FFI/PGPSecureEnclaveCustodyPublicBindingInspector.swift",
                     "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
                 ]
             ),
