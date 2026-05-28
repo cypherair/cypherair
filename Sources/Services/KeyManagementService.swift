@@ -17,13 +17,16 @@ final class KeyManagementService: @unchecked Sendable {
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let provisioningService: KeyProvisioningService
+    private let secureEnclaveCustodyGenerationService: SecureEnclaveCustodyGenerationService?
     private let exportService: KeyExportService
     private let selectiveRevocationService: SelectiveRevocationService
     private let mutationService: KeyMutationService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
+    private let provisioningCommitCoordinator: KeyProvisioningCommitCoordinator
     private let beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
@@ -47,7 +50,12 @@ final class KeyManagementService: @unchecked Sendable {
         identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
-        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        secureEnclaveCustodyGenerationServiceFactory: ((
+            KeyCatalogStore,
+            KeyProvisioningInvalidationGate,
+            KeyProvisioningCommitCoordinator
+        ) -> SecureEnclaveCustodyGenerationService)? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -62,13 +70,16 @@ final class KeyManagementService: @unchecked Sendable {
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
+        let provisioningCommitCoordinator = KeyProvisioningCommitCoordinator()
         self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
+        self.provisioningCommitCoordinator = provisioningCommitCoordinator
         self.beforeAuthModeReadCheckpoint = beforeAuthModeReadCheckpoint
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
+        self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
@@ -77,11 +88,16 @@ final class KeyManagementService: @unchecked Sendable {
             bundleStore: bundleStore,
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
+            commitCoordinator: provisioningCommitCoordinator,
             beforePermanentStorageCheckpoint: provisioningCheckpoint,
             afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
             afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
-            afterIdentityStoreCheckpoint: identityStoreCheckpoint,
-            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+            afterIdentityStoreCheckpoint: identityStoreCheckpoint
+        )
+        self.secureEnclaveCustodyGenerationService = secureEnclaveCustodyGenerationServiceFactory?(
+            catalogStore,
+            provisioningInvalidationGate,
+            provisioningCommitCoordinator
         )
         self.exportService = KeyExportService(
             keyAdapter: keyAdapter,
@@ -264,6 +280,33 @@ final class KeyManagementService: @unchecked Sendable {
             expirySeconds: expirySeconds,
             profile: profile,
             authMode: authMode,
+            invalidationToken: token
+        )
+        if let postProvisioningCheckpoint {
+            await postProvisioningCheckpoint()
+        }
+        try provisioningInvalidationGate.checkValid(token)
+        syncKeys()
+        return identity
+    }
+
+    func generateHiddenSecureEnclaveCustodyKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        configurationIdentity: PGPKeyConfiguration.Identity
+    ) async throws -> PGPKeyIdentity {
+        guard let secureEnclaveCustodyGenerationService else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: PGPKeyOperationFailureCategory.operationUnavailableByPolicy.rawValue
+            )
+        }
+        let token = provisioningInvalidationGate.makeToken()
+        let identity = try await secureEnclaveCustodyGenerationService.generateHiddenKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            configurationIdentity: configurationIdentity,
             invalidationToken: token
         )
         if let postProvisioningCheckpoint {
@@ -568,7 +611,9 @@ extension KeyManagementService: ProtectedDataRelockParticipant {
         if let relockInvalidationCheckpoint {
             await relockInvalidationCheckpoint()
         }
-        await provisioningService.waitForActiveProvisioningCommitsToFinish()
+        await provisioningCommitCoordinator.waitForActiveCommitsToFinish(
+            waiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+        )
         markKeyMetadataLocked()
     }
 }

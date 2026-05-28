@@ -176,6 +176,75 @@ struct SecureEnclaveCustodyHandleStore {
         }
     }
 
+    func locateHandlePair(
+        signingPublicKeyX963: Data,
+        keyAgreementPublicKeyX963: Data
+    ) throws -> SecureEnclaveCustodyHandlePair {
+        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(
+            signingPublicKeyX963
+        ) else {
+            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.signing)
+        }
+        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(
+            keyAgreementPublicKeyX963
+        ) else {
+            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
+        }
+
+        let items = try keyStore.inventoryKeys()
+        var grouped: [String: [SecureEnclaveCustodyHandleInventoryItem]] = [:]
+        for item in items {
+            guard let reference = item.reference else {
+                continue
+            }
+            grouped[reference.handleSetIdentifier, default: []].append(item)
+        }
+
+        var matches: [SecureEnclaveCustodyHandlePair] = []
+        for (handleSetIdentifier, group) in grouped {
+            let signingCount = group.filter { $0.role == .signing }.count
+            let keyAgreementCount = group.filter { $0.role == .keyAgreement }.count
+            if signingCount > 1 {
+                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
+            }
+            if keyAgreementCount > 1 {
+                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.keyAgreement)
+            }
+
+            switch inspectHandlePair(handleSetIdentifier: handleSetIdentifier) {
+            case .missing:
+                continue
+            case .invalid(let error):
+                throw error
+            case .partial(let presentRoles):
+                try failIfPartialSetMatchesExpectedPublicKey(
+                    handleSetIdentifier: handleSetIdentifier,
+                    presentRoles: presentRoles,
+                    signingPublicKeyX963: signingPublicKeyX963,
+                    keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
+                )
+            case .complete(let pair):
+                let signingMatches = pair.signing.publicKeyX963 == signingPublicKeyX963
+                let keyAgreementMatches = pair.keyAgreement.publicKeyX963 == keyAgreementPublicKeyX963
+                if signingMatches, keyAgreementMatches {
+                    matches.append(pair)
+                } else if signingMatches {
+                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
+                } else if keyAgreementMatches {
+                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.signing)
+                }
+            }
+        }
+
+        guard !matches.isEmpty else {
+            throw SecureEnclaveCustodyHandleError.privateHandleMissing(.signing)
+        }
+        guard matches.count == 1 else {
+            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
+        }
+        return matches[0]
+    }
+
     func inventorySummaryForLocalRecovery() throws -> SecureEnclaveCustodyHandleInventorySummary {
         let items = try keyStore.inventoryKeys()
         guard !items.isEmpty else {
@@ -287,6 +356,25 @@ struct SecureEnclaveCustodyHandleStore {
         }
         if cleanupFailed {
             throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+        }
+    }
+
+    private func failIfPartialSetMatchesExpectedPublicKey(
+        handleSetIdentifier: String,
+        presentRoles: Set<PGPPrivateOperationRole>,
+        signingPublicKeyX963: Data,
+        keyAgreementPublicKeyX963: Data
+    ) throws {
+        for role in presentRoles {
+            let reference = try SecureEnclaveCustodyHandleReference(
+                handleSetIdentifier: handleSetIdentifier,
+                role: role
+            )
+            let candidates = try keyStore.loadKeys(reference: reference)
+            let expectedPublicKey = role == .signing ? signingPublicKeyX963 : keyAgreementPublicKeyX963
+            if candidates.contains(where: { $0.binding.publicKeyX963 == expectedPublicKey }) {
+                throw SecureEnclaveCustodyHandleError.partialHandlePair
+            }
         }
     }
 }

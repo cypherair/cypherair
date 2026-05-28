@@ -393,6 +393,9 @@ final class AppContainer: @unchecked Sendable {
         let engine = PgpEngine()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+        )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -554,9 +557,6 @@ final class AppContainer: @unchecked Sendable {
             selfTestAdapter: selfTestAdapter,
             keyManagement: keyManagement,
             contactService: contactService
-        )
-        let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
