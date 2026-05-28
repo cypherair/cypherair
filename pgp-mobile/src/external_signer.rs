@@ -4,6 +4,8 @@ use openpgp::crypto::{mpi, Signer};
 use openpgp::packet::{key, Key};
 use openpgp::types::{Curve, HashAlgorithm, PublicKeyAlgorithm};
 
+use crate::keys::ExternalP256SigningFailureCategory;
+
 const P256_SCALAR_LENGTH: usize = 32;
 const P256_ACCEPTABLE_HASHES: &[HashAlgorithm] = &[HashAlgorithm::SHA256];
 
@@ -19,20 +21,22 @@ impl ExternalP256Signature {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum ExternalP256SignerError {
+    #[error("external P-256 signer invalid request: {0}")]
     InvalidRequest(&'static str),
+    #[error("external P-256 signer invalid response: {0}")]
     InvalidResponse(&'static str),
-    ExternalFailure(&'static str),
+    #[error("external P-256 signer failed: {}", .0.stable_reason())]
+    ExternalFailure(ExternalP256SigningFailureCategory),
+    #[error("external P-256 signer operation cancelled")]
+    OperationCancelled,
 }
 
 impl ExternalP256SignerError {
-    fn sanitized_reason(self) -> &'static str {
-        match self {
-            ExternalP256SignerError::InvalidRequest(reason)
-            | ExternalP256SignerError::InvalidResponse(reason)
-            | ExternalP256SignerError::ExternalFailure(reason) => reason,
-        }
+    #[cfg(test)]
+    pub(crate) fn external_operation_failed() -> Self {
+        Self::ExternalFailure(ExternalP256SigningFailureCategory::ExternalOperationFailed)
     }
 }
 
@@ -139,17 +143,14 @@ where
     }
 
     fn sign(&mut self, hash_algo: HashAlgorithm, digest: &[u8]) -> openpgp::Result<mpi::Signature> {
-        Self::validate_request(hash_algo, digest).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-        })?;
-
-        let signature = (self.sign_operation)(hash_algo, digest).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-        })?;
-
-        Self::validate_response(&self.public_key, hash_algo, digest, signature).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string()).into()
-        })
+        Self::validate_request(hash_algo, digest)?;
+        let signature = (self.sign_operation)(hash_algo, digest)?;
+        Ok(Self::validate_response(
+            &self.public_key,
+            hash_algo,
+            digest,
+            signature,
+        )?)
     }
 }
 
@@ -279,22 +280,13 @@ mod tests {
             match oracle.sign(hash_algo, digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
                     r.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                     s.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                 )),
-                Ok(_) => Err(ExternalP256SignerError::ExternalFailure(
-                    "external P-256 oracle returned a non-ECDSA signature",
-                )),
-                Err(_) => Err(ExternalP256SignerError::ExternalFailure(
-                    "external P-256 oracle failed",
-                )),
+                Ok(_) | Err(_) => Err(ExternalP256SignerError::external_operation_failed()),
             }
         })
     }
@@ -402,9 +394,7 @@ mod tests {
     fn test_external_signer_failure_does_not_fallback_to_secret_certificate_signing() {
         let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
         let signer = ExternalP256Signer::new(material.signing_public_key, |_hash, _digest| {
-            Err(ExternalP256SignerError::ExternalFailure(
-                "external P-256 signer failed",
-            ))
+            Err(ExternalP256SignerError::external_operation_failed())
         })
         .expect("external signer should initialize");
 
@@ -475,23 +465,13 @@ mod tests {
                 match oracle.sign(hash, &wrong_digest) {
                     Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
                         r.value_padded(P256_SCALAR_LENGTH)
-                            .map_err(|_| {
-                                ExternalP256SignerError::ExternalFailure(
-                                    "external P-256 oracle failed",
-                                )
-                            })?
+                            .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                             .into_owned(),
                         s.value_padded(P256_SCALAR_LENGTH)
-                            .map_err(|_| {
-                                ExternalP256SignerError::ExternalFailure(
-                                    "external P-256 oracle failed",
-                                )
-                            })?
+                            .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                             .into_owned(),
                     )),
-                    _ => Err(ExternalP256SignerError::ExternalFailure(
-                        "external P-256 oracle failed",
-                    )),
+                    _ => Err(ExternalP256SignerError::external_operation_failed()),
                 }
             })
             .expect("external signer should initialize");
@@ -511,19 +491,13 @@ mod tests {
             move |hash, digest| match oracle.sign(hash, digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
                     r.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                     s.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                 )),
-                _ => Err(ExternalP256SignerError::ExternalFailure(
-                    "external P-256 oracle failed",
-                )),
+                _ => Err(ExternalP256SignerError::external_operation_failed()),
             },
         )
         .expect("external signer should initialize");

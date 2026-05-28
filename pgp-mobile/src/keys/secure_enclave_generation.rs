@@ -95,8 +95,8 @@ pub fn generate_secure_enclave_public_certificate(
 
     let user_id_binding = user_id_packet
         .bind(&mut external_signer, &cert, user_id_builder)
-        .map_err(|error| PgpError::KeyGenerationFailed {
-            reason: format!("Failed to bind user ID: {error}"),
+        .map_err(|error| {
+            map_external_signing_key_generation_error("Failed to bind user ID", error)
         })?;
     cert = cert
         .insert_packets(vec![Packet::from(user_id_packet), user_id_binding.into()])
@@ -120,8 +120,8 @@ pub fn generate_secure_enclave_public_certificate(
                     reason: format!("Failed to set subkey validity period: {error}"),
                 })?,
         )
-        .map_err(|error| PgpError::KeyGenerationFailed {
-            reason: format!("Failed to bind key-agreement subkey: {error}"),
+        .map_err(|error| {
+            map_external_signing_key_generation_error("Failed to bind key-agreement subkey", error)
         })?;
     let key_agreement_fingerprint = key_agreement_key.fingerprint().to_hex().to_lowercase();
     cert = cert
@@ -137,8 +137,8 @@ pub fn generate_secure_enclave_public_certificate(
             reason: format!("Failed to configure key revocation: {error}"),
         })?
         .build(&mut external_signer, &cert, HashAlgorithm::SHA256)
-        .map_err(|error| PgpError::RevocationError {
-            reason: format!("Failed to generate key revocation: {error}"),
+        .map_err(|error| {
+            map_external_signing_revocation_error("Failed to generate key revocation", error)
         })?;
 
     let mut public_key_data = Vec::new();
@@ -229,11 +229,58 @@ fn signer_for_provider(
                 "external P-256 signer supports SHA-256 only",
             ));
         }
-        let signature = provider.sign_sha256_digest(digest.to_vec()).map_err(|_| {
-            ExternalP256SignerError::ExternalFailure("external P-256 signer failed")
-        })?;
+        let signature = provider
+            .sign_sha256_digest(digest.to_vec())
+            .map_err(external_signing_error_to_signer_error)?;
         Ok(ExternalP256Signature::new(signature.r, signature.s))
     })
+}
+
+fn external_signing_error_to_signer_error(
+    error: ExternalP256SigningError,
+) -> ExternalP256SignerError {
+    match error {
+        ExternalP256SigningError::Failed { category } => {
+            ExternalP256SignerError::ExternalFailure(category)
+        }
+        ExternalP256SigningError::OperationCancelled => ExternalP256SignerError::OperationCancelled,
+    }
+}
+
+fn map_external_signing_key_generation_error(
+    context: &str,
+    error: openpgp::anyhow::Error,
+) -> PgpError {
+    map_external_signing_error(error, |reason| PgpError::KeyGenerationFailed {
+        reason: format!("{context}: {reason}"),
+    })
+}
+
+fn map_external_signing_revocation_error(context: &str, error: openpgp::anyhow::Error) -> PgpError {
+    map_external_signing_error(error, |reason| PgpError::RevocationError {
+        reason: format!("{context}: {reason}"),
+    })
+}
+
+fn map_external_signing_error(
+    error: openpgp::anyhow::Error,
+    fallback: impl FnOnce(String) -> PgpError,
+) -> PgpError {
+    if let Some(external_error) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<ExternalP256SignerError>().copied())
+    {
+        match external_error {
+            ExternalP256SignerError::OperationCancelled => PgpError::OperationCancelled,
+            ExternalP256SignerError::ExternalFailure(category) => {
+                fallback(category.stable_reason().to_string())
+            }
+            ExternalP256SignerError::InvalidRequest(reason)
+            | ExternalP256SignerError::InvalidResponse(reason) => fallback(reason.to_string()),
+        }
+    } else {
+        fallback(error.to_string())
+    }
 }
 
 fn validate_public_key_point(public_key_x963: &[u8], label: &str) -> Result<(), PgpError> {
@@ -296,47 +343,78 @@ mod tests {
     }
 
     impl ExternalP256SigningProvider for OracleSigningProvider {
-        fn sign_sha256_digest(&self, digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError> {
-            let mut keypair = self.keypair.lock().map_err(|_| PgpError::InternalError {
-                reason: "oracle signer lock poisoned".to_string(),
-            })?;
+        fn sign_sha256_digest(
+            &self,
+            digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            let mut keypair = self
+                .keypair
+                .lock()
+                .map_err(|_| external_operation_failed())?;
             match keypair.sign(HashAlgorithm::SHA256, &digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(P256EcdsaSignature {
                     r: r.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|error| PgpError::SigningFailed {
-                            reason: error.to_string(),
-                        })?
+                        .map_err(|_| external_operation_failed())?
                         .into_owned(),
                     s: s.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|error| PgpError::SigningFailed {
-                            reason: error.to_string(),
-                        })?
+                        .map_err(|_| external_operation_failed())?
                         .into_owned(),
                 }),
-                Ok(_) => Err(PgpError::SigningFailed {
-                    reason: "oracle signer returned a non-ECDSA signature".to_string(),
-                }),
-                Err(error) => Err(PgpError::SigningFailed {
-                    reason: error.to_string(),
-                }),
+                Ok(_) | Err(_) => Err(external_operation_failed()),
             }
+        }
+    }
+
+    fn external_operation_failed() -> ExternalP256SigningError {
+        ExternalP256SigningError::Failed {
+            category: ExternalP256SigningFailureCategory::ExternalOperationFailed,
         }
     }
 
     struct FailingSigningProvider;
 
     impl ExternalP256SigningProvider for FailingSigningProvider {
-        fn sign_sha256_digest(&self, _digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError> {
-            Err(PgpError::SigningFailed {
-                reason: "synthetic signer failure".to_string(),
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Err(external_operation_failed())
+        }
+    }
+
+    struct CategoryFailureSigningProvider {
+        category: ExternalP256SigningFailureCategory,
+    }
+
+    impl ExternalP256SigningProvider for CategoryFailureSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Err(ExternalP256SigningError::Failed {
+                category: self.category,
             })
+        }
+    }
+
+    struct CancelledSigningProvider;
+
+    impl ExternalP256SigningProvider for CancelledSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Err(ExternalP256SigningError::OperationCancelled)
         }
     }
 
     struct MalformedSigningProvider;
 
     impl ExternalP256SigningProvider for MalformedSigningProvider {
-        fn sign_sha256_digest(&self, _digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError> {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
             Ok(P256EcdsaSignature {
                 r: vec![1u8; P256_SCALAR_LENGTH - 1],
                 s: vec![1u8; P256_SCALAR_LENGTH],
@@ -349,27 +427,25 @@ mod tests {
     }
 
     impl ExternalP256SigningProvider for WrongDigestSigningProvider {
-        fn sign_sha256_digest(&self, mut digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError> {
+        fn sign_sha256_digest(
+            &self,
+            mut digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
             digest[0] ^= 1;
-            let mut keypair = self.keypair.lock().map_err(|_| PgpError::InternalError {
-                reason: "oracle signer lock poisoned".to_string(),
-            })?;
+            let mut keypair = self
+                .keypair
+                .lock()
+                .map_err(|_| external_operation_failed())?;
             match keypair.sign(HashAlgorithm::SHA256, &digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(P256EcdsaSignature {
                     r: r.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|error| PgpError::SigningFailed {
-                            reason: error.to_string(),
-                        })?
+                        .map_err(|_| external_operation_failed())?
                         .into_owned(),
                     s: s.value_padded(P256_SCALAR_LENGTH)
-                        .map_err(|error| PgpError::SigningFailed {
-                            reason: error.to_string(),
-                        })?
+                        .map_err(|_| external_operation_failed())?
                         .into_owned(),
                 }),
-                _ => Err(PgpError::SigningFailed {
-                    reason: "oracle signer failed".to_string(),
-                }),
+                _ => Err(external_operation_failed()),
             }
         }
     }
@@ -596,6 +672,42 @@ mod tests {
             Arc::new(MalformedSigningProvider),
         )
         .is_err());
+    }
+
+    #[test]
+    fn test_secure_enclave_public_certificate_preserves_typed_callback_failure_category() {
+        let material =
+            public_material(SecureEnclaveCertificateVersion::V4).expect("material should generate");
+        let input = input_for(SecureEnclaveCertificateVersion::V4, &material);
+        let error = generate_secure_enclave_public_certificate(
+            input,
+            Arc::new(CategoryFailureSigningProvider {
+                category: ExternalP256SigningFailureCategory::HardwareUnavailable,
+            }),
+        )
+        .expect_err("callback failure should fail generation");
+
+        match error {
+            PgpError::KeyGenerationFailed { reason } => {
+                assert!(reason.contains("hardwareUnavailable"));
+                assert!(!reason.contains("raw-secret"));
+                assert!(!reason.contains("/tmp"));
+                assert!(!reason.contains("capability"));
+            }
+            other => panic!("expected key generation failure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_secure_enclave_public_certificate_preserves_typed_callback_cancellation() {
+        let material =
+            public_material(SecureEnclaveCertificateVersion::V4).expect("material should generate");
+        let input = input_for(SecureEnclaveCertificateVersion::V4, &material);
+        let error =
+            generate_secure_enclave_public_certificate(input, Arc::new(CancelledSigningProvider))
+                .expect_err("callback cancellation should fail generation");
+
+        assert!(matches!(error, PgpError::OperationCancelled));
     }
 
     #[test]

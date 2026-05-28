@@ -112,9 +112,11 @@ public key, requested hash algorithm, and digest, and accepts only fixed-shape
 ECDSA `r/s` output that verifies against that public key and digest. Phase 2C
 negative tests also reject key-agreement-role keys, wrong digest signatures,
 wrong public-key signatures, malformed responses, and external failures. It does
-not store Apple handle locators, use response files, add a Security-layer handle
-store, expose a UniFFI API, or fall back to secret-certificate material when the
-external signer fails.
+not store Apple handle locators, use response files, or fall back to
+secret-certificate material when the external signer fails. The Phase 4A public
+certificate callback boundary carries only typed cancellation and sanitized
+failure categories, not free-form error text, fingerprints, Keychain locators,
+digests, signatures, or temporary capability paths.
 
 **Rust external ECDH proof note:** The Phase 2B Rust proof keeps external P-256
 key agreement behind an internal test-backed adapter only. The adapter sends

@@ -42,9 +42,11 @@ enum CypherAirError: Error {
     case keyTooLargeForQr
     case contactsUnavailable(ContactsAvailability)
 
-    /// Wrap any error into CypherAirError.
+    /// Wrap any already-normalized app error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.
     /// - Otherwise, use the fallback case with the error's description.
+    /// Generated UniFFI `PgpError` values are intentionally normalized by
+    /// `PGPErrorMapper` in `Sources/Services/FFI`, not here.
     static func from(_ error: Error, fallback: (String) -> CypherAirError) -> CypherAirError {
         if let cypherAirError = error as? CypherAirError {
             return cypherAirError

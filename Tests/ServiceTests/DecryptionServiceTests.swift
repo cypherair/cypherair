@@ -178,6 +178,22 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
+    func test_parseRecipientsFromFile_missingFile_throwsFileIoError() async throws {
+        let missingFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("missing-\(UUID().uuidString).gpg")
+
+        do {
+            _ = try await stack.decryptionService.parseRecipientsFromFile(fileURL: missingFile)
+            XCTFail("Expected fileIoError")
+        } catch let error as CypherAirError {
+            if case .fileIoError = error {
+                // Expected — file access errors must not masquerade as recipient mismatch.
+            } else {
+                XCTFail("Expected .fileIoError, got \(error)")
+            }
+        }
+    }
+
     func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)

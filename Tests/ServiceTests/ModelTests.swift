@@ -26,6 +26,46 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_pgpErrorMapper_recipientMatchingOnlyNoMatchingKeyMapsToNoMatchingKey() {
+        let error = PGPErrorMapper.mapRecipientMatching(PgpError.NoMatchingKey)
+        if case .noMatchingKey = error {
+            // Expected
+        } else {
+            XCTFail("Expected .noMatchingKey, got \(error)")
+        }
+    }
+
+    func test_pgpErrorMapper_recipientMatchingPreservesFileIoError() {
+        let error = PGPErrorMapper.mapRecipientMatching(
+            PgpError.FileIoError(reason: "Cannot open file")
+        )
+        if case .fileIoError(let reason) = error {
+            XCTAssertEqual(reason, "Cannot open file")
+        } else {
+            XCTFail("Expected .fileIoError, got \(error)")
+        }
+    }
+
+    func test_pgpErrorMapper_recipientMatchingPreservesCancellation() {
+        let error = PGPErrorMapper.mapRecipientMatching(PgpError.OperationCancelled)
+        if case .operationCancelled = error {
+            // Expected
+        } else {
+            XCTFail("Expected .operationCancelled, got \(error)")
+        }
+    }
+
+    func test_pgpErrorMapper_recipientMatchingNonPGPErrorDoesNotBecomeNoMatchingKey() {
+        let error = PGPErrorMapper.mapRecipientMatching(
+            NSError(domain: "test", code: 7)
+        )
+        if case .internalError = error {
+            // Expected
+        } else {
+            XCTFail("Expected .internalError, got \(error)")
+        }
+    }
+
     func test_pgpErrorMapper_wrongPassphraseMapped() {
         let error = PGPErrorMapper.map(.WrongPassphrase)
         if case .wrongPassphrase = error {
