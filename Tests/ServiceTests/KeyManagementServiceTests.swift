@@ -168,6 +168,7 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
     var failNextSave = false
     var failNextDelete = false
     var throwOnDuplicate = true
+    var deleteCheckpoint: (() -> Void)?
 
     func seed(_ identities: [PGPKeyIdentity]) {
         self.identities = identities.sorted { $0.fingerprint < $1.fingerprint }
@@ -203,6 +204,7 @@ private final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
 
     func delete(fingerprint: String) throws {
         deleteCallCount += 1
+        deleteCheckpoint?()
         if failNextDelete {
             failNextDelete = false
             throw RecordingKeyMetadataPersistenceError.deleteFailed
@@ -251,6 +253,18 @@ private actor CapturedDataBox {
     func clear() {
         value.protectedDataZeroize()
         value.removeAll(keepingCapacity: false)
+    }
+}
+
+private actor AsyncFlag {
+    private var value = false
+
+    func set() {
+        value = true
+    }
+
+    func isSet() -> Bool {
+        value
     }
 }
 
@@ -1073,7 +1087,18 @@ final class KeyManagementServiceTests: XCTestCase {
     func test_hiddenSecureEnclaveGeneration_relockWaitsForIdentityCommitAndRollsBackHandles() async throws {
         let identityCommitGate = ProvisioningCheckpointGate()
         let waiterRegisteredGate = ProvisioningCheckpointGate()
+        let deleteStarted = expectation(description: "hidden generation metadata rollback delete started")
+        let allowDelete = DispatchSemaphore(value: 0)
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.deleteCheckpoint = {
+            deleteStarted.fulfill()
+            allowDelete.wait()
+        }
+        defer {
+            allowDelete.signal()
+        }
         let target = makeHiddenSecureEnclaveGenerationService(
+            metadataPersistence: metadataPersistence,
             afterIdentityCommitCheckpoint: {
                 await identityCommitGate.suspend()
             },
@@ -1102,12 +1127,27 @@ final class KeyManagementServiceTests: XCTestCase {
         let relockTask = Task { [targetService] in
             try await targetService.relockProtectedData()
         }
+        let relockFinished = AsyncFlag()
+        let observedRelockTask = Task {
+            try await relockTask.value
+            await relockFinished.set()
+        }
         await waitUntil("hidden generation commit-drain waiter") {
             await waiterRegisteredGate.isSuspended()
         }
 
         await waiterRegisteredGate.resume()
         await identityCommitGate.resume()
+        await fulfillment(of: [deleteStarted], timeout: 2)
+        for _ in 0..<10 {
+            await Task.yield()
+        }
+        let didRelockFinishWhileRollbackWasBlocked = await relockFinished.isSet()
+        XCTAssertFalse(
+            didRelockFinishWhileRollbackWasBlocked,
+            "Relock must stay inside the shared commit drain until hidden rollback finishes."
+        )
+        allowDelete.signal()
 
         do {
             _ = try await generationTask.value
@@ -1117,7 +1157,7 @@ final class KeyManagementServiceTests: XCTestCase {
         } catch {
             XCTFail("Expected CancellationError, got \(error)")
         }
-        try await relockTask.value
+        try await observedRelockTask.value
 
         XCTAssertEqual(targetService.metadataLoadState, .locked)
         XCTAssertTrue(targetService.keys.isEmpty)

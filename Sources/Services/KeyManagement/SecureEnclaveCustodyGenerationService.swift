@@ -63,6 +63,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
 
         let handlePair = try handleStore.createHandlePair()
         var storedFingerprint: String?
+        var didRollbackGeneratedState = false
         do {
             let loadedPair = try handleStore.loadHandlePair(expected: handlePair)
             try Task.checkCancellation()
@@ -80,47 +81,62 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             try invalidationGate.checkValid(token)
 
             return try await commitCoordinator.performCommit {
-                try Task.checkCancellation()
-                try invalidationGate.checkValid(token)
-                guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
-                    throw CypherAirError.duplicateKey
-                }
+                do {
+                    try Task.checkCancellation()
+                    try invalidationGate.checkValid(token)
+                    guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
+                        throw CypherAirError.duplicateKey
+                    }
 
-                let identity = PGPKeyIdentity(
-                    fingerprint: generated.metadata.fingerprint,
-                    keyVersion: generated.metadata.keyVersion,
-                    profile: configuration.keyVersion == 4 ? .universal : .advanced,
-                    userId: generated.metadata.userId,
-                    hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
-                    isRevoked: false,
-                    isExpired: generated.metadata.isExpired,
-                    isDefault: catalogStore.keys.isEmpty,
-                    isBackedUp: false,
-                    publicKeyData: generated.publicKeyData,
-                    revocationCert: generated.revocationCert,
-                    primaryAlgo: generated.metadata.primaryAlgo,
-                    subkeyAlgo: generated.metadata.subkeyAlgo,
-                    expiryDate: generated.metadata.expiryDate,
-                    openPGPConfigurationIdentity: configuration.identity,
-                    privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-                )
-                try catalogStore.storeNewIdentity(identity)
-                storedFingerprint = identity.fingerprint
-                if let afterIdentityCommitCheckpoint {
-                    try await afterIdentityCommitCheckpoint()
+                    let identity = PGPKeyIdentity(
+                        fingerprint: generated.metadata.fingerprint,
+                        keyVersion: generated.metadata.keyVersion,
+                        profile: configuration.keyVersion == 4 ? .universal : .advanced,
+                        userId: generated.metadata.userId,
+                        hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
+                        isRevoked: false,
+                        isExpired: generated.metadata.isExpired,
+                        isDefault: catalogStore.keys.isEmpty,
+                        isBackedUp: false,
+                        publicKeyData: generated.publicKeyData,
+                        revocationCert: generated.revocationCert,
+                        primaryAlgo: generated.metadata.primaryAlgo,
+                        subkeyAlgo: generated.metadata.subkeyAlgo,
+                        expiryDate: generated.metadata.expiryDate,
+                        openPGPConfigurationIdentity: configuration.identity,
+                        privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+                    )
+                    try catalogStore.storeNewIdentity(identity)
+                    storedFingerprint = identity.fingerprint
+                    if let afterIdentityCommitCheckpoint {
+                        try await afterIdentityCommitCheckpoint()
+                    }
+                    try Task.checkCancellation()
+                    try invalidationGate.checkValid(token)
+                    return identity
+                } catch {
+                    do {
+                        didRollbackGeneratedState = true
+                        try rollbackGeneratedState(
+                            handlePair: handlePair,
+                            storedFingerprint: storedFingerprint
+                        )
+                    } catch {
+                        throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+                    }
+                    throw error
                 }
-                try Task.checkCancellation()
-                try invalidationGate.checkValid(token)
-                return identity
             }
         } catch {
-            do {
-                try rollbackGeneratedState(
-                    handlePair: handlePair,
-                    storedFingerprint: storedFingerprint
-                )
-            } catch {
-                throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+            if !didRollbackGeneratedState {
+                do {
+                    try rollbackGeneratedState(
+                        handlePair: handlePair,
+                        storedFingerprint: storedFingerprint
+                    )
+                } catch {
+                    throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+                }
             }
             throw error
         }
