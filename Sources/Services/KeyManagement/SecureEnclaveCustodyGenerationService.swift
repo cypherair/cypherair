@@ -2,12 +2,15 @@ import Foundation
 
 /// Internal hidden generation path for Secure Enclave custody public-only keys.
 final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
+    typealias GenerationCheckpoint = @Sendable () async throws -> Void
+
     private let certificateBuilder: any SecureEnclaveCustodyCertificateBuilding
     private let handleStore: SecureEnclaveCustodyHandleStore
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
     private let catalogStore: KeyCatalogStore
     private let resolver: PGPKeyCapabilityResolver
     private let invalidationGate: KeyProvisioningInvalidationGate
+    private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
         certificateBuilder: any SecureEnclaveCustodyCertificateBuilding,
@@ -15,7 +18,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         digestSigner: any SecureEnclaveCustodyDigestSigning,
         catalogStore: KeyCatalogStore,
         resolver: PGPKeyCapabilityResolver,
-        invalidationGate: KeyProvisioningInvalidationGate
+        invalidationGate: KeyProvisioningInvalidationGate,
+        afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
     ) {
         self.certificateBuilder = certificateBuilder
         self.handleStore = handleStore
@@ -23,6 +27,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.catalogStore = catalogStore
         self.resolver = resolver
         self.invalidationGate = invalidationGate
+        self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
     func generateHiddenKey(
@@ -54,7 +59,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         try invalidationGate.checkValid(token)
 
         let handlePair = try handleStore.createHandlePair()
-        var didStoreIdentity = false
         var storedFingerprint: String?
         do {
             let loadedPair = try handleStore.loadHandlePair(expected: handlePair)
@@ -95,21 +99,33 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
             )
             try catalogStore.storeNewIdentity(identity)
-            didStoreIdentity = true
             storedFingerprint = identity.fingerprint
+            if let afterIdentityCommitCheckpoint {
+                try await afterIdentityCommitCheckpoint()
+            }
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
             return identity
         } catch {
-            if didStoreIdentity, let storedFingerprint {
-                try? catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
-            }
             do {
-                try handleStore.deleteHandlePair(handlePair)
+                try rollbackGeneratedState(
+                    handlePair: handlePair,
+                    storedFingerprint: storedFingerprint
+                )
             } catch {
                 throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
             }
             throw error
         }
+    }
+
+    private func rollbackGeneratedState(
+        handlePair: SecureEnclaveCustodyHandlePair,
+        storedFingerprint: String?
+    ) throws {
+        if let storedFingerprint {
+            try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
+        }
+        try handleStore.deleteHandlePair(handlePair)
     }
 }

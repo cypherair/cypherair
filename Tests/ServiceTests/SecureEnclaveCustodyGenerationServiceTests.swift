@@ -157,11 +157,129 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         XCTAssertTrue(metadataStore.identities.isEmpty)
     }
 
+    func test_postIdentityCommitFailureRollsBackMetadataBeforeHandles() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let metadataStore = MemoryKeyMetadataPersistence()
+        let service = makeService(
+            keyStore: keyStore,
+            metadataStore: metadataStore,
+            builder: MockSecureEnclaveCustodyCertificateBuilder(
+                result: Self.material(fingerprint: "postcommit", keyVersion: 4)
+            ),
+            afterIdentityCommitCheckpoint: {
+                throw PostIdentityCommitTestError.simulatedFailure
+            }
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateHiddenKey(
+                name: "Post Commit",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        } inspectError: { error in
+            XCTAssertTrue(error is PostIdentityCommitTestError)
+        }
+        XCTAssertTrue(metadataStore.identities.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
+    }
+
+    func test_postIdentityCommitRollbackFailureKeepsHandlesWhenMetadataCannotRollback() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let metadataStore = MemoryKeyMetadataPersistence()
+        metadataStore.failNextDelete = true
+        let service = makeService(
+            keyStore: keyStore,
+            metadataStore: metadataStore,
+            builder: MockSecureEnclaveCustodyCertificateBuilder(
+                result: Self.material(fingerprint: "rollbackfailure", keyVersion: 6)
+            ),
+            afterIdentityCommitCheckpoint: {
+                throw PostIdentityCommitTestError.simulatedFailure
+            }
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateHiddenKey(
+                name: "Rollback Failure",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.modernP256V6,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        } inspectError: { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+            )
+        }
+        XCTAssertEqual(metadataStore.identities.map(\.fingerprint), ["rollbackfailure"])
+        XCTAssertEqual(keyStore.storedHandleCount(), 2)
+        XCTAssertTrue(keyStore.deleteRequests.isEmpty)
+    }
+
+    func test_signingCallbackMapsHandleErrorToSanitizedCallbackFailure() throws {
+        let loadedPair = try loadedHandlePair()
+        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+            handle: loadedPair.signing,
+            digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(
+                error: SecureEnclaveCustodyHandleError.hardwareUnavailable
+            )
+        )
+
+        XCTAssertThrowsError(
+            try bridge.signSha256Digest(digest: Data(repeating: 0xA5, count: 32))
+        ) { error in
+            XCTAssertEqual(
+                error as? ExternalP256SigningError,
+                ExternalP256SigningError.Failed(category: .hardwareUnavailable)
+            )
+        }
+    }
+
+    func test_signingCallbackMapsCancellationToCallbackCancellation() throws {
+        let loadedPair = try loadedHandlePair()
+        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+            handle: loadedPair.signing,
+            digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(error: CancellationError())
+        )
+
+        XCTAssertThrowsError(
+            try bridge.signSha256Digest(digest: Data(repeating: 0xA5, count: 32))
+        ) { error in
+            XCTAssertEqual(
+                error as? ExternalP256SigningError,
+                ExternalP256SigningError.OperationCancelled
+            )
+        }
+    }
+
+    func test_signingCallbackMapsUnknownErrorToExternalOperationFailed() throws {
+        let loadedPair = try loadedHandlePair()
+        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+            handle: loadedPair.signing,
+            digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(error: RawSigningCallbackError())
+        )
+
+        XCTAssertThrowsError(
+            try bridge.signSha256Digest(digest: Data(repeating: 0xA5, count: 32))
+        ) { error in
+            XCTAssertEqual(
+                error as? ExternalP256SigningError,
+                ExternalP256SigningError.Failed(category: .externalOperationFailed)
+            )
+        }
+    }
+
     private func makeService(
         keyStore: MockSecureEnclaveCustodyKeyStore,
         metadataStore: MemoryKeyMetadataPersistence = MemoryKeyMetadataPersistence(),
         builder: MockSecureEnclaveCustodyCertificateBuilder? = nil,
-        policy: PGPKeyCapabilityResolver.Policy = .testSecureEnclaveGeneration
+        policy: PGPKeyCapabilityResolver.Policy = .testSecureEnclaveGeneration,
+        afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil
     ) -> SecureEnclaveCustodyGenerationService {
         let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
         try? catalogStore.loadAll()
@@ -176,8 +294,21 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             digestSigner: MockSecureEnclaveCustodyDigestSigner(),
             catalogStore: catalogStore,
             resolver: PGPKeyCapabilityResolver(policy: policy),
-            invalidationGate: KeyProvisioningInvalidationGate()
+            invalidationGate: KeyProvisioningInvalidationGate(),
+            afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
         )
+    }
+
+    private func loadedHandlePair() throws -> SecureEnclaveCustodyLoadedHandlePair {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: {
+                try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
+            }
+        )
+        let pair = try store.createHandlePair()
+        return try store.loadHandlePair(expected: pair)
     }
 
     private static func material(
@@ -277,11 +408,13 @@ private struct MockSecureEnclaveCustodyDigestSigner: SecureEnclaveCustodyDigestS
 
 private enum MemoryKeyMetadataPersistenceError: Error {
     case saveFailed
+    case deleteFailed
 }
 
 private final class MemoryKeyMetadataPersistence: KeyMetadataPersistence {
     private(set) var identities: [PGPKeyIdentity] = []
     var failNextSave = false
+    var failNextDelete = false
 
     func seed(_ identities: [PGPKeyIdentity]) {
         self.identities = identities
@@ -308,19 +441,41 @@ private final class MemoryKeyMetadataPersistence: KeyMetadataPersistence {
     }
 
     func delete(fingerprint: String) throws {
+        if failNextDelete {
+            failNextDelete = false
+            throw MemoryKeyMetadataPersistenceError.deleteFailed
+        }
         identities.removeAll { $0.fingerprint == fingerprint }
+    }
+}
+
+private enum PostIdentityCommitTestError: Error {
+    case simulatedFailure
+}
+
+private struct RawSigningCallbackError: Error {}
+
+private struct ThrowingSecureEnclaveCustodyDigestSigner: SecureEnclaveCustodyDigestSigning {
+    let error: Error
+
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        throw error
     }
 }
 
 private func XCTAssertThrowsErrorAsync(
     _ expression: () async throws -> Void,
     file: StaticString = #filePath,
-    line: UInt = #line
+    line: UInt = #line,
+    inspectError: (Error) -> Void = { _ in }
 ) async {
     do {
         try await expression()
         XCTFail("Expected expression to throw.", file: file, line: line)
     } catch {
-        // Expected.
+        inspectError(error)
     }
 }
