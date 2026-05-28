@@ -219,7 +219,11 @@ revocation artifact availability.
 Recommended PR grouping:
 
 - PR 4A: integrate model, Security handles, and Rust certificate construction
-  for hidden v4 and v6 generation.
+  for hidden v4 and v6 generation. **Implemented:** hidden/test generation now
+  creates Security-owned P-256 handle pairs, uses a narrow UniFFI external
+  signer callback for public-only certificate/revocation construction, persists
+  P-256 Secure Enclave custody metadata only, and leaves software-key behavior
+  and UI exposure unchanged.
 - PR 4B: add generation cleanup, partial-failure recovery, and local reset
   behavior.
 - PR 4C: add public certificate and revocation artifact export coverage for

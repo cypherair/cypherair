@@ -87,8 +87,8 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
-| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, and selective revocation export through focused internal key-management helpers and key/certificate FFI adapters |
-| `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave private-key custody remains hidden/unavailable or test-only until handle storage and Rust external-operation APIs exist. |
+| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
+| `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation remains production-unavailable and is enabled only by an internal hidden/test policy. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -160,6 +160,18 @@ public-key bindings, malformed responses, and signer failures without falling
 back to stored secret-certificate signing. It is not a UniFFI API,
 response-file bridge, or Security handle store.
 
+Phase 4A promotes the P-256 external-signer seam into a narrow UniFFI-backed
+public-certificate construction boundary for hidden/test-only generation. Swift
+creates real Security-owned signing and key-agreement handles, loads the signing
+`SecKey`, and passes only public X9.63 points plus an in-process SHA-256 digest
+signing callback to Rust. Rust/Sequoia constructs the v4/v6 public-only
+certificate, User ID self-certification, ECDH subkey binding, key-level
+revocation artifact, fingerprints, and selector-valid public material. The
+callback returns fixed-width P-256 ECDSA `r/s` values; Rust verifies each
+signature against the input public key and digest before accepting it. This
+path never returns a secret certificate, response-file bridge, fake software
+private material, Apple handle locator, or access-control policy.
+
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256
 public key plus the PKESK ephemeral public key; tests supply a software OpenSSL
@@ -205,7 +217,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
-| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Not wired to shipped workflows yet. |
+| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Wired only to hidden/test generation, not shipped user workflows. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
