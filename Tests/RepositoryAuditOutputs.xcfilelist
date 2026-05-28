@@ -311,6 +311,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyCatalogStore.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyExportService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyMutationService.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyProvisioningCommitCoordinator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyProvisioningInvalidationGate.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/KeyProvisioningService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift

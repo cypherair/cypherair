@@ -10,6 +10,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let catalogStore: KeyCatalogStore
     private let resolver: PGPKeyCapabilityResolver
     private let invalidationGate: KeyProvisioningInvalidationGate
+    private let commitCoordinator: KeyProvisioningCommitCoordinator
     private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
@@ -19,6 +20,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         catalogStore: KeyCatalogStore,
         resolver: PGPKeyCapabilityResolver,
         invalidationGate: KeyProvisioningInvalidationGate,
+        commitCoordinator: KeyProvisioningCommitCoordinator,
         afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
     ) {
         self.certificateBuilder = certificateBuilder
@@ -27,6 +29,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.catalogStore = catalogStore
         self.resolver = resolver
         self.invalidationGate = invalidationGate
+        self.commitCoordinator = commitCoordinator
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
@@ -76,36 +79,40 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
-            guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
-                throw CypherAirError.duplicateKey
-            }
+            return try await commitCoordinator.performCommit {
+                try Task.checkCancellation()
+                try invalidationGate.checkValid(token)
+                guard !catalogStore.containsKey(fingerprint: generated.metadata.fingerprint) else {
+                    throw CypherAirError.duplicateKey
+                }
 
-            let identity = PGPKeyIdentity(
-                fingerprint: generated.metadata.fingerprint,
-                keyVersion: generated.metadata.keyVersion,
-                profile: configuration.keyVersion == 4 ? .universal : .advanced,
-                userId: generated.metadata.userId,
-                hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
-                isRevoked: false,
-                isExpired: generated.metadata.isExpired,
-                isDefault: catalogStore.keys.isEmpty,
-                isBackedUp: false,
-                publicKeyData: generated.publicKeyData,
-                revocationCert: generated.revocationCert,
-                primaryAlgo: generated.metadata.primaryAlgo,
-                subkeyAlgo: generated.metadata.subkeyAlgo,
-                expiryDate: generated.metadata.expiryDate,
-                openPGPConfigurationIdentity: configuration.identity,
-                privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-            )
-            try catalogStore.storeNewIdentity(identity)
-            storedFingerprint = identity.fingerprint
-            if let afterIdentityCommitCheckpoint {
-                try await afterIdentityCommitCheckpoint()
+                let identity = PGPKeyIdentity(
+                    fingerprint: generated.metadata.fingerprint,
+                    keyVersion: generated.metadata.keyVersion,
+                    profile: configuration.keyVersion == 4 ? .universal : .advanced,
+                    userId: generated.metadata.userId,
+                    hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
+                    isRevoked: false,
+                    isExpired: generated.metadata.isExpired,
+                    isDefault: catalogStore.keys.isEmpty,
+                    isBackedUp: false,
+                    publicKeyData: generated.publicKeyData,
+                    revocationCert: generated.revocationCert,
+                    primaryAlgo: generated.metadata.primaryAlgo,
+                    subkeyAlgo: generated.metadata.subkeyAlgo,
+                    expiryDate: generated.metadata.expiryDate,
+                    openPGPConfigurationIdentity: configuration.identity,
+                    privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+                )
+                try catalogStore.storeNewIdentity(identity)
+                storedFingerprint = identity.fingerprint
+                if let afterIdentityCommitCheckpoint {
+                    try await afterIdentityCommitCheckpoint()
+                }
+                try Task.checkCancellation()
+                try invalidationGate.checkValid(token)
+                return identity
             }
-            try Task.checkCancellation()
-            try invalidationGate.checkValid(token)
-            return identity
         } catch {
             do {
                 try rollbackGeneratedState(

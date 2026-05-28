@@ -23,8 +23,10 @@ final class KeyManagementService: @unchecked Sendable {
     private let mutationService: KeyMutationService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
+    private let provisioningCommitCoordinator: KeyProvisioningCommitCoordinator
     private let beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
     private var legacyMetadataMigrationCompletedInProcess = false
@@ -51,7 +53,8 @@ final class KeyManagementService: @unchecked Sendable {
         relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         secureEnclaveCustodyGenerationServiceFactory: ((
             KeyCatalogStore,
-            KeyProvisioningInvalidationGate
+            KeyProvisioningInvalidationGate,
+            KeyProvisioningCommitCoordinator
         ) -> SecureEnclaveCustodyGenerationService)? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
@@ -67,13 +70,16 @@ final class KeyManagementService: @unchecked Sendable {
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
+        let provisioningCommitCoordinator = KeyProvisioningCommitCoordinator()
         self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
+        self.provisioningCommitCoordinator = provisioningCommitCoordinator
         self.beforeAuthModeReadCheckpoint = beforeAuthModeReadCheckpoint
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
+        self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
@@ -82,15 +88,16 @@ final class KeyManagementService: @unchecked Sendable {
             bundleStore: bundleStore,
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
+            commitCoordinator: provisioningCommitCoordinator,
             beforePermanentStorageCheckpoint: provisioningCheckpoint,
             afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
             afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
-            afterIdentityStoreCheckpoint: identityStoreCheckpoint,
-            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+            afterIdentityStoreCheckpoint: identityStoreCheckpoint
         )
         self.secureEnclaveCustodyGenerationService = secureEnclaveCustodyGenerationServiceFactory?(
             catalogStore,
-            provisioningInvalidationGate
+            provisioningInvalidationGate,
+            provisioningCommitCoordinator
         )
         self.exportService = KeyExportService(
             keyAdapter: keyAdapter,
@@ -604,7 +611,9 @@ extension KeyManagementService: ProtectedDataRelockParticipant {
         if let relockInvalidationCheckpoint {
             await relockInvalidationCheckpoint()
         }
-        await provisioningService.waitForActiveProvisioningCommitsToFinish()
+        await provisioningCommitCoordinator.waitForActiveCommitsToFinish(
+            waiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint
+        )
         markKeyMetadataLocked()
     }
 }

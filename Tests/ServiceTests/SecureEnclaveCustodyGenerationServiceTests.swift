@@ -279,6 +279,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         metadataStore: MemoryKeyMetadataPersistence = MemoryKeyMetadataPersistence(),
         builder: MockSecureEnclaveCustodyCertificateBuilder? = nil,
         policy: PGPKeyCapabilityResolver.Policy = .testSecureEnclaveGeneration,
+        commitCoordinator: KeyProvisioningCommitCoordinator = KeyProvisioningCommitCoordinator(),
         afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil
     ) -> SecureEnclaveCustodyGenerationService {
         let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
@@ -295,6 +296,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             catalogStore: catalogStore,
             resolver: PGPKeyCapabilityResolver(policy: policy),
             invalidationGate: KeyProvisioningInvalidationGate(),
+            commitCoordinator: commitCoordinator,
             afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
         )
     }

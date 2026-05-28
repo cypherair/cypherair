@@ -254,6 +254,37 @@ private actor CapturedDataBox {
     }
 }
 
+private final class HiddenGenerationTestCertificateBuilder: SecureEnclaveCustodyCertificateBuilding, @unchecked Sendable {
+    private let result: PGPSecureEnclaveCustodyGeneratedMaterial
+
+    init(result: PGPSecureEnclaveCustodyGeneratedMaterial) {
+        self.result = result
+    }
+
+    func generatePublicCertificate(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        configuration: PGPKeyConfiguration,
+        handlePair: SecureEnclaveCustodyLoadedHandlePair,
+        digestSigner: any SecureEnclaveCustodyDigestSigning
+    ) async throws -> PGPSecureEnclaveCustodyGeneratedMaterial {
+        result
+    }
+}
+
+private struct HiddenGenerationTestDigestSigner: SecureEnclaveCustodyDigestSigning {
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        try SecureEnclaveP256RawSignature(
+            r: Data(repeating: 1, count: 32),
+            s: Data(repeating: 2, count: 32)
+        )
+    }
+}
+
 /// Tests for KeyManagementService — full key lifecycle with mock SE/Keychain/Auth.
 final class KeyManagementServiceTests: XCTestCase {
 
@@ -464,6 +495,53 @@ final class KeyManagementServiceTests: XCTestCase {
         return (service, localKeychain, metadataPersistence)
     }
 
+    private func makeHiddenSecureEnclaveGenerationService(
+        metadataPersistence: RecordingKeyMetadataPersistence = RecordingKeyMetadataPersistence(),
+        keyStore: MockSecureEnclaveCustodyKeyStore = MockSecureEnclaveCustodyKeyStore(),
+        afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil,
+        commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+    ) -> (
+        service: KeyManagementService,
+        keyStore: MockSecureEnclaveCustodyKeyStore,
+        metadataPersistence: RecordingKeyMetadataPersistence
+    ) {
+        let localSE = MockSecureEnclave()
+        let localKeychain = MockKeychain()
+        let localAuthenticator = MockAuthenticator()
+        let localPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        let service = KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: localSE,
+            keychain: localKeychain,
+            authenticator: localAuthenticator,
+            privateKeyControlStore: localPrivateKeyControlStore,
+            metadataPersistence: metadataPersistence,
+            commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint,
+            secureEnclaveCustodyGenerationServiceFactory: { catalogStore, invalidationGate, commitCoordinator in
+                SecureEnclaveCustodyGenerationService(
+                    certificateBuilder: HiddenGenerationTestCertificateBuilder(
+                        result: Self.hiddenGenerationMaterial(
+                            fingerprint: "hidden-drain",
+                            keyVersion: 4
+                        )
+                    ),
+                    handleStore: SecureEnclaveCustodyHandleStore(
+                        keyStore: keyStore,
+                        handleSetIdentifierGenerator: { "hidden-drain" }
+                    ),
+                    digestSigner: HiddenGenerationTestDigestSigner(),
+                    catalogStore: catalogStore,
+                    resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+                    invalidationGate: invalidationGate,
+                    commitCoordinator: commitCoordinator,
+                    afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
+                )
+            }
+        )
+        return (service, keyStore, metadataPersistence)
+    }
+
     private func makeProtectedKeyMetadataProvisioningTarget(
         identityStoreCheckpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint,
         relockInvalidationCheckpoint: @escaping KeyProvisioningService.ProvisioningCheckpoint
@@ -643,6 +721,30 @@ final class KeyManagementServiceTests: XCTestCase {
             service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
             account: KeychainConstants.metadataAccount,
             accessControl: nil
+        )
+    }
+
+    private static func hiddenGenerationMaterial(
+        fingerprint: String,
+        keyVersion: UInt8
+    ) -> PGPSecureEnclaveCustodyGeneratedMaterial {
+        PGPSecureEnclaveCustodyGeneratedMaterial(
+            publicKeyData: Data("public-\(fingerprint)".utf8),
+            revocationCert: Data("revocation-\(fingerprint)".utf8),
+            metadata: PGPKeyMetadata(
+                fingerprint: fingerprint,
+                keyVersion: keyVersion,
+                userId: "Hidden Relock Drain <hidden-drain@example.com>",
+                hasEncryptionSubkey: true,
+                isRevoked: false,
+                isExpired: false,
+                profile: keyVersion == 4 ? .universal : .advanced,
+                primaryAlgo: "ECDSA P-256",
+                subkeyAlgo: "ECDH P-256",
+                expiryTimestamp: nil
+            ),
+            signingKeyFingerprint: "\(fingerprint)-signing",
+            keyAgreementSubkeyFingerprint: "\(fingerprint)-agreement"
         )
     }
 
@@ -966,6 +1068,63 @@ final class KeyManagementServiceTests: XCTestCase {
             in: target.keychain,
             metadataPersistence: target.metadataPersistence
         )
+    }
+
+    func test_hiddenSecureEnclaveGeneration_relockWaitsForIdentityCommitAndRollsBackHandles() async throws {
+        let identityCommitGate = ProvisioningCheckpointGate()
+        let waiterRegisteredGate = ProvisioningCheckpointGate()
+        let target = makeHiddenSecureEnclaveGenerationService(
+            afterIdentityCommitCheckpoint: {
+                await identityCommitGate.suspend()
+            },
+            commitDrainWaiterRegisteredCheckpoint: {
+                await waiterRegisteredGate.suspend()
+            }
+        )
+        let targetService = target.service
+
+        let generationTask = Task { [targetService] in
+            try await targetService.generateHiddenSecureEnclaveCustodyKey(
+                name: "Hidden Relock Drain",
+                email: "hidden-drain@example.com",
+                expirySeconds: nil,
+                configurationIdentity: .compatibleP256V4
+            )
+        }
+
+        await waitUntil("hidden generation identity-store checkpoint") {
+            await identityCommitGate.isSuspended()
+        }
+        XCTAssertEqual(target.metadataPersistence.saveCallCount, 1)
+        XCTAssertEqual(target.metadataPersistence.identities.map(\.fingerprint), ["hidden-drain"])
+        XCTAssertEqual(target.keyStore.storedHandleCount(), 2)
+
+        let relockTask = Task { [targetService] in
+            try await targetService.relockProtectedData()
+        }
+        await waitUntil("hidden generation commit-drain waiter") {
+            await waiterRegisteredGate.isSuspended()
+        }
+
+        await waiterRegisteredGate.resume()
+        await identityCommitGate.resume()
+
+        do {
+            _ = try await generationTask.value
+            XCTFail("Expected invalidated hidden generation to cancel during identity commit")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+        try await relockTask.value
+
+        XCTAssertEqual(targetService.metadataLoadState, .locked)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(target.metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(target.metadataPersistence.deleteCallCount, 1)
+        XCTAssertEqual(target.keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(target.keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {
