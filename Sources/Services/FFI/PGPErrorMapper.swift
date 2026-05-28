@@ -1,6 +1,8 @@
 import Foundation
 
 enum PGPErrorMapper {
+    /// Normalizes generated UniFFI `PgpError` values at the FFI adapter boundary.
+    /// Non-FFI layers should receive app-owned `CypherAirError` values instead.
     static func map(
         _ error: Error,
         fallback: (String) -> CypherAirError
@@ -19,17 +21,13 @@ enum PGPErrorMapper {
             return cypherAirError
         }
         guard let pgpError = error as? PgpError else {
-            return .noMatchingKey
+            return .internalError(reason: error.localizedDescription)
         }
 
-        switch pgpError {
-        case .CorruptData(let reason):
-            return .corruptData(reason: reason)
-        case .UnsupportedAlgorithm(let algo):
-            return .unsupportedAlgorithm(algo: algo)
-        default:
+        if case .NoMatchingKey = pgpError {
             return .noMatchingKey
         }
+        return map(pgpError)
     }
 
     static func map(_ pgpError: PgpError) -> CypherAirError {

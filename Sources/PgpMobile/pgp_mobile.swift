@@ -627,7 +627,7 @@ open class ExternalP256SigningProviderImpl: ExternalP256SigningProvider, @unchec
      * Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
      */
 open func signSha256Digest(digest: Data)throws  -> P256EcdsaSignature  {
-    return try  FfiConverterTypeP256EcdsaSignature_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    return try  FfiConverterTypeP256EcdsaSignature_lift(try rustCallWithError(FfiConverterTypeExternalP256SigningError_lift) {
     uniffi_pgp_mobile_fn_method_externalp256signingprovider_sign_sha256_digest(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(digest),$0
@@ -685,7 +685,7 @@ fileprivate struct UniffiCallbackInterfaceExternalP256SigningProvider {
                 callStatus: uniffiCallStatus,
                 makeCall: makeCall,
                 writeReturn: writeReturn,
-                lowerError: FfiConverterTypePgpError_lower
+                lowerError: FfiConverterTypeExternalP256SigningError_lower
             )
         }
     )
@@ -4088,6 +4088,235 @@ public func FfiConverterTypeDetailedSignatureStatus_lower(_ value: DetailedSigna
 }
 
 
+
+/**
+ * Expected error returned by the foreign P-256 signing callback.
+ */
+public enum ExternalP256SigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+
+
+    /**
+     * The callback failed with a sanitized shared operation category.
+     */
+    case Failed(category: ExternalP256SigningFailureCategory
+    )
+    /**
+     * The callback was cancelled before producing a signature.
+     */
+    case OperationCancelled
+
+
+
+
+
+
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+
+}
+
+#if compiler(>=6)
+extension ExternalP256SigningError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256SigningError: FfiConverterRustBuffer {
+    typealias SwiftType = ExternalP256SigningError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256SigningError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+
+
+
+        case 1: return .Failed(
+            category: try FfiConverterTypeExternalP256SigningFailureCategory.read(from: &buf)
+            )
+        case 2: return .OperationCancelled
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExternalP256SigningError, into buf: inout [UInt8]) {
+        switch value {
+
+
+
+
+
+        case let .Failed(category):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeExternalP256SigningFailureCategory.write(category, into: &buf)
+
+
+        case .OperationCancelled:
+            writeInt(&buf, Int32(2))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningError_lift(_ buf: RustBuffer) throws -> ExternalP256SigningError {
+    return try FfiConverterTypeExternalP256SigningError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningError_lower(_ value: ExternalP256SigningError) -> RustBuffer {
+    return FfiConverterTypeExternalP256SigningError.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Sanitized failure categories that may cross the external P-256 signing callback boundary.
+ */
+
+public enum ExternalP256SigningFailureCategory: Equatable, Hashable {
+
+    case hardwareUnavailable
+    case localAuthenticationRequired
+    case localAuthenticationCancelled
+    case localAuthenticationFailed
+    case localAuthenticationUnavailable
+    case localAuthenticationLockedOut
+    case privateHandleMissing
+    case privateHandleInaccessible
+    case privateHandleUnauthorized
+    case privateOperationRoleMismatch
+    case handlePublicKeyBindingMismatch
+    case externalOperationFailed
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExternalP256SigningFailureCategory: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256SigningFailureCategory: FfiConverterRustBuffer {
+    typealias SwiftType = ExternalP256SigningFailureCategory
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256SigningFailureCategory {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .hardwareUnavailable
+
+        case 2: return .localAuthenticationRequired
+
+        case 3: return .localAuthenticationCancelled
+
+        case 4: return .localAuthenticationFailed
+
+        case 5: return .localAuthenticationUnavailable
+
+        case 6: return .localAuthenticationLockedOut
+
+        case 7: return .privateHandleMissing
+
+        case 8: return .privateHandleInaccessible
+
+        case 9: return .privateHandleUnauthorized
+
+        case 10: return .privateOperationRoleMismatch
+
+        case 11: return .handlePublicKeyBindingMismatch
+
+        case 12: return .externalOperationFailed
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExternalP256SigningFailureCategory, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .hardwareUnavailable:
+            writeInt(&buf, Int32(1))
+
+
+        case .localAuthenticationRequired:
+            writeInt(&buf, Int32(2))
+
+
+        case .localAuthenticationCancelled:
+            writeInt(&buf, Int32(3))
+
+
+        case .localAuthenticationFailed:
+            writeInt(&buf, Int32(4))
+
+
+        case .localAuthenticationUnavailable:
+            writeInt(&buf, Int32(5))
+
+
+        case .localAuthenticationLockedOut:
+            writeInt(&buf, Int32(6))
+
+
+        case .privateHandleMissing:
+            writeInt(&buf, Int32(7))
+
+
+        case .privateHandleInaccessible:
+            writeInt(&buf, Int32(8))
+
+
+        case .privateHandleUnauthorized:
+            writeInt(&buf, Int32(9))
+
+
+        case .privateOperationRoleMismatch:
+            writeInt(&buf, Int32(10))
+
+
+        case .handlePublicKeyBindingMismatch:
+            writeInt(&buf, Int32(11))
+
+
+        case .externalOperationFailed:
+            writeInt(&buf, Int32(12))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningFailureCategory_lift(_ buf: RustBuffer) throws -> ExternalP256SigningFailureCategory {
+    return try FfiConverterTypeExternalP256SigningFailureCategory.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: ExternalP256SigningFailureCategory) -> RustBuffer {
+    return FfiConverterTypeExternalP256SigningFailureCategory.lower(value)
+}
+
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -5312,7 +5541,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 18125) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 45038) {
+    if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 35195) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_progressreporter_on_progress() != 45018) {

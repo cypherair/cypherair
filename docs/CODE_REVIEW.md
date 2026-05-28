@@ -33,6 +33,8 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Retryable recovery failures keep retry flags set; unrecoverable states clear flags and surface a generic warning
 - [ ] Startup diagnostics remain generic and do not leak fingerprints or key identifiers
 - [ ] Secure Enclave custody failure mapping uses shared key operation failure categories and does not leak plaintext, private material, session keys, KEKs, Keychain locators, fingerprints, or temporary capability paths
+- [ ] Secure Enclave custody external private-operation callbacks use typed generated callback errors and sanitized categories, not free-form strings that later need to be parsed from Sequoia errors
+- [ ] Recipient matching maps only a real generated `NoMatchingKey` to `.noMatchingKey`; file I/O, cancellation, corrupt data, unsupported algorithms, and infrastructure failures must not be collapsed into recipient mismatch
 - [ ] Secure Enclave custody handle changes keep signing and key-agreement handles distinct, use `kSecClassKey`/`kSecAttrTokenIDSecureEnclave`, preserve biometrics-only private-key usage access control, and never reuse the legacy `se-key` / `salt` / `sealed-key` wrapping bundle
 - [ ] Secure Enclave custody inventory, cleanup, and local reset paths delete only app-owned custody handles, treat missing handles as idempotent cleanup, fail closed on list/delete/remaining-row errors, and expose only sanitized role/category/count metadata
 - [ ] Secure Enclave custody hardware-evidence changes remain guarded in the device-only test plan, skip when Secure Enclave or biometrics are unavailable, and do not make Secure Enclave custody product-selectable
@@ -48,6 +50,7 @@ Changes to `pgp-mobile/src/lib.rs` public API surface.
 - [ ] UniFFI bindings regenerated
 - [ ] Swift call sites in `Sources/Services/` updated
 - [ ] `PgpError` enum stays 1:1 between Rust and Swift
+- [ ] Callback-specific UniFFI errors stay operation-specific and are normalized at the FFI adapter boundary before reaching app/service code
 - [ ] Both Profile A and Profile B tested
 - [ ] FFI round-trip tests pass (generate in Rust → pass to Swift → pass back → verify)
 

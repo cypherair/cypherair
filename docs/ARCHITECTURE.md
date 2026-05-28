@@ -500,7 +500,8 @@ These pairs must be updated together. A change to one without the other will cau
 
 | Module A | Module B | Coupling Reason |
 |----------|----------|----------------|
-| `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | Generated PgpError variants are normalized at the FFI mapper boundary into the app-owned `CypherAirError` vocabulary |
+| `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | Generated `PgpError` variants are normalized only at the FFI mapper boundary into the app-owned `CypherAirError` vocabulary; `CypherAirError.from` preserves already-normalized app errors and applies caller fallbacks |
+| `pgp-mobile/src/keys.rs` external callbacks | `pgp-mobile/src/external_signer.rs` and `Sources/Services/FFI/*` callback bridges | Foreign private-operation callbacks use dedicated generated callback error types and sanitized categories; callback failures must not be carried through Sequoia as free-form strings |
 | `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/FFI/*Adapter.swift` and explicitly documented temporary call sites | Any Rust API change requires Swift adapter or documented temporary call-site updates |
 | `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes 3 Keychain items; unwrapping reads them |
 | `SecureEnclaveManager` | `AuthenticationManager` | Mode switch re-wraps all keys via SE manager |

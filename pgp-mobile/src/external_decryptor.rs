@@ -478,22 +478,13 @@ mod tests {
             match oracle.sign(hash_algo, digest) {
                 Ok(mpi::Signature::ECDSA { r, s }) => Ok(ExternalP256Signature::new(
                     r.value_padded(P256_SHARED_SECRET_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                     s.value_padded(P256_SHARED_SECRET_LENGTH)
-                        .map_err(|_| {
-                            ExternalP256SignerError::ExternalFailure("external P-256 oracle failed")
-                        })?
+                        .map_err(|_| ExternalP256SignerError::external_operation_failed())?
                         .into_owned(),
                 )),
-                Ok(_) => Err(ExternalP256SignerError::ExternalFailure(
-                    "external P-256 oracle returned a non-ECDSA signature",
-                )),
-                Err(_) => Err(ExternalP256SignerError::ExternalFailure(
-                    "external P-256 oracle failed",
-                )),
+                Ok(_) | Err(_) => Err(ExternalP256SignerError::external_operation_failed()),
             }
         })
     }

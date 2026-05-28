@@ -86,11 +86,83 @@ pub struct P256EcdsaSignature {
     pub s: Vec<u8>,
 }
 
+/// Sanitized failure categories that may cross the external P-256 signing callback boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ExternalP256SigningFailureCategory {
+    HardwareUnavailable,
+    LocalAuthenticationRequired,
+    LocalAuthenticationCancelled,
+    LocalAuthenticationFailed,
+    LocalAuthenticationUnavailable,
+    LocalAuthenticationLockedOut,
+    PrivateHandleMissing,
+    PrivateHandleInaccessible,
+    PrivateHandleUnauthorized,
+    PrivateOperationRoleMismatch,
+    HandlePublicKeyBindingMismatch,
+    ExternalOperationFailed,
+}
+
+impl ExternalP256SigningFailureCategory {
+    pub(crate) fn stable_reason(self) -> &'static str {
+        match self {
+            ExternalP256SigningFailureCategory::HardwareUnavailable => "hardwareUnavailable",
+            ExternalP256SigningFailureCategory::LocalAuthenticationRequired => {
+                "localAuthenticationRequired"
+            }
+            ExternalP256SigningFailureCategory::LocalAuthenticationCancelled => {
+                "localAuthenticationCancelled"
+            }
+            ExternalP256SigningFailureCategory::LocalAuthenticationFailed => {
+                "localAuthenticationFailed"
+            }
+            ExternalP256SigningFailureCategory::LocalAuthenticationUnavailable => {
+                "localAuthenticationUnavailable"
+            }
+            ExternalP256SigningFailureCategory::LocalAuthenticationLockedOut => {
+                "localAuthenticationLockedOut"
+            }
+            ExternalP256SigningFailureCategory::PrivateHandleMissing => "privateHandleMissing",
+            ExternalP256SigningFailureCategory::PrivateHandleInaccessible => {
+                "privateHandleInaccessible"
+            }
+            ExternalP256SigningFailureCategory::PrivateHandleUnauthorized => {
+                "privateHandleUnauthorized"
+            }
+            ExternalP256SigningFailureCategory::PrivateOperationRoleMismatch => {
+                "privateOperationRoleMismatch"
+            }
+            ExternalP256SigningFailureCategory::HandlePublicKeyBindingMismatch => {
+                "handlePublicKeyBindingMismatch"
+            }
+            ExternalP256SigningFailureCategory::ExternalOperationFailed => {
+                "externalOperationFailed"
+            }
+        }
+    }
+}
+
+/// Expected error returned by the foreign P-256 signing callback.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum ExternalP256SigningError {
+    /// The callback failed with a sanitized shared operation category.
+    #[error("External P-256 signing failed: {}", category.stable_reason())]
+    Failed {
+        category: ExternalP256SigningFailureCategory,
+    },
+    /// The callback was cancelled before producing a signature.
+    #[error("External P-256 signing operation cancelled")]
+    OperationCancelled,
+}
+
 /// Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
 #[uniffi::export(with_foreign)]
 pub trait ExternalP256SigningProvider: Send + Sync {
     /// Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
-    fn sign_sha256_digest(&self, digest: Vec<u8>) -> Result<P256EcdsaSignature, PgpError>;
+    fn sign_sha256_digest(
+        &self,
+        digest: Vec<u8>,
+    ) -> Result<P256EcdsaSignature, ExternalP256SigningError>;
 }
 
 /// Public-only Secure Enclave custody certificate generation result.
