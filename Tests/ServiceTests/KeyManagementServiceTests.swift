@@ -300,18 +300,27 @@ private struct HiddenGenerationTestDigestSigner: SecureEnclaveCustodyDigestSigni
 }
 
 private final class RecordingSecureEnclaveCustodyRecoveryClassifier: SecureEnclaveCustodyGenerationRecoveryClassifying, @unchecked Sendable {
-    private let report: SecureEnclaveCustodyGenerationRecoveryReport
-    private(set) var requestedIdentityFingerprints: [String] = []
+    private let reportProvider: @Sendable ([PGPKeyIdentity]) -> SecureEnclaveCustodyGenerationRecoveryReport
+    private(set) var requestedIdentitySnapshots: [[PGPKeyIdentity]] = []
+    var requestedIdentityFingerprints: [String] {
+        requestedIdentitySnapshots.last?.map(\.fingerprint) ?? []
+    }
 
     init(report: SecureEnclaveCustodyGenerationRecoveryReport) {
-        self.report = report
+        self.reportProvider = { _ in report }
+    }
+
+    init(
+        _ reportProvider: @escaping @Sendable ([PGPKeyIdentity]) -> SecureEnclaveCustodyGenerationRecoveryReport
+    ) {
+        self.reportProvider = reportProvider
     }
 
     func classify(
         identities: [PGPKeyIdentity]
     ) -> SecureEnclaveCustodyGenerationRecoveryReport {
-        requestedIdentityFingerprints = identities.map(\.fingerprint)
-        return report
+        requestedIdentitySnapshots.append(identities)
+        return reportProvider(identities)
     }
 }
 
@@ -778,6 +787,60 @@ final class KeyManagementServiceTests: XCTestCase {
         )
     }
 
+    private static func hiddenCustodyIdentity(
+        fingerprint: String,
+        keyVersion: UInt8,
+        isDefault: Bool = true,
+        isBackedUp: Bool = false
+    ) -> PGPKeyIdentity {
+        let material = hiddenGenerationMaterial(fingerprint: fingerprint, keyVersion: keyVersion)
+        return PGPKeyIdentity(
+            fingerprint: material.metadata.fingerprint,
+            keyVersion: material.metadata.keyVersion,
+            profile: material.metadata.profile,
+            userId: material.metadata.userId,
+            hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: isDefault,
+            isBackedUp: isBackedUp,
+            publicKeyData: material.publicKeyData,
+            revocationCert: material.revocationCert,
+            primaryAlgo: material.metadata.primaryAlgo,
+            subkeyAlgo: material.metadata.subkeyAlgo,
+            expiryDate: nil,
+            openPGPConfigurationIdentity: keyVersion == 4 ? .compatibleP256V4 : .modernP256V6,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+    }
+
+    private static func hiddenRecoveryReport(
+        identities: [PGPKeyIdentity],
+        handleAvailability: (PGPKeyIdentity) -> SecureEnclaveCustodyHandleAvailability = { _ in
+            .unavailable(.privateHandleMissing)
+        }
+    ) -> SecureEnclaveCustodyGenerationRecoveryReport {
+        let assessments = identities
+            .filter { $0.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations }
+            .enumerated()
+            .map { ordinal, identity in
+                SecureEnclaveCustodyGenerationRecoveryAssessment(
+                    identityOrdinal: ordinal,
+                    configurationIdentity: identity.openPGPConfigurationIdentity,
+                    publicMaterialAvailability: .available,
+                    revocationArtifactAvailability: identity.revocationCert.isEmpty
+                        ? .unavailable(.revocationArtifactUnavailable)
+                        : .available,
+                    handleAvailability: handleAvailability(identity)
+                )
+            }
+        return SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: assessments,
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+    }
+
     private func provisionFixtureBackedIdentity(secretCertData: Data) throws -> PGPKeyIdentity {
         let info = try engine.parseKeyInfo(keyData: secretCertData)
         let metadata = PGPKeyMetadataAdapter.metadata(from: info)
@@ -1185,25 +1248,7 @@ final class KeyManagementServiceTests: XCTestCase {
 
     func test_loadKeysRefreshesSecureEnclaveCustodyRecoveryReportAndRelockClearsIt() async throws {
         let metadataPersistence = RecordingKeyMetadataPersistence()
-        let material = Self.hiddenGenerationMaterial(fingerprint: "hidden-recovery", keyVersion: 4)
-        let identity = PGPKeyIdentity(
-            fingerprint: material.metadata.fingerprint,
-            keyVersion: material.metadata.keyVersion,
-            profile: .universal,
-            userId: material.metadata.userId,
-            hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: true,
-            isBackedUp: false,
-            publicKeyData: material.publicKeyData,
-            revocationCert: material.revocationCert,
-            primaryAlgo: material.metadata.primaryAlgo,
-            subkeyAlgo: material.metadata.subkeyAlgo,
-            expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-        )
+        let identity = Self.hiddenCustodyIdentity(fingerprint: "hidden-recovery", keyVersion: 4)
         metadataPersistence.seed([identity])
         let expectedReport = SecureEnclaveCustodyGenerationRecoveryReport(
             assessments: [
@@ -1241,6 +1286,79 @@ final class KeyManagementServiceTests: XCTestCase {
 
         XCTAssertEqual(targetService.secureEnclaveCustodyRecoveryReport, .empty)
         XCTAssertEqual(targetService.metadataLoadState, .locked)
+    }
+
+    func test_deleteHiddenSecureEnclaveCustodyKeyRefreshesRecoveryReport() throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let hiddenIdentity = Self.hiddenCustodyIdentity(fingerprint: "hidden-delete", keyVersion: 4)
+        metadataPersistence.seed([hiddenIdentity])
+        let recoveryClassifier = RecordingSecureEnclaveCustodyRecoveryClassifier { identities in
+            Self.hiddenRecoveryReport(identities: identities)
+        }
+        let targetService = KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
+            metadataPersistence: metadataPersistence,
+            secureEnclaveCustodyRecoveryService: recoveryClassifier
+        )
+
+        try targetService.loadKeys()
+        XCTAssertEqual(targetService.secureEnclaveCustodyRecoveryReport.assessments.count, 1)
+
+        try targetService.deleteKey(fingerprint: hiddenIdentity.fingerprint)
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(targetService.secureEnclaveCustodyRecoveryReport.assessments.isEmpty)
+        XCTAssertEqual(recoveryClassifier.requestedIdentitySnapshots.map { $0.map(\.fingerprint) }, [
+            ["hidden-delete"],
+            []
+        ])
+    }
+
+    func test_confirmKeyBackupExportedRefreshesRecoveryReportWithCurrentSnapshot() throws {
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        let hiddenIdentity = Self.hiddenCustodyIdentity(
+            fingerprint: "hidden-backup",
+            keyVersion: 4,
+            isBackedUp: false
+        )
+        metadataPersistence.seed([hiddenIdentity])
+        let recoveryClassifier = RecordingSecureEnclaveCustodyRecoveryClassifier { identities in
+            Self.hiddenRecoveryReport(identities: identities) { identity in
+                identity.isBackedUp ? .available : .unavailable(.privateHandleMissing)
+            }
+        }
+        let targetService = KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
+            metadataPersistence: metadataPersistence,
+            secureEnclaveCustodyRecoveryService: recoveryClassifier
+        )
+
+        try targetService.loadKeys()
+        XCTAssertEqual(
+            targetService.secureEnclaveCustodyRecoveryReport.assessments.first?.handleAvailability,
+            .unavailable(.privateHandleMissing)
+        )
+
+        targetService.confirmKeyBackupExported(fingerprint: hiddenIdentity.fingerprint)
+
+        XCTAssertEqual(
+            recoveryClassifier.requestedIdentitySnapshots.last?.first?.isBackedUp,
+            true
+        )
+        XCTAssertEqual(
+            targetService.secureEnclaveCustodyRecoveryReport.assessments.first?.handleAvailability,
+            .available
+        )
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {

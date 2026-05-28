@@ -231,15 +231,25 @@ pub fn inspect_secure_enclave_public_bindings(
     }
 
     let policy = StandardPolicy::new();
-    let is_transport_encryption_capable = cert
-        .keys()
-        .subkeys()
-        .with_policy(&policy, None)
-        .supported()
-        .for_transport_encryption()
-        .any(|subkey| {
-            subkey.key().fingerprint().to_hex().to_lowercase() == key_agreement_subkey_fingerprint
-        });
+    let is_transport_encryption_capable = cert.keys().subkeys().any(|subkey| {
+        if subkey.key().fingerprint().to_hex().to_lowercase() != key_agreement_subkey_fingerprint {
+            return false;
+        }
+
+        let mut binding_reference_times = subkey
+            .self_signatures()
+            .filter_map(|signature| signature.signature_creation_time())
+            .collect::<Vec<_>>();
+        binding_reference_times.sort_unstable();
+        binding_reference_times.dedup();
+        binding_reference_times.into_iter().any(|reference_time| {
+            subkey
+                .binding_signature(&policy, Some(reference_time))
+                .ok()
+                .and_then(|signature| signature.key_flags())
+                .is_some_and(|flags| flags.for_transport_encryption())
+        })
+    });
     if !is_transport_encryption_capable {
         return Err(PgpError::InvalidKeyData {
             reason:
@@ -848,6 +858,56 @@ mod tests {
             .expect("non-distinct role cert should serialize");
 
         assert!(inspect_secure_enclave_public_bindings(&data).is_err());
+    }
+
+    #[test]
+    fn test_secure_enclave_public_binding_inspection_preserves_expired_bindings() {
+        let cases = [
+            SecureEnclaveCertificateVersion::V4,
+            SecureEnclaveCertificateVersion::V6,
+        ]
+        .into_iter()
+        .map(|version| {
+            let material = public_material(version).expect("material should generate");
+            let signing_public_key_x963 = material.signing_public_key_x963.clone();
+            let key_agreement_public_key_x963 = material.key_agreement_public_key_x963.clone();
+            let mut input = input_for(version, &material);
+            input.expiry_seconds = Some(1);
+            let result = generate_secure_enclave_public_certificate(input, provider_for(material))
+                .expect("certificate should generate");
+            (
+                result,
+                signing_public_key_x963,
+                key_agreement_public_key_x963,
+            )
+        })
+        .collect::<Vec<_>>();
+
+        std::thread::sleep(Duration::from_secs(2));
+
+        for (result, signing_public_key_x963, key_agreement_public_key_x963) in cases {
+            let cert = openpgp::Cert::from_bytes(&result.public_key_data)
+                .expect("public cert should parse");
+            let policy = StandardPolicy::new();
+            let expiration_time = cert
+                .with_policy(&policy, None)
+                .expect("certificate should remain structurally policy-valid")
+                .primary_key()
+                .key_expiration_time()
+                .expect("test certificate should have an expiration time");
+            assert!(
+                expiration_time <= SystemTime::now(),
+                "test certificate should be past its advertised expiration time"
+            );
+
+            let inspection = inspect_secure_enclave_public_bindings(&result.public_key_data)
+                .expect("expired Secure Enclave bindings should remain recoverable");
+            assert_eq!(inspection.signing_public_key_x963, signing_public_key_x963);
+            assert_eq!(
+                inspection.key_agreement_public_key_x963,
+                key_agreement_public_key_x963
+            );
+        }
     }
 
     #[test]

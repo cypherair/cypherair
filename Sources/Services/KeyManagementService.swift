@@ -135,8 +135,7 @@ final class KeyManagementService: @unchecked Sendable {
         metadataLoadState = .loading
         do {
             try catalogStore.loadAll()
-            syncKeys()
-            refreshSecureEnclaveCustodyRecoveryReport()
+            syncKeysAndSecureEnclaveRecoveryReport()
             metadataLoadState = .loaded
         } catch {
             catalogStore.clearInMemoryIdentities()
@@ -199,8 +198,7 @@ final class KeyManagementService: @unchecked Sendable {
             let outcome = try catalogStore.migrateLegacyMetadataIfNeeded(
                 authenticationContext: authenticationContext
             )
-            syncKeys()
-            refreshSecureEnclaveCustodyRecoveryReport()
+            syncKeysAndSecureEnclaveRecoveryReport()
             legacyMetadataMigrationCompletedInProcess = outcome.failedItemCount == 0
             legacyMetadataMigrationLoadWarning = outcome.failedItemCount == 0 ? nil : Self.legacyMetadataMigrationWarningMessage()
             traceStore?.record(
@@ -296,8 +294,7 @@ final class KeyManagementService: @unchecked Sendable {
             await postProvisioningCheckpoint()
         }
         try provisioningInvalidationGate.checkValid(token)
-        syncKeys()
-        refreshSecureEnclaveCustodyRecoveryReport()
+        syncKeysAndSecureEnclaveRecoveryReport()
         return identity
     }
 
@@ -324,8 +321,7 @@ final class KeyManagementService: @unchecked Sendable {
             await postProvisioningCheckpoint()
         }
         try provisioningInvalidationGate.checkValid(token)
-        syncKeys()
-        refreshSecureEnclaveCustodyRecoveryReport()
+        syncKeysAndSecureEnclaveRecoveryReport()
         return identity
     }
 
@@ -372,7 +368,7 @@ final class KeyManagementService: @unchecked Sendable {
             await postProvisioningCheckpoint()
         }
         try provisioningInvalidationGate.checkValid(token)
-        syncKeys()
+        syncKeysAndSecureEnclaveRecoveryReport()
         return identity
     }
 
@@ -391,7 +387,7 @@ final class KeyManagementService: @unchecked Sendable {
             passphrase: passphrase,
             markBackedUp: true
         )
-        syncKeys()
+        syncKeysAndSecureEnclaveRecoveryReport()
         return exported
     }
 
@@ -405,7 +401,7 @@ final class KeyManagementService: @unchecked Sendable {
 
     func confirmKeyBackupExported(fingerprint: String) {
         catalogStore.markBackedUp(fingerprint: fingerprint)
-        syncKeys()
+        syncKeysAndSecureEnclaveRecoveryReport()
     }
 
     /// Export the key's revocation signature as an ASCII-armored signature.
@@ -415,7 +411,7 @@ final class KeyManagementService: @unchecked Sendable {
         let armoredRevocation = try await exportService.exportRevocationCertificate(
             fingerprint: fingerprint
         )
-        syncKeys()
+        syncKeysAndSecureEnclaveRecoveryReport()
         return armoredRevocation
     }
 
@@ -480,7 +476,7 @@ final class KeyManagementService: @unchecked Sendable {
         newExpirySeconds: UInt64?
     ) async throws -> PGPKeyIdentity {
         defer {
-            syncKeys()
+            syncKeysAndSecureEnclaveRecoveryReport()
         }
         return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
@@ -507,7 +503,7 @@ final class KeyManagementService: @unchecked Sendable {
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         defer {
-            syncKeys()
+            syncKeysAndSecureEnclaveRecoveryReport()
         }
         return try await mutationService.modifyExpiry(
             fingerprint: fingerprint,
@@ -523,7 +519,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
     /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
-        defer { syncKeys() }
+        defer { syncKeysAndSecureEnclaveRecoveryReport() }
         try mutationService.deleteKey(fingerprint: fingerprint)
     }
 
@@ -532,7 +528,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// Set a key as the default signing/encryption identity.
     /// Persists the change to Keychain metadata so it survives cold restart.
     func setDefaultKey(fingerprint: String) throws {
-        defer { syncKeys() }
+        defer { syncKeysAndSecureEnclaveRecoveryReport() }
         try mutationService.setDefaultKey(fingerprint: fingerprint)
     }
 
@@ -612,11 +608,8 @@ final class KeyManagementService: @unchecked Sendable {
         )
     }
 
-    private func syncKeys() {
+    private func syncKeysAndSecureEnclaveRecoveryReport() {
         keys = catalogStore.keys
-    }
-
-    private func refreshSecureEnclaveCustodyRecoveryReport() {
         guard let secureEnclaveCustodyRecoveryService else {
             secureEnclaveCustodyRecoveryReport = .empty
             return
