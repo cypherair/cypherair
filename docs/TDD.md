@@ -121,8 +121,13 @@ public key and digest, and rejects wrong-digest/wrong-public-key/malformed
 responses without secret-certificate fallback. Swift persists only
 `PGPKeyIdentity` metadata with P-256 configuration and Secure Enclave custody;
 it does not store a secret cert, Apple handle locator, access-control policy,
-or response-file bridge. More complete interrupted-generation recovery remains
-future work.
+or response-file bridge. Phase 4B closes the hidden recovery seam by inspecting
+stored public certificates for public P-256 role bindings, locating matching
+Security handles by public binding, and maintaining only a sanitized in-memory
+metadata/handle recovery report. The report classifies public material,
+revocation artifact, handle availability, metadata association, and inventory
+failures through shared categories without persisting locators or deleting
+startup orphan handles.
 
 ### 1.4 Encryption Format Auto-Selection
 

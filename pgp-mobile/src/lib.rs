@@ -32,8 +32,8 @@ use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256SigningProvider,
     GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, PublicCertificateValidationResult,
-    S2kInfo, SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicCertificateInput,
-    UserIdSelectorInput,
+    S2kInfo, SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicBindingInspection,
+    SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -84,6 +84,17 @@ impl PgpEngine {
         signer: Arc<dyn ExternalP256SigningProvider>,
     ) -> Result<SecureEnclaveGeneratedPublicCertificate, PgpError> {
         keys::generate_secure_enclave_public_certificate(input, signer)
+    }
+
+    /// Inspect a public-only P-256 Secure Enclave custody certificate.
+    ///
+    /// Returns only public OpenPGP identity metadata and the signing/key-agreement
+    /// X9.63 public points needed to locate Security-owned private-operation handles.
+    pub fn inspect_secure_enclave_public_bindings(
+        &self,
+        public_key_data: Vec<u8>,
+    ) -> Result<SecureEnclavePublicBindingInspection, PgpError> {
+        keys::inspect_secure_enclave_public_bindings(&public_key_data)
     }
 
     // ── Key Information ─────────────────────────────────────────────

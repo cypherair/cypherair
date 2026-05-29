@@ -914,6 +914,14 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func importSecretKey(armoredData: Data, passphrase: String) throws  -> Data
 
     /**
+     * Inspect a public-only P-256 Secure Enclave custody certificate.
+     *
+     * Returns only public OpenPGP identity metadata and the signing/key-agreement
+     * X9.63 public points needed to locate Security-owned private-operation handles.
+     */
+    func inspectSecureEnclavePublicBindings(publicKeyData: Data) throws  -> SecureEnclavePublicBindingInspection
+
+    /**
      * Match PKESK recipients against local certificates (Phase 1 — no auth needed).
      * Returns primary fingerprints of matching certificates (lowercase hex).
      *
@@ -1425,6 +1433,21 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
             self.uniffiCloneHandle(),
         FfiConverterData.lower(armoredData),
         FfiConverterString.lower(passphrase),$0
+    )
+})
+}
+
+    /**
+     * Inspect a public-only P-256 Secure Enclave custody certificate.
+     *
+     * Returns only public OpenPGP identity metadata and the signing/key-agreement
+     * X9.63 public points needed to locate Security-owned private-operation handles.
+     */
+open func inspectSecureEnclavePublicBindings(publicKeyData: Data)throws  -> SecureEnclavePublicBindingInspection  {
+    return try  FfiConverterTypeSecureEnclavePublicBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_public_bindings(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicKeyData),$0
     )
 })
 }
@@ -3419,6 +3442,115 @@ public func FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lift(_ buf: 
 #endif
 public func FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lower(_ value: SecureEnclaveGeneratedPublicCertificate) -> RustBuffer {
     return FfiConverterTypeSecureEnclaveGeneratedPublicCertificate.lower(value)
+}
+
+
+/**
+ * Public bindings extracted from a Secure Enclave custody OpenPGP certificate.
+ */
+public struct SecureEnclavePublicBindingInspection: Equatable, Hashable {
+    /**
+     * Certificate fingerprint as lowercase hex.
+     */
+    public var fingerprint: String
+    /**
+     * OpenPGP key version.
+     */
+    public var keyVersion: UInt8
+    /**
+     * Primary signing key fingerprint as lowercase hex.
+     */
+    public var signingKeyFingerprint: String
+    /**
+     * Key-agreement subkey fingerprint as lowercase hex.
+     */
+    public var keyAgreementSubkeyFingerprint: String
+    /**
+     * 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+     */
+    public var signingPublicKeyX963: Data
+    /**
+     * 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+     */
+    public var keyAgreementPublicKeyX963: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Certificate fingerprint as lowercase hex.
+         */fingerprint: String,
+        /**
+         * OpenPGP key version.
+         */keyVersion: UInt8,
+        /**
+         * Primary signing key fingerprint as lowercase hex.
+         */signingKeyFingerprint: String,
+        /**
+         * Key-agreement subkey fingerprint as lowercase hex.
+         */keyAgreementSubkeyFingerprint: String,
+        /**
+         * 65-byte uncompressed X9.63 P-256 ECDSA public key for signing/certification.
+         */signingPublicKeyX963: Data,
+        /**
+         * 65-byte uncompressed X9.63 P-256 ECDH public key for key agreement.
+         */keyAgreementPublicKeyX963: Data) {
+        self.fingerprint = fingerprint
+        self.keyVersion = keyVersion
+        self.signingKeyFingerprint = signingKeyFingerprint
+        self.keyAgreementSubkeyFingerprint = keyAgreementSubkeyFingerprint
+        self.signingPublicKeyX963 = signingPublicKeyX963
+        self.keyAgreementPublicKeyX963 = keyAgreementPublicKeyX963
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclavePublicBindingInspection: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclavePublicBindingInspection: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclavePublicBindingInspection {
+        return
+            try SecureEnclavePublicBindingInspection(
+                fingerprint: FfiConverterString.read(from: &buf),
+                keyVersion: FfiConverterUInt8.read(from: &buf),
+                signingKeyFingerprint: FfiConverterString.read(from: &buf),
+                keyAgreementSubkeyFingerprint: FfiConverterString.read(from: &buf),
+                signingPublicKeyX963: FfiConverterData.read(from: &buf),
+                keyAgreementPublicKeyX963: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SecureEnclavePublicBindingInspection, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.fingerprint, into: &buf)
+        FfiConverterUInt8.write(value.keyVersion, into: &buf)
+        FfiConverterString.write(value.signingKeyFingerprint, into: &buf)
+        FfiConverterString.write(value.keyAgreementSubkeyFingerprint, into: &buf)
+        FfiConverterData.write(value.signingPublicKeyX963, into: &buf)
+        FfiConverterData.write(value.keyAgreementPublicKeyX963, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclavePublicBindingInspection_lift(_ buf: RustBuffer) throws -> SecureEnclavePublicBindingInspection {
+    return try FfiConverterTypeSecureEnclavePublicBindingInspection.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclavePublicBindingInspection_lower(_ value: SecureEnclavePublicBindingInspection) -> RustBuffer {
+    return FfiConverterTypeSecureEnclavePublicBindingInspection.lower(value)
 }
 
 
@@ -5494,6 +5626,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 53716) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_public_bindings() != 48954) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients() != 28006) {

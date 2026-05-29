@@ -396,6 +396,10 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
         )
+        let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
+            publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+            handleStore: secureEnclaveCustodyHandleStore
+        )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -421,7 +425,8 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore,
-            metadataPersistence: keyMetadataDomainStore
+            metadataPersistence: keyMetadataDomainStore,
+            secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
         protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)

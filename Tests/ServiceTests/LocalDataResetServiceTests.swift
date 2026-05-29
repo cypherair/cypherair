@@ -212,6 +212,33 @@ final class LocalDataResetServiceTests: XCTestCase {
         keyStore.insertMalformedApplicationTag(
             "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).reset-malformed"
         )
+        let hiddenIdentity = PGPKeyIdentity(
+            fingerprint: "hidden-reset",
+            keyVersion: 4,
+            profile: .universal,
+            userId: "Hidden Reset <hidden-reset@example.test>",
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: true,
+            isBackedUp: false,
+            publicKeyData: Data("hidden-reset-public".utf8),
+            revocationCert: Data("hidden-reset-revocation".utf8),
+            primaryAlgo: "ECDSA P-256",
+            subkeyAlgo: "ECDH P-256",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleP256V4,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        let hiddenMetadataService = KeychainConstants.metadataService(
+            fingerprint: hiddenIdentity.fingerprint
+        )
+        try container.keychain.save(
+            try JSONEncoder().encode(hiddenIdentity),
+            service: hiddenMetadataService,
+            account: KeychainConstants.metadataAccount,
+            accessControl: nil
+        )
         let resetService = makeResetService(
             from: container,
             secureEnclaveCustodyHandleStore: handleStore
@@ -221,6 +248,12 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertFalse(
+            container.keychain.exists(
+                service: hiddenMetadataService,
+                account: KeychainConstants.metadataAccount
+            )
+        )
         let cleanupEntry = try XCTUnwrap(
             container.authLifecycleTraceStore?.recentEntries.last {
                 $0.name == "localDataReset.secureEnclaveCustody.cleanup.finish"
