@@ -33,6 +33,7 @@ Sources/
 ├── Security/         # Secure Enclave wrapping, Keychain, auth mode logic, ProtectedData
 ├── Models/           # Data models and error types
 ├── Extensions/       # Small Foundation/Swift helpers
+├── PgpMobile/        # Generated UniFFI Swift bindings (do not hand-edit)
 └── Resources/        # String catalogs, previews
 
 pgp-mobile/           # Rust wrapper crate
