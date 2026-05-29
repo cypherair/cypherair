@@ -21,6 +21,13 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     func classify(
         identities: [PGPKeyIdentity]
     ) -> SecureEnclaveCustodyGenerationRecoveryReport {
+        // The handle inventory runs first and unconditionally — before the
+        // `.appleSecureEnclavePrivateOperations` filter below — so the report can
+        // surface `handle-only` orphan states: Secure Enclave handles that exist
+        // with no corresponding metadata identity (e.g. from interrupted/partial
+        // generation). Do NOT gate the inventory on the presence of Secure Enclave
+        // identities; that would hide orphan handles whenever no such identity
+        // exists. See docs/APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md (PR 4B).
         let inventorySummary: SecureEnclaveCustodyHandleInventorySummary
         let inventoryFailureCategory: PGPKeyOperationFailureCategory?
         do {
