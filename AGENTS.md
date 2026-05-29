@@ -4,7 +4,7 @@ This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding ag
 
 ## Apple arm64e Status
 
-`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support. It summarizes app-side readiness, Rust stage1 provenance, the OpenSSL carry chain, XCFramework manifest/release validation, and the update triggers for that status record.
+`docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support. Consult it when working on anything arm64e-related.
 
 ## Documentation Scope
 
@@ -107,7 +107,7 @@ Never violate these:
    Swift: `SecRandomCopyBytes` or CryptoKit. Rust: `getrandom`/Sequoia crypto randomness.
 7. Keep MIE/Enhanced Security capability enabled.
 8. Preserve profile-correct message format selection.
-   v4 recipient -> SEIPDv1, v6 recipient -> SEIPDv2, mixed -> SEIPDv1.
+   Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See `docs/TDD.md` Section 1.4.
 
 ## Sensitive Boundaries
 
