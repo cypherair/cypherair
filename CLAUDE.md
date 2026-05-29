@@ -24,9 +24,10 @@ Sources/
 ├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, Argon2id memory guard, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
+├── PgpMobile/        # Generated UniFFI Swift bindings (do not hand-edit)
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-docs/                 # PRD, TDD, POC, architecture, security, testing, conventions
+docs/                 # PRD, TDD, architecture, security, testing, conventions
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -132,7 +133,7 @@ Standard Mode (default) and High Security Mode, selectable in Settings; switchin
 - Crypto tests: run for **both profiles**. Round-trip tests (encrypt→decrypt, sign→verify), tamper tests (1-bit flip → failure).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - MIE: test on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging diagnostics enabled; current device examples live in `docs/SECURITY.md`.
-- Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows).
+- Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows), `CypherAir-DangerousDeviceTests.xctestplan` (manual destructive physical-device lane for the Secure Enclave custody Reset All Local Data cleanup proof).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
 - If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
