@@ -131,6 +131,30 @@
 - **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`textCiphertextFileImportAction`); `Sources/App/Sign/VerifyScreenModel.swift` (`cleartextFileImportAction`); `Sources/App/Common/TextImport/ImportedTextInputState.swift` (retains rawData + textSnapshot).
 - **Fix:** cap pre-read size (read `attributes[.size] as? UInt64` and reject oversized before `Data(contentsOf:)`, consistent with EncryptionService / DiskSpaceChecker); avoid retaining Data + two String copies.
 
+## [open] CA-29: Abandoned file decrypt can adopt temporary plaintext output
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
+- **Verified real, but low impact.** Manual cancel and content-clear already cancel the file operation, and the Rust streaming path deletes partial `.tmp` plaintext on cancellation or failure. The remaining gap is route abandonment: `DecryptView.onDisappear` clears current state but does not cancel an in-flight file decrypt, so a later successful operation can adopt a temporary plaintext output after the screen is gone.
+- **Impact:** local app-sandbox temporary plaintext residue until startup/reset cleanup, not an external leak, AEAD bypass, or partial-plaintext exposure. The app already uses app temporary `tmp/decrypted/op-<UUID>/...` storage, complete file protection, and startup/reset cleanup.
+- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`handleDisappear`, `decryptFile`, `adoptDecryptedFileOutput`); `Sources/App/Decrypt/DecryptView.swift` (`onDisappear`); `Sources/App/Common/OperationController.swift` (`cancelAndInvalidate`); `Sources/App/Common/AppTemporaryArtifactStore.swift` (`cleanupTemporaryArtifacts`).
+- **Fix:** when the Decrypt route disappears, cancel/invalidate any in-flight file decrypt and prevent late output adoption; continue relying on startup/reset temporary cleanup as a backstop.
+
+## [open] CA-33: Decrypt output and signature verification can become cross-mode mismatched
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab — Codex severity **medium** · user-confirmed **pending fix**
+- **Verified real.** Decrypt keeps text output and file output separately, but both modes share one `detailedSignatureVerification`. A user can decrypt in one mode, decrypt in the other mode, then switch back and see the first mode's output with the second mode's signature verification state.
+- **Impact:** trust UI correctness bug, not a cryptographic verification bypass. The visible signature section can be read as applying to the visible output even when it came from a different mode's result.
+- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`decryptedText`, `decryptedFileURL`, shared `detailedSignatureVerification`, `decryptText`, `decryptFile`); `Sources/App/Decrypt/DecryptView.swift` (mode-gated output sections plus shared signature section).
+- **Fix:** model text and file results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
+
+## [open] CA-42: Decrypt/Verify text input section recreation dismisses keyboard during edits
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0 — Codex severity **informational** · user-confirmed **Medium priority, pending fix**
+- **Verified real by code and user reproduction.** Decrypt and Verify both place the text input `Section` under `.id(textInputSectionEpoch)`, and ordinary edit setters bump that epoch through invalidation helpers. User reproduced that pressing backspace can dismiss the keyboard.
+- **Impact:** core text-entry UX/availability issue for Decrypt text mode and Verify cleartext mode. It does not expose secrets or change decrypt/verify correctness, but it makes manual correction of encrypted/signed text unreliable.
+- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`setCiphertextInput`, `invalidateTextInputState`); `Sources/App/Decrypt/DecryptView.swift` (`.id(model.textInputSectionEpoch)`); `Sources/App/Sign/VerifyScreenModel.swift` (`setSignedInput`, `invalidateCleartextVerificationState`); `Sources/App/Sign/VerifyView.swift` (`.id(model.textInputSectionEpoch)`).
+- **Fix:** split edit invalidation from section refresh. Edit paths should clear stale result/phase1/verification state without bumping `textInputSectionEpoch`; import/reset/operation-completion paths can still refresh the input section when needed.
+
 ## [open] Unbounded SKESK fallback in password decrypt (latent — not shipped-reachable)
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/5dfacb1e55cc81918f142034127840ff — Codex severity **medium** · assessed **real-low, latent**
