@@ -24,13 +24,16 @@ final class KeyExportService {
         passphrase: String,
         markBackedUp: Bool = true
     ) async throws -> Data {
+        guard let identity = catalogStore.identity(for: fingerprint) else {
+            throw CypherAirError.noMatchingKey
+        }
+        guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
+            throw CypherAirError.keyOperationUnavailable(category: .operationUnsupportedForCustody)
+        }
+
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
         }
 
         let exported = try await keyAdapter.exportSecretKey(
@@ -52,6 +55,9 @@ final class KeyExportService {
 
         if !identity.revocationCert.isEmpty {
             return try await certificateAdapter.armorSignature(identity.revocationCert)
+        }
+        guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
+            throw CypherAirError.keyOperationUnavailable(category: .revocationArtifactUnavailable)
         }
 
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)

@@ -23,6 +23,7 @@ enum CypherAirError: Error {
     case internalError(reason: String)
     case operationCancelled
     case fileIoError(reason: String)
+    case keyOperationUnavailable(category: PGPKeyOperationFailureCategory)
 
     // Security-layer errors
     case secureEnclaveUnavailable

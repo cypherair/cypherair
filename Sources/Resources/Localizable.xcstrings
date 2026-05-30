@@ -5121,6 +5121,22 @@
         }
       }
     },
+    "error.keyOperationUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key operation is unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥操作不可用。"
+          }
+        }
+      }
+    },
     "error.keyTooLargeForQr" : {
       "localizations" : {
         "en" : {
