@@ -90,6 +90,14 @@
 - **Current code:** `.github/workflows/xcframework-edge-release.yml` defines `rust-dependency-audit` and `publish-edge-release` without a `needs` relationship; `.github/workflows/stable-build-release.yml` already uses the intended gated shape for stable release publication.
 - **Fix:** make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before any tag/release creation or asset upload.
 
+## [open] CA-11: Local reset must fail closed when app-session auth is unavailable
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663 — Codex severity **medium** · user-confirmed **real, low impact, pending fix**
+- **Verified real, low reachability.** The local data reset flow checks whether app-session auth can be evaluated, but if auth is unavailable it skips the prompt and still proceeds to reset. In the realistic threat model this is a local destructive action, not data disclosure; an attacker generally still needs an already-unlocked app/session to reach it.
+- **Impact:** local availability/destructive reset risk under narrow device-auth-unavailable conditions. No private-key disclosure or Secure Enclave bypass is implied.
+- **Current code:** `Sources/App/Settings/SettingsScreenModel.swift` (`confirmLocalDataReset`); `Sources/App/Settings/LocalDataResetService.swift` (`resetAllLocalData`).
+- **Fix:** if app-session auth cannot be evaluated, block reset and show an auth-unavailable error instead of treating the auth check as optional.
+
 ## [open] CA-18: Drill release verification command needs shell-safe source refs
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484 — Codex severity **medium** · user-confirmed **low-impact hardening, pending fix**

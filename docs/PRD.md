@@ -235,7 +235,7 @@ Protected app-data scope and per-surface classification are maintained in [PERSI
 The App offers two authentication modes, selectable in Settings:
 
 - **Standard Mode (default):** Face ID / Touch ID with device passcode fallback. Suitable for most users. Equivalent to Apple `deviceOwnerAuthentication`.
-- **High Security Mode:** Face ID / Touch ID only, with no passcode fallback. Inspired by Apple's Stolen Device Protection, which removes passcode fallback for sensitive operations to prevent a thief who has obtained both the device and the passcode from accessing critical data. In this mode, if biometric authentication is unavailable (sensor damaged, face obscured), the user cannot perform any private-key operations (decrypt, sign, export) until biometric authentication is restored.
+- **High Security Mode:** Face ID / Touch ID only, with no passcode fallback for private-key operations. In this mode, decrypt, sign, and export require biometric authorization before private-key material can be used. If biometric authentication is unavailable (sensor damaged, face obscured, or temporarily locked out), private-key operations remain unavailable until biometric authentication is restored.
 
 **Activation safeguards:** When the user enables High Security Mode, the App:
 
@@ -432,4 +432,4 @@ Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop 
 
 **Scenario 10: Contact Key Update** — Alice regenerates her key (same UID, new fingerprint). She sends her new public key. Bob's App detects same UID but different fingerprint → warning → Bob verifies with Alice → confirms update.
 
-**Scenario 11: High-Risk User** — A journalist enables High Security Mode in Settings and generates a Profile B key. The App warns about backup necessity and requires Face ID confirmation. From this point, all decryption and signing requires biometric authentication only — even if someone obtains the device passcode, they cannot access encrypted messages. The journalist's private keys are protected by both Secure Enclave hardware binding and biometric-only access control. Messages use AEAD (OCB) encryption. Argon2id protects key backups.
+**Scenario 11: High-Risk User** — A journalist enables High Security Mode in Settings and generates a Profile B key. The App warns about backup necessity and requires Face ID confirmation. From this point, all decryption and signing requires biometric authentication at the private-key operation boundary; the device passcode cannot be used as a fallback to unlock those operations. The journalist's private keys are protected by both Secure Enclave hardware binding and biometric-only access control. Messages use AEAD (OCB) encryption. Argon2id protects key backups.
