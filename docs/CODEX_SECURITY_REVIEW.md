@@ -98,6 +98,14 @@
 - **Current code:** `Sources/App/Settings/SettingsScreenModel.swift` (`confirmLocalDataReset`); `Sources/App/Settings/LocalDataResetService.swift` (`resetAllLocalData`).
 - **Fix:** if app-session auth cannot be evaluated, block reset and show an auth-unavailable error instead of treating the auth check as optional.
 
+## [open] CA-15: Operation prompt lifecycle suppression can stale-consume real app switches
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/daf3bd3399248191900565067b6785ae — Codex severity **medium** · user-confirmed **High priority, pending fix**
+- **Verified real, with platform-specific impact.** `PrivacyScreenLifecycleGate` observes operation-prompt generation lazily from later lifecycle callbacks. If an operation prompt ended before the gate observed the new generation, a later real lifecycle event can be stale-consumed as prompt noise. On macOS, a real `didResignActive` / `didBecomeActive` after Touch ID can leave the window unblurred, skip expected resume authentication, or contribute to the long-standing stuck-blur behavior. On iOS/iPadOS/visionOS, `.background` normally hard-blurs before the app-switcher snapshot, but inactive-only or prompt-tail timing can still cause short-lived privacy/UX failures.
+- **Impact:** lifecycle privacy and reliability bug, not a private-key or payload-authentication bypass. It can expose already-unlocked UI on macOS app switches and can make authentication recovery feel stuck or inconsistent.
+- **Current code:** `Sources/App/Common/PrivacyScreenLifecycleGate.swift` (`syncOperationAuthenticationAttemptGeneration`, prompt suppression decisions); `Sources/App/Common/PrivacyScreenModifier.swift` (scene/app notification routing); `Sources/Security/AuthenticationPromptCoordinator.swift` (`operationPromptAttemptGeneration`); `Sources/Security/ProtectedData/AppSessionOrchestrator.swift` (`handleSceneDidResignActive`, `handleSceneDidEnterBackground`, resume/settle handlers).
+- **Fix design:** replace unbounded "next lifecycle event" suppression with bounded operation-prompt settle state. Real `.background` must always clear prompt state and hard-blur. Prompt-induced inactive/resign should use `blurOnly`; the matching active should use `settleTransientBlur` and must not call `handleResume()` or create a second auth prompt. After a short internal prompt-settle window from prompt end, stale prompt state must no longer suppress real app switches. Do not change the user-visible "Immediately" grace-period semantics to 3 seconds.
+
 ## [open] CA-18: Drill release verification command needs shell-safe source refs
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484 — Codex severity **medium** · user-confirmed **low-impact hardening, pending fix**
