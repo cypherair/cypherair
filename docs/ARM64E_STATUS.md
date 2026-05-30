@@ -1,6 +1,6 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-05-27
+Snapshot date: 2026-05-30
 
 ## Repo Identity
 
@@ -47,8 +47,13 @@ Snapshot date: 2026-05-27
     ordinary local development and CI validation use explicit Rust official
     stable commands such as `cargo +stable`
   - Rust fork repository: `cypherair/rust`
-  - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain`
-  - current Rust stage1 carry head: `ffa5e3128fe`
+  - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain-stable-1.96`
+  - current Rust stage1 carry head: `ecc85bfa110`
+  - Rust stable base release: `1.96.0`
+  - Rust stable base commit: `ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`
+  - the former `carry/cypherair-arm64e-toolchain` line and its
+    `rust-arm64e-stage1-*` prereleases are retained for diagnostics but are no
+    longer the app's default stage1 consumption path
   - Rust upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`
   - current Rust upstream-prep head: `77e2e3639785`
@@ -56,8 +61,8 @@ Snapshot date: 2026-05-27
   - current Rust downstream integration head: `a9d110acd4fc`
   - `stage1-arm64e-patch` is an optional local rustup-linked stage1 compiler
     for Rust-fork development and diagnostics; it must include host
-    `std`/`proc_macro` plus the arm64e Darwin std payload to be usable for app
-    packaging
+    `std`/`proc_macro` plus prebuilt std for arm64e Darwin, iOS, tvOS, and
+    visionOS to be usable for app packaging
   - local app-side full packaging should use
     `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release`
     so it consumes the same `cypherair/rust` stage1 prerelease path as GitHub
@@ -71,18 +76,19 @@ Snapshot date: 2026-05-27
     cache actions; clean CI builds avoid reusing `target/` artifacts produced
     by an older Rust fork stage1 compiler
   - arm64e builds call the patched compiler through explicit `RUSTC` while
-    using nightly Cargo as the driver for `-Zbuild-std`
+    using stable Cargo with prebuilt std payloads; the official app path does
+    not use nightly Cargo or `-Zbuild-std`
   - latest verified stage1 prerelease:
-    `rust-arm64e-stage1-20260519T081052Z-ffa5e31-r26083865790-a1`
+    `rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1`
   - latest verified stage1 source ref:
-    `refs/heads/carry/cypherair-arm64e-toolchain`
+    `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96`
   - latest verified stage1 source commit:
-    `ffa5e3128fed80404edd864ceb7a26e1bbb97c26`
-  - latest verified stage1 workflow run: `26083865790`
-  - latest verified stage1 manifest declares `includedRustSrc: true`, includes
-    host `std`/`proc_macro`, and includes Apple arm64e std targets for Darwin,
-    iOS, tvOS, and visionOS, so GitHub-hosted app builds can run
-    `cargo -Zbuild-std` without relying on a runner-local Rust source tree
+    `ecc85bfa110f4232246be6ff27c1e9c20e5539d9`
+  - latest verified stage1 workflow run: `26679152716`
+  - latest verified stage1 manifest declares `stableBaseRelease: "1.96.0"`,
+    `stableBaseCommit: "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96"`,
+    `requiresBuildStd: false`, includes host `std`/`proc_macro`, and includes
+    Apple arm64e std targets for Darwin, iOS, tvOS, and visionOS
   - latest hosted LLVM-workaround-shrink validation force-downloaded the
     prerelease above and recorded the same source and checked-out commit in
     `PgpMobile.arm64e-build-manifest.json`
@@ -111,10 +117,11 @@ Snapshot date: 2026-05-27
 ## Automation Posture
 
 - `cypherair/rust`:
-  - `arm64e-stage1-prerelease.yml` validates the stage1 carry branch, builds
-    the patched stage1 compiler, host `std`/`proc_macro`, and arm64e Apple std
-    payloads, smoke-tests the packaged toolchain, and publishes a prerelease
-    asset for app CI
+  - `arm64e-stage1-prerelease.yml` validates the stable196 stage1 carry branch,
+    builds the patched stage1 compiler, host `std`/`proc_macro`, and arm64e
+    Apple std payloads, smoke-tests the packaged toolchain with
+    `cargo +stable`, and publishes a `rust-arm64e-stage1-stable196-*`
+    prerelease asset for app CI
   - `arm64e-upstream-sync-prep.yml` performs manual upstream-sync dry-runs and
     can open a refresh PR without force-pushing the integration branch
 - `cypherair/cypherair`:
@@ -153,7 +160,7 @@ Snapshot date: 2026-05-27
   - canonical branch: `main`
 - Rust fork:
   - remote `cypherair/rust`
-  - stage1 carry branch: `carry/cypherair-arm64e-toolchain`
+  - stage1 carry branch: `carry/cypherair-arm64e-toolchain-stable-1.96`
   - downstream integration branch: `integration/arm64e-upstream-prs`
   - upstream-prep branch:
     `prep/upstream-ready-arm64e-ptrauth-core-diagnostics-2026-04-24-u9836b06`

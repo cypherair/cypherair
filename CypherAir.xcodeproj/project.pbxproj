@@ -683,6 +683,7 @@
 				"$(SRCROOT)/scripts/snapshot_repository_audit_inputs.sh",
 				"$(SRCROOT)/.git/HEAD",
 				"$(SRCROOT)/.git/config",
+				"$(SRCROOT)/.git/config.worktree",
 				"$(SRCROOT)/.git/index",
 				"$(SRCROOT)/.git/info/exclude",
 				"$(SRCROOT)/Sources",

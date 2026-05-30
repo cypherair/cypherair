@@ -199,7 +199,7 @@ These jobs must pass on pull requests and nightly validation:
 The repository also publishes unique edge XCFramework prereleases:
 
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework, conditionally runs hosted Apple platform probes when Xcode 26.5 is healthy, then publishes a unique `pgpmobile-edge-` prerelease for canonical `main` builds; non-main manual runs must use `pgpmobile-drill-*` prefixes
-- The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with stable Rust, while `arm64e` slices use nightly Cargo with `RUSTC` pointing at the downloaded stage1 compiler.
+- The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-stable196-*` prerelease on GitHub Actions. Stable `arm64` slices are still built with official stable Rust, while `arm64e` slices use stable Cargo with `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
 - `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` uses the same hosted Xcode 26.5 platform preflight as edge, runs app-side iOS/visionOS probes only when the runner is platform-ready, records skipped probes in release notes when the hosted image lags, fails before packaging on project or scheme destination regressions, and can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails, while `publish-stable-release` depends on both jobs and creates the immutable GitHub Release only after the audit passes.
 
 Toolchain contract:
@@ -321,17 +321,17 @@ ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
     ./build-xcframework.sh --release
 ```
 
-Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with nightly Cargo plus explicit `RUSTC`, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with stable Cargo plus explicit `RUSTC` and prebuilt std payloads, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
 
 The sync script normalizes generated Swift bindings, C headers, and modulemaps by stripping trailing whitespace before copying them into `bindings/` and `Sources/PgpMobile/`. Do not hand-edit generated binding whitespace; rerun the sync path instead.
 
-For local packaging, prefer the same force-download mode used by GitHub Actions. It downloads the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged checksum, and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup state. `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked `stage1-arm64e-patch` toolchain remain supported for Rust-fork development and diagnostics, but release-candidate app artifact refreshes should use the force-download path unless you are deliberately testing a local compiler build.
+For local packaging, prefer the same force-download mode used by GitHub Actions. It downloads the latest `cypherair/rust` `rust-arm64e-stage1-stable196-*` prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged checksum, validates the stable196 prebuilt-std manifest, and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup state. `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked `stage1-arm64e-patch` toolchain remain supported for Rust-fork development and diagnostics, but release-candidate app artifact refreshes should use the force-download path unless you are deliberately testing a local compiler build.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 
 ```bash
 cd pgp-mobile
-cargo +nightly run --release --bin uniffi-bindgen generate \
+cargo +stable run --release --bin uniffi-bindgen generate \
     --library target/release/libpgp_mobile.dylib \
     --language swift --out-dir ../bindings
 ```
