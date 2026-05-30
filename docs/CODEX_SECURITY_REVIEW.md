@@ -82,6 +82,14 @@
 - **Current code:** `.github/workflows/stable-build-release.yml` uses `workflow_dispatch.source_ref` for checkout under `contents: write`, `id-token: write`, and `attestations: write`; `publish-stable-release` creates the release after the build/audit jobs complete.
 - **Fix:** formal stable publication should be tag-push only. Keep `workflow_dispatch` only for dry-run or validation that cannot create the official release, and add a guard that the checked-out `HEAD` equals the peeled stable tag commit.
 
+## [open] CA-08: Edge release publication is not gated on Rust audit
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/9b57feaa6750819185da3adea4e4b205 — Codex severity **medium** · user-confirmed **real for edge, pending fix**
+- **Verified real, narrowed to edge/drill releases.** Stable publication is already gated because `publish-stable-release` depends on `rust-dependency-audit`. The edge workflow still runs `rust-dependency-audit` and `publish-edge-release` as independent jobs, so the edge publish job can create the tag, upload assets, and publish the prerelease even if `cargo audit --deny warnings` fails.
+- **Impact:** public edge/drill XCFramework prerelease assets can be published from a workflow run whose Rust dependency audit failed. This does not affect formal stable/App Store publication, but it weakens the prerelease supply-chain signal.
+- **Current code:** `.github/workflows/xcframework-edge-release.yml` defines `rust-dependency-audit` and `publish-edge-release` without a `needs` relationship; `.github/workflows/stable-build-release.yml` already uses the intended gated shape for stable release publication.
+- **Fix:** make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before any tag/release creation or asset upload.
+
 ## [open] CA-18: Drill release verification command needs shell-safe source refs
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484 — Codex severity **medium** · user-confirmed **low-impact hardening, pending fix**
