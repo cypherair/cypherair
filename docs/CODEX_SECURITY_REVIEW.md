@@ -66,6 +66,30 @@
 - **Current code:** `ContactImportMatcher.candidateMatch` computes the candidate; `ContactSnapshotMutator.addContact` stores the new identity/key; `ContactService.importResult` returns `.addedWithCandidate`; `ContactImportWorkflow.importContact` treats `.addedWithCandidate` like `.added`; `ContactRecipientResolver.publicKeysForRecipientContactIDs` resolves the selected contact ID's preferred key.
 - **Fix idea:** preserve duplicate identities if that remains product policy, but surface the candidate conflict before/at import success and offer an explicit merge/review path. If product policy should be stricter, stage or block conflicting imports until the user chooses how to handle the existing contact.
 
+## [open] CA-02: Release build token scope is too broad
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d — Codex severity **high** · user-confirmed **real, pending fix**
+- **Verified real, with narrowed scope.** The core issue is stable/edge release XCFramework builds passing `GH_TOKEN` to the whole `./build-xcframework.sh --release` step, so Cargo build scripts, proc macros, and `cargo run` helpers can inherit the release job token. PR/nightly read-token exposure is lower impact and not the main risk.
+- **Impact:** if release builds run untrusted or compromised build code, that code can read a write-capable workflow token during artifact production. No app-runtime or end-user exploit is implied; this is a release supply-chain hardening issue.
+- **Current code:** `.github/workflows/stable-build-release.yml` and `.github/workflows/xcframework-edge-release.yml` set write-class workflow permissions and pass `GH_TOKEN` to the XCFramework build step; `.github/workflows/pr-checks.yml` and `.github/workflows/nightly-full.yml` also pass read-scoped tokens; `scripts/build_apple_arm64e_xcframework.sh` invokes `gh`, `cargo build`, and `cargo run` in the inherited environment.
+- **Fix:** only provide GitHub tokens to the `gh release list/download` calls that need them, and clear `GH_TOKEN` / `GITHUB_TOKEN` from Cargo/build subprocess environments.
+
+## [open] CA-05: Stable release dispatch can decouple source ref from stable tag
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/893e12c4d22c8191afba18916328b86d — Codex severity **high** · user-confirmed **real, pending fix**
+- **Verified real.** The manual stable release path accepts both `release_tag` and `source_ref`, checks out `source_ref`, and validates tag spelling plus project version/build, but does not prove the checkout `HEAD` is the stable tag commit.
+- **Impact:** a user or attacker with workflow-dispatch authority could build and publish stable release assets from one ref under a different stable tag's release page, weakening provenance for the XCFramework, source bundle, and compliance artifacts. This is not an arbitrary fork-PR path.
+- **Current code:** `.github/workflows/stable-build-release.yml` uses `workflow_dispatch.source_ref` for checkout under `contents: write`, `id-token: write`, and `attestations: write`; `publish-stable-release` creates the release after the build/audit jobs complete.
+- **Fix:** formal stable publication should be tag-push only. Keep `workflow_dispatch` only for dry-run or validation that cannot create the official release, and add a guard that the checked-out `HEAD` equals the peeled stable tag commit.
+
+## [open] CA-18: Drill release verification command needs shell-safe source refs
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484 — Codex severity **medium** · user-confirmed **low-impact hardening, pending fix**
+- **Verified low impact.** Edge/drill release notes render a copyable `gh attestation verify ... --source-ref "$RELEASE_SOURCE_REF"` command. A drill branch name containing shell metacharacters can be expanded if a developer copies that command into a shell.
+- **Impact:** this does not execute in GitHub Actions and does not affect app users. It only affects manual verification of drill artifacts, but project docs explicitly tell reviewers to use the ref-pinned command from drill release notes.
+- **Current code:** `.github/workflows/xcframework-edge-release.yml` writes `RELEASE_SOURCE_REF` into release metadata and the release-notes verification command; `docs/XCFRAMEWORK_RELEASES.md` directs drill-release verification to use the exact command rendered in release notes.
+- **Fix:** render shell-safe quoted source refs in release notes, or restrict drill source refs to a safe character set before publishing notes.
+
 ## [open] Unbounded armored text import can exhaust memory
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/792eaf5ba0488191a3b45e9651c6162c — Codex severity **medium** · assessed **real-low (one sub-claim is a false positive)**
