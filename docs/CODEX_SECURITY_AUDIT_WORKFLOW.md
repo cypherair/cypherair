@@ -19,7 +19,9 @@ rows from line numbers.
 
 ## Round Layout
 
-Each round gets a local, git-excluded directory under the repository root:
+Each round gets a repository-local directory under the repository root. For
+durable audit rounds, commit the round directory to the current audit branch so
+the evidence survives machine resets and can be resumed from another checkout.
 
 ```text
 .codex-audit/round-NNN/
