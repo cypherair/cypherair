@@ -81,12 +81,6 @@ There is currently no dedicated visionOS XCTest test plan. Native visionOS valid
 
 For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see @docs/TESTING.md.
 
-## Xcode MCP
-
-Xcode MCP provides access to Apple Developer Documentation search. When it is
-available in the current agent session, use `DocumentationSearch` to query Apple
-documentation.
-
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession. Custom app URL scheme handling (`cypherair://`) is permitted — it is local IPC, not network access.
