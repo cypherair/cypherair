@@ -90,6 +90,14 @@
 - **Current code:** `.github/workflows/xcframework-edge-release.yml` defines `rust-dependency-audit` and `publish-edge-release` without a `needs` relationship; `.github/workflows/stable-build-release.yml` already uses the intended gated shape for stable release publication.
 - **Fix:** make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before any tag/release creation or asset upload.
 
+## [open] CA-09: Contact certification needs an explicit trust model
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/784c0115a134819188d3ebac0d5d8ac3 — Codex severity **medium** · user-confirmed **Medium, standalone trust-model follow-up**
+- **Verified real as a trust-semantics issue.** The certification workflow can save any cryptographically valid certification artifact from the candidate signer set, including unverified contacts, and the projection then displays a green `Certified` state in the contact Trust UI. This does not change manual fingerprint verification or recipient selection.
+- **Impact:** misleading local trust metadata. A user may read `Certified` as trusted endorsement even when the signer is merely a known but untrusted contact, or when the artifact is only a self-certification-like structure.
+- **Current code:** `Sources/Services/CertificateSignatureService.swift` (`candidateSignerCertificates`, artifact validation); `Sources/Services/ContactSnapshotMutator.swift` (`saveCertificationArtifact`, `recomputeCertificationProjections`); `Sources/App/Contacts/ContactDetailView.swift` / `ContactKeySummaryView.swift` (`Certified` Trust UI).
+- **Fix:** handle separately as a Contacts/OpenPGP trust-model design item. `Certified` should mean trusted certification, while ordinary valid certification signatures should use neutral UI. Self-certification should not trigger contact-level trusted certification.
+
 ## [open] CA-11: Local reset must fail closed when app-session auth is unavailable
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663 — Codex severity **medium** · user-confirmed **real, low impact, pending fix**
@@ -146,6 +154,14 @@
 - **Impact:** trust UI correctness bug, not a cryptographic verification bypass. The visible signature section can be read as applying to the visible output even when it came from a different mode's result.
 - **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`decryptedText`, `decryptedFileURL`, shared `detailedSignatureVerification`, `decryptText`, `decryptFile`); `Sources/App/Decrypt/DecryptView.swift` (mode-gated output sections plus shared signature section).
 - **Fix:** model text and file results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
+
+## [open] CA-41: Tutorial contacts open should be idempotent while opening
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/703d8b5d0ad48191abf6a936394d174e — Codex severity **informational** · user-confirmed **low-priority pending fix**
+- **Verified as a narrow tutorial reliability race.** Rapid repeated tutorial module opens can start more than one contacts-domain open while the tutorial sandbox is still `.opening`. A later failure can clean up the active tutorial container.
+- **Impact:** disposable tutorial sandbox availability only. Real keys, contacts, settings, exports, temporary files, and private-key security assets are isolated from the tutorial sandbox.
+- **Current code:** `Sources/App/Onboarding/TutorialSessionStore.swift` (`openModule`, `openContactsIfNeeded`); `Sources/App/Onboarding/TutorialSandboxContainer.swift` (`openContactsIfNeeded`); `Sources/Services/ContactService.swift` (`openContactsAfterPostUnlock`).
+- **Fix:** when tutorial contacts are opening, either disable repeated module opens in the UI or cache/reuse one in-flight contacts-open task in `TutorialSandboxContainer`.
 
 ## [open] CA-42: Decrypt/Verify text input section recreation dismisses keyboard during edits
 
