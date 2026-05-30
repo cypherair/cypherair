@@ -19,10 +19,10 @@ rows from line numbers.
 
 ## Round Layout
 
-Each round gets a new temporary directory:
+Each round gets a local, git-excluded directory under the repository root:
 
 ```text
-/private/tmp/cypherair-codex-audit-round2/
+.codex-audit/round-NNN/
   round-index.md
   cluster-a/
     investigator.md
