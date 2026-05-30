@@ -16,10 +16,11 @@ GENERATED_BINDINGS_DIR="$CARGO_TARGET_DIR/apple-arm64e-generated-bindings"
 STAGE1_CACHE_DIR="$CARGO_TARGET_DIR/apple-arm64e-stage1"
 
 STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
-NIGHTLY_TOOLCHAIN="${NIGHTLY_TOOLCHAIN:-nightly}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-latest}"
+ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
 ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
 ARM64E_RUSTC="${ARM64E_RUSTC:-}"
@@ -27,6 +28,12 @@ ARM64E_RUST_STAGE1_MANIFEST="${ARM64E_RUST_STAGE1_MANIFEST:-}"
 ARM64E_DEPENDENCY_FRESHNESS_LEVEL="${ARM64E_DEPENDENCY_FRESHNESS_LEVEL:-warn}"
 MANIFEST_BACKUP="$MANIFEST.bak.apple-arm64e-build"
 MANIFEST_BACKUP_CREATED=0
+ARM64E_PREBUILT_STD_TARGETS=(
+    arm64e-apple-darwin
+    arm64e-apple-ios
+    arm64e-apple-tvos
+    arm64e-apple-visionos
+)
 
 BUILD_MODE="${1:---release}"
 if [ "$BUILD_MODE" = "--debug" ]; then
@@ -85,10 +92,12 @@ ensure_rustup_target() {
 }
 
 latest_stage1_release_tag() {
+    local prefix="$ARM64E_STAGE1_RELEASE_PREFIX"
     gh release list \
         --repo "$ARM64E_RUST_REPOSITORY" \
+        --limit 100 \
         --json tagName,isPrerelease,publishedAt \
-        --jq '[.[] | select(.isPrerelease and (.tagName | startswith("rust-arm64e-stage1-")))] | sort_by(.publishedAt) | last | .tagName'
+        --jq '[.[] | select(.isPrerelease and (.tagName | startswith("'"$prefix"'")))] | sort_by(.publishedAt) | last | .tagName'
 }
 
 download_stage1_toolchain() {
@@ -100,7 +109,7 @@ download_stage1_toolchain() {
         tag="$(latest_stage1_release_tag)"
     fi
     if [ -z "$tag" ] || [ "$tag" = "null" ]; then
-        echo "error: unable to discover a rust-arm64e-stage1 prerelease in $ARM64E_RUST_REPOSITORY" >&2
+        echo "error: unable to discover a ${ARM64E_STAGE1_RELEASE_PREFIX} prerelease in $ARM64E_RUST_REPOSITORY" >&2
         exit 1
     fi
 
@@ -125,6 +134,53 @@ download_stage1_toolchain() {
     ARM64E_STAGE1_DIR="$STAGE1_CACHE_DIR/toolchain/stage1-arm64e-patch"
     ARM64E_RUST_STAGE1_MANIFEST="$STAGE1_CACHE_DIR/download/rust-stage1-arm64e-apple-darwin.json"
     export ARM64E_RUST_STAGE1_RELEASE_TAG="$tag"
+}
+
+validate_stage1_manifest() {
+    if [ -z "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
+        return
+    fi
+    if [ ! -f "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
+        echo "error: arm64e stage1 manifest is missing: $ARM64E_RUST_STAGE1_MANIFEST" >&2
+        exit 1
+    fi
+
+    "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
+import json
+import sys
+
+manifest_path = sys.argv[1]
+release_prefix = sys.argv[2]
+required_targets = set(sys.argv[3:])
+
+with open(manifest_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+errors = []
+if payload.get("stableBaseRelease") != "1.96.0":
+    errors.append("stableBaseRelease must be 1.96.0")
+if payload.get("stableBaseCommit") != "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96":
+    errors.append("stableBaseCommit must be ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96")
+if payload.get("requiresBuildStd") is not False:
+    errors.append("requiresBuildStd must be false")
+
+release_tag = str(payload.get("releaseTag") or "")
+if release_tag and not release_tag.startswith(release_prefix):
+    errors.append(f"releaseTag must start with {release_prefix}")
+
+included_targets = payload.get("includedPrebuiltStdTargets")
+if not isinstance(included_targets, list):
+    errors.append("includedPrebuiltStdTargets must be present")
+else:
+    missing = sorted(required_targets.difference(str(target) for target in included_targets))
+    if missing:
+        errors.append("includedPrebuiltStdTargets missing: " + ", ".join(missing))
+
+if errors:
+    for error in errors:
+        print(f"error: {error}", file=sys.stderr)
+    sys.exit(1)
+PY
 }
 
 resolve_arm64e_rustc() {
@@ -159,7 +215,8 @@ resolve_arm64e_rustc() {
 ensure_arm64e_stage1_payload() {
     local host_triple
     local host_libdir
-    local rust_src_dir
+    local target
+    local target_libdir
 
     host_triple="$("$ARM64E_RUSTC" -vV | sed -n 's/^host: //p')"
     if [ -z "$host_triple" ]; then
@@ -175,7 +232,7 @@ error: arm64e stage1 toolchain is missing host std/proc_macro for ${host_triple}
 Cargo compiles build scripts and proc macros for the host even when the final
 crate target is arm64e. Rebuild or republish the Rust fork stage1 with:
 
-    python3 x.py build compiler/rustc library/std library/proc_macro --stage 1 --target ${host_triple},arm64e-apple-darwin
+    python3 x.py build compiler/rustc library/std library/proc_macro --stage 1 --target ${host_triple},arm64e-apple-darwin,arm64e-apple-ios,arm64e-apple-tvos,arm64e-apple-visionos
 
 Then relink the rebuilt stage1 directory or use ARM64E_STAGE1_FORCE_DOWNLOAD=1
 with a prerelease that includes host std.
@@ -183,12 +240,16 @@ EOF
         exit 1
     fi
 
-    rust_src_dir="$("$ARM64E_RUSTC" --print sysroot)/lib/rustlib/src/rust"
-    if [ ! -d "$rust_src_dir/library" ]; then
-        echo "error: arm64e stage1 toolchain is missing rust-src at $rust_src_dir" >&2
-        echo "       cargo -Zbuild-std needs the Rust library sources for arm64e targets." >&2
-        exit 1
-    fi
+    for target in "${ARM64E_PREBUILT_STD_TARGETS[@]}"; do
+        target_libdir="$("$ARM64E_RUSTC" --print target-libdir --target "$target")"
+        if ! compgen -G "$target_libdir/libstd-*.rlib" >/dev/null; then
+            echo "error: arm64e stage1 toolchain is missing prebuilt std for ${target} at ${target_libdir}" >&2
+            echo "       republish the stable196 Rust fork stage1 with prebuilt std payloads." >&2
+            exit 1
+        fi
+    done
+
+    validate_stage1_manifest
 }
 
 normalize_generated_text_file() {
@@ -240,7 +301,7 @@ build_rust_artifact() {
         env \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
             RUSTC="$ARM64E_RUSTC" \
-            cargo +"$NIGHTLY_TOOLCHAIN" build --locked -Zbuild-std "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
+            cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     else
         env \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
@@ -271,12 +332,12 @@ combine_archives() {
 }
 
 cleanup_target_specific_dylibs() {
-    find "$CARGO_TARGET_DIR" -path "*/$BUILD_DIR/libpgp_mobile.dylib" -delete 2>/dev/null || true
+    find "$CARGO_TARGET_DIR" -type f -name "libpgp_mobile.dylib" -delete 2>/dev/null || true
 }
 
 assert_no_target_specific_dylibs() {
     local stale
-    stale="$(find "$CARGO_TARGET_DIR" -path "*/$BUILD_DIR/libpgp_mobile.dylib" -print 2>/dev/null || true)"
+    stale="$(find "$CARGO_TARGET_DIR" -type f -name "libpgp_mobile.dylib" -print 2>/dev/null || true)"
     if [ -n "$stale" ]; then
         echo "error: stale target-specific dylibs found:" >&2
         printf '%s\n' "$stale" >&2
@@ -296,7 +357,7 @@ generate_bindings() {
     env \
         CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
         RUSTC="$ARM64E_RUSTC" \
-        cargo +"$NIGHTLY_TOOLCHAIN" build --locked -Zbuild-std "${CARGO_FLAGS[@]}" --target arm64e-apple-darwin --manifest-path "$MANIFEST"
+        cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" --target arm64e-apple-darwin --manifest-path "$MANIFEST"
 
     mv "$MANIFEST_BACKUP" "$MANIFEST"
     MANIFEST_BACKUP_CREATED=0
@@ -311,7 +372,7 @@ generate_bindings() {
         cd "$REPO_ROOT/pgp-mobile"
         env \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
-            cargo +"$NIGHTLY_TOOLCHAIN" run --locked "${CARGO_FLAGS[@]}" --bin uniffi-bindgen generate \
+            cargo +"$STABLE_TOOLCHAIN" run --locked "${CARGO_FLAGS[@]}" --bin uniffi-bindgen generate \
                 --library "$host_dylib" \
                 --language swift \
                 --out-dir "$GENERATED_BINDINGS_DIR"
@@ -369,7 +430,7 @@ verify_xcframework() {
     if [ -n "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
         metadata_args+=(--rust-stage1-manifest "$ARM64E_RUST_STAGE1_MANIFEST")
     fi
-    python3 "$SCRIPT_DIR/arm64e_release_metadata.py" "${metadata_args[@]}"
+    "$PYTHON_BIN" "$SCRIPT_DIR/arm64e_release_metadata.py" "${metadata_args[@]}"
 
     while IFS= read -r lib_path; do
         echo "=== $lib_path ==="
@@ -387,10 +448,9 @@ require_command rustup
 require_command lipo
 require_command xcodebuild
 require_command bsdtar
+require_command "$PYTHON_BIN"
 
 ensure_toolchain "$STABLE_TOOLCHAIN"
-ensure_toolchain "$NIGHTLY_TOOLCHAIN"
-ensure_component "$NIGHTLY_TOOLCHAIN" rust-src
 resolve_arm64e_rustc
 ensure_arm64e_stage1_payload
 

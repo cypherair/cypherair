@@ -91,7 +91,7 @@ def rebuild_command_for_target(target: str) -> str:
     if target.startswith("arm64e-"):
         return (
             "RUSTC=/path/to/stage1-arm64e-patch/bin/rustc "
-            f"cargo +nightly build --release -Zbuild-std --target {target} "
+            f"cargo +stable build --release --target {target} "
             "--manifest-path pgp-mobile/Cargo.toml"
         )
     return f"cargo +stable build --release --target {target} --manifest-path pgp-mobile/Cargo.toml"

@@ -178,7 +178,7 @@ If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, trea
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` `rust-arm64e-stage1-*` prerelease instead of relying on local `stage1-arm64e-patch` state. Use `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or a rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
+- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` `rust-arm64e-stage1-stable196-*` prerelease instead of relying on local `stage1-arm64e-patch` state. Use `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or a rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - For route ownership, launch, tutorial-host, or macOS UI workflow changes, also run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted smoke subset.
 
