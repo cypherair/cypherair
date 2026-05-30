@@ -179,6 +179,13 @@ uses those public bindings to locate Security-owned handles and populate a
 sanitized in-memory recovery report for hidden/test keys; the report is not a
 UI surface and does not persist or expose Apple locators.
 
+Phase 4C closes the public-artifact export boundary for hidden/test custody
+keys. `exportPublicKey` armors the stored public certificate, and
+`exportRevocationCertificate` armors the stored key-level revocation packet.
+Secure Enclave custody private-key backup/export fails closed with a shared
+unavailable category before software bundle unwrap, and a missing stored
+revocation artifact is reported unavailable rather than lazily regenerated.
+
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256
 public key plus the PKESK ephemeral public key; tests supply a software OpenSSL

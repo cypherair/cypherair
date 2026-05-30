@@ -234,7 +234,11 @@ Recommended PR grouping:
   hidden metadata and all app-owned custody handles, while startup/load
   classification does not silently delete orphan handles.
 - PR 4C: add public certificate and revocation artifact export coverage for
-  generated hidden keys.
+  generated hidden keys. **Implemented:** hidden Secure Enclave custody public
+  certificates export from stored public material, stored key-level revocation
+  artifacts export without private-key access, missing revocation artifacts fail
+  closed, and Secure Enclave custody private-key backup/export remains
+  unsupported.
 
 Entry conditions:
 

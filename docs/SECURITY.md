@@ -186,6 +186,15 @@ fingerprints, public key bytes, digests, signatures, plaintext, or temp paths.
 Startup/load classification does not delete orphan handles; Reset All Local
 Data remains the cleanup path for app-owned custody rows.
 
+Phase 4C closes public and revocation export coverage for hidden custody
+identities. Public-key export uses only stored public certificate bytes, and
+revocation export uses only the stored key-level revocation signature packet.
+Missing Secure Enclave custody revocation artifacts fail closed with a sanitized
+unavailable category; export does not try to re-sign, unwrap software bundles, or
+backfill from private material. Secure Enclave custody private-key backup/export
+is explicitly unsupported and must not touch the legacy `se-key` / `salt` /
+`sealed-key` bundle path.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

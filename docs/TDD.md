@@ -127,7 +127,11 @@ Security handles by public binding, and maintaining only a sanitized in-memory
 metadata/handle recovery report. The report classifies public material,
 revocation artifact, handle availability, metadata association, and inventory
 failures through shared categories without persisting locators or deleting
-startup orphan handles.
+startup orphan handles. Phase 4C closes public-artifact export behavior:
+public-key export armors stored public certificate bytes, revocation export
+armors the stored key-level revocation packet, missing Secure Enclave revocation
+artifacts fail closed, and private-key backup/export remains unsupported for
+Secure Enclave custody.
 
 ### 1.4 Encryption Format Auto-Selection
 
