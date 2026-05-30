@@ -58,6 +58,14 @@
 - **Current code:** `Sources/App/Contacts/ImportConfirmationCoordinator.swift` (`present()`, `confirmVerified`/`confirmUnverified` vs local-capture `onCancel`); `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift` + `AppSceneIncomingURLRouter` (URL caller); `Sources/App/Contacts/AddContactView.swift` (in-app caller); shared host in `CypherAirApp.swift`; warning suppression at `Sources/App/Encrypt/EncryptScreenModel.swift`.
 - **Fix:** Verify/Add + Add-Unverified button closures should capture the **displayed** request's callbacks (from the sheet closure parameter), matching `onCancel` and the pre-refactor pattern; and/or make `present()` refuse/queue while a request is pending. Add a regression test (`present(A); present(B);` then the sheet-bound verify action).
 
+## [open] CA-01: Duplicate-contact conflict warning is dropped on import
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2 — Codex severity **high** · assessed **real, needs UI/workflow fix**
+- **Verified real, but narrower than the report headline.** A same-email or same-User-ID public-key import with a different fingerprint is intentionally stored as a **separate contact identity**, not as an overwrite of the existing contact. The app already computes `ContactCandidateMatch` and returns `.addedWithCandidate`, but `ContactImportWorkflow` collapses that result into ordinary success and never shows the conflict/candidate warning in the import confirmation flow.
+- **Impact:** a spoofed duplicate contact can appear next to the legitimate contact with the expected display name/email. Future encryption only targets the attacker key if the user selects that duplicate contact row; unverified imports still get unverified-recipient warnings. This is a duplicate-recipient/conflict-warning gap, not automatic key takeover.
+- **Current code:** `ContactImportMatcher.candidateMatch` computes the candidate; `ContactSnapshotMutator.addContact` stores the new identity/key; `ContactService.importResult` returns `.addedWithCandidate`; `ContactImportWorkflow.importContact` treats `.addedWithCandidate` like `.added`; `ContactRecipientResolver.publicKeysForRecipientContactIDs` resolves the selected contact ID's preferred key.
+- **Fix idea:** preserve duplicate identities if that remains product policy, but surface the candidate conflict before/at import success and offer an explicit merge/review path. If product policy should be stricter, stage or block conflicting imports until the user chooses how to handle the existing contact.
+
 ## [open] Unbounded armored text import can exhaust memory
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/792eaf5ba0488191a3b45e9651c6162c — Codex severity **medium** · assessed **real-low (one sub-claim is a false positive)**
