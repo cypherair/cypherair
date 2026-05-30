@@ -98,6 +98,14 @@
 - **Current code:** `Sources/Services/CertificateSignatureService.swift` (`candidateSignerCertificates`, artifact validation); `Sources/Services/ContactSnapshotMutator.swift` (`saveCertificationArtifact`, `recomputeCertificationProjections`); `Sources/App/Contacts/ContactDetailView.swift` / `ContactKeySummaryView.swift` (`Certified` Trust UI).
 - **Fix:** handle separately as a Contacts/OpenPGP trust-model design item. `Certified` should mean trusted certification, while ordinary valid certification signatures should use neutral UI. Self-certification should not trigger contact-level trusted certification.
 
+## [open] CA-10: Orphan root-secret cleanup can race first-domain creation
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/9fd5a847678881918e0eea9cbdfc2e77 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
+- **Verified real but low probability.** `ProtectedDataFirstDomainSharedRightCleaner` decides whether a root secret is orphaned from a caller-provided registry snapshot, then deletes the persisted root secret without reloading the current registry or serializing with registry mutations. A stale empty-registry snapshot could race a first-domain transaction after the root secret is saved but before domain artifacts are staged.
+- **Impact:** local ProtectedData availability/recovery risk, not disclosure or authentication bypass. Normal first app authentication appears mostly serialized; practical reachability requires unusual fresh/reset first-domain task interleaving around protected settings or other ProtectedData access.
+- **Current code:** `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift` (`cleanupOrphanedSharedRightIfSafe`); `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift` (`performCreateDomainTransaction`); `Sources/Security/ProtectedData/PrivateKeyControlStore.swift` and `ProtectedSettingsStore.swift` first-domain bootstrap paths.
+- **Fix:** before deleting a supposedly orphaned root secret, reload current registry under the registry mutation gate or equivalent serialized operation. Abort cleanup if current registry has a pending mutation, committed membership, or ready shared-resource state.
+
 ## [open] CA-11: Local reset must fail closed when app-session auth is unavailable
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663 — Codex severity **medium** · user-confirmed **real, low impact, pending fix**
