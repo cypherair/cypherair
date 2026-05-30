@@ -83,6 +83,12 @@ There is currently no dedicated visionOS XCTest test plan. Native visionOS valid
 
 For the full Rust artifact refresh, UniFFI/bindings sync, XCFramework linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
+## Xcode MCP
+
+Xcode MCP provides access to Apple Developer Documentation search. When it is
+available in the current agent session, use `DocumentationSearch` to query Apple
+documentation.
+
 For formal stable releases and App Store candidate archives, read
 `docs/APP_RELEASE_PROCESS.md` before acting. Stable releases are tag-first:
 the `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>` tag must
