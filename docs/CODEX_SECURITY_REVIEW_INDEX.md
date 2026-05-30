@@ -11,25 +11,28 @@
 - Keep the original CSV untouched.
 - Use this file as the scheduling/status index, not as the detailed evidence log.
 - Record confirmed real follow-ups in `docs/CODEX_SECURITY_REVIEW.md`.
+- Record user decisions explicitly in `Status`; use `Notes` for the rationale.
 - Close false positives or by-design findings in Codex only after user review.
 - For sub-agent calibration, use one investigator and then one adversarial reviewer.
 - Sub-agent defaults for this audit: `explorer`, `gpt-5.5`, `xhigh`, `priority`, `fork_context: false`.
-- Do not re-audit `recorded -> PR #401` findings unless their status changes.
+- Do not re-audit `recorded -> PR #401` / `user-confirmed-real -> PR #401` findings unless their status changes.
 
 ## Status Values
 
-- `to-check`
-- `under-review`
-- `needs-user-decision`
-- `recorded -> PR #401`
-- `closed-FP/by-design`
-- `fixed`
+- `to-check`: not started.
+- `under-review`: currently being checked.
+- `needs-user-decision`: evidence has been synthesized and is waiting for user decision.
+- `recorded -> PR #401`: previously accepted real finding already recorded in the review log.
+- `user-confirmed-real -> PR #401`: user accepted as real / fix-worthy and it is recorded for later fix.
+- `user-confirmed-FP -> close in Codex`: user confirmed false positive; close/dismiss in Codex.
+- `user-confirmed-by-design -> close in Codex`: user confirmed intended behavior; close/dismiss in Codex.
+- `fixed`: code/docs fix has landed and the finding can be closed as fixed.
 
 ## Findings
 
 | ID | Severity | Area | Status | Batch | Title | Link | Relevant Paths | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CA-01 | high | contact-import | recorded -> PR #401 | calibration-1 | Spoofed duplicate contacts bypass key-update warning | [finding](https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2) | `Sources/Services/ContactService.swift`<br>`Sources/App/Contacts/Import/ContactImportWorkflow.swift` | User decision: record for later fix as duplicate-contact conflict warning gap. |
+| CA-01 | high | contact-import | user-confirmed-real -> PR #401 | calibration-1 | Spoofed duplicate contacts bypass key-update warning | [finding](https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2) | `Sources/Services/ContactService.swift`<br>`Sources/App/Contacts/Import/ContactImportWorkflow.swift` | User decision: record for later fix as duplicate-contact conflict warning gap. |
 | CA-02 | high | ci-supply-chain | to-check | pending | GH_TOKEN exposed to entire XCFramework build | [finding](https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d) | `github/workflows/pr-checks.yml`<br>`github/workflows/stable-build-release.yml`<br>`github/workflows/xcframework-edge-release.yml`<br>`scripts/build_apple_arm64e_xcframework.sh` |  |
 | CA-03 | high | ci-supply-chain | to-check | pending | Release builds trust mutable arm64e compiler prereleases | [finding](https://chatgpt.com/codex/cloud/security/findings/f2e7648c09e08191ad848e57aeee7474) | `github/workflows/stable-build-release.yml`<br>`github/workflows/xcframework-edge-release.yml`<br>`scripts/build_apple_arm64e_xcframework.sh` |  |
 | CA-04 | high | release-provenance | to-check | pending | Candidate gate ignores untracked build inputs | [finding](https://chatgpt.com/codex/cloud/security/findings/0cb2d605ae5c8191b0842302245431ad) | `scripts/validate_app_store_candidate_release.py`<br>`scripts/tests/test_validate_app_store_candidate_release.py`<br>`CypherAir.xcodeproj/project.pbxproj`<br>`gitignore`<br>`scripts/generate_source_compliance_info.py` |  |
@@ -56,7 +59,7 @@
 | CA-25 | medium | key-import-memory | to-check | pending | macOS Argon2 guard treats total RAM as available | [finding](https://chatgpt.com/codex/cloud/security/findings/c56fc514b22481918273dc22faae7421) | `Sources/Security/Argon2idMemoryGuard.swift`<br>`Sources/Services/KeyManagementService.swift`<br>`pgp-mobile/src/keys.rs` |  |
 | CA-26 | medium | entitlements | to-check | pending | Enhanced Security entitlements renamed to ignored keys | [finding](https://chatgpt.com/codex/cloud/security/findings/5d51dc7622fc8191b9062c03230f5356) | `CypherAir.entitlements`<br>`docs/SECURITY.md`<br>`CypherAir.xcodeproj/project.pbxproj` |  |
 | CA-27 | medium | key-management-zeroization | to-check | pending | Secret key zeroization skipped on KMS helper failures | [finding](https://chatgpt.com/codex/cloud/security/findings/2a18f490890c8191afc9b8775a8ff2b3) | `Sources/Services/KeyManagementService.swift` |  |
-| CA-28 | medium | contact-import | closed-FP/by-design | calibration-1 | Hidden QR key can override pasted contact import | [finding](https://chatgpt.com/codex/cloud/security/findings/fbaae00c695881919aad5d01d8942311) | `Sources/App/Contacts/AddContactView.swift` | User decision: close in Codex as false positive; unrealistic QR/Paste timing and confirmation shows actual key. |
+| CA-28 | medium | contact-import | user-confirmed-FP -> close in Codex | calibration-1 | Hidden QR key can override pasted contact import | [finding](https://chatgpt.com/codex/cloud/security/findings/fbaae00c695881919aad5d01d8942311) | `Sources/App/Contacts/AddContactView.swift` | User decision: close in Codex as false positive; unrealistic QR/Paste timing and confirmation shows actual key. |
 | CA-29 | medium | decrypt-file-output | to-check | pending | Decrypted file can persist after cancelled/abandoned decrypt | [finding](https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6) | `Sources/App/Decrypt/DecryptView.swift`<br>`Sources/Services/DecryptionService.swift` |  |
 | CA-30 | medium | rust-streaming | to-check | pending | Predictable decrypt temp file enables plaintext and symlink attacks | [finding](https://chatgpt.com/codex/cloud/security/findings/536baf654b288191b275f2c4d4b9d32a) | `pgp-mobile/src/streaming.rs` |  |
 | CA-31 | medium | privacy-lifecycle | to-check | pending | Launch auth can show content before blur is enabled | [finding](https://chatgpt.com/codex/cloud/security/findings/6e6da113cfc481919d83defdc698e785) | `Sources/App/Common/PrivacyScreenModifier.swift`<br>`Sources/App/CypherAirApp.swift` |  |
