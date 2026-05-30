@@ -83,12 +83,6 @@ There is currently no dedicated visionOS XCTest test plan. Native visionOS valid
 
 For the full Rust artifact refresh, UniFFI/bindings sync, XCFramework linkage details, and Xcode validation workflow, see `docs/TESTING.md`.
 
-## Xcode MCP
-
-Xcode MCP provides access to Apple Developer Documentation search. When it is
-available in the current agent session, use `DocumentationSearch` to query Apple
-documentation.
-
 For formal stable releases and App Store candidate archives, read
 `docs/APP_RELEASE_PROCESS.md` before acting. Stable releases are tag-first:
 the `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>` tag must
@@ -226,6 +220,7 @@ After editing:
   work was started on `main` temporarily, create a branch to carry those changes
   before committing. Do not commit directly to `main` unless the user explicitly
   asks for that.
+- Commits should be signed. If the signing key is unavailable, ask the user to unlock it; do not create an unsigned commit.
 - When merging pull requests for this repository, prefer a regular merge commit by default. Do not squash-merge or rebase-merge unless the user explicitly asks for it.
 - Conventional commit prefixes are preferred:
   `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
