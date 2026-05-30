@@ -442,6 +442,7 @@ mod tests {
     use openpgp::crypto::Signer;
     use openpgp::parse::Parse;
     use openpgp::policy::StandardPolicy;
+    use openpgp::types::RevocationStatus;
 
     struct OracleSigningProvider {
         keypair: Mutex<openpgp::crypto::KeyPair>,
@@ -720,6 +721,25 @@ mod tests {
         assert_eq!(selectors.subkeys.len(), 1);
         parse_revocation_cert(&result.revocation_cert, &result.public_key_data)
             .expect("revocation should verify with public cert");
+        let revocation_packet = Packet::from_bytes(&result.revocation_cert)
+            .expect("revocation artifact should parse as one OpenPGP packet");
+        match &revocation_packet {
+            Packet::Signature(signature) => {
+                assert_eq!(signature.typ(), SignatureType::KeyRevocation);
+            }
+            other => panic!("revocation artifact should be a signature packet, got {other:?}"),
+        }
+        let (revoked_cert, _) = cert
+            .clone()
+            .insert_packets(vec![revocation_packet])
+            .expect("revocation artifact should merge into public cert");
+        assert!(
+            matches!(
+                revoked_cert.revocation_status(&policy, None),
+                RevocationStatus::Revoked(_)
+            ),
+            "merged revocation artifact should revoke the public cert"
+        );
 
         let inspection = inspect_secure_enclave_public_bindings(&result.public_key_data)
             .expect("Secure Enclave bindings should inspect");
