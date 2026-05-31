@@ -287,7 +287,7 @@ let accessControl = SecAccessControlCreateWithFlags(
 
 Face ID / Touch ID only. No passcode fallback. If biometrics are unavailable (sensor damaged, face obscured, biometry locked out after 5 failures), all private-key operations (decrypt, sign, export) are blocked until biometric auth is restored.
 
-Inspired by Apple's Stolen Device Protection: prevents a thief who has both the device and the passcode from accessing encrypted data.
+High Security protects private-key operations by requiring biometric authorization and denying device-passcode fallback. The current policy uses `.biometryAny`, so it does not invalidate keys merely because biometric enrollment changes.
 
 ### Mode Switching Procedure
 
