@@ -29,6 +29,7 @@ struct PrivacyScreenLifecycleGate {
     private var traceStore: AuthLifecycleTraceStore?
     private var appSessionCompletionPending = false
     private var operationPromptSettle: OperationPromptSettleState?
+    private var operationPromptSettleEligibleGeneration: UInt64?
     private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
     private var ignoredOperationGenerationThrough: UInt64 = 0
     private let operationPromptSettleWindow: TimeInterval
@@ -70,6 +71,7 @@ struct PrivacyScreenLifecycleGate {
     ) -> Bool {
         guard snapshot.generation > 0 else {
             operationPromptSettle = nil
+            operationPromptSettleEligibleGeneration = nil
             return false
         }
 
@@ -77,6 +79,7 @@ struct PrivacyScreenLifecycleGate {
 
         if snapshot.generation <= ignoredOperationGenerationThrough {
             clearOperationSettleIfCurrent(snapshot.generation)
+            clearOperationSettleEligibilityIfCurrent(snapshot.generation)
             return false
         }
 
@@ -90,9 +93,15 @@ struct PrivacyScreenLifecycleGate {
             return false
         }
 
+        guard operationPromptSettleEligibleGeneration == snapshot.generation else {
+            clearOperationSettleIfCurrent(snapshot.generation)
+            return false
+        }
+
         let expiresAt = lastEndedAt.addingTimeInterval(operationPromptSettleWindow)
         guard now() <= expiresAt else {
             clearOperationSettleIfCurrent(snapshot.generation)
+            clearOperationSettleEligibilityIfCurrent(snapshot.generation)
             ignoredOperationGenerationThrough = max(
                 ignoredOperationGenerationThrough,
                 snapshot.generation
@@ -131,6 +140,10 @@ struct PrivacyScreenLifecycleGate {
         operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
     ) -> PrivacyScreenLifecycleDecision {
         let operationPromptActive = refreshOperationPromptState(operationPrompt)
+
+        if operationPromptActive {
+            operationPromptSettleEligibleGeneration = operationPrompt.generation
+        }
 
         if isAuthenticating {
             armAppSessionCompletion()
@@ -199,6 +212,7 @@ struct PrivacyScreenLifecycleGate {
             )
         }
         operationPromptSettle = nil
+        operationPromptSettleEligibleGeneration = nil
         appSessionCompletionPending = false
         traceStore?.record(
             category: .lifecycle,
@@ -315,9 +329,17 @@ struct PrivacyScreenLifecycleGate {
         operationPromptSettle = nil
     }
 
+    private mutating func clearOperationSettleEligibilityIfCurrent(_ generation: UInt64) {
+        guard operationPromptSettleEligibleGeneration == generation else {
+            return
+        }
+        operationPromptSettleEligibleGeneration = nil
+    }
+
     private mutating func consumeOperationPromptSettle(generation: UInt64) {
         ignoredOperationGenerationThrough = max(ignoredOperationGenerationThrough, generation)
         operationPromptSettle = nil
+        clearOperationSettleEligibilityIfCurrent(generation)
     }
 
     private func traceLifecycleDecision(
