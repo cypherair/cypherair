@@ -186,15 +186,6 @@ fingerprints, public key bytes, digests, signatures, plaintext, or temp paths.
 Startup/load classification does not delete orphan handles; Reset All Local
 Data remains the cleanup path for app-owned custody rows.
 
-Phase 4C closes public and revocation export coverage for hidden custody
-identities. Public-key export uses only stored public certificate bytes, and
-revocation export uses only the stored key-level revocation signature packet.
-Missing Secure Enclave custody revocation artifacts fail closed with a sanitized
-unavailable category; export does not try to re-sign, unwrap software bundles, or
-backfill from private material. Secure Enclave custody private-key backup/export
-is explicitly unsupported and must not touch the legacy `se-key` / `salt` /
-`sealed-key` bundle path.
-
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
@@ -287,7 +278,7 @@ let accessControl = SecAccessControlCreateWithFlags(
 
 Face ID / Touch ID only. No passcode fallback. If biometrics are unavailable (sensor damaged, face obscured, biometry locked out after 5 failures), all private-key operations (decrypt, sign, export) are blocked until biometric auth is restored.
 
-Inspired by Apple's Stolen Device Protection: prevents a thief who has both the device and the passcode from accessing encrypted data.
+High Security protects private-key operations by requiring biometric authorization and denying device-passcode fallback. The current policy uses `.biometryAny`, so it does not invalidate keys merely because biometric enrollment changes.
 
 ### Mode Switching Procedure
 
