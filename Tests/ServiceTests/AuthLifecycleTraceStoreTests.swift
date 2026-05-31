@@ -438,6 +438,43 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(Set(promptBegins.compactMap { $0.metadata["promptID"] }).count, 2)
     }
 
+    func test_authenticationPromptCoordinator_operationPromptSessionGenerationTracksNestedPrompts() {
+        let coordinator = TraceAuthenticationPromptCoordinator()
+
+        let outerPrompt = coordinator.beginOperationPrompt(source: "trace.outer")
+        var snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 1)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 1)
+
+        let innerPrompt = coordinator.beginOperationPrompt(source: "trace.inner")
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 2)
+
+        coordinator.endOperationPrompt(innerPrompt)
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 1)
+        XCTAssertNil(snapshot.lastEndedAt)
+
+        coordinator.endOperationPrompt(outerPrompt)
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 0)
+        XCTAssertNotNil(snapshot.lastEndedAt)
+
+        let serialPrompt = coordinator.beginOperationPrompt(source: "trace.serial")
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 3)
+        XCTAssertEqual(snapshot.sessionGeneration, 3)
+        XCTAssertEqual(snapshot.depth, 1)
+        coordinator.endOperationPrompt(serialPrompt)
+    }
+
     func test_authenticationPromptCoordinator_recordsOperationPromptSuccessBoundaries() async throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)

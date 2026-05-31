@@ -22,6 +22,7 @@ private enum PrivacyScreenLifecycleSuppressionScope: String {
 struct PrivacyScreenLifecycleGate {
     private struct OperationPromptSettleState {
         let generation: UInt64
+        let sessionGeneration: UInt64
         let expiresAt: Date
         var didApplyTransientBlur: Bool
     }
@@ -29,7 +30,7 @@ struct PrivacyScreenLifecycleGate {
     private var traceStore: AuthLifecycleTraceStore?
     private var appSessionCompletionPending = false
     private var operationPromptSettle: OperationPromptSettleState?
-    private var operationPromptSettleEligibleGeneration: UInt64?
+    private var operationPromptSettleEligibleSessionGeneration: UInt64?
     private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
     private var ignoredOperationGenerationThrough: UInt64 = 0
     private let operationPromptSettleWindow: TimeInterval
@@ -69,17 +70,18 @@ struct PrivacyScreenLifecycleGate {
     private mutating func refreshOperationPromptState(
         _ snapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot
     ) -> Bool {
-        guard snapshot.generation > 0 else {
+        guard snapshot.generation > 0, snapshot.sessionGeneration > 0 else {
             operationPromptSettle = nil
-            operationPromptSettleEligibleGeneration = nil
+            operationPromptSettleEligibleSessionGeneration = nil
             return false
         }
 
         recordObservedOperationPromptIfNeeded(snapshot)
+        clearOperationSettleIfSuperseded(by: snapshot)
 
         if snapshot.generation <= ignoredOperationGenerationThrough {
             clearOperationSettleIfCurrent(snapshot.generation)
-            clearOperationSettleEligibilityIfCurrent(snapshot.generation)
+            clearOperationSettleEligibilityIfCurrentSession(snapshot.sessionGeneration)
             return false
         }
 
@@ -93,7 +95,7 @@ struct PrivacyScreenLifecycleGate {
             return false
         }
 
-        guard operationPromptSettleEligibleGeneration == snapshot.generation else {
+        guard operationPromptSettleEligibleSessionGeneration == snapshot.sessionGeneration else {
             clearOperationSettleIfCurrent(snapshot.generation)
             return false
         }
@@ -101,7 +103,7 @@ struct PrivacyScreenLifecycleGate {
         let expiresAt = lastEndedAt.addingTimeInterval(operationPromptSettleWindow)
         guard now() <= expiresAt else {
             clearOperationSettleIfCurrent(snapshot.generation)
-            clearOperationSettleEligibilityIfCurrent(snapshot.generation)
+            clearOperationSettleEligibilityIfCurrentSession(snapshot.sessionGeneration)
             ignoredOperationGenerationThrough = max(
                 ignoredOperationGenerationThrough,
                 snapshot.generation
@@ -111,15 +113,18 @@ struct PrivacyScreenLifecycleGate {
                 name: "gate.operationPromptSettle.expired",
                 metadata: [
                     "generation": String(snapshot.generation),
+                    "sessionGeneration": String(snapshot.sessionGeneration),
                     "ignoredThrough": String(ignoredOperationGenerationThrough)
                 ]
             )
             return false
         }
 
-        if operationPromptSettle?.generation != snapshot.generation {
+        if operationPromptSettle?.generation != snapshot.generation
+            || operationPromptSettle?.sessionGeneration != snapshot.sessionGeneration {
             operationPromptSettle = OperationPromptSettleState(
                 generation: snapshot.generation,
+                sessionGeneration: snapshot.sessionGeneration,
                 expiresAt: expiresAt,
                 didApplyTransientBlur: false
             )
@@ -128,6 +133,7 @@ struct PrivacyScreenLifecycleGate {
                 name: "gate.operationPromptSettle.arm",
                 metadata: [
                     "generation": String(snapshot.generation),
+                    "sessionGeneration": String(snapshot.sessionGeneration),
                     "expiresInSeconds": String(format: "%.3f", expiresAt.timeIntervalSince(now()))
                 ]
             )
@@ -142,7 +148,7 @@ struct PrivacyScreenLifecycleGate {
         let operationPromptActive = refreshOperationPromptState(operationPrompt)
 
         if operationPromptActive {
-            operationPromptSettleEligibleGeneration = operationPrompt.generation
+            operationPromptSettleEligibleSessionGeneration = operationPrompt.sessionGeneration
         }
 
         if isAuthenticating {
@@ -212,7 +218,7 @@ struct PrivacyScreenLifecycleGate {
             )
         }
         operationPromptSettle = nil
-        operationPromptSettleEligibleGeneration = nil
+        operationPromptSettleEligibleSessionGeneration = nil
         appSessionCompletionPending = false
         traceStore?.record(
             category: .lifecycle,
@@ -222,6 +228,7 @@ struct PrivacyScreenLifecycleGate {
                 "suppressed": "false",
                 "suppressionArmed": "false",
                 "suppressionScope": "none",
+                "operationSessionGeneration": String(operationPrompt.sessionGeneration),
                 "ignoredOperationGenerationThrough": String(ignoredOperationGenerationThrough)
             ]
         )
@@ -270,7 +277,7 @@ struct PrivacyScreenLifecycleGate {
             let decision: PrivacyScreenLifecycleDecision = settle.didApplyTransientBlur
                 ? .settleTransientBlur
                 : .suppress
-            consumeOperationPromptSettle(generation: settle.generation)
+            consumeOperationPromptSettle(settle)
             traceLifecycleDecision(
                 name: "gate.active",
                 decision: decision,
@@ -315,6 +322,7 @@ struct PrivacyScreenLifecycleGate {
             name: "gate.observeOperationAuthenticationAttempt",
             metadata: [
                 "generation": String(snapshot.generation),
+                "sessionGeneration": String(snapshot.sessionGeneration),
                 "depth": String(snapshot.depth),
                 "inProgress": snapshot.isInProgress ? "true" : "false",
                 "hasLastEndedAt": snapshot.lastEndedAt == nil ? "false" : "true"
@@ -329,17 +337,28 @@ struct PrivacyScreenLifecycleGate {
         operationPromptSettle = nil
     }
 
-    private mutating func clearOperationSettleEligibilityIfCurrent(_ generation: UInt64) {
-        guard operationPromptSettleEligibleGeneration == generation else {
+    private mutating func clearOperationSettleIfSuperseded(
+        by snapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot
+    ) {
+        guard let settle = operationPromptSettle,
+              snapshot.generation > settle.generation,
+              snapshot.sessionGeneration != settle.sessionGeneration else {
             return
         }
-        operationPromptSettleEligibleGeneration = nil
+        operationPromptSettle = nil
     }
 
-    private mutating func consumeOperationPromptSettle(generation: UInt64) {
-        ignoredOperationGenerationThrough = max(ignoredOperationGenerationThrough, generation)
+    private mutating func clearOperationSettleEligibilityIfCurrentSession(_ sessionGeneration: UInt64) {
+        guard operationPromptSettleEligibleSessionGeneration == sessionGeneration else {
+            return
+        }
+        operationPromptSettleEligibleSessionGeneration = nil
+    }
+
+    private mutating func consumeOperationPromptSettle(_ settle: OperationPromptSettleState) {
+        ignoredOperationGenerationThrough = max(ignoredOperationGenerationThrough, settle.generation)
         operationPromptSettle = nil
-        clearOperationSettleEligibilityIfCurrent(generation)
+        clearOperationSettleEligibilityIfCurrentSession(settle.sessionGeneration)
     }
 
     private func traceLifecycleDecision(

@@ -15,15 +15,31 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     struct OperationAuthenticationPromptSnapshot: Equatable, Sendable {
         static let idle = OperationAuthenticationPromptSnapshot(
             generation: 0,
+            sessionGeneration: 0,
             depth: 0,
             lastBeganAt: nil,
             lastEndedAt: nil
         )
 
         let generation: UInt64
+        let sessionGeneration: UInt64
         let depth: Int
         let lastBeganAt: Date?
         let lastEndedAt: Date?
+
+        init(
+            generation: UInt64,
+            sessionGeneration: UInt64? = nil,
+            depth: Int,
+            lastBeganAt: Date?,
+            lastEndedAt: Date?
+        ) {
+            self.generation = generation
+            self.sessionGeneration = sessionGeneration ?? generation
+            self.depth = depth
+            self.lastBeganAt = lastBeganAt
+            self.lastEndedAt = lastEndedAt
+        }
 
         var isInProgress: Bool {
             depth > 0
@@ -51,6 +67,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var operationPromptAttemptGenerationValue: UInt64 = 0
+    private var operationPromptSessionGenerationValue: UInt64 = 0
     private var lastOperationPromptBeganAt: Date?
     private var lastOperationPromptEndedAt: Date?
     private var nextPromptID: UInt64 = 1
@@ -86,6 +103,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         lock.withLock {
             OperationAuthenticationPromptSnapshot(
                 generation: operationPromptAttemptGenerationValue,
+                sessionGeneration: operationPromptSessionGenerationValue,
                 depth: operationPromptDepth,
                 lastBeganAt: lastOperationPromptBeganAt,
                 lastEndedAt: lastOperationPromptEndedAt
@@ -213,6 +231,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             privacyDepth: Int,
             operationDepth: Int,
             operationGeneration: UInt64,
+            operationSessionGeneration: UInt64,
             context: PromptTraceContext
         ) in
             let resolvedContext: PromptTraceContext
@@ -231,9 +250,13 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 privacyPromptDepth = privacyPromptStack.count
             case .operation:
                 if delta > 0 {
+                    let startsNewOperationSession = operationPromptStack.isEmpty
                     resolvedContext = makePromptTraceContext(kind: kind, source: source)
                     operationPromptStack.append(resolvedContext)
                     operationPromptAttemptGenerationValue &+= 1
+                    if startsNewOperationSession {
+                        operationPromptSessionGenerationValue = operationPromptAttemptGenerationValue
+                    }
                     lastOperationPromptBeganAt = timestamp
                     lastOperationPromptEndedAt = nil
                 } else {
@@ -249,7 +272,13 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 }
                 operationPromptDepth = operationPromptStack.count
             }
-            return (privacyPromptDepth, operationPromptDepth, operationPromptAttemptGenerationValue, resolvedContext)
+            return (
+                privacyPromptDepth,
+                operationPromptDepth,
+                operationPromptAttemptGenerationValue,
+                operationPromptSessionGenerationValue,
+                resolvedContext
+            )
         }
 
         traceStore?.record(
@@ -262,6 +291,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 "privacyDepth": String(snapshot.privacyDepth),
                 "operationDepth": String(snapshot.operationDepth),
                 "operationGeneration": String(snapshot.operationGeneration),
+                "operationSessionGeneration": String(snapshot.operationSessionGeneration),
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
