@@ -1217,14 +1217,36 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
 
     func test_privacyScreenLifecycleGate_recordsDecisionTagsWithoutChangingBehavior() {
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        var gate = TracePrivacyScreenLifecycleGate(traceStore: traceStore)
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 8_000)
+        var gate = TracePrivacyScreenLifecycleGate(
+            traceStore: traceStore,
+            now: { promptEndedAt.addingTimeInterval(0.1) }
+        )
+        let activePrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
+            generation: 1,
+            depth: 1,
+            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
+            lastEndedAt: nil
+        )
+        let endedPrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
+            lastEndedAt: promptEndedAt
+        )
 
         XCTAssertEqual(
-            gate.shouldHandleInactive(isAuthenticating: false, isOperationPromptInProgress: true),
+            gate.shouldHandleInactive(isAuthenticating: false, operationPrompt: activePrompt),
             .suppress
         )
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
+            .handle
+        )
 
         let names = traceStore.recentEntries.map(\.name)
         XCTAssertTrue(names.contains("gate.inactive"))
@@ -1233,7 +1255,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             traceStore.recentEntries.contains {
                 $0.name == "gate.inactive"
                     && $0.metadata["decision"] == "suppressed"
-                    && $0.metadata["suppressionScope"] == "promptLifecycle"
+                    && $0.metadata["suppressionScope"] == "operationPromptActive"
             }
         )
     }

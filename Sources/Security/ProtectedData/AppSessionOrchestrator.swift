@@ -130,6 +130,10 @@ final class AppSessionOrchestrator {
         authenticationPromptCoordinator.operationPromptAttemptGeneration
     }
 
+    var operationAuthenticationPromptSnapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot {
+        authenticationPromptCoordinator.operationAuthenticationPromptSnapshot
+    }
+
     var hasProtectedDataAuthorizationHandoffContext: Bool {
         pendingAuthenticatedContext != nil
     }

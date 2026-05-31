@@ -9,22 +9,39 @@ enum PrivacyScreenLifecycleDecision: String, Equatable {
 
 private enum PrivacyScreenLifecycleSuppressionScope: String {
     case appSessionCompletion
-    case promptLifecycle
+    case operationPromptActive
+    case operationPromptSettle
 }
 
 /// Filters transient resign/activate cycles caused by system biometric prompts
 /// so privacy re-auth runs only for real app resume events.
 ///
-/// The next activation can be suppressed either because an authentication
-/// attempt has just started, or because the system reported resign/inactive
-/// while the auth prompt was already in progress.
+/// Operation-prompt lifecycle suppression is deliberately bounded: a completed
+/// operation prompt can only influence lifecycle decisions during a short
+/// settle window, and real background transitions always win.
 struct PrivacyScreenLifecycleGate {
-    private var traceStore: AuthLifecycleTraceStore?
-    private var suppressionScope: PrivacyScreenLifecycleSuppressionScope?
-    private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
+    private struct OperationPromptSettleState {
+        let generation: UInt64
+        let expiresAt: Date
+        var didApplyTransientBlur: Bool
+    }
 
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
+    private var traceStore: AuthLifecycleTraceStore?
+    private var appSessionCompletionPending = false
+    private var operationPromptSettle: OperationPromptSettleState?
+    private var lastObservedOperationAuthenticationAttemptGeneration: UInt64 = 0
+    private var ignoredOperationGenerationThrough: UInt64 = 0
+    private let operationPromptSettleWindow: TimeInterval
+    private let now: () -> Date
+
+    init(
+        traceStore: AuthLifecycleTraceStore? = nil,
+        operationPromptSettleWindow: TimeInterval = 1.0,
+        now: @escaping () -> Date = Date.init
+    ) {
         self.traceStore = traceStore
+        self.operationPromptSettleWindow = operationPromptSettleWindow
+        self.now = now
     }
 
     mutating func attachTraceStore(_ traceStore: AuthLifecycleTraceStore?) {
@@ -32,74 +49,157 @@ struct PrivacyScreenLifecycleGate {
     }
 
     mutating func armForAuthenticationAttempt() {
-        armSuppression(scope: .appSessionCompletion)
+        armAppSessionCompletion()
     }
 
-    private mutating func armPromptLifecycleSuppression() {
-        armSuppression(scope: .promptLifecycle)
-    }
-
-    private mutating func armSuppression(scope: PrivacyScreenLifecycleSuppressionScope) {
-        suppressionScope = scope
+    private mutating func armAppSessionCompletion() {
+        appSessionCompletionPending = true
         traceStore?.record(
             category: .lifecycle,
             name: "gate.armForAuthenticationAttempt",
             metadata: [
                 "suppressed": "true",
-                "suppressionScope": scope.rawValue
+                "suppressionScope": PrivacyScreenLifecycleSuppressionScope.appSessionCompletion.rawValue
             ]
         )
     }
 
-    mutating func syncOperationAuthenticationAttemptGeneration(_ generation: UInt64) {
-        guard generation > lastObservedOperationAuthenticationAttemptGeneration else {
-            return
+    @discardableResult
+    private mutating func refreshOperationPromptState(
+        _ snapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot
+    ) -> Bool {
+        guard snapshot.generation > 0 else {
+            operationPromptSettle = nil
+            return false
         }
 
-        lastObservedOperationAuthenticationAttemptGeneration = generation
-        traceStore?.record(
-            category: .lifecycle,
-            name: "gate.observeOperationAuthenticationAttempt",
-            metadata: ["generation": String(generation)]
-        )
-        armPromptLifecycleSuppression()
+        recordObservedOperationPromptIfNeeded(snapshot)
+
+        if snapshot.generation <= ignoredOperationGenerationThrough {
+            clearOperationSettleIfCurrent(snapshot.generation)
+            return false
+        }
+
+        if snapshot.isInProgress {
+            clearOperationSettleIfCurrent(snapshot.generation)
+            return true
+        }
+
+        guard let lastEndedAt = snapshot.lastEndedAt else {
+            clearOperationSettleIfCurrent(snapshot.generation)
+            return false
+        }
+
+        let expiresAt = lastEndedAt.addingTimeInterval(operationPromptSettleWindow)
+        guard now() <= expiresAt else {
+            clearOperationSettleIfCurrent(snapshot.generation)
+            ignoredOperationGenerationThrough = max(
+                ignoredOperationGenerationThrough,
+                snapshot.generation
+            )
+            traceStore?.record(
+                category: .lifecycle,
+                name: "gate.operationPromptSettle.expired",
+                metadata: [
+                    "generation": String(snapshot.generation),
+                    "ignoredThrough": String(ignoredOperationGenerationThrough)
+                ]
+            )
+            return false
+        }
+
+        if operationPromptSettle?.generation != snapshot.generation {
+            operationPromptSettle = OperationPromptSettleState(
+                generation: snapshot.generation,
+                expiresAt: expiresAt,
+                didApplyTransientBlur: false
+            )
+            traceStore?.record(
+                category: .lifecycle,
+                name: "gate.operationPromptSettle.arm",
+                metadata: [
+                    "generation": String(snapshot.generation),
+                    "expiresInSeconds": String(format: "%.3f", expiresAt.timeIntervalSince(now()))
+                ]
+            )
+        }
+        return false
     }
 
     mutating func shouldHandleInactive(
         isAuthenticating: Bool,
-        isOperationPromptInProgress: Bool = false
+        operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
     ) -> PrivacyScreenLifecycleDecision {
-        if isAuthenticating || isOperationPromptInProgress {
-            armPromptLifecycleSuppression()
+        let operationPromptActive = refreshOperationPromptState(operationPrompt)
+
+        if isAuthenticating {
+            armAppSessionCompletion()
             traceLifecycleDecision(
                 name: "gate.inactive",
                 decision: .suppress,
                 isAuthenticating: isAuthenticating,
-                isOperationPromptInProgress: isOperationPromptInProgress
+                isOperationPromptInProgress: operationPrompt.isInProgress,
+                suppressionScope: .appSessionCompletion
             )
             return .suppress
         }
 
-        let decision: PrivacyScreenLifecycleDecision
-        switch suppressionScope {
-        case .appSessionCompletion:
-            decision = .blurOnly
-        case .promptLifecycle:
-            decision = .suppress
-        case nil:
-            decision = .handle
+        if operationPromptActive {
+            traceLifecycleDecision(
+                name: "gate.inactive",
+                decision: .suppress,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: true,
+                suppressionScope: .operationPromptActive
+            )
+            return .suppress
         }
+
+        if var settle = operationPromptSettle {
+            settle.didApplyTransientBlur = true
+            operationPromptSettle = settle
+            traceLifecycleDecision(
+                name: "gate.inactive",
+                decision: .blurOnly,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: false,
+                suppressionScope: .operationPromptSettle
+            )
+            return .blurOnly
+        }
+
+        if appSessionCompletionPending {
+            traceLifecycleDecision(
+                name: "gate.inactive",
+                decision: .blurOnly,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: false,
+                suppressionScope: .appSessionCompletion
+            )
+            return .blurOnly
+        }
+
         traceLifecycleDecision(
             name: "gate.inactive",
-            decision: decision,
+            decision: .handle,
             isAuthenticating: isAuthenticating,
-            isOperationPromptInProgress: isOperationPromptInProgress
+            isOperationPromptInProgress: false
         )
-        return decision
+        return .handle
     }
 
-    mutating func shouldHandleBackground() -> Bool {
-        suppressionScope = nil
+    mutating func shouldHandleBackground(
+        operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
+    ) -> Bool {
+        recordObservedOperationPromptIfNeeded(operationPrompt)
+        if operationPrompt.generation > 0 {
+            ignoredOperationGenerationThrough = max(
+                ignoredOperationGenerationThrough,
+                operationPrompt.generation
+            )
+        }
+        operationPromptSettle = nil
+        appSessionCompletionPending = false
         traceStore?.record(
             category: .lifecycle,
             name: "gate.background",
@@ -107,7 +207,8 @@ struct PrivacyScreenLifecycleGate {
                 "decision": PrivacyScreenLifecycleDecision.handle.rawValue,
                 "suppressed": "false",
                 "suppressionArmed": "false",
-                "suppressionScope": "none"
+                "suppressionScope": "none",
+                "ignoredOperationGenerationThrough": String(ignoredOperationGenerationThrough)
             ]
         )
         return true
@@ -115,44 +216,67 @@ struct PrivacyScreenLifecycleGate {
 
     mutating func shouldHandleResignActive(
         isAuthenticating: Bool,
-        isOperationPromptInProgress: Bool = false
+        operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
     ) -> PrivacyScreenLifecycleDecision {
         shouldHandleInactive(
             isAuthenticating: isAuthenticating,
-            isOperationPromptInProgress: isOperationPromptInProgress
+            operationPrompt: operationPrompt
         )
     }
 
     mutating func shouldHandleBecomeActive(
         isAuthenticating: Bool,
-        isOperationPromptInProgress: Bool = false
+        operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
     ) -> PrivacyScreenLifecycleDecision {
-        if isAuthenticating || isOperationPromptInProgress {
+        let operationPromptActive = refreshOperationPromptState(operationPrompt)
+
+        if isAuthenticating {
             traceLifecycleDecision(
                 name: "gate.active",
                 decision: .suppress,
                 isAuthenticating: isAuthenticating,
-                isOperationPromptInProgress: isOperationPromptInProgress
+                isOperationPromptInProgress: operationPrompt.isInProgress,
+                suppressionScope: .appSessionCompletion
             )
             return .suppress
         }
 
-        if let suppressionScope {
-            self.suppressionScope = nil
-            let decision: PrivacyScreenLifecycleDecision = switch suppressionScope {
-            case .appSessionCompletion:
-                .settleTransientBlur
-            case .promptLifecycle:
-                .suppress
-            }
+        if operationPromptActive {
+            traceLifecycleDecision(
+                name: "gate.active",
+                decision: .suppress,
+                isAuthenticating: isAuthenticating,
+                isOperationPromptInProgress: true,
+                suppressionScope: .operationPromptActive
+            )
+            return .suppress
+        }
+
+        if let settle = operationPromptSettle {
+            let decision: PrivacyScreenLifecycleDecision = settle.didApplyTransientBlur
+                ? .settleTransientBlur
+                : .suppress
+            consumeOperationPromptSettle(generation: settle.generation)
             traceLifecycleDecision(
                 name: "gate.active",
                 decision: decision,
                 isAuthenticating: false,
                 isOperationPromptInProgress: false,
-                consumedSuppressionScope: suppressionScope
+                suppressionScope: .operationPromptSettle
             )
             return decision
+        }
+
+        if appSessionCompletionPending {
+            appSessionCompletionPending = false
+            traceLifecycleDecision(
+                name: "gate.active",
+                decision: .settleTransientBlur,
+                isAuthenticating: false,
+                isOperationPromptInProgress: false,
+                suppressionScope: .appSessionCompletion
+            )
+            return .settleTransientBlur
         }
 
         traceLifecycleDecision(
@@ -164,14 +288,46 @@ struct PrivacyScreenLifecycleGate {
         return .handle
     }
 
+    private mutating func recordObservedOperationPromptIfNeeded(
+        _ snapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot
+    ) {
+        guard snapshot.generation > lastObservedOperationAuthenticationAttemptGeneration else {
+            return
+        }
+
+        lastObservedOperationAuthenticationAttemptGeneration = snapshot.generation
+        traceStore?.record(
+            category: .lifecycle,
+            name: "gate.observeOperationAuthenticationAttempt",
+            metadata: [
+                "generation": String(snapshot.generation),
+                "depth": String(snapshot.depth),
+                "inProgress": snapshot.isInProgress ? "true" : "false",
+                "hasLastEndedAt": snapshot.lastEndedAt == nil ? "false" : "true"
+            ]
+        )
+    }
+
+    private mutating func clearOperationSettleIfCurrent(_ generation: UInt64) {
+        guard operationPromptSettle?.generation == generation else {
+            return
+        }
+        operationPromptSettle = nil
+    }
+
+    private mutating func consumeOperationPromptSettle(generation: UInt64) {
+        ignoredOperationGenerationThrough = max(ignoredOperationGenerationThrough, generation)
+        operationPromptSettle = nil
+    }
+
     private func traceLifecycleDecision(
         name: String,
         decision: PrivacyScreenLifecycleDecision,
         isAuthenticating: Bool,
         isOperationPromptInProgress: Bool,
-        consumedSuppressionScope: PrivacyScreenLifecycleSuppressionScope? = nil
+        suppressionScope: PrivacyScreenLifecycleSuppressionScope? = nil
     ) {
-        let activeSuppressionScope = consumedSuppressionScope ?? suppressionScope
+        let activeSuppressionScope = suppressionScope ?? currentSuppressionScope
         traceStore?.record(
             category: .lifecycle,
             name: name,
@@ -185,5 +341,15 @@ struct PrivacyScreenLifecycleGate {
                 "operationPrompt": isOperationPromptInProgress ? "true" : "false"
             ]
         )
+    }
+
+    private var currentSuppressionScope: PrivacyScreenLifecycleSuppressionScope? {
+        if operationPromptSettle != nil {
+            return .operationPromptSettle
+        }
+        if appSessionCompletionPending {
+            return .appSessionCompletion
+        }
+        return nil
     }
 }

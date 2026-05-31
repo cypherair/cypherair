@@ -64,31 +64,37 @@ struct PrivacyScreenModifier: ViewModifier {
                     name: "scenePhase.observed",
                     metadata: ["phase": scenePhaseName(newPhase)]
                 )
-                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
-                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
-                )
+                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
                 switch newPhase {
                 case .inactive:
-                    guard lifecycleGate.shouldHandleInactive(
+                    switch lifecycleGate.shouldHandleInactive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
-                        isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                    ) == .handle else {
-                        return
+                        operationPrompt: operationPrompt
+                    ) {
+                    case .handle:
+                        appSessionOrchestrator.handleSceneDidResignActive()
+                    case .blurOnly:
+                        appSessionOrchestrator.handleAuthenticationSettleInactive(source: "sceneInactive")
+                    case .settleTransientBlur, .suppress:
+                        break
                     }
-                    appSessionOrchestrator.handleSceneDidResignActive()
                 case .background:
-                    guard lifecycleGate.shouldHandleBackground() else {
+                    guard lifecycleGate.shouldHandleBackground(operationPrompt: operationPrompt) else {
                         return
                     }
                     appSessionOrchestrator.handleSceneDidEnterBackground()
                 case .active:
-                    guard lifecycleGate.shouldHandleBecomeActive(
+                    switch lifecycleGate.shouldHandleBecomeActive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
-                        isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
-                    ) == .handle else {
-                        return
+                        operationPrompt: operationPrompt
+                    ) {
+                    case .handle:
+                        performResumeAction(source: "sceneActive")
+                    case .settleTransientBlur:
+                        appSessionOrchestrator.handleAuthenticationSettleActive(source: "sceneActive")
+                    case .blurOnly, .suppress:
+                        break
                     }
-                    performResumeAction(source: "sceneActive")
                 @unknown default:
                     break
                 }
@@ -96,12 +102,10 @@ struct PrivacyScreenModifier: ViewModifier {
             #endif
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
-                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
-                )
+                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
                 switch lifecycleGate.shouldHandleResignActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
-                    isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
+                    operationPrompt: operationPrompt
                 ) {
                 case .handle:
                     appSessionOrchestrator.handleSceneDidResignActive()
@@ -112,12 +116,10 @@ struct PrivacyScreenModifier: ViewModifier {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                lifecycleGate.syncOperationAuthenticationAttemptGeneration(
-                    appSessionOrchestrator.operationAuthenticationAttemptGeneration
-                )
+                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
                 switch lifecycleGate.shouldHandleBecomeActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
-                    isOperationPromptInProgress: appSessionOrchestrator.isOperationAuthenticationPromptInProgress
+                    operationPrompt: operationPrompt
                 ) {
                 case .handle:
                     performResumeAction(source: "sceneActive")

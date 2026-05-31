@@ -36,6 +36,18 @@ private typealias AppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMaste
 private typealias AppProtectedOrdinarySettingsCoordinator = CypherAir.ProtectedOrdinarySettingsCoordinator
 private typealias AppLegacyOrdinarySettingsStore = CypherAir.LegacyOrdinarySettingsStore
 
+private final class MutableDateProvider: @unchecked Sendable {
+    var value: Date
+
+    init(_ value: Date) {
+        self.value = value
+    }
+
+    func now() -> Date {
+        value
+    }
+}
+
 private final class MockProtectedDataPersistedRightHandle: AppProtectedDataPersistedRightHandle {
     let identifier: String
     private let secretData: Data
@@ -1977,7 +1989,7 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
     }
 
-    func test_lateLifecycleAfterOperationPromptEnds_doesNotTriggerPrivacyResumeAuthentication() async {
+    func test_operationPromptSettleLifecycleAfterPromptEnds_blursWithoutResumeAuthentication() async {
         let storageRoot = AppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataLateLifecycleSuppression")
         )
@@ -2013,28 +2025,32 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         authPromptCoordinator.beginOperationPrompt()
         authPromptCoordinator.endOperationPrompt()
 
-        gate.syncOperationAuthenticationAttemptGeneration(
-            orchestrator.operationAuthenticationAttemptGeneration
-        )
-        if gate.shouldHandleInactive(
+        let operationPrompt = orchestrator.operationAuthenticationPromptSnapshot
+        switch gate.shouldHandleInactive(
             isAuthenticating: orchestrator.isAuthenticating,
-            isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
-        ) == .handle {
+            operationPrompt: operationPrompt
+        ) {
+        case .handle:
             orchestrator.handleSceneDidResignActive()
+        case .blurOnly:
+            orchestrator.handleAuthenticationSettleInactive(source: "unit.promptSettleInactive")
+        case .settleTransientBlur, .suppress:
+            break
         }
 
-        gate.syncOperationAuthenticationAttemptGeneration(
-            orchestrator.operationAuthenticationAttemptGeneration
-        )
         let attemptedAuthentication: Bool
-        if gate.shouldHandleBecomeActive(
+        switch gate.shouldHandleBecomeActive(
             isAuthenticating: orchestrator.isAuthenticating,
-            isOperationPromptInProgress: orchestrator.isOperationAuthenticationPromptInProgress
-        ) == .handle {
+            operationPrompt: operationPrompt
+        ) {
+        case .handle:
             attemptedAuthentication = await orchestrator.handleResume(
                 localizedReason: "Late lifecycle after operation prompt"
             )
-        } else {
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.promptSettleActive")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
             attemptedAuthentication = false
         }
 
@@ -2044,6 +2060,83 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(orchestrator.contentClearGeneration, 0)
         XCTAssertEqual(relockParticipant.relockCallCount, 0)
         XCTAssertFalse(didEvaluate)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    func test_expiredOperationPromptLifecycleTreatsResignAndActiveAsRealResume() async {
+        let storageRoot = AppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataExpiredLifecycle")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let clock = MutableDateProvider(Date(timeIntervalSinceReferenceDate: 9_000))
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator(now: clock.now)
+        let coordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rightStoreClient,
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.expired-lifecycle",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = AppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        var gate = AppPrivacyScreenLifecycleGate(now: clock.now)
+
+        authPromptCoordinator.beginOperationPrompt()
+        authPromptCoordinator.endOperationPrompt()
+        clock.value = clock.value.addingTimeInterval(1.1)
+
+        let operationPrompt = orchestrator.operationAuthenticationPromptSnapshot
+        switch gate.shouldHandleResignActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: operationPrompt
+        ) {
+        case .handle:
+            orchestrator.handleSceneDidResignActive()
+        case .blurOnly:
+            orchestrator.handleAuthenticationSettleInactive(source: "unit.expiredPromptInactive")
+        case .settleTransientBlur, .suppress:
+            break
+        }
+
+        let attemptedAuthentication: Bool
+        switch gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: operationPrompt
+        ) {
+        case .handle:
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Expired lifecycle after operation prompt"
+            )
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.expiredPromptActive")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
+            attemptedAuthentication = false
+        }
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication)
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(relockParticipant.relockCallCount, 1)
+        XCTAssertTrue(didEvaluate)
+        XCTAssertNotNil(orchestrator.lastAuthenticationDate)
+        XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
     }
 
@@ -2545,13 +2638,28 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
 
+        var gate = AppPrivacyScreenLifecycleGate()
         authPromptCoordinator.beginOperationPrompt()
-        orchestrator.handleSceneDidEnterBackground()
+        if gate.shouldHandleBackground(operationPrompt: orchestrator.operationAuthenticationPromptSnapshot) {
+            orchestrator.handleSceneDidEnterBackground()
+        }
         authPromptCoordinator.endOperationPrompt()
 
-        let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Resume after a real background should still re-authenticate"
-        )
+        let attemptedAuthentication: Bool
+        switch gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: orchestrator.operationAuthenticationPromptSnapshot
+        ) {
+        case .handle:
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Resume after a real background should still re-authenticate"
+            )
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.backgroundPromptActive")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
+            attemptedAuthentication = false
+        }
         let didEvaluate = await didEvaluateAuthentication.currentValue()
 
         XCTAssertTrue(attemptedAuthentication)
