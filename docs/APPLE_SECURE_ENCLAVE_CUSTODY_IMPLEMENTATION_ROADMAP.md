@@ -2,7 +2,7 @@
 
 > Status: Draft implementation roadmap. This document describes proposed future
 > work and does not describe shipped behavior.
-> Date: 2026-05-26.
+> Date: 2026-05-31.
 > Purpose: Provide staged PR planning guidance for Apple Secure Enclave-backed
 > OpenPGP private-key custody.
 > Audience: Product owners, Swift/Rust implementers, security reviewers,
@@ -278,24 +278,36 @@ custody through the external signer path.
 
 Recommended PR grouping:
 
-- PR 5A: message signing and the signing half of sign-plus-encrypt.
-- PR 5B: password-message optional signing and the signing half of streaming
-  sign or encrypt-plus-sign workflows.
-- PR 5C: other Product-approved signing-class operations, such as expiry,
-  binding, revocation, selective-revocation, or contact-certification work if
-  they remain in first-version scope.
+- PR 5A: private-operation router foundation, shared route vocabulary,
+  unsupported/unavailable outcomes, sanitized error mapping, hidden/test policy
+  hooks, and Security handle lookup helpers. This PR must not integrate a user
+  workflow.
+- PR 5B: Rust/UniFFI external signer runtime API plus cleartext message signing
+  pilot.
+- PR 5C: sign-plus-encrypt text optional signing.
+- PR 5D: password-message optional signing.
+- PR 5E: streaming detached file signing.
+- PR 5F: streaming encrypt-plus-sign.
+- PR 5G: expiry and binding-refresh signing route, or explicit unsupported
+  closeout.
+- PR 5H: selective subkey and User ID revocation signing route.
+- PR 5I: contact certification signing route.
+- PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,
+  and tests.
 
 Entry conditions:
 
 - Hidden generation can create usable signing handles.
-- Resolver and router contracts are in place for signing-class operations.
+- Phase 5A establishes resolver/router contracts before signing-class workflow
+  PRs consume them.
 - Product Design still approves the exact signing-class operation set targeted
   by the phase-specific plan.
 - The phase-specific plan names any operation that remains unsupported and why.
 
 Exit conditions:
 
-- Supported signing-class operations use the Secure Enclave signer route.
+- Every supported signing-class operation uses the router and Secure Enclave
+  signer route.
 - Unsupported signing-class operations produce explicit unsupported outcomes.
 - No workflow-local custody switch bypasses the router.
 - No supported operation unwraps or synthesizes a complete secret certificate
@@ -323,21 +335,31 @@ success-only plaintext release.
 
 Recommended PR grouping:
 
-- PR 6A: message decrypt session-key acquisition and payload processing.
-- PR 6B: streaming file decrypt and the decrypt-side streaming variants that
-  need ECDH/session-key acquisition.
-- PR 6C: cancellation, cleanup, tamper, and no-partial-plaintext hardening.
+- PR 6A: external P-256 ECDH UniFFI callback, Swift key-agreement bridge, and
+  router key-agreement route. This PR must not release a plaintext workflow.
+- PR 6B: message decrypt integration for v4/v6, verification folding,
+  recipient mismatch, tamper, and no fallback.
+- PR 6C: streaming file decrypt integration with success-only output, progress,
+  cancellation, cleanup, and tamper coverage.
+- PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
+  artifacts, no partial plaintext, docs, and tests.
 
 Entry conditions:
 
 - Hidden generation can create usable key-agreement handles.
 - Phase 2 ECDH/session-key behavior is proven through tests.
-- The phase-specific plan describes temporary-file and output-release behavior.
+- Phase 6A owns only the ECDH route foundation and must not release a plaintext
+  workflow.
+- Before PR 6C starts, its phase-specific plan must describe
+  temporary-artifact ownership, success-only output release, cancellation
+  cleanup, and file protection behavior for streaming file decrypt.
 
 Exit conditions:
 
 - Secure Enclave custody decrypt uses the ECDH/session-key route.
-- Sequoia payload authentication remains the plaintext-release gate.
+- Payload authentication remains outside the router; Sequoia
+  read-to-completion/message-processed behavior remains the plaintext-release
+  gate.
 - v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD tampering fail closed.
 - Cancellation and authentication errors do not expose partial plaintext.
 - Streaming progress, cancellation, and cleanup behavior remain intact.
