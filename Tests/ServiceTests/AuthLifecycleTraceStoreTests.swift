@@ -438,6 +438,43 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(Set(promptBegins.compactMap { $0.metadata["promptID"] }).count, 2)
     }
 
+    func test_authenticationPromptCoordinator_operationPromptSessionGenerationTracksNestedPrompts() {
+        let coordinator = TraceAuthenticationPromptCoordinator()
+
+        let outerPrompt = coordinator.beginOperationPrompt(source: "trace.outer")
+        var snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 1)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 1)
+
+        let innerPrompt = coordinator.beginOperationPrompt(source: "trace.inner")
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 2)
+
+        coordinator.endOperationPrompt(innerPrompt)
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 1)
+        XCTAssertNil(snapshot.lastEndedAt)
+
+        coordinator.endOperationPrompt(outerPrompt)
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 2)
+        XCTAssertEqual(snapshot.sessionGeneration, 1)
+        XCTAssertEqual(snapshot.depth, 0)
+        XCTAssertNotNil(snapshot.lastEndedAt)
+
+        let serialPrompt = coordinator.beginOperationPrompt(source: "trace.serial")
+        snapshot = coordinator.operationAuthenticationPromptSnapshot
+        XCTAssertEqual(snapshot.generation, 3)
+        XCTAssertEqual(snapshot.sessionGeneration, 3)
+        XCTAssertEqual(snapshot.depth, 1)
+        coordinator.endOperationPrompt(serialPrompt)
+    }
+
     func test_authenticationPromptCoordinator_recordsOperationPromptSuccessBoundaries() async throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let coordinator = TraceAuthenticationPromptCoordinator(traceStore: store)
@@ -1217,14 +1254,36 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
 
     func test_privacyScreenLifecycleGate_recordsDecisionTagsWithoutChangingBehavior() {
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        var gate = TracePrivacyScreenLifecycleGate(traceStore: traceStore)
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 8_000)
+        var gate = TracePrivacyScreenLifecycleGate(
+            traceStore: traceStore,
+            now: { promptEndedAt.addingTimeInterval(0.1) }
+        )
+        let activePrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
+            generation: 1,
+            depth: 1,
+            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
+            lastEndedAt: nil
+        )
+        let endedPrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
+            lastEndedAt: promptEndedAt
+        )
 
         XCTAssertEqual(
-            gate.shouldHandleInactive(isAuthenticating: false, isOperationPromptInProgress: true),
+            gate.shouldHandleInactive(isAuthenticating: false, operationPrompt: activePrompt),
             .suppress
         )
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
+            .handle
+        )
 
         let names = traceStore.recentEntries.map(\.name)
         XCTAssertTrue(names.contains("gate.inactive"))
@@ -1233,7 +1292,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             traceStore.recentEntries.contains {
                 $0.name == "gate.inactive"
                     && $0.metadata["decision"] == "suppressed"
-                    && $0.metadata["suppressionScope"] == "promptLifecycle"
+                    && $0.metadata["suppressionScope"] == "operationPromptActive"
             }
         )
     }

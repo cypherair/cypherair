@@ -52,6 +52,18 @@ private enum CommonHelpersTestError: Error {
     case delayedFailure
 }
 
+private final class MutableDateProvider: @unchecked Sendable {
+    var value: Date
+
+    init(_ value: Date) {
+        self.value = value
+    }
+
+    func now() -> Date {
+        value
+    }
+}
+
 private final class FailingCompleteRewrapPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {
     private var mode: AuthenticationMode?
     private var journal: PrivateKeyControlRecoveryJournal
@@ -147,6 +159,22 @@ private final class FailingCompleteRewrapPrivateKeyControlStore: PrivateKeyContr
 
 @MainActor
 final class CommonHelpersTests: XCTestCase {
+    private func operationPromptSnapshot(
+        generation: UInt64 = 1,
+        sessionGeneration: UInt64? = nil,
+        depth: Int = 0,
+        beganAt: Date? = Date(timeIntervalSinceReferenceDate: 1_000),
+        endedAt: Date? = Date(timeIntervalSinceReferenceDate: 1_000)
+    ) -> CypherAir.AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot {
+        CypherAir.AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
+            generation: generation,
+            sessionGeneration: sessionGeneration,
+            depth: depth,
+            lastBeganAt: beganAt,
+            lastEndedAt: endedAt
+        )
+    }
+
     func test_securityScopedFileAccess_failure_stopsPreviouslyStartedResources() async {
         let first = MockScopedResource()
         let second = MockScopedResource()
@@ -397,7 +425,7 @@ final class CommonHelpersTests: XCTestCase {
 
         XCTAssertEqual(gate.shouldHandleResignActive(isAuthenticating: true), .suppress)
         XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: true), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
+        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .settleTransientBlur)
         XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
     }
 
@@ -405,49 +433,340 @@ final class CommonHelpersTests: XCTestCase {
         var gate = PrivacyScreenLifecycleGate()
 
         XCTAssertEqual(gate.shouldHandleResignActive(isAuthenticating: true), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
+        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .settleTransientBlur)
         XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
     }
 
     func test_privacyScreenLifecycleGate_suppressesOneActivationForExternalAuthPromptCycle() {
-        var gate = PrivacyScreenLifecycleGate()
+        let start = Date(timeIntervalSinceReferenceDate: 2_000)
+        let clock = MutableDateProvider(start)
+        var gate = PrivacyScreenLifecycleGate(now: clock.now)
 
         XCTAssertEqual(
             gate.shouldHandleResignActive(
                 isAuthenticating: false,
-                isOperationPromptInProgress: true
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    depth: 1,
+                    beganAt: start,
+                    endedAt: nil
+                )
             ),
             .suppress
         )
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    depth: 0,
+                    beganAt: start,
+                    endedAt: start
+                )
+            ),
+            .suppress
+        )
+        clock.value = start.addingTimeInterval(0.2)
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    depth: 0,
+                    beganAt: start,
+                    endedAt: start
+                )
+            ),
+            .handle
+        )
     }
 
-    func test_privacyScreenLifecycleGate_observedOperationPromptGenerationSuppressesLateInactiveAndActivation() {
-        var gate = PrivacyScreenLifecycleGate()
-
-        gate.syncOperationAuthenticationAttemptGeneration(1)
+    func test_privacyScreenLifecycleGate_observedOperationPromptSettleBlursLateInactiveAndSettlesActivation() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_000)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
 
         XCTAssertEqual(
             gate.shouldHandleResignActive(
                 isAuthenticating: false,
-                isOperationPromptInProgress: false
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
             ),
             .suppress
         )
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .suppress)
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .blurOnly
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .settleTransientBlur
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_unobservedOperationPromptTailHandlesRealLifecycleWithinSettleWindow() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_500)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_nestedOperationPromptCarriesObservedSessionEligibilityAcrossGeneration() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_750)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let endedPrompt = operationPromptSnapshot(
+            generation: 2,
+            sessionGeneration: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-0.5),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: endedPrompt
+            ),
+            .blurOnly
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: endedPrompt
+            ),
+            .settleTransientBlur
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_serialOperationPromptSessionDoesNotInheritSettleEligibility() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_850)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let serialEndedPrompt = operationPromptSnapshot(
+            generation: 2,
+            sessionGeneration: 2,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-0.5),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: serialEndedPrompt
+            ),
+            .handle
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: serialEndedPrompt
+            ),
+            .handle
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_serialOperationPromptSessionClearsOlderArmedSettle() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_875)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let firstEndedPrompt = operationPromptSnapshot(
+            generation: 1,
+            sessionGeneration: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
+        let serialEndedPrompt = operationPromptSnapshot(
+            generation: 2,
+            sessionGeneration: 2,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-0.5),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: firstEndedPrompt
+            ),
+            .blurOnly
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: serialEndedPrompt
+            ),
+            .handle
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_activeOnlyNestedOperationPromptDoesNotGrantSettleEligibility() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 3_900)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let endedPrompt = operationPromptSnapshot(
+            generation: 2,
+            sessionGeneration: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-0.5),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: endedPrompt
+            ),
+            .handle
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: endedPrompt
+            ),
+            .handle
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_expiredOperationPromptGenerationHandlesRealLifecycle() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 4_000)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(1.1) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
     }
 
     func test_privacyScreenLifecycleGate_activeDuringPromptDoesNotConsumeSuppression() {
         var gate = PrivacyScreenLifecycleGate()
+        let prompt = operationPromptSnapshot(depth: 1, endedAt: nil)
 
         gate.armForAuthenticationAttempt()
 
         XCTAssertEqual(
             gate.shouldHandleBecomeActive(
                 isAuthenticating: false,
-                isOperationPromptInProgress: true
+                operationPrompt: prompt
             ),
             .suppress
         )
@@ -465,15 +784,125 @@ final class CommonHelpersTests: XCTestCase {
     }
 
     func test_privacyScreenLifecycleGate_backgroundClearsObservedOperationPromptSuppression() {
-        var gate = PrivacyScreenLifecycleGate()
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 5_000)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.1) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
 
-        gate.syncOperationAuthenticationAttemptGeneration(1)
+        XCTAssertTrue(gate.shouldHandleBackground(operationPrompt: prompt))
 
-        XCTAssertTrue(gate.shouldHandleBackground())
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .handle
+        )
+    }
 
-        gate.syncOperationAuthenticationAttemptGeneration(1)
+    func test_privacyScreenLifecycleGate_appSessionCompletionSurvivesExpiredOperationPrompt() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 6_000)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(1.1) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
 
-        XCTAssertEqual(gate.shouldHandleBecomeActive(isAuthenticating: false), .handle)
+        gate.armForAuthenticationAttempt()
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .blurOnly
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .settleTransientBlur
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_appSessionCompletionSurvivesUnobservedOperationPromptTail() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 6_500)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.25) })
+        let prompt = operationPromptSnapshot(
+            generation: 1,
+            depth: 0,
+            beganAt: promptEndedAt.addingTimeInterval(-1),
+            endedAt: promptEndedAt
+        )
+
+        gate.armForAuthenticationAttempt()
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .blurOnly
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: prompt
+            ),
+            .settleTransientBlur
+        )
+    }
+
+    func test_privacyScreenLifecycleGate_nestedOperationPromptSettlesOnlyAfterDepthReachesZero() {
+        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 7_000)
+        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(0.1) })
+
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 1,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleBecomeActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 2,
+                    sessionGeneration: 1,
+                    depth: 1,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: nil
+                )
+            ),
+            .suppress
+        )
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: false,
+                operationPrompt: operationPromptSnapshot(
+                    generation: 2,
+                    sessionGeneration: 1,
+                    depth: 0,
+                    beganAt: promptEndedAt.addingTimeInterval(-1),
+                    endedAt: promptEndedAt
+                )
+            ),
+            .blurOnly
+        )
     }
 
     func test_privacyScreenLifecycleGate_authenticationAttemptSuppressesActivationWithoutResignEvent() {

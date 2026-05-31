@@ -12,6 +12,40 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         let kind: String
     }
 
+    struct OperationAuthenticationPromptSnapshot: Equatable, Sendable {
+        static let idle = OperationAuthenticationPromptSnapshot(
+            generation: 0,
+            sessionGeneration: 0,
+            depth: 0,
+            lastBeganAt: nil,
+            lastEndedAt: nil
+        )
+
+        let generation: UInt64
+        let sessionGeneration: UInt64
+        let depth: Int
+        let lastBeganAt: Date?
+        let lastEndedAt: Date?
+
+        init(
+            generation: UInt64,
+            sessionGeneration: UInt64? = nil,
+            depth: Int,
+            lastBeganAt: Date?,
+            lastEndedAt: Date?
+        ) {
+            self.generation = generation
+            self.sessionGeneration = sessionGeneration ?? generation
+            self.depth = depth
+            self.lastBeganAt = lastBeganAt
+            self.lastEndedAt = lastEndedAt
+        }
+
+        var isInProgress: Bool {
+            depth > 0
+        }
+    }
+
     private enum PromptKind {
         case privacy
         case operation
@@ -29,19 +63,25 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private let lock = NSLock()
     private let shieldEventHandler: ShieldEventHandler?
     private let traceStore: AuthLifecycleTraceStore?
+    private let now: @Sendable () -> Date
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
     private var operationPromptAttemptGenerationValue: UInt64 = 0
+    private var operationPromptSessionGenerationValue: UInt64 = 0
+    private var lastOperationPromptBeganAt: Date?
+    private var lastOperationPromptEndedAt: Date?
     private var nextPromptID: UInt64 = 1
     private var privacyPromptStack: [PromptTraceContext] = []
     private var operationPromptStack: [PromptTraceContext] = []
 
     init(
         shieldEventHandler: ShieldEventHandler? = nil,
-        traceStore: AuthLifecycleTraceStore? = nil
+        traceStore: AuthLifecycleTraceStore? = nil,
+        now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.shieldEventHandler = shieldEventHandler
         self.traceStore = traceStore
+        self.now = now
     }
 
     var isOperationPromptInProgress: Bool {
@@ -56,6 +96,18 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     var operationPromptAttemptGeneration: UInt64 {
         lock.withLock {
             operationPromptAttemptGenerationValue
+        }
+    }
+
+    var operationAuthenticationPromptSnapshot: OperationAuthenticationPromptSnapshot {
+        lock.withLock {
+            OperationAuthenticationPromptSnapshot(
+                generation: operationPromptAttemptGenerationValue,
+                sessionGeneration: operationPromptSessionGenerationValue,
+                depth: operationPromptDepth,
+                lastBeganAt: lastOperationPromptBeganAt,
+                lastEndedAt: lastOperationPromptEndedAt
+            )
         }
     }
 
@@ -174,10 +226,12 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         source: String = "unspecified",
         context: PromptTraceContext? = nil
     ) -> PromptTraceContext {
+        let timestamp = now()
         let snapshot = lock.withLock { () -> (
             privacyDepth: Int,
             operationDepth: Int,
             operationGeneration: UInt64,
+            operationSessionGeneration: UInt64,
             context: PromptTraceContext
         ) in
             let resolvedContext: PromptTraceContext
@@ -196,19 +250,35 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 privacyPromptDepth = privacyPromptStack.count
             case .operation:
                 if delta > 0 {
+                    let startsNewOperationSession = operationPromptStack.isEmpty
                     resolvedContext = makePromptTraceContext(kind: kind, source: source)
                     operationPromptStack.append(resolvedContext)
                     operationPromptAttemptGenerationValue &+= 1
+                    if startsNewOperationSession {
+                        operationPromptSessionGenerationValue = operationPromptAttemptGenerationValue
+                    }
+                    lastOperationPromptBeganAt = timestamp
+                    lastOperationPromptEndedAt = nil
                 } else {
+                    let wasOperationPromptInProgress = !operationPromptStack.isEmpty
                     resolvedContext = popPromptTraceContext(
                         from: &operationPromptStack,
                         matching: context,
                         kind: kind
                     )
+                    if wasOperationPromptInProgress, operationPromptStack.isEmpty {
+                        lastOperationPromptEndedAt = timestamp
+                    }
                 }
                 operationPromptDepth = operationPromptStack.count
             }
-            return (privacyPromptDepth, operationPromptDepth, operationPromptAttemptGenerationValue, resolvedContext)
+            return (
+                privacyPromptDepth,
+                operationPromptDepth,
+                operationPromptAttemptGenerationValue,
+                operationPromptSessionGenerationValue,
+                resolvedContext
+            )
         }
 
         traceStore?.record(
@@ -221,6 +291,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 "privacyDepth": String(snapshot.privacyDepth),
                 "operationDepth": String(snapshot.operationDepth),
                 "operationGeneration": String(snapshot.operationGeneration),
+                "operationSessionGeneration": String(snapshot.operationSessionGeneration),
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
