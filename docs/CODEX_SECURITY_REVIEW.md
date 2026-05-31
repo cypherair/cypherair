@@ -138,6 +138,14 @@
 - **Current code:** `.github/workflows/xcframework-edge-release.yml` writes `RELEASE_SOURCE_REF` into release metadata and the release-notes verification command; `docs/XCFRAMEWORK_RELEASES.md` directs drill-release verification to use the exact command rendered in release notes.
 - **Fix:** render shell-safe quoted source refs in release notes, or restrict drill source refs to a safe character set before publishing notes.
 
+## [open] CA-27: Secret key zeroization can be skipped on key adapter failures
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/2a18f490890c8191afc9b8775a8ff2b3 — Codex severity **medium** · user-confirmed **real, pending fix**
+- **Verified real, with updated location.** The current upper layer installs zeroization `defer`s after `PGPKeyOperationAdapter` returns, but the adapter can produce generated/imported secret key `Data` and then throw while parsing metadata, armoring, detecting profiles, or generating revocation data.
+- **Impact:** best-effort Swift heap zeroization gap on failure paths only. No disk write, logging, network exposure, or OpenPGP authentication bypass is implied, but the project treats explicit zeroization of secret-key `Data` as a security invariant.
+- **Current code:** `Sources/Services/FFI/PGPKeyOperationAdapter.swift` (`performGenerateKey`, `performImportSecretKey`); `Sources/Services/KeyManagement/KeyProvisioningService.swift` (`generateKey`, `importKey` zeroize only after adapter success).
+- **Fix:** once secret key `Data` is produced in the adapter, zeroize it on any later failure before rethrowing. Do not zeroize the success return inside the adapter; the caller still needs the `Data` and already owns success-path cleanup.
+
 ## [open] CA-29: Abandoned file decrypt can adopt temporary plaintext output
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
@@ -146,6 +154,14 @@
 - **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`handleDisappear`, `decryptFile`, `adoptDecryptedFileOutput`); `Sources/App/Decrypt/DecryptView.swift` (`onDisappear`); `Sources/App/Common/OperationController.swift` (`cancelAndInvalidate`); `Sources/App/Common/AppTemporaryArtifactStore.swift` (`cleanupTemporaryArtifacts`).
 - **Fix:** when the Decrypt route disappears, cancel/invalidate any in-flight file decrypt and prevent late output adoption; continue relying on startup/reset temporary cleanup as a backstop.
 
+## [open] CA-32: Signing key unwrap should happen after public-only encryption validation
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/8ef989997a7081919d767f560071a253 — Codex severity **medium** · user-confirmed **informational hardening, pending fix**
+- **Verified as a service-boundary hardening issue.** Text and file encryption unwrap the optional signing private key before resolving the encrypt-to-self public key. If `encryptToSelf` requires a missing default key, `noKeySelected` is thrown before the signing-key zeroization `defer` is installed.
+- **Impact:** the operation fails with no ciphertext or file output, and normal UI state should not pass this inconsistent combination. The remaining concern is unnecessary private-key unwrap plus missed explicit zeroization in API/test/metadata-corruption states.
+- **Current code:** `Sources/Services/EncryptionService.swift` text and file encryption helpers (`signWithFingerprint`, `encryptToSelf`, `encryptToSelfFingerprint`, `keyManagement.defaultKey` resolution).
+- **Fix:** resolve all public-only inputs first, including encrypt-to-self/default public key selection. Only then unwrap the signing private key, and immediately enter a zeroization `defer` scope before any later throwing work.
+
 ## [open] CA-33: Decrypt output and signature verification can become cross-mode mismatched
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab — Codex severity **medium** · user-confirmed **pending fix**
@@ -153,6 +169,14 @@
 - **Impact:** trust UI correctness bug, not a cryptographic verification bypass. The visible signature section can be read as applying to the visible output even when it came from a different mode's result.
 - **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`decryptedText`, `decryptedFileURL`, shared `detailedSignatureVerification`, `decryptText`, `decryptFile`); `Sources/App/Decrypt/DecryptView.swift` (mode-gated output sections plus shared signature section).
 - **Fix:** model text and file results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
+
+## [open] CA-40: Security mock implementations are compiled into the app target
+
+- **Codex:** https://chatgpt.com/codex/cloud/security/findings/715f18cb62e48191abe332c39da5f2bd — Codex severity **low** · user-confirmed **defer until architecture/target split**
+- **Verified as an architecture-boundary issue, not current production misuse.** The app target file-system-synchronizes `Sources`, so `Sources/Security/Mocks` is visible to the app module. Current production startup still wires `HardwareSecureEnclave` and `SystemKeychain`; UI tests and the guided tutorial are the observed mock users.
+- **Impact:** no evidence that real user keys are protected by mocks today. The risk is future accidental or malicious mock selection because test/tutorial security implementations are compiled into the same app module as production composition code.
+- **Current code:** `CypherAir.xcodeproj/project.pbxproj` (`Sources` root in app target); `Sources/Security/Mocks/*`; `Sources/App/AppContainer.swift` (`makeDefault`, `makeUITest`); `Sources/App/Onboarding/TutorialSandboxContainer.swift`.
+- **Fix:** handle during broader componentization. Move test-only mocks to test support outside the app target, and rename/scope the tutorial-needed software security stack as tutorial-only simulation instead of generic security mocks.
 
 ## [open] CA-41: Tutorial contacts open should be idempotent while opening
 
