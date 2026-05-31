@@ -86,11 +86,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
         static let bypassAuthenticationKey = "com.cypherair.preference.uiTestBypassAuthentication"
     }
 
+    private struct LocalAuthenticationPolicyTraceHooks {
+        var callStart: () -> Void = {}
+        var reply: ([String: String]) -> Void = { _ in }
+        var resume: ([String: String]) -> Void = { _ in }
+    }
+
     // MARK: - Dependencies
 
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
     private let defaults: UserDefaults
+    private let allowsUITestAuthenticationBypass: Bool
     private let bundleStore: KeyBundleStore
     private let migrationCoordinator: KeyMigrationCoordinator
     private let modeSwitchAuthenticator: PrivateKeyModeSwitchAuthenticator
@@ -129,6 +136,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         defaults: UserDefaults = .standard,
+        allowsUITestAuthenticationBypass: Bool = false,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
@@ -147,6 +155,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.defaults = defaults
+        self.allowsUITestAuthenticationBypass = allowsUITestAuthenticationBypass
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
         self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
@@ -205,7 +214,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
     }
 
     func evaluate(mode: AuthenticationMode, reason: String, source: String) async throws -> Bool {
-        if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
+        if isUITestAuthenticationBypassEnabled {
             traceStore?.record(
                 category: .prompt,
                 name: "privateKey.evaluate.start",
@@ -229,23 +238,23 @@ final class AuthenticationManager: AuthenticationEvaluable {
                     name: "privateKey.evaluate.start",
                     metadata: ["mode": mode.rawValue, "source": source, "promptID": promptID]
                 )
+                let policy: LAPolicy
                 switch mode {
                 case .standard:
                     // Face ID / Touch ID with device passcode fallback.
-                    return try await context.evaluatePolicy(
-                        .deviceOwnerAuthentication,
-                        localizedReason: reason
-                    )
+                    policy = .deviceOwnerAuthentication
 
                 case .highSecurity:
                     // Face ID / Touch ID only. Hide the passcode fallback button.
                     context.localizedFallbackTitle = ""
-
-                    return try await context.evaluatePolicy(
-                        .deviceOwnerAuthenticationWithBiometrics,
-                        localizedReason: reason
-                    )
+                    policy = .deviceOwnerAuthenticationWithBiometrics
                 }
+
+                return try await evaluateLocalAuthenticationPolicy(
+                    context,
+                    policy: policy,
+                    reason: reason
+                )
             }
 
             traceStore?.record(
@@ -358,7 +367,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         reason: String,
         source: String = "unspecified"
     ) async throws -> AppSessionAuthenticationResult {
-        if defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey) {
+        if isUITestAuthenticationBypassEnabled {
             traceStore?.record(
                 category: .prompt,
                 name: "appSession.evaluate.start",
@@ -549,45 +558,31 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
     }
 
-    private func evaluateLocalAuthenticationPolicyWithCallback(
+    private var isUITestAuthenticationBypassEnabled: Bool {
+        allowsUITestAuthenticationBypass && defaults.bool(forKey: UITestPreferences.bypassAuthenticationKey)
+    }
+
+    private func evaluateLocalAuthenticationPolicy(
         _ context: LAContext,
-        appSessionPolicy policy: AppSessionAuthenticationPolicy,
+        policy: LAPolicy,
         reason: String,
-        source: String,
-        promptID: String
+        traceHooks: LocalAuthenticationPolicyTraceHooks = LocalAuthenticationPolicyTraceHooks()
     ) async throws -> Bool {
-        traceAppSessionCallbackStage(
-            "appSession.evaluate.callback.call.start",
-            policy: policy,
-            source: source,
-            promptID: promptID
-        )
+        traceHooks.callStart()
 
         return try await withCheckedThrowingContinuation { continuation in
             localAuthenticationPolicyEvaluator(
                 context,
-                policy.localAuthenticationPolicy,
+                policy,
                 reason
             ) { success, error in
                 var metadata = Self.callbackReplyMetadata(success: success, error: error)
-                self.traceAppSessionCallbackStage(
-                    "appSession.evaluate.callback.reply",
-                    policy: policy,
-                    source: source,
-                    promptID: promptID,
-                    metadata: metadata
-                )
+                traceHooks.reply(metadata)
 
                 if !success && error == nil {
                     metadata["mappedError"] = "failedWithoutError"
                 }
-                self.traceAppSessionCallbackStage(
-                    "appSession.evaluate.callback.resume",
-                    policy: policy,
-                    source: source,
-                    promptID: promptID,
-                    metadata: metadata
-                )
+                traceHooks.resume(metadata)
 
                 if success {
                     continuation.resume(returning: true)
@@ -598,6 +593,48 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 }
             }
         }
+    }
+
+    private func evaluateLocalAuthenticationPolicyWithCallback(
+        _ context: LAContext,
+        appSessionPolicy policy: AppSessionAuthenticationPolicy,
+        reason: String,
+        source: String,
+        promptID: String
+    ) async throws -> Bool {
+        try await evaluateLocalAuthenticationPolicy(
+            context,
+            policy: policy.localAuthenticationPolicy,
+            reason: reason,
+            traceHooks: LocalAuthenticationPolicyTraceHooks(
+                callStart: {
+                    self.traceAppSessionCallbackStage(
+                        "appSession.evaluate.callback.call.start",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID
+                    )
+                },
+                reply: { metadata in
+                    self.traceAppSessionCallbackStage(
+                        "appSession.evaluate.callback.reply",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: metadata
+                    )
+                },
+                resume: { metadata in
+                    self.traceAppSessionCallbackStage(
+                        "appSession.evaluate.callback.resume",
+                        policy: policy,
+                        source: source,
+                        promptID: promptID,
+                        metadata: metadata
+                    )
+                }
+            )
+        )
     }
 
     private func traceAppSessionPolicyAwaitStage(
