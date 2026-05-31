@@ -94,11 +94,14 @@ This document is the implementation planning record for accepted security-review
 - Severity: `medium`
 - Area: `privacy-lifecycle`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/daf3bd3399248191900565067b6785ae)
+- Status: `Fixed / Closed`
+- Resolution: Landed via [PR #411](https://github.com/cypherair/cypherair/pull/411).
 - Decision: Confirmed high-priority privacy lifecycle bug. Stale operation-prompt state can suppress real app-switch lifecycle handling.
 - Impact: Can leave already-unlocked UI insufficiently blurred during real lifecycle transitions, especially on macOS, and can contribute to inconsistent auth recovery.
 - Relevant paths: `Sources/Security/AuthenticationPromptCoordinator.swift`, `Sources/App/Common/PrivacyScreenLifecycleGate.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`
-- Fix plan: Replace unbounded next-lifecycle suppression with bounded operation-prompt settle state. Background transitions must always clear prompt state and hard-blur; prompt-tail active transitions must not trigger resume auth or stale suppression after the settle window.
-- Validation: Add lifecycle state-machine tests for prompt-induced inactive/active transitions, real background transitions, stale prompt state expiry, and macOS resume behavior.
+- Fix summary: Replaced unbounded next-lifecycle suppression with a bounded operation-prompt snapshot lifecycle, including nested prompt session generations, prompt-owned inactive evidence before settle, and background transitions that always clear prompt state and hard-blur.
+- Validation: Added lifecycle state-machine, ProtectedData integration, and trace coverage for prompt-induced inactive/active transitions, real background transitions, stale prompt state expiry, nested prompt sessions, and macOS resume behavior.
+- Follow-up note: Codex review disposition was OK to land. User macOS validation still observed behavior similar to the previous issue when the authentication grace period is set to immediate; the old behavior's root cause remains unknown and this residual observation is not tracked as part of SR-FIX-08 closure. If pursued, it should be opened as a separate investigation.
 
 ### SR-FIX-09: Post-auth warm-up can clear background privacy blur
 
