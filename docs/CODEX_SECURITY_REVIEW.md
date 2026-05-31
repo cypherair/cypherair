@@ -133,11 +133,13 @@ This document is the implementation planning record for accepted security-review
 - Severity: `medium`
 - Area: `app-auth`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/85c8b620e92c8191ab484e11a5cf4143)
+- Status: `Fixed / Closed`
+- Resolution: Implemented in [PR #414](https://github.com/cypherair/cypherair/pull/414).
 - Decision: Confirmed highest-priority app-auth issue. Production auth paths must not honor a UI-test bypass defaults key from the standard defaults domain.
 - Impact: Can bypass app-session/privacy-lock and mode-switch authorization if the app standard defaults domain is manipulated. It does not bypass hardware-gated private-key unwrap/sign/decrypt/export.
 - Relevant paths: `Sources/App/AppContainer.swift`, `Sources/Security/AuthenticationManager.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
-- Fix plan: Make production `AuthenticationManager` unable to honor the UI-test bypass key: gate reads to debug/XCTest-only contexts or inject a non-standard defaults suite that production never uses.
-- Validation: Add production-manager tests proving standard defaults cannot enable bypass, plus UI-test-path tests showing automation still uses the isolated test-only path.
+- Fix summary: Production/default `AuthenticationManager` instances now ignore `com.cypherair.preference.uiTestBypassAuthentication` unless explicitly constructed with UI-test bypass opt-in. `AppContainer.makeUITest()` remains opted in for automation, while private-key and app-session authentication share a lower-level LocalAuthentication policy helper that preserves the existing trace vocabulary.
+- Validation: Added regression coverage proving default managers do not bypass when the defaults key is set, and proving explicitly opted-in UI-test managers still bypass without invoking the LocalAuthentication evaluator. Targeted `AuthLifecycleTraceStoreTests`, the full macOS `CypherAir-UnitTests` plan, and `git diff --check` passed.
 
 ### SR-FIX-12: Import confirmation can act on a replaced key request
 
