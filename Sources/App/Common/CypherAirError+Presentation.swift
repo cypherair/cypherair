@@ -44,6 +44,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.operationCancelled", defaultValue: "Operation was cancelled.")
         case .fileIoError(let reason):
             String(localized: "error.fileIoError", defaultValue: "File operation failed: \(reason)")
+        case .keyOperationUnavailable:
+            String(localized: "error.keyOperationUnavailable", defaultValue: "This key operation is unavailable.")
         case .secureEnclaveUnavailable:
             String(localized: "error.seUnavailable", defaultValue: "Secure Enclave is not available on this device.")
         case .authenticationFailed:

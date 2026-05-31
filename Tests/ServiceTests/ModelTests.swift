@@ -243,6 +243,7 @@ final class ModelTests: XCTestCase {
             .biometricsUnavailable,
             .fileIoError(reason: "test io error"),
             .operationCancelled,
+            .keyOperationUnavailable(category: .operationUnsupportedForCustody),
             .insufficientDiskSpace(fileSizeMB: 50, requiredMB: 100, availableMB: 30),
             .duplicateKey,
             .keyTooLargeForQr,

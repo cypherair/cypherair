@@ -814,6 +814,108 @@ final class KeyManagementServiceTests: XCTestCase {
         )
     }
 
+    private struct HiddenCustodyExportFixture {
+        let identity: PGPKeyIdentity
+        let signingPublicKeyX963: Data
+        let keyAgreementPublicKeyX963: Data
+    }
+
+    private func generatedHiddenCustodyExportFixture(
+        configurationIdentity: PGPKeyConfiguration.Identity
+    ) async throws -> HiddenCustodyExportFixture {
+        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
+        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
+        let handleSetIdentifier = "export-\(UUID().uuidString.lowercased())"
+        let signingReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .signing
+        )
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .keyAgreement
+        )
+        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
+            signing: SecureEnclaveCustodyLoadedHandle(
+                binding: SecureEnclaveCustodyHandlePublicBinding(
+                    reference: signingReference,
+                    publicKeyX963: signingPublicKeyX963
+                ),
+                privateKey: signingPrivateKey
+            ),
+            keyAgreement: SecureEnclaveCustodyLoadedHandle(
+                binding: SecureEnclaveCustodyHandlePublicBinding(
+                    reference: keyAgreementReference,
+                    publicKeyX963: keyAgreementPublicKeyX963
+                ),
+                privateKey: nil
+            )
+        )
+        let adapter = PGPSecureEnclaveCustodyGenerationAdapter(engine: engine)
+        let material = try await adapter.generatePublicCertificate(
+            name: "Hidden Export \(configurationIdentity.rawValue)",
+            email: "hidden-export@example.invalid",
+            expirySeconds: 3600,
+            configuration: configurationIdentity.configuration,
+            handlePair: handlePair,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        let metadata = material.metadata
+        let identity = PGPKeyIdentity(
+            fingerprint: metadata.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
+            isDefault: true,
+            isBackedUp: false,
+            publicKeyData: material.publicKeyData,
+            revocationCert: material.revocationCert,
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo,
+            expiryDate: metadata.expiryDate,
+            openPGPConfigurationIdentity: configurationIdentity,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        return HiddenCustodyExportFixture(
+            identity: identity,
+            signingPublicKeyX963: signingPublicKeyX963,
+            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
+        )
+    }
+
+    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256
+        ]
+        var error: Unmanaged<CFError>?
+        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to create test P-256 key."
+            )
+        }
+        return key
+    }
+
+    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw CypherAirError.keyGenerationFailed(reason: "Failed to derive test P-256 public key.")
+        }
+        var error: Unmanaged<CFError>?
+        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to export test P-256 public key."
+            )
+        }
+        return data
+    }
+
     private static func hiddenRecoveryReport(
         identities: [PGPKeyIdentity],
         handleAvailability: (PGPKeyIdentity) -> SecureEnclaveCustodyHandleAvailability = { _ in
@@ -1625,6 +1727,70 @@ final class KeyManagementServiceTests: XCTestCase {
         service.confirmKeyBackupExported(fingerprint: identity.fingerprint)
 
         XCTAssertTrue(try XCTUnwrap(service.keys.first).isBackedUp)
+    }
+
+    func test_exportPublicKey_hiddenSecureEnclaveCustody_returnsStoredPublicCertificate() async throws {
+        for configurationIdentity in [
+            PGPKeyConfiguration.Identity.compatibleP256V4,
+            .modernP256V6
+        ] {
+            let fixture = try await generatedHiddenCustodyExportFixture(
+                configurationIdentity: configurationIdentity
+            )
+            try storeIdentity(fixture.identity)
+            try service.loadKeys()
+            let unwrapCountBefore = mockSE.unwrapCallCount
+
+            let armored = try service.exportPublicKey(fingerprint: fixture.identity.fingerprint)
+            let binary = try engine.dearmor(armored: armored)
+
+            XCTAssertEqual(binary, fixture.identity.publicKeyData)
+            XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+            let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine)
+                .inspectPublicBindings(publicKeyData: binary)
+            XCTAssertEqual(inspection.fingerprint, fixture.identity.fingerprint)
+            XCTAssertEqual(inspection.keyVersion, fixture.identity.keyVersion)
+            XCTAssertEqual(inspection.signingPublicKeyX963, fixture.signingPublicKeyX963)
+            XCTAssertEqual(inspection.keyAgreementPublicKeyX963, fixture.keyAgreementPublicKeyX963)
+        }
+    }
+
+    func test_exportKey_hiddenSecureEnclaveCustody_isUnsupportedAndDoesNotUnwrapOrMarkBackedUp() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        try storeIdentity(fixture.identity)
+        try service.loadKeys()
+        XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
+        let unwrapCountBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportKeyBackupData(
+                fingerprint: fixture.identity.fingerprint,
+                passphrase: "backup-pass"
+            )
+            XCTFail("Expected Secure Enclave custody backup export to be unsupported")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnsupportedForCustody)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        do {
+            _ = try await service.exportKey(
+                fingerprint: fixture.identity.fingerprint,
+                passphrase: "backup-pass"
+            )
+            XCTFail("Expected Secure Enclave custody private export to be unsupported")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnsupportedForCustody)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+        XCTAssertFalse(try loadStoredIdentity(fingerprint: fixture.identity.fingerprint).isBackedUp)
+        XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
     }
 
     func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
@@ -3356,6 +3522,60 @@ final class KeyManagementServiceTests: XCTestCase {
 
         let binary = try engine.dearmor(armored: armored)
         XCTAssertEqual(binary, imported.revocationCert)
+    }
+
+    func test_exportRevocationCertificate_hiddenSecureEnclaveCustody_returnsStoredRevocationArtifact() async throws {
+        for configurationIdentity in [
+            PGPKeyConfiguration.Identity.compatibleP256V4,
+            .modernP256V6
+        ] {
+            let fixture = try await generatedHiddenCustodyExportFixture(
+                configurationIdentity: configurationIdentity
+            )
+            try storeIdentity(fixture.identity)
+            try service.loadKeys()
+            let unwrapCountBefore = mockSE.unwrapCallCount
+            let saveCountBefore = mockKC.saveCallCount
+
+            let armored = try await service.exportRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint
+            )
+            let binary = try engine.dearmor(armored: armored)
+
+            XCTAssertEqual(binary, fixture.identity.revocationCert)
+            XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+            XCTAssertEqual(mockKC.saveCallCount, saveCountBefore)
+            let validation = try engine.parseRevocationCert(
+                revData: binary,
+                certData: fixture.identity.publicKeyData
+            )
+            XCTAssertTrue(validation.lowercased().contains(fixture.identity.fingerprint.lowercased()))
+        }
+    }
+
+    func test_exportRevocationCertificate_hiddenSecureEnclaveCustody_missingArtifactFailsClosed() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .modernP256V6
+        )
+        var identity = fixture.identity
+        identity.revocationCert = Data()
+        try storeIdentity(identity)
+        try service.loadKeys()
+        let unwrapCountBefore = mockSE.unwrapCallCount
+        let saveCountBefore = mockKC.saveCallCount
+
+        do {
+            _ = try await service.exportRevocationCertificate(fingerprint: identity.fingerprint)
+            XCTFail("Expected missing Secure Enclave revocation artifact to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .revocationArtifactUnavailable)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+        XCTAssertEqual(mockKC.saveCallCount, saveCountBefore)
+        XCTAssertTrue(try loadStoredIdentity(fingerprint: identity.fingerprint).revocationCert.isEmpty)
     }
 
     func test_exportRevocationCertificate_legacyMissingRevocation_backfillsAndSecondExportSkipsUnwrap() async throws {
