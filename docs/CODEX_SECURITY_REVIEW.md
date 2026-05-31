@@ -138,15 +138,6 @@
 - **Current code:** `.github/workflows/xcframework-edge-release.yml` writes `RELEASE_SOURCE_REF` into release metadata and the release-notes verification command; `docs/XCFRAMEWORK_RELEASES.md` directs drill-release verification to use the exact command rendered in release notes.
 - **Fix:** render shell-safe quoted source refs in release notes, or restrict drill source refs to a safe character set before publishing notes.
 
-## [open] Unbounded armored text import can exhaust memory
-
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/792eaf5ba0488191a3b45e9651c6162c — Codex severity **medium** · assessed **real-low (one sub-claim is a false positive)**
-- **Verified — text-mode real (HEAD 40ea2fa).** Decrypt "Import .asc File" and Verify "Import Signed File" read the chosen file with `Data(contentsOf:)` with **no size cap**, then make a full UTF-8 `String` copy, retaining both (plus the bound input → triple retention). A very large attacker-supplied .asc/plaintext file → memory exhaustion → app crash. Reachable from shipped Decrypt/Verify UI (default config enables import; only the tutorial sandbox disables it). Trigger: user taps the import button and selects a huge file.
-- **File-mode sub-claim = FALSE POSITIVE (note when closing).** The report's "NSNumber.intValue 32-bit truncation bypasses the 256 KiB inspection guard" does not hold: on the macOS 26.5 SDK Swift's `intValue` is a 64-bit `Int` (only `int32Value` truncates, unused here), so the guard is sound; file *decryption* is streamed anyway. (Codex itself could not reproduce it.)
-- **Impact:** local, user-mediated, availability-only crash of the victim's own process. No confidentiality/integrity/key/RCE; zero-network (no remote/zero-click).
-- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`textCiphertextFileImportAction`); `Sources/App/Sign/VerifyScreenModel.swift` (`cleartextFileImportAction`); `Sources/App/Common/TextImport/ImportedTextInputState.swift` (retains rawData + textSnapshot).
-- **Fix:** cap pre-read size (read `attributes[.size] as? UInt64` and reject oversized before `Data(contentsOf:)`, consistent with EncryptionService / DiskSpaceChecker); avoid retaining Data + two String copies.
-
 ## [open] CA-29: Abandoned file decrypt can adopt temporary plaintext output
 
 - **Codex:** https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
@@ -178,11 +169,3 @@
 - **Impact:** core text-entry UX/availability issue for Decrypt text mode and Verify cleartext mode. It does not expose secrets or change decrypt/verify correctness, but it makes manual correction of encrypted/signed text unreliable.
 - **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`setCiphertextInput`, `invalidateTextInputState`); `Sources/App/Decrypt/DecryptView.swift` (`.id(model.textInputSectionEpoch)`); `Sources/App/Sign/VerifyScreenModel.swift` (`setSignedInput`, `invalidateCleartextVerificationState`); `Sources/App/Sign/VerifyView.swift` (`.id(model.textInputSectionEpoch)`).
 - **Fix:** split edit invalidation from section refresh. Edit paths should clear stale result/phase1/verification state without bumping `textInputSectionEpoch`; import/reset/operation-completion paths can still refresh the input section when needed.
-
-## [open] Unbounded SKESK fallback in password decrypt (latent — not shipped-reachable)
-
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/5dfacb1e55cc81918f142034127840ff — Codex severity **medium** · assessed **real-low, latent**
-- **Verified real at the Rust layer, NOT reachable in the shipped app (HEAD 40ea2fa).** `password::decrypt` loops over every SKESK collected by `collect_message_context` (unbounded `Vec`, no cap); each candidate triggers a full `decrypt_with_helper` (`read_to_end` of the whole payload into memory) *before* the integrity/auth failure is detected, and those errors are deferred so the loop continues. N valid-looking-but-failing SKESKs → ~N full-payload decrypts → CPU/memory amplification. The deferral is an intentional interop fix (6d9334a); only the bound is missing.
-- **Reachability:** `PasswordMessageService` is service-only — no shipped UI/route/ScreenModel consumes it (no AppRoute case). No end-user action reaches this today.
-- **Current code:** `pgp-mobile/src/password.rs` (`collect_message_context`, `decrypt`); `pgp-mobile/src/decrypt.rs` (`decrypt_with_helper`, `decrypt_with_fixed_session_key_detailed`); exposed via `pgp-mobile/src/lib.rs` `PgpEngine::decrypt_with_password`; wrapped by `Sources/Services/PasswordMessageService.swift` (no UI consumer).
-- **Fix (do before any password-message route ships):** bound the SKESK / candidate-attempt count and/or add a payload-size/work budget separating cheap rejects from full-payload retries.
