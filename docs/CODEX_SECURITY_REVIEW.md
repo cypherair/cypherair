@@ -1,195 +1,245 @@
-# Codex Security Review — Verified Follow-ups
+# Codex Security Review Fix Plan
 
-> Purpose: Track Codex cloud security-review findings that, after manual verification
-> against the current code, are **real and worth acting on**. Confirmed false positives
-> / by-design items are closed directly in Codex and are not duplicated here.
-> Source: Codex cloud security review (`chatgpt.com/codex/cloud/security`).
-> Verified against: branch `main`, HEAD `40ea2fa`. Code is referenced by file + symbol
-> name (not line number) so references stay valid as the tree moves.
-> Convention: keep each entry short — impact in 1–2 lines, the current code locations,
-> and the Codex link so the finding can be closed once fixed.
+This document is the implementation planning record for accepted security-review follow-ups. Use the `SR-FIX-*` IDs in future issues, commits, and pull requests. Legacy `CA-*` IDs are included only for traceability to the original review discussion.
 
-**Status:** `open` = verified, not yet fixed · `in-progress` · `fixed` (then close in Codex). Findings judged false-positive / by-design are closed directly in Codex and never recorded here — this file only holds items we intend to fix.
+## Fix Queue
 
----
+### SR-FIX-01: Spoofed duplicate contacts bypass key-update warning
 
-## [open] Selector discovery surfaces unauthenticated User IDs
+- Legacy ID: `CA-01`
+- Severity: `high`
+- Area: `contact-import`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2)
+- Decision: Confirmed fix-worthy. Duplicate conflicting contact imports are stored as separate identities, but the import workflow drops the computed conflict warning before user confirmation.
+- Impact: A spoofed duplicate contact can appear beside a legitimate contact with the expected name or email. Future encryption is affected only if the user selects that duplicate; no automatic key takeover occurs.
+- Relevant paths: `Sources/Services/ContactService.swift`, `Sources/App/Contacts/Import/ContactImportWorkflow.swift`
+- Fix plan: Preserve duplicate identities if that remains product policy, but surface the candidate conflict before or at import success and offer an explicit review or merge path. If product policy changes, stage or block conflicting imports until the user chooses how to handle the existing contact.
+- Validation: Add import workflow tests for same-email/User-ID different-fingerprint candidates and UI/workflow checks that the conflict warning is preserved before success.
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/f6c9737226248191a651f043b8b6f146 — severity **low**
-- **Verified real & reachable.** A crafted public certificate with a bare (un-self-signed)
-  User ID survives import and appears in the contact certificate-signature UI looking
-  identical to a validly-bound User ID. The app treats unauthenticated == normal at all
-  three layers: data (no validity field), UI (only `Primary` / `Revoked` badges), and
-  operation (`certify` succeeds with no binding check).
-- **Impact (low, bounded):** A user can be socially engineered into producing / sharing a
-  certification for an identity the key owner never bound. No in-app trust propagation
-  (certifications are crypto-only); recipient selection is unaffected (keyed by key, not
-  by these selectors). Real harm requires an external web-of-trust consumer.
-- **Current code:**
-  - `pgp-mobile/src/keys/selector_discovery.rs` — `discover_certificate_selectors` (enumerates every raw User ID packet)
-  - `pgp-mobile/src/keys.rs` — `current_user_id_occurrence_state` (bare packet → `primary=false, revoked=false`), `find_user_id_by_selector` (validates occurrence index + bytes only, no binding), `struct DiscoveredUserId`
-  - `Sources/Models/UserIdSelectionOption.swift` — no validity / authenticated field
-  - `Sources/Services/CertificateSelectionCatalogMapper.swift` — forwards fields unchanged
-  - `Sources/App/Contacts/ContactCertificateSignaturesView.swift` — User ID rows render only `Primary` / `Revoked` badges
-- **Fix idea:** Add a `hasValidSelfBinding` (authenticated) flag to `DiscoveredUserId` →
-  `UserIdSelectionOption` — the per-occurrence binding is already computed in Rust. Surface
-  it in the UI ("not authenticated by this key") and/or gate `certify`. `DiscoveredUserId`
-  is a `#[uniffi::Record]`, so this is a UniFFI-visible, multi-layer change (regenerate
-  bindings + rebuild XCFramework + both-profile tests). While reworking this UI, also
-  consider surfacing signer-key expiry/revocation status alongside User-ID binding
-  validity — a related OpenPGP validity-display improvement on the same screen.
+### SR-FIX-02: GH_TOKEN exposed to entire XCFramework build
 
----
+- Legacy ID: `CA-02`
+- Severity: `high`
+- Area: `ci-supply-chain`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d)
+- Decision: Confirmed release supply-chain hardening. Release XCFramework builds expose GitHub tokens to broader build subprocesses than needed.
+- Impact: Compromised release-time build code could read workflow tokens during artifact production. This is release infrastructure risk, not an app-runtime exploit.
+- Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`
+- Fix plan: Scope `GH_TOKEN` / `GITHUB_TOKEN` only to `gh` release operations that need GitHub API access. Clear token variables from Cargo, build-script, and helper subprocess environments.
+- Validation: Inspect workflow environments and run release-workflow dry validation showing build subprocesses do not inherit GitHub tokens except for narrow `gh` calls.
 
-## [open] Production auth bypassable via ungated UI-test defaults key
+### SR-FIX-03: Release workflow runs arbitrary refs with write token
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/85c8b620e92c8191ab484e11a5cf4143 — Codex severity **medium** · assessed **real, fix soon (highest priority in this batch)**
-- **Verified real (HEAD 40ea2fa).** `AuthenticationManager.evaluate` and `evaluateAppSession` both return success the moment the `UserDefaults` bool `com.cypherair.preference.uiTestBypassAuthentication` is true — *before* any `LAContext`, with **no** `#if DEBUG` / XCTest / launch-arg gate (only the key definition + the two reads exist in the file). Production `AppContainer.makeDefault` builds the manager on `UserDefaults.standard`; the bypass is reachable from the shipped privacy-screen resume path. Introduced in 89d44d1; the read path later broadened to `evaluateAppSession` (15820db). **Never retired** (distinct from the authMode / grace-period / theme keys that *were* migrated to ProtectedData).
-- **Purpose:** UI-test (XCUITest) auth bypass so automation skips biometric prompts. `makeUITest` writes it into an isolated per-UUID defaults suite — isolation is only on the *write* side; the production *read* path trusts `.standard` unconditionally.
-- **Impact (bounded):** app-session / privacy-lock + mode-switch authorization bypass only. Does **not** bypass Secure Enclave private-key unwrap/sign/decrypt/export (hardware-gated independently). Zero-network → local same-user only; precondition is writing the key into the app's `UserDefaults.standard` / container domain (sandbox + macOS TCC make this non-trivial; not demonstrated end-to-end).
-- **Current code:** `Sources/Security/AuthenticationManager.swift` (`UITestPreferences.bypassAuthenticationKey`, `evaluate`, `evaluateAppSession`); `Sources/App/AppContainer.swift` (`makeDefault` → `.standard`; `makeUITest` = only writer, isolated suite).
-- **Fix:** make production unable to honor the key — gate on `#if DEBUG` / `isXCTestHost` / an injected non-standard defaults suite, or never read it from `.standard` in the production manager. `Sources/Security` red-line → describe + human-review before editing (SECURITY.md §10).
+- Legacy ID: `CA-05`
+- Severity: `high`
+- Area: `ci-supply-chain`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/893e12c4d22c8191afba18916328b86d)
+- Decision: Confirmed release provenance issue. Formal stable publication can be dispatched from a source ref that is not proven to match the stable release tag commit.
+- Impact: A stable release page could receive assets built from the wrong ref, weakening provenance for released XCFramework and source/compliance artifacts.
+- Relevant paths: `.github/workflows/stable-build-release.yml`
+- Fix plan: Make formal stable publication tag-push only, or guard dispatch so checked-out `HEAD` equals the peeled stable tag commit before any official release asset is created.
+- Validation: Add workflow guard tests or script checks for tag/HEAD equality and verify dispatch cannot publish official assets from a mismatched ref.
 
-## [open] Import confirmation can act on a replaced key request (regression)
+### SR-FIX-04: Rust audit does not gate release publication
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/078f49939538819195ae18333d9d130b — Codex severity **medium** · assessed **real-low (regression)**
-- **Verified real (HEAD 40ea2fa); a regression.** Pre-refactor (08a6e5d^) the confirmation buttons captured the displayed request locally; the refactor routed Verify/Add through `coordinator.confirmVerified()` / `confirmUnverified()`, which dereference the **live mutable** `coordinator.request` at tap time, while `present()` blindly overwrites any pending request. Tell-tale: `onCancel` still captures locally — the asymmetry shows it's an oversight. One shared coordinator is fed by two shipped sources (cypherair:// URL import + in-app Add Contact).
-- **Impact:** a second import arriving while a confirmation sheet is open can make the action apply to the newer (attacker) request → an attacker key added / marked `.verified`, which suppresses the unverified-recipient warning at encryption time. Bounded by friction (precise timing, local/deep-link delivery, user tap); contact public-key/verification metadata only (no private-key compromise, no RCE). The exact exploitable window depends on SwiftUI `.sheet(item:)` dismiss/re-present timing (unverified on a real device), but the closure-capture regression is a correctness defect regardless.
-- **Current code:** `Sources/App/Contacts/ImportConfirmationCoordinator.swift` (`present()`, `confirmVerified`/`confirmUnverified` vs local-capture `onCancel`); `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift` + `AppSceneIncomingURLRouter` (URL caller); `Sources/App/Contacts/AddContactView.swift` (in-app caller); shared host in `CypherAirApp.swift`; warning suppression at `Sources/App/Encrypt/EncryptScreenModel.swift`.
-- **Fix:** Verify/Add + Add-Unverified button closures should capture the **displayed** request's callbacks (from the sheet closure parameter), matching `onCancel` and the pre-refactor pattern; and/or make `present()` refuse/queue while a request is pending. Add a regression test (`present(A); present(B);` then the sheet-bound verify action).
+- Legacy ID: `CA-08`
+- Severity: `medium`
+- Area: `ci-supply-chain`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9b57feaa6750819185da3adea4e4b205)
+- Decision: Confirmed edge-release hardening. Edge publication is not currently blocked by a failed Rust dependency audit.
+- Impact: Public edge or drill assets can be published even when Rust dependency audit fails, weakening prerelease supply-chain signals.
+- Relevant paths: `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `docs/TESTING.md`, `docs/APP_RELEASE_PROCESS.md`
+- Fix plan: Make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before tag/release creation and asset upload.
+- Validation: Verify the edge workflow graph requires Rust audit before publication and that a failing audit prevents tag/release asset creation.
 
-## [open] CA-01: Duplicate-contact conflict warning is dropped on import
+### SR-FIX-05: Untrusted certifications can mark contacts certified
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2 — Codex severity **high** · assessed **real, needs UI/workflow fix**
-- **Verified real, but narrower than the report headline.** A same-email or same-User-ID public-key import with a different fingerprint is intentionally stored as a **separate contact identity**, not as an overwrite of the existing contact. The app already computes `ContactCandidateMatch` and returns `.addedWithCandidate`, but `ContactImportWorkflow` collapses that result into ordinary success and never shows the conflict/candidate warning in the import confirmation flow.
-- **Impact:** a spoofed duplicate contact can appear next to the legitimate contact with the expected display name/email. Future encryption only targets the attacker key if the user selects that duplicate contact row; unverified imports still get unverified-recipient warnings. This is a duplicate-recipient/conflict-warning gap, not automatic key takeover.
-- **Current code:** `ContactImportMatcher.candidateMatch` computes the candidate; `ContactSnapshotMutator.addContact` stores the new identity/key; `ContactService.importResult` returns `.addedWithCandidate`; `ContactImportWorkflow.importContact` treats `.addedWithCandidate` like `.added`; `ContactRecipientResolver.publicKeysForRecipientContactIDs` resolves the selected contact ID's preferred key.
-- **Fix idea:** preserve duplicate identities if that remains product policy, but surface the candidate conflict before/at import success and offer an explicit merge/review path. If product policy should be stricter, stage or block conflicting imports until the user chooses how to handle the existing contact.
+- Legacy ID: `CA-09`
+- Severity: `medium`
+- Area: `contact-certification`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/784c0115a134819188d3ebac0d5d8ac3)
+- Decision: Confirmed trust-semantics issue. The UI can present cryptographically valid certifications as trusted contact certification without an explicit signer trust policy.
+- Impact: Users may read neutral or untrusted certification artifacts as trusted endorsements. Recipient selection and manual fingerprint verification are not directly changed.
+- Relevant paths: `Sources/Services/CertificateSignatureService.swift`, `Sources/Services/ContactSnapshotMutator.swift`, `Sources/App/Contacts/ContactKeySummaryView.swift`, `Sources/App/Contacts/ContactDetailView.swift`
+- Fix plan: Separate cryptographic certification validity from trusted certification semantics. Use neutral UI for valid but untrusted certifications; reserve trusted labels for artifacts accepted under an explicit signer trust policy.
+- Validation: Add service/UI tests for valid-untrusted certifications, trusted certifications, and self-certification-like artifacts so labels cannot overstate trust.
 
-## [open] CA-02: Release build token scope is too broad
+### SR-FIX-06: TOCTOU can delete active protected-data root secret
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d — Codex severity **high** · user-confirmed **real, pending fix**
-- **Verified real, with narrowed scope.** The core issue is stable/edge release XCFramework builds passing `GH_TOKEN` to the whole `./build-xcframework.sh --release` step, so Cargo build scripts, proc macros, and `cargo run` helpers can inherit the release job token. PR/nightly read-token exposure is lower impact and not the main risk.
-- **Impact:** if release builds run untrusted or compromised build code, that code can read a write-capable workflow token during artifact production. No app-runtime or end-user exploit is implied; this is a release supply-chain hardening issue.
-- **Current code:** `.github/workflows/stable-build-release.yml` and `.github/workflows/xcframework-edge-release.yml` set write-class workflow permissions and pass `GH_TOKEN` to the XCFramework build step; `.github/workflows/pr-checks.yml` and `.github/workflows/nightly-full.yml` also pass read-scoped tokens; `scripts/build_apple_arm64e_xcframework.sh` invokes `gh`, `cargo build`, and `cargo run` in the inherited environment.
-- **Fix:** only provide GitHub tokens to the `gh release list/download` calls that need them, and clear `GH_TOKEN` / `GITHUB_TOKEN` from Cargo/build subprocess environments.
+- Legacy ID: `CA-10`
+- Severity: `medium`
+- Area: `protected-data`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9fd5a847678881918e0eea9cbdfc2e77)
+- Decision: Confirmed low-probability ProtectedData availability risk. Root-secret orphan cleanup can act on stale registry state during first-domain creation.
+- Impact: Failure mode is local ProtectedData availability or recovery loss. It is not disclosure, authentication bypass, or cryptographic breakage.
+- Relevant paths: `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift`, `Sources/Security/ProtectedData/PrivateKeyControlStore.swift`, `Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift`, `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift`, `Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift`
+- Fix plan: Before deleting a supposedly orphaned root secret, reload current registry state under the registry mutation gate or equivalent serialization. Abort cleanup if any current membership, pending mutation, or ready shared resource exists.
+- Validation: Add concurrency/unit coverage around first-domain creation and orphan cleanup with stale snapshots; assert cleanup aborts under current registry membership or mutation.
 
-## [open] CA-05: Stable release dispatch can decouple source ref from stable tag
+### SR-FIX-07: Local reset fails open when authentication is unavailable
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/893e12c4d22c8191afba18916328b86d — Codex severity **high** · user-confirmed **real, pending fix**
-- **Verified real.** The manual stable release path accepts both `release_tag` and `source_ref`, checks out `source_ref`, and validates tag spelling plus project version/build, but does not prove the checkout `HEAD` is the stable tag commit.
-- **Impact:** a user or attacker with workflow-dispatch authority could build and publish stable release assets from one ref under a different stable tag's release page, weakening provenance for the XCFramework, source bundle, and compliance artifacts. This is not an arbitrary fork-PR path.
-- **Current code:** `.github/workflows/stable-build-release.yml` uses `workflow_dispatch.source_ref` for checkout under `contents: write`, `id-token: write`, and `attestations: write`; `publish-stable-release` creates the release after the build/audit jobs complete.
-- **Fix:** formal stable publication should be tag-push only. Keep `workflow_dispatch` only for dry-run or validation that cannot create the official release, and add a guard that the checked-out `HEAD` equals the peeled stable tag commit.
+- Legacy ID: `CA-11`
+- Severity: `medium`
+- Area: `local-reset-auth`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663)
+- Decision: Confirmed low-impact destructive-action risk. Local data reset should fail closed when app-session authentication cannot be evaluated.
+- Impact: Failure mode is local destructive reset under narrow auth-unavailable conditions. It does not disclose data or bypass Secure Enclave private-key operations.
+- Relevant paths: `Sources/App/Settings/SettingsScreenModel.swift`, `Sources/App/Settings/LocalDataResetService.swift`
+- Fix plan: If app-session authentication cannot be evaluated, block local reset and surface an auth-unavailable error instead of treating the prompt as optional.
+- Validation: Add settings/reset tests for auth unavailable, auth failure, and auth success; only success should proceed to destructive reset.
 
-## [open] CA-08: Edge release publication is not gated on Rust audit
+### SR-FIX-08: Stale operation prompt generation can disable privacy blur
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/9b57feaa6750819185da3adea4e4b205 — Codex severity **medium** · user-confirmed **real for edge, pending fix**
-- **Verified real, narrowed to edge/drill releases.** Stable publication is already gated because `publish-stable-release` depends on `rust-dependency-audit`. The edge workflow still runs `rust-dependency-audit` and `publish-edge-release` as independent jobs, so the edge publish job can create the tag, upload assets, and publish the prerelease even if `cargo audit --deny warnings` fails.
-- **Impact:** public edge/drill XCFramework prerelease assets can be published from a workflow run whose Rust dependency audit failed. This does not affect formal stable/App Store publication, but it weakens the prerelease supply-chain signal.
-- **Current code:** `.github/workflows/xcframework-edge-release.yml` defines `rust-dependency-audit` and `publish-edge-release` without a `needs` relationship; `.github/workflows/stable-build-release.yml` already uses the intended gated shape for stable release publication.
-- **Fix:** make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before any tag/release creation or asset upload.
+- Legacy ID: `CA-15`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/daf3bd3399248191900565067b6785ae)
+- Decision: Confirmed high-priority privacy lifecycle bug. Stale operation-prompt state can suppress real app-switch lifecycle handling.
+- Impact: Can leave already-unlocked UI insufficiently blurred during real lifecycle transitions, especially on macOS, and can contribute to inconsistent auth recovery.
+- Relevant paths: `Sources/Security/AuthenticationPromptCoordinator.swift`, `Sources/App/Common/PrivacyScreenLifecycleGate.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`
+- Fix plan: Replace unbounded next-lifecycle suppression with bounded operation-prompt settle state. Background transitions must always clear prompt state and hard-blur; prompt-tail active transitions must not trigger resume auth or stale suppression after the settle window.
+- Validation: Add lifecycle state-machine tests for prompt-induced inactive/active transitions, real background transitions, stale prompt state expiry, and macOS resume behavior.
 
-## [open] CA-09: Contact certification needs an explicit trust model
+### SR-FIX-09: Post-auth warm-up can clear background privacy blur
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/784c0115a134819188d3ebac0d5d8ac3 — Codex severity **medium** · user-confirmed **Medium, standalone trust-model follow-up**
-- **Verified real as a trust-semantics issue.** The certification workflow can save any cryptographically valid certification artifact from the candidate signer set, including unverified contacts, and the projection then displays a green `Certified` state in the contact Trust UI. This does not change manual fingerprint verification or recipient selection.
-- **Impact:** misleading local trust metadata. A user may read `Certified` as trusted endorsement even when the signer is merely a known but untrusted contact, or when the artifact is only a self-certification-like structure.
-- **Current code:** `Sources/Services/CertificateSignatureService.swift` (`candidateSignerCertificates`, artifact validation); `Sources/Services/ContactSnapshotMutator.swift` (`saveCertificationArtifact`, `recomputeCertificationProjections`); `Sources/App/Contacts/ContactDetailView.swift` / `ContactKeySummaryView.swift` (`Certified` Trust UI).
-- **Fix:** handle separately as a Contacts/OpenPGP trust-model design item. `Certified` should mean trusted certification, while ordinary valid certification signatures should use neutral UI. Self-certification should not trigger contact-level trusted certification.
+- Legacy ID: `CA-16`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
+- Decision: Confirmed high-priority privacy lifecycle race. An in-flight resume task can clear a hard background privacy blur after the app leaves the active generation.
+- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle repair as SR-FIX-08.
+- Relevant paths: `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Settings/ProtectedSettingsHost.swift`
+- Fix plan: Track scene/activity generation or equivalent foreground state. Resume completion may clear blur only if it still belongs to the current active generation; otherwise keep blur for the next active/resume path.
+- Validation: Add generation/race tests where background occurs during post-auth work; completion must not clear blur for an obsolete generation.
 
-## [open] CA-10: Orphan root-secret cleanup can race first-domain creation
+### SR-FIX-10: Unescaped source ref in release verification command
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/9fd5a847678881918e0eea9cbdfc2e77 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
-- **Verified real but low probability.** `ProtectedDataFirstDomainSharedRightCleaner` decides whether a root secret is orphaned from a caller-provided registry snapshot, then deletes the persisted root secret without reloading the current registry or serializing with registry mutations. A stale empty-registry snapshot could race a first-domain transaction after the root secret is saved but before domain artifacts are staged.
-- **Impact:** local ProtectedData availability/recovery risk, not disclosure or authentication bypass. Normal first app authentication appears mostly serialized; practical reachability requires unusual fresh/reset first-domain task interleaving around protected settings or other ProtectedData access.
-- **Current code:** `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift` (`cleanupOrphanedSharedRightIfSafe`); `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift` (`performCreateDomainTransaction`); `Sources/Security/ProtectedData/PrivateKeyControlStore.swift` and `ProtectedSettingsStore.swift` first-domain bootstrap paths.
-- **Fix:** before deleting a supposedly orphaned root secret, reload current registry under the registry mutation gate or equivalent serialized operation. Abort cleanup if current registry has a pending mutation, committed membership, or ready shared-resource state.
+- Legacy ID: `CA-18`
+- Severity: `medium`
+- Area: `ci-supply-chain`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484)
+- Decision: Confirmed low-impact release-note hardening. Drill release verification commands should render shell-safe source refs.
+- Impact: A developer copying an unsafe verification command from drill release notes could trigger shell expansion. GitHub Actions and app users are not directly affected.
+- Relevant paths: `.github/workflows/xcframework-edge-release.yml`
+- Fix plan: Render shell-safe quoted source refs in drill release notes, or constrain accepted drill source refs to a safe character set before publishing notes.
+- Validation: Validate generated release notes for refs containing shell metacharacters, or validate that unsafe refs are rejected before publication.
 
-## [open] CA-11: Local reset must fail closed when app-session auth is unavailable
+### SR-FIX-11: Production auth can be bypassed via UI-test defaults key
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663 — Codex severity **medium** · user-confirmed **real, low impact, pending fix**
-- **Verified real, low reachability.** The local data reset flow checks whether app-session auth can be evaluated, but if auth is unavailable it skips the prompt and still proceeds to reset. In the realistic threat model this is a local destructive action, not data disclosure; an attacker generally still needs an already-unlocked app/session to reach it.
-- **Impact:** local availability/destructive reset risk under narrow device-auth-unavailable conditions. No private-key disclosure or Secure Enclave bypass is implied.
-- **Current code:** `Sources/App/Settings/SettingsScreenModel.swift` (`confirmLocalDataReset`); `Sources/App/Settings/LocalDataResetService.swift` (`resetAllLocalData`).
-- **Fix:** if app-session auth cannot be evaluated, block reset and show an auth-unavailable error instead of treating the auth check as optional.
+- Legacy ID: `CA-22`
+- Severity: `medium`
+- Area: `app-auth`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/85c8b620e92c8191ab484e11a5cf4143)
+- Decision: Confirmed highest-priority app-auth issue. Production auth paths must not honor a UI-test bypass defaults key from the standard defaults domain.
+- Impact: Can bypass app-session/privacy-lock and mode-switch authorization if the app standard defaults domain is manipulated. It does not bypass hardware-gated private-key unwrap/sign/decrypt/export.
+- Relevant paths: `Sources/App/AppContainer.swift`, `Sources/Security/AuthenticationManager.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
+- Fix plan: Make production `AuthenticationManager` unable to honor the UI-test bypass key: gate reads to debug/XCTest-only contexts or inject a non-standard defaults suite that production never uses.
+- Validation: Add production-manager tests proving standard defaults cannot enable bypass, plus UI-test-path tests showing automation still uses the isolated test-only path.
 
-## [open] CA-15: Operation prompt lifecycle suppression can stale-consume real app switches
+### SR-FIX-12: Import confirmation can act on a replaced key request
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/daf3bd3399248191900565067b6785ae — Codex severity **medium** · user-confirmed **High priority, pending fix**
-- **Verified real, with platform-specific impact.** `PrivacyScreenLifecycleGate` observes operation-prompt generation lazily from later lifecycle callbacks. If an operation prompt ended before the gate observed the new generation, a later real lifecycle event can be stale-consumed as prompt noise. On macOS, a real `didResignActive` / `didBecomeActive` after Touch ID can leave the window unblurred, skip expected resume authentication, or contribute to the long-standing stuck-blur behavior. On iOS/iPadOS/visionOS, `.background` normally hard-blurs before the app-switcher snapshot, but inactive-only or prompt-tail timing can still cause short-lived privacy/UX failures.
-- **Impact:** lifecycle privacy and reliability bug, not a private-key or payload-authentication bypass. It can expose already-unlocked UI on macOS app switches and can make authentication recovery feel stuck or inconsistent.
-- **Current code:** `Sources/App/Common/PrivacyScreenLifecycleGate.swift` (`syncOperationAuthenticationAttemptGeneration`, prompt suppression decisions); `Sources/App/Common/PrivacyScreenModifier.swift` (scene/app notification routing); `Sources/Security/AuthenticationPromptCoordinator.swift` (`operationPromptAttemptGeneration`); `Sources/Security/ProtectedData/AppSessionOrchestrator.swift` (`handleSceneDidResignActive`, `handleSceneDidEnterBackground`, resume/settle handlers).
-- **Fix design:** replace unbounded "next lifecycle event" suppression with bounded operation-prompt settle state. Real `.background` must always clear prompt state and hard-blur. Prompt-induced inactive/resign should use `blurOnly`; the matching active should use `settleTransientBlur` and must not call `handleResume()` or create a second auth prompt. After a short internal prompt-settle window from prompt end, stale prompt state must no longer suppress real app switches. Do not change the user-visible "Immediately" grace-period semantics to 3 seconds.
+- Legacy ID: `CA-23`
+- Severity: `medium`
+- Area: `contact-import`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/078f49939538819195ae18333d9d130b)
+- Decision: Confirmed contact-import regression. Confirmation actions can dereference a later mutable request instead of the request displayed to the user.
+- Impact: A second import delivered while a confirmation sheet is open can make the user action apply to the newer request, potentially marking an attacker contact as verified.
+- Relevant paths: `Sources/App/Contacts/ImportConfirmationCoordinator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Contacts/AddContactView.swift`
+- Fix plan: Make sheet button closures capture the displayed request callbacks, matching the cancellation path, and/or make `present()` refuse or queue while another request is pending.
+- Validation: Add regression coverage for `present(A); present(B); confirm displayed A` semantics or for explicit pending-request refusal/queue behavior.
 
-## [open] CA-16: In-flight resume task can clear background privacy blur
+### SR-FIX-13: Secret key zeroization skipped on KMS helper failures
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d — Codex severity **medium** · user-confirmed **High priority, pending fix**
-- **Verified real, with updated mechanism.** The historical `runPostAuthenticationWarmUpIfNeeded` path is gone, but `handleResume()` still authenticates, awaits post-auth domain/settings/contact work, then unconditionally clears `isPrivacyScreenBlurred`. If the user backgrounds the app during that post-auth window, `handleSceneDidEnterBackground()` hard-blurs first, but the in-flight resume task can later clear the blur.
-- **Impact:** narrow timing window, but worth fixing with CA-15. On iOS/iPadOS/visionOS the common background-snapshot path is usually protected by the background event and system suspension, but the race is timing-sensitive. On macOS it is a clearer privacy/state-machine issue because an inactive or backgrounded window can remain visible and be overwritten by old resume work.
-- **Current code:** `Sources/Security/ProtectedData/AppSessionOrchestrator.swift` (`handleResume`, `handleSceneDidEnterBackground`, post-auth completion); `Sources/App/Common/PrivacyScreenModifier.swift` (`performResumeAction` untracked task); `Sources/App/AppContainer.swift` (post-auth handler opens protected domains, contacts, protected settings, and recovery state).
-- **Fix design:** maintain scene/activity generation or equivalent foreground state. `resignActive` / `background` should increment the generation and hard-blur. `handleResume()` should capture the generation at start and clear blur only if completion still belongs to the current active generation; otherwise keep blur and let the next active/resume path decide. This should not change user grace-period semantics.
+- Legacy ID: `CA-27`
+- Severity: `medium`
+- Area: `key-management-zeroization`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/2a18f490890c8191afc9b8775a8ff2b3)
+- Decision: Confirmed zeroization gap. Key-operation adapter failure paths can skip explicit zeroization after secret key Data is produced.
+- Impact: Best-effort Swift heap zeroization can be missed on failure paths. There is no disk write, logging, network exposure, or OpenPGP authentication bypass implied.
+- Relevant paths: `Sources/Services/KeyManagementService.swift`
+- Fix plan: Once secret key `Data` is produced inside the adapter, zeroize it before rethrowing any later failure. Do not zeroize the successful return inside the adapter because the caller owns success-path cleanup.
+- Validation: Add failure-injection tests for adapter post-secret-key errors and assert best-effort zeroization is invoked before errors escape.
 
-## [open] CA-18: Drill release verification command needs shell-safe source refs
+### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484 — Codex severity **medium** · user-confirmed **low-impact hardening, pending fix**
-- **Verified low impact.** Edge/drill release notes render a copyable `gh attestation verify ... --source-ref "$RELEASE_SOURCE_REF"` command. A drill branch name containing shell metacharacters can be expanded if a developer copies that command into a shell.
-- **Impact:** this does not execute in GitHub Actions and does not affect app users. It only affects manual verification of drill artifacts, but project docs explicitly tell reviewers to use the ref-pinned command from drill release notes.
-- **Current code:** `.github/workflows/xcframework-edge-release.yml` writes `RELEASE_SOURCE_REF` into release metadata and the release-notes verification command; `docs/XCFRAMEWORK_RELEASES.md` directs drill-release verification to use the exact command rendered in release notes.
-- **Fix:** render shell-safe quoted source refs in release notes, or restrict drill source refs to a safe character set before publishing notes.
+- Legacy ID: `CA-29`
+- Severity: `medium`
+- Area: `decrypt-file-output`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6)
+- Decision: Confirmed low-impact temporary-output issue. Route abandonment can allow a late successful decrypt to adopt app-sandbox plaintext output.
+- Impact: Temporary plaintext can remain in the app sandbox until normal startup/reset cleanup. Rust streaming cancellation still deletes partial output on cancellation or failure.
+- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/Services/DecryptionService.swift`
+- Fix plan: Cancel and invalidate any in-flight file decrypt when the Decrypt route disappears, and prevent late adoption of outputs whose operation generation is no longer current.
+- Validation: Add Decrypt route disappearance tests showing in-flight operations cancel/invalidate and cannot adopt outputs after disappearance.
 
-## [open] CA-27: Secret key zeroization can be skipped on key adapter failures
+### SR-FIX-15: Signing key not zeroized on no-default encrypt-to-self error
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/2a18f490890c8191afc9b8775a8ff2b3 — Codex severity **medium** · user-confirmed **real, pending fix**
-- **Verified real, with updated location.** The current upper layer installs zeroization `defer`s after `PGPKeyOperationAdapter` returns, but the adapter can produce generated/imported secret key `Data` and then throw while parsing metadata, armoring, detecting profiles, or generating revocation data.
-- **Impact:** best-effort Swift heap zeroization gap on failure paths only. No disk write, logging, network exposure, or OpenPGP authentication bypass is implied, but the project treats explicit zeroization of secret-key `Data` as a security invariant.
-- **Current code:** `Sources/Services/FFI/PGPKeyOperationAdapter.swift` (`performGenerateKey`, `performImportSecretKey`); `Sources/Services/KeyManagement/KeyProvisioningService.swift` (`generateKey`, `importKey` zeroize only after adapter success).
-- **Fix:** once secret key `Data` is produced in the adapter, zeroize it on any later failure before rethrowing. Do not zeroize the success return inside the adapter; the caller still needs the `Data` and already owns success-path cleanup.
+- Legacy ID: `CA-32`
+- Severity: `medium`
+- Area: `encryption-zeroization`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/8ef989997a7081919d767f560071a253)
+- Decision: Confirmed informational hardening. Encryption should resolve public-only inputs before unwrapping the optional signing private key.
+- Impact: Normal UI should not pass the inconsistent state, but service/API and corrupted metadata states should not unwrap private signing material before public validation succeeds.
+- Relevant paths: `Sources/Services/EncryptionService.swift`
+- Fix plan: Resolve all public-only inputs first, including encrypt-to-self/default public key selection. Only then unwrap the signing private key and immediately install a zeroization `defer` before later throwing work.
+- Validation: Add service tests for missing default encrypt-to-self with signing requested; assert no signing private-key unwrap happens before public input failure.
 
-## [open] CA-29: Abandoned file decrypt can adopt temporary plaintext output
+### SR-FIX-16: Decrypt view can show stale signature for wrong content
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6 — Codex severity **medium** · user-confirmed **Low priority, pending fix**
-- **Verified real, but low impact.** Manual cancel and content-clear already cancel the file operation, and the Rust streaming path deletes partial `.tmp` plaintext on cancellation or failure. The remaining gap is route abandonment: `DecryptView.onDisappear` clears current state but does not cancel an in-flight file decrypt, so a later successful operation can adopt a temporary plaintext output after the screen is gone.
-- **Impact:** local app-sandbox temporary plaintext residue until startup/reset cleanup, not an external leak, AEAD bypass, or partial-plaintext exposure. The app already uses app temporary `tmp/decrypted/op-<UUID>/...` storage, complete file protection, and startup/reset cleanup.
-- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`handleDisappear`, `decryptFile`, `adoptDecryptedFileOutput`); `Sources/App/Decrypt/DecryptView.swift` (`onDisappear`); `Sources/App/Common/OperationController.swift` (`cancelAndInvalidate`); `Sources/App/Common/AppTemporaryArtifactStore.swift` (`cleanupTemporaryArtifacts`).
-- **Fix:** when the Decrypt route disappears, cancel/invalidate any in-flight file decrypt and prevent late output adoption; continue relying on startup/reset temporary cleanup as a backstop.
+- Legacy ID: `CA-33`
+- Severity: `medium`
+- Area: `decrypt-verify-ui`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab)
+- Decision: Confirmed trust UI correctness issue. Decrypt text and file modes share one signature verification state that can mismatch the visible output.
+- Impact: The visible signature section can appear to apply to output from another mode. This is a trust UI correctness problem, not a verification bypass.
+- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`
+- Fix plan: Represent text and file decrypt results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
+- Validation: Add text/file mode switching tests showing each visible output renders only its own signature verification state.
 
-## [open] CA-32: Signing key unwrap should happen after public-only encryption validation
+### SR-FIX-17: Selector discovery exposes unauthenticated User IDs
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/8ef989997a7081919d767f560071a253 — Codex severity **medium** · user-confirmed **informational hardening, pending fix**
-- **Verified as a service-boundary hardening issue.** Text and file encryption unwrap the optional signing private key before resolving the encrypt-to-self public key. If `encryptToSelf` requires a missing default key, `noKeySelected` is thrown before the signing-key zeroization `defer` is installed.
-- **Impact:** the operation fails with no ciphertext or file output, and normal UI state should not pass this inconsistent combination. The remaining concern is unnecessary private-key unwrap plus missed explicit zeroization in API/test/metadata-corruption states.
-- **Current code:** `Sources/Services/EncryptionService.swift` text and file encryption helpers (`signWithFingerprint`, `encryptToSelf`, `encryptToSelfFingerprint`, `keyManagement.defaultKey` resolution).
-- **Fix:** resolve all public-only inputs first, including encrypt-to-self/default public key selection. Only then unwrap the signing private key, and immediately enter a zeroization `defer` scope before any later throwing work.
+- Legacy ID: `CA-38`
+- Severity: `low`
+- Area: `selector-discovery`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/f6c9737226248191a651f043b8b6f146)
+- Decision: Confirmed low-impact OpenPGP validity display issue. Selector discovery exposes unauthenticated User IDs without distinguishing them in data or UI.
+- Impact: A user can be socially engineered into certifying an identity not self-bound by the key owner. Harm requires an external consumer of that certification.
+- Relevant paths: `pgp-mobile/src/keys.rs`, `Sources/Services/FFI/PGPCertificateSelectionAdapter.swift`, `Sources/Models/UserIdSelectionOption.swift`
+- Fix plan: Add an authenticated/self-binding flag to the Rust selector record and propagate it through UniFFI/Swift models. Surface unauthenticated User IDs in UI and consider gating certification.
+- Validation: Add Rust selector tests for bare User ID packets plus Swift/UI tests for unauthenticated indicators or certification gating after UniFFI regeneration.
 
-## [open] CA-33: Decrypt output and signature verification can become cross-mode mismatched
+### SR-FIX-18: Production Xcode target compiles security test mocks
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab — Codex severity **medium** · user-confirmed **pending fix**
-- **Verified real.** Decrypt keeps text output and file output separately, but both modes share one `detailedSignatureVerification`. A user can decrypt in one mode, decrypt in the other mode, then switch back and see the first mode's output with the second mode's signature verification state.
-- **Impact:** trust UI correctness bug, not a cryptographic verification bypass. The visible signature section can be read as applying to the visible output even when it came from a different mode's result.
-- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`decryptedText`, `decryptedFileURL`, shared `detailedSignatureVerification`, `decryptText`, `decryptFile`); `Sources/App/Decrypt/DecryptView.swift` (mode-gated output sections plus shared signature section).
-- **Fix:** model text and file results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
+- Legacy ID: `CA-40`
+- Severity: `low`
+- Area: `build-integration`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/715f18cb62e48191abe332c39da5f2bd)
+- Decision: Confirmed deferred architecture hardening. Security mocks are compiled into the app module even though production composition does not currently select them.
+- Impact: No evidence shows production user keys are currently protected by mocks. The risk is future accidental mock selection because mocks share the app module.
+- Relevant paths: `CypherAir.xcodeproj/project.pbxproj`, `Sources/Security/Mocks/MockAuthenticator.swift`, `Sources/Security/Mocks/MockKeychain.swift`, `Sources/Security/Mocks/MockSecureEnclave.swift`
+- Fix plan: Handle during broader componentization: move test-only mocks outside the app target and scope tutorial software security implementations as tutorial-only simulation.
+- Validation: During architecture work, add target membership/build checks proving test-only mocks are not compiled into production targets.
 
-## [open] CA-40: Security mock implementations are compiled into the app target
+### SR-FIX-19: Concurrent tutorial contacts open can fail sandbox setup
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/715f18cb62e48191abe332c39da5f2bd — Codex severity **low** · user-confirmed **defer until architecture/target split**
-- **Verified as an architecture-boundary issue, not current production misuse.** The app target file-system-synchronizes `Sources`, so `Sources/Security/Mocks` is visible to the app module. Current production startup still wires `HardwareSecureEnclave` and `SystemKeychain`; UI tests and the guided tutorial are the observed mock users.
-- **Impact:** no evidence that real user keys are protected by mocks today. The risk is future accidental or malicious mock selection because test/tutorial security implementations are compiled into the same app module as production composition code.
-- **Current code:** `CypherAir.xcodeproj/project.pbxproj` (`Sources` root in app target); `Sources/Security/Mocks/*`; `Sources/App/AppContainer.swift` (`makeDefault`, `makeUITest`); `Sources/App/Onboarding/TutorialSandboxContainer.swift`.
-- **Fix:** handle during broader componentization. Move test-only mocks to test support outside the app target, and rename/scope the tutorial-needed software security stack as tutorial-only simulation instead of generic security mocks.
+- Legacy ID: `CA-41`
+- Severity: `informational`
+- Area: `tutorial-contacts`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/703d8b5d0ad48191abf6a936394d174e)
+- Decision: Confirmed tutorial-only reliability issue. Repeated module opens can start concurrent contacts-domain opens in the disposable tutorial sandbox.
+- Impact: Disposable tutorial sandbox setup can fail or clean up the active tutorial container. Production keys, contacts, settings, and protected data are isolated.
+- Relevant paths: `Sources/App/Onboarding/TutorialSessionStore.swift`, `Sources/App/Onboarding/TutorialSandboxContainer.swift`, `Sources/Services/ContactService.swift`
+- Fix plan: Make tutorial contacts opening idempotent by disabling repeated opens while opening or caching/reusing one in-flight contacts-open task in the tutorial sandbox container.
+- Validation: Add tutorial sandbox tests or UI smoke coverage for rapid repeated module opens while contacts are opening.
 
-## [open] CA-41: Tutorial contacts open should be idempotent while opening
+### SR-FIX-20: Text input section is recreated on every edit
 
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/703d8b5d0ad48191abf6a936394d174e — Codex severity **informational** · user-confirmed **low-priority pending fix**
-- **Verified as a narrow tutorial reliability race.** Rapid repeated tutorial module opens can start more than one contacts-domain open while the tutorial sandbox is still `.opening`. A later failure can clean up the active tutorial container.
-- **Impact:** disposable tutorial sandbox availability only. Real keys, contacts, settings, exports, temporary files, and private-key security assets are isolated from the tutorial sandbox.
-- **Current code:** `Sources/App/Onboarding/TutorialSessionStore.swift` (`openModule`, `openContactsIfNeeded`); `Sources/App/Onboarding/TutorialSandboxContainer.swift` (`openContactsIfNeeded`); `Sources/Services/ContactService.swift` (`openContactsAfterPostUnlock`).
-- **Fix:** when tutorial contacts are opening, either disable repeated module opens in the UI or cache/reuse one in-flight contacts-open task in `TutorialSandboxContainer`.
-
-## [open] CA-42: Decrypt/Verify text input section recreation dismisses keyboard during edits
-
-- **Codex:** https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0 — Codex severity **informational** · user-confirmed **Medium priority, pending fix**
-- **Verified real by code and user reproduction.** Decrypt and Verify both place the text input `Section` under `.id(textInputSectionEpoch)`, and ordinary edit setters bump that epoch through invalidation helpers. User reproduced that pressing backspace can dismiss the keyboard.
-- **Impact:** core text-entry UX/availability issue for Decrypt text mode and Verify cleartext mode. It does not expose secrets or change decrypt/verify correctness, but it makes manual correction of encrypted/signed text unreliable.
-- **Current code:** `Sources/App/Decrypt/DecryptScreenModel.swift` (`setCiphertextInput`, `invalidateTextInputState`); `Sources/App/Decrypt/DecryptView.swift` (`.id(model.textInputSectionEpoch)`); `Sources/App/Sign/VerifyScreenModel.swift` (`setSignedInput`, `invalidateCleartextVerificationState`); `Sources/App/Sign/VerifyView.swift` (`.id(model.textInputSectionEpoch)`).
-- **Fix:** split edit invalidation from section refresh. Edit paths should clear stale result/phase1/verification state without bumping `textInputSectionEpoch`; import/reset/operation-completion paths can still refresh the input section when needed.
+- Legacy ID: `CA-42`
+- Severity: `informational`
+- Area: `decrypt-verify-ui`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0)
+- Decision: Confirmed UX/availability issue. Decrypt/Verify text input sections are recreated during ordinary edits, disrupting keyboard focus.
+- Impact: Manual correction of ciphertext or signed text can lose focus, cursor, selection, or keyboard state. Decrypt/verify correctness and secrecy are not changed.
+- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/App/Sign/VerifyView.swift`
+- Fix plan: Split edit invalidation from section refresh. Ordinary edit paths should clear stale result/phase state without bumping the text input section identity; import/reset/completion paths can still refresh when needed.
+- Validation: Add SwiftUI model/view tests or targeted UI smoke coverage showing backspace/editing does not recreate the text editor section or dismiss keyboard focus.
