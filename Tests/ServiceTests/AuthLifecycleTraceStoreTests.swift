@@ -37,6 +37,21 @@ private enum TracePrivateKeyAccessTestError: Error {
     case seUnwrapFailed
 }
 
+private final class TracePolicyEvaluatorProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var callCount = 0
+    private(set) var lastPolicy: LAPolicy?
+    private(set) var lastReason: String?
+
+    func record(policy: LAPolicy, reason: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        callCount += 1
+        lastPolicy = policy
+        lastReason = reason
+    }
+}
+
 private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable {
     private let base: MockSecureEnclave
     private let unwrapError: Error
@@ -813,22 +828,79 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         )
     }
 
-    func test_authenticationManager_evaluateAppSessionBypass_recordsStartAndFinishTrace() async throws {
+    func test_authenticationManager_evaluateAppSessionIgnoresBypassKeyByDefault() async throws {
         let (defaults, suiteName) = makeIsolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let reason = "Default manager should ignore bypass key"
+        let probe = TracePolicyEvaluatorProbe()
         let manager = TraceAuthenticationManager(
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
             defaults: defaults,
-            traceStore: traceStore
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
+                probe.record(policy: policy, reason: receivedReason)
+                reply(true, nil)
+            }
+        )
+
+        let result = try await manager.evaluateAppSession(policy: .userPresence, reason: reason)
+
+        XCTAssertTrue(result.isAuthenticated)
+        XCTAssertNotNil(result.context)
+        XCTAssertEqual(probe.callCount, 1)
+        XCTAssertEqual(probe.lastPolicy, AppSessionAuthenticationPolicy.userPresence.localAuthenticationPolicy)
+        XCTAssertEqual(probe.lastReason, reason)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.start"
+                    && $0.metadata["policy"] == "userPresence"
+                    && $0.metadata["source"] == "unspecified"
+                    && $0.metadata["promptID"] != "none"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.finish"
+                    && $0.metadata["result"] == "success"
+                    && $0.metadata["hasContext"] == "true"
+                    && $0.metadata["promptID"] != "none"
+            }
+        )
+        XCTAssertFalse(
+            traceStore.recentEntries.contains {
+                $0.name == "appSession.evaluate.finish"
+                    && $0.metadata["result"] == "bypass"
+            }
+        )
+    }
+
+    func test_authenticationManager_evaluateAppSessionBypassOptIn_recordsStartAndFinishTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let probe = TracePolicyEvaluatorProbe()
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            allowsUITestAuthenticationBypass: true,
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
+                probe.record(policy: policy, reason: receivedReason)
+                XCTFail("Opt-in UI-test bypass should not call the LA policy evaluator")
+                reply(true, nil)
+            }
         )
 
         let result = try await manager.evaluateAppSession(policy: .userPresence, reason: "Trace bypass")
 
         XCTAssertTrue(result.isAuthenticated)
         XCTAssertNil(result.context)
+        XCTAssertEqual(probe.callCount, 0)
         XCTAssertTrue(
             traceStore.recentEntries.contains {
                 $0.name == "appSession.evaluate.start"
@@ -1056,16 +1128,76 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertFalse(metadataValues.contains(reason))
     }
 
-    func test_authenticationManager_evaluateModeBypass_recordsStartAndFinishTrace() async throws {
+    func test_authenticationManager_evaluateModeIgnoresBypassKeyByDefault() async throws {
         let (defaults, suiteName) = makeIsolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
         let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let reason = "Default manager should ignore private-key bypass key"
+        let probe = TracePolicyEvaluatorProbe()
         let manager = TraceAuthenticationManager(
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
             defaults: defaults,
-            traceStore: traceStore
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { context, policy, receivedReason, reply in
+                XCTAssertEqual(context.localizedFallbackTitle, "")
+                probe.record(policy: policy, reason: receivedReason)
+                reply(true, nil)
+            }
+        )
+
+        let result = try await manager.evaluate(
+            mode: .highSecurity,
+            reason: reason,
+            source: "unit.evaluateMode"
+        )
+
+        XCTAssertTrue(result)
+        XCTAssertNotNil(manager.lastEvaluatedContext)
+        XCTAssertEqual(probe.callCount, 1)
+        XCTAssertEqual(probe.lastPolicy, LAPolicy.deviceOwnerAuthenticationWithBiometrics)
+        XCTAssertEqual(probe.lastReason, reason)
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKey.evaluate.start"
+                    && $0.metadata["mode"] == "highSecurity"
+                    && $0.metadata["source"] == "unit.evaluateMode"
+                    && $0.metadata["promptID"] != "none"
+            }
+        )
+        XCTAssertTrue(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKey.evaluate.finish"
+                    && $0.metadata["result"] == "success"
+                    && $0.metadata["promptID"] != "none"
+            }
+        )
+        XCTAssertFalse(
+            traceStore.recentEntries.contains {
+                $0.name == "privateKey.evaluate.finish"
+                    && $0.metadata["result"] == "bypass"
+            }
+        )
+    }
+
+    func test_authenticationManager_evaluateModeBypassOptIn_recordsStartAndFinishTrace() async throws {
+        let (defaults, suiteName) = makeIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "com.cypherair.preference.uiTestBypassAuthentication")
+        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let probe = TracePolicyEvaluatorProbe()
+        let manager = TraceAuthenticationManager(
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            defaults: defaults,
+            allowsUITestAuthenticationBypass: true,
+            traceStore: traceStore,
+            localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
+                probe.record(policy: policy, reason: receivedReason)
+                XCTFail("Opt-in UI-test bypass should not call the LA policy evaluator")
+                reply(true, nil)
+            }
         )
 
         let result = try await manager.evaluate(
@@ -1075,6 +1207,8 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         )
 
         XCTAssertTrue(result)
+        XCTAssertNil(manager.lastEvaluatedContext)
+        XCTAssertEqual(probe.callCount, 0)
         XCTAssertTrue(
             traceStore.recentEntries.contains {
                 $0.name == "privateKey.evaluate.start"

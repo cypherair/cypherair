@@ -643,6 +643,7 @@ final class AppContainer: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults,
+            allowsUITestAuthenticationBypass: true,
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
