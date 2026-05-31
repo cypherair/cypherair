@@ -348,8 +348,11 @@ Entry conditions:
 
 - Hidden generation can create usable key-agreement handles.
 - Phase 2 ECDH/session-key behavior is proven through tests.
-- Phase 6A owns only the ECDH route foundation; temporary-file and
-  output-release behavior must be described before PR 6C.
+- Phase 6A owns only the ECDH route foundation and must not release a plaintext
+  workflow.
+- Before PR 6C starts, its phase-specific plan must describe
+  temporary-artifact ownership, success-only output release, cancellation
+  cleanup, and file protection behavior for streaming file decrypt.
 
 Exit conditions:
 
