@@ -52,18 +52,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: If app-session authentication cannot be evaluated, block local reset and surface an auth-unavailable error instead of treating the prompt as optional.
 - Validation: Add settings/reset tests for auth unavailable, auth failure, and auth success; only success should proceed to destructive reset.
 
-### SR-FIX-09: Post-auth warm-up can clear background privacy blur
-
-- Legacy ID: `CA-16`
-- Severity: `medium`
-- Area: `privacy-lifecycle`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
-- Decision: Confirmed high-priority privacy lifecycle race. An in-flight resume task can clear a hard background privacy blur after the app leaves the active generation.
-- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle area as former SR-FIX-08 / SR-CLOSED-32.
-- Relevant paths: `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Settings/ProtectedSettingsHost.swift`
-- Fix plan: Track scene/activity generation or equivalent foreground state. Resume completion may clear blur only if it still belongs to the current active generation; otherwise keep blur for the next active/resume path.
-- Validation: Add generation/race tests where background occurs during post-auth work; completion must not clear blur for an obsolete generation.
-
 ### SR-FIX-12: Import confirmation can act on a replaced key request
 
 - Legacy ID: `CA-23`

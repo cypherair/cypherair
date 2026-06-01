@@ -3,6 +3,18 @@ import LocalAuthentication
 
 @Observable
 final class AppSessionOrchestrator {
+    struct ResumeLifecycleResult: Equatable {
+        let attemptedAuthentication: Bool
+        let shouldArmAuthenticationSettle: Bool
+        let shouldStartFreshResume: Bool
+
+        static let noAuthentication = ResumeLifecycleResult(
+            attemptedAuthentication: false,
+            shouldArmAuthenticationSettle: false,
+            shouldStartFreshResume: false
+        )
+    }
+
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let currentRegistryProvider: () throws -> ProtectedDataRegistry
     private let shouldBypassPrivacyAuthentication: () -> Bool
@@ -17,6 +29,9 @@ final class AppSessionOrchestrator {
     private var hasAppearedOnce = false
     private var pendingAuthenticatedContext: LAContext?
     private var isAuthenticationSettleBlurActive = false
+    private var isSceneCurrentlyActive = true
+    private var sceneActivityGeneration: UInt64 = 0
+    private var resumeInvalidationGeneration: UInt64 = 0
 
     var isPrivacyScreenBlurred = false
     var isAuthenticating = false
@@ -154,6 +169,17 @@ final class AppSessionOrchestrator {
         localizedReason: String,
         source: String = "initialAppearance"
     ) async -> Bool {
+        await handleInitialAppearanceForLifecycle(
+            localizedReason: localizedReason,
+            source: source
+        ).attemptedAuthentication
+    }
+
+    @discardableResult
+    func handleInitialAppearanceForLifecycle(
+        localizedReason: String,
+        source: String = "initialAppearance"
+    ) async -> ResumeLifecycleResult {
         traceStore?.record(
             category: .session,
             name: "session.handleInitialAppearance.enter",
@@ -165,7 +191,7 @@ final class AppSessionOrchestrator {
                 name: "session.handleInitialAppearance.exit",
                 metadata: ["reason": "alreadyAppeared", "source": source]
             )
-            return false
+            return .noAuthentication
         }
         hasAppearedOnce = true
 
@@ -179,7 +205,7 @@ final class AppSessionOrchestrator {
                 name: "session.handleInitialAppearance.exit",
                 metadata: ["reason": "bypass", "source": source]
             )
-            return false
+            return .noAuthentication
         }
 
         clearAuthenticationSettleBlur()
@@ -190,7 +216,21 @@ final class AppSessionOrchestrator {
             name: "session.handleInitialAppearance.exit",
             metadata: ["reason": "delegatedToResume", "source": source]
         )
-        return await handleResume(localizedReason: localizedReason, source: source)
+        return await handleResumeForLifecycle(localizedReason: localizedReason, source: source)
+    }
+
+    func handleSceneDidBecomeActive(source: String = "sceneActive") {
+        isSceneCurrentlyActive = true
+        sceneActivityGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.handleSceneDidBecomeActive",
+            metadata: [
+                "source": source,
+                "sceneActivityGeneration": String(sceneActivityGeneration),
+                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
+            ]
+        )
     }
 
     func handleSceneDidResignActive() {
@@ -202,6 +242,7 @@ final class AppSessionOrchestrator {
             )
             return
         }
+        invalidateResumeCompletions(reason: "sceneResignActive")
         clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneResignActive")
         clearAuthenticationFailure()
@@ -215,6 +256,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidEnterBackground() {
+        invalidateResumeCompletions(reason: "sceneBackground")
         clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "sceneBackground")
         clearAuthenticationFailure()
@@ -232,6 +274,17 @@ final class AppSessionOrchestrator {
         localizedReason: String,
         source: String = "unspecified"
     ) async -> Bool {
+        await handleResumeForLifecycle(
+            localizedReason: localizedReason,
+            source: source
+        ).attemptedAuthentication
+    }
+
+    @discardableResult
+    func handleResumeForLifecycle(
+        localizedReason: String,
+        source: String = "unspecified"
+    ) async -> ResumeLifecycleResult {
         traceStore?.record(
             category: .session,
             name: "session.handleResume.enter",
@@ -239,20 +292,28 @@ final class AppSessionOrchestrator {
                 "source": source,
                 "operationPrompt": isOperationAuthenticationPromptInProgress ? "true" : "false",
                 "isAuthenticating": isAuthenticating ? "true" : "false",
-                "hasLastAuthenticationDate": lastAuthenticationDate == nil ? "false" : "true"
+                "hasLastAuthenticationDate": lastAuthenticationDate == nil ? "false" : "true",
+                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
             ]
         )
+        let resumeGeneration = resumeInvalidationGeneration
         if shouldBypassPrivacyAuthentication() {
             clearAuthenticationSettleBlur()
             authFailed = false
             clearAuthenticationFailure()
-            isPrivacyScreenBlurred = false
+            if isSceneCurrentlyActive {
+                isPrivacyScreenBlurred = false
+            }
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "bypass", "attemptedAuthentication": "false", "source": source]
+                metadata: [
+                    "reason": isSceneCurrentlyActive ? "bypass" : "bypassInactive",
+                    "attemptedAuthentication": "false",
+                    "source": source
+                ]
             )
-            return false
+            return .noAuthentication
         }
 
         guard !isOperationAuthenticationPromptInProgress else {
@@ -261,7 +322,7 @@ final class AppSessionOrchestrator {
                 name: "session.handleResume.exit",
                 metadata: ["reason": "operationPromptInProgress", "attemptedAuthentication": "false", "source": source]
             )
-            return false
+            return .noAuthentication
         }
 
         guard !isAuthenticating else {
@@ -270,7 +331,7 @@ final class AppSessionOrchestrator {
                 name: "session.handleResume.exit",
                 metadata: ["reason": "alreadyAuthenticating", "attemptedAuthentication": "false", "source": source]
             )
-            return false
+            return .noAuthentication
         }
 
         let gracePeriod = effectiveGracePeriod()
@@ -327,24 +388,73 @@ final class AppSessionOrchestrator {
                         source: source
                     )
                     recordPostAuthenticationCompletion(source: source)
+                    let completion = currentResumeCompletion(
+                        resumeGeneration: resumeGeneration,
+                        source: source
+                    )
                     authFailed = false
-                    clearAuthenticationSettleBlur()
                     clearAuthenticationFailure()
-                    isPrivacyScreenBlurred = false
-                    traceStore?.record(
-                        category: .session,
-                        name: "session.handleResume.exit",
-                        metadata: ["reason": "authenticated", "attemptedAuthentication": "true", "source": source]
+                    if completion.isCurrent {
+                        clearAuthenticationSettleBlur()
+                        isPrivacyScreenBlurred = false
+                        traceStore?.record(
+                            category: .session,
+                            name: "session.handleResume.exit",
+                            metadata: [
+                                "reason": "authenticated",
+                                "attemptedAuthentication": "true",
+                                "source": source,
+                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
+                            ]
+                        )
+                    } else {
+                        discardPendingAuthenticatedContext(reason: "staleResumeCompletion")
+                        isPrivacyScreenBlurred = true
+                        traceStore?.record(
+                            category: .session,
+                            name: "session.handleResume.exit",
+                            metadata: [
+                                "reason": "staleAuthenticated",
+                                "attemptedAuthentication": "true",
+                                "source": source,
+                                "resumeGeneration": String(resumeGeneration),
+                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
+                                "sceneActive": isSceneCurrentlyActive ? "true" : "false"
+                            ]
+                        )
+                    }
+                    return ResumeLifecycleResult(
+                        attemptedAuthentication: true,
+                        shouldArmAuthenticationSettle: completion.isCurrent,
+                        shouldStartFreshResume: completion.shouldStartFreshResume
                     )
                 } else {
                     discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
-                    clearAuthenticationSettleBlur()
+                    let completion = currentResumeCompletion(
+                        resumeGeneration: resumeGeneration,
+                        source: source
+                    )
+                    if completion.isCurrent {
+                        clearAuthenticationSettleBlur()
+                    }
                     authFailed = true
                     setAuthenticationFailureReason(.authenticationFailed, source: source)
                     traceStore?.record(
                         category: .session,
                         name: "session.handleResume.exit",
-                        metadata: ["reason": "authenticationReturnedFalse", "attemptedAuthentication": "true", "source": source]
+                        metadata: [
+                            "reason": completion.isCurrent ? "authenticationReturnedFalse" : "staleAuthenticationReturnedFalse",
+                            "attemptedAuthentication": "true",
+                            "source": source,
+                            "resumeGeneration": String(resumeGeneration),
+                            "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
+                            "sceneActive": isSceneCurrentlyActive ? "true" : "false"
+                        ]
+                    )
+                    return ResumeLifecycleResult(
+                        attemptedAuthentication: true,
+                        shouldArmAuthenticationSettle: completion.isCurrent,
+                        shouldStartFreshResume: completion.shouldStartFreshResume
                     )
                 }
             } catch {
@@ -354,7 +464,13 @@ final class AppSessionOrchestrator {
                     metadata: AuthErrorTraceMetadata.errorMetadata(error)
                 )
                 discardPendingAuthenticatedContext(reason: "resumeThrew")
-                clearAuthenticationSettleBlur()
+                let completion = currentResumeCompletion(
+                    resumeGeneration: resumeGeneration,
+                    source: source
+                )
+                if completion.isCurrent {
+                    clearAuthenticationSettleBlur()
+                }
                 authFailed = true
                 let failureReason = authenticationFailureReason(for: error)
                 setAuthenticationFailureReason(failureReason, source: source)
@@ -366,22 +482,37 @@ final class AppSessionOrchestrator {
                         "attemptedAuthentication": "true",
                         "source": source,
                         "errorType": String(describing: type(of: error)),
-                        "failureReason": failureReason.rawValue
+                        "failureReason": failureReason.rawValue,
+                        "resumeGeneration": String(resumeGeneration),
+                        "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
+                        "sceneActive": isSceneCurrentlyActive ? "true" : "false"
                     ]
                 )
+                return ResumeLifecycleResult(
+                    attemptedAuthentication: true,
+                    shouldArmAuthenticationSettle: completion.isCurrent,
+                    shouldStartFreshResume: completion.shouldStartFreshResume
+                )
             }
-            return true
         } else {
             clearAuthenticationSettleBlur()
             authFailed = false
             clearAuthenticationFailure()
-            isPrivacyScreenBlurred = false
+            if isSceneCurrentlyActive {
+                isPrivacyScreenBlurred = false
+            } else {
+                isPrivacyScreenBlurred = true
+            }
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",
-                metadata: ["reason": "graceValid", "attemptedAuthentication": "false", "source": source]
+                metadata: [
+                    "reason": isSceneCurrentlyActive ? "graceValid" : "graceValidInactive",
+                    "attemptedAuthentication": "false",
+                    "source": source
+                ]
             )
-            return false
+            return .noAuthentication
         }
     }
 
@@ -401,6 +532,42 @@ final class AppSessionOrchestrator {
 
     private func effectiveGracePeriod() -> Int {
         gracePeriodProvider() ?? 0
+    }
+
+    private func invalidateResumeCompletions(reason: String) {
+        isSceneCurrentlyActive = false
+        sceneActivityGeneration += 1
+        resumeInvalidationGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.resumeInvalidation",
+            metadata: [
+                "reason": reason,
+                "sceneActivityGeneration": String(sceneActivityGeneration),
+                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
+            ]
+        )
+    }
+
+    private func currentResumeCompletion(
+        resumeGeneration: UInt64,
+        source: String
+    ) -> (isCurrent: Bool, shouldStartFreshResume: Bool) {
+        let isCurrent = resumeGeneration == resumeInvalidationGeneration && isSceneCurrentlyActive
+        let shouldStartFreshResume = !isCurrent && isSceneCurrentlyActive
+        traceStore?.record(
+            category: .session,
+            name: "session.handleResume.completionGeneration",
+            metadata: [
+                "source": source,
+                "resumeGeneration": String(resumeGeneration),
+                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
+                "isCurrent": isCurrent ? "true" : "false",
+                "sceneActive": isSceneCurrentlyActive ? "true" : "false",
+                "shouldStartFreshResume": shouldStartFreshResume ? "true" : "false"
+            ]
+        )
+        return (isCurrent, shouldStartFreshResume)
     }
 
     func handleAuthenticationSettleInactive(source: String = "authenticationSettle") {
@@ -465,12 +632,23 @@ final class AppSessionOrchestrator {
         localizedReason: String,
         source: String = "retryButton"
     ) async -> Bool {
+        await retryPrivacyUnlockForLifecycle(
+            localizedReason: localizedReason,
+            source: source
+        ).attemptedAuthentication
+    }
+
+    @discardableResult
+    func retryPrivacyUnlockForLifecycle(
+        localizedReason: String,
+        source: String = "retryButton"
+    ) async -> ResumeLifecycleResult {
         traceStore?.record(
             category: .session,
             name: "session.retryPrivacyUnlock",
             metadata: ["source": source]
         )
-        return await handleResume(localizedReason: localizedReason, source: source)
+        return await handleResumeForLifecycle(localizedReason: localizedReason, source: source)
     }
 
     func consumeAuthenticatedContextForProtectedData() -> LAContext? {
