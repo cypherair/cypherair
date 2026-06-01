@@ -26,7 +26,7 @@ env:
   SOURCE_BUNDLE: CypherAir-source-bundle.tar.zst
   COMPLIANCE_MANIFEST: CypherAir-compliance-manifest.json
   RELINK_KIT: PgpMobile-relink-kit.tar.zst
-  ARM64E_STAGE1_RELEASE_TAG: latest
+  ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1
   ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
 jobs:

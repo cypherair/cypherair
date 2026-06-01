@@ -11,7 +11,7 @@
 ## All Code PRs
 
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
-- [ ] For Rust / UniFFI-visible behavior changes, `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` has been run before any Xcode validation
+- [ ] For Rust / UniFFI-visible behavior changes, `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` has been run before any Xcode validation
 - [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, local `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`, and the native visionOS build probe pass
 - [ ] If `swift-unit-tests-hosted-preview` is warning-skipped by hosted environment preflight, rely on local macOS validation for Swift test signal
 - [ ] No new compiler warnings

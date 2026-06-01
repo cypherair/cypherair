@@ -64,31 +64,36 @@ Snapshot date: 2026-05-30
     `std`/`proc_macro` plus prebuilt std for arm64e Darwin, iOS, tvOS, and
     visionOS to be usable for app packaging
   - local app-side full packaging should use
-    `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release`
-    so it consumes the same `cypherair/rust` stage1 prerelease path as GitHub
-    Actions instead of implicitly trusting local rustup-linked toolchain state
+    `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`
+    so it consumes the same pinned `cypherair/rust` stage1 prerelease path as
+    GitHub Actions instead of implicitly trusting local rustup-linked toolchain
+    state
   - `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and `stage1-arm64e-patch` remain
     supported only when deliberately testing a local compiler build
   - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
-    the Rust fork stage1 prerelease and record the resolved tag, commit, and
-    checksums in `PgpMobile.arm64e-build-manifest.json`
+    the pinned Rust fork stage1 prerelease and record the resolved tag, commit,
+    and checksums in `PgpMobile.arm64e-build-manifest.json`
   - GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
     cache actions; clean CI builds avoid reusing `target/` artifacts produced
     by an older Rust fork stage1 compiler
   - arm64e builds call the patched compiler through explicit `RUSTC` while
     using stable Cargo with prebuilt std payloads; the official app path does
     not use nightly Cargo or `-Zbuild-std`
-  - latest verified stage1 prerelease:
+  - current pinned stage1 prerelease:
     `rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1`
-  - latest verified stage1 source ref:
+  - current pinned stage1 source ref:
     `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96`
-  - latest verified stage1 source commit:
+  - current pinned stage1 source commit:
     `ecc85bfa110f4232246be6ff27c1e9c20e5539d9`
-  - latest verified stage1 workflow run: `26679152716`
-  - latest verified stage1 manifest declares `stableBaseRelease: "1.96.0"`,
+  - current pinned stage1 workflow run: `26679152716`
+  - current pinned stage1 manifest declares `stableBaseRelease: "1.96.0"`,
     `stableBaseCommit: "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96"`,
     `requiresBuildStd: false`, includes host `std`/`proc_macro`, and includes
     Apple arm64e std targets for Darwin, iOS, tvOS, and visionOS
+  - when publishing a new official stage1 prerelease, update this pinned tag,
+    the GitHub Actions workflow env values, the script default, and the workflow
+    hardening tests in the same PR; `latest` is not allowed in the CI/default
+    download path
   - latest hosted LLVM-workaround-shrink validation force-downloaded the
     prerelease above and recorded the same source and checked-out commit in
     `PgpMobile.arm64e-build-manifest.json`

@@ -21,7 +21,8 @@ STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-latest}"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
+ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
 ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
 ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
@@ -69,7 +70,7 @@ require_command() {
     fi
 }
 
-download_stage1_with_public_api() {
+download_stage1_release_assets() {
     env -u GH_TOKEN -u GITHUB_TOKEN \
         ARM64E_RUST_REPOSITORY="$ARM64E_RUST_REPOSITORY" \
         ARM64E_STAGE1_RELEASE_TAG="$ARM64E_STAGE1_RELEASE_TAG" \
@@ -101,47 +102,18 @@ ensure_rustup_target() {
     fi
 }
 
-latest_stage1_release_tag() {
-    local prefix="$ARM64E_STAGE1_RELEASE_PREFIX"
-    local releases_json
-    releases_json="$(mktemp)"
-    curl --fail --silent --show-error --location \
-        -H 'Accept: application/vnd.github+json' \
-        -H 'X-GitHub-Api-Version: 2022-11-28' \
-        "https://api.github.com/repos/${ARM64E_RUST_REPOSITORY}/releases?per_page=100" \
-        > "$releases_json"
-    "$PYTHON_BIN" - "$releases_json" "$prefix" <<'PY'
-import json
-import sys
-
-path, prefix = sys.argv[1], sys.argv[2]
-with open(path, encoding="utf-8") as handle:
-    releases = json.load(handle)
-matches = [
-    release
-    for release in releases
-    if release.get("prerelease") and release.get("tag_name", "").startswith(prefix)
-]
-matches.sort(key=lambda release: release.get("published_at") or "")
-print(matches[-1]["tag_name"] if matches else "")
-PY
-    rm -f "$releases_json"
-}
-
 download_stage1_toolchain() {
     require_command zstd
 
     local tag="$ARM64E_STAGE1_RELEASE_TAG"
-    if [ "$tag" = "latest" ] || [ -z "$tag" ]; then
-        tag="$(latest_stage1_release_tag)"
-    fi
-    if [ -z "$tag" ] || [ "$tag" = "null" ]; then
-        echo "error: unable to discover a ${ARM64E_STAGE1_RELEASE_PREFIX} prerelease in $ARM64E_RUST_REPOSITORY" >&2
+    if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
+        echo "error: ARM64E_STAGE1_RELEASE_TAG must be an explicit ${ARM64E_STAGE1_RELEASE_PREFIX}-* tag; 'latest' is not allowed" >&2
+        echo "       current default: $DEFAULT_ARM64E_STAGE1_RELEASE_TAG" >&2
         exit 1
     fi
 
     log_step "stage1" "Downloading Rust arm64e stage1 prerelease ${tag}..."
-    ARM64E_STAGE1_RELEASE_TAG="$tag" download_stage1_with_public_api
+    ARM64E_STAGE1_RELEASE_TAG="$tag" download_stage1_release_assets
 
     ARM64E_STAGE1_DIR="$STAGE1_CACHE_DIR/toolchain/stage1-arm64e-patch"
     ARM64E_RUST_STAGE1_MANIFEST="$STAGE1_CACHE_DIR/download/rust-stage1-arm64e-apple-darwin.json"

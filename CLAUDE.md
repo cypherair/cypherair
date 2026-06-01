@@ -53,7 +53,8 @@ cargo +stable build --release --target aarch64-apple-visionos --manifest-path pg
 cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
 
 # Full Rust + UniFFI + packaged-artifact sync
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
 
 # Run Rust tests
@@ -135,7 +136,7 @@ Standard Mode (default) and High Security Mode, selectable in Settings; switchin
 - MIE: test on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging diagnostics enabled; current device examples live in `docs/SECURITY.md`.
 - Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows), `CypherAir-DangerousDeviceTests.xctestplan` (manual destructive physical-device lane for the Secure Enclave custody Reset All Local Data cleanup proof).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the latest `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
+- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the pinned `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
 - See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
 - **GitHub Actions caveat:** the hosted `macos-26` runner image may still lag the project's current 26.5 deployment target or expose Xcode before all matching platform runtimes are usable. When that happens, hosted Swift tests or app probes can be warning-skipped by preflight even though local validation passes.
 - Full testing guide: @docs/TESTING.md

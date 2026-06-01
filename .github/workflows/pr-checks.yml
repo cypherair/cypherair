@@ -13,7 +13,7 @@ env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
-  ARM64E_STAGE1_RELEASE_TAG: latest
+  ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1
 
 jobs:
   rust-dependency-audit:

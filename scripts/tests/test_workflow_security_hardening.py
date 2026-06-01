@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PINNED_STAGE1_RELEASE_TAG = "rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
 
 
 def read(relative_path: str) -> str:
@@ -38,6 +39,15 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
         ".github/workflows/pr-checks.yml",
         ".github/workflows/nightly-full.yml",
     ]
+
+    def test_stage1_release_tag_is_pinned_in_xcframework_workflows(self) -> None:
+        for workflow in self.workflows_with_xcframework_build:
+            with self.subTest(workflow=workflow):
+                text = read(workflow)
+
+                self.assertIn(f"ARM64E_STAGE1_RELEASE_TAG: {PINNED_STAGE1_RELEASE_TAG}", text)
+                self.assertNotIn("ARM64E_STAGE1_RELEASE_TAG: latest", text)
+
     def test_xcframework_build_steps_do_not_receive_github_tokens(self) -> None:
         for workflow in self.workflows_with_xcframework_build:
             with self.subTest(workflow=workflow):
@@ -142,16 +152,39 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
         self.assertRegex(text, r"env -u GH_TOKEN -u GITHUB_TOKEN \\\n\s+xcodebuild -create-xcframework")
         self.assertRegex(text, r"env -u GH_TOKEN -u GITHUB_TOKEN \\\n\s+\"\$PYTHON_BIN\"")
 
-    def test_stage1_downloader_uses_token_free_public_release_api(self) -> None:
+    def test_build_script_uses_pinned_stage1_and_no_latest_discovery(self) -> None:
+        text = read("scripts/build_apple_arm64e_xcframework.sh")
+
+        self.assertIn(f'DEFAULT_ARM64E_STAGE1_RELEASE_TAG="{PINNED_STAGE1_RELEASE_TAG}"', text)
+        self.assertIn("'latest' is not allowed", text)
+        self.assertNotIn("latest_stage1_release_tag", text)
+        self.assertNotIn("releases?per_page", text)
+        self.assertNotIn("api.github.com/repos", text)
+
+    def test_stage1_downloader_uses_pinned_direct_release_assets(self) -> None:
         text = read("scripts/download_arm64e_stage1_toolchain.sh")
 
         self.assertIn("unset GH_TOKEN GITHUB_TOKEN", text)
-        self.assertIn("curl_github_api", text)
-        self.assertIn("browser_download_url", text)
+        self.assertIn(f'DEFAULT_ARM64E_STAGE1_RELEASE_TAG="{PINNED_STAGE1_RELEASE_TAG}"', text)
+        self.assertIn("'latest' is not allowed", text)
+        self.assertIn("/releases/download/${tag}", text)
         self.assertNotIn("GH_TOKEN=", text)
         self.assertNotIn("GITHUB_TOKEN=", text)
         self.assertNotIn("gh release list", text)
         self.assertNotIn("gh release download", text)
+        self.assertNotIn("curl_github_api", text)
+        self.assertNotIn("browser_download_url", text)
+        self.assertNotIn("latest_stage1_release_tag", text)
+        self.assertNotIn("releases?per_page", text)
+        self.assertNotIn("api.github.com", text)
+
+    def test_edge_metadata_step_exports_same_step_environment(self) -> None:
+        text = read(".github/workflows/xcframework-edge-release.yml")
+        package = step_block(text, "Package release assets")
+        export_line = "export BUILT_AT XCODE_VERSION RUSTC_VERSION MARKETING_VERSION PROJECT_BUILD_NUMBER"
+
+        self.assertIn(export_line, package)
+        self.assertLess(package.index(export_line), package.index('python3 - "$RELEASE_METADATA"'))
 
 
 if __name__ == "__main__":
