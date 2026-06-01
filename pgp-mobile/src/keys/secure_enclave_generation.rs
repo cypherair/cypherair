@@ -9,7 +9,7 @@ use openssl::bn::BigNumContext;
 use openssl::ec::{EcGroup, EcPoint};
 use openssl::nid::Nid;
 
-use crate::external_signer::{ExternalP256Signature, ExternalP256Signer, ExternalP256SignerError};
+use crate::external_signer::{map_external_signing_error, signer_for_provider};
 
 const P256_X963_PUBLIC_KEY_LENGTH: usize = 65;
 #[cfg(test)]
@@ -318,40 +318,6 @@ fn make_key_agreement_key(
     Ok(key)
 }
 
-fn signer_for_provider(
-    public_key: Key<key::PublicParts, key::UnspecifiedRole>,
-    provider: Arc<dyn ExternalP256SigningProvider>,
-) -> openpgp::Result<
-    ExternalP256Signer<
-        impl FnMut(HashAlgorithm, &[u8]) -> Result<ExternalP256Signature, ExternalP256SignerError>
-            + Send
-            + Sync,
-    >,
-> {
-    ExternalP256Signer::new(public_key, move |hash_algorithm, digest| {
-        if hash_algorithm != HashAlgorithm::SHA256 {
-            return Err(ExternalP256SignerError::InvalidRequest(
-                "external P-256 signer supports SHA-256 only",
-            ));
-        }
-        let signature = provider
-            .sign_sha256_digest(digest.to_vec())
-            .map_err(external_signing_error_to_signer_error)?;
-        Ok(ExternalP256Signature::new(signature.r, signature.s))
-    })
-}
-
-fn external_signing_error_to_signer_error(
-    error: ExternalP256SigningError,
-) -> ExternalP256SignerError {
-    match error {
-        ExternalP256SigningError::Failed { category } => {
-            ExternalP256SignerError::ExternalFailure(category)
-        }
-        ExternalP256SigningError::OperationCancelled => ExternalP256SignerError::OperationCancelled,
-    }
-}
-
 fn map_external_signing_key_generation_error(
     context: &str,
     error: openpgp::anyhow::Error,
@@ -365,27 +331,6 @@ fn map_external_signing_revocation_error(context: &str, error: openpgp::anyhow::
     map_external_signing_error(error, |reason| PgpError::RevocationError {
         reason: format!("{context}: {reason}"),
     })
-}
-
-fn map_external_signing_error(
-    error: openpgp::anyhow::Error,
-    fallback: impl FnOnce(String) -> PgpError,
-) -> PgpError {
-    if let Some(external_error) = error
-        .chain()
-        .find_map(|cause| cause.downcast_ref::<ExternalP256SignerError>().copied())
-    {
-        match external_error {
-            ExternalP256SignerError::OperationCancelled => PgpError::OperationCancelled,
-            ExternalP256SignerError::ExternalFailure(category) => {
-                fallback(category.stable_reason().to_string())
-            }
-            ExternalP256SignerError::InvalidRequest(reason)
-            | ExternalP256SignerError::InvalidResponse(reason) => fallback(reason.to_string()),
-        }
-    } else {
-        fallback(error.to_string())
-    }
 }
 
 fn validate_public_key_point(public_key_x963: &[u8], label: &str) -> Result<(), PgpError> {
@@ -961,13 +906,13 @@ mod tests {
         .expect_err("callback failure should fail generation");
 
         match error {
-            PgpError::KeyGenerationFailed { reason } => {
-                assert!(reason.contains("hardwareUnavailable"));
-                assert!(!reason.contains("raw-secret"));
-                assert!(!reason.contains("/tmp"));
-                assert!(!reason.contains("capability"));
+            PgpError::ExternalP256SigningFailed { category } => {
+                assert_eq!(
+                    category,
+                    ExternalP256SigningFailureCategory::HardwareUnavailable
+                );
             }
-            other => panic!("expected key generation failure, got {other:?}"),
+            other => panic!("expected external signing failure, got {other:?}"),
         }
     }
 

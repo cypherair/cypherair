@@ -155,7 +155,7 @@ pub enum ExternalP256SigningError {
     OperationCancelled,
 }
 
-/// Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+/// Foreign signing callback for Secure Enclave-shaped certificate construction and runtime signing.
 #[uniffi::export(with_foreign)]
 pub trait ExternalP256SigningProvider: Send + Sync {
     /// Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.

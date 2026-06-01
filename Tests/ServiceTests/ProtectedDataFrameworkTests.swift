@@ -1963,10 +1963,16 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let cleartextSigner = TestHelpers.makeCleartextSigner(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
         let signingService = SigningService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            cleartextSigner: cleartextSigner
         )
         let certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,

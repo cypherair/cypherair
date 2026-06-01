@@ -241,10 +241,16 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc
         )
+        let cleartextSigner = makeCleartextSigner(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
         let signingSvc = SigningService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
-            contactService: contactSvc
+            contactService: contactSvc,
+            cleartextSigner: cleartextSigner
         )
         let certificateSignatureSvc = CertificateSignatureService(
             certificateAdapter: certificateAdapter,
@@ -294,6 +300,28 @@ enum TestHelpers {
         func cleanup() {
             try? FileManager.default.removeItem(at: tempDir)
         }
+    }
+
+    static func makeCleartextSigner(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyCleartextSigningService {
+        PrivateKeyCleartextSigningService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: digestSigner
+        )
     }
 
     // MARK: - Cleanup

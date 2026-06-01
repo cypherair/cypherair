@@ -1,10 +1,14 @@
 use sequoia_openpgp as openpgp;
+use std::sync::Arc;
 
 use openpgp::crypto::{mpi, Signer};
 use openpgp::packet::{key, Key};
 use openpgp::types::{Curve, HashAlgorithm, PublicKeyAlgorithm};
 
-use crate::keys::ExternalP256SigningFailureCategory;
+use crate::error::PgpError;
+use crate::keys::{
+    ExternalP256SigningError, ExternalP256SigningFailureCategory, ExternalP256SigningProvider,
+};
 
 const P256_SCALAR_LENGTH: usize = 32;
 const P256_ACCEPTABLE_HASHES: &[HashAlgorithm] = &[HashAlgorithm::SHA256];
@@ -154,6 +158,61 @@ where
     }
 }
 
+pub(crate) fn signer_for_provider(
+    public_key: Key<key::PublicParts, key::UnspecifiedRole>,
+    provider: Arc<dyn ExternalP256SigningProvider>,
+) -> openpgp::Result<
+    ExternalP256Signer<
+        impl FnMut(HashAlgorithm, &[u8]) -> Result<ExternalP256Signature, ExternalP256SignerError>
+            + Send
+            + Sync,
+    >,
+> {
+    ExternalP256Signer::new(public_key, move |hash_algorithm, digest| {
+        if hash_algorithm != HashAlgorithm::SHA256 {
+            return Err(ExternalP256SignerError::InvalidRequest(
+                "external P-256 signer supports SHA-256 only",
+            ));
+        }
+        let signature = provider
+            .sign_sha256_digest(digest.to_vec())
+            .map_err(external_signing_error_to_signer_error)?;
+        Ok(ExternalP256Signature::new(signature.r, signature.s))
+    })
+}
+
+pub(crate) fn map_external_signing_error(
+    error: openpgp::anyhow::Error,
+    fallback: impl FnOnce(String) -> PgpError,
+) -> PgpError {
+    if let Some(external_error) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<ExternalP256SignerError>().copied())
+    {
+        match external_error {
+            ExternalP256SignerError::OperationCancelled => PgpError::OperationCancelled,
+            ExternalP256SignerError::ExternalFailure(category) => {
+                PgpError::ExternalP256SigningFailed { category }
+            }
+            ExternalP256SignerError::InvalidRequest(reason)
+            | ExternalP256SignerError::InvalidResponse(reason) => fallback(reason.to_string()),
+        }
+    } else {
+        fallback(error.to_string())
+    }
+}
+
+fn external_signing_error_to_signer_error(
+    error: ExternalP256SigningError,
+) -> ExternalP256SignerError {
+    match error {
+        ExternalP256SigningError::Failed { category } => {
+            ExternalP256SignerError::ExternalFailure(category)
+        }
+        ExternalP256SigningError::OperationCancelled => ExternalP256SignerError::OperationCancelled,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,9 +222,14 @@ mod tests {
     use openpgp::policy::StandardPolicy;
     use openpgp::serialize::Serialize;
     use openpgp::types::{Features, KeyFlags, SignatureType};
+    use std::sync::{Arc, Mutex};
 
     use crate::decrypt::SignatureStatus;
     use crate::error::PgpError;
+    use crate::keys::{
+        ExternalP256SigningError, ExternalP256SigningFailureCategory, ExternalP256SigningProvider,
+        P256EcdsaSignature,
+    };
     use crate::{keys, sign, streaming, verify};
     use tempfile::NamedTempFile;
 
@@ -342,6 +406,124 @@ mod tests {
         input
     }
 
+    struct OracleSigningProvider {
+        keypair: Mutex<openpgp::crypto::KeyPair>,
+    }
+
+    impl ExternalP256SigningProvider for OracleSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            let mut keypair = self
+                .keypair
+                .lock()
+                .map_err(|_| external_operation_failed())?;
+            sign_digest_with_keypair(&mut keypair, &digest)
+        }
+    }
+
+    struct FailingRuntimeSigningProvider {
+        category: ExternalP256SigningFailureCategory,
+    }
+
+    impl ExternalP256SigningProvider for FailingRuntimeSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Err(ExternalP256SigningError::Failed {
+                category: self.category,
+            })
+        }
+    }
+
+    struct CancelledRuntimeSigningProvider;
+
+    impl ExternalP256SigningProvider for CancelledRuntimeSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Err(ExternalP256SigningError::OperationCancelled)
+        }
+    }
+
+    struct MalformedRuntimeSigningProvider {
+        r: Vec<u8>,
+        s: Vec<u8>,
+    }
+
+    impl ExternalP256SigningProvider for MalformedRuntimeSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            Ok(P256EcdsaSignature {
+                r: self.r.clone(),
+                s: self.s.clone(),
+            })
+        }
+    }
+
+    struct WrongDigestRuntimeSigningProvider {
+        keypair: Mutex<openpgp::crypto::KeyPair>,
+    }
+
+    impl ExternalP256SigningProvider for WrongDigestRuntimeSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            mut digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            digest[0] ^= 1;
+            let mut keypair = self
+                .keypair
+                .lock()
+                .map_err(|_| external_operation_failed())?;
+            sign_digest_with_keypair(&mut keypair, &digest)
+        }
+    }
+
+    struct UnexpectedRuntimeSigningProvider;
+
+    impl ExternalP256SigningProvider for UnexpectedRuntimeSigningProvider {
+        fn sign_sha256_digest(
+            &self,
+            _digest: Vec<u8>,
+        ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+            panic!("runtime signing provider should not be called")
+        }
+    }
+
+    fn runtime_provider(keypair: openpgp::crypto::KeyPair) -> Arc<dyn ExternalP256SigningProvider> {
+        Arc::new(OracleSigningProvider {
+            keypair: Mutex::new(keypair),
+        })
+    }
+
+    fn external_operation_failed() -> ExternalP256SigningError {
+        ExternalP256SigningError::Failed {
+            category: ExternalP256SigningFailureCategory::ExternalOperationFailed,
+        }
+    }
+
+    fn sign_digest_with_keypair(
+        keypair: &mut openpgp::crypto::KeyPair,
+        digest: &[u8],
+    ) -> Result<P256EcdsaSignature, ExternalP256SigningError> {
+        match keypair.sign(HashAlgorithm::SHA256, digest) {
+            Ok(mpi::Signature::ECDSA { r, s }) => Ok(P256EcdsaSignature {
+                r: r.value_padded(P256_SCALAR_LENGTH)
+                    .map_err(|_| external_operation_failed())?
+                    .into_owned(),
+                s: s.value_padded(P256_SCALAR_LENGTH)
+                    .map_err(|_| external_operation_failed())?
+                    .into_owned(),
+            }),
+            _ => Err(external_operation_failed()),
+        }
+    }
+
     #[test]
     fn test_external_signer_builds_valid_public_only_p256_certificates() {
         for version in CandidateVersion::all() {
@@ -366,6 +548,203 @@ mod tests {
                 .expect("external cleartext signature should verify");
             assert_eq!(result.legacy_status, SignatureStatus::Valid);
         }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_api_verifies_for_v4_and_v6() {
+        for version in CandidateVersion::all() {
+            let material = build_candidate(version).expect("candidate should build");
+            let signing_key_fingerprint = material
+                .signing_public_key
+                .fingerprint()
+                .to_hex()
+                .to_lowercase();
+            let signed = sign::sign_cleartext_with_external_p256_signer(
+                format!("runtime external signer {}", version.label()).as_bytes(),
+                &material.public_cert,
+                &signing_key_fingerprint,
+                runtime_provider(material.signing_keypair),
+            )
+            .expect("runtime external cleartext signing should succeed");
+
+            let result = verify::verify_cleartext_detailed(&signed, &[material.public_cert])
+                .expect("runtime external cleartext signature should verify");
+            assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_cancellation_is_preserved() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let signing_key_fingerprint = material
+            .signing_public_key
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        let result = sign::sign_cleartext_with_external_p256_signer(
+            b"cancel runtime signing",
+            &material.public_cert,
+            &signing_key_fingerprint,
+            Arc::new(CancelledRuntimeSigningProvider),
+        );
+
+        assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_sanitizes_callback_failures() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let signing_key_fingerprint = material
+            .signing_public_key
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        let result = sign::sign_cleartext_with_external_p256_signer(
+            b"fail runtime signing",
+            &material.public_cert,
+            &signing_key_fingerprint,
+            Arc::new(FailingRuntimeSigningProvider {
+                category: ExternalP256SigningFailureCategory::PrivateHandleMissing,
+            }),
+        );
+
+        match result {
+            Err(PgpError::ExternalP256SigningFailed { category }) => {
+                assert_eq!(
+                    category,
+                    ExternalP256SigningFailureCategory::PrivateHandleMissing
+                );
+            }
+            other => panic!("expected sanitized ExternalP256SigningFailed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_rejects_invalid_responses() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let signing_key_fingerprint = material
+            .signing_public_key
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        for provider in [
+            Arc::new(MalformedRuntimeSigningProvider {
+                r: vec![1u8; P256_SCALAR_LENGTH - 1],
+                s: vec![1u8; P256_SCALAR_LENGTH],
+            }) as Arc<dyn ExternalP256SigningProvider>,
+            Arc::new(MalformedRuntimeSigningProvider {
+                r: vec![0u8; P256_SCALAR_LENGTH],
+                s: vec![1u8; P256_SCALAR_LENGTH],
+            }) as Arc<dyn ExternalP256SigningProvider>,
+            Arc::new(WrongDigestRuntimeSigningProvider {
+                keypair: Mutex::new(material.signing_keypair),
+            }) as Arc<dyn ExternalP256SigningProvider>,
+        ] {
+            let result = sign::sign_cleartext_with_external_p256_signer(
+                b"invalid runtime response",
+                &material.public_cert,
+                &signing_key_fingerprint,
+                provider,
+            );
+            assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_rejects_wrong_public_key_signature() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let other = build_candidate(CandidateVersion::V4).expect("other should build");
+        let signing_key_fingerprint = material
+            .signing_public_key
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        let result = sign::sign_cleartext_with_external_p256_signer(
+            b"wrong public key",
+            &material.public_cert,
+            &signing_key_fingerprint,
+            runtime_provider(other.signing_keypair),
+        );
+
+        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_rejects_mismatched_fingerprint() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let other = build_candidate(CandidateVersion::V4).expect("other should build");
+        let wrong_fingerprint = other
+            .signing_public_key
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        let result = sign::sign_cleartext_with_external_p256_signer(
+            b"wrong fingerprint",
+            &material.public_cert,
+            &wrong_fingerprint,
+            runtime_provider(material.signing_keypair),
+        );
+
+        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_cleartext_rejects_secret_non_p256_and_wrong_role_inputs() {
+        let secret = keys::generate_key_with_profile(
+            "Software Secret".to_string(),
+            Some("software-secret@example.test".to_string()),
+            None,
+            keys::KeyProfile::Universal,
+        )
+        .expect("software key should generate");
+        let secret_result = sign::sign_cleartext_with_external_p256_signer(
+            b"secret-bearing input",
+            &secret.cert_data,
+            &secret.fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+        );
+        assert!(matches!(
+            secret_result,
+            Err(PgpError::InvalidKeyData { .. })
+        ));
+
+        let non_p256_result = sign::sign_cleartext_with_external_p256_signer(
+            b"non-p256 input",
+            &secret.public_key_data,
+            &secret.fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+        );
+        assert!(matches!(
+            non_p256_result,
+            Err(PgpError::SigningFailed { .. })
+        ));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let cert = openpgp::Cert::from_bytes(&material.public_cert).expect("candidate parses");
+        let key_agreement_fingerprint = cert
+            .keys()
+            .subkeys()
+            .next()
+            .expect("candidate has key-agreement subkey")
+            .key()
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+        let wrong_role_result = sign::sign_cleartext_with_external_p256_signer(
+            b"wrong role input",
+            &material.public_cert,
+            &key_agreement_fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+        );
+        assert!(matches!(
+            wrong_role_result,
+            Err(PgpError::SigningFailed { .. })
+        ));
     }
 
     #[test]
@@ -399,7 +778,12 @@ mod tests {
         .expect("external signer should initialize");
 
         let result = sign::sign_cleartext_with_signer(b"must not fallback", signer);
-        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+        assert!(matches!(
+            result,
+            Err(PgpError::ExternalP256SigningFailed {
+                category: ExternalP256SigningFailureCategory::ExternalOperationFailed
+            })
+        ));
     }
 
     #[test]

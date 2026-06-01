@@ -302,6 +302,7 @@ $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPContactImportAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyOperationAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPExternalP256SigningProviderBridge.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageResultMapper.swift
 $(SRCROOT)/Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift
@@ -318,6 +319,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PGPKeyOperationFailureMapper.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyAccessService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SelectiveRevocationService.swift

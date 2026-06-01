@@ -205,6 +205,25 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func signCleartextWithExternalP256Signer(
+        text: Data,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider
+    ) async throws -> Data {
+        do {
+            return try await Self.performSignCleartextWithExternalP256Signer(
+                engine: engine,
+                text: text,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func signDetachedFile(
         inputPath: String,
         signerCert: Data,
@@ -412,6 +431,22 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         signerCert: Data
     ) async throws -> Data {
         try engine.signCleartext(text: text, signerCert: signerCert)
+    }
+
+    @concurrent
+    private static func performSignCleartextWithExternalP256Signer(
+        engine: PgpEngine,
+        text: Data,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider
+    ) async throws -> Data {
+        try engine.signCleartextWithExternalP256Signer(
+            text: text,
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider
+        )
     }
 
     @concurrent

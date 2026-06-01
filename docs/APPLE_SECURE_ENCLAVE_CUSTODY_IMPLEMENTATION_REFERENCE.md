@@ -239,6 +239,19 @@ loads only the signing handle by public bindings. Production policy still blocks
 Secure Enclave private operations, and no product workflow consumes the router
 in this foundation PR.
 
+Phase 5B is the first workflow consumer and is intentionally narrow. The Rust
+runtime cleartext signing API accepts only public certificate bytes, an expected
+signing-key fingerprint, and the existing external P-256 signing provider. Rust
+selects a policy-valid P-256 signing key matching that fingerprint, builds an
+external signer, and asks Sequoia to construct the cleartext signature without
+extracting a secret keypair. Swift routes only `SigningService.signCleartext`:
+software routes keep the existing unwrap-and-zeroize behavior, Secure Enclave
+signer routes pass the stored public certificate and loaded signing handle to
+the external signer API, and blocked routes map to sanitized unavailable
+categories. Sign-plus-encrypt, password-message signing, detached file signing,
+certification, revocation, expiry/binding refresh, and decrypt remain outside
+PR 5B.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -378,6 +391,16 @@ wrong public binding, local-authentication cancellation/failure, and no software
 fallback all resolve to sanitized blocked outcomes. Source-audit coverage should
 continue to catch new workflow-local custody switches outside the resolver,
 router, and established key-management/security boundaries.
+
+Phase 5B coverage adds the runtime cleartext signing path. Rust tests should
+verify v4/v6 public-only P-256 cleartext signatures, callback cancellation and
+sanitized failure categories, malformed `r/s`, wrong digest, wrong public key,
+non-P-256 or wrong-role certificates, fingerprint mismatch, and no fallback to
+secret-certificate signing. Swift tests should verify software cleartext signing
+stays unchanged, Secure Enclave cleartext signing does not unwrap a software
+secret certificate, production policy blocks, hidden/test signing policy can
+sign and verify, missing/wrong handles and auth failures surface stable
+categories, and blocked routes do not call FFI signing.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

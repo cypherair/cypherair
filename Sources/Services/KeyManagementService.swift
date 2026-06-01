@@ -596,6 +596,19 @@ final class KeyManagementService: @unchecked Sendable {
         try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
     }
 
+    func makePrivateKeyOperationRouter(
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
+        handleStore: SecureEnclaveCustodyHandleStore
+    ) -> PrivateKeyOperationRouter {
+        PrivateKeyOperationRouter(
+            catalogStore: catalogStore,
+            resolver: resolver,
+            publicBindingInspector: publicBindingInspector,
+            handleStore: handleStore
+        )
+    }
+
     @concurrent
     private static func discoverSelectionCatalogOffMainActor(
         certificateAdapter: PGPCertificateOperationAdapter,
