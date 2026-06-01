@@ -27,6 +27,7 @@ PgpMobile.arm64e-build-manifest.json
 .claude/worktrees/
 
 # Local Codex/agent helper config
+.codex/
 .agents/
 
 # Python bytecode caches
