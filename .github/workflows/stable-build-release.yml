@@ -11,20 +11,13 @@ on:
         required: true
         type: string
       source_ref:
-        description: Git ref to checkout. For create_release=true, this should match the pushed stable tag commit.
+        description: Git ref to checkout for dry-run validation. Formal publishing is tag-push only.
         required: true
         default: main
         type: string
-      create_release:
-        description: Create the immutable GitHub release instead of a dry run. Requires the stable tag to already exist.
-        required: true
-        default: false
-        type: boolean
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
@@ -33,7 +26,6 @@ env:
   SOURCE_BUNDLE: CypherAir-source-bundle.tar.zst
   COMPLIANCE_MANIFEST: CypherAir-compliance-manifest.json
   RELINK_KIT: PgpMobile-relink-kit.tar.zst
-  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
   ARM64E_STAGE1_RELEASE_TAG: latest
   ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
@@ -43,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref || github.ref }}
       - name: Install Rust stable toolchain
         run: |
@@ -67,6 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref || github.ref }}
       - name: Check Xcode 26.5 platform probe readiness
@@ -88,7 +82,6 @@ jobs:
         id: resolve
         env:
           INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
-          INPUT_CREATE_RELEASE: ${{ github.event.inputs.create_release }}
           INPUT_SOURCE_REF: ${{ github.event.inputs.source_ref }}
         run: |
           set -euo pipefail
@@ -103,7 +96,7 @@ jobs:
             workflow_dispatch)
               RELEASE_TAG="${INPUT_RELEASE_TAG}"
               RELEASE_SOURCE_REF="${INPUT_SOURCE_REF}"
-              CREATE_RELEASE="${INPUT_CREATE_RELEASE}"
+              CREATE_RELEASE="false"
               ;;
             *)
               echo "::error::Unsupported event: $EVENT_NAME"
@@ -135,6 +128,17 @@ jobs:
             echo "commit_sha=$COMMIT_SHA"
             echo "artifact_name=$STABLE_RELEASE_ARTIFACT"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Validate publish source matches stable tag
+        if: steps.resolve.outputs.create_release == 'true'
+        run: |
+          set -euo pipefail
+
+          TAG_COMMIT="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          if [ "$COMMIT_SHA" != "$TAG_COMMIT" ]; then
+            echo "::error::Stable release publishing requires checked-out HEAD $COMMIT_SHA to match $RELEASE_TAG commit $TAG_COMMIT."
+            exit 1
+          fi
 
       - name: Validate tag against project version
         run: |
@@ -177,9 +181,12 @@ jobs:
             --output arm64e-dependency-chain.json \
             --freshness-level error
 
+      - name: Download arm64e stage1 toolchain
+        run: scripts/download_arm64e_stage1_toolchain.sh "$RUNNER_TEMP/arm64e-stage1"
+
       - name: Build XCFramework and generated bindings
         env:
-          GH_TOKEN: ${{ github.token }}
+          ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
 
       - name: Probe iOS build with stable compliance metadata
@@ -315,6 +322,10 @@ jobs:
       - build-stable-release-assets
     if: needs.build-stable-release-assets.outputs.create_release == 'true'
     runs-on: macos-26
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     env:
       RELEASE_TAG: ${{ needs.build-stable-release-assets.outputs.release_tag }}
       COMMIT_SHA: ${{ needs.build-stable-release-assets.outputs.commit_sha }}
@@ -345,6 +356,63 @@ jobs:
           done
 
           shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
+
+      - name: Revalidate stable tag before publishing
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          read -r tag_object_type tag_object_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+              --jq '.object | [.type, .sha] | @tsv'
+          )
+
+          if [ "$tag_object_type" != "tag" ]; then
+            echo "::error::Stable tag $RELEASE_TAG must be an annotated signed tag, got $tag_object_type"
+            exit 1
+          fi
+
+          tag_object_json="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" > "$tag_object_json"
+          python3 - "$tag_object_json" "$RELEASE_TAG" "$COMMIT_SHA" <<'PY'
+          import json
+          import sys
+
+          path, release_tag, commit_sha = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, encoding="utf-8") as handle:
+              tag_object = json.load(handle)
+
+          errors = []
+          tag_name = tag_object.get("tag")
+          if tag_name != release_tag:
+              errors.append(f"tag object name {tag_name!r} does not match {release_tag!r}")
+
+          target = tag_object.get("object") or {}
+          target_type = target.get("type")
+          tag_commit = target.get("sha")
+          if target_type != "commit":
+              errors.append(f"stable tag peels to {target_type!r}, not commit")
+          elif tag_commit != commit_sha:
+              errors.append(f"stable tag now resolves to {tag_commit}, expected {commit_sha}")
+
+          verification = tag_object.get("verification") or {}
+          signature = verification.get("signature") or ""
+          if verification.get("verified") is not True:
+              errors.append(f"stable tag signature is not verified: {verification.get('reason')}")
+          if verification.get("reason") != "valid":
+              errors.append(f"stable tag signature verification reason is {verification.get('reason')!r}")
+          if not signature.startswith("-----BEGIN SSH SIGNATURE-----"):
+              errors.append("stable tag must be SSH-signed")
+
+          if errors:
+              for error in errors:
+                  print(f"::error::{error}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"Stable tag {release_tag} is an SSH-signed annotated tag for {tag_commit}")
+          PY
+          rm -f "$tag_object_json"
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0

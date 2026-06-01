@@ -16,6 +16,7 @@ CypherAir publishes a unique edge prerelease XCFramework from the current `main`
 - Edge prerelease tags use the `pgpmobile-edge-` prefix.
 - Tag format: `pgpmobile-edge-YYYYMMDDTHHMMSSZ-shortsha-rRUN_ID-aRUN_ATTEMPT`.
 - This channel is updated automatically on every successful push to `main` and may be manually re-run from `main` only with the exact `pgpmobile-edge` prefix.
+- Edge publication is gated on the Rust dependency audit; a failed audit prevents release/tag creation and asset publication.
 - It is intended for CI, integration, and manual validation of the current `main` tip.
 - It is not treated as a stable SDK release.
 
@@ -81,11 +82,15 @@ CypherAir publishes stable XCFramework assets through the same unified stable Gi
 ### CI Cache Policy
 
 CypherAir release and validation workflows intentionally avoid Cargo cache
-actions. The arm64e XCFramework build force-downloads the selected Rust fork
-stage1 prerelease inside `./build-xcframework.sh --release`; caching Cargo
-`target/` artifacts before that resolution can reuse objects built by an older
-stage1 compiler. Clean Rust builds are slower, but they keep edge, drill, PR,
-nightly, and stable release artifacts deterministic across stage1 updates.
+actions. GitHub Actions downloads the selected Rust fork stage1 prerelease in a
+dedicated pre-build step, then invokes `./build-xcframework.sh --release` with
+the local `ARM64E_STAGE1_DIR` and manifest path while GitHub token variables are
+absent from Cargo/build subprocesses. Stage1 downloads use the public
+`cypherair/rust` GitHub release API without `GH_TOKEN` or `GITHUB_TOKEN`, so
+checked-out workflow scripts never receive a token for this download. Caching
+Cargo `target/` artifacts before that resolution can reuse objects built by an
+older stage1 compiler. Clean Rust builds are slower, but they keep edge, drill,
+PR, nightly, and stable release artifacts deterministic across stage1 updates.
 
 ## 2. Edge Discovery And Downloading
 
@@ -145,7 +150,7 @@ gh attestation verify PgpMobile.arm64e-build-manifest.json \
     --source-ref refs/heads/main
 ```
 
-Drill releases are verified using the exact ref-pinned command rendered in that release's notes. Do not reuse the canonical edge command for drill artifacts.
+Drill releases are verified using the exact ref-pinned command rendered in that release's notes. The rendered command shell-quotes the source ref so it is safe to copy even for unusual branch names. Do not reuse the canonical edge command for drill artifacts.
 
 ## 4. Stable Release Retrieval
 

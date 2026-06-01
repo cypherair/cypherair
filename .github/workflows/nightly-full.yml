@@ -12,7 +12,6 @@ env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
-  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
   ARM64E_STAGE1_RELEASE_TAG: latest
 
 jobs:
@@ -20,6 +19,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
@@ -36,6 +37,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Install Rust stable toolchain
         run: |
           rustup set profile minimal
@@ -61,6 +64,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Select CI Xcode
         run: bash scripts/ci_xcode_platform_preflight.sh select
       - name: Install Rust stable toolchain
@@ -78,9 +83,11 @@ jobs:
             --cargo-lock pgp-mobile/Cargo.lock \
             --output arm64e-dependency-chain.json \
             --freshness-level warn
+      - name: Download arm64e stage1 toolchain
+        run: scripts/download_arm64e_stage1_toolchain.sh "$RUNNER_TEMP/arm64e-stage1"
       - name: Build XCFramework and generated bindings
         env:
-          GH_TOKEN: ${{ github.token }}
+          ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
       - name: Package XCFramework artifact
         run: |
@@ -100,6 +107,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Check Xcode 26.5 platform probe readiness
         id: platform_preflight
         run: bash scripts/ci_xcode_platform_preflight.sh preflight
@@ -139,6 +148,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - name: Check hosted Swift unit-test readiness
         id: swift_unit_preflight
         run: bash scripts/ci_xcode_platform_preflight.sh macos-unit-test-preflight
