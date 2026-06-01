@@ -7,6 +7,32 @@ enum KeychainFailureKind: Equatable, Sendable {
     case authenticationFailed
     case interactionNotAllowed
     case unhandled
+
+    var isAuthorizationCancellationOrDenial: Bool {
+        switch self {
+        case .userCancelled, .authenticationFailed, .interactionNotAllowed:
+            return true
+        case .itemNotFound, .duplicateItem, .unhandled:
+            return false
+        }
+    }
+
+    var traceName: String {
+        switch self {
+        case .itemNotFound:
+            return "itemNotFound"
+        case .duplicateItem:
+            return "duplicateItem"
+        case .userCancelled:
+            return "userCancelled"
+        case .authenticationFailed:
+            return "authenticationFailed"
+        case .interactionNotAllowed:
+            return "interactionNotAllowed"
+        case .unhandled:
+            return "unhandled"
+        }
+    }
 }
 
 protocol KeychainFailureRepresentable: Error {
@@ -24,5 +50,16 @@ enum KeychainFailureClassifier {
 
     static func isDuplicateItem(_ error: Error) -> Bool {
         kind(for: error) == .duplicateItem
+    }
+
+    static func isAuthorizationCancellationOrDenial(_ error: Error) -> Bool {
+        kind(for: error)?.isAuthorizationCancellationOrDenial == true
+    }
+
+    static func traceName(for error: Error) -> String? {
+        if let keychainError = error as? KeychainError {
+            return keychainError.traceName
+        }
+        return kind(for: error)?.traceName
     }
 }

@@ -89,6 +89,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.productionMockKeychainErrorReferences)
     }
 
+    func test_protectedDataAuthorizationClassificationUsesKeychainFailureClassifier() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.protectedDataAuthorizationConcreteKeychainErrorClassification)
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
@@ -1059,6 +1063,17 @@ private enum ArchitectureSourceAuditRules {
                 && !path.hasPrefix("Sources/PgpMobile/")
                 && !path.hasPrefix("Sources/Security/Mocks/")
                 && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let protectedDataAuthorizationConcreteKeychainErrorClassification = ArchitectureSourceAuditRule(
+        name: "ProtectedData authorization keychain failure classification",
+        failureSummary: "ProtectedData authorization must classify keychain failures through KeychainFailureClassifier, not concrete KeychainError casts.",
+        pattern: #"\bas\s*\?\s*KeychainError\b"#,
+        scope: { path in
+            path == "Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift"
         },
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([])

@@ -390,8 +390,8 @@ final class ProtectedDataRootSecretCoordinator: @unchecked Sendable {
     ) -> [String: String] {
         var metadata = extra
         metadata["errorType"] = String(describing: type(of: error))
-        if let keychainError = error as? KeychainError {
-            metadata["keychainError"] = String(describing: keychainError)
+        if let keychainFailureTraceName = KeychainFailureClassifier.traceName(for: error) {
+            metadata["keychainError"] = keychainFailureTraceName
         }
         if let laError = error as? LAError {
             metadata["laCode"] = String(laError.errorCode)
