@@ -381,3 +381,15 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Encryption now resolves public-only encrypt-to-self inputs before unwrapping an optional signing private key.
 - Resolution: Text and streaming encryption share one encrypt-to-self resolver, preserving the existing explicit-fingerprint fallback-to-default behavior. Regression tests cover missing-default encrypt-to-self with signing requested and assert signer private-key unwrap does not occur.
 - Relevant paths: `Sources/Services/EncryptionService.swift`, `Tests/ServiceTests/EncryptionServiceTests.swift`
+
+### SR-CLOSED-37: Post-auth warm-up can clear background privacy blur
+
+- Former Review ID: `SR-FIX-09`
+- Legacy ID: `CA-16`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
+- Decision: Fixed. Resume completion now checks whether its captured lifecycle generation is still current before it can clear the privacy blur.
+- Resolution: Real resign-active and background transitions invalidate in-flight resume completions and keep the hard blur. A stale post-auth completion no longer arms the transient authentication settle path; when the app has already returned active, the UI schedules a fresh resume/grace check instead of accepting the stale completion directly.
+- Relevant paths: `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Tests/ServiceTests/ProtectedDataFrameworkTests.swift`

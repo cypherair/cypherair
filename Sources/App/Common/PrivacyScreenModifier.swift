@@ -84,6 +84,7 @@ struct PrivacyScreenModifier: ViewModifier {
                     }
                     appSessionOrchestrator.handleSceneDidEnterBackground()
                 case .active:
+                    appSessionOrchestrator.handleSceneDidBecomeActive(source: "sceneActive")
                     switch lifecycleGate.shouldHandleBecomeActive(
                         isAuthenticating: appSessionOrchestrator.isAuthenticating,
                         operationPrompt: operationPrompt
@@ -117,6 +118,7 @@ struct PrivacyScreenModifier: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
+                appSessionOrchestrator.handleSceneDidBecomeActive(source: "sceneActive")
                 switch lifecycleGate.shouldHandleBecomeActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     operationPrompt: operationPrompt
@@ -293,19 +295,19 @@ struct PrivacyScreenModifier: ViewModifier {
                 name: "privacy.resumeTask.start",
                 metadata: ["source": "initialAppearance"]
             )
-            let attemptedAuthentication = await appSessionOrchestrator.handleInitialAppearance(
-                localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+            let result = await appSessionOrchestrator.handleInitialAppearanceForLifecycle(
+                localizedReason: localizedResumeReason,
                 source: "initialAppearance"
             )
-            if attemptedAuthentication {
-                lifecycleGate.armForAuthenticationAttempt()
-            }
+            processResumeLifecycleResult(result, source: "initialAppearance")
             authLifecycleTraceStore?.record(
                 category: .lifecycle,
                 name: "privacy.resumeTask.finish",
                 metadata: [
                     "source": "initialAppearance",
-                    "attemptedAuthentication": attemptedAuthentication ? "true" : "false"
+                    "attemptedAuthentication": result.attemptedAuthentication ? "true" : "false",
+                    "shouldArmAuthenticationSettle": result.shouldArmAuthenticationSettle ? "true" : "false",
+                    "shouldStartFreshResume": result.shouldStartFreshResume ? "true" : "false"
                 ]
             )
         }
@@ -323,31 +325,54 @@ struct PrivacyScreenModifier: ViewModifier {
                 name: "privacy.resumeTask.start",
                 metadata: ["source": source, "retry": retry ? "true" : "false"]
             )
-            let attemptedAuthentication: Bool
+            let result: AppSessionOrchestrator.ResumeLifecycleResult
             if retry {
-                attemptedAuthentication = await appSessionOrchestrator.retryPrivacyUnlock(
-                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+                result = await appSessionOrchestrator.retryPrivacyUnlockForLifecycle(
+                    localizedReason: localizedResumeReason,
                     source: source
                 )
             } else {
-                attemptedAuthentication = await appSessionOrchestrator.handleResume(
-                    localizedReason: String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume"),
+                result = await appSessionOrchestrator.handleResumeForLifecycle(
+                    localizedReason: localizedResumeReason,
                     source: source
                 )
             }
-            if attemptedAuthentication {
-                lifecycleGate.armForAuthenticationAttempt()
-            }
+            processResumeLifecycleResult(result, source: source)
             authLifecycleTraceStore?.record(
                 category: .lifecycle,
                 name: "privacy.resumeTask.finish",
                 metadata: [
                     "source": source,
                     "retry": retry ? "true" : "false",
-                    "attemptedAuthentication": attemptedAuthentication ? "true" : "false"
+                    "attemptedAuthentication": result.attemptedAuthentication ? "true" : "false",
+                    "shouldArmAuthenticationSettle": result.shouldArmAuthenticationSettle ? "true" : "false",
+                    "shouldStartFreshResume": result.shouldStartFreshResume ? "true" : "false"
                 ]
             )
         }
+    }
+
+    private var localizedResumeReason: String {
+        String(localized: "privacy.reauth.reason", defaultValue: "Authenticate to resume")
+    }
+
+    private func processResumeLifecycleResult(
+        _ result: AppSessionOrchestrator.ResumeLifecycleResult,
+        source: String
+    ) {
+        if result.shouldArmAuthenticationSettle {
+            lifecycleGate.armForAuthenticationAttempt()
+        }
+
+        guard result.shouldStartFreshResume else {
+            return
+        }
+        authLifecycleTraceStore?.record(
+            category: .lifecycle,
+            name: "privacy.resumeTask.reschedule",
+            metadata: ["source": source, "reason": "staleCompletion"]
+        )
+        performResumeAction(source: "\(source).fresh")
     }
 }
 
