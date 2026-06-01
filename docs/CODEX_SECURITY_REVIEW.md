@@ -1,6 +1,6 @@
 # Codex Security Review Fix Plan
 
-This document is the implementation planning record for accepted security-review follow-ups. Use the `SR-FIX-*` IDs in future issues, commits, and pull requests. Legacy `CA-*` IDs are included only for traceability to the original review discussion.
+This document is the implementation planning record for active accepted security-review follow-ups. Use the `SR-FIX-*` IDs in future issues, commits, and pull requests. Closed items are moved to `docs/CODEX_SECURITY_REVIEW_CLOSED.md` with a new `SR-CLOSED-*` ID while retaining their former `SR-FIX-*` and legacy `CA-*` references.
 
 ## Fix Queue
 
@@ -15,45 +15,6 @@ This document is the implementation planning record for accepted security-review
 - Relevant paths: `Sources/Services/ContactService.swift`, `Sources/App/Contacts/Import/ContactImportWorkflow.swift`
 - Fix plan: Preserve duplicate identities if that remains product policy, but surface the candidate conflict before or at import success and offer an explicit review or merge path. If product policy changes, stage or block conflicting imports until the user chooses how to handle the existing contact.
 - Validation: Add import workflow tests for same-email/User-ID different-fingerprint candidates and UI/workflow checks that the conflict warning is preserved before success.
-
-### SR-FIX-02: GH_TOKEN exposed to entire XCFramework build
-
-- Legacy ID: `CA-02`
-- Severity: `high`
-- Area: `ci-supply-chain`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d)
-- Status: `Fixed / Closed`
-- Decision: Confirmed release supply-chain hardening. Release XCFramework builds expose GitHub tokens to broader build subprocesses than needed.
-- Impact: Compromised release-time build code could read workflow tokens during artifact production. This is release infrastructure risk, not an app-runtime exploit.
-- Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`, `scripts/download_arm64e_stage1_toolchain.sh`
-- Fix summary: CI now downloads the public arm64e stage1 toolchain in a dedicated token-free pre-build step before XCFramework builds, invokes the build without GitHub token variables, disables checkout credential persistence, and keeps all stage1 downloader invocations token-free.
-- Validation: Added static workflow hardening coverage proving XCFramework build steps and stage1 download steps do not receive GitHub tokens, and stage1 download remains separate from the build.
-
-### SR-FIX-03: Release workflow runs arbitrary refs with write token
-
-- Legacy ID: `CA-05`
-- Severity: `high`
-- Area: `ci-supply-chain`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/893e12c4d22c8191afba18916328b86d)
-- Status: `Fixed / Closed`
-- Decision: Confirmed release provenance issue. Formal stable publication can be dispatched from a source ref that is not proven to match the stable release tag commit.
-- Impact: A stable release page could receive assets built from the wrong ref, weakening provenance for released XCFramework and source/compliance artifacts.
-- Relevant paths: `.github/workflows/stable-build-release.yml`
-- Fix summary: Formal stable publication is tag-push only; manual `workflow_dispatch` runs are dry-run validation artifacts. The publish path keeps a defensive `HEAD` versus peeled stable-tag commit check before official asset creation, then requires the current remote tag to be an SSH-signed annotated tag for the artifact commit immediately before attestation and release publication.
-- Validation: Added static workflow hardening coverage proving manual dispatch cannot publish, the build-time tag/HEAD guard is present, and publish-time tag revalidation rejects lightweight or unsigned stable tags before attestation and release creation.
-
-### SR-FIX-04: Rust audit does not gate release publication
-
-- Legacy ID: `CA-08`
-- Severity: `medium`
-- Area: `ci-supply-chain`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9b57feaa6750819185da3adea4e4b205)
-- Status: `Fixed / Closed`
-- Decision: Confirmed edge-release hardening. Edge publication is not currently blocked by a failed Rust dependency audit.
-- Impact: Public edge or drill assets can be published even when Rust dependency audit fails, weakening prerelease supply-chain signals.
-- Relevant paths: `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `docs/TESTING.md`, `docs/APP_RELEASE_PROCESS.md`
-- Fix summary: Edge/drill builds now produce short-lived artifacts in a read-scoped build job; `publish-edge-release` depends on both the build job and `rust-dependency-audit` before attestation, tag creation, release creation, asset upload, or publication.
-- Validation: Added static workflow hardening coverage proving edge publication is audit-gated and write-scoped to the publish job.
 
 ### SR-FIX-05: Untrusted certifications can mark contacts certified
 
@@ -91,21 +52,6 @@ This document is the implementation planning record for accepted security-review
 - Fix plan: If app-session authentication cannot be evaluated, block local reset and surface an auth-unavailable error instead of treating the prompt as optional.
 - Validation: Add settings/reset tests for auth unavailable, auth failure, and auth success; only success should proceed to destructive reset.
 
-### SR-FIX-08: Stale operation prompt generation can disable privacy blur
-
-- Legacy ID: `CA-15`
-- Severity: `medium`
-- Area: `privacy-lifecycle`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/daf3bd3399248191900565067b6785ae)
-- Status: `Fixed / Closed`
-- Resolution: Landed via [PR #411](https://github.com/cypherair/cypherair/pull/411).
-- Decision: Confirmed high-priority privacy lifecycle bug. Stale operation-prompt state can suppress real app-switch lifecycle handling.
-- Impact: Can leave already-unlocked UI insufficiently blurred during real lifecycle transitions, especially on macOS, and can contribute to inconsistent auth recovery.
-- Relevant paths: `Sources/Security/AuthenticationPromptCoordinator.swift`, `Sources/App/Common/PrivacyScreenLifecycleGate.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`
-- Fix summary: Replaced unbounded next-lifecycle suppression with a bounded operation-prompt snapshot lifecycle, including nested prompt session generations, prompt-owned inactive evidence before settle, and background transitions that always clear prompt state and hard-blur.
-- Validation: Added lifecycle state-machine, ProtectedData integration, and trace coverage for prompt-induced inactive/active transitions, real background transitions, stale prompt state expiry, nested prompt sessions, and macOS resume behavior.
-- Follow-up note: Codex review disposition was OK to land. User macOS validation still observed behavior similar to the previous issue when the authentication grace period is set to immediate; the old behavior's root cause remains unknown and this residual observation is not tracked as part of SR-FIX-08 closure. If pursued, it should be opened as a separate investigation.
-
 ### SR-FIX-09: Post-auth warm-up can clear background privacy blur
 
 - Legacy ID: `CA-16`
@@ -113,37 +59,10 @@ This document is the implementation planning record for accepted security-review
 - Area: `privacy-lifecycle`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
 - Decision: Confirmed high-priority privacy lifecycle race. An in-flight resume task can clear a hard background privacy blur after the app leaves the active generation.
-- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle repair as SR-FIX-08.
+- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle area as former SR-FIX-08 / SR-CLOSED-32.
 - Relevant paths: `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Settings/ProtectedSettingsHost.swift`
 - Fix plan: Track scene/activity generation or equivalent foreground state. Resume completion may clear blur only if it still belongs to the current active generation; otherwise keep blur for the next active/resume path.
 - Validation: Add generation/race tests where background occurs during post-auth work; completion must not clear blur for an obsolete generation.
-
-### SR-FIX-10: Unescaped source ref in release verification command
-
-- Legacy ID: `CA-18`
-- Severity: `medium`
-- Area: `ci-supply-chain`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484)
-- Status: `Fixed / Closed`
-- Decision: Confirmed low-impact release-note hardening. Drill release verification commands should render shell-safe source refs.
-- Impact: A developer copying an unsafe verification command from drill release notes could trigger shell expansion. GitHub Actions and app users are not directly affected.
-- Relevant paths: `.github/workflows/xcframework-edge-release.yml`
-- Fix summary: Edge/drill release metadata is generated through JSON escaping, and release-note attestation commands render the source ref through Python `shlex.quote` before publication.
-- Validation: Added static workflow hardening coverage proving release notes no longer render raw `"$RELEASE_SOURCE_REF"` and metadata no longer writes raw JSON heredoc values.
-
-### SR-FIX-11: Production auth can be bypassed via UI-test defaults key
-
-- Legacy ID: `CA-22`
-- Severity: `medium`
-- Area: `app-auth`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/85c8b620e92c8191ab484e11a5cf4143)
-- Status: `Fixed / Closed`
-- Resolution: Implemented in [PR #414](https://github.com/cypherair/cypherair/pull/414).
-- Decision: Confirmed highest-priority app-auth issue. Production auth paths must not honor a UI-test bypass defaults key from the standard defaults domain.
-- Impact: Can bypass app-session/privacy-lock and mode-switch authorization if the app standard defaults domain is manipulated. It does not bypass hardware-gated private-key unwrap/sign/decrypt/export.
-- Relevant paths: `Sources/App/AppContainer.swift`, `Sources/Security/AuthenticationManager.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
-- Fix summary: Production/default `AuthenticationManager` instances now ignore `com.cypherair.preference.uiTestBypassAuthentication` unless explicitly constructed with UI-test bypass opt-in. `AppContainer.makeUITest()` remains opted in for automation, while private-key and app-session authentication share a lower-level LocalAuthentication policy helper that preserves the existing trace vocabulary.
-- Validation: Added regression coverage proving default managers do not bypass when the defaults key is set, and proving explicitly opted-in UI-test managers still bypass without invoking the LocalAuthentication evaluator. Targeted `AuthLifecycleTraceStoreTests`, the full macOS `CypherAir-UnitTests` plan, and `git diff --check` passed.
 
 ### SR-FIX-12: Import confirmation can act on a replaced key request
 
@@ -252,3 +171,15 @@ This document is the implementation planning record for accepted security-review
 - Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/App/Sign/VerifyView.swift`
 - Fix plan: Split edit invalidation from section refresh. Ordinary edit paths should clear stale result/phase state without bumping the text input section identity; import/reset/completion paths can still refresh when needed.
 - Validation: Add SwiftUI model/view tests or targeted UI smoke coverage showing backspace/editing does not recreate the text editor section or dismiss keyboard focus.
+
+### SR-FIX-21: Public docs disclose unfixed security findings
+
+- Legacy ID: none
+- Severity: `medium`
+- Area: `security-review-docs`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/90434042d17c819187a2df545d7848e4)
+- Decision: Confirmed documentation governance follow-up. The public security-review records currently describe unresolved findings in enough detail to lower attacker effort against issues that have not yet been fixed.
+- Impact: Public documentation can expose exploit-relevant implementation details before the corresponding code or workflow hardening has landed. This is a documentation and disclosure-control issue, not an app-runtime vulnerability by itself.
+- Relevant paths: `docs/CODEX_SECURITY_REVIEW.md`, `docs/CODEX_SECURITY_REVIEW_INDEX.md`
+- Fix plan: Define and apply a public documentation policy for active security findings, including what can remain in the repository versus what should stay in Security Cloud or another restricted record until the finding is closed.
+- Validation: Re-run the Security Cloud scan after the documentation policy is applied and confirm active public records no longer disclose unresolved exploit-relevant details beyond the chosen policy.

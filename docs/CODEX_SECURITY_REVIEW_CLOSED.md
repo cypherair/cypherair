@@ -1,6 +1,6 @@
 # Codex Security Review Closed Findings
 
-This document records reviewed findings that are not part of the active fix queue. Use `SR-CLOSED-*` only for audit and traceability. Active implementation work should use `SR-FIX-*` from `docs/CODEX_SECURITY_REVIEW.md`.
+This document records reviewed findings that are not part of the active fix queue. Use `SR-CLOSED-*` only for audit and traceability. Active implementation work should use `SR-FIX-*` from `docs/CODEX_SECURITY_REVIEW.md`; when an active `SR-FIX-*` item closes, the former active ID is recorded here for traceability.
 
 The archived CSV exports are retained as raw source exports. This Markdown file is the curated decision record for closed findings.
 
@@ -285,3 +285,75 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Source: [finding](https://chatgpt.com/codex/cloud/security/archives/754d34973c5c8191acd83ea713c022d9)
 - Decision: Already fixed as documentation. The implementation intentionally uses `.biometryAny`; PRD/SECURITY wording now states the precise guarantee: no device-passcode fallback for private-key operations and no biometric-enrollment invalidation guarantee.
 - Relevant paths: `docs/SECURITY.md`, `docs/PRD.md`, `docs/TDD.md`, `.claude/rules/security-rules.md`
+
+### SR-CLOSED-29: GH_TOKEN exposed to entire XCFramework build
+
+- Former Review ID: `SR-FIX-02`
+- Legacy ID: `CA-02`
+- Severity: `high`
+- Area: `ci-supply-chain`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/b2db20bd745c8191856cc218daacb19d)
+- Decision: Fixed by PR #415. Release/XCFramework builds now keep GitHub credentials out of the broad artifact build environment.
+- Resolution: Stage1 toolchain download is handled separately, checkout credential persistence is disabled, and static workflow tests verify build and downloader steps do not receive GitHub tokens.
+- Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`, `scripts/download_arm64e_stage1_toolchain.sh`
+
+### SR-CLOSED-30: Release workflow runs arbitrary refs with write token
+
+- Former Review ID: `SR-FIX-03`
+- Legacy ID: `CA-05`
+- Severity: `medium`
+- Area: `ci-supply-chain`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/893e12c4d22c8191afba18916328b86d)
+- Decision: Fixed by PR #415. Stable release publication is now tag-push only, and manual workflow dispatch runs are limited to dry-run validation.
+- Resolution: The publish path revalidates that `HEAD` matches the peeled stable tag commit before official artifact creation and rechecks that the remote stable tag is an SSH-signed annotated tag for the expected artifact commit before attestation and release publication.
+- Relevant paths: `.github/workflows/stable-build-release.yml`
+
+### SR-CLOSED-31: Rust audit does not gate release publication
+
+- Former Review ID: `SR-FIX-04`
+- Legacy ID: `CA-08`
+- Severity: `medium`
+- Area: `ci-supply-chain`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/9b57feaa6750819185da3adea4e4b205)
+- Decision: Fixed by PR #415. Edge/drill release publication is now gated on the Rust dependency audit.
+- Resolution: The workflow separates read-scoped asset generation from the write-scoped publish job, and the publish job depends on both the artifact build and `rust-dependency-audit` before attestation, tag creation, release creation, asset upload, or publication.
+- Relevant paths: `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `docs/TESTING.md`, `docs/APP_RELEASE_PROCESS.md`
+
+### SR-CLOSED-32: Stale operation prompt generation can disable privacy blur
+
+- Former Review ID: `SR-FIX-08`
+- Legacy ID: `CA-15`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/daf3bd3399248191900565067b6785ae)
+- Decision: Fixed by PR #411, with closure recorded in PR #413. The stale operation-prompt suppression path was replaced with bounded prompt snapshots and generation-aware lifecycle handling.
+- Resolution: Operation prompt tails now require prompt-owned lifecycle evidence, expire after a short settle window, and real background transitions clear prompt state and still hard-blur. A related macOS immediate-grace-period observation remains for separate follow-up and is tracked outside this finding.
+- Relevant paths: `Sources/Security/AuthenticationPromptCoordinator.swift`, `Sources/App/Common/PrivacyScreenLifecycleGate.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`
+
+### SR-CLOSED-33: Unescaped source ref in release verification command
+
+- Former Review ID: `SR-FIX-10`
+- Legacy ID: `CA-18`
+- Severity: `medium`
+- Area: `ci-supply-chain`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/6d4198b21e5c8191a5d7d8339a3d6484)
+- Decision: Fixed by PR #415. Drill release verification commands now render the source ref through Python `shlex.quote` before publication.
+- Resolution: Copied `gh attestation verify --source-ref` commands are shell-safe. Release metadata generation was also moved to structured JSON output, and static workflow tests assert that raw source-ref interpolation is no longer used.
+- Relevant paths: `.github/workflows/xcframework-edge-release.yml`
+
+### SR-CLOSED-34: Production auth can be bypassed via UI-test defaults key
+
+- Former Review ID: `SR-FIX-11`
+- Legacy ID: `CA-22`
+- Severity: `medium`
+- Area: `app-auth`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/85c8b620e92c8191ab484e11a5cf4143)
+- Decision: Fixed by PR #414. Production/default `AuthenticationManager` instances now ignore the UI-test authentication bypass unless explicitly constructed with UI-test bypass opt-in.
+- Resolution: `AppContainer.makeUITest()` remains opted in for automation, while production app-session and private-key authentication paths no longer treat a mutable defaults key as an auth bypass switch. Curated Markdown records this as fixed despite the temporary Security Cloud status anomaly in the raw CSV export.
+- Relevant paths: `Sources/App/AppContainer.swift`, `Sources/Security/AuthenticationManager.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
