@@ -76,18 +76,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: Make sheet button closures capture the displayed request callbacks, matching the cancellation path, and/or make `present()` refuse or queue while another request is pending.
 - Validation: Add regression coverage for `present(A); present(B); confirm displayed A` semantics or for explicit pending-request refusal/queue behavior.
 
-### SR-FIX-13: Secret key zeroization skipped on KMS helper failures
-
-- Legacy ID: `CA-27`
-- Severity: `medium`
-- Area: `key-management-zeroization`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/2a18f490890c8191afc9b8775a8ff2b3)
-- Decision: Confirmed zeroization gap. Key-operation adapter failure paths can skip explicit zeroization after secret key Data is produced.
-- Impact: Best-effort Swift heap zeroization can be missed on failure paths. There is no disk write, logging, network exposure, or OpenPGP authentication bypass implied.
-- Relevant paths: `Sources/Services/KeyManagementService.swift`
-- Fix plan: Once secret key `Data` is produced inside the adapter, zeroize it before rethrowing any later failure. Do not zeroize the successful return inside the adapter because the caller owns success-path cleanup.
-- Validation: Add failure-injection tests for adapter post-secret-key errors and assert best-effort zeroization is invoked before errors escape.
-
 ### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
 
 - Legacy ID: `CA-29`
@@ -99,18 +87,6 @@ This document is the implementation planning record for active accepted security
 - Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/Services/DecryptionService.swift`
 - Fix plan: Cancel and invalidate any in-flight file decrypt when the Decrypt route disappears, and prevent late adoption of outputs whose operation generation is no longer current.
 - Validation: Add Decrypt route disappearance tests showing in-flight operations cancel/invalidate and cannot adopt outputs after disappearance.
-
-### SR-FIX-15: Signing key not zeroized on no-default encrypt-to-self error
-
-- Legacy ID: `CA-32`
-- Severity: `medium`
-- Area: `encryption-zeroization`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/8ef989997a7081919d767f560071a253)
-- Decision: Confirmed informational hardening. Encryption should resolve public-only inputs before unwrapping the optional signing private key.
-- Impact: Normal UI should not pass the inconsistent state, but service/API and corrupted metadata states should not unwrap private signing material before public validation succeeds.
-- Relevant paths: `Sources/Services/EncryptionService.swift`
-- Fix plan: Resolve all public-only inputs first, including encrypt-to-self/default public key selection. Only then unwrap the signing private key and immediately install a zeroization `defer` before later throwing work.
-- Validation: Add service tests for missing default encrypt-to-self with signing requested; assert no signing private-key unwrap happens before public input failure.
 
 ### SR-FIX-16: Decrypt view can show stale signature for wrong content
 
