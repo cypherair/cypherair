@@ -332,7 +332,7 @@ final class DecryptScreenModelTests: XCTestCase {
         await settleAsyncWork()
 
         XCTAssertNil(model.decryptedText)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNil(decryptedPlaintext)
         XCTAssertFalse(model.operation.isShowingError)
     }
@@ -350,8 +350,10 @@ final class DecryptScreenModelTests: XCTestCase {
             text: "OLD"
         )
         model.phase1Result = makePhase1Result(matchedKey: identity)
-        model.decryptedText = "Plaintext"
-        model.detailedSignatureVerification = makeDetailedVerification(status: .valid)
+        model.textDecryptionResult = makeTextDecryptionResult(
+            plaintext: "Plaintext",
+            status: .valid
+        )
         let startingEpoch = model.textInputSectionEpoch
 
         model.setCiphertextInput("NEW")
@@ -359,9 +361,9 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.ciphertextInput, "NEW")
         XCTAssertFalse(model.importedCiphertext.hasImportedFile)
         XCTAssertNil(model.phase1Result)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNil(model.decryptedText)
-        XCTAssertEqual(model.textInputSectionEpoch, startingEpoch + 1)
+        XCTAssertEqual(model.textInputSectionEpoch, startingEpoch)
     }
 
     @MainActor
@@ -374,7 +376,7 @@ final class DecryptScreenModelTests: XCTestCase {
             }
         )
         model.phase1Result = makePhase1Result()
-        model.detailedSignatureVerification = makeDetailedVerification(status: .bad)
+        model.textDecryptionResult = makeTextDecryptionResult(status: .bad)
 
         model.requestTextCiphertextImport()
         XCTAssertEqual(model.fileImportTarget, .textCiphertextImport)
@@ -388,7 +390,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.importedCiphertext.fileName, "message.asc")
         XCTAssertNil(model.fileImportTarget)
         XCTAssertNil(model.phase1Result)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
     }
 
     @MainActor
@@ -421,7 +423,10 @@ final class DecryptScreenModelTests: XCTestCase {
             }
         )
         model.decryptMode = .file
-        model.detailedSignatureVerification = makeDetailedVerification(status: .valid)
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: inputURL,
+            status: .valid
+        )
 
         model.requestFileCiphertextImport()
         model.handleImportedFile(inputURL)
@@ -436,7 +441,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertTrue(model.importedCiphertext.hasImportedFile)
         XCTAssertEqual(model.importedCiphertext.fileName, "message.asc")
         XCTAssertFalse(model.showTextModeSuggestion)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
     }
 
     @MainActor
@@ -449,7 +454,10 @@ final class DecryptScreenModelTests: XCTestCase {
             }
         )
         model.decryptMode = .file
-        model.detailedSignatureVerification = makeDetailedVerification(status: .valid)
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: inputURL,
+            status: .valid
+        )
 
         model.requestFileCiphertextImport()
         model.handleImportedFile(inputURL)
@@ -464,7 +472,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedFileName, "message.asc")
         XCTAssertFalse(model.showTextModeSuggestion)
         XCTAssertNil(model.filePhase1Result)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
     }
 
     @MainActor
@@ -523,7 +531,8 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedText, "decrypted-text")
-        XCTAssertEqual(model.detailedSignatureVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.textDecryptionResult?.verification.legacyStatus, .valid)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
         XCTAssertEqual(decryptedPlaintext, Data("decrypted-text".utf8))
         XCTAssertEqual(decryptedStatus, .valid)
     }
@@ -599,7 +608,8 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedFileURL, outputURL)
-        XCTAssertEqual(model.detailedSignatureVerification?.legacyStatus, .unknownSigner)
+        XCTAssertEqual(model.fileDecryptionResult?.verification.legacyStatus, .unknownSigner)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .unknownSigner)
 
         model.exportDecryptedFile()
 
@@ -720,8 +730,152 @@ final class DecryptScreenModelTests: XCTestCase {
 
         XCTAssertNil(model.decryptedFileURL)
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
+    func test_handleDisappearCancelsInFlightFileDecryptAndCleansLateOutput() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Recipient"
+        )
+        let inputURL = try makeTemporaryFile(
+            named: "abandoned.gpg",
+            contents: Data("cipher".utf8)
+        )
+        let outputURL = try makeTemporaryFile(
+            named: "abandoned",
+            contents: Data("plaintext".utf8)
+        )
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+
+        let gate = DecryptOperationGate()
+        let model = makeModel(
+            fileDecryptionAction: { _ in
+                await gate.suspend()
+                return DecryptScreenModel.FileDecryptionResult(
+                    output: TemporaryFileOutput(fileURL: outputURL),
+                    verification: self.makeDetailedVerification(status: .valid)
+                )
+            }
+        )
+        model.decryptMode = .file
+        model.selectedFileURL = inputURL
+        model.selectedFileName = inputURL.lastPathComponent
+        model.filePhase1Result = makeFilePhase1Result(
+            matchedKey: identity,
+            inputURL: inputURL
+        )
+
+        model.decryptFile()
+
+        await waitUntil("file decrypt to suspend before disappearance") {
+            guard model.operation.isRunning else {
+                return false
+            }
+            return await gate.isSuspended()
+        }
+
+        model.handleDisappear()
+
+        XCTAssertFalse(model.operation.isRunning)
+        XCTAssertNil(model.decryptedFileURL)
+
+        await gate.resume()
+        await settleAsyncWork()
+
+        XCTAssertNil(model.decryptedFileURL)
+        XCTAssertNil(model.fileDecryptionResult)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
+        XCTAssertFalse(model.operation.isShowingError)
+    }
+
+    @MainActor
+    func test_textAndFileDecryptResultsKeepSeparateVerificationState() throws {
+        let fileOutputURL = try makeTemporaryFile(
+            named: "separate-mode-output",
+            contents: Data("plaintext".utf8)
+        )
+        defer { try? FileManager.default.removeItem(at: fileOutputURL) }
+
+        let model = makeModel()
+        model.textDecryptionResult = makeTextDecryptionResult(
+            plaintext: "Text plaintext",
+            status: .valid
+        )
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: fileOutputURL,
+            status: .bad
+        )
+
+        model.decryptMode = .text
+
+        XCTAssertEqual(model.decryptedText, "Text plaintext")
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
+
+        model.decryptMode = .file
+
+        XCTAssertEqual(model.decryptedFileURL, fileOutputURL)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .bad)
+
+        model.setCiphertextInput("edited text")
+
+        XCTAssertNil(model.textDecryptionResult)
+        XCTAssertEqual(model.fileDecryptionResult?.verification.legacyStatus, .bad)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .bad)
+    }
+
+    @MainActor
+    func test_fileInputInvalidationDoesNotClearTextResult() async throws {
+        let inputURL = try makeTemporaryFile(
+            named: "file-input-change.gpg",
+            contents: Data("cipher".utf8)
+        )
+        let fileOutputURL = try makeTemporaryFile(
+            named: "file-input-change-output",
+            contents: Data("plaintext".utf8)
+        )
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: fileOutputURL)
+        }
+
+        let model = makeModel(
+            parseFileRecipientsAction: { url in
+                XCTAssertEqual(url, inputURL)
+                return self.makeFilePhase1Result(matchedKey: nil, inputURL: inputURL)
+            }
+        )
+        model.textDecryptionResult = makeTextDecryptionResult(
+            plaintext: "Text plaintext",
+            status: .valid
+        )
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: fileOutputURL,
+            status: .bad
+        )
+        model.decryptMode = .file
+        model.selectedFileURL = inputURL
+        model.selectedFileName = inputURL.lastPathComponent
+
+        model.parseRecipientsFile()
+
+        await waitUntil("file parse to finish") {
+            model.operation.isRunning == false
+        }
+
+        XCTAssertNil(model.fileDecryptionResult)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileOutputURL.path))
+
+        model.decryptMode = .text
+
+        XCTAssertEqual(model.decryptedText, "Text plaintext")
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
     }
 
     @MainActor
@@ -733,14 +887,19 @@ final class DecryptScreenModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: contentClearURL) }
 
         let model = makeModel()
-        model.decryptedText = "Plaintext"
-        model.detailedSignatureVerification = makeDetailedVerification(status: .valid)
+        model.textDecryptionResult = makeTextDecryptionResult(
+            plaintext: "Plaintext",
+            status: .valid
+        )
         model.phase1Result = makePhase1Result()
         model.filePhase1Result = makeFilePhase1Result(
             matchedKey: nil,
             inputURL: contentClearURL
         )
-        model.decryptedFileURL = contentClearURL
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: contentClearURL,
+            status: .unknownSigner
+        )
         model.importedCiphertext.setImportedFile(
             data: Data("cipher".utf8),
             fileName: "message.asc",
@@ -752,7 +911,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.ciphertextInput, "")
         XCTAssertNil(model.decryptedText)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.filePhase1Result)
         XCTAssertFalse(FileManager.default.fileExists(atPath: contentClearURL.path))
@@ -769,7 +928,10 @@ final class DecryptScreenModelTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: disappearURL) }
 
-        model.decryptedFileURL = disappearURL
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: disappearURL,
+            status: .bad
+        )
         model.importedCiphertext.setImportedFile(
             data: Data("cipher".utf8),
             fileName: "message.asc",
@@ -783,7 +945,7 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: disappearURL.path))
         XCTAssertFalse(model.importedCiphertext.hasImportedFile)
         XCTAssertNil(model.fileImportTarget)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
     }
 
     @MainActor
@@ -794,8 +956,10 @@ final class DecryptScreenModelTests: XCTestCase {
             }
         )
         model.ciphertextInput = "ciphertext"
-        model.decryptedText = "Plaintext"
-        model.detailedSignatureVerification = makeDetailedVerification(status: .valid)
+        model.textDecryptionResult = makeTextDecryptionResult(
+            plaintext: "Plaintext",
+            status: .valid
+        )
 
         model.parseRecipientsText()
 
@@ -804,7 +968,7 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertNil(model.decryptedText)
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNotNil(model.phase1Result)
     }
 
@@ -814,7 +978,14 @@ final class DecryptScreenModelTests: XCTestCase {
             named: "parse-file.gpg",
             contents: Data("cipher".utf8)
         )
-        defer { try? FileManager.default.removeItem(at: inputURL) }
+        let outputURL = try makeTemporaryFile(
+            named: "parse-file-output",
+            contents: Data("plaintext".utf8)
+        )
+        defer {
+            try? FileManager.default.removeItem(at: inputURL)
+            try? FileManager.default.removeItem(at: outputURL)
+        }
 
         let model = makeModel(
             parseFileRecipientsAction: { url in
@@ -825,7 +996,10 @@ final class DecryptScreenModelTests: XCTestCase {
         model.decryptMode = .file
         model.selectedFileURL = inputURL
         model.selectedFileName = inputURL.lastPathComponent
-        model.detailedSignatureVerification = makeDetailedVerification(status: .unknownSigner)
+        model.fileDecryptionResult = makeFileDecryptionResult(
+            outputURL: outputURL,
+            status: .unknownSigner
+        )
 
         model.parseRecipientsFile()
 
@@ -833,7 +1007,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.detailedSignatureVerification)
+        XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertEqual(model.filePhase1Result?.inputPath, inputURL.path)
     }
 
@@ -866,6 +1040,34 @@ final class DecryptScreenModelTests: XCTestCase {
             .appendingPathComponent("CypherAirDecryptScreenTests-\(UUID().uuidString)-\(name)")
         try contents.write(to: url, options: .atomic)
         return url
+    }
+
+    private func makeTextDecryptionResult(
+        plaintext: String = "Plaintext",
+        status: MessageSignatureStatus,
+        signerFingerprint: String? = nil
+    ) -> DecryptScreenModel.TextDecryptionResult {
+        DecryptScreenModel.TextDecryptionResult(
+            plaintext: plaintext,
+            verification: makeDetailedVerification(
+                status: status,
+                signerFingerprint: signerFingerprint
+            )
+        )
+    }
+
+    private func makeFileDecryptionResult(
+        outputURL: URL,
+        status: MessageSignatureStatus,
+        signerFingerprint: String? = nil
+    ) -> DecryptScreenModel.FileDecryptionResult {
+        DecryptScreenModel.FileDecryptionResult(
+            output: TemporaryFileOutput(fileURL: outputURL),
+            verification: makeDetailedVerification(
+                status: status,
+                signerFingerprint: signerFingerprint
+            )
+        )
     }
 
     private func makePhase1Result(

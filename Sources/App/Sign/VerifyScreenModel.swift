@@ -171,7 +171,7 @@ final class VerifyScreenModel {
 
         signedInput = newValue
         _ = importedCleartext.invalidateIfEditedTextDiffers(newValue)
-        invalidateCleartextVerificationState()
+        invalidateCleartextVerificationState(refreshInputSection: false)
     }
 
     func requestCleartextFileImport() {
@@ -281,7 +281,7 @@ final class VerifyScreenModel {
 
     func verifyCleartext() {
         let inputData = importedCleartext.rawData ?? Data(signedInput.utf8)
-        invalidateCleartextVerificationState()
+        invalidateCleartextVerificationState(refreshInputSection: false)
 
         operation.run(mapError: mapVerificationError) { [self] in
             let result = try await self.cleartextVerificationAction(inputData)
@@ -322,7 +322,7 @@ final class VerifyScreenModel {
     func clearImportedCleartext() {
         importedCleartext.clear()
         signedInput = ""
-        invalidateCleartextVerificationState()
+        invalidateCleartextVerificationState(refreshInputSection: true)
     }
 
     private func importCleartextFile(from url: URL) {
@@ -334,7 +334,7 @@ final class VerifyScreenModel {
                 text: loadedFile.text
             )
             signedInput = loadedFile.text
-            invalidateCleartextVerificationState()
+            invalidateCleartextVerificationState(refreshInputSection: true)
         } catch let error as CypherAirError {
             operation.present(error: error)
         } catch {
@@ -342,10 +342,12 @@ final class VerifyScreenModel {
         }
     }
 
-    private func invalidateCleartextVerificationState() {
+    private func invalidateCleartextVerificationState(refreshInputSection: Bool) {
         cleartextOriginalText = nil
         clearCleartextVerificationState()
-        textInputSectionEpoch &+= 1
+        if refreshInputSection {
+            textInputSectionEpoch &+= 1
+        }
     }
 
     private func invalidateDetachedVerificationState() {

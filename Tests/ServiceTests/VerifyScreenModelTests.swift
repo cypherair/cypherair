@@ -72,12 +72,14 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertNil(model.filePickerTarget)
         XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
         XCTAssertEqual(model.cleartextOriginalText, "Original signed message")
+        let startingEpoch = model.textInputSectionEpoch
 
         model.setSignedInput("Edited signed message")
 
         XCTAssertFalse(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
+        XCTAssertEqual(model.textInputSectionEpoch, startingEpoch)
     }
 
     @MainActor
@@ -144,12 +146,14 @@ final class VerifyScreenModelTests: XCTestCase {
         model.cleartextOriginalText = "Original"
         model.cleartextDetailedVerification = makeDetailedVerification(status: .valid)
         model.detachedDetailedVerification = makeDetailedVerification(status: .bad)
+        let startingEpoch = model.textInputSectionEpoch
 
         model.setSignedInput("Edited signed message")
 
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
         XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.textInputSectionEpoch, startingEpoch)
     }
 
     @MainActor

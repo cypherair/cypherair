@@ -8,6 +8,11 @@ final class DecryptScreenModel {
         let phase1Result: FileDecryptionPhase1Result
     }
 
+    struct TextDecryptionResult {
+        let plaintext: String
+        let verification: DetailedSignatureVerification
+    }
+
     struct FileDecryptionResult {
         let output: TemporaryFileOutput
         let verification: DetailedSignatureVerification
@@ -35,7 +40,6 @@ final class DecryptScreenModel {
     private let textDecryptionAction: TextDecryptionAction
     private let fileDecryptionAction: FileOperationAction<FileDecryptionRequest, FileDecryptionResult>
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
-    @ObservationIgnored private var decryptedFileOutput: TemporaryFileOutput?
     private var fileImportRequestGate = FileImportRequestGate()
 
     private struct PendingTextModeImport {
@@ -47,20 +51,19 @@ final class DecryptScreenModel {
 
     var decryptMode: DecryptView.DecryptMode = .text
     var ciphertextInput = ""
-    var decryptedText: String?
-    var detailedSignatureVerification: DetailedSignatureVerification?
+    var textDecryptionResult: TextDecryptionResult?
+    var fileDecryptionResult: FileDecryptionResult? {
+        didSet {
+            oldValue?.output.cleanup()
+        }
+    }
     var phase1Result: DecryptionPhase1Result?
     var showFileImporter = false
     var fileImportTarget: DecryptView.FileImportTarget?
     var selectedFileURL: URL?
     var selectedFileName: String?
     var decryptedFileURL: URL? {
-        didSet {
-            if decryptedFileURL != decryptedFileOutput?.fileURL {
-                decryptedFileOutput?.cleanup()
-                decryptedFileOutput = decryptedFileURL.map { TemporaryFileOutput(fileURL: $0) }
-            }
-        }
+        fileDecryptionResult?.output.fileURL
     }
     var filePhase1Result: FileDecryptionPhase1Result?
     var importedCiphertext = ImportedTextInputState()
@@ -203,6 +206,19 @@ final class DecryptScreenModel {
         }
     }
 
+    var decryptedText: String? {
+        textDecryptionResult?.plaintext
+    }
+
+    var activeDetailedSignatureVerification: DetailedSignatureVerification? {
+        switch decryptMode {
+        case .text:
+            textDecryptionResult?.verification
+        case .file:
+            fileDecryptionResult?.verification
+        }
+    }
+
     var decryptButtonDisabled: Bool {
         if operation.isRunning || hasPhase1Result {
             return true
@@ -244,9 +260,9 @@ final class DecryptScreenModel {
     }
 
     func handleDisappear() {
-        clearDisplayedText()
-        deleteTemporaryDecryptedFile()
-        clearDetailedSignatureVerification()
+        operation.cancelAndInvalidate()
+        clearTextDecryptionResult()
+        clearFileDecryptionResult()
         phase1Result = nil
         filePhase1Result = nil
         importedCiphertext.clear()
@@ -267,9 +283,8 @@ final class DecryptScreenModel {
 
     func clearTransientInput() {
         ciphertextInput = ""
-        clearDisplayedText()
-        deleteTemporaryDecryptedFile()
-        clearDetailedSignatureVerification()
+        clearTextDecryptionResult()
+        clearFileDecryptionResult()
         phase1Result = nil
         filePhase1Result = nil
         importedCiphertext.clear()
@@ -288,7 +303,7 @@ final class DecryptScreenModel {
         guard newValue != ciphertextInput else { return }
         ciphertextInput = newValue
         _ = importedCiphertext.invalidateIfEditedTextDiffers(newValue)
-        invalidateTextInputState()
+        invalidateTextInputState(refreshInputSection: false)
     }
 
     func requestTextCiphertextImport() {
@@ -341,8 +356,7 @@ final class DecryptScreenModel {
 
     func parseRecipientsText() {
         let inputData = importedCiphertext.rawData ?? Data(ciphertextInput.utf8)
-        decryptedText = nil
-        clearDetailedSignatureVerification()
+        clearTextDecryptionResult()
         let onParsed = configuration.onParsed
 
         operation.run(mapError: mapDecryptError) { [self] in
@@ -379,9 +393,11 @@ final class DecryptScreenModel {
             try Task.checkCancellation()
 
             if let text = String(data: plaintext, encoding: .utf8) {
-                self.decryptedText = text
+                self.textDecryptionResult = TextDecryptionResult(
+                    plaintext: text,
+                    verification: verification
+                )
             }
-            self.replaceDetailedSignatureVerification(with: verification)
             onDecrypted?(plaintext, verification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
@@ -412,9 +428,8 @@ final class DecryptScreenModel {
                 pendingOutput?.cleanup()
             }
             try Task.checkCancellation()
-            self.adoptDecryptedFileOutput(result.output)
+            self.adoptFileDecryptionResult(result)
             pendingOutput = nil
-            self.replaceDetailedSignatureVerification(with: result.verification)
             self.authLifecycleTraceStore?.record(
                 category: .operation,
                 name: "decrypt.file.finish",
@@ -425,9 +440,10 @@ final class DecryptScreenModel {
 
     func exportDecryptedFile() {
         guard configuration.allowsFileResultExport,
-              let decryptedFileURL else {
+              let fileDecryptionResult else {
             return
         }
+        let decryptedFileURL = fileDecryptionResult.output.fileURL
 
         guard FileManager.default.fileExists(atPath: decryptedFileURL.path) else {
             operation.present(
@@ -468,7 +484,7 @@ final class DecryptScreenModel {
             text: pendingTextModeImport.text
         )
         ciphertextInput = pendingTextModeImport.text
-        invalidateTextInputState()
+        invalidateTextInputState(refreshInputSection: true)
         self.pendingTextModeImport = nil
         showTextModeSuggestion = false
     }
@@ -487,7 +503,7 @@ final class DecryptScreenModel {
     func clearImportedCiphertext() {
         importedCiphertext.clear()
         ciphertextInput = ""
-        invalidateTextInputState()
+        invalidateTextInputState(refreshInputSection: true)
     }
 
     func dismissError() {
@@ -522,7 +538,7 @@ final class DecryptScreenModel {
                 text: imported.text
             )
             ciphertextInput = imported.text
-            invalidateTextInputState()
+            invalidateTextInputState(refreshInputSection: true)
         } catch let error as CypherAirError {
             operation.present(error: error)
         } catch {
@@ -562,44 +578,31 @@ final class DecryptScreenModel {
         invalidateFileInputState(deleteTemporaryOutput: true)
     }
 
-    private func invalidateTextInputState() {
-        clearDisplayedText()
-        clearDetailedSignatureVerification()
+    private func invalidateTextInputState(refreshInputSection: Bool) {
+        clearTextDecryptionResult()
         phase1Result = nil
-        textInputSectionEpoch &+= 1
+        if refreshInputSection {
+            textInputSectionEpoch &+= 1
+        }
     }
 
     private func invalidateFileInputState(deleteTemporaryOutput: Bool) {
         if deleteTemporaryOutput {
-            deleteTemporaryDecryptedFile()
+            clearFileDecryptionResult()
         }
-        clearDetailedSignatureVerification()
         filePhase1Result = nil
     }
 
-    private func replaceDetailedSignatureVerification(with verification: DetailedSignatureVerification) {
-        detailedSignatureVerification = verification
+    private func clearTextDecryptionResult() {
+        textDecryptionResult = nil
     }
 
-    private func clearDetailedSignatureVerification() {
-        detailedSignatureVerification = nil
+    private func clearFileDecryptionResult() {
+        fileDecryptionResult = nil
     }
 
-    private func clearDisplayedText() {
-        decryptedText = ""
-        decryptedText = nil
-    }
-
-    private func deleteTemporaryDecryptedFile() {
-        decryptedFileOutput?.cleanup()
-        decryptedFileOutput = nil
-        decryptedFileURL = nil
-    }
-
-    private func adoptDecryptedFileOutput(_ output: TemporaryFileOutput) {
-        deleteTemporaryDecryptedFile()
-        decryptedFileOutput = output
-        decryptedFileURL = output.fileURL
+    private func adoptFileDecryptionResult(_ result: FileDecryptionResult) {
+        fileDecryptionResult = result
     }
 
     private func applyPrefilledCiphertextIfNeeded(from configuration: DecryptView.Configuration) {

@@ -217,10 +217,11 @@ private struct DecryptScreenHostView: View {
                 }
             }
 
-            if model.decryptMode == .text, let decryptedText = model.decryptedText {
+            if model.decryptMode == .text,
+               let textDecryptionResult = model.textDecryptionResult {
                 Section {
                     CypherOutputTextBlock(
-                        text: decryptedText,
+                        text: textDecryptionResult.plaintext,
                         font: .body,
                         minHeight: 80,
                         maxHeight: 220
@@ -230,7 +231,7 @@ private struct DecryptScreenHostView: View {
                 }
             }
 
-            if model.decryptMode == .file, model.decryptedFileURL != nil {
+            if model.decryptMode == .file, model.fileDecryptionResult != nil {
                 Section {
                     Button {
                         model.exportDecryptedFile()
@@ -244,7 +245,7 @@ private struct DecryptScreenHostView: View {
                 }
             }
 
-            if let detailedVerification = model.detailedSignatureVerification {
+            if let detailedVerification = model.activeDetailedSignatureVerification {
                 DetailedSignatureSectionView(
                     verification: detailedVerification,
                     resultTitle: "decrypt.signature",
