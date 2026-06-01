@@ -7,6 +7,10 @@ import SwiftUI
 final class SettingsScreenModel {
     typealias AuthModeSwitchAction = @MainActor (AuthenticationMode, [String], Bool) async throws -> Void
     typealias AppAccessPolicySwitchAction = @MainActor (AppSessionAuthenticationPolicy) async throws -> Void
+    typealias LocalDataResetAuthenticationAction = @MainActor (
+        AppSessionAuthenticationPolicy,
+        String
+    ) async throws -> AppSessionAuthenticationResult
 
     let configuration: SettingsView.Configuration
     let appConfiguration: AppConfiguration
@@ -19,6 +23,7 @@ final class SettingsScreenModel {
     private let macPresentationController: MacPresentationController?
     private let authModeSwitchAction: AuthModeSwitchAction
     private let appAccessPolicySwitchAction: AppAccessPolicySwitchAction
+    private let localDataResetAuthenticationAction: LocalDataResetAuthenticationAction
     private let localDataResetService: LocalDataResetService?
     private let localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?
 
@@ -51,7 +56,8 @@ final class SettingsScreenModel {
         localDataResetService: LocalDataResetService? = nil,
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
         authModeSwitchAction: AuthModeSwitchAction? = nil,
-        appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil
+        appAccessPolicySwitchAction: AppAccessPolicySwitchAction? = nil,
+        localDataResetAuthenticationAction: LocalDataResetAuthenticationAction? = nil
     ) {
         self.configuration = configuration
         self.appConfiguration = config
@@ -75,6 +81,13 @@ final class SettingsScreenModel {
             guard authManager.canEvaluate(appSessionPolicy: newPolicy) else {
                 throw AuthenticationError.appAccessBiometricsUnavailable
             }
+        }
+        self.localDataResetAuthenticationAction = localDataResetAuthenticationAction ?? { policy, reason in
+            try await authManager.evaluateAppSession(
+                policy: policy,
+                reason: reason,
+                source: "localDataReset"
+            )
         }
     }
 
@@ -368,20 +381,17 @@ final class SettingsScreenModel {
                 defer {
                     resetAuthenticationContext?.invalidate()
                 }
-                if authManager.canEvaluate(appSessionPolicy: appConfiguration.appSessionAuthenticationPolicy) {
-                    let result = try await authManager.evaluateAppSession(
-                        policy: appConfiguration.appSessionAuthenticationPolicy,
-                        reason: String(
-                            localized: "settings.resetAll.authReason",
-                            defaultValue: "Authenticate to reset all CypherAir X data on this device."
-                        ),
-                        source: "localDataReset"
+                let result = try await localDataResetAuthenticationAction(
+                    appConfiguration.appSessionAuthenticationPolicy,
+                    String(
+                        localized: "settings.resetAll.authReason",
+                        defaultValue: "Authenticate to reset all CypherAir X data on this device."
                     )
-                    guard result.isAuthenticated else {
-                        throw AuthenticationError.failed
-                    }
-                    resetAuthenticationContext = result.context
+                )
+                guard result.isAuthenticated else {
+                    throw AuthenticationError.failed
                 }
+                resetAuthenticationContext = result.context
 
                 let summary = try await localDataResetService.resetAllLocalData(
                     authenticationContext: resetAuthenticationContext

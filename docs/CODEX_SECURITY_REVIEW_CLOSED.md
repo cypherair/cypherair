@@ -417,3 +417,15 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Import confirmation presentation is now first-request-wins, and sheet actions execute the request displayed to the user rather than dereferencing a later mutable request.
 - Resolution: `ImportConfirmationCoordinator.present(_:)` refuses replacement while a request is pending, sheet buttons pass the displayed request into coordinator actions, Add Contact surfaces an already-pending error when custom presentation refuses a request, and URL import keeps the current confirmation while reporting that the user must finish or cancel it first.
 - Relevant paths: `Sources/App/Contacts/ImportConfirmationCoordinator.swift`, `Sources/App/Contacts/AddContactScreenModel.swift`, `Sources/App/Contacts/AddContactView.swift`, `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift`, `Sources/App/Onboarding/TutorialSessionStore.swift`, `Tests/ServiceTests/AddContactScreenModelTests.swift`, `Tests/ServiceTests/IncomingURLImportCoordinatorTests.swift`
+
+### SR-CLOSED-40: Local reset fails open when authentication is unavailable
+
+- Former Review ID: `SR-FIX-07`
+- Legacy ID: `CA-11`
+- Severity: `medium`
+- Area: `local-reset-auth`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663)
+- Decision: Fixed. Reset All Local Data now requires a successful app-session authentication result before destructive cleanup begins.
+- Resolution: `SettingsScreenModel` routes reset confirmation through an injectable app-session authentication action and treats unavailable authentication, failed authentication, cancellation, and non-authenticated results as reset-blocking errors. `LocalDataResetService` remains the internal cleanup primitive and is called only after the Settings flow receives the authenticated result.
+- Relevant paths: `Sources/App/Settings/SettingsScreenModel.swift`, `Sources/App/Settings/LocalDataResetService.swift`, `Tests/ServiceTests/SettingsScreenModelTests.swift`

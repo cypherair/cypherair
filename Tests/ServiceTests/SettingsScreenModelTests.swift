@@ -463,6 +463,21 @@ final class SettingsScreenModelTests: XCTestCase {
     func test_localDataReset_successMarksRestartRequiredWithoutResultAlert() async {
         let resetContainer = AppContainer.makeUITest()
         defer { cleanup(resetContainer) }
+        guard let keychain = resetContainer.keychain as? MockKeychain else {
+            return XCTFail("Expected UI-test container to use MockKeychain")
+        }
+        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7SUCCESS")
+        do {
+            try keychain.save(
+                Data([0x07]),
+                service: markerService,
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            return XCTFail("Failed to seed reset marker: \(error)")
+        }
+        keychain.resetCallHistory()
         let restartCoordinator = LocalDataResetRestartCoordinator()
         let model = makeModel(
             appConfigurationOverride: resetContainer.config,
@@ -470,7 +485,12 @@ final class SettingsScreenModelTests: XCTestCase {
             authManagerOverride: resetContainer.authManager,
             keyManagementOverride: resetContainer.keyManagement,
             localDataResetService: resetContainer.localDataResetService,
-            localDataResetRestartCoordinator: restartCoordinator
+            localDataResetRestartCoordinator: restartCoordinator,
+            localDataResetAuthenticationAction: { policy, reason in
+                XCTAssertEqual(policy, resetContainer.config.appSessionAuthenticationPolicy)
+                XCTAssertFalse(reason.isEmpty)
+                return .authenticated(context: LAContext())
+            }
         )
 
         model.requestLocalDataReset()
@@ -483,6 +503,111 @@ final class SettingsScreenModelTests: XCTestCase {
         }
         XCTAssertFalse(model.showLocalDataResetResultAlert)
         XCTAssertNotNil(restartCoordinator.resetSummary)
+        XCTAssertFalse(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
+        XCTAssertTrue(keychain.listItemsCalls.contains { $0.hasAuthenticationContext })
+    }
+
+    @MainActor
+    func test_localDataReset_authUnavailableDoesNotReset() async {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        guard let keychain = resetContainer.keychain as? MockKeychain else {
+            return XCTFail("Expected UI-test container to use MockKeychain")
+        }
+        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7UNAVAILABLE")
+        do {
+            try keychain.save(
+                Data([0x07]),
+                service: markerService,
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            return XCTFail("Failed to seed reset marker: \(error)")
+        }
+        keychain.resetCallHistory()
+        let restartCoordinator = LocalDataResetRestartCoordinator()
+        var authCallCount = 0
+        let model = makeModel(
+            appConfigurationOverride: resetContainer.config,
+            protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
+            authManagerOverride: resetContainer.authManager,
+            keyManagementOverride: resetContainer.keyManagement,
+            localDataResetService: resetContainer.localDataResetService,
+            localDataResetRestartCoordinator: restartCoordinator,
+            localDataResetAuthenticationAction: { _, _ in
+                authCallCount += 1
+                throw AuthenticationError.appAccessBiometricsUnavailable
+            }
+        )
+
+        model.requestLocalDataReset()
+        model.continueLocalDataReset()
+        model.localDataResetConfirmationPhrase = "RESET"
+        model.confirmLocalDataReset()
+
+        await waitUntil("auth-unavailable reset failure") {
+            !model.isResettingLocalData && model.showLocalDataResetResultAlert
+        }
+        XCTAssertEqual(authCallCount, 1)
+        XCTAssertTrue(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
+        XCTAssertEqual(keychain.listItemsCallCount, 0)
+        XCTAssertEqual(keychain.deleteCallCount, 0)
+        XCTAssertFalse(restartCoordinator.restartRequiredAfterLocalDataReset)
+        XCTAssertEqual(
+            model.localDataResetAlertMessage,
+            AuthenticationError.appAccessBiometricsUnavailable.localizedDescription
+        )
+    }
+
+    @MainActor
+    func test_localDataReset_authFailureDoesNotReset() async {
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        guard let keychain = resetContainer.keychain as? MockKeychain else {
+            return XCTFail("Expected UI-test container to use MockKeychain")
+        }
+        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7FAILED")
+        do {
+            try keychain.save(
+                Data([0x07]),
+                service: markerService,
+                account: KeychainConstants.defaultAccount,
+                accessControl: nil
+            )
+        } catch {
+            return XCTFail("Failed to seed reset marker: \(error)")
+        }
+        keychain.resetCallHistory()
+        let restartCoordinator = LocalDataResetRestartCoordinator()
+        var authCallCount = 0
+        let model = makeModel(
+            appConfigurationOverride: resetContainer.config,
+            protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
+            authManagerOverride: resetContainer.authManager,
+            keyManagementOverride: resetContainer.keyManagement,
+            localDataResetService: resetContainer.localDataResetService,
+            localDataResetRestartCoordinator: restartCoordinator,
+            localDataResetAuthenticationAction: { _, _ in
+                authCallCount += 1
+                return .failed
+            }
+        )
+
+        model.requestLocalDataReset()
+        model.continueLocalDataReset()
+        model.localDataResetConfirmationPhrase = "RESET"
+        model.confirmLocalDataReset()
+
+        await waitUntil("auth-failed reset failure") {
+            !model.isResettingLocalData && model.showLocalDataResetResultAlert
+        }
+        XCTAssertEqual(authCallCount, 1)
+        XCTAssertTrue(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
+        XCTAssertEqual(keychain.listItemsCallCount, 0)
+        XCTAssertEqual(keychain.deleteCallCount, 0)
+        XCTAssertFalse(restartCoordinator.restartRequiredAfterLocalDataReset)
+        XCTAssertEqual(model.localDataResetAlertMessage, AuthenticationError.failed.localizedDescription)
     }
 
     @MainActor
@@ -1396,7 +1521,8 @@ final class SettingsScreenModelTests: XCTestCase {
         localDataResetService: LocalDataResetService? = nil,
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
         authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
-        appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil
+        appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil,
+        localDataResetAuthenticationAction: SettingsScreenModel.LocalDataResetAuthenticationAction? = nil
     ) -> SettingsScreenModel {
         SettingsScreenModel(
             config: appConfigurationOverride ?? config,
@@ -1409,7 +1535,8 @@ final class SettingsScreenModelTests: XCTestCase {
             localDataResetService: localDataResetService,
             localDataResetRestartCoordinator: localDataResetRestartCoordinator,
             authModeSwitchAction: authModeSwitchAction,
-            appAccessPolicySwitchAction: appAccessPolicySwitchAction
+            appAccessPolicySwitchAction: appAccessPolicySwitchAction,
+            localDataResetAuthenticationAction: localDataResetAuthenticationAction
         )
     }
 
