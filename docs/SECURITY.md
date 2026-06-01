@@ -195,6 +195,19 @@ backfill from private material. Secure Enclave custody private-key backup/export
 is explicitly unsupported and must not touch the legacy `se-key` / `salt` /
 `sealed-key` bundle path.
 
+**Private-operation router foundation note:** Phase 5A adds only hidden/internal
+routing contracts. `PGPKeyCapabilityResolver` gates Secure Enclave generation,
+signing-class operations, and key-agreement operations independently; production
+policy still blocks Secure Enclave private operations. `PrivateKeyOperationRouter`
+must consult the resolver before Security handle lookup, must return software
+routes without unwrapping secret certificates, and may return a Secure Enclave
+signer route only after the stored public certificate, fingerprint, key version,
+role, and public-key bindings agree with the Security-owned handle pair. Secure
+Enclave decrypt/key-agreement remains a blocked not-implemented route for this
+phase. Shared failure mapping must expose only stable categories and must not log
+or return fingerprints, handle tags, public binding bytes, Keychain locators,
+plaintext, private material, session keys, or temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

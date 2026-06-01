@@ -128,6 +128,43 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertEqual(loaded.keyAgreement.binding, pair.keyAgreement)
     }
 
+    func test_loadSigningHandleLocatesCompletePairAndReturnsSigningHandle() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "signlookup")
+        let pair = try store.createHandlePair()
+
+        let signing = try store.loadSigningHandle(
+            signingPublicKeyX963: pair.signing.publicKeyX963,
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+        )
+
+        XCTAssertEqual(signing.role, .signing)
+        XCTAssertEqual(signing.binding, pair.signing)
+    }
+
+    func test_loadSigningHandleFailsClosedForMissingAgreementPeer() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let signingReference = try reference("partialsigninglookup", .signing)
+        let signingHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try binding(signingReference, byte: 0x61),
+            privateKey: nil
+        )
+        keyStore.insert(signingHandle)
+
+        XCTAssertThrowsError(
+            try store.loadSigningHandle(
+                signingPublicKeyX963: signingHandle.binding.publicKeyX963,
+                keyAgreementPublicKeyX963: makePublicKey(byte: 0x62)
+            )
+        ) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .migrationOrRecoveryRequired
+            )
+        }
+    }
+
     func test_loadHandleFailsClosedForWrongRole() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)

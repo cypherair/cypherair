@@ -209,6 +209,7 @@ $(SRCROOT)/Sources/Models/PGPKeyOperationResolution.swift
 $(SRCROOT)/Sources/Models/PGPKeyOperationSupport.swift
 $(SRCROOT)/Sources/Models/PGPKeyProfile.swift
 $(SRCROOT)/Sources/Models/PGPPrivateKeyCustodyKind.swift
+$(SRCROOT)/Sources/Models/PGPPrivateOperationKind.swift
 $(SRCROOT)/Sources/Models/PGPPrivateOperationRole.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsAvailability.swift
 $(SRCROOT)/Sources/Models/ProtectedOrdinarySettingsCoordinator.swift
@@ -315,7 +316,10 @@ $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningCommitCoordinator.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningInvalidationGate.swift
 $(SRCROOT)/Sources/Services/KeyManagement/KeyProvisioningService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PGPKeyOperationFailureMapper.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyAccessService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SelectiveRevocationService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryReport.swift

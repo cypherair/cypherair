@@ -226,6 +226,19 @@ routes:
 - Secure Enclave ECDH/session-key route for recipient-key decryption;
 - explicit unsupported route.
 
+Phase 5A implements the router foundation only. The shared Swift vocabulary is
+`PGPPrivateOperationKind`: `sign`, `decrypt`, `certify`, `revoke`,
+`modifyExpiry`, and `refreshBinding`, with role mapping to signing or
+key-agreement handles. The implemented route outcomes are software
+secret-certificate route, Secure Enclave signer route, and blocked
+`PGPKeyOperationResolution`; the successful Secure Enclave key-agreement route
+remains future Phase 6 work. The Phase 5A router resolves local identity by
+fingerprint, consults resolver policy before Security handle lookup, validates
+stored public-certificate bindings and key-version/fingerprint association, and
+loads only the signing handle by public bindings. Production policy still blocks
+Secure Enclave private operations, and no product workflow consumes the router
+in this foundation PR.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -355,6 +368,16 @@ Swift tests should prove resolver/router behavior, metadata migration,
 Security-layer handle-store behavior through mocks, workflow-service
 orchestration, cancellation, cleanup, and error mapping. Device-only tests must
 be guarded for real hardware availability.
+
+Phase 5A Swift coverage should remain workflow-local: software custody routes
+without Secure Enclave handle lookup; production policy blocks; hidden/test
+signing policy returns signer routes for signing-class operations; decrypt and
+key agreement remain blocked; missing identity, invalid custody/configuration,
+public-certificate mismatch, fingerprint mismatch, missing handle, wrong role,
+wrong public binding, local-authentication cancellation/failure, and no software
+fallback all resolve to sanitized blocked outcomes. Source-audit coverage should
+continue to catch new workflow-local custody switches outside the resolver,
+router, and established key-management/security boundaries.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

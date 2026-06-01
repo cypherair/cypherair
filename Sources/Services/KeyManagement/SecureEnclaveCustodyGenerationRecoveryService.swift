@@ -108,22 +108,14 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             inspection = try publicBindingInspector.inspectPublicBindings(
                 publicKeyData: identity.publicKeyData
             )
-        } catch let error as CypherAirError {
-            let category = publicCertificateFailureCategory(for: error)
+        } catch {
+            let category = PGPKeyOperationFailureMapper.publicCertificateAssociationCategory(for: error)
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
                 publicMaterialAvailability: .unavailable(category),
                 revocationArtifactAvailability: revocationAvailability,
                 handleAvailability: .unavailable(category)
-            )
-        } catch {
-            return assessment(
-                identity: identity,
-                ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.publicCertificateAssociationMismatch),
-                revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.publicCertificateAssociationMismatch)
             )
         }
 
@@ -167,21 +159,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             return .unavailable(error.failureCategory)
         } catch {
             return .unavailable(.privateHandleInaccessible)
-        }
-    }
-
-    private func publicCertificateFailureCategory(
-        for error: CypherAirError
-    ) -> PGPKeyOperationFailureCategory {
-        switch error {
-        case .invalidKeyData,
-             .corruptData,
-             .unsupportedAlgorithm:
-            return .publicCertificateAssociationMismatch
-        case .operationCancelled:
-            return .operationUnavailableByPolicy
-        default:
-            return .openPGPSemanticFailure
         }
     }
 
