@@ -4,18 +4,6 @@ This document is the implementation planning record for active accepted security
 
 ## Fix Queue
 
-### SR-FIX-01: Spoofed duplicate contacts bypass key-update warning
-
-- Legacy ID: `CA-01`
-- Severity: `high`
-- Area: `contact-import`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2)
-- Decision: Confirmed fix-worthy. Duplicate conflicting contact imports are stored as separate identities, but the import workflow drops the computed conflict warning before user confirmation.
-- Impact: A spoofed duplicate contact can appear beside a legitimate contact with the expected name or email. Future encryption is affected only if the user selects that duplicate; no automatic key takeover occurs.
-- Relevant paths: `Sources/Services/ContactService.swift`, `Sources/App/Contacts/Import/ContactImportWorkflow.swift`
-- Fix plan: Preserve duplicate identities if that remains product policy, but surface the candidate conflict before or at import success and offer an explicit review or merge path. If product policy changes, stage or block conflicting imports until the user chooses how to handle the existing contact.
-- Validation: Add import workflow tests for same-email/User-ID different-fingerprint candidates and UI/workflow checks that the conflict warning is preserved before success.
-
 ### SR-FIX-05: Untrusted certifications can mark contacts certified
 
 - Legacy ID: `CA-09`
@@ -51,18 +39,6 @@ This document is the implementation planning record for active accepted security
 - Relevant paths: `Sources/App/Settings/SettingsScreenModel.swift`, `Sources/App/Settings/LocalDataResetService.swift`
 - Fix plan: If app-session authentication cannot be evaluated, block local reset and surface an auth-unavailable error instead of treating the prompt as optional.
 - Validation: Add settings/reset tests for auth unavailable, auth failure, and auth success; only success should proceed to destructive reset.
-
-### SR-FIX-12: Import confirmation can act on a replaced key request
-
-- Legacy ID: `CA-23`
-- Severity: `medium`
-- Area: `contact-import`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/078f49939538819195ae18333d9d130b)
-- Decision: Confirmed contact-import regression. Confirmation actions can dereference a later mutable request instead of the request displayed to the user.
-- Impact: A second import delivered while a confirmation sheet is open can make the user action apply to the newer request, potentially marking an attacker contact as verified.
-- Relevant paths: `Sources/App/Contacts/ImportConfirmationCoordinator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Contacts/AddContactView.swift`
-- Fix plan: Make sheet button closures capture the displayed request callbacks, matching the cancellation path, and/or make `present()` refuse or queue while another request is pending.
-- Validation: Add regression coverage for `present(A); present(B); confirm displayed A` semantics or for explicit pending-request refusal/queue behavior.
 
 ### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
 

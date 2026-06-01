@@ -10,15 +10,20 @@ struct ContactImportWorkflow {
         onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void,
         onCancel: @escaping @MainActor () -> Void = {}
-    ) -> ImportConfirmationRequest {
-        ImportConfirmationRequest(
+    ) throws -> ImportConfirmationRequest {
+        let candidateMatch = try contactService.previewImportCandidateMatch(
+            publicKeyData: inspection.keyData
+        )
+        return ImportConfirmationRequest(
             keyData: inspection.keyData,
             metadata: inspection.metadata,
+            candidateMatch: candidateMatch,
             allowsUnverifiedImport: allowsUnverifiedImport,
             onImportVerified: {
                 importContact(
                     keyData: inspection.keyData,
                     verificationState: .verified,
+                    displayedCandidateMatch: candidateMatch,
                     onSuccess: onSuccess,
                     onFailure: onFailure
                 )
@@ -27,6 +32,7 @@ struct ContactImportWorkflow {
                 importContact(
                     keyData: inspection.keyData,
                     verificationState: .unverified,
+                    displayedCandidateMatch: candidateMatch,
                     onSuccess: onSuccess,
                     onFailure: onFailure
                 )
@@ -38,13 +44,15 @@ struct ContactImportWorkflow {
     private func importContact(
         keyData: Data,
         verificationState: ContactVerificationState,
+        displayedCandidateMatch: ContactCandidateMatch?,
         onSuccess: @escaping @MainActor (ContactIdentitySummary) -> Void,
         onFailure: @escaping @MainActor (CypherAirError) -> Void
     ) {
         do {
-            let result = try contactService.importContact(
+            let result = try contactService.importContactAfterConfirmation(
                 publicKeyData: keyData,
-                verificationState: verificationState
+                verificationState: verificationState,
+                displayedCandidateMatch: displayedCandidateMatch
             )
             switch result {
             case .added(let contact, _),

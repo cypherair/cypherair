@@ -126,6 +126,7 @@ final class AddContactScreenModelTests: XCTestCase {
         model.addContact(actions: hostActions)
 
         let request = try XCTUnwrap(presentedRequest)
+        XCTAssertNil(request.candidateMatch)
         request.onImportVerified()
 
         XCTAssertEqual(dismissCount, 1)
@@ -164,6 +165,8 @@ final class AddContactScreenModelTests: XCTestCase {
         model.addContact(actions: hostActions)
 
         let request = try XCTUnwrap(presentedRequest)
+        let candidate = try XCTUnwrap(request.candidateMatch)
+        XCTAssertEqual(candidate.strength, .strong)
         request.onImportVerified()
 
         XCTAssertEqual(dismissCount, 1)
@@ -171,6 +174,110 @@ final class AddContactScreenModelTests: XCTestCase {
         XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 2)
         XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
         XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
+    }
+
+    @MainActor
+    func test_addContact_duplicateFingerprintImportDoesNotShowCandidateConflict() throws {
+        let generated = try stack.engine.generateKey(
+            name: "Duplicate",
+            email: "duplicate@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try stack.contactService.importContact(publicKeyData: generated.publicKeyData)
+
+        let model = makeModel()
+        model.importedKeyData = generated.publicKeyData
+
+        var presentedRequest: ImportConfirmationRequest?
+        let hostActions = makeHostActions(
+            onPresent: { presentedRequest = $0 },
+            onDismiss: {},
+            onComplete: { _ in }
+        )
+
+        model.addContact(actions: hostActions)
+
+        let request = try XCTUnwrap(presentedRequest)
+        XCTAssertNil(request.candidateMatch)
+    }
+
+    @MainActor
+    func test_addContact_staleCandidateWarningFailsClosedWithoutImportingDisplayedKey() throws {
+        let firstKey = try stack.engine.generateKey(
+            name: "Stale Candidate",
+            email: "stale-candidate@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secondKey = try stack.engine.generateKey(
+            name: "Stale Candidate",
+            email: "stale-candidate@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let model = makeModel()
+        model.importedKeyData = secondKey.publicKeyData
+
+        var presentedRequest: ImportConfirmationRequest?
+        var dismissCount = 0
+        var completedContact: ContactIdentitySummary?
+        let hostActions = makeHostActions(
+            onPresent: { presentedRequest = $0 },
+            onDismiss: { dismissCount += 1 },
+            onComplete: { completedContact = $0 }
+        )
+
+        model.addContact(actions: hostActions)
+        let request = try XCTUnwrap(presentedRequest)
+        XCTAssertNil(request.candidateMatch)
+
+        _ = try stack.contactService.importContact(publicKeyData: firstKey.publicKeyData)
+        request.onImportVerified()
+
+        XCTAssertEqual(dismissCount, 1)
+        XCTAssertNil(completedContact)
+        XCTAssertTrue(model.showError)
+        if case .contactImportConfirmationStale? = model.error {
+            // Expected.
+        } else {
+            XCTFail("Expected stale import confirmation error, got \(String(describing: model.error))")
+        }
+        XCTAssertNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 1)
+    }
+
+    @MainActor
+    func test_addContact_whenConfirmationAlreadyPendingReportsErrorWithoutReplacingRequest() throws {
+        let generated = try stack.engine.generateKey(
+            name: "Pending",
+            email: "pending@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let model = makeModel()
+        model.importedKeyData = generated.publicKeyData
+
+        var presentedRequest: ImportConfirmationRequest?
+        let hostActions = AddContactScreenHostActions(
+            presentImportConfirmation: { request in
+                presentedRequest = request
+                return false
+            },
+            dismissPresentedImportConfirmation: {},
+            completeImportedContact: { _ in }
+        )
+
+        model.addContact(actions: hostActions)
+
+        XCTAssertNotNil(presentedRequest)
+        XCTAssertTrue(model.showError)
+        if case .contactImportConfirmationAlreadyPending? = model.error {
+            // Expected.
+        } else {
+            XCTFail("Expected already-pending import confirmation error, got \(String(describing: model.error))")
+        }
+        XCTAssertTrue(stack.contactService.testContactKeyRecords.isEmpty)
     }
 
     @MainActor
@@ -466,7 +573,10 @@ final class AddContactScreenModelTests: XCTestCase {
         onComplete: @escaping @MainActor (ContactIdentitySummary) -> Void
     ) -> AddContactScreenHostActions {
         AddContactScreenHostActions(
-            presentImportConfirmation: onPresent,
+            presentImportConfirmation: { request in
+                onPresent(request)
+                return true
+            },
             dismissPresentedImportConfirmation: onDismiss,
             completeImportedContact: onComplete
         )

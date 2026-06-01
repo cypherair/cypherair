@@ -74,6 +74,10 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.keyTooLargeForQr", defaultValue: "This key contains too much data to display as a QR code. Please share your public key via file or text instead.")
         case .contactsUnavailable(let availability):
             availability.unavailableDescription
+        case .contactImportConfirmationStale:
+            String(localized: "error.contactImportConfirmationStale", defaultValue: "Contacts changed while this import was open. Review the key again before adding it.")
+        case .contactImportConfirmationAlreadyPending:
+            String(localized: "error.contactImportConfirmationAlreadyPending", defaultValue: "Finish or cancel the current contact import before opening another one.")
         }
     }
 }

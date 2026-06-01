@@ -96,12 +96,78 @@ final class ContactService: @unchecked Sendable {
         }
     }
 
+    func previewImportCandidateMatch(
+        publicKeyData: Data
+    ) throws -> ContactCandidateMatch? {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+        return try snapshotMutator.importCandidateMatch(
+            publicKeyData: publicKeyData,
+            in: mutableRuntimeSnapshot()
+        )
+    }
+
+    @discardableResult
+    func importContactAfterConfirmation(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState = .verified,
+        displayedCandidateMatch: ContactCandidateMatch?
+    ) throws -> ContactImportResult {
+        try requireContactsAvailable()
+        guard contactsAvailability == .availableProtectedDomain else {
+            throw CypherAirError.contactsUnavailable(contactsAvailability)
+        }
+        return try withProtectedRuntimeRollback {
+            try performProtectedImportContactAfterConfirmation(
+                publicKeyData: publicKeyData,
+                verificationState: verificationState,
+                displayedCandidateMatch: displayedCandidateMatch
+            )
+        }
+    }
+
     @discardableResult
     private func performProtectedImportContact(
         publicKeyData: Data,
         verificationState: ContactVerificationState = .verified
     ) throws -> ContactImportResult {
         var snapshot = try mutableRuntimeSnapshot()
+        return try applyImportContactMutation(
+            publicKeyData: publicKeyData,
+            verificationState: verificationState,
+            in: &snapshot
+        )
+    }
+
+    @discardableResult
+    private func performProtectedImportContactAfterConfirmation(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState,
+        displayedCandidateMatch: ContactCandidateMatch?
+    ) throws -> ContactImportResult {
+        var snapshot = try mutableRuntimeSnapshot()
+        let currentCandidateMatch = try snapshotMutator.importCandidateMatch(
+            publicKeyData: publicKeyData,
+            in: snapshot
+        )
+        guard currentCandidateMatch == displayedCandidateMatch else {
+            throw CypherAirError.contactImportConfirmationStale
+        }
+        return try applyImportContactMutation(
+            publicKeyData: publicKeyData,
+            verificationState: verificationState,
+            in: &snapshot
+        )
+    }
+
+    @discardableResult
+    private func applyImportContactMutation(
+        publicKeyData: Data,
+        verificationState: ContactVerificationState,
+        in snapshot: inout ContactsDomainSnapshot
+    ) throws -> ContactImportResult {
         let mutation = try snapshotMutator.addContact(
             publicKeyData: publicKeyData,
             verificationState: verificationState,

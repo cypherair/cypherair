@@ -248,6 +248,8 @@ final class ModelTests: XCTestCase {
             .duplicateKey,
             .keyTooLargeForQr,
             .contactsUnavailable(.locked),
+            .contactImportConfirmationStale,
+            .contactImportConfirmationAlreadyPending,
         ]
 
         for error in errors {

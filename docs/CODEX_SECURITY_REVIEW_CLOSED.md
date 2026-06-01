@@ -393,3 +393,27 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Resume completion now checks whether its captured lifecycle generation is still current before it can clear the privacy blur.
 - Resolution: Real resign-active and background transitions invalidate in-flight resume completions and keep the hard blur. A stale post-auth completion no longer arms the transient authentication settle path; when the app has already returned active, the UI schedules a fresh resume/grace check instead of accepting the stale completion directly.
 - Relevant paths: `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Tests/ServiceTests/ProtectedDataFrameworkTests.swift`
+
+### SR-CLOSED-38: Spoofed duplicate contacts bypass key-update warning
+
+- Former Review ID: `SR-FIX-01`
+- Legacy ID: `CA-01`
+- Severity: `high`
+- Area: `contact-import`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3db1dd11b0548191993e920e471adfb2)
+- Decision: Fixed. Duplicate conflicting contact imports remain separate identities by product policy, but the import confirmation now preserves and displays same-identity/different-fingerprint candidate warnings before the user can verify or import the key.
+- Resolution: `ContactService` exposes a non-mutating candidate preview for contact import confirmation, `ContactImportWorkflow` carries that preview into `ImportConfirmationRequest`, and confirmed imports recheck the displayed candidate immediately before mutation. If Contacts state changes while the sheet is open, import fails closed and asks the user to review the key again.
+- Relevant paths: `Sources/Services/ContactService.swift`, `Sources/Services/ContactSnapshotMutator.swift`, `Sources/App/Contacts/Import/ContactImportWorkflow.swift`, `Sources/App/Contacts/ImportConfirmView.swift`, `Tests/ServiceTests/AddContactScreenModelTests.swift`, `Tests/ServiceTests/IncomingURLImportCoordinatorTests.swift`
+
+### SR-CLOSED-39: Import confirmation can act on a replaced key request
+
+- Former Review ID: `SR-FIX-12`
+- Legacy ID: `CA-23`
+- Severity: `medium`
+- Area: `contact-import`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/078f49939538819195ae18333d9d130b)
+- Decision: Fixed. Import confirmation presentation is now first-request-wins, and sheet actions execute the request displayed to the user rather than dereferencing a later mutable request.
+- Resolution: `ImportConfirmationCoordinator.present(_:)` refuses replacement while a request is pending, sheet buttons pass the displayed request into coordinator actions, Add Contact surfaces an already-pending error when custom presentation refuses a request, and URL import keeps the current confirmation while reporting that the user must finish or cancel it first.
+- Relevant paths: `Sources/App/Contacts/ImportConfirmationCoordinator.swift`, `Sources/App/Contacts/AddContactScreenModel.swift`, `Sources/App/Contacts/AddContactView.swift`, `Sources/App/Contacts/Import/IncomingURLImportCoordinator.swift`, `Sources/App/Onboarding/TutorialSessionStore.swift`, `Tests/ServiceTests/AddContactScreenModelTests.swift`, `Tests/ServiceTests/IncomingURLImportCoordinatorTests.swift`

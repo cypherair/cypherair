@@ -36,21 +36,28 @@ final class IncomingURLImportCoordinator {
             return
         }
 
+        guard importConfirmationCoordinator.request == nil else {
+            importError = .contactImportConfirmationAlreadyPending
+            return
+        }
+
         do {
             let inspection = try importLoader.loadFromURL(url)
-            importConfirmationCoordinator.present(
-                importWorkflow.makeImportConfirmationRequest(
-                    inspection: inspection,
-                    allowsUnverifiedImport: true,
-                    onSuccess: { [self] _ in
-                        importConfirmationCoordinator.dismiss()
-                    },
-                    onFailure: { [self] importError in
-                        self.importError = importError
-                        importConfirmationCoordinator.dismiss()
-                    }
-                )
+            let request = try importWorkflow.makeImportConfirmationRequest(
+                inspection: inspection,
+                allowsUnverifiedImport: true,
+                onSuccess: { [self] _ in
+                    importConfirmationCoordinator.dismiss()
+                },
+                onFailure: { [self] importError in
+                    self.importError = importError
+                    importConfirmationCoordinator.dismiss()
+                }
             )
+            guard importConfirmationCoordinator.present(request) else {
+                importError = .contactImportConfirmationAlreadyPending
+                return
+            }
         } catch {
             importError = CypherAirError.from(error) { _ in .invalidQRCode }
         }

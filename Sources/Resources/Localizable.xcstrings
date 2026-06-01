@@ -4897,6 +4897,38 @@
         }
       }
     },
+    "error.contactImportConfirmationAlreadyPending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish or cancel the current contact import before opening another one."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先完成或取消当前联系人导入，再打开另一个导入请求。"
+          }
+        }
+      }
+    },
+    "error.contactImportConfirmationStale" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacts changed while this import was open. Review the key again before adding it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此导入打开期间联系人已发生变化。请重新检查该密钥后再添加。"
+          }
+        }
+      }
+    },
     "error.contactImportRequiresPublicCertificate" : {
       "localizations" : {
         "en" : {
@@ -7917,6 +7949,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除文件"
+          }
+        }
+      }
+    },
+    "import.conflict.ambiguousStrong" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key matches multiple existing contacts but has a different fingerprint. Confirm the owner carefully before adding it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥匹配多个现有联系人，但指纹不同。添加前请仔细确认密钥所有者。"
+          }
+        }
+      }
+    },
+    "import.conflict.existingContact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现有联系人"
+          }
+        }
+      }
+    },
+    "import.conflict.mergeHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this is a legitimate key replacement, import it only after checking the new fingerprint, then merge the contacts from Contact Detail."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果这是合法的密钥替换，请先核对新指纹再导入，然后在联系人详情中合并联系人。"
+          }
+        }
+      }
+    },
+    "import.conflict.strong" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key matches an existing contact email but has a different fingerprint. It may be a real key replacement, or it may be an impersonation attempt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥匹配一个现有联系人的邮箱，但指纹不同。它可能是真实的密钥替换，也可能是冒充尝试。"
+          }
+        }
+      }
+    },
+    "import.conflict.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Possible Existing Contact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可能是现有联系人"
+          }
+        }
+      }
+    },
+    "import.conflict.weak" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key matches an existing User ID but has a different fingerprint. It may be a real key replacement, or it may be an impersonation attempt."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥匹配一个现有 User ID，但指纹不同。它可能是真实的密钥替换，也可能是冒充尝试。"
           }
         }
       }

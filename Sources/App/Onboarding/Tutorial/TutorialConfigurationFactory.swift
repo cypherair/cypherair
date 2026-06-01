@@ -48,7 +48,7 @@ struct TutorialConfigurationFactory {
                 )
             }
             configuration.onImportConfirmationRequested = { [weak store] request in
-                store?.presentImportConfirmation(request)
+                store?.presentImportConfirmation(request) ?? false
             }
         }
 

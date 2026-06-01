@@ -37,6 +37,26 @@ final class LocalizationCatalogTests: XCTestCase {
         }
     }
 
+    func test_contactImportHardeningKeysAreTranslated() throws {
+        let catalog = try loadCatalog(at: "Sources/Resources/Localizable.xcstrings")
+        let requiredKeys = [
+            "error.contactImportConfirmationAlreadyPending",
+            "error.contactImportConfirmationStale",
+            "import.conflict.ambiguousStrong",
+            "import.conflict.existingContact",
+            "import.conflict.mergeHint",
+            "import.conflict.strong",
+            "import.conflict.title",
+            "import.conflict.weak"
+        ]
+
+        for key in requiredKeys {
+            let entry = try XCTUnwrap(catalog.strings[key], "Missing catalog entry for \(key)")
+            XCTAssertNotEqual(entry.extractionState, "stale", "\(key) should not be stale")
+            assertFullyTranslated(entry, key: key)
+        }
+    }
+
     func test_infoPlistCatalogEntriesAreFullyTranslatedAndNotStale() throws {
         let catalog = try loadCatalog(at: "Sources/Resources/InfoPlist.xcstrings")
 

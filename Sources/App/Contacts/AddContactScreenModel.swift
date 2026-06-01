@@ -1,7 +1,7 @@
 import Foundation
 
 struct AddContactScreenHostActions {
-    let presentImportConfirmation: @MainActor (ImportConfirmationRequest) -> Void
+    let presentImportConfirmation: @MainActor (ImportConfirmationRequest) -> Bool
     let dismissPresentedImportConfirmation: @MainActor () -> Void
     let completeImportedContact: @MainActor (ContactIdentitySummary) -> Void
 }
@@ -130,7 +130,7 @@ final class AddContactScreenModel {
         do {
             let keyData = importedKeyData ?? Data(armoredText.utf8)
             let inspection = try inspectKeyDataAction(keyData)
-            let request = importWorkflow.makeImportConfirmationRequest(
+            let request = try importWorkflow.makeImportConfirmationRequest(
                 inspection: inspection,
                 allowsUnverifiedImport: configuration.verificationPolicy == .allowUnverified,
                 onSuccess: { contact in
@@ -144,7 +144,11 @@ final class AddContactScreenModel {
                 }
             )
 
-            actions.presentImportConfirmation(request)
+            guard actions.presentImportConfirmation(request) else {
+                self.error = .contactImportConfirmationAlreadyPending
+                showError = true
+                return
+            }
         } catch {
             self.error = CypherAirError.from(error) { .invalidKeyData(reason: $0) }
             showError = true
