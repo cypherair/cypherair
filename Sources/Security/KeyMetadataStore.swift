@@ -356,17 +356,6 @@ final class KeyMetadataStore: KeyMetadataPersistence {
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
-        if let keychainError = error as? KeychainError {
-            return keychainError == .itemNotFound
-        }
-        if let mockKeychainError = error as? MockKeychainError {
-            switch mockKeychainError {
-            case .itemNotFound:
-                return true
-            case .duplicateItem, .saveFailed, .deleteFailed:
-                return false
-            }
-        }
-        return false
+        KeychainFailureClassifier.isItemNotFound(error)
     }
 }

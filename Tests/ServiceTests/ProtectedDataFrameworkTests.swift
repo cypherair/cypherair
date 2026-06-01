@@ -150,7 +150,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         lastAuthenticationContext = authenticationContext
         rightLookupCallCount += 1
         guard let persistedRightHandle else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         if let authorizeError = persistedRightHandle.authorizeError {
             throw authorizeError
@@ -166,7 +166,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         removeCallCount += 1
         lastRemovedIdentifier = identifier
         guard persistedRightHandle != nil else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         persistedRightHandle = nil
     }
@@ -186,7 +186,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         _ = newPolicy
         lastAuthenticationContext = authenticationContext
         guard persistedRightHandle != nil else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
     }
 }

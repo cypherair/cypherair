@@ -223,14 +223,6 @@ final class KeyMutationService {
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
-        if let keychainError = error as? KeychainError,
-           case .itemNotFound = keychainError {
-            return true
-        }
-        if let mockError = error as? MockKeychainError,
-           case .itemNotFound = mockError {
-            return true
-        }
-        return false
+        KeychainFailureClassifier.isItemNotFound(error)
     }
 }

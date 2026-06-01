@@ -76,7 +76,7 @@ final class ProtectedDataRootSecretCoordinator: @unchecked Sendable {
                 name: "protectedData.rootSecret.delete.finish",
                 metadata: ["result": "success"]
             )
-        } catch let error as KeychainError where error == .itemNotFound {
+        } catch where KeychainFailureClassifier.isItemNotFound(error) {
             // Deleting the last protected domain can run against legacy or already
             // cleaned-up state. Missing root secret is not a recovery failure here.
             traceStore?.record(
@@ -105,7 +105,7 @@ final class ProtectedDataRootSecretCoordinator: @unchecked Sendable {
                 usesHandoffContext: usesHandoffContext,
                 minimumEnvelopeVersion: registry.rootSecretEnvelopeMinimumVersion
             )
-        } catch let error as KeychainError where error == .itemNotFound {
+        } catch where KeychainFailureClassifier.isItemNotFound(error) {
             guard allowLegacyMigration else {
                 return .legacyMigrationDeferred
             }

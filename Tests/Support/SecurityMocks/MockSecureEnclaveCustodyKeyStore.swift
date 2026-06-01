@@ -1,4 +1,5 @@
 import Foundation
+@testable import CypherAir
 
 final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @unchecked Sendable {
     private var storage: [SecureEnclaveCustodyHandleReference: [SecureEnclaveCustodyLoadedHandle]] = [:]

@@ -5,12 +5,10 @@ import Security
 /// In-memory mock Keychain for testing.
 /// Records all operations for verification in tests.
 ///
-/// **Note on error types:** This mock throws `MockKeychainError`, which is a
-/// different type from the production `KeychainError`. If consuming code uses
-/// `catch let error as KeychainError` to distinguish error cases, mock errors
-/// will not match. Currently `AuthenticationManager.switchMode` catches generic
-/// `Error` and wraps it, so this is not a problem — but keep this in mind if
-/// adding typed error handling in consuming code.
+/// **Note on error types:** This mock throws `MockKeychainError`, not the
+/// production `KeychainError`. Shared production logic must classify keychain
+/// failures through `KeychainFailureRepresentable` rather than checking this
+/// concrete mock error type.
 ///
 /// - Warning: Not thread-safe. Only use from test methods on a single actor.
 final class MockKeychain: KeychainManageable, @unchecked Sendable {
@@ -28,13 +26,13 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     private(set) var listItemsCalls: [(servicePrefix: String, account: String, hasAuthenticationContext: Bool)] = []
 
     /// If set, the next save operation will throw this error (one-shot).
-    var saveError: Error?
+    var saveError: MockKeychainError?
     /// If set, the next load operation will throw this error (one-shot).
-    var loadError: Error?
+    var loadError: MockKeychainError?
     /// If set, the next delete operation will throw this error (one-shot).
-    var deleteError: Error?
+    var deleteError: MockKeychainError?
     /// If set, the next list operation will throw this error (one-shot).
-    var listItemsError: Error?
+    var listItemsError: MockKeychainError?
 
     /// If non-zero, the save at this call count (1-based) will throw `saveError ?? MockKeychainError.saveFailed`.
     /// Example: `failOnSaveNumber = 4` means the 4th save call will fail.
@@ -164,11 +162,31 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     }
 }
 
-enum MockKeychainError: Error {
+enum MockKeychainError: Error, KeychainFailureRepresentable {
     case itemNotFound
     case duplicateItem
+    case userCancelled
+    case authenticationFailed
+    case interactionNotAllowed
     case saveFailed
     case deleteFailed
+
+    var keychainFailureKind: KeychainFailureKind {
+        switch self {
+        case .itemNotFound:
+            .itemNotFound
+        case .duplicateItem:
+            .duplicateItem
+        case .userCancelled:
+            .userCancelled
+        case .authenticationFailed:
+            .authenticationFailed
+        case .interactionNotAllowed:
+            .interactionNotAllowed
+        case .saveFailed, .deleteFailed:
+            .unhandled
+        }
+    }
 }
 
 /// In-memory root-secret store used by unit tests and UI-test containers.
@@ -188,10 +206,10 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
     private(set) var lastLoadedIdentifier: String?
     private(set) var lastAuthenticationContext: LAContext?
 
-    var saveError: Error?
-    var loadError: Error?
-    var deleteError: Error?
-    var reprotectError: Error?
+    var saveError: MockKeychainError?
+    var loadError: MockKeychainError?
+    var deleteError: MockKeychainError?
+    var reprotectError: MockKeychainError?
     var throwOnDuplicate = true
 
     func saveRootSecret(
@@ -224,7 +242,7 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
             throw loadError
         }
         guard let storedSecret = storage[identifier] else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         return ProtectedDataRootSecretLoadResult(
             secretData: storedSecret.data,
@@ -240,7 +258,7 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
             throw deleteError
         }
         guard storage.removeValue(forKey: identifier) != nil else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
     }
 
@@ -263,7 +281,7 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
             throw reprotectError
         }
         guard var storedSecret = storage[identifier] else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         storedSecret.policy = newPolicy
         storage[identifier] = storedSecret

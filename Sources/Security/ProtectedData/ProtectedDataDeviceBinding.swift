@@ -137,7 +137,7 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
     private func loadOrCreateKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
         do {
             return try loadKey()
-        } catch let error as KeychainError where error == .itemNotFound {
+        } catch where KeychainFailureClassifier.isItemNotFound(error) {
             return try createAndPersistKey()
         }
     }
@@ -181,87 +181,9 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
                 account: account,
                 accessControl: nil
             )
-        } catch KeychainError.duplicateItem {
+        } catch where KeychainFailureClassifier.isDuplicateItem(error) {
             return try loadKey()
         }
-        return key
-    }
-}
-
-final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingProvider, @unchecked Sendable {
-    let keyIdentifier: String
-    var sealError: Error?
-    var openError: Error?
-    var deleteError: Error?
-    private var privateKey: P256.KeyAgreement.PrivateKey?
-
-    init(keyIdentifier: String = ProtectedDataDeviceBindingConstants.keyIdentifier) {
-        self.keyIdentifier = keyIdentifier
-    }
-
-    func sealRootSecret(
-        _ rootSecret: Data,
-        sharedRightIdentifier: String
-    ) throws -> ProtectedDataRootSecretEnvelope {
-        if let sealError {
-            self.sealError = nil
-            throw sealError
-        }
-        let privateKey = try loadOrCreateKey()
-        return try ProtectedDataRootSecretEnvelopeCodec.seal(
-            rootSecret: rootSecret,
-            sharedRightIdentifier: sharedRightIdentifier,
-            deviceBindingKeyIdentifier: keyIdentifier,
-            deviceBindingPublicKeyX963: privateKey.publicKey.x963Representation
-        )
-    }
-
-    func openRootSecret(
-        envelope: ProtectedDataRootSecretEnvelope,
-        expectedSharedRightIdentifier: String
-    ) throws -> Data {
-        if let openError {
-            self.openError = nil
-            throw openError
-        }
-        guard let privateKey else {
-            throw KeychainError.itemNotFound
-        }
-        guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
-            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
-        }
-        guard envelope.deviceBindingPublicKeyX963 == privateKey.publicKey.x963Representation else {
-            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
-        }
-        let ephemeralPublicKey = try P256.KeyAgreement.PublicKey(
-            x963Representation: envelope.ephemeralPublicKeyX963
-        )
-        let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
-        return try ProtectedDataRootSecretEnvelopeCodec.open(
-            envelope: envelope,
-            sharedSecret: sharedSecret,
-            expectedSharedRightIdentifier: expectedSharedRightIdentifier
-        )
-    }
-
-    func bindingKeyExists() -> Bool {
-        privateKey != nil
-    }
-
-    func deleteBindingKey() throws {
-        if let deleteError {
-            self.deleteError = nil
-            throw deleteError
-        }
-        privateKey = nil
-    }
-
-    private func loadOrCreateKey() throws -> P256.KeyAgreement.PrivateKey {
-        if let privateKey {
-            return privateKey
-        }
-        let key = P256.KeyAgreement.PrivateKey()
-        privateKey = key
         return key
     }
 }
@@ -405,17 +327,6 @@ final class ProtectedDataRootSecretFormatFloorStore {
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
-        if let keychainError = error as? KeychainError {
-            return keychainError == .itemNotFound
-        }
-        if let mockKeychainError = error as? MockKeychainError {
-            switch mockKeychainError {
-            case .itemNotFound:
-                return true
-            case .duplicateItem, .saveFailed, .deleteFailed:
-                return false
-            }
-        }
-        return false
+        KeychainFailureClassifier.isItemNotFound(error)
     }
 }

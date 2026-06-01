@@ -1,4 +1,5 @@
 import Foundation
+@testable import CypherAir
 
 /// Mock memory info provider for testing Argon2id memory guard logic.
 /// Allows tests to simulate different device memory conditions.

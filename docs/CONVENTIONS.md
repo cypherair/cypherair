@@ -211,8 +211,7 @@ Sources/
 │   └── Mocks/
 │       ├── MockAuthenticator.swift
 │       ├── MockKeychain.swift
-│       ├── MockSecureEnclave.swift
-│       └── MockMemoryInfo.swift
+│       └── MockSecureEnclave.swift
 ├── Models/
 │   ├── CypherAirError.swift
 │   ├── ExportableFile.swift
