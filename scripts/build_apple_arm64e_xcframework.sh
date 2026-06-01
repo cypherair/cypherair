@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+unset GH_TOKEN GITHUB_TOKEN
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MANIFEST="$REPO_ROOT/pgp-mobile/Cargo.toml"
@@ -67,6 +69,14 @@ require_command() {
     fi
 }
 
+download_stage1_with_public_api() {
+    env -u GH_TOKEN -u GITHUB_TOKEN \
+        ARM64E_RUST_REPOSITORY="$ARM64E_RUST_REPOSITORY" \
+        ARM64E_STAGE1_RELEASE_TAG="$ARM64E_STAGE1_RELEASE_TAG" \
+        ARM64E_STAGE1_RELEASE_PREFIX="$ARM64E_STAGE1_RELEASE_PREFIX" \
+        "$SCRIPT_DIR/download_arm64e_stage1_toolchain.sh" "$STAGE1_CACHE_DIR"
+}
+
 ensure_toolchain() {
     local toolchain="$1"
     if ! rustup toolchain list | sed 's/ .*//' | grep -Eq "^${toolchain}(-.*)?$"; then
@@ -93,15 +103,32 @@ ensure_rustup_target() {
 
 latest_stage1_release_tag() {
     local prefix="$ARM64E_STAGE1_RELEASE_PREFIX"
-    gh release list \
-        --repo "$ARM64E_RUST_REPOSITORY" \
-        --limit 100 \
-        --json tagName,isPrerelease,publishedAt \
-        --jq '[.[] | select(.isPrerelease and (.tagName | startswith("'"$prefix"'")))] | sort_by(.publishedAt) | last | .tagName'
+    local releases_json
+    releases_json="$(mktemp)"
+    curl --fail --silent --show-error --location \
+        -H 'Accept: application/vnd.github+json' \
+        -H 'X-GitHub-Api-Version: 2022-11-28' \
+        "https://api.github.com/repos/${ARM64E_RUST_REPOSITORY}/releases?per_page=100" \
+        > "$releases_json"
+    "$PYTHON_BIN" - "$releases_json" "$prefix" <<'PY'
+import json
+import sys
+
+path, prefix = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as handle:
+    releases = json.load(handle)
+matches = [
+    release
+    for release in releases
+    if release.get("prerelease") and release.get("tag_name", "").startswith(prefix)
+]
+matches.sort(key=lambda release: release.get("published_at") or "")
+print(matches[-1]["tag_name"] if matches else "")
+PY
+    rm -f "$releases_json"
 }
 
 download_stage1_toolchain() {
-    require_command gh
     require_command zstd
 
     local tag="$ARM64E_STAGE1_RELEASE_TAG"
@@ -114,22 +141,7 @@ download_stage1_toolchain() {
     fi
 
     log_step "stage1" "Downloading Rust arm64e stage1 prerelease ${tag}..."
-    rm -rf "$STAGE1_CACHE_DIR"
-    mkdir -p "$STAGE1_CACHE_DIR/download" "$STAGE1_CACHE_DIR/toolchain"
-
-    gh release download "$tag" \
-        --repo "$ARM64E_RUST_REPOSITORY" \
-        --pattern 'rust-stage1-arm64e-apple-darwin.tar.zst' \
-        --pattern 'rust-stage1-arm64e-apple-darwin.sha256' \
-        --pattern 'rust-stage1-arm64e-apple-darwin.json' \
-        --dir "$STAGE1_CACHE_DIR/download" \
-        --clobber
-
-    (
-        cd "$STAGE1_CACHE_DIR/download"
-        shasum -a 256 -c rust-stage1-arm64e-apple-darwin.sha256
-        zstd -d -c rust-stage1-arm64e-apple-darwin.tar.zst | bsdtar -xf - -C "$STAGE1_CACHE_DIR/toolchain"
-    )
+    ARM64E_STAGE1_RELEASE_TAG="$tag" download_stage1_with_public_api
 
     ARM64E_STAGE1_DIR="$STAGE1_CACHE_DIR/toolchain/stage1-arm64e-patch"
     ARM64E_RUST_STAGE1_MANIFEST="$STAGE1_CACHE_DIR/download/rust-stage1-arm64e-apple-darwin.json"
@@ -145,7 +157,8 @@ validate_stage1_manifest() {
         exit 1
     fi
 
-    "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
+    env -u GH_TOKEN -u GITHUB_TOKEN \
+        "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
 import json
 import sys
 
@@ -298,12 +311,12 @@ build_rust_artifact() {
 
     log_step "$label" "Building ${target}..."
     if [[ "$target" == arm64e-* ]]; then
-        env \
+        env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
             RUSTC="$ARM64E_RUSTC" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     else
-        env \
+        env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     fi
@@ -354,7 +367,7 @@ generate_bindings() {
     MANIFEST_BACKUP_CREATED=1
     perl -0pi -e 's/crate-type = \["lib", "staticlib"\]/crate-type = ["lib", "staticlib", "cdylib"]/g' "$MANIFEST"
 
-    env \
+    env -u GH_TOKEN -u GITHUB_TOKEN \
         CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
         RUSTC="$ARM64E_RUSTC" \
         cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" --target arm64e-apple-darwin --manifest-path "$MANIFEST"
@@ -370,7 +383,7 @@ generate_bindings() {
 
     (
         cd "$REPO_ROOT/pgp-mobile"
-        env \
+        env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
             cargo +"$STABLE_TOOLCHAIN" run --locked "${CARGO_FLAGS[@]}" --bin uniffi-bindgen generate \
                 --library "$host_dylib" \
@@ -410,7 +423,8 @@ create_xcframework() {
     cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h" "$headers_dir/"
     cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$headers_dir/module.modulemap"
 
-    xcodebuild -create-xcframework \
+    env -u GH_TOKEN -u GITHUB_TOKEN \
+        xcodebuild -create-xcframework \
         -library "$ios_device_lib" -headers "$headers_dir" \
         -library "$ios_sim_lib" -headers "$headers_dir" \
         -library "$macos_lib" -headers "$headers_dir" \
@@ -430,7 +444,8 @@ verify_xcframework() {
     if [ -n "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
         metadata_args+=(--rust-stage1-manifest "$ARM64E_RUST_STAGE1_MANIFEST")
     fi
-    "$PYTHON_BIN" "$SCRIPT_DIR/arm64e_release_metadata.py" "${metadata_args[@]}"
+    env -u GH_TOKEN -u GITHUB_TOKEN \
+        "$PYTHON_BIN" "$SCRIPT_DIR/arm64e_release_metadata.py" "${metadata_args[@]}"
 
     while IFS= read -r lib_path; do
         echo "=== $lib_path ==="
@@ -445,6 +460,7 @@ df -h "$REPO_ROOT" || true
 
 require_command cargo
 require_command rustup
+require_command curl
 require_command lipo
 require_command xcodebuild
 require_command bsdtar

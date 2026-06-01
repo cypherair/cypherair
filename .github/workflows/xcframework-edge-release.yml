@@ -13,15 +13,12 @@ on:
         type: string
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
-  ARM64E_STAGE1_FORCE_DOWNLOAD: "1"
   ARM64E_STAGE1_RELEASE_TAG: latest
   ARM64E_DEPENDENCY_FRESHNESS_LEVEL: error
 
@@ -31,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Install Rust stable toolchain
         run: |
@@ -44,11 +42,17 @@ jobs:
           cargo +stable install cargo-audit --version 0.22.1 --locked
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
-  publish-edge-release:
+  build-edge-release-assets:
     runs-on: macos-26
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_title: ${{ steps.resolve.outputs.release_title }}
+      release_metadata: ${{ steps.resolve.outputs.release_metadata }}
+      artifact_name: ${{ steps.resolve.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Check Xcode 26.5 platform probe readiness
         id: platform_preflight
@@ -63,6 +67,7 @@ jobs:
           rustc +stable --version
           cargo +stable --version
       - name: Resolve release settings
+        id: resolve
         env:
           INPUT_RELEASE_TAG_PREFIX: ${{ github.event.inputs.release_tag_prefix || 'pgpmobile-edge' }}
         run: |
@@ -142,13 +147,9 @@ jobs:
             exit 1
           fi
 
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "::error::Release tag already exists: $RELEASE_TAG"
-            exit 1
-          fi
-
           RELEASE_TITLE="PgpMobile ${RELEASE_CHANNEL_LABEL} XCFramework ($RELEASE_TAG)"
           RELEASE_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          EDGE_RELEASE_ARTIFACT="xcframework-edge-release-assets-${RELEASE_TAG}"
 
           {
             echo "RELEASE_CHANNEL=$RELEASE_CHANNEL"
@@ -159,10 +160,18 @@ jobs:
             echo "RELEASE_SOURCE_REF=$RELEASE_SOURCE_REF"
             echo "RELEASE_SIGNER_WORKFLOW=$RELEASE_SIGNER_WORKFLOW"
             echo "RELEASE_METADATA=$RELEASE_METADATA"
+            echo "EDGE_RELEASE_ARTIFACT=$EDGE_RELEASE_ARTIFACT"
             echo "RUN_ATTEMPT=$RUN_ATTEMPT"
             echo "WORKFLOW_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "WORKFLOW_REF_NAME=${GITHUB_REF_NAME}"
           } >> "$GITHUB_ENV"
+
+          {
+            echo "release_tag=$RELEASE_TAG"
+            echo "release_title=$RELEASE_TITLE"
+            echo "release_metadata=$RELEASE_METADATA"
+            echo "artifact_name=$EDGE_RELEASE_ARTIFACT"
+          } >> "$GITHUB_OUTPUT"
       - name: Run full Rust suite
         run: |
           cargo +stable test --manifest-path pgp-mobile/Cargo.toml
@@ -174,9 +183,11 @@ jobs:
             --cargo-lock pgp-mobile/Cargo.lock \
             --output arm64e-dependency-chain.json \
             --freshness-level error
+      - name: Download arm64e stage1 toolchain
+        run: scripts/download_arm64e_stage1_toolchain.sh "$RUNNER_TEMP/arm64e-stage1"
       - name: Build XCFramework and generated bindings
         env:
-          GH_TOKEN: ${{ github.token }}
+          ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
       - name: Probe iOS build
         if: steps.platform_preflight.outputs.ready == 'true'
@@ -246,25 +257,42 @@ jobs:
             echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER"
           } >> "$GITHUB_ENV"
 
-          cat > "$RELEASE_METADATA" <<EOF
-          {
-            "release_channel": "$RELEASE_CHANNEL",
-            "release_tag": "$RELEASE_TAG",
-            "release_url": "$RELEASE_URL",
-            "commit_sha": "$GITHUB_SHA",
-            "built_at": "$BUILT_AT",
-            "run_id": "$GITHUB_RUN_ID",
-            "run_attempt": "$RUN_ATTEMPT",
-            "marketing_version": "$MARKETING_VERSION",
-            "project_build_number": "$PROJECT_BUILD_NUMBER",
-            "xcode_version": "$XCODE_VERSION",
-            "rustc_version": "$RUSTC_VERSION",
-            "arm64e_manifest": "$ARM64E_MANIFEST",
-            "workflow_url": "$WORKFLOW_URL",
-            "source_ref": "$RELEASE_SOURCE_REF",
-            "apple_platform_probes": $APPLE_PLATFORM_PROBES_JSON
+          export APPLE_PLATFORM_PROBES_JSON
+          python3 - "$RELEASE_METADATA" <<'PY'
+          import json
+          import os
+          import sys
+
+          payload = {
+              "release_channel": os.environ["RELEASE_CHANNEL"],
+              "release_tag": os.environ["RELEASE_TAG"],
+              "release_url": os.environ["RELEASE_URL"],
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "built_at": os.environ["BUILT_AT"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["RUN_ATTEMPT"],
+              "marketing_version": os.environ["MARKETING_VERSION"],
+              "project_build_number": os.environ["PROJECT_BUILD_NUMBER"],
+              "xcode_version": os.environ["XCODE_VERSION"],
+              "rustc_version": os.environ["RUSTC_VERSION"],
+              "arm64e_manifest": os.environ["ARM64E_MANIFEST"],
+              "workflow_url": os.environ["WORKFLOW_URL"],
+              "source_ref": os.environ["RELEASE_SOURCE_REF"],
+              "apple_platform_probes": json.loads(os.environ["APPLE_PLATFORM_PROBES_JSON"]),
           }
-          EOF
+
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump(payload, handle, indent=2)
+              handle.write("\n")
+          PY
+
+          SOURCE_REF_SHELL="$(python3 - <<'PY'
+          import os
+          import shlex
+
+          print(shlex.quote(os.environ["RELEASE_SOURCE_REF"]))
+          PY
+          )"
 
           cat > release-notes.md <<EOF
           Unique $RELEASE_CHANNEL prerelease XCFramework built from workflow ref \`$WORKFLOW_REF_NAME\`.
@@ -297,9 +325,61 @@ jobs:
           shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
           gh release verify "$RELEASE_TAG" -R "$GITHUB_REPOSITORY"
           gh release verify-asset "$RELEASE_TAG" "$XCFRAMEWORK_ZIP" -R "$GITHUB_REPOSITORY"
-          gh attestation verify "$XCFRAMEWORK_ZIP" -R "$GITHUB_REPOSITORY" --signer-workflow "$RELEASE_SIGNER_WORKFLOW" --source-ref "$RELEASE_SOURCE_REF"
+          gh attestation verify "$XCFRAMEWORK_ZIP" -R "$GITHUB_REPOSITORY" --signer-workflow "$RELEASE_SIGNER_WORKFLOW" --source-ref $SOURCE_REF_SHELL
           \`\`\`
           EOF
+      - name: Upload edge release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.EDGE_RELEASE_ARTIFACT }}
+          path: |
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELEASE_METADATA }}
+            release-notes.md
+          retention-days: 7
+          if-no-files-found: error
+
+  publish-edge-release:
+    needs:
+      - rust-dependency-audit
+      - build-edge-release-assets
+    runs-on: macos-26
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ needs.build-edge-release-assets.outputs.release_tag }}
+      RELEASE_TITLE: ${{ needs.build-edge-release-assets.outputs.release_title }}
+      RELEASE_METADATA: ${{ needs.build-edge-release-assets.outputs.release_metadata }}
+      EDGE_RELEASE_ARTIFACT: ${{ needs.build-edge-release-assets.outputs.artifact_name }}
+    steps:
+      - name: Download edge release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ env.EDGE_RELEASE_ARTIFACT }}
+
+      - name: Verify edge release assets
+        run: |
+          set -euo pipefail
+
+          for asset in \
+            "$XCFRAMEWORK_ZIP" \
+            "$XCFRAMEWORK_CHECKSUM" \
+            "$ARM64E_MANIFEST" \
+            "$RELEASE_METADATA" \
+            release-notes.md
+          do
+            if [ ! -f "$asset" ]; then
+              echo "::error::Missing edge release asset: $asset"
+              exit 1
+            fi
+          done
+
+          shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
+
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
@@ -309,18 +389,19 @@ jobs:
             ${{ env.ARM64E_MANIFEST }}
             ${{ env.RELEASE_METADATA }}
       - name: Create edge release tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
             echo "::error::Release tag already exists: $RELEASE_TAG"
             exit 1
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$RELEASE_TAG" "$GITHUB_SHA"
-          git push origin "refs/tags/$RELEASE_TAG"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/$RELEASE_TAG" \
+            -f "sha=$GITHUB_SHA"
       - name: Create draft edge prerelease
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -387,8 +468,8 @@ jobs:
             exit 0
           fi
 
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            if ! git push origin ":refs/tags/$RELEASE_TAG"; then
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            if ! gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}"; then
               warn "Failed to delete orphan tag $RELEASE_TAG; manual cleanup may be required."
             fi
             exit 0
