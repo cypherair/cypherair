@@ -7,15 +7,18 @@ final class SigningService {
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let cleartextSigner: any CleartextMessageSigning
 
     init(
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        cleartextSigner: any CleartextMessageSigning
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.cleartextSigner = cleartextSigner
     }
 
     // MARK: - Signing
@@ -28,19 +31,9 @@ final class SigningService {
     ///   - signerFingerprint: Fingerprint of the signing key.
     /// - Returns: The cleartext-signed message data.
     func signCleartext(_ text: String, signerFingerprint: String) async throws -> Data {
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        return try await messageAdapter.signCleartext(
-            text: Data(text.utf8),
-            signerCert: secretKey
+        try await cleartextSigner.signCleartext(
+            Data(text.utf8),
+            signerFingerprint: signerFingerprint
         )
     }
 

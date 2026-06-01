@@ -988,6 +988,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func signCleartext(text: Data, signerCert: Data) throws  -> Data
 
     /**
+     * Create a cleartext signature using a public certificate and an external P-256 signer.
+     */
+    func signCleartextWithExternalP256Signer(text: Data, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider) throws  -> Data
+
+    /**
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
@@ -1583,6 +1588,21 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
             self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
         FfiConverterData.lower(signerCert),$0
+    )
+})
+}
+
+    /**
+     * Create a cleartext signature using a public certificate and an external P-256 signer.
+     */
+open func signCleartextWithExternalP256Signer(text: Data, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(text),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
     )
 })
 }
@@ -5656,6 +5676,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_p256_signer() != 40306) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 18095) {

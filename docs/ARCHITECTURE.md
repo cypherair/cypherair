@@ -86,10 +86,10 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter |
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Separate from the recipient-key/two-phase decrypt flow; password-based decrypt does not use PKESK matching, while optional signing during password-message encryption may trigger Secure Enclave unwrap. |
-| `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows |
+| `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext signing routes through the private-operation router so software custody preserves the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
 | `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation, signing-class operations, and key-agreement operations are independently gated and remain production-unavailable unless an internal hidden/test policy enables a narrow route. |
-| `PrivateKeyOperationRouter` | Internal key-management router foundation for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5A does not connect user workflows to this router. |
+| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects only cleartext message signing to this router; later signing-class and decrypt workflows remain deferred. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -145,9 +145,8 @@ session-key handling, payload decryption, and signature verification. Current ke
 metadata already models algorithm/profile and private-key custody as separate
 app-owned dimensions, with a capability resolver exposing only supported
 combinations.
-Sequoia 2.3's `Signer` and `Decryptor` traits are the likely Rust-side seam for
-this external private-key custody model, but the production API shape remains
-undecided. Current integration planning lives in
+Sequoia 2.3's `Signer` and `Decryptor` traits are the Rust-side seam for this
+external private-key custody model. Current integration planning lives in
 [APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md);
 the completed POC validation track is archived as historical context in
 [APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
@@ -200,6 +199,16 @@ only under hidden/test signing policy after public-certificate binding,
 fingerprint, key-version, role, and public-key checks pass. Secure Enclave
 decrypt/key-agreement remains explicitly not implemented until Phase 6, and
 production policy still blocks Secure Enclave private operations.
+
+Phase 5B wires only cleartext message signing to that router. The Rust/UniFFI
+runtime API accepts public certificate bytes, the expected signing-key
+fingerprint, and an external P-256 signing provider, then selects the matching
+policy-valid signing key and asks Sequoia to emit the cleartext signature. The
+Swift service path keeps software custody behavior unchanged, maps blocked
+routes to sanitized unavailable categories, and uses the loaded Secure Enclave
+signing handle only when the router returns a signer route. It does not wire
+sign-plus-encrypt, password-message signing, detached file signing,
+certification, revocation, expiry/binding refresh, or decrypt.
 
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256

@@ -298,6 +298,22 @@ impl PgpEngine {
         sign::sign_cleartext(&text, &signer_cert)
     }
 
+    /// Create a cleartext signature using a public certificate and an external P-256 signer.
+    pub fn sign_cleartext_with_external_p256_signer(
+        &self,
+        text: Vec<u8>,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        sign::sign_cleartext_with_external_p256_signer(
+            &text,
+            &public_cert,
+            &signing_key_fingerprint,
+            signer,
+        )
+    }
+
     // ── Verification ────────────────────────────────────────────────
 
     /// Verify a cleartext-signed message and preserve per-signature detailed results.

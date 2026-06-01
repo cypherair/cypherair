@@ -263,10 +263,19 @@ final class AppContainer: @unchecked Sendable {
         contactImportAdapter: PGPContactImportAdapter,
         selfTestAdapter: PGPSelfTestOperationAdapter,
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
     ) -> PgpServiceGraph {
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let cleartextSigner = makePrivateKeyCleartextSigningService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
@@ -289,7 +298,8 @@ final class AppContainer: @unchecked Sendable {
             signingService: SigningService(
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
-                contactService: contactService
+                contactService: contactService,
+                cleartextSigner: cleartextSigner
             ),
             certificateSignatureService: CertificateSignatureService(
                 certificateAdapter: certificateAdapter,
@@ -301,6 +311,24 @@ final class AppContainer: @unchecked Sendable {
                 selfTestAdapter: selfTestAdapter,
                 messageAdapter: messageAdapter
             )
+        )
+    }
+
+    private static func makePrivateKeyCleartextSigningService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyCleartextSigningService {
+        PrivateKeyCleartextSigningService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
         )
     }
 
@@ -561,7 +589,9 @@ final class AppContainer: @unchecked Sendable {
             contactImportAdapter: contactImportAdapter,
             selfTestAdapter: selfTestAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
@@ -867,7 +897,11 @@ final class AppContainer: @unchecked Sendable {
             contactImportAdapter: contactImportAdapter,
             selfTestAdapter: selfTestAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore(
+                keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+            ),
+            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,

@@ -131,10 +131,22 @@ final class TutorialSandboxContainer {
             contactService: contactService,
             temporaryArtifactStore: temporaryArtifactStore
         )
+        let cleartextSigner = PrivateKeyCleartextSigningService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: SecureEnclaveCustodyHandleStore(
+                    keyStore: SystemSecureEnclaveCustodyKeyStore()
+                )
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
         self.signingService = SigningService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            cleartextSigner: cleartextSigner
         )
         self.certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,

@@ -287,7 +287,14 @@ Recommended PR grouping:
   mapper, and Security signing-handle lookup by public bindings. Production
   remains unavailable and no workflow service consumes the router yet.
 - PR 5B: Rust/UniFFI external signer runtime API plus cleartext message signing
-  pilot.
+  pilot. **Implemented:** Phase 5B adds a runtime Rust/UniFFI cleartext signing
+  API that accepts a public certificate, expected signing-key fingerprint, and
+  external P-256 signer callback; Swift wires only `SigningService.signCleartext`
+  through the router. Software routes still unwrap and zeroize secret
+  certificates as before, Secure Enclave signer routes use public certificate
+  material plus a loaded signing handle, blocked routes surface sanitized
+  unavailable categories, and production policy still blocks Secure Enclave
+  custody.
 - PR 5C: sign-plus-encrypt text optional signing.
 - PR 5D: password-message optional signing.
 - PR 5E: streaming detached file signing.

@@ -208,6 +208,19 @@ phase. Shared failure mapping must expose only stable categories and must not lo
 or return fingerprints, handle tags, public binding bytes, Keychain locators,
 plaintext, private material, session keys, or temporary capability paths.
 
+**Secure Enclave cleartext signing pilot note:** Phase 5B wires only
+`SigningService.signCleartext` through the router. Software-custody routes still
+unwrap a complete secret certificate only for the existing signing operation and
+zeroize it afterward. Secure Enclave signer routes pass the stored public
+certificate, expected signing-key fingerprint, and loaded signing handle through
+the Rust/UniFFI external P-256 signer API; Rust selects a matching policy-valid
+P-256 signing key and never extracts a secret keypair. Production policy still
+blocks Secure Enclave custody, blocked routes map to sanitized unavailable
+categories, and there is no software fallback for a Secure Enclave signer route.
+Sign-plus-encrypt, password-message signing, detached file signing,
+certification, revocation, expiry/binding refresh, and decrypt remain outside
+this pilot.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

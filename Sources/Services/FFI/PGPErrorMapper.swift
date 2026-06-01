@@ -30,6 +30,29 @@ enum PGPErrorMapper {
         return map(pgpError)
     }
 
+    static func mapExternalP256Signing(_ error: Error) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        }
+        guard let pgpError = error as? PgpError else {
+            return .signingFailed(reason: error.localizedDescription)
+        }
+
+        switch pgpError {
+        case .OperationCancelled:
+            return .operationCancelled
+        case .SigningFailed(let reason):
+            if let category = PGPKeyOperationFailureMapper.externalP256SigningCategory(
+                for: reason
+            ) {
+                return .keyOperationUnavailable(category: category)
+            }
+            return .signingFailed(reason: reason)
+        default:
+            return map(pgpError)
+        }
+    }
+
     static func map(_ pgpError: PgpError) -> CypherAirError {
         switch pgpError {
         case .AeadAuthenticationFailed:
