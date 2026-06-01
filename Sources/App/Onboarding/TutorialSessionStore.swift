@@ -300,8 +300,13 @@ final class TutorialSessionStore {
         )
     }
 
-    func presentImportConfirmation(_ request: ImportConfirmationRequest) {
+    @discardableResult
+    func presentImportConfirmation(_ request: ImportConfirmationRequest) -> Bool {
+        guard navigation.activeModal == nil else {
+            return false
+        }
         navigation.activeModal = .importConfirmation(request)
+        return true
     }
 
     func presentAuthModeConfirmation(_ request: AuthModeChangeConfirmationRequest) {

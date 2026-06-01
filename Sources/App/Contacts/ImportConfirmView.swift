@@ -4,6 +4,7 @@ import SwiftUI
 /// Shows key details and requires explicit confirmation before adding a contact.
 struct ImportConfirmView: View {
     let metadata: PGPKeyMetadata
+    let candidateMatch: ContactCandidateMatch?
     let onImportVerified: () -> Void
     let onImportUnverified: (() -> Void)?
     let onCancel: () -> Void
@@ -14,6 +15,9 @@ struct ImportConfirmView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         summaryCard
+                        if let candidateMatch {
+                            conflictWarningCard(candidateMatch)
+                        }
                         fingerprintCard
                         warningCard
                     }
@@ -129,6 +133,42 @@ struct ImportConfirmView: View {
         }
     }
 
+    private func conflictWarningCard(_ candidateMatch: ContactCandidateMatch) -> some View {
+        confirmationCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    String(localized: "import.conflict.title", defaultValue: "Possible Existing Contact"),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.headline)
+                .foregroundStyle(.orange)
+
+                Text(conflictWarningMessage(for: candidateMatch))
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "import.conflict.existingContact", defaultValue: "Existing contact"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(IdentityDisplayPresentation.displayName(candidateMatch.displayName))
+                        .font(.body)
+                    if let primaryEmail = candidateMatch.primaryEmail {
+                        Text(primaryEmail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text(String(localized: "import.conflict.mergeHint", defaultValue: "If this is a legitimate key replacement, import it only after checking the new fingerprint, then merge the contacts from Contact Detail."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var warningCard: some View {
         confirmationCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -185,6 +225,17 @@ struct ImportConfirmView: View {
         (metadata.hasEncryptionSubkey && !metadata.isRevoked && !metadata.isExpired)
             ? String(localized: "common.yes", defaultValue: "Yes")
             : String(localized: "common.no", defaultValue: "No")
+    }
+
+    private func conflictWarningMessage(for candidateMatch: ContactCandidateMatch) -> String {
+        switch candidateMatch.strength {
+        case .strong:
+            String(localized: "import.conflict.strong", defaultValue: "This key matches an existing contact email but has a different fingerprint. It may be a real key replacement, or it may be an impersonation attempt.")
+        case .weak:
+            String(localized: "import.conflict.weak", defaultValue: "This key matches an existing User ID but has a different fingerprint. It may be a real key replacement, or it may be an impersonation attempt.")
+        case .ambiguousStrong:
+            String(localized: "import.conflict.ambiguousStrong", defaultValue: "This key matches multiple existing contacts but has a different fingerprint. Confirm the owner carefully before adding it.")
+        }
     }
 
     @ViewBuilder

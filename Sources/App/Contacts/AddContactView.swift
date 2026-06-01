@@ -14,7 +14,7 @@ struct AddContactView: View {
         var prefilledArmoredText: String?
         var verificationPolicy: VerificationPolicy = .allowUnverified
         var onImported: (@MainActor (ContactIdentitySummary) -> Void)?
-        var onImportConfirmationRequested: (@MainActor (ImportConfirmationRequest) -> Void)?
+        var onImportConfirmationRequested: (@MainActor (ImportConfirmationRequest) -> Bool)?
 
         static let `default` = Configuration()
     }
@@ -298,9 +298,9 @@ private struct AddContactScreenHostView: View {
         AddContactScreenHostActions(
             presentImportConfirmation: { request in
                 if let onImportConfirmationRequested = configuration.onImportConfirmationRequested {
-                    onImportConfirmationRequested(request)
+                    return onImportConfirmationRequested(request)
                 } else {
-                    activeImportConfirmationCoordinator.present(request)
+                    return activeImportConfirmationCoordinator.present(request)
                 }
             },
             dismissPresentedImportConfirmation: {

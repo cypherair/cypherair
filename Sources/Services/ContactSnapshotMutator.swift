@@ -124,6 +124,19 @@ struct ContactSnapshotMutator {
         )
     }
 
+    func importCandidateMatch(
+        publicKeyData: Data,
+        in snapshot: ContactsDomainSnapshot
+    ) throws -> ContactCandidateMatch? {
+        let validation = try contactImportAdapter.validateImportablePublicCertificate(publicKeyData)
+        guard !snapshot.keyRecords.contains(where: {
+            $0.fingerprint == validation.metadata.fingerprint
+        }) else {
+            return nil
+        }
+        return importMatcher.candidateMatch(for: validation, in: snapshot)
+    }
+
     func setVerificationState(
         _ verificationState: ContactVerificationState,
         for fingerprint: String,

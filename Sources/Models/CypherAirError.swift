@@ -42,6 +42,8 @@ enum CypherAirError: Error {
     case duplicateKey
     case keyTooLargeForQr
     case contactsUnavailable(ContactsAvailability)
+    case contactImportConfirmationStale
+    case contactImportConfirmationAlreadyPending
 
     /// Wrap any already-normalized app error into CypherAirError.
     /// - If it's already a CypherAirError, return as-is.

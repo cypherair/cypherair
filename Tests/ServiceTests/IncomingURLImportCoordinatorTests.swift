@@ -54,6 +54,7 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
         coordinator.handleIncomingURL(url, isTutorialPresentationActive: false)
 
         let request = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
+        XCTAssertNil(request.candidateMatch)
         request.onImportVerified()
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
@@ -82,12 +83,101 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
 
         coordinator.handleIncomingURL(url, isTutorialPresentationActive: false)
         let request = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
+        let candidate = try XCTUnwrap(request.candidateMatch)
+        XCTAssertEqual(candidate.strength, .strong)
         request.onImportVerified()
 
         XCTAssertNil(coordinator.importConfirmationCoordinator.request)
         XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 2)
         XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
         XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
+    }
+
+    @MainActor
+    func test_handleIncomingURL_whileConfirmationPendingKeepsCurrentRequestAndReportsError() throws {
+        let coordinator = makeCoordinator()
+        let firstKey = try stack.engine.generateKey(
+            name: "First Pending",
+            email: "first-pending@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let secondKey = try stack.engine.generateKey(
+            name: "Second Pending",
+            email: "second-pending@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        coordinator.handleIncomingURL(
+            try makeImportURL(publicKeyData: firstKey.publicKeyData),
+            isTutorialPresentationActive: false
+        )
+        let firstRequest = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
+
+        coordinator.handleIncomingURL(
+            try makeImportURL(publicKeyData: secondKey.publicKeyData),
+            isTutorialPresentationActive: false
+        )
+
+        XCTAssertEqual(coordinator.importConfirmationCoordinator.request?.id, firstRequest.id)
+        if case .contactImportConfirmationAlreadyPending? = coordinator.importError {
+            // Expected.
+        } else {
+            XCTFail("Expected already-pending import confirmation error, got \(String(describing: coordinator.importError))")
+        }
+
+        firstRequest.onImportVerified()
+
+        XCTAssertNotNil(stack.contactService.availableContactKeyRecord(fingerprint: firstKey.fingerprint))
+        XCTAssertNil(stack.contactService.availableContactKeyRecord(fingerprint: secondKey.fingerprint))
+        XCTAssertEqual(stack.contactService.testContactKeyRecords.count, 1)
+    }
+
+    @MainActor
+    func test_handleIncomingURL_whileConfirmationPendingRejectsBeforeParsingLaterURL() throws {
+        let coordinator = makeCoordinator()
+        let firstKey = try stack.engine.generateKey(
+            name: "First Pending",
+            email: "first-pending@example.com",
+            expirySeconds: nil,
+            profile: .universal
+        )
+
+        coordinator.handleIncomingURL(
+            try makeImportURL(publicKeyData: firstKey.publicKeyData),
+            isTutorialPresentationActive: false
+        )
+        let firstRequest = try XCTUnwrap(coordinator.importConfirmationCoordinator.request)
+
+        coordinator.handleIncomingURL(
+            URL(string: "cypherair://import/v1/not-a-valid-key")!,
+            isTutorialPresentationActive: false
+        )
+
+        XCTAssertEqual(coordinator.importConfirmationCoordinator.request?.id, firstRequest.id)
+        if case .contactImportConfirmationAlreadyPending? = coordinator.importError {
+            // Expected.
+        } else {
+            XCTFail("Expected already-pending import confirmation error, got \(String(describing: coordinator.importError))")
+        }
+    }
+
+    @MainActor
+    func test_importConfirmationCoordinatorRefusesReplacementWhileRequestIsPending() throws {
+        let coordinator = ImportConfirmationCoordinator()
+        let first = makeRequest(fingerprintSeed: "a")
+        let second = makeRequest(fingerprintSeed: "b")
+
+        XCTAssertTrue(coordinator.present(first))
+        XCTAssertFalse(coordinator.present(second))
+        XCTAssertEqual(coordinator.request?.id, first.id)
+
+        coordinator.dismiss(first)
+
+        XCTAssertNil(coordinator.request)
+        XCTAssertTrue(coordinator.present(second))
+        XCTAssertEqual(coordinator.request?.id, second.id)
     }
 
     @MainActor
@@ -179,6 +269,29 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
     private func makeImportURL(publicKeyData: Data) throws -> URL {
         let urlString = try stack.engine.encodeQrUrl(publicKeyData: publicKeyData)
         return try XCTUnwrap(URL(string: urlString))
+    }
+
+    @MainActor
+    private func makeRequest(fingerprintSeed: Character) -> ImportConfirmationRequest {
+        ImportConfirmationRequest(
+            keyData: Data(),
+            metadata: PGPKeyMetadata(
+                fingerprint: String(repeating: String(fingerprintSeed), count: 40),
+                keyVersion: 4,
+                userId: "Pending <pending@example.invalid>",
+                hasEncryptionSubkey: true,
+                isRevoked: false,
+                isExpired: false,
+                profile: .universal,
+                primaryAlgo: "Ed25519",
+                subkeyAlgo: "X25519",
+                expiryTimestamp: nil
+            ),
+            allowsUnverifiedImport: true,
+            onImportVerified: {},
+            onImportUnverified: {},
+            onCancel: {}
+        )
     }
 
     private func isInvalidQRCode(_ error: CypherAirError?) -> Bool {
