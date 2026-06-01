@@ -4,8 +4,8 @@
 > Purpose: Document the current release flows for CypherAir app builds and the stable build contract that backs formal App Store candidate archives.
 > Audience: Human developers, release owners, and AI coding tools.
 > Source of truth: `CypherAir` and `CypherAir AppStore Candidate` scheme behavior, `SourceComplianceInfo.json` build integration, and `.github/workflows/stable-build-release.yml`.
-> Last reviewed: 2026-05-10.
-> Update triggers: stable tag rules, stable asset names, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
+> Last reviewed: 2026-06-01.
+> Update triggers: stable tag rules, stable asset names, arm64e stage1 pin changes, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 
 ## 1. Release Modes
@@ -41,6 +41,10 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   SSH-signed annotated tag for the artifact commit immediately before
   provenance attestation and immutable GitHub Release creation.
 - The stable workflow includes an independent `rust-dependency-audit` job that selects the official stable Rust toolchain and runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal tag-push-only `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
+- The stable workflow uses the pinned arm64e Rust stage1 prerelease recorded in
+  `docs/ARM64E_STATUS.md`. If the intended release requires a newer Rust fork
+  stage1, update the workflow env, script default, status docs, and workflow
+  hardening tests in a normal PR before creating the stable tag.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.
@@ -167,16 +171,18 @@ This order is mandatory for App Store candidates:
    candidates, confirm `CURRENT_PROJECT_VERSION` is higher than the highest
    macOS build previously uploaded for the app.
 3. Commit and push the candidate commit to `main`.
-4. Create the SSH-signed stable tag:
+4. Confirm the pinned arm64e stage1 tag in `docs/ARM64E_STATUS.md` matches the
+   workflow env and is the intended stage1 input for this release.
+5. Create the SSH-signed stable tag:
    - `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`
    - annotated and SSH-signed; lightweight and unsigned tags are not allowed
    - push the tag to `origin`; that tag push triggers the formal stable release
      workflow
-5. Wait for the GitHub stable release workflow to complete successfully, including the `rust-dependency-audit` and `publish-stable-release` jobs.
-6. Confirm the stable release page and required assets exist.
-7. Return to a clean `main` checkout whose `HEAD` exactly matches the stable tag commit.
-8. Open Xcode and archive using `CypherAir AppStore Candidate`.
-9. Upload that archive to TestFlight as the App Store candidate validation build.
+6. Wait for the GitHub stable release workflow to complete successfully, including the `rust-dependency-audit` and `publish-stable-release` jobs.
+7. Confirm the stable release page and required assets exist.
+8. Return to a clean `main` checkout whose `HEAD` exactly matches the stable tag commit.
+9. Open Xcode and archive using `CypherAir AppStore Candidate`.
+10. Upload that archive to TestFlight as the App Store candidate validation build.
 
 Do **not** archive the App Store candidate before the GitHub stable release exists, or from a checkout whose tracked state or `HEAD` differs from the published stable tag commit.
 
@@ -190,6 +196,8 @@ Before uploading the App Store candidate to TestFlight, confirm:
 - the macOS App Store build number is higher than any previously uploaded
   macOS build for the app
 - the stable tag matches the app version/build
+- the pinned arm64e stage1 tag in `docs/ARM64E_STATUS.md` matches the workflow
+  env and is the intended stage1 input for this release
 - the GitHub stable release completed successfully
 - the stable workflow's Rust dependency audit passed without warnings
 - the release notes identify the same workflow run whose `rust-dependency-audit`

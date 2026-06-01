@@ -198,14 +198,29 @@ These jobs must pass on pull requests and nightly validation:
 The repository also publishes unique edge XCFramework prereleases:
 
 - `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework in a read-scoped build job, conditionally runs hosted Apple platform probes when Xcode 26.5 is healthy, then publishes a unique `pgpmobile-edge-` prerelease only after the audit passes; non-main manual runs must use `pgpmobile-drill-*` prefixes, and drill verification commands quote the exact source ref for safe shell copy/paste
-- The arm64e XCFramework path consumes the latest `cypherair/rust` `rust-arm64e-stage1-stable196-*` prerelease on GitHub Actions. CI downloads that public toolchain before invoking the build script, then passes `ARM64E_STAGE1_DIR` and `ARM64E_RUST_STAGE1_MANIFEST` to the build with token variables scrubbed. Stage1 downloads use the public GitHub releases API without `GH_TOKEN` or `GITHUB_TOKEN`, including PR validation, manual dry-runs, edge/drill builds, nightly builds, and stable asset generation. Stable `arm64` slices are still built with official stable Rust, while `arm64e` slices use stable Cargo with `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
+- The arm64e XCFramework path consumes the pinned `cypherair/rust`
+  `rust-arm64e-stage1-stable196-*` prerelease recorded in
+  `docs/ARM64E_STATUS.md` and the GitHub Actions workflow env. CI downloads
+  that public toolchain before invoking the build script, then passes
+  `ARM64E_STAGE1_DIR` and `ARM64E_RUST_STAGE1_MANIFEST` to the build with token
+  variables scrubbed. Stage1 downloads use direct GitHub release asset URLs for
+  the pinned tag without `GH_TOKEN`, `GITHUB_TOKEN`, or anonymous releases API
+  discovery, including PR validation, manual dry-runs, edge/drill builds,
+  nightly builds, and stable asset generation. Stable `arm64` slices are still
+  built with official stable Rust, while `arm64e` slices use stable Cargo with
+  `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt
+  std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
 - `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` uses the same hosted Xcode 26.5 platform preflight as edge, runs app-side iOS/visionOS probes only when the runner is platform-ready, records skipped probes in release notes when the hosted image lags, fails before packaging on project or scheme destination regressions, and can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails. `workflow_dispatch` is dry-run only; `publish-stable-release` runs only for stable tag pushes, depends on both jobs, verifies checked-out `HEAD` against the peeled stable tag commit, revalidates that the current remote tag is an SSH-signed annotated tag for the artifact commit before attestation, and creates the immutable GitHub Release only after the audit passes.
 
 Toolchain contract:
 
 - `stable` means the official Rust stable channel, not a CypherAir release channel or Rust fork branch.
 - The repository root intentionally has no custom `rust-toolchain.toml` override. Use explicit `cargo +stable` / `rustc +stable` for ordinary Rust validation and metadata.
-- App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust stage1 prerelease beyond the currently published one. Local full packaging should force-download the latest attested Rust fork stage1 prerelease to match GitHub-hosted release jobs; use a linked `stage1-arm64e-patch` only when deliberately testing a local compiler build.
+- App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust
+  stage1 prerelease beyond the currently pinned one. Local full packaging should
+  force-download the pinned attested Rust fork stage1 prerelease to match
+  GitHub-hosted release jobs; use a linked `stage1-arm64e-patch` only when
+  deliberately testing a local compiler build.
 - Only changes to the Rust compiler fork itself require rebuilding the local stage1 or publishing a new Rust fork stage1 prerelease before app-side arm64e packaging can consume the new compiler.
 - GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
   cache actions. The arm64e path can consume a newer Rust fork stage1 while
@@ -316,7 +331,8 @@ Use this when Rust implementation, the UniFFI surface, generated bindings, heade
 Recommended path:
 
 ```bash
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
 ```
 
@@ -324,7 +340,18 @@ Prefer this path after Rust or UniFFI changes because it refreshes the stable `a
 
 The sync script normalizes generated Swift bindings, C headers, and modulemaps by stripping trailing whitespace before copying them into `bindings/` and `Sources/PgpMobile/`. Do not hand-edit generated binding whitespace; rerun the sync path instead.
 
-For local packaging, prefer the same force-download mode used by GitHub Actions. It downloads the latest `cypherair/rust` `rust-arm64e-stage1-stable196-*` prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged checksum, validates the stable196 prebuilt-std manifest, and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup state. `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked `stage1-arm64e-patch` toolchain remain supported for Rust-fork development and diagnostics, but release-candidate app artifact refreshes should use the force-download path unless you are deliberately testing a local compiler build.
+For local packaging, prefer the same force-download mode used by GitHub Actions.
+It downloads the pinned `cypherair/rust` `rust-arm64e-stage1-stable196-*`
+prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged
+checksum, validates the stable196 prebuilt-std manifest, and avoids depending on
+stale or incomplete local `stage1-arm64e-patch` rustup state. The downloader
+rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; when a new Rust fork stage1
+prerelease becomes the official input, update the workflow env, script default,
+`docs/ARM64E_STATUS.md`, and the workflow hardening tests in the same PR.
+`ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked
+`stage1-arm64e-patch` toolchain remain supported for Rust-fork development and
+diagnostics, but release-candidate app artifact refreshes should use the
+force-download path unless you are deliberately testing a local compiler build.
 
 If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
 
@@ -364,14 +391,16 @@ Recommended flows:
 # Cargo.lock dependency update
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
 
 # Rust-backed behavior change
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'
@@ -381,7 +410,8 @@ xcodebuild build -scheme CypherAir \
 
 # UniFFI surface / bindings / packaged artifact change
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS'

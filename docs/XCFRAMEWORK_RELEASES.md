@@ -82,15 +82,17 @@ CypherAir publishes stable XCFramework assets through the same unified stable Gi
 ### CI Cache Policy
 
 CypherAir release and validation workflows intentionally avoid Cargo cache
-actions. GitHub Actions downloads the selected Rust fork stage1 prerelease in a
-dedicated pre-build step, then invokes `./build-xcframework.sh --release` with
-the local `ARM64E_STAGE1_DIR` and manifest path while GitHub token variables are
-absent from Cargo/build subprocesses. Stage1 downloads use the public
-`cypherair/rust` GitHub release API without `GH_TOKEN` or `GITHUB_TOKEN`, so
-checked-out workflow scripts never receive a token for this download. Caching
-Cargo `target/` artifacts before that resolution can reuse objects built by an
-older stage1 compiler. Clean Rust builds are slower, but they keep edge, drill,
-PR, nightly, and stable release artifacts deterministic across stage1 updates.
+actions. GitHub Actions downloads the pinned Rust fork stage1 prerelease recorded
+in `docs/ARM64E_STATUS.md` in a dedicated pre-build step, then invokes
+`./build-xcframework.sh --release` with the local `ARM64E_STAGE1_DIR` and
+manifest path while GitHub token variables are absent from Cargo/build
+subprocesses. Stage1 downloads use direct public `cypherair/rust` GitHub release
+asset URLs for the pinned tag without `GH_TOKEN`, `GITHUB_TOKEN`, or anonymous
+release API discovery, so checked-out workflow scripts never receive a token for
+this download and do not depend on shared runner API quota. Caching Cargo
+`target/` artifacts before that resolution can reuse objects built by an older
+stage1 compiler. Clean Rust builds are slower, but they keep edge, drill, PR,
+nightly, and stable release artifacts deterministic across stage1 updates.
 
 ## 2. Edge Discovery And Downloading
 

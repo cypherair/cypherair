@@ -7,8 +7,14 @@ unset GH_TOKEN GITHUB_TOKEN
 
 OUTPUT_ROOT="${1:?usage: download_arm64e_stage1_toolchain.sh <output-root>}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-latest}"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
+ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
 ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
+EXPECTED_STAGE1_ASSETS=(
+    "rust-stage1-arm64e-apple-darwin.tar.zst"
+    "rust-stage1-arm64e-apple-darwin.sha256"
+    "rust-stage1-arm64e-apple-darwin.json"
+)
 
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -17,87 +23,25 @@ require_command() {
     fi
 }
 
-github_api_url() {
-    printf 'https://api.github.com/repos/%s/%s' "$ARM64E_RUST_REPOSITORY" "$1"
-}
-
-curl_github_api() {
-    curl --fail --silent --show-error --location \
-        -H 'Accept: application/vnd.github+json' \
-        -H 'X-GitHub-Api-Version: 2022-11-28' \
-        "$1"
-}
-
-latest_stage1_release_tag() {
-    local prefix="$ARM64E_STAGE1_RELEASE_PREFIX"
-    local releases_json
-    releases_json="$(mktemp)"
-    curl_github_api "$(github_api_url 'releases?per_page=100')" > "$releases_json"
-    python3 - "$releases_json" "$prefix" <<'PY'
-import json
-import sys
-
-path, prefix = sys.argv[1], sys.argv[2]
-with open(path, encoding="utf-8") as handle:
-    releases = json.load(handle)
-matches = [
-    release
-    for release in releases
-    if release.get("prerelease") and release.get("tag_name", "").startswith(prefix)
-]
-matches.sort(key=lambda release: release.get("published_at") or "")
-print(matches[-1]["tag_name"] if matches else "")
-PY
-    rm -f "$releases_json"
-}
-
 download_stage1_release() {
-    local release_json assets_tsv
-    release_json="$(mktemp)"
-    assets_tsv="$(mktemp)"
-    curl_github_api "$(github_api_url "releases/tags/${tag}")" > "$release_json"
-    python3 - "$release_json" <<'PY' > "$assets_tsv"
-import json
-import sys
-
-expected = [
-    "rust-stage1-arm64e-apple-darwin.tar.zst",
-    "rust-stage1-arm64e-apple-darwin.sha256",
-    "rust-stage1-arm64e-apple-darwin.json",
-]
-with open(sys.argv[1], encoding="utf-8") as handle:
-    release = json.load(handle)
-assets = {
-    asset.get("name"): asset.get("browser_download_url")
-    for asset in release.get("assets", [])
-}
-missing = [name for name in expected if not assets.get(name)]
-if missing:
-    print(f"missing release assets: {', '.join(missing)}", file=sys.stderr)
-    sys.exit(1)
-for name in expected:
-    print(f"{name}\t{assets[name]}")
-PY
-    while IFS=$'\t' read -r asset_name asset_url; do
+    local release_base_url asset_name
+    release_base_url="https://github.com/${ARM64E_RUST_REPOSITORY}/releases/download/${tag}"
+    for asset_name in "${EXPECTED_STAGE1_ASSETS[@]}"; do
         curl --fail --silent --show-error --location \
             --output "$download_dir/$asset_name" \
-            "$asset_url"
-    done < "$assets_tsv"
-    rm -f "$release_json" "$assets_tsv"
+            "$release_base_url/$asset_name"
+    done
 }
 
 require_command curl
-require_command python3
 require_command shasum
 require_command zstd
 require_command bsdtar
 
 tag="$ARM64E_STAGE1_RELEASE_TAG"
-if [ "$tag" = "latest" ] || [ -z "$tag" ]; then
-    tag="$(latest_stage1_release_tag)"
-fi
-if [ -z "$tag" ] || [ "$tag" = "null" ]; then
-    echo "error: unable to discover a ${ARM64E_STAGE1_RELEASE_PREFIX} prerelease in $ARM64E_RUST_REPOSITORY" >&2
+if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
+    echo "error: ARM64E_STAGE1_RELEASE_TAG must be an explicit ${ARM64E_STAGE1_RELEASE_PREFIX}-* tag; 'latest' is not allowed" >&2
+    echo "       current default: $DEFAULT_ARM64E_STAGE1_RELEASE_TAG" >&2
     exit 1
 fi
 

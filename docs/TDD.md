@@ -246,7 +246,7 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 ### 2.5 Build Pipeline
 
 1. `cargo +stable build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim` refreshes ordinary stable `arm64` archives when you only need target-specific Rust outputs
-2. `./build-xcframework.sh --release` is the packaging entrypoint; for local app-side validation, run it as `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` so it refreshes stable `arm64` and patched `arm64e` release archives from the latest attested stage1, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
+2. `./build-xcframework.sh --release` is the packaging entrypoint; for local app-side validation, run it as `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` so it refreshes stable `arm64` and patched `arm64e` release archives from the pinned attested stage1, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
 4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
 

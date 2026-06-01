@@ -10,7 +10,7 @@
 > [SECURITY](SECURITY.md), [TESTING](TESTING.md),
 > [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md),
 > [CONVENTIONS](CONVENTIONS.md), and [CODE_REVIEW](CODE_REVIEW.md).
-> Last reviewed: 2026-05-13.
+> Last reviewed: 2026-06-01.
 > Update triggers: Any completed cleanup wave, changed old-install support
 > policy, removed public Swift or UniFFI compatibility surface, ProtectedData
 > migration boundary change, validation workflow change, or audit replacement.
@@ -371,8 +371,8 @@ Validation:
 - Phase 4A-D test/docs-only cleanup does not require XCFramework regeneration
   because Rust exports and generated bindings are unchanged.
 - PR 4E changes the Swift-visible FFI surface: refresh the XCFramework and
-  generated bindings with `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release`, then run macOS
-  Swift unit tests.
+  generated bindings with `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`,
+  then run macOS Swift unit tests.
 
 ### Phase 5: Migration Boundary Isolation Only
 
@@ -556,7 +556,7 @@ Known surfaces that require this gate:
 | Contacts helpers and recipient cleanup | Focused Swift unit tests for Contacts and affected encryption/decryption service tests. Add macOS UI smoke tests if route or tutorial behavior changes. |
 | Swift service API cleanup | Service tests for the touched area, plus screen-model tests when UI-facing model behavior changes. |
 | Detailed verification cutover and legacy surface deletion | Signing, verify, decryption, streaming, password-message, self-test, GnuPG interop, and Device MIE tests as applicable; PR 3C also requires Rust tests, regenerated UniFFI/XCFramework artifacts, and macOS unit tests because generated bindings change. |
-| Rust and UniFFI API cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`; run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest ./build-xcframework.sh --release` to refresh XCFramework/generated bindings and run macOS unit tests when Swift-visible behavior changes. |
+| Rust and UniFFI API cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`; run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` to refresh XCFramework/generated bindings and run macOS unit tests when Swift-visible behavior changes. |
 | ProtectedData, Keychain, authentication, and root-secret migration | `ProtectedDataFrameworkTests` plus affected settings, private-key control, key metadata, authentication, local reset, and device-binding tests. |
 | Temporary, tutorial, self-test, and reset cleanup | Startup cleanup, owner cleanup, reset cleanup, file-protection, and local data reset tests. |
 | Script or docs-only cleanup | Documentation link checks where relevant and `git diff --check`. |
