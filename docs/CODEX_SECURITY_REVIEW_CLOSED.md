@@ -389,7 +389,7 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Severity: `medium`
 - Area: `privacy-lifecycle`
 - Disposition: `closed-fixed`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/e2433b9357a48191b7ea3c939cad1a4d)
 - Decision: Fixed. Resume completion now checks whether its captured lifecycle generation is still current before it can clear the privacy blur.
 - Resolution: Real resign-active and background transitions invalidate in-flight resume completions and keep the hard blur. A stale post-auth completion no longer arms the transient authentication settle path; when the app has already returned active, the UI schedules a fresh resume/grace check instead of accepting the stale completion directly.
 - Relevant paths: `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Tests/ServiceTests/ProtectedDataFrameworkTests.swift`
