@@ -28,18 +28,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: Before deleting a supposedly orphaned root secret, reload current registry state under the registry mutation gate or equivalent serialization. Abort cleanup if any current membership, pending mutation, or ready shared resource exists.
 - Validation: Add concurrency/unit coverage around first-domain creation and orphan cleanup with stale snapshots; assert cleanup aborts under current registry membership or mutation.
 
-### SR-FIX-07: Local reset fails open when authentication is unavailable
-
-- Legacy ID: `CA-11`
-- Severity: `medium`
-- Area: `local-reset-auth`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/be6dc440a494819194638fde5dcd7663)
-- Decision: Confirmed low-impact destructive-action risk. Local data reset should fail closed when app-session authentication cannot be evaluated.
-- Impact: Failure mode is local destructive reset under narrow auth-unavailable conditions. It does not disclose data or bypass Secure Enclave private-key operations.
-- Relevant paths: `Sources/App/Settings/SettingsScreenModel.swift`, `Sources/App/Settings/LocalDataResetService.swift`
-- Fix plan: If app-session authentication cannot be evaluated, block local reset and surface an auth-unavailable error instead of treating the prompt as optional.
-- Validation: Add settings/reset tests for auth unavailable, auth failure, and auth success; only success should proceed to destructive reset.
-
 ### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
 
 - Legacy ID: `CA-29`
