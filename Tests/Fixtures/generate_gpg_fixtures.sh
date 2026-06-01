@@ -190,6 +190,8 @@ if [ -f "$SCRIPT_DIR/profile_b_v6_pubkey.gpg" ]; then
         echo "gpg_import_exit_code=$?" >> "$SCRIPT_DIR/gpg_v6_import_rejection.txt"
         echo "GnuPG correctly rejected v6 key import (expected behavior)"
     fi
+    # Normalize local paths captured in GnuPG diagnostics before committing fixtures.
+    perl -0pi -e "s|\\Q$SCRIPT_DIR/\\E|<fixture-dir>/|g" "$SCRIPT_DIR/gpg_v6_import_rejection.txt"
     echo "Exported: gpg_v6_import_rejection.txt"
 else
     echo "--- Skipping v6 rejection test (profile_b_v6_pubkey.gpg not found) ---"
