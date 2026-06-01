@@ -429,3 +429,15 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Reset All Local Data now requires a successful app-session authentication result before destructive cleanup begins.
 - Resolution: `SettingsScreenModel` routes reset confirmation through an injectable app-session authentication action and treats unavailable authentication, failed authentication, cancellation, and non-authenticated results as reset-blocking errors. `LocalDataResetService` remains the internal cleanup primitive and is called only after the Settings flow receives the authenticated result.
 - Relevant paths: `Sources/App/Settings/SettingsScreenModel.swift`, `Sources/App/Settings/LocalDataResetService.swift`, `Tests/ServiceTests/SettingsScreenModelTests.swift`
+
+### SR-CLOSED-41: Concurrent tutorial contacts open can fail sandbox setup
+
+- Former Review ID: `SR-FIX-19`
+- Legacy ID: `CA-41`
+- Severity: `informational`
+- Area: `tutorial-contacts`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/703d8b5d0ad48191abf6a936394d174e)
+- Decision: Fixed. Tutorial module opens are now serialized by `TutorialSessionStore`, so repeated module launches cannot start concurrent contacts-domain opens against the same disposable tutorial sandbox.
+- Resolution: Module open state uses a token-guarded in-flight marker, reset and finish cleanup clear that state, and tutorial launch controls are disabled while an open is running. Production Contacts and ProtectedData open paths are unchanged.
+- Relevant paths: `Sources/App/Onboarding/TutorialSessionStore.swift`, `Sources/App/Onboarding/TutorialView.swift`, `Sources/App/Onboarding/Tutorial/TutorialShellTabsView.swift`, `Tests/ServiceTests/TutorialSessionStoreTests.swift`

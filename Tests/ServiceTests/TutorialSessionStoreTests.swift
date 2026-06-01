@@ -4,33 +4,42 @@ import XCTest
 
 @MainActor
 private final class TutorialContactsOpenGate {
-    private var didStart = false
+    private(set) var openCallCount = 0
     private var isReleased = false
-    private var startContinuations: [CheckedContinuation<Void, Never>] = []
-    private var releaseContinuation: CheckedContinuation<Void, Never>?
+    private var startContinuations: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var releaseContinuations: [CheckedContinuation<Void, Never>] = []
 
     func open(_ container: TutorialSandboxContainer) async throws {
-        didStart = true
-        startContinuations.forEach { $0.resume() }
-        startContinuations.removeAll()
+        openCallCount += 1
+        resumeSatisfiedStartContinuations()
 
         guard !isReleased else { return }
         await withCheckedContinuation { continuation in
-            releaseContinuation = continuation
+            releaseContinuations.append(continuation)
         }
     }
 
     func waitUntilStarted() async {
-        guard !didStart else { return }
+        await waitUntilOpenCallCount(1)
+    }
+
+    func waitUntilOpenCallCount(_ count: Int) async {
+        guard openCallCount < count else { return }
         await withCheckedContinuation { continuation in
-            startContinuations.append(continuation)
+            startContinuations.append((count, continuation))
         }
     }
 
     func release() {
         isReleased = true
-        releaseContinuation?.resume()
-        releaseContinuation = nil
+        releaseContinuations.forEach { $0.resume() }
+        releaseContinuations.removeAll()
+    }
+
+    private func resumeSatisfiedStartContinuations() {
+        let continuationsToResume = startContinuations.filter { $0.count <= openCallCount }
+        startContinuations.removeAll { $0.count <= openCallCount }
+        continuationsToResume.forEach { $0.continuation.resume() }
     }
 }
 
@@ -89,6 +98,41 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertFalse(store.isCompleted(.sandbox))
     }
 
+    func test_openModule_sandboxSerializesConcurrentContactsOpen() async {
+        let gate = TutorialContactsOpenGate()
+        let store = TutorialSessionStore(openTutorialContacts: { container in
+            try await gate.open(container)
+        })
+        let firstTask = Task { @MainActor in
+            await store.openModule(.sandbox)
+        }
+
+        await gate.waitUntilStarted()
+        XCTAssertEqual(gate.openCallCount, 1)
+        XCTAssertEqual(store.openingModule, .sandbox)
+        XCTAssertTrue(store.isOpeningModule)
+
+        let secondOpenAttempted = expectation(description: "second module open attempted")
+        let secondTask = Task { @MainActor in
+            secondOpenAttempted.fulfill()
+            await store.openModule(.sandbox)
+        }
+        await fulfillment(of: [secondOpenAttempted], timeout: 1)
+        await Task.yield()
+
+        XCTAssertEqual(gate.openCallCount, 1)
+        XCTAssertTrue(store.isOpeningModule)
+
+        gate.release()
+        await firstTask.value
+        await secondTask.value
+
+        XCTAssertEqual(gate.openCallCount, 1)
+        XCTAssertNil(store.openingModule)
+        XCTAssertFalse(store.isOpeningModule)
+        XCTAssertEqual(store.hostSurface, .sandboxAcknowledgement)
+    }
+
     func test_openModule_sandboxIgnoresContactsOpenAfterReset() async {
         let gate = TutorialContactsOpenGate()
         let store = TutorialSessionStore(openTutorialContacts: { container in
@@ -102,12 +146,14 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(store.container)
 
         store.resetTutorial()
+        XCTAssertFalse(store.isOpeningModule)
         gate.release()
         await task.value
 
         XCTAssertNil(store.container)
         XCTAssertEqual(store.lifecycleState, .notStarted)
         XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertFalse(store.isOpeningModule)
     }
 
     func test_openModule_sandboxIgnoresContactsOpenAfterFinishAndCleanup() async {
@@ -123,12 +169,14 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(store.container)
 
         store.finishAndCleanupTutorial()
+        XCTAssertFalse(store.isOpeningModule)
         gate.release()
         await task.value
 
         XCTAssertNil(store.container)
         XCTAssertEqual(store.lifecycleState, .notStarted)
         XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertFalse(store.isOpeningModule)
     }
 
     func test_openModule_sandboxIgnoresContactsOpenAfterTaskCancellation() async {
@@ -148,6 +196,7 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertNotNil(store.container)
         XCTAssertEqual(store.lifecycleState, .inProgress)
         XCTAssertEqual(store.hostSurface, .hub)
+        XCTAssertFalse(store.isOpeningModule)
     }
 
     func test_confirmSandboxAcknowledgement_completesSandboxAndAdvancesToIdentityModule() async {
