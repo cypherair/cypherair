@@ -16,30 +16,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: Separate cryptographic certification validity from trusted certification semantics. Use neutral UI for valid but untrusted certifications; reserve trusted labels for artifacts accepted under an explicit signer trust policy.
 - Validation: Add service/UI tests for valid-untrusted certifications, trusted certifications, and self-certification-like artifacts so labels cannot overstate trust.
 
-### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
-
-- Legacy ID: `CA-29`
-- Severity: `medium`
-- Area: `decrypt-file-output`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6)
-- Decision: Confirmed low-impact temporary-output issue. Route abandonment can allow a late successful decrypt to adopt app-sandbox plaintext output.
-- Impact: Temporary plaintext can remain in the app sandbox until normal startup/reset cleanup. Rust streaming cancellation still deletes partial output on cancellation or failure.
-- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/Services/DecryptionService.swift`
-- Fix plan: Cancel and invalidate any in-flight file decrypt when the Decrypt route disappears, and prevent late adoption of outputs whose operation generation is no longer current.
-- Validation: Add Decrypt route disappearance tests showing in-flight operations cancel/invalidate and cannot adopt outputs after disappearance.
-
-### SR-FIX-16: Decrypt view can show stale signature for wrong content
-
-- Legacy ID: `CA-33`
-- Severity: `medium`
-- Area: `decrypt-verify-ui`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab)
-- Decision: Confirmed trust UI correctness issue. Decrypt text and file modes share one signature verification state that can mismatch the visible output.
-- Impact: The visible signature section can appear to apply to output from another mode. This is a trust UI correctness problem, not a verification bypass.
-- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`
-- Fix plan: Represent text and file decrypt results as separate atomic `output + DetailedSignatureVerification` values, and render only the verification owned by the currently visible result.
-- Validation: Add text/file mode switching tests showing each visible output renders only its own signature verification state.
-
 ### SR-FIX-17: Selector discovery exposes unauthenticated User IDs
 
 - Legacy ID: `CA-38`
@@ -64,18 +40,6 @@ This document is the implementation planning record for active accepted security
 - Interim guardrail: test-only mocks that do not serve tutorial/UI-test runtime are moved out of `Sources`; `Sources/Security/Mocks` is the only temporary production-source mock directory; ProtectedData production files must not embed mock implementations; non-mock production code must not directly reference `MockKeychainError`; Release and App Store Candidate builds ignore `UITEST_*` app-container launch overrides.
 - Remaining fix plan: close SR-FIX-18 only after tutorial migrates away from mock security primitives to tutorial-specific isolated real Protected Data domains and hardware-backed processing that never touches user security assets, and after build/target-membership checks prove test-only mocks are not compiled into production targets.
 - Validation: Maintain source-audit guardrails plus macOS unit tests, mandatory `CypherAir-MacUITests`, and Release/App Store Candidate build probes for this interim state.
-
-### SR-FIX-20: Text input section is recreated on every edit
-
-- Legacy ID: `CA-42`
-- Severity: `informational`
-- Area: `decrypt-verify-ui`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0)
-- Decision: Confirmed UX/availability issue. Decrypt/Verify text input sections are recreated during ordinary edits, disrupting keyboard focus.
-- Impact: Manual correction of ciphertext or signed text can lose focus, cursor, selection, or keyboard state. Decrypt/verify correctness and secrecy are not changed.
-- Relevant paths: `Sources/App/Decrypt/DecryptView.swift`, `Sources/App/Sign/VerifyView.swift`
-- Fix plan: Split edit invalidation from section refresh. Ordinary edit paths should clear stale result/phase state without bumping the text input section identity; import/reset/completion paths can still refresh when needed.
-- Validation: Add SwiftUI model/view tests or targeted UI smoke coverage showing backspace/editing does not recreate the text editor section or dismiss keyboard focus.
 
 ### SR-FIX-21: Public docs disclose unfixed security findings
 

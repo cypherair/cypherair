@@ -453,3 +453,39 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. First-domain root-secret cleanup no longer trusts an empty-registry snapshot captured before domain creation begins.
 - Resolution: Orphan cleanup now runs from the first-domain create transaction only after the registry has persisted the matching `.createDomain(..., .journaled)` mutation. The cleaner deletes only for that exact journaled first-domain state and returns `notNeeded` for committed membership, unrelated pending mutations, or other shared-resource states.
 - Relevant paths: `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift`, `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift`, `Sources/Security/ProtectedData/PrivateKeyControlStore.swift`, `Sources/Security/ProtectedData/ProtectedSettingsStore.swift`, `Tests/ServiceTests/ProtectedDataFrameworkTests.swift`, `Tests/ServiceTests/LocalDataResetServiceTests.swift`
+
+### SR-CLOSED-43: Decrypted file can persist after cancelled/abandoned decrypt
+
+- Former Review ID: `SR-FIX-14`
+- Legacy ID: `CA-29`
+- Severity: `medium`
+- Area: `decrypt-file-output`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6)
+- Decision: Fixed. Decrypt route disappearance now cancels and invalidates in-flight operations before clearing route state, so a late successful file decrypt cannot adopt plaintext output after the route is abandoned.
+- Resolution: `DecryptScreenModel.handleDisappear()` enters the same cancel/invalidate lifecycle used by content-clear handling, and file decrypt keeps its pending-output cleanup guard until adoption after cancellation checks. Regression coverage suspends a file decrypt, disappears the route, then lets the operation return successfully and verifies the output is removed and not published.
+- Relevant paths: `Sources/App/Decrypt/DecryptScreenModel.swift`, `Tests/ServiceTests/DecryptScreenModelTests.swift`
+
+### SR-CLOSED-44: Decrypt view can show stale signature for wrong content
+
+- Former Review ID: `SR-FIX-16`
+- Legacy ID: `CA-33`
+- Severity: `medium`
+- Area: `decrypt-verify-ui`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab)
+- Decision: Fixed. Decrypt text and file outputs now own separate detailed signature verification state, and the view renders only the verification for the currently visible result.
+- Resolution: `DecryptScreenModel` now represents text decrypt as an atomic plaintext-plus-verification result and file decrypt as an atomic temporary-output-plus-verification result. File result replacement and clearing preserve temporary-output cleanup ownership. Regression tests cover mode switching, per-mode result preservation, file export from the file-owned result, and text/file invalidation isolation.
+- Relevant paths: `Sources/App/Decrypt/DecryptScreenModel.swift`, `Sources/App/Decrypt/DecryptView.swift`, `Tests/ServiceTests/DecryptScreenModelTests.swift`
+
+### SR-CLOSED-45: Text input section is recreated on every edit
+
+- Former Review ID: `SR-FIX-20`
+- Legacy ID: `CA-42`
+- Severity: `informational`
+- Area: `decrypt-verify-ui`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0)
+- Decision: Fixed. Ordinary Decrypt and Verify text edits now clear stale parse/result state without changing the text input section identity.
+- Resolution: Decrypt and Verify screen models separate result invalidation from explicit section refresh. Import, reset, and completion workflows can still refresh the section, while normal text edits preserve focus-friendly section identity. Regression tests assert ordinary ciphertext and signed-message edits leave `textInputSectionEpoch` unchanged.
+- Relevant paths: `Sources/App/Decrypt/DecryptScreenModel.swift`, `Sources/App/Sign/VerifyScreenModel.swift`, `Tests/ServiceTests/DecryptScreenModelTests.swift`, `Tests/ServiceTests/VerifyScreenModelTests.swift`
