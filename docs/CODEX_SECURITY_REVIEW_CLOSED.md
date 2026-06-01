@@ -441,3 +441,15 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Tutorial module opens are now serialized by `TutorialSessionStore`, so repeated module launches cannot start concurrent contacts-domain opens against the same disposable tutorial sandbox.
 - Resolution: Module open state uses a token-guarded in-flight marker, reset and finish cleanup clear that state, and tutorial launch controls are disabled while an open is running. Production Contacts and ProtectedData open paths are unchanged.
 - Relevant paths: `Sources/App/Onboarding/TutorialSessionStore.swift`, `Sources/App/Onboarding/TutorialView.swift`, `Sources/App/Onboarding/Tutorial/TutorialShellTabsView.swift`, `Tests/ServiceTests/TutorialSessionStoreTests.swift`
+
+### SR-CLOSED-42: TOCTOU can delete active protected-data root secret
+
+- Former Review ID: `SR-FIX-06`
+- Legacy ID: `CA-10`
+- Severity: `medium`
+- Area: `protected-data`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9fd5a847678881918e0eea9cbdfc2e77)
+- Decision: Fixed. First-domain root-secret cleanup no longer trusts an empty-registry snapshot captured before domain creation begins.
+- Resolution: Orphan cleanup now runs from the first-domain create transaction only after the registry has persisted the matching `.createDomain(..., .journaled)` mutation. The cleaner deletes only for that exact journaled first-domain state and returns `notNeeded` for committed membership, unrelated pending mutations, or other shared-resource states.
+- Relevant paths: `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift`, `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift`, `Sources/Security/ProtectedData/PrivateKeyControlStore.swift`, `Sources/Security/ProtectedData/ProtectedSettingsStore.swift`, `Tests/ServiceTests/ProtectedDataFrameworkTests.swift`, `Tests/ServiceTests/LocalDataResetServiceTests.swift`

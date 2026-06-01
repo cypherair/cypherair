@@ -86,22 +86,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             privateKeyControlState = .locked
             return false
         }
-        if let firstDomainSharedRightCleaner {
-            do {
-                let cleanupOutcome = try await firstDomainSharedRightCleaner.cleanupOrphanedSharedRightIfSafe(
-                    registry: registry,
-                    source: Self.domainID.rawValue
-                )
-                if cleanupOutcome == .blockedByArtifacts {
-                    privateKeyControlState = .recoveryNeeded
-                    throw PrivateKeyControlError.recoveryNeeded
-                }
-            } catch {
-                privateKeyControlState = .recoveryNeeded
-                throw error
-            }
-        }
-
         let initialPayload = try legacyInitialPayload()
         let provisionedSecret = SensitiveBytesBox(
             data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
@@ -117,6 +101,26 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
 
         _ = try await registryStore.performCreateDomainTransaction(
             domainID: Self.domainID,
+            cleanupJournaledFirstDomainSharedRightIfNeeded: { [self] in
+                guard let firstDomainSharedRightCleaner else {
+                    return
+                }
+                do {
+                    let cleanupOutcome = try await firstDomainSharedRightCleaner
+                        .cleanupJournaledFirstDomainSharedRightIfSafe(
+                            expectedDomainID: Self.domainID,
+                            source: Self.domainID.rawValue,
+                            loadCurrentRegistry: { try registryStore.loadRegistry() }
+                        )
+                    if cleanupOutcome == .blockedByArtifacts {
+                        privateKeyControlState = .recoveryNeeded
+                        throw PrivateKeyControlError.recoveryNeeded
+                    }
+                } catch {
+                    privateKeyControlState = .recoveryNeeded
+                    throw error
+                }
+            },
             provisionSharedResourceIfNeeded: {
                 try await persistSharedRight(provisionedSecret.dataCopy())
             },

@@ -10,6 +10,8 @@ enum ProtectedDataFirstDomainSharedRightCleanupOutcome: Equatable, Sendable {
 struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
     private let storageRoot: ProtectedDataStorageRoot
     private let hasPersistedSharedRight: @Sendable (_ identifier: String) -> Bool
+    // The actual root-secret deletion must happen before this closure's first suspension point.
+    // Delaying deletion past an await would reopen the first-domain cleanup race.
     private let removePersistedSharedRight: @Sendable (_ identifier: String) async throws -> Void
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -25,13 +27,17 @@ struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
         self.traceStore = traceStore
     }
 
-    func cleanupOrphanedSharedRightIfSafe(
-        registry: ProtectedDataRegistry,
-        source: String
+    func cleanupJournaledFirstDomainSharedRightIfSafe(
+        expectedDomainID: ProtectedDataDomainID,
+        source: String,
+        loadCurrentRegistry: @Sendable () throws -> ProtectedDataRegistry
     ) async throws -> ProtectedDataFirstDomainSharedRightCleanupOutcome {
-        guard registry.pendingMutation == nil,
-              registry.committedMembership.isEmpty,
-              registry.sharedResourceLifecycleState == .absent else {
+        let registry = try loadCurrentRegistry()
+        guard registry.committedMembership.isEmpty,
+              registry.sharedResourceLifecycleState == .absent,
+              case let .createDomain(targetDomainID, phase)? = registry.pendingMutation,
+              targetDomainID == expectedDomainID,
+              phase == .journaled else {
             traceFinish(.notNeeded, source: source)
             return .notNeeded
         }

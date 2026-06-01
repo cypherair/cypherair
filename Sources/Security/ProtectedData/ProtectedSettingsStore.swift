@@ -269,26 +269,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             domainState = .locked
             return
         }
-        if let firstDomainSharedRightCleaner {
-            do {
-                let cleanupOutcome = try await firstDomainSharedRightCleaner.cleanupOrphanedSharedRightIfSafe(
-                    registry: registry,
-                    source: Self.domainID.rawValue
-                )
-                if cleanupOutcome == .blockedByArtifacts {
-                    domainState = .pendingResetRequired
-                    throw ProtectedDataError.invalidRegistry(
-                        "Protected settings cannot create the first domain while protected-data artifacts remain without registry membership."
-                    )
-                }
-            } catch {
-                if domainState != .pendingResetRequired {
-                    domainState = .frameworkUnavailable
-                }
-                throw error
-            }
-        }
-
         let provisionedSecret = SensitiveBytesBox(
             data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
         )
@@ -303,6 +283,30 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
         _ = try await registryStore.performCreateDomainTransaction(
             domainID: Self.domainID,
+            cleanupJournaledFirstDomainSharedRightIfNeeded: { [self] in
+                guard let firstDomainSharedRightCleaner else {
+                    return
+                }
+                do {
+                    let cleanupOutcome = try await firstDomainSharedRightCleaner
+                        .cleanupJournaledFirstDomainSharedRightIfSafe(
+                            expectedDomainID: Self.domainID,
+                            source: Self.domainID.rawValue,
+                            loadCurrentRegistry: { try registryStore.loadRegistry() }
+                        )
+                    if cleanupOutcome == .blockedByArtifacts {
+                        domainState = .pendingResetRequired
+                        throw ProtectedDataError.invalidRegistry(
+                            "Protected settings cannot create the first domain while protected-data artifacts remain without registry membership."
+                        )
+                    }
+                } catch {
+                    if domainState != .pendingResetRequired {
+                        domainState = .frameworkUnavailable
+                    }
+                    throw error
+                }
+            },
             provisionSharedResourceIfNeeded: {
                 try await persistSharedRight(provisionedSecret.dataCopy())
             },

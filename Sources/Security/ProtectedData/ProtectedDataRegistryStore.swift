@@ -143,6 +143,7 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
         domainID: ProtectedDataDomainID,
         initialCommittedState: ProtectedDataCommittedDomainState = .active,
         validateBeforeJournal: @escaping @Sendable (ProtectedDataRegistry) throws -> Void = { _ in },
+        cleanupJournaledFirstDomainSharedRightIfNeeded: @escaping @Sendable () async throws -> Void = {},
         provisionSharedResourceIfNeeded: @escaping @Sendable () async throws -> Void,
         stageArtifacts: @escaping @Sendable () async throws -> Void,
         validateArtifacts: @escaping @Sendable () async throws -> Void
@@ -157,6 +158,18 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
             try saveRegistry(registry)
 
             if isFirstCommittedDomain {
+                try await cleanupJournaledFirstDomainSharedRightIfNeeded()
+                registry = try loadRegistry()
+                guard registry.committedMembership.isEmpty,
+                      registry.sharedResourceLifecycleState == .absent,
+                      registry.pendingMutation == .createDomain(
+                        targetDomainID: domainID,
+                        phase: .journaled
+                      ) else {
+                    throw ProtectedDataError.invalidRegistry(
+                        "First-domain create changed before shared resource provisioning."
+                    )
+                }
                 try await provisionSharedResourceIfNeeded()
                 registry = try loadRegistry()
                 registry.pendingMutation = .createDomain(

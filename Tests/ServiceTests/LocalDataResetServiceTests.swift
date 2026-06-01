@@ -414,8 +414,15 @@ final class LocalDataResetServiceTests: XCTestCase {
             baseDirectory: baseDirectory,
             validationMode: .allowArbitraryBaseDirectoryForTesting
         )
-        let registry = ProtectedDataRegistry.emptySteadyState(
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: ProtectedSettingsStore.domainID,
+                phase: .journaled
+            )
         )
         let rootSecret = ProtectedDataRootSecretFlag(exists: true)
         let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
@@ -424,9 +431,10 @@ final class LocalDataResetServiceTests: XCTestCase {
             removePersistedSharedRight: { _ in rootSecret.exists = false }
         )
 
-        let outcome = try await cleaner.cleanupOrphanedSharedRightIfSafe(
-            registry: registry,
-            source: "test"
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: ProtectedSettingsStore.domainID,
+            source: "test",
+            loadCurrentRegistry: { registry }
         )
 
         XCTAssertEqual(outcome, .removedOrphanedSharedRight)
@@ -447,8 +455,15 @@ final class LocalDataResetServiceTests: XCTestCase {
         try Data([0x01]).write(
             to: storageRoot.rootURL.appendingPathComponent("orphan-artifact.bin")
         )
-        let registry = ProtectedDataRegistry.emptySteadyState(
-            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: ProtectedSettingsStore.domainID,
+                phase: .journaled
+            )
         )
         let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
             storageRoot: storageRoot,
@@ -456,9 +471,10 @@ final class LocalDataResetServiceTests: XCTestCase {
             removePersistedSharedRight: { _ in XCTFail("Should not remove root secret when artifacts remain") }
         )
 
-        let outcome = try await cleaner.cleanupOrphanedSharedRightIfSafe(
-            registry: registry,
-            source: "test"
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: ProtectedSettingsStore.domainID,
+            source: "test",
+            loadCurrentRegistry: { registry }
         )
 
         XCTAssertEqual(outcome, .blockedByArtifacts)
