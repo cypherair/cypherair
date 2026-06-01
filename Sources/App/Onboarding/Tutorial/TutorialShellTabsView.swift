@@ -124,7 +124,7 @@ struct TutorialShellTabsView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(!tutorialStore.canOpen(module))
+                    .disabled(tutorialStore.isOpeningModule || !tutorialStore.canOpen(module))
                     .accessibilityIdentifier(module.launchControlIdentifier)
                 }
             } header: {

@@ -76,18 +76,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: Handle during broader componentization: move test-only mocks outside the app target and scope tutorial software security implementations as tutorial-only simulation.
 - Validation: During architecture work, add target membership/build checks proving test-only mocks are not compiled into production targets.
 
-### SR-FIX-19: Concurrent tutorial contacts open can fail sandbox setup
-
-- Legacy ID: `CA-41`
-- Severity: `informational`
-- Area: `tutorial-contacts`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/703d8b5d0ad48191abf6a936394d174e)
-- Decision: Confirmed tutorial-only reliability issue. Repeated module opens can start concurrent contacts-domain opens in the disposable tutorial sandbox.
-- Impact: Disposable tutorial sandbox setup can fail or clean up the active tutorial container. Production keys, contacts, settings, and protected data are isolated.
-- Relevant paths: `Sources/App/Onboarding/TutorialSessionStore.swift`, `Sources/App/Onboarding/TutorialSandboxContainer.swift`, `Sources/Services/ContactService.swift`
-- Fix plan: Make tutorial contacts opening idempotent by disabling repeated opens while opening or caching/reusing one in-flight contacts-open task in the tutorial sandbox container.
-- Validation: Add tutorial sandbox tests or UI smoke coverage for rapid repeated module opens while contacts are opening.
-
 ### SR-FIX-20: Text input section is recreated on every edit
 
 - Legacy ID: `CA-42`

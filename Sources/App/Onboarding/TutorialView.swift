@@ -99,6 +99,7 @@ struct TutorialView: View {
                                 await handlePrimaryHeroAction()
                             }
                         }
+                        .disabled(tutorialStore.isOpeningModule)
                         .accessibilityIdentifier(TutorialAutomationContract.primaryToolbarActionIdentifier)
                     }
                 }
@@ -143,6 +144,7 @@ struct TutorialView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(tutorialStore.isOpeningModule)
                     .accessibilityIdentifier(TutorialAutomationContract.primaryActionIdentifier)
                 }
 
@@ -201,6 +203,7 @@ struct TutorialView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(tutorialStore.isOpeningModule)
                 .accessibilityIdentifier(module.launchControlIdentifier)
             }
         }

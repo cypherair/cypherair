@@ -14,6 +14,9 @@ final class TutorialSessionStore {
     private(set) var navigation = TutorialNavigationState()
     private(set) var errorMessage: String?
     private(set) var isTutorialPresentationActive = false
+    private(set) var openingModule: TutorialModuleID?
+    @ObservationIgnored
+    private var openingModuleToken: UUID?
     #if DEBUG
     private var didPrepareUITestCompletionSurface = false
     private var didPrepareUITestAuthModeConfirmation = false
@@ -25,6 +28,7 @@ final class TutorialSessionStore {
     var visibleTab: AppShellTab { navigation.visibleSurface.tab }
     var visibleRoute: AppRoute? { navigation.visibleSurface.route }
     var isInspectorPresented: Bool { navigation.isInspectorPresented }
+    var isOpeningModule: Bool { openingModule != nil }
     var configurationFactory: TutorialConfigurationFactory { TutorialConfigurationFactory(store: self) }
     var blocklist = TutorialUnsafeRouteBlocklist()
 
@@ -148,6 +152,10 @@ final class TutorialSessionStore {
 
     func openModule(_ requestedModule: TutorialModuleID) async {
         guard canOpen(requestedModule) else { return }
+        guard let openingToken = beginOpeningModule(requestedModule) else { return }
+        defer {
+            finishOpeningModule(openingToken)
+        }
 
         ensureSession()
         guard let activeContainer = container,
@@ -254,6 +262,7 @@ final class TutorialSessionStore {
         session = TutorialSessionState()
         navigation = TutorialNavigationState()
         errorMessage = nil
+        clearOpeningModule()
     }
 
     func markFinishedTutorial() {
@@ -267,6 +276,7 @@ final class TutorialSessionStore {
         session = TutorialSessionState()
         navigation = TutorialNavigationState()
         errorMessage = nil
+        clearOpeningModule()
     }
 
     func selectTab(_ tab: AppShellTab) {
@@ -493,6 +503,24 @@ final class TutorialSessionStore {
             session.pendingCompletionPromptModule = module
         }
         refreshLifecycleState()
+    }
+
+    private func beginOpeningModule(_ module: TutorialModuleID) -> UUID? {
+        guard openingModule == nil else { return nil }
+        let token = UUID()
+        openingModule = module
+        openingModuleToken = token
+        return token
+    }
+
+    private func finishOpeningModule(_ token: UUID) {
+        guard openingModuleToken == token else { return }
+        clearOpeningModule()
+    }
+
+    private func clearOpeningModule() {
+        openingModule = nil
+        openingModuleToken = nil
     }
 
     private func ensureSession() {
