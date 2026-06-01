@@ -293,7 +293,7 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Severity: `high`
 - Area: `ci-supply-chain`
 - Disposition: `closed-fixed`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/b2db20bd745c8191993e920e471adfb2)
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/b2db20bd745c8191856cc218daacb19d)
 - Decision: Fixed by PR #415. Release/XCFramework builds now keep GitHub credentials out of the broad artifact build environment.
 - Resolution: Stage1 toolchain download is handled separately, checkout credential persistence is disabled, and static workflow tests verify build and downloader steps do not receive GitHub tokens.
 - Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`, `scripts/download_arm64e_stage1_toolchain.sh`

@@ -59,7 +59,7 @@ This document is the implementation planning record for active accepted security
 - Area: `privacy-lifecycle`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/e2433b9357a48191b7ea3c939cad1a4d)
 - Decision: Confirmed high-priority privacy lifecycle race. An in-flight resume task can clear a hard background privacy blur after the app leaves the active generation.
-- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle repair as SR-FIX-08.
+- Impact: Can overwrite a hard background blur after post-auth work completes. The risk is timing-sensitive but belongs with the same privacy lifecycle area as former SR-FIX-08 / SR-CLOSED-32.
 - Relevant paths: `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/CypherAirApp.swift`, `Sources/App/Settings/ProtectedSettingsHost.swift`
 - Fix plan: Track scene/activity generation or equivalent foreground state. Resume completion may clear blur only if it still belongs to the current active generation; otherwise keep blur for the next active/resume path.
 - Validation: Add generation/race tests where background occurs during post-auth work; completion must not clear blur for an obsolete generation.
