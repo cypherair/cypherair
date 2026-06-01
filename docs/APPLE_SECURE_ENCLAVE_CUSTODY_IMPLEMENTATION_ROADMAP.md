@@ -281,7 +281,11 @@ Recommended PR grouping:
 - PR 5A: private-operation router foundation, shared route vocabulary,
   unsupported/unavailable outcomes, sanitized error mapping, hidden/test policy
   hooks, and Security handle lookup helpers. This PR must not integrate a user
-  workflow.
+  workflow. **Implemented:** Phase 5A adds internal Swift routing contracts,
+  independent resolver policy gates, software and Secure Enclave signer route
+  outcomes, blocked decrypt/key-agreement outcomes, a shared sanitized failure
+  mapper, and Security signing-handle lookup by public bindings. Production
+  remains unavailable and no workflow service consumes the router yet.
 - PR 5B: Rust/UniFFI external signer runtime API plus cleartext message signing
   pilot.
 - PR 5C: sign-plus-encrypt text optional signing.

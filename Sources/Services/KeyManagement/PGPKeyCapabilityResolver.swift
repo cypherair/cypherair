@@ -4,21 +4,31 @@ import Foundation
 struct PGPKeyCapabilityResolver: Sendable {
     struct Policy: Equatable, Sendable {
         var secureEnclaveGenerationSupport: PGPKeyOperationSupport
-        var secureEnclavePrivateOperationSupport: PGPKeyOperationSupport
+        var secureEnclaveSigningOperationSupport: PGPKeyOperationSupport
+        var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
 
         static let production = Policy(
             secureEnclaveGenerationSupport: .unavailable,
-            secureEnclavePrivateOperationSupport: .unavailable
+            secureEnclaveSigningOperationSupport: .unavailable,
+            secureEnclaveKeyAgreementOperationSupport: .unavailable
         )
 
         static let testSecureEnclavePrivateOperations = Policy(
             secureEnclaveGenerationSupport: .unavailable,
-            secureEnclavePrivateOperationSupport: .notImplemented
+            secureEnclaveSigningOperationSupport: .notImplemented,
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveGeneration = Policy(
             secureEnclaveGenerationSupport: .supported,
-            secureEnclavePrivateOperationSupport: .notImplemented
+            secureEnclaveSigningOperationSupport: .notImplemented,
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
+        )
+
+        static let testSecureEnclaveSigningRoutes = Policy(
+            secureEnclaveGenerationSupport: .unavailable,
+            secureEnclaveSigningOperationSupport: .supported,
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
         )
     }
 
@@ -125,12 +135,13 @@ struct PGPKeyCapabilityResolver: Sendable {
         case .generate:
             return resolutionForPolicySupport(policy.secureEnclaveGenerationSupport)
         case .sign,
-             .decrypt,
              .certify,
              .revoke,
              .modifyExpiry,
              .refreshBinding:
-            return resolutionForPolicySupport(policy.secureEnclavePrivateOperationSupport)
+            return resolutionForPolicySupport(policy.secureEnclaveSigningOperationSupport)
+        case .decrypt:
+            return resolutionForPolicySupport(policy.secureEnclaveKeyAgreementOperationSupport)
         case .exportPrivateMaterial:
             return .unsupported(.operationUnsupportedForCustody)
         case .exportPublicMaterial:

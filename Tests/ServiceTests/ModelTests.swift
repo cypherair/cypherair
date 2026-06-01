@@ -547,6 +547,22 @@ final class ModelTests: XCTestCase {
             Set(PGPPrivateOperationRole.allCases),
             [.signing, .keyAgreement]
         )
+        XCTAssertEqual(
+            Set(PGPPrivateOperationKind.allCases),
+            [.sign, .decrypt, .certify, .revoke, .modifyExpiry, .refreshBinding]
+        )
+        XCTAssertEqual(PGPPrivateOperationKind.sign.keyOperationKind, .sign)
+        XCTAssertEqual(PGPPrivateOperationKind.decrypt.keyOperationKind, .decrypt)
+        XCTAssertEqual(PGPPrivateOperationKind.certify.keyOperationKind, .certify)
+        XCTAssertEqual(PGPPrivateOperationKind.revoke.keyOperationKind, .revoke)
+        XCTAssertEqual(PGPPrivateOperationKind.modifyExpiry.keyOperationKind, .modifyExpiry)
+        XCTAssertEqual(PGPPrivateOperationKind.refreshBinding.keyOperationKind, .refreshBinding)
+        XCTAssertEqual(PGPPrivateOperationKind.sign.requiredRole, .signing)
+        XCTAssertEqual(PGPPrivateOperationKind.certify.requiredRole, .signing)
+        XCTAssertEqual(PGPPrivateOperationKind.revoke.requiredRole, .signing)
+        XCTAssertEqual(PGPPrivateOperationKind.modifyExpiry.requiredRole, .signing)
+        XCTAssertEqual(PGPPrivateOperationKind.refreshBinding.requiredRole, .signing)
+        XCTAssertEqual(PGPPrivateOperationKind.decrypt.requiredRole, .keyAgreement)
         XCTAssertTrue(PGPKeyOperationKind.allCases.contains(.exportPrivateMaterial))
         XCTAssertEqual(PGPKeyOperationSupport.notImplemented.rawValue, "notImplemented")
     }

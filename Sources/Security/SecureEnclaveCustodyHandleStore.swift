@@ -245,6 +245,20 @@ struct SecureEnclaveCustodyHandleStore {
         return matches[0]
     }
 
+    func loadSigningHandle(
+        signingPublicKeyX963: Data,
+        keyAgreementPublicKeyX963: Data
+    ) throws -> SecureEnclaveCustodyLoadedHandle {
+        let pair = try locateHandlePair(
+            signingPublicKeyX963: signingPublicKeyX963,
+            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
+        )
+        return try loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyX963: pair.signing.publicKeyX963
+        )
+    }
+
     func inventorySummaryForLocalRecovery() throws -> SecureEnclaveCustodyHandleInventorySummary {
         let items = try keyStore.inventoryKeys()
         guard !items.isEmpty else {

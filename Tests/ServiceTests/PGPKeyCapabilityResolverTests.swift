@@ -198,6 +198,46 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         )
     }
 
+    func test_secureEnclaveSigningRoutePolicySupportsSigningClassOnly() {
+        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes)
+        let signingOperations: [PGPKeyOperationKind] = [
+            .sign,
+            .certify,
+            .revoke,
+            .modifyExpiry,
+            .refreshBinding
+        ]
+
+        for operation in signingOperations {
+            XCTAssertEqual(
+                resolver.resolution(
+                    for: operation,
+                    configuration: .compatibleP256V4,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .supported,
+                "Expected \(operation) to be routeable through the Phase 5A signing hook."
+            )
+        }
+
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .decrypt,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .notImplemented(.operationNotImplementedForCustody)
+        )
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable(.operationUnavailableByPolicy)
+        )
+    }
+
     func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
         let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
 

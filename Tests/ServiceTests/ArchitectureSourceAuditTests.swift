@@ -50,6 +50,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.contactsLegacyRuntimeVocabulary)
     }
 
+    func test_privateOperationCustodySwitchesStayInsideRouterBoundaries() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.privateOperationCustodySwitchContainment)
+    }
+
     func test_keyRouteViews_doNotOrchestrateKeyManagementWorkflows() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment)
     }
@@ -967,6 +971,25 @@ private enum ArchitectureSourceAuditRules {
         scope: { path in
             path.hasPrefix("Sources/")
                 && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let privateOperationCustodySwitchContainment = ArchitectureSourceAuditRule(
+        name: "Private operation custody switch containment",
+        failureSummary: "Workflow services should route custody-specific private operations through the key-management router.",
+        pattern: wordPattern(for: [
+            "PGPPrivateKeyCustodyKind",
+            "appleSecureEnclavePrivateOperations",
+            "privateKeyCustodyKind",
+            "softwareSecretCertificate",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/Services/")
+                && !path.hasPrefix("Sources/Services/FFI/")
+                && !path.hasPrefix("Sources/Services/KeyManagement/")
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
