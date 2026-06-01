@@ -38,6 +38,24 @@ final class EncryptionServiceTests: XCTestCase {
         try XCTUnwrap(stack.contactService.contactId(forFingerprint: identity.fingerprint))
     }
 
+    private func importExternalRecipientContact(
+        name: String = "External Recipient"
+    ) throws -> String {
+        var recipientKey = try stack.engine.generateKey(
+            name: name,
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+        defer {
+            recipientKey.certData.zeroize()
+        }
+
+        try stack.contactService.importContact(publicKeyData: recipientKey.publicKeyData)
+        let info = try stack.engine.parseKeyInfo(keyData: recipientKey.publicKeyData)
+        return try XCTUnwrap(stack.contactService.contactId(forFingerprint: info.fingerprint))
+    }
+
     // MARK: - Text Encryption: Profile A
 
     func test_encryptText_profileA_producesNonEmptyCiphertext() async throws {
@@ -358,6 +376,75 @@ final class EncryptionServiceTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error type: \(error)")
         }
+    }
+
+    func test_encryptText_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
+        let signer = try await TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: .universal,
+            name: "Signer"
+        )
+        try stack.keyManagement.setDefaultKey(fingerprint: "missing-default-for-test")
+        XCTAssertNil(stack.keyManagement.defaultKey)
+
+        let recipientContactId = try importExternalRecipientContact()
+        let unwrapCountBefore = stack.mockSE.unwrapCallCount
+
+        do {
+            _ = try await stack.encryptionService.encryptText(
+                "test",
+                recipientContactIds: [recipientContactId],
+                signWithFingerprint: signer.fingerprint,
+                encryptToSelf: true
+            )
+            XCTFail("Expected noKeySelected error")
+        } catch let error as CypherAirError {
+            if case .noKeySelected = error {
+                // Expected: public-only encrypt-to-self resolution failed before signer unwrap.
+            } else {
+                XCTFail("Expected .noKeySelected, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
+    func test_encryptFileStreaming_signingRequested_noDefaultEncryptToSelf_doesNotUnwrapSigner() async throws {
+        let signer = try await TestHelpers.generateAndStoreKey(
+            service: stack.keyManagement,
+            profile: .universal,
+            name: "Streaming Signer"
+        )
+        try stack.keyManagement.setDefaultKey(fingerprint: "missing-default-for-test")
+        XCTAssertNil(stack.keyManagement.defaultKey)
+
+        let recipientContactId = try importExternalRecipientContact(name: "Streaming Recipient")
+        let inputURL = stack.tempDir.appendingPathComponent("encrypt-input.txt")
+        try Data("streaming test".utf8).write(to: inputURL)
+        let unwrapCountBefore = stack.mockSE.unwrapCallCount
+
+        do {
+            _ = try await stack.encryptionService.encryptFileStreaming(
+                inputURL: inputURL,
+                recipientContactIds: [recipientContactId],
+                signWithFingerprint: signer.fingerprint,
+                encryptToSelf: true,
+                progress: nil
+            )
+            XCTFail("Expected noKeySelected error")
+        } catch let error as CypherAirError {
+            if case .noKeySelected = error {
+                // Expected: public-only encrypt-to-self resolution failed before signer unwrap.
+            } else {
+                XCTFail("Expected .noKeySelected, got \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore)
     }
 
     // MARK: - Encrypt-to-Self: Key Selection

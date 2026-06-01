@@ -108,6 +108,11 @@ final class EncryptionService {
         // Validate disk space before starting
         try diskSpaceChecker.validateForEncryption(inputFileSize: fileSize)
 
+        let selfKey = try resolvedEncryptToSelfKey(
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint
+        )
+
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
         if let signerFp = signWithFingerprint {
@@ -115,19 +120,6 @@ final class EncryptionService {
                 signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
             } catch {
                 throw CypherAirError.from(error) { _ in .authenticationFailed }
-            }
-        }
-
-        // Get encrypt-to-self key
-        var selfKey: Data?
-        if encryptToSelf {
-            if let fp = encryptToSelfFingerprint,
-               let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) {
-                selfKey = key.publicKeyData
-            } else if let defaultKey = keyManagement.defaultKey {
-                selfKey = defaultKey.publicKeyData
-            } else {
-                throw CypherAirError.noKeySelected
             }
         }
 
@@ -201,6 +193,11 @@ final class EncryptionService {
             throw CypherAirError.noRecipientsSelected
         }
 
+        let selfKey = try resolvedEncryptToSelfKey(
+            encryptToSelf: encryptToSelf,
+            encryptToSelfFingerprint: encryptToSelfFingerprint
+        )
+
         // Get signing key if requested (requires SE unwrap → Face ID)
         var signingKey: Data?
         if let signerFp = signWithFingerprint {
@@ -208,19 +205,6 @@ final class EncryptionService {
                 signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
             } catch {
                 throw CypherAirError.from(error) { _ in .authenticationFailed }
-            }
-        }
-
-        // Get encrypt-to-self key
-        var selfKey: Data?
-        if encryptToSelf {
-            if let fp = encryptToSelfFingerprint,
-               let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) {
-                selfKey = key.publicKeyData
-            } else if let defaultKey = keyManagement.defaultKey {
-                selfKey = defaultKey.publicKeyData
-            } else {
-                throw CypherAirError.noKeySelected
             }
         }
 
@@ -249,5 +233,23 @@ final class EncryptionService {
         }
 
         return result
+    }
+
+    private func resolvedEncryptToSelfKey(
+        encryptToSelf: Bool,
+        encryptToSelfFingerprint: String?
+    ) throws -> Data? {
+        guard encryptToSelf else {
+            return nil
+        }
+
+        if let fp = encryptToSelfFingerprint,
+           let key = keyManagement.keys.first(where: { $0.fingerprint == fp }) {
+            return key.publicKeyData
+        } else if let defaultKey = keyManagement.defaultKey {
+            return defaultKey.publicKeyData
+        } else {
+            throw CypherAirError.noKeySelected
+        }
     }
 }

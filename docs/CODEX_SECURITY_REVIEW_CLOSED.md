@@ -355,5 +355,29 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Disposition: `closed-fixed`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/archives/85c8b620e92c8191ab484e11a5cf4143)
 - Decision: Fixed by PR #414. Production/default `AuthenticationManager` instances now ignore the UI-test authentication bypass unless explicitly constructed with UI-test bypass opt-in.
-- Resolution: `AppContainer.makeUITest()` remains opted in for automation, while production app-session and private-key authentication paths no longer treat a mutable defaults key as an auth bypass switch. Curated Markdown records this as fixed despite the temporary Security Cloud status anomaly in the raw CSV export.
+- Resolution: `AppContainer.makeUITest()` remains opted in for automation, while production app-session and private-key authentication paths no longer treat a mutable defaults key as an auth bypass switch. Curated Markdown and the refreshed raw CSV export both record this as fixed.
 - Relevant paths: `Sources/App/AppContainer.swift`, `Sources/Security/AuthenticationManager.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
+
+### SR-CLOSED-35: Secret key zeroization skipped on KMS helper failures
+
+- Former Review ID: `SR-FIX-13`
+- Legacy ID: `CA-27`
+- Severity: `medium`
+- Area: `key-management-zeroization`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/2a18f490890c8191afc9b8775a8ff2b3)
+- Decision: Fixed. Key-operation adapter helpers now zeroize secret certificate `Data` on failure paths after secret material has been produced but before ownership reaches the caller.
+- Resolution: `PGPKeyOperationAdapter` keeps success-path cleanup caller-owned, while failure-injection tests assert adapter-local zeroization is invoked for post-secret key generation/import helper failures.
+- Relevant paths: `Sources/Services/FFI/PGPKeyOperationAdapter.swift`, `Tests/ServiceTests/PGPKeyOperationAdapterTests.swift`
+
+### SR-CLOSED-36: Signing key not zeroized on no-default encrypt-to-self error
+
+- Former Review ID: `SR-FIX-15`
+- Legacy ID: `CA-32`
+- Severity: `medium`
+- Area: `encryption-zeroization`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/8ef989997a7081919d767f560071a253)
+- Decision: Fixed. Encryption now resolves public-only encrypt-to-self inputs before unwrapping an optional signing private key.
+- Resolution: Text and streaming encryption share one encrypt-to-self resolver, preserving the existing explicit-fingerprint fallback-to-default behavior. Regression tests cover missing-default encrypt-to-self with signing requested and assert signer private-key unwrap does not occur.
+- Relevant paths: `Sources/Services/EncryptionService.swift`, `Tests/ServiceTests/EncryptionServiceTests.swift`
