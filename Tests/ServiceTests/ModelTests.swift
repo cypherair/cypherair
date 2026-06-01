@@ -147,6 +147,17 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_pgpErrorMapper_externalP256SigningFailureMapped() {
+        let error = PGPErrorMapper.map(
+            .ExternalP256SigningFailed(category: .localAuthenticationFailed)
+        )
+        if case .keyOperationUnavailable(let category) = error {
+            XCTAssertEqual(category, .localAuthenticationFailed)
+        } else {
+            XCTFail("Expected .keyOperationUnavailable, got \(error)")
+        }
+    }
+
     func test_pgpErrorMapper_armorErrorMapped() {
         let error = PGPErrorMapper.map(.ArmorError(reason: "bad format"))
         if case .armorError(let reason) = error {

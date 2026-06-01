@@ -906,13 +906,13 @@ mod tests {
         .expect_err("callback failure should fail generation");
 
         match error {
-            PgpError::KeyGenerationFailed { reason } => {
-                assert!(reason.contains("hardwareUnavailable"));
-                assert!(!reason.contains("raw-secret"));
-                assert!(!reason.contains("/tmp"));
-                assert!(!reason.contains("capability"));
+            PgpError::ExternalP256SigningFailed { category } => {
+                assert_eq!(
+                    category,
+                    ExternalP256SigningFailureCategory::HardwareUnavailable
+                );
             }
-            other => panic!("expected key generation failure, got {other:?}"),
+            other => panic!("expected external signing failure, got {other:?}"),
         }
     }
 

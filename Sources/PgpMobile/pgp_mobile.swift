@@ -557,7 +557,7 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
- * Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+ * Foreign signing callback for Secure Enclave-shaped certificate construction and runtime signing.
  */
 public protocol ExternalP256SigningProvider: AnyObject, Sendable {
 
@@ -568,7 +568,7 @@ public protocol ExternalP256SigningProvider: AnyObject, Sendable {
 
 }
 /**
- * Foreign signing callback used only for Secure Enclave-shaped public certificate construction.
+ * Foreign signing callback for Secure Enclave-shaped certificate construction and runtime signing.
  */
 open class ExternalP256SigningProviderImpl: ExternalP256SigningProvider, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -4772,6 +4772,11 @@ public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedErro
     case SigningFailed(reason: String
     )
     /**
+     * External P-256 signing failed with a sanitized callback category.
+     */
+    case ExternalP256SigningFailed(category: ExternalP256SigningFailureCategory
+    )
+    /**
      * Armor encoding/decoding error.
      */
     case ArmorError(reason: String
@@ -4867,26 +4872,29 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         case 13: return .SigningFailed(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .ArmorError(
+        case 14: return .ExternalP256SigningFailed(
+            category: try FfiConverterTypeExternalP256SigningFailureCategory.read(from: &buf)
+            )
+        case 15: return .ArmorError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .S2kError(
+        case 16: return .S2kError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .Argon2idMemoryExceeded(
+        case 17: return .Argon2idMemoryExceeded(
             requiredMb: try FfiConverterUInt64.read(from: &buf)
             )
-        case 17: return .RevocationError(
+        case 18: return .RevocationError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 18: return .InternalError(
+        case 19: return .InternalError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .OperationCancelled
-        case 20: return .FileIoError(
+        case 20: return .OperationCancelled
+        case 21: return .FileIoError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 21: return .KeyTooLargeForQr(
+        case 22: return .KeyTooLargeForQr(
             sizeBytes: try FfiConverterUInt64.read(from: &buf),
             maxBytes: try FfiConverterUInt64.read(from: &buf)
             )
@@ -4960,42 +4968,47 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .ArmorError(reason):
+        case let .ExternalP256SigningFailed(category):
             writeInt(&buf, Int32(14))
-            FfiConverterString.write(reason, into: &buf)
+            FfiConverterTypeExternalP256SigningFailureCategory.write(category, into: &buf)
 
 
-        case let .S2kError(reason):
+        case let .ArmorError(reason):
             writeInt(&buf, Int32(15))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .Argon2idMemoryExceeded(requiredMb):
+        case let .S2kError(reason):
             writeInt(&buf, Int32(16))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case let .Argon2idMemoryExceeded(requiredMb):
+            writeInt(&buf, Int32(17))
             FfiConverterUInt64.write(requiredMb, into: &buf)
 
 
         case let .RevocationError(reason):
-            writeInt(&buf, Int32(17))
-            FfiConverterString.write(reason, into: &buf)
-
-
-        case let .InternalError(reason):
             writeInt(&buf, Int32(18))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case .OperationCancelled:
+        case let .InternalError(reason):
             writeInt(&buf, Int32(19))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case .OperationCancelled:
+            writeInt(&buf, Int32(20))
 
 
         case let .FileIoError(reason):
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(21))
             FfiConverterString.write(reason, into: &buf)
 
 
         case let .KeyTooLargeForQr(sizeBytes,maxBytes):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(22))
             FfiConverterUInt64.write(sizeBytes, into: &buf)
             FfiConverterUInt64.write(maxBytes, into: &buf)
 

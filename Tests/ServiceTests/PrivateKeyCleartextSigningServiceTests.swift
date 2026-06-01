@@ -95,6 +95,41 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         XCTAssertEqual(verification.legacyStatus, .valid)
     }
 
+    func test_secureEnclaveCleartextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let service = TestHelpers.makeCleartextSigner(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+
+        let signed = try await service.signCleartext(
+            Data("secure enclave routed cleartext".utf8),
+            signerFingerprint: fixture.identity.fingerprint
+        )
+
+        XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
+        let verification = try await verificationResult(
+            signed,
+            verificationKey: fixture.identity.publicKeyData,
+            identity: fixture.identity,
+            messageAdapter: messageAdapter
+        )
+        XCTAssertEqual(verification.legacyStatus, .valid)
+    }
+
     func test_blockedRouteThrowsUnavailableCategoryWithoutUnwrapping() async throws {
         let router = StaticPrivateKeyOperationRouter(
             route: .blocked(.unavailable(.operationUnavailableByPolicy))
@@ -249,7 +284,8 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
                 operation: .sign,
                 publicBindingInspection: inspection,
                 signingHandle: signingHandle
-            )
+            ),
+            keyAgreementHandle: keyAgreementHandle
         )
     }
 
@@ -286,6 +322,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
 private struct SecureEnclaveRouteFixture {
     let identity: PGPKeyIdentity
     let route: SecureEnclaveSignerRoute
+    let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
 }
 
 private final class StaticPrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {

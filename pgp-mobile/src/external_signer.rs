@@ -192,7 +192,7 @@ pub(crate) fn map_external_signing_error(
         match external_error {
             ExternalP256SignerError::OperationCancelled => PgpError::OperationCancelled,
             ExternalP256SignerError::ExternalFailure(category) => {
-                fallback(category.stable_reason().to_string())
+                PgpError::ExternalP256SigningFailed { category }
             }
             ExternalP256SignerError::InvalidRequest(reason)
             | ExternalP256SignerError::InvalidResponse(reason) => fallback(reason.to_string()),
@@ -611,11 +611,13 @@ mod tests {
         );
 
         match result {
-            Err(PgpError::SigningFailed { reason }) => {
-                assert!(reason.contains("privateHandleMissing"));
-                assert!(!reason.contains(&signing_key_fingerprint));
+            Err(PgpError::ExternalP256SigningFailed { category }) => {
+                assert_eq!(
+                    category,
+                    ExternalP256SigningFailureCategory::PrivateHandleMissing
+                );
             }
-            other => panic!("expected sanitized SigningFailed, got {other:?}"),
+            other => panic!("expected sanitized ExternalP256SigningFailed, got {other:?}"),
         }
     }
 
@@ -776,7 +778,12 @@ mod tests {
         .expect("external signer should initialize");
 
         let result = sign::sign_cleartext_with_signer(b"must not fallback", signer);
-        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+        assert!(matches!(
+            result,
+            Err(PgpError::ExternalP256SigningFailed {
+                category: ExternalP256SigningFailureCategory::ExternalOperationFailed
+            })
+        ));
     }
 
     #[test]

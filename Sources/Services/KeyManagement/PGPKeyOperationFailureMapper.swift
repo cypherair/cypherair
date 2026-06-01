@@ -36,29 +36,6 @@ enum PGPKeyOperationFailureMapper {
         return category(for: error, fallback: .publicCertificateAssociationMismatch)
     }
 
-    static func externalP256SigningCategory(
-        for reason: String
-    ) -> PGPKeyOperationFailureCategory? {
-        let callbackCategories: Set<PGPKeyOperationFailureCategory> = [
-            .hardwareUnavailable,
-            .localAuthenticationRequired,
-            .localAuthenticationCancelled,
-            .localAuthenticationFailed,
-            .localAuthenticationUnavailable,
-            .localAuthenticationLockedOut,
-            .privateHandleMissing,
-            .privateHandleInaccessible,
-            .privateHandleUnauthorized,
-            .privateOperationRoleMismatch,
-            .handlePublicKeyBindingMismatch,
-            .externalOperationFailed
-        ]
-
-        return callbackCategories.first { category in
-            reason == category.rawValue || reason.contains(category.rawValue)
-        }
-    }
-
     private static func category(
         for error: CypherAirError,
         fallback: PGPKeyOperationFailureCategory
