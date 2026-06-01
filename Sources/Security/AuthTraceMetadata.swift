@@ -83,8 +83,8 @@ enum AuthTraceMetadata {
 
     static func errorMetadata(_ error: Error, extra: [String: String] = [:]) -> [String: String] {
         var metadata = AuthErrorTraceMetadata.errorMetadata(error, extra: extra)
-        if let keychainError = error as? KeychainError {
-            metadata["keychainError"] = keychainError.traceName
+        if let keychainFailureTraceName = KeychainFailureClassifier.traceName(for: error) {
+            metadata["keychainError"] = keychainFailureTraceName
         }
         return metadata
     }

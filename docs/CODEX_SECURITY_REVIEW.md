@@ -58,11 +58,12 @@ This document is the implementation planning record for active accepted security
 - Severity: `low`
 - Area: `build-integration`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/715f18cb62e48191abe332c39da5f2bd)
-- Decision: Confirmed deferred architecture hardening. Security mocks are compiled into the app module even though production composition does not currently select them.
-- Impact: No evidence shows production user keys are currently protected by mocks. The risk is future accidental mock selection because mocks share the app module.
+- Decision: Confirmed deferred architecture hardening. This remains open after the interim guardrail pass.
+- Impact: No evidence shows production user keys are currently protected by mocks. The risk is future accidental mock selection because tutorial/UI-test mocks still share part of the app module.
 - Relevant paths: `CypherAir.xcodeproj/project.pbxproj`, `Sources/Security/Mocks/MockAuthenticator.swift`, `Sources/Security/Mocks/MockKeychain.swift`, `Sources/Security/Mocks/MockSecureEnclave.swift`
-- Fix plan: Handle during broader componentization: move test-only mocks outside the app target and scope tutorial software security implementations as tutorial-only simulation.
-- Validation: During architecture work, add target membership/build checks proving test-only mocks are not compiled into production targets.
+- Interim guardrail: test-only mocks that do not serve tutorial/UI-test runtime are moved out of `Sources`; `Sources/Security/Mocks` is the only temporary production-source mock directory; ProtectedData production files must not embed mock implementations; non-mock production code must not directly reference `MockKeychainError`; Release and App Store Candidate builds ignore `UITEST_*` app-container launch overrides.
+- Remaining fix plan: close SR-FIX-18 only after tutorial migrates away from mock security primitives to tutorial-specific isolated real Protected Data domains and hardware-backed processing that never touches user security assets, and after build/target-membership checks prove test-only mocks are not compiled into production targets.
+- Validation: Maintain source-audit guardrails plus macOS unit tests, mandatory `CypherAir-MacUITests`, and Release/App Store Candidate build probes for this interim state.
 
 ### SR-FIX-20: Text input section is recreated on every edit
 

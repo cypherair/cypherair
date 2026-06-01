@@ -1643,7 +1643,7 @@ final class KeyManagementServiceTests: XCTestCase {
             authenticator: mockAuth,
             privateKeyControlStore: privateKeyControlStore
         )
-        mockKC.listItemsError = KeychainError.userCancelled
+        mockKC.listItemsError = MockKeychainError.userCancelled
 
         await freshService.migrateLegacyMetadataAfterAppAuthentication(
             authenticationContext: LAContext(),

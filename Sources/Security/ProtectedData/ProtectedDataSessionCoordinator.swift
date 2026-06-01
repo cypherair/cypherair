@@ -271,13 +271,8 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     }
 
     private func isAuthorizationCancellationOrDenial(_ error: Error) -> Bool {
-        if let keychainError = error as? KeychainError {
-            switch keychainError {
-            case .userCancelled, .authenticationFailed, .interactionNotAllowed:
-                return true
-            case .itemNotFound, .duplicateItem, .unhandledError:
-                return false
-            }
+        if KeychainFailureClassifier.isAuthorizationCancellationOrDenial(error) {
+            return true
         }
 
         if let authenticationError = error as? AuthenticationError {

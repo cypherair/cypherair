@@ -77,6 +77,22 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         XCTAssertFalse(contents.contains("openSandboxContactsSynchronously"))
     }
 
+    func test_securityMockImplementations_areConfinedToTemporaryMocksDirectory() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.securityMockImplementationContainment)
+    }
+
+    func test_protectedDataProductionFiles_doNotEmbedMockImplementations() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.protectedDataMockImplementationContainment)
+    }
+
+    func test_productionCodeDoesNotReferenceMockKeychainErrorOutsideMocks() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.productionMockKeychainErrorReferences)
+    }
+
+    func test_protectedDataAuthorizationClassificationUsesKeychainFailureClassifier() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.protectedDataAuthorizationConcreteKeychainErrorClassification)
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
@@ -391,6 +407,54 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             allowedContents: "struct FileProgressReporterBox { let reporter: ProgressReporterImpl }",
             cleanContents: "struct FileProgressReporterBox {}"
         )
+
+        let embeddedProtectedDataMockSource = AuditedSource(
+            path: "Sources/Security/ProtectedData/NewStore.swift",
+            contents: "final class MockProtectedDataThing {}"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.securityMockImplementationContainment
+                .violations(in: [embeddedProtectedDataMockSource])
+                .map(\.path),
+            [embeddedProtectedDataMockSource.path]
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.protectedDataMockImplementationContainment
+                .violations(in: [embeddedProtectedDataMockSource])
+                .map(\.path),
+            [embeddedProtectedDataMockSource.path]
+        )
+
+        let temporaryMockDirectorySource = AuditedSource(
+            path: "Sources/Security/Mocks/MockNewStore.swift",
+            contents: "final class MockNewStore {}"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.securityMockImplementationContainment
+                .violations(in: [temporaryMockDirectorySource])
+                .isEmpty
+        )
+
+        let mockKeychainErrorSource = AuditedSource(
+            path: "Sources/Security/NewStore.swift",
+            contents: "func check(_ error: Error) -> Bool { error is MockKeychainError }"
+        )
+        XCTAssertEqual(
+            ArchitectureSourceAuditRules.productionMockKeychainErrorReferences
+                .violations(in: [mockKeychainErrorSource])
+                .map(\.path),
+            [mockKeychainErrorSource.path]
+        )
+
+        let mockKeychainErrorInTemporaryMockSource = AuditedSource(
+            path: "Sources/Security/Mocks/MockKeychain.swift",
+            contents: "enum MockKeychainError: Error {}"
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.productionMockKeychainErrorReferences
+                .violations(in: [mockKeychainErrorInTemporaryMockSource])
+                .isEmpty
+        )
     }
 
     func test_sourceAuditRules_ignoreCommentsAndStringLiterals() throws {
@@ -483,6 +547,30 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         XCTAssertTrue(
             ArchitectureSourceAuditRules.screenModelStreamingProgressOwnership
                 .violations(in: [progressStateReadSource])
+                .isEmpty
+        )
+
+        let mockSource = AuditedSource(
+            path: "Sources/Security/ProtectedData/NewStore.swift",
+            contents: """
+            // final class MockProtectedDataThing {}
+            let message = "MockKeychainError final class MockProtectedDataThing"
+            struct NewStore {}
+            """
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.securityMockImplementationContainment
+                .violations(in: [mockSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.protectedDataMockImplementationContainment
+                .violations(in: [mockSource])
+                .isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.productionMockKeychainErrorReferences
+                .violations(in: [mockSource])
                 .isEmpty
         )
     }
@@ -941,6 +1029,56 @@ private enum ArchitectureSourceAuditRules {
         temporaryExceptions: temporaryExceptions([])
     )
 
+    static let securityMockImplementationContainment = ArchitectureSourceAuditRule(
+        name: "Security mock implementation containment",
+        failureSummary: "Mock implementations in production sources must stay in the temporary Sources/Security/Mocks debt area.",
+        pattern: mockTypeDeclarationPattern,
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && !path.hasPrefix("Sources/Security/Mocks/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let protectedDataMockImplementationContainment = ArchitectureSourceAuditRule(
+        name: "ProtectedData mock implementation containment",
+        failureSummary: "ProtectedData production files must not embed mock implementations.",
+        pattern: mockTypeDeclarationPattern,
+        scope: { path in
+            path.hasPrefix("Sources/Security/ProtectedData/") && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let productionMockKeychainErrorReferences = ArchitectureSourceAuditRule(
+        name: "Production MockKeychainError references",
+        failureSummary: "Production code outside the temporary mock directory must not reference MockKeychainError directly.",
+        pattern: #"\bMockKeychainError\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && !path.hasPrefix("Sources/Security/Mocks/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let protectedDataAuthorizationConcreteKeychainErrorClassification = ArchitectureSourceAuditRule(
+        name: "ProtectedData authorization keychain failure classification",
+        failureSummary: "ProtectedData authorization must classify keychain failures through KeychainFailureClassifier, not concrete KeychainError casts.",
+        pattern: #"\bas\s*\?\s*KeychainError\b"#,
+        scope: { path in
+            path == "Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift"
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
     private static let keyRouteViewPaths: Set<String> = [
         "Sources/App/Keys/BackupKeyView.swift",
         "Sources/App/Keys/ImportKeyView.swift",
@@ -954,6 +1092,9 @@ private enum ArchitectureSourceAuditRules {
         path.hasPrefix("Sources/App/Contacts/")
             && path.hasSuffix("View.swift")
     }
+
+    private static let mockTypeDeclarationPattern =
+        #"\b(?:(?:private|fileprivate|internal|public|package)\s+)*(?:final\s+)?(?:class|struct|enum|actor)\s+Mock[A-Za-z0-9_]*\b"#
 
     private static func wordPattern(for symbols: [String]) -> String {
         let alternation = symbols

@@ -35,7 +35,8 @@ struct CypherAirApp: App {
     init() {
         let launchConfiguration = AppLaunchConfiguration()
         let container: AppContainer
-        if launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost {
+        #if DEBUG
+        if launchConfiguration.usesUITestAppContainer {
             container = AppContainer.makeUITest(
                 requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
                 preloadContact: launchConfiguration.preloadsUITestContact,
@@ -46,8 +47,12 @@ struct CypherAirApp: App {
                 authTraceEnabled: launchConfiguration.isAuthTraceEnabled
             )
         }
-        if (launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost)
-            && !launchConfiguration.requiresManualAuthentication {
+        #else
+        container = AppContainer.makeDefault(
+            authTraceEnabled: launchConfiguration.isAuthTraceEnabled
+        )
+        #endif
+        if launchConfiguration.usesUITestAppContainer && !launchConfiguration.requiresManualAuthentication {
             container.appSessionOrchestrator.recordAuthentication()
         }
         if launchConfiguration.shouldSkipOnboarding {
@@ -514,7 +519,7 @@ struct CypherAirApp: App {
 
     @MainActor
     private func prepareUITestContactsIfNeeded() async {
-        guard launchConfiguration.isUITestMode || launchConfiguration.isXCTestHost,
+        guard launchConfiguration.usesUITestAppContainer,
               !launchConfiguration.requiresManualAuthentication else {
             return
         }
@@ -620,7 +625,7 @@ struct CypherAirApp: App {
             isAuthenticating: container.appSessionOrchestrator.isAuthenticating,
             isPrivacyScreenBlurred: container.appSessionOrchestrator.isPrivacyScreenBlurred,
             hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
-            allowsPreAuthenticationPresentation: launchConfiguration.isUITestMode
+            allowsPreAuthenticationPresentation: launchConfiguration.usesUITestAppContainer
                 && !launchConfiguration.requiresManualAuthentication
         )
     }

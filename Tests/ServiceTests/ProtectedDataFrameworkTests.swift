@@ -150,7 +150,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         lastAuthenticationContext = authenticationContext
         rightLookupCallCount += 1
         guard let persistedRightHandle else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         if let authorizeError = persistedRightHandle.authorizeError {
             throw authorizeError
@@ -166,7 +166,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         removeCallCount += 1
         lastRemovedIdentifier = identifier
         guard persistedRightHandle != nil else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
         persistedRightHandle = nil
     }
@@ -186,7 +186,7 @@ private final class MockProtectedDataRightStoreClient: AppProtectedDataRightStor
         _ = newPolicy
         lastAuthenticationContext = authenticationContext
         guard persistedRightHandle != nil else {
-            throw KeychainError.itemNotFound
+            throw MockKeychainError.itemNotFound
         }
     }
 }
@@ -3876,6 +3876,60 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
     }
 
+    func test_postUnlockCoordinator_mockKeychainInteractionNotAllowedReturnsAuthorizationDenied() async throws {
+        let sharedRightIdentifier = "com.cypherair.tests.protected-data.post-unlock.mock-interaction"
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockMockInteraction"))
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let rootSecretStore = AppMockProtectedDataRootSecretStore()
+        try rootSecretStore.saveRootSecret(
+            Data(repeating: 0xC8, count: 32),
+            identifier: sharedRightIdentifier,
+            policy: .userPresence
+        )
+        rootSecretStore.loadError = .interactionNotAllowed
+        let sessionCoordinator = AppProtectedDataSessionCoordinator(
+            rootSecretStore: rootSecretStore,
+            domainKeyManager: AppProtectedDomainKeyManager(storageRoot: storageRoot),
+            sharedRightIdentifier: sharedRightIdentifier
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: sharedRightIdentifier,
+            sharedResourceLifecycleState: .ready,
+            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
+            pendingMutation: nil
+        )
+        let openCalled = AsyncBooleanFlag()
+        let coordinator = AppProtectedDataPostUnlockCoordinator(
+            currentRegistryProvider: { registry },
+            protectedDataSessionCoordinator: sessionCoordinator,
+            domainOpeners: [
+                AppProtectedDataPostUnlockDomainOpener(
+                    domainID: CypherAir.ProtectedSettingsStore.domainID,
+                    open: { _ in await openCalled.setTrue() }
+                )
+            ]
+        )
+        let handoffContext = LAContext()
+        defer { handoffContext.invalidate() }
+
+        let outcome = await coordinator.openRegisteredDomains(
+            authenticationContext: handoffContext,
+            localizedReason: "Open protected domains",
+            source: "unitTest"
+        )
+
+        XCTAssertEqual(outcome, .authorizationDenied)
+        XCTAssertEqual(rootSecretStore.loadCallCount, 1)
+        XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
+        XCTAssertTrue(handoffContext.interactionNotAllowed)
+        let didOpen = await openCalled.currentValue()
+        XCTAssertFalse(didOpen)
+        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
+        XCTAssertFalse(sessionCoordinator.hasActiveWrappingRootKey)
+    }
+
     func test_postUnlockCoordinator_createsAndOpensFrameworkSentinelAsSecondDomain() async throws {
         let storageRoot = AppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockSentinel"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
@@ -4357,6 +4411,52 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
         XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
+    }
+
+    func test_authorization_mockKeychainCancellationFailures_returnCancelledOrDenied() async throws {
+        let cases: [(suffix: String, error: MockKeychainError)] = [
+            ("user-cancelled", .userCancelled),
+            ("authentication-failed", .authenticationFailed),
+            ("interaction-not-allowed", .interactionNotAllowed),
+        ]
+
+        for testCase in cases {
+            let sharedRightIdentifier = "com.cypherair.tests.protected-data.authorization.mock-\(testCase.suffix)"
+            let storageRoot = AppProtectedDataStorageRoot(
+                baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationMock-\(testCase.suffix)")
+            )
+            let keyManager = AppProtectedDomainKeyManager(storageRoot: storageRoot)
+            let rootSecretStore = AppMockProtectedDataRootSecretStore()
+            try rootSecretStore.saveRootSecret(
+                Data(repeating: 0xB0, count: 32),
+                identifier: sharedRightIdentifier,
+                policy: .userPresence
+            )
+            rootSecretStore.loadError = testCase.error
+            let coordinator = AppProtectedDataSessionCoordinator(
+                rootSecretStore: rootSecretStore,
+                domainKeyManager: keyManager,
+                sharedRightIdentifier: sharedRightIdentifier
+            )
+            let registry = ProtectedDataRegistry(
+                formatVersion: ProtectedDataRegistry.currentFormatVersion,
+                sharedRightIdentifier: sharedRightIdentifier,
+                sharedResourceLifecycleState: .ready,
+                committedMembership: ["contacts": .active],
+                pendingMutation: nil
+            )
+            keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xD4, count: 32), for: "contacts")
+
+            let result = await coordinator.beginProtectedDataAuthorization(
+                registry: registry,
+                localizedReason: "Authorize protected data"
+            )
+
+            XCTAssertEqual(result, .cancelledOrDenied, "case: \(testCase.suffix)")
+            XCTAssertEqual(coordinator.frameworkState, .sessionLocked, "case: \(testCase.suffix)")
+            XCTAssertFalse(coordinator.hasActiveWrappingRootKey, "case: \(testCase.suffix)")
+            XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys, "case: \(testCase.suffix)")
+        }
     }
 
     func test_authorization_userCancelled_returnsCancelledOrDenied() async throws {

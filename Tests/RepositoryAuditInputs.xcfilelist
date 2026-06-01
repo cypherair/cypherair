@@ -228,6 +228,7 @@ $(SRCROOT)/Sources/Security/AuthenticationEvaluable.swift
 $(SRCROOT)/Sources/Security/AuthenticationManager.swift
 $(SRCROOT)/Sources/Security/AuthenticationPromptCoordinator.swift
 $(SRCROOT)/Sources/Security/KeyBundleStore.swift
+$(SRCROOT)/Sources/Security/KeychainFailure.swift
 $(SRCROOT)/Sources/Security/KeyMetadataStore.swift
 $(SRCROOT)/Sources/Security/KeyMigrationCoordinator.swift
 $(SRCROOT)/Sources/Security/KeychainManageable.swift
@@ -239,9 +240,7 @@ $(SRCROOT)/Sources/Security/PrivateKeyRewrapRecoveryCoordinator.swift
 $(SRCROOT)/Sources/Security/PrivateKeyRewrapWorkflow.swift
 $(SRCROOT)/Sources/Security/Mocks/MockAuthenticator.swift
 $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
-$(SRCROOT)/Sources/Security/Mocks/MockMemoryInfo.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
-$(SRCROOT)/Sources/Security/Mocks/MockSecureEnclaveCustodyKeyStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift

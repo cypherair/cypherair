@@ -623,6 +623,7 @@ final class AppContainer: @unchecked Sendable {
         )
     }
 
+    #if DEBUG
     static func makeUITest(
         requiresManualAuthentication: Bool = false,
         preloadContact: Bool = false,
@@ -933,6 +934,7 @@ final class AppContainer: @unchecked Sendable {
         }
         return container
     }
+    #endif
 
     @MainActor
     @discardableResult

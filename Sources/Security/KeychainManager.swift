@@ -3,7 +3,7 @@ import LocalAuthentication
 import Security
 
 /// Errors from Keychain operations.
-enum KeychainError: Error, Equatable {
+enum KeychainError: Error, Equatable, KeychainFailureRepresentable {
     /// The item was not found in the Keychain (errSecItemNotFound).
     case itemNotFound
     /// A duplicate item already exists (errSecDuplicateItem).
@@ -16,6 +16,23 @@ enum KeychainError: Error, Equatable {
     case interactionNotAllowed
     /// An unspecified Keychain error occurred.
     case unhandledError(OSStatus)
+
+    var keychainFailureKind: KeychainFailureKind {
+        switch self {
+        case .itemNotFound:
+            .itemNotFound
+        case .duplicateItem:
+            .duplicateItem
+        case .userCancelled:
+            .userCancelled
+        case .authenticationFailed:
+            .authenticationFailed
+        case .interactionNotAllowed:
+            .interactionNotAllowed
+        case .unhandledError:
+            .unhandled
+        }
+    }
 }
 
 /// Production Keychain implementation using Security.framework.
