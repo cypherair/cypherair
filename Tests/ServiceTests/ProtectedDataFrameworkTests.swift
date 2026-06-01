@@ -262,6 +262,49 @@ private actor AsyncDataBox {
     }
 }
 
+private final class ProtectedDataRootSecretCleanupProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var currentExists: Bool
+    private var recordedEvents: [String] = []
+
+    init(exists: Bool = true) {
+        self.currentExists = exists
+    }
+
+    func rootSecretExists() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedEvents.append("exists")
+        return currentExists
+    }
+
+    func removeRootSecret() {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedEvents.append("remove")
+        currentExists = false
+    }
+
+    func provisionRootSecret() {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedEvents.append("provision")
+        currentExists = true
+    }
+
+    func record(_ event: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedEvents.append(event)
+    }
+
+    func snapshot() -> (exists: Bool, events: [String]) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (currentExists, recordedEvents)
+    }
+}
+
 private enum ProtectedDataTestInterruption: Error {
     case injectedPendingCreateInterruption
 }
@@ -1257,6 +1300,158 @@ final class ProtectedDataFrameworkTests: XCTestCase {
         XCTAssertEqual(loadedRegistry, registry)
         XCTAssertEqual(recoveryDisposition, .continuePendingMutation)
         XCTAssertEqual(result.frameworkState, .sessionLocked)
+    }
+
+    func test_firstDomainCleanupRunsAfterCreateJournalBeforeProvisioning() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataFirstDomainCleanupOrder")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let registryStore = AppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.first-domain-cleanup-order"
+        )
+        _ = try registryStore.performSynchronousBootstrap()
+        let rootSecretProbe = ProtectedDataRootSecretCleanupProbe(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecretProbe.rootSecretExists() },
+            removePersistedSharedRight: { _ in rootSecretProbe.removeRootSecret() }
+        )
+        let domainID: ProtectedDataDomainID = "first-domain"
+
+        let registry = try await registryStore.performCreateDomainTransaction(
+            domainID: domainID,
+            cleanupJournaledFirstDomainSharedRightIfNeeded: {
+                rootSecretProbe.record("cleanup")
+                let journaledRegistry = try registryStore.loadRegistry()
+                XCTAssertEqual(
+                    journaledRegistry.pendingMutation,
+                    .createDomain(targetDomainID: domainID, phase: .journaled)
+                )
+                let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+                    expectedDomainID: domainID,
+                    source: "unitTest",
+                    loadCurrentRegistry: {
+                        let currentRegistry = try registryStore.loadRegistry()
+                        XCTAssertEqual(currentRegistry, journaledRegistry)
+                        return currentRegistry
+                    }
+                )
+                XCTAssertEqual(outcome, .removedOrphanedSharedRight)
+            },
+            provisionSharedResourceIfNeeded: {
+                rootSecretProbe.provisionRootSecret()
+            },
+            stageArtifacts: {},
+            validateArtifacts: {}
+        )
+
+        let snapshot = rootSecretProbe.snapshot()
+        XCTAssertTrue(snapshot.exists)
+        XCTAssertEqual(snapshot.events, ["cleanup", "exists", "remove", "provision"])
+        XCTAssertEqual(registry.committedMembership[domainID], .active)
+        XCTAssertEqual(registry.sharedResourceLifecycleState, .ready)
+        XCTAssertNil(registry.pendingMutation)
+    }
+
+    func test_firstDomainSharedRightCleaner_abortsWhenCurrentRegistryHasCommittedMembership() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataFirstDomainCleanupCommitted")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let rootSecretProbe = ProtectedDataRootSecretCleanupProbe(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecretProbe.rootSecretExists() },
+            removePersistedSharedRight: { _ in rootSecretProbe.removeRootSecret() }
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.first-domain-cleanup-committed",
+            sharedResourceLifecycleState: .ready,
+            committedMembership: ["committed-domain": .active],
+            pendingMutation: nil
+        )
+
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: "committed-domain",
+            source: "unitTest",
+            loadCurrentRegistry: { registry }
+        )
+
+        let snapshot = rootSecretProbe.snapshot()
+        XCTAssertEqual(outcome, .notNeeded)
+        XCTAssertTrue(snapshot.exists)
+        XCTAssertFalse(snapshot.events.contains("remove"))
+    }
+
+    func test_firstDomainSharedRightCleaner_abortsWhenCurrentRegistryHasUnrelatedPendingMutation() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataFirstDomainCleanupPending")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let rootSecretProbe = ProtectedDataRootSecretCleanupProbe(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecretProbe.rootSecretExists() },
+            removePersistedSharedRight: { _ in rootSecretProbe.removeRootSecret() }
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.first-domain-cleanup-pending",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: "other-domain",
+                phase: .journaled
+            )
+        )
+
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: "requested-domain",
+            source: "unitTest",
+            loadCurrentRegistry: { registry }
+        )
+
+        let snapshot = rootSecretProbe.snapshot()
+        XCTAssertEqual(outcome, .notNeeded)
+        XCTAssertTrue(snapshot.exists)
+        XCTAssertFalse(snapshot.events.contains("remove"))
+    }
+
+    func test_firstDomainSharedRightCleaner_doesNotDeleteRootSecretFromConcurrentPendingCreate() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataFirstDomainCleanupConcurrent")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = AppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let rootSecretProbe = ProtectedDataRootSecretCleanupProbe(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecretProbe.rootSecretExists() },
+            removePersistedSharedRight: { _ in rootSecretProbe.removeRootSecret() }
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.first-domain-cleanup-concurrent",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: "first-domain-in-progress",
+                phase: .sharedResourceProvisioned
+            )
+        )
+
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: "competing-first-domain",
+            source: "unitTest",
+            loadCurrentRegistry: { registry }
+        )
+
+        let snapshot = rootSecretProbe.snapshot()
+        XCTAssertEqual(outcome, .notNeeded)
+        XCTAssertTrue(snapshot.exists)
+        XCTAssertFalse(snapshot.events.contains("remove"))
     }
 
     func test_domainKeyManager_deriveWrappingRootKey_zeroizesInputAndWrapsDeterministicallyPerDomain() throws {

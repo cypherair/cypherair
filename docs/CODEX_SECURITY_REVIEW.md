@@ -16,18 +16,6 @@ This document is the implementation planning record for active accepted security
 - Fix plan: Separate cryptographic certification validity from trusted certification semantics. Use neutral UI for valid but untrusted certifications; reserve trusted labels for artifacts accepted under an explicit signer trust policy.
 - Validation: Add service/UI tests for valid-untrusted certifications, trusted certifications, and self-certification-like artifacts so labels cannot overstate trust.
 
-### SR-FIX-06: TOCTOU can delete active protected-data root secret
-
-- Legacy ID: `CA-10`
-- Severity: `medium`
-- Area: `protected-data`
-- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9fd5a847678881918e0eea9cbdfc2e77)
-- Decision: Confirmed low-probability ProtectedData availability risk. Root-secret orphan cleanup can act on stale registry state during first-domain creation.
-- Impact: Failure mode is local ProtectedData availability or recovery loss. It is not disclosure, authentication bypass, or cryptographic breakage.
-- Relevant paths: `Sources/Security/ProtectedData/ProtectedDataFirstDomainSharedRightCleaner.swift`, `Sources/Security/ProtectedData/PrivateKeyControlStore.swift`, `Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift`, `Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift`, `Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift`
-- Fix plan: Before deleting a supposedly orphaned root secret, reload current registry state under the registry mutation gate or equivalent serialization. Abort cleanup if any current membership, pending mutation, or ready shared resource exists.
-- Validation: Add concurrency/unit coverage around first-domain creation and orphan cleanup with stale snapshots; assert cleanup aborts under current registry membership or mutation.
-
 ### SR-FIX-14: Decrypted file can persist after cancelled/abandoned decrypt
 
 - Legacy ID: `CA-29`
