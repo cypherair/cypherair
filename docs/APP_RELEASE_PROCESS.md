@@ -29,15 +29,18 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
   exact Xcode project build setting values.
 - Stable release tags must be SSH-signed annotated tags. Do not publish
   lightweight or unsigned stable tags.
-- Pushing a stable tag triggers the stable build release workflow; manual runs can dry-run the same contract without publishing the immutable release.
+- Pushing a stable tag triggers the stable build release workflow; manual runs
+  can dry-run the same contract but cannot publish the immutable release.
 - Formal publishing is tag-first. Create and push the stable tag on the
   intended `main` commit; the tag push is the preferred trigger for the
-  immutable GitHub release. A manual `workflow_dispatch` run with
-  `create_release=true` still requires that stable tag to already exist because
-  the workflow publishes with `gh release create --verify-tag`.
+  immutable GitHub release. `workflow_dispatch` is validation-only and always
+  leaves produced files as short-lived workflow artifacts.
 - The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
 - The stable workflow validates that the tag's marketing version and build number match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` before assets are published.
-- The stable workflow includes an independent `rust-dependency-audit` job that selects the official stable Rust toolchain and runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
+- The publish job revalidates that the current remote stable tag is still an
+  SSH-signed annotated tag for the artifact commit immediately before
+  provenance attestation and immutable GitHub Release creation.
+- The stable workflow includes an independent `rust-dependency-audit` job that selects the official stable Rust toolchain and runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal tag-push-only `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.

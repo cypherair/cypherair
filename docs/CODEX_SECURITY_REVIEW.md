@@ -22,11 +22,12 @@ This document is the implementation planning record for accepted security-review
 - Severity: `high`
 - Area: `ci-supply-chain`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/b2db20bd745c8191856cc218daacb19d)
+- Status: `Fixed / Closed`
 - Decision: Confirmed release supply-chain hardening. Release XCFramework builds expose GitHub tokens to broader build subprocesses than needed.
 - Impact: Compromised release-time build code could read workflow tokens during artifact production. This is release infrastructure risk, not an app-runtime exploit.
-- Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`
-- Fix plan: Scope `GH_TOKEN` / `GITHUB_TOKEN` only to `gh` release operations that need GitHub API access. Clear token variables from Cargo, build-script, and helper subprocess environments.
-- Validation: Inspect workflow environments and run release-workflow dry validation showing build subprocesses do not inherit GitHub tokens except for narrow `gh` calls.
+- Relevant paths: `.github/workflows/pr-checks.yml`, `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `scripts/build_apple_arm64e_xcframework.sh`, `scripts/download_arm64e_stage1_toolchain.sh`
+- Fix summary: CI now downloads the public arm64e stage1 toolchain in a dedicated token-free pre-build step before XCFramework builds, invokes the build without GitHub token variables, disables checkout credential persistence, and keeps all stage1 downloader invocations token-free.
+- Validation: Added static workflow hardening coverage proving XCFramework build steps and stage1 download steps do not receive GitHub tokens, and stage1 download remains separate from the build.
 
 ### SR-FIX-03: Release workflow runs arbitrary refs with write token
 
@@ -34,11 +35,12 @@ This document is the implementation planning record for accepted security-review
 - Severity: `high`
 - Area: `ci-supply-chain`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/893e12c4d22c8191afba18916328b86d)
+- Status: `Fixed / Closed`
 - Decision: Confirmed release provenance issue. Formal stable publication can be dispatched from a source ref that is not proven to match the stable release tag commit.
 - Impact: A stable release page could receive assets built from the wrong ref, weakening provenance for released XCFramework and source/compliance artifacts.
 - Relevant paths: `.github/workflows/stable-build-release.yml`
-- Fix plan: Make formal stable publication tag-push only, or guard dispatch so checked-out `HEAD` equals the peeled stable tag commit before any official release asset is created.
-- Validation: Add workflow guard tests or script checks for tag/HEAD equality and verify dispatch cannot publish official assets from a mismatched ref.
+- Fix summary: Formal stable publication is tag-push only; manual `workflow_dispatch` runs are dry-run validation artifacts. The publish path keeps a defensive `HEAD` versus peeled stable-tag commit check before official asset creation, then requires the current remote tag to be an SSH-signed annotated tag for the artifact commit immediately before attestation and release publication.
+- Validation: Added static workflow hardening coverage proving manual dispatch cannot publish, the build-time tag/HEAD guard is present, and publish-time tag revalidation rejects lightweight or unsigned stable tags before attestation and release creation.
 
 ### SR-FIX-04: Rust audit does not gate release publication
 
@@ -46,11 +48,12 @@ This document is the implementation planning record for accepted security-review
 - Severity: `medium`
 - Area: `ci-supply-chain`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/9b57feaa6750819185da3adea4e4b205)
+- Status: `Fixed / Closed`
 - Decision: Confirmed edge-release hardening. Edge publication is not currently blocked by a failed Rust dependency audit.
 - Impact: Public edge or drill assets can be published even when Rust dependency audit fails, weakening prerelease supply-chain signals.
 - Relevant paths: `.github/workflows/stable-build-release.yml`, `.github/workflows/xcframework-edge-release.yml`, `docs/TESTING.md`, `docs/APP_RELEASE_PROCESS.md`
-- Fix plan: Make `publish-edge-release` depend on `rust-dependency-audit`, or run the audit inside the publish job before tag/release creation and asset upload.
-- Validation: Verify the edge workflow graph requires Rust audit before publication and that a failing audit prevents tag/release asset creation.
+- Fix summary: Edge/drill builds now produce short-lived artifacts in a read-scoped build job; `publish-edge-release` depends on both the build job and `rust-dependency-audit` before attestation, tag creation, release creation, asset upload, or publication.
+- Validation: Added static workflow hardening coverage proving edge publication is audit-gated and write-scoped to the publish job.
 
 ### SR-FIX-05: Untrusted certifications can mark contacts certified
 
@@ -121,11 +124,12 @@ This document is the implementation planning record for accepted security-review
 - Severity: `medium`
 - Area: `ci-supply-chain`
 - Source: [finding](https://chatgpt.com/codex/cloud/security/findings/6d4198b21e5c8191a5d7d8339a3d6484)
+- Status: `Fixed / Closed`
 - Decision: Confirmed low-impact release-note hardening. Drill release verification commands should render shell-safe source refs.
 - Impact: A developer copying an unsafe verification command from drill release notes could trigger shell expansion. GitHub Actions and app users are not directly affected.
 - Relevant paths: `.github/workflows/xcframework-edge-release.yml`
-- Fix plan: Render shell-safe quoted source refs in drill release notes, or constrain accepted drill source refs to a safe character set before publishing notes.
-- Validation: Validate generated release notes for refs containing shell metacharacters, or validate that unsafe refs are rejected before publication.
+- Fix summary: Edge/drill release metadata is generated through JSON escaping, and release-note attestation commands render the source ref through Python `shlex.quote` before publication.
+- Validation: Added static workflow hardening coverage proving release notes no longer render raw `"$RELEASE_SOURCE_REF"` and metadata no longer writes raw JSON heredoc values.
 
 ### SR-FIX-11: Production auth can be bypassed via UI-test defaults key
 
