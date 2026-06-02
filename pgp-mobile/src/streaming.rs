@@ -17,6 +17,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+use openpgp::crypto::Signer as CryptoSigner;
 use openpgp::parse::stream::*;
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
@@ -30,6 +31,8 @@ use crate::decrypt::{
 };
 use crate::encrypt;
 use crate::error::PgpError;
+use crate::external_signer::{map_external_signing_error, signer_for_provider};
+use crate::keys::ExternalP256SigningProvider;
 use crate::sign;
 use crate::signature_details::{
     state_from_legacy_status, FileDecryptDetailedResult, FileVerifyDetailedResult,
@@ -472,6 +475,37 @@ pub fn sign_detached_file(
     let policy = StandardPolicy::new();
     let signing_keypair = sign::extract_signing_keypair(signer_cert, &policy)?;
 
+    sign_detached_file_with_signer(input_path, signing_keypair, progress)
+}
+
+/// Create a detached file signature using a public certificate plus external P-256 signer.
+pub fn sign_detached_file_with_external_p256_signer(
+    input_path: &str,
+    public_cert_data: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let signing_public_key =
+        sign::select_external_p256_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+    let external_signer = signer_for_provider(signing_public_key, signer).map_err(|error| {
+        PgpError::SigningFailed {
+            reason: format!("External signer setup failed: {error}"),
+        }
+    })?;
+
+    sign_detached_file_with_signer(input_path, external_signer, progress)
+}
+
+fn sign_detached_file_with_signer<S>(
+    input_path: &str,
+    signing_keypair: S,
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<Vec<u8>, PgpError>
+where
+    S: CryptoSigner + Send + Sync,
+{
     // Open input file with progress reporting
     let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
         reason: format!("Cannot open input file '{}': {e}", input_path),
@@ -496,16 +530,12 @@ pub fn sign_detached_file(
         })?
         .detached()
         .build()
-        .map_err(|e| PgpError::SigningFailed {
-            reason: format!("Signer setup failed: {e}"),
-        })?;
+        .map_err(|error| map_detached_signing_error("Signer setup failed", error))?;
 
     // Stream file data through the signer
     if let Err(e) = zeroing_copy(&mut progress_reader, &mut signer, STREAM_BUFFER_SIZE) {
         return Err(match e {
-            CopyError::Read(io_err) => PgpError::SigningFailed {
-                reason: format!("Read failed: {io_err}"),
-            },
+            CopyError::Read(io_err) => classify_detached_signing_io_error("Read failed", io_err),
             CopyError::Write(io_err) => PgpError::SigningFailed {
                 reason: format!("Write failed: {io_err}"),
             },
@@ -513,11 +543,33 @@ pub fn sign_detached_file(
         });
     }
 
-    signer.finalize().map_err(|e| PgpError::SigningFailed {
-        reason: format!("Finalize failed: {e}"),
-    })?;
+    signer
+        .finalize()
+        .map_err(|error| map_detached_signing_error("Finalize failed", error))?;
 
     Ok(sink)
+}
+
+fn classify_detached_signing_io_error(context: &str, error: std::io::Error) -> PgpError {
+    if error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<StreamingCancelled>())
+        .is_some()
+    {
+        return PgpError::OperationCancelled;
+    }
+
+    map_external_signing_error(openpgp::anyhow::Error::from(error), |reason| {
+        PgpError::SigningFailed {
+            reason: format!("{context}: {reason}"),
+        }
+    })
+}
+
+fn map_detached_signing_error(context: &str, error: openpgp::anyhow::Error) -> PgpError {
+    map_external_signing_error(error, |reason| PgpError::SigningFailed {
+        reason: format!("{context}: {reason}"),
+    })
 }
 
 /// Verify a detached signature against a file using streaming I/O and preserve details.

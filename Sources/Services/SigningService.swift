@@ -8,17 +8,20 @@ final class SigningService {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let cleartextSigner: any CleartextMessageSigning
+    private let detachedFileSigner: any DetachedFileSigning
 
     init(
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
-        cleartextSigner: any CleartextMessageSigning
+        cleartextSigner: any CleartextMessageSigning,
+        detachedFileSigner: any DetachedFileSigning
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.cleartextSigner = cleartextSigner
+        self.detachedFileSigner = detachedFileSigner
     }
 
     // MARK: - Signing
@@ -52,19 +55,9 @@ final class SigningService {
         signerFingerprint: String,
         progress: FileProgressReporter?
     ) async throws -> Data {
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        return try await messageAdapter.signDetachedFile(
+        try await detachedFileSigner.signDetachedFile(
             inputPath: fileURL.path,
-            signerCert: secretKey,
+            signerFingerprint: signerFingerprint,
             progress: progress
         )
     }

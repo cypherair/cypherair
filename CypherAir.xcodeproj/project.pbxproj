@@ -383,6 +383,7 @@
 				Services/KeyManagement/PGPKeyOperationFailureMapper.swift,
 				Services/KeyManagement/PGPKeyCapabilityResolver.swift,
 				Services/KeyManagement/PrivateKeyCleartextSigningService.swift,
+				Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift,
 				Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift,
 				Services/KeyManagement/PrivateKeyTextEncryptionService.swift,
 				Services/KeyManagement/PrivateKeyOperationRouter.swift,

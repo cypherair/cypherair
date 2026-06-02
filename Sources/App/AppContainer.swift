@@ -283,6 +283,13 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
+        let detachedFileSigner = makePrivateKeyDetachedFileSigningService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         let passwordEncryptor = makePrivateKeyPasswordMessageEncryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
@@ -315,7 +322,8 @@ final class AppContainer: @unchecked Sendable {
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
-                cleartextSigner: cleartextSigner
+                cleartextSigner: cleartextSigner,
+                detachedFileSigner: detachedFileSigner
             ),
             certificateSignatureService: CertificateSignatureService(
                 certificateAdapter: certificateAdapter,
@@ -356,6 +364,24 @@ final class AppContainer: @unchecked Sendable {
         secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
     ) -> PrivateKeyCleartextSigningService {
         PrivateKeyCleartextSigningService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyDetachedFileSigningService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyDetachedFileSigningService {
+        PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore

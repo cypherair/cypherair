@@ -290,6 +290,28 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func signDetachedFileWithExternalP256Signer(
+        inputPath: String,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        progress: FileProgressReporter?
+    ) async throws -> Data {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            return try await Self.performSignDetachedFileWithExternalP256Signer(
+                engine: engine,
+                inputPath: inputPath,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                progress: progressBridge
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func verifyCleartextDetailed(
         signedMessage: Data,
         verificationContext: PGPMessageVerificationContext
@@ -558,6 +580,24 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         try engine.signDetachedFile(
             inputPath: inputPath,
             signerCert: signerCert,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performSignDetachedFileWithExternalP256Signer(
+        engine: PgpEngine,
+        inputPath: String,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        progress: ProgressReporter?
+    ) async throws -> Data {
+        try engine.signDetachedFileWithExternalP256Signer(
+            inputPath: inputPath,
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
             progress: progress
         )
     }

@@ -281,9 +281,23 @@ routes only optional signing for `PasswordMessageService.encryptText` and
 keep the existing unwrap-and-zeroize behavior, Secure Enclave signer routes pass
 public signing certificate material and the loaded signing handle to the
 external signer password APIs, and blocked routes map to sanitized unavailable
-categories. Streaming file encryption/signing, detached signing,
+categories. Streaming file encryption/signing, certification, revocation,
+expiry/binding refresh, and decrypt remain outside PR 5D.
+
+Phase 5E is the fourth narrow workflow consumer. The Rust runtime detached file
+signing API streams file bytes through the existing detached-signature path
+while accepting a public signing certificate, expected signing-key fingerprint,
+and the existing external P-256 signing provider. Rust rejects secret signing
+certificates, non-P-256 or wrong-role signing certificates, fingerprint
+mismatches, malformed callback signatures, wrong digests, and wrong public-key
+signatures without falling back to secret-certificate signing. Swift routes only
+`SigningService.signDetachedStreaming`: software routes keep the existing
+unwrap-and-zeroize behavior, Secure Enclave signer routes pass public signing
+certificate material, the loaded signing handle, and existing progress
+cancellation through the external signer detached-file API, and blocked routes
+map to sanitized unavailable categories. Streaming encrypt-plus-sign,
 certification, revocation, expiry/binding refresh, and decrypt remain outside
-PR 5D.
+PR 5E.
 
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
