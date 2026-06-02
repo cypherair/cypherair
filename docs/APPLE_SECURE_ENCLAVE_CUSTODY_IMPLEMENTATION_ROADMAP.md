@@ -324,6 +324,18 @@ Recommended PR grouping:
   reporting, blocked routes surface sanitized unavailable categories, and
   production policy still blocks Secure Enclave custody.
 - PR 5F: streaming encrypt-plus-sign.
+  **Implemented:** Phase 5F adds a Rust/UniFFI streaming file encrypt API that
+  can sign with a public-only P-256 certificate through the external signer
+  callback, and Swift routes only `EncryptionService.encryptFileStreaming`
+  optional signing through the private-operation router. File encryption still
+  owns recipient lookup, disk-space checks, encrypt-to-self resolution,
+  temporary artifact creation/protection/cleanup, progress, binary output, and
+  SEIPDv1/SEIPDv2 selection. Software routes retain the existing
+  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
+  material plus a loaded signing handle and existing progress/cancellation
+  reporting, unsigned streaming file encryption does not route, blocked routes
+  surface sanitized unavailable categories, and production policy still blocks
+  Secure Enclave custody.
 - PR 5G: expiry and binding-refresh signing route, or explicit unsupported
   closeout.
 - PR 5H: selective subkey and User ID revocation signing route.

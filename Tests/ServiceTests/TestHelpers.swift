@@ -230,6 +230,11 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let fileEncryptor = makeFileEncryptor(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
         let passwordMessageEncryptor = makePasswordMessageEncryptor(
             engine: engine,
             keyManagement: keyMgmt,
@@ -237,10 +242,10 @@ enum TestHelpers {
         )
 
         let encryptionSvc = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc,
-            textEncryptor: textEncryptor
+            textEncryptor: textEncryptor,
+            fileEncryptor: fileEncryptor
         )
         let decryptionSvc = DecryptionService(
             messageAdapter: messageAdapter,
@@ -282,6 +287,7 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc,
             textEncryptor: textEncryptor,
+            fileEncryptor: fileEncryptor,
             passwordMessageEncryptor: passwordMessageEncryptor,
             detachedFileSigner: detachedFileSigner,
             encryptionService: encryptionSvc,
@@ -307,6 +313,7 @@ enum TestHelpers {
         let keyManagement: KeyManagementService
         let contactService: ContactService
         let textEncryptor: any TextMessageEncrypting
+        let fileEncryptor: any StreamingFileEncrypting
         let passwordMessageEncryptor: any PasswordMessageEncrypting
         let detachedFileSigner: any DetachedFileSigning
         let encryptionService: EncryptionService
@@ -359,6 +366,28 @@ enum TestHelpers {
         digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makeFileEncryptor(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyStreamingFileEncryptionService {
+        PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: resolver,
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

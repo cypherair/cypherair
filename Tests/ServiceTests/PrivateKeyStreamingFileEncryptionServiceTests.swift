@@ -2,36 +2,45 @@ import Security
 import XCTest
 @testable import CypherAir
 
-final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
+final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
     private let engine = PgpEngine()
 
-    func test_unsignedTextEncryptionDoesNotRouteOrUnwrapSigner() async throws {
+    func test_unsignedFileEncryptionDoesNotRouteOrUnwrapSigner() async throws {
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        let router = StaticTextPrivateKeyOperationRouter(
+        let input = try makeTemporaryFile(Data("unsigned streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(
             route: .blocked(.unavailable(.operationUnavailableByPolicy))
         )
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = makeService(router: router, unwrapper: unwrapper)
 
-        let ciphertext = try await service.encryptText(
-            Data("unsigned text".utf8),
+        try await service.encryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
             recipientKeys: [recipient.publicKeyData],
             signerFingerprint: nil,
-            selfKey: nil
+            selfKey: nil,
+            progress: nil
         )
 
         XCTAssertEqual(router.requests, [])
         XCTAssertEqual(unwrapper.unwrapRequests, [])
-        let result = try decrypt(ciphertext, recipientSecret: recipient.certData, verificationKeys: [])
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "unsigned text")
+        let result = try decryptFile(
+            output,
+            recipientSecret: recipient.certData,
+            verificationKeys: []
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "unsigned streaming file")
         XCTAssertEqual(result.legacyStatus, .notSigned)
     }
 
     func test_softwareRouteSignsWithUnwrappedSecretCertificate() async throws {
         var signer = try engine.generateKey(
-            name: "Software Signer",
-            email: "software@example.invalid",
+            name: "Software File Signer",
+            email: "software-file-signer@example.invalid",
             expirySeconds: nil,
             profile: .universal
         )
@@ -39,64 +48,74 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
         let identity = try identity(from: signer, isDefault: true)
-        let router = StaticTextPrivateKeyOperationRouter(
+        let input = try makeTemporaryFile(Data("software signed streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(
             route: .softwareSecretCertificate(
                 SoftwareSecretCertificateRoute(identity: identity, operation: .sign)
             )
         )
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: signer.certData)
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: signer.certData)
         let service = makeService(router: router, unwrapper: unwrapper)
 
-        let ciphertext = try await service.encryptText(
-            Data("software signed text".utf8),
+        try await service.encryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
             recipientKeys: [recipient.publicKeyData],
             signerFingerprint: identity.fingerprint,
-            selfKey: nil
+            selfKey: nil,
+            progress: nil
         )
 
         XCTAssertEqual(router.requests, [
             PrivateKeyOperationRequest(fingerprint: identity.fingerprint, operation: .sign)
         ])
         XCTAssertEqual(unwrapper.unwrapRequests, [identity.fingerprint])
-        let result = try decrypt(
-            ciphertext,
+        let result = try decryptFile(
+            output,
             recipientSecret: recipient.certData,
             verificationKeys: [identity.publicKeyData]
         )
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "software signed text")
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "software signed streaming file")
         XCTAssertEqual(result.legacyStatus, .valid)
     }
 
-    func test_secureEnclaveRouteSignsWithoutUnwrappingSecretCertificate() async throws {
+    func test_secureEnclaveRouteSignsFileWithoutUnwrappingSecretCertificate() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let input = try makeTemporaryFile(Data("secure enclave signed streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
 
-        let ciphertext = try await service.encryptText(
-            Data("secure enclave signed text".utf8),
+        try await service.encryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
             recipientKeys: [recipient.publicKeyData],
             signerFingerprint: fixture.identity.fingerprint,
-            selfKey: nil
+            selfKey: nil,
+            progress: nil
         )
 
         XCTAssertEqual(unwrapper.unwrapRequests, [])
-        let result = try decrypt(
-            ciphertext,
+        let result = try decryptFile(
+            output,
             recipientSecret: recipient.certData,
             verificationKeys: [fixture.identity.publicKeyData]
         )
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave signed text")
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave signed streaming file")
         XCTAssertEqual(result.legacyStatus, .valid)
     }
 
-    func test_secureEnclaveV6RouteSignsAndVerifies() async throws {
+    func test_secureEnclaveV6RouteSignsFileAndVerifies() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
         XCTAssertEqual(fixture.identity.profile, .advanced)
@@ -104,41 +123,61 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         var recipient = try makeRecipient(profile: .advanced)
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let input = try makeTemporaryFile(Data("secure enclave v6 signed streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
 
-        let ciphertext = try await service.encryptText(
-            Data("secure enclave v6 signed text".utf8),
+        try await service.encryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
             recipientKeys: [recipient.publicKeyData],
             signerFingerprint: fixture.identity.fingerprint,
-            selfKey: nil
+            selfKey: nil,
+            progress: nil
         )
 
         XCTAssertEqual(unwrapper.unwrapRequests, [])
-        let result = try decrypt(
-            ciphertext,
+        let result = try decryptFile(
+            output,
             recipientSecret: recipient.certData,
             verificationKeys: [fixture.identity.publicKeyData]
         )
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave v6 signed text")
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave v6 signed streaming file")
         XCTAssertEqual(result.legacyStatus, .valid)
     }
 
-    func test_secureEnclaveTextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
+    func test_secureEnclaveFileSigningUsesRealCatalogRouterSharedHandleStoreAndDefaultSelfKey() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        var selfSecret = try engine.generateKey(
+            name: "Default Self",
+            email: "default-self@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        defer { selfSecret.certData.resetBytes(in: 0..<selfSecret.certData.count) }
+        let selfKey = try TestHelpers.provisionFixtureBackedIdentity(
+            secretCertData: selfSecret.certData,
+            engine: engine,
+            service: keyManagement,
+            mockSE: mockSE,
+            mockKC: mockKeychain,
+            isDefault: true
+        )
         try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.insert(fixture.route.signingHandle)
         keyStore.insert(fixture.keyAgreementHandle)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
-        let textEncryptor = TestHelpers.makeTextEncryptor(
+        let fileEncryptor = TestHelpers.makeFileEncryptor(
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
@@ -146,112 +185,122 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
+        let textEncryptor = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
         let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
         defer { TestHelpers.cleanupTempDir(contactsDirectory) }
-        var recipient = try makeRecipient(name: "Route Recipient")
+        var recipient = try makeRecipient(name: "Route File Recipient")
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
         try contactService.importContact(publicKeyData: recipient.publicKeyData)
         let recipientInfo = try engine.parseKeyInfo(keyData: recipient.publicKeyData)
         let recipientContactId = try XCTUnwrap(
             contactService.contactId(forFingerprint: recipientInfo.fingerprint)
         )
+        let tempRoot = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let artifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempRoot)
         let encryptionService = EncryptionService(
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,
-            fileEncryptor: TestHelpers.makeFileEncryptor(
-                engine: engine,
-                keyManagement: keyManagement,
-                messageAdapter: messageAdapter
-            )
+            fileEncryptor: fileEncryptor,
+            temporaryArtifactStore: artifactStore
         )
+        let input = try makeTemporaryFile(Data("secure enclave routed streaming file".utf8))
+        defer { try? FileManager.default.removeItem(at: input) }
 
-        let ciphertext = try await encryptionService.encryptText(
-            "secure enclave routed text",
+        let artifact = try await encryptionService.encryptFileStreaming(
+            inputURL: input,
             recipientContactIds: [recipientContactId],
             signWithFingerprint: fixture.identity.fingerprint,
-            encryptToSelf: false
+            encryptToSelf: true,
+            progress: nil
         )
+        defer { artifact.cleanup() }
 
-        XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
-        let result = try decrypt(
-            ciphertext,
-            recipientSecret: recipient.certData,
-            verificationKeys: [fixture.identity.publicKeyData]
-        )
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed text")
-        XCTAssertEqual(result.legacyStatus, .valid)
-    }
-
-    func test_secureEnclaveTextSigningWithSelfKeyUsesRealRouterAndDoesNotUnwrap() async throws {
-        let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
-        try keyManagement.loadKeys()
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        keyStore.insert(fixture.route.signingHandle)
-        keyStore.insert(fixture.keyAgreementHandle)
-        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
-        let service = PrivateKeyTextEncryptionService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-            ),
-            softwarePrivateKeyAccess: unwrapper,
-            messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
-        )
-        var recipient = try makeRecipient(name: "Recipient With Self")
-        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        var selfKey = try makeRecipient(name: "Self Recipient")
-        defer { selfKey.certData.resetBytes(in: 0..<selfKey.certData.count) }
-
-        let ciphertext = try await service.encryptText(
-            Data("secure enclave text with self key".utf8),
-            recipientKeys: [recipient.publicKeyData],
-            signerFingerprint: fixture.identity.fingerprint,
-            selfKey: selfKey.publicKeyData
-        )
-
-        XCTAssertEqual(unwrapper.unwrapRequests, [])
-        for secret in [recipient.certData, selfKey.certData] {
-            let result = try decrypt(
-                ciphertext,
+        XCTAssertEqual(keyManagement.keys.map(\.fingerprint).sorted(), [
+            fixture.identity.fingerprint,
+            selfKey.fingerprint,
+        ].sorted())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: artifact.fileURL.path))
+        for secret in [recipient.certData, selfSecret.certData] {
+            let result = try decryptFile(
+                artifact.fileURL,
                 recipientSecret: secret,
                 verificationKeys: [fixture.identity.publicKeyData]
             )
-            XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave text with self key")
+            XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed streaming file")
             XCTAssertEqual(result.legacyStatus, .valid)
         }
     }
 
-    func test_productionPolicyBlocksSecureEnclaveTextSigning() async throws {
+    func test_secureEnclaveFileSigningWithExplicitSelfKeyDoesNotUnwrap() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient(name: "Recipient With Explicit Self")
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        var selfKey = try makeRecipient(name: "Explicit Self")
+        defer { selfKey.certData.resetBytes(in: 0..<selfKey.certData.count) }
+        let input = try makeTemporaryFile(Data("secure enclave file with explicit self key".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(
+            router: router,
+            unwrapper: unwrapper,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+
+        try await service.encryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: fixture.identity.fingerprint,
+            selfKey: selfKey.publicKeyData,
+            progress: nil
+        )
+
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+        for secret in [recipient.certData, selfKey.certData] {
+            let result = try decryptFile(
+                output,
+                recipientSecret: secret,
+                verificationKeys: [fixture.identity.publicKeyData]
+            )
+            XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave file with explicit self key")
+            XCTAssertEqual(result.legacyStatus, .valid)
+        }
+    }
+
+    func test_productionPolicyBlocksSecureEnclaveFileSigningWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
         try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
         try keyManagement.loadKeys()
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        keyStore.insert(fixture.route.signingHandle)
-        keyStore.insert(fixture.keyAgreementHandle)
-        let service = TestHelpers.makeTextEncryptor(
+        let service = TestHelpers.makeFileEncryptor(
             engine: engine,
             keyManagement: keyManagement,
-            messageAdapter: PGPMessageOperationAdapter(engine: engine),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            messageAdapter: PGPMessageOperationAdapter(engine: engine)
         )
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let input = try makeTemporaryFile(Data("blocked secure enclave streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
 
         do {
-            _ = try await service.encryptText(
-                Data("blocked by production policy".utf8),
+            try await service.encryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
                 recipientKeys: [recipient.publicKeyData],
                 signerFingerprint: fixture.identity.fingerprint,
-                selfKey: nil
+                selfKey: nil,
+                progress: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave signing")
+            XCTFail("Expected production policy to block Secure Enclave file signing")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {
@@ -259,12 +308,12 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_secureEnclaveMissingHandleBlocksWithoutSoftwareFallback() async throws {
+    func test_missingHandleSurfacesUnavailableWithoutSoftwareFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
         try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
         try keyManagement.loadKeys()
-        let service = TestHelpers.makeTextEncryptor(
+        let service = TestHelpers.makeFileEncryptor(
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
@@ -273,15 +322,20 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         )
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let input = try makeTemporaryFile(Data("missing handle streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
 
         do {
-            _ = try await service.encryptText(
-                Data("missing handle".utf8),
+            try await service.encryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
                 recipientKeys: [recipient.publicKeyData],
                 signerFingerprint: fixture.identity.fingerprint,
-                selfKey: nil
+                selfKey: nil,
+                progress: nil
             )
-            XCTFail("Expected missing handle to block")
+            XCTFail("Expected missing handle to fail")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .privateHandleMissing)
         } catch {
@@ -289,28 +343,69 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         }
     }
 
+    func test_progressCancellationMapsToOperationCancelledWithoutSoftwareFallback() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let input = try makeTemporaryFile(Data(repeating: 0x42, count: 128 * 1024))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(
+            router: router,
+            unwrapper: unwrapper,
+            digestSigner: UnexpectedStreamingDigestSigner()
+        )
+        let progress = FileProgressReporter()
+        progress.cancel()
+
+        do {
+            try await service.encryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: fixture.identity.fingerprint,
+                selfKey: nil,
+                progress: progress
+            )
+            XCTFail("Expected progress cancellation to throw")
+        } catch CypherAirError.operationCancelled {
+            XCTAssertEqual(unwrapper.unwrapRequests, [])
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+        } catch {
+            XCTFail("Expected operationCancelled, got \(error)")
+        }
+    }
+
     func test_secureEnclaveCancellationMapsToOperationCancelledWithoutSoftwareFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let input = try makeTemporaryFile(Data("cancel streaming file signing".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
-            digestSigner: ThrowingTextDigestSigner(error: CancellationError())
+            digestSigner: ThrowingStreamingDigestSigner(error: CancellationError())
         )
 
         do {
-            _ = try await service.encryptText(
-                Data("cancel text signing".utf8),
+            try await service.encryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
                 recipientKeys: [recipient.publicKeyData],
                 signerFingerprint: fixture.identity.fingerprint,
-                selfKey: nil
+                selfKey: nil,
+                progress: nil
             )
             XCTFail("Expected cancellation to throw")
         } catch CypherAirError.operationCancelled {
             XCTAssertEqual(unwrapper.unwrapRequests, [])
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
         } catch {
             XCTFail("Expected operationCancelled, got \(error)")
         }
@@ -328,24 +423,30 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         ]
 
         for (error, expectedCategory) in cases {
-            let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
-            let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+            let input = try makeTemporaryFile(Data("callback streaming file failure".utf8))
+            let output = makeTemporaryOutputURL()
+            defer { cleanup(input, output) }
+            let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+            let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
             let service = makeService(
                 router: router,
                 unwrapper: unwrapper,
-                digestSigner: ThrowingTextDigestSigner(error: error)
+                digestSigner: ThrowingStreamingDigestSigner(error: error)
             )
 
             do {
-                _ = try await service.encryptText(
-                    Data("callback failure".utf8),
+                try await service.encryptFile(
+                    inputPath: input.path,
+                    outputPath: output.path,
                     recipientKeys: [recipient.publicKeyData],
                     signerFingerprint: fixture.identity.fingerprint,
-                    selfKey: nil
+                    selfKey: nil,
+                    progress: nil
                 )
                 XCTFail("Expected callback failure to throw")
             } catch CypherAirError.keyOperationUnavailable(let category) {
                 XCTAssertEqual(category, expectedCategory)
+                XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
             } catch {
                 XCTFail("Expected keyOperationUnavailable, got \(error)")
             }
@@ -353,25 +454,31 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_blockedRouteThrowsUnavailableCategoryWithoutUnwrappingOrFFISigning() async throws {
+    func test_blockedRouteThrowsUnavailableCategoryWithoutUnwrappingOrFFI() async throws {
         var recipient = try makeRecipient()
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
-        let router = StaticTextPrivateKeyOperationRouter(
+        let input = try makeTemporaryFile(Data("blocked streaming file".utf8))
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(
             route: .blocked(.unavailable(.operationUnavailableByPolicy))
         )
-        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let unwrapper = RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = makeService(router: router, unwrapper: unwrapper)
 
         do {
-            _ = try await service.encryptText(
-                Data("blocked".utf8),
+            try await service.encryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
                 recipientKeys: [recipient.publicKeyData],
                 signerFingerprint: "blocked-fingerprint",
-                selfKey: nil
+                selfKey: nil,
+                progress: nil
             )
             XCTFail("Expected blocked route to throw")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
         } catch {
             XCTFail("Expected keyOperationUnavailable, got \(error)")
         }
@@ -379,13 +486,77 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(unwrapper.unwrapRequests, [])
     }
 
+    func test_encryptionServiceCleansTemporaryArtifactOnSecureEnclaveSigningFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let fileEncryptor = makeService(
+            router: router,
+            unwrapper: RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            digestSigner: ThrowingStreamingDigestSigner(error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing))
+        )
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let textEncryptor = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
+        let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
+        defer { TestHelpers.cleanupTempDir(contactsDirectory) }
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        try contactService.importContact(publicKeyData: recipient.publicKeyData)
+        let recipientInfo = try engine.parseKeyInfo(keyData: recipient.publicKeyData)
+        let recipientContactId = try XCTUnwrap(
+            contactService.contactId(forFingerprint: recipientInfo.fingerprint)
+        )
+        let tempRoot = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let artifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempRoot)
+        let encryptionService = EncryptionService(
+            keyManagement: keyManagement,
+            contactService: contactService,
+            textEncryptor: textEncryptor,
+            fileEncryptor: fileEncryptor,
+            temporaryArtifactStore: artifactStore
+        )
+        let input = try makeTemporaryFile(Data("cleanup failed streaming file".utf8))
+        defer { try? FileManager.default.removeItem(at: input) }
+
+        do {
+            _ = try await encryptionService.encryptFileStreaming(
+                inputURL: input,
+                recipientContactIds: [recipientContactId],
+                signWithFingerprint: fixture.identity.fingerprint,
+                encryptToSelf: false,
+                progress: nil
+            )
+            XCTFail("Expected signing failure")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .localAuthenticationFailed)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        let streamingRoot = tempRoot.appendingPathComponent("streaming", isDirectory: true)
+        let streamingContents = (
+            try? FileManager.default.contentsOfDirectory(
+                at: streamingRoot,
+                includingPropertiesForKeys: nil
+            )
+        ) ?? []
+        XCTAssertTrue(streamingContents.isEmpty)
+    }
+
     private func makeService(
-        router: StaticTextPrivateKeyOperationRouter,
-        unwrapper: RecordingTextSoftwareSecretCertificateUnwrapper,
+        router: StaticStreamingPrivateKeyOperationRouter,
+        unwrapper: RecordingStreamingSoftwareSecretCertificateUnwrapper,
         messageAdapter: PGPMessageOperationAdapter? = nil,
         digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
-    ) -> PrivateKeyTextEncryptionService {
-        PrivateKeyTextEncryptionService(
+    ) -> PrivateKeyStreamingFileEncryptionService {
+        PrivateKeyStreamingFileEncryptionService(
             router: router,
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
@@ -394,7 +565,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
     }
 
     private func makeRecipient(
-        name: String = "Recipient",
+        name: String = "Streaming Recipient",
         profile: KeyProfile = .universal
     ) throws -> GeneratedKey {
         try engine.generateKey(
@@ -410,7 +581,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: .universal,
+            profile: keyInfo.keyVersion == 6 ? .advanced : .universal,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -425,27 +596,56 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         )
     }
 
-    private func decrypt(
-        _ ciphertext: Data,
+    private func decryptFile(
+        _ output: URL,
         recipientSecret: Data,
         verificationKeys: [Data]
     ) throws -> DecryptDetailedResult {
-        let binary = try engine.dearmor(armored: ciphertext)
-        return try engine.decryptDetailed(
-            ciphertext: binary,
+        try engine.decryptDetailed(
+            ciphertext: Data(contentsOf: output),
             secretKeys: [recipientSecret],
             verificationKeys: verificationKeys
         )
     }
 
+    private func makeTemporaryFile(
+        _ contents: Data,
+        name: String = "streaming-encrypt-\(UUID().uuidString).bin"
+    ) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try contents.write(to: url, options: .atomic)
+        return url
+    }
+
+    private func makeTemporaryOutputURL(
+        name: String = "streaming-encrypt-output-\(UUID().uuidString).gpg"
+    ) -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent(name)
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "streaming-file-encrypt-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func cleanup(_ urls: URL...) {
+        for url in urls {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     private func makeSecureEnclaveRouteFixture(
         configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
-    ) async throws -> TextSecureEnclaveRouteFixture {
+    ) async throws -> StreamingSecureEnclaveRouteFixture {
         let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
         let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
         let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
         let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
-        let handleSetIdentifier = "text-encrypt-\(UUID().uuidString.lowercased())"
+        let handleSetIdentifier = "streaming-file-\(UUID().uuidString.lowercased())"
         let signingReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
             role: .signing
@@ -476,8 +676,8 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(
-            name: "Secure Enclave Text Encrypt \(label)",
-            email: "secure-text-encrypt-\(label)@example.invalid",
+            name: "Secure Enclave Streaming File \(label)",
+            email: "secure-streaming-file-\(label)@example.invalid",
             expirySeconds: 3600,
             configuration: configurationIdentity.configuration,
             handlePair: handlePair,
@@ -505,7 +705,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             engine: engine
         ).inspectPublicBindings(publicKeyData: material.publicKeyData)
 
-        return TextSecureEnclaveRouteFixture(
+        return StreamingSecureEnclaveRouteFixture(
             identity: identity,
             route: SecureEnclaveSignerRoute(
                 identity: identity,
@@ -547,27 +747,27 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
     }
 }
 
-private struct TextSecureEnclaveRouteFixture {
+private struct StreamingSecureEnclaveRouteFixture {
     let identity: PGPKeyIdentity
     let route: SecureEnclaveSignerRoute
     let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
 }
 
-private final class StaticTextPrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {
-    private let routeResult: PrivateKeyOperationRoute
+private final class StaticStreamingPrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {
+    private let route: PrivateKeyOperationRoute
     private(set) var requests: [PrivateKeyOperationRequest] = []
 
     init(route: PrivateKeyOperationRoute) {
-        routeResult = route
+        self.route = route
     }
 
     func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
         requests.append(request)
-        return routeResult
+        return route
     }
 }
 
-private final class RecordingTextSoftwareSecretCertificateUnwrapper: SoftwareSecretCertificateUnwrapping {
+private final class RecordingStreamingSoftwareSecretCertificateUnwrapper: SoftwareSecretCertificateUnwrapping {
     private let secretCert: Data
     private(set) var unwrapRequests: [String] = []
 
@@ -581,7 +781,17 @@ private final class RecordingTextSoftwareSecretCertificateUnwrapper: SoftwareSec
     }
 }
 
-private struct ThrowingTextDigestSigner: SecureEnclaveCustodyDigestSigning {
+private struct UnexpectedStreamingDigestSigner: SecureEnclaveCustodyDigestSigning {
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        XCTFail("Digest signer should not be called")
+        throw CancellationError()
+    }
+}
+
+private struct ThrowingStreamingDigestSigner: SecureEnclaveCustodyDigestSigning {
     let error: Error
 
     func signSHA256Digest(

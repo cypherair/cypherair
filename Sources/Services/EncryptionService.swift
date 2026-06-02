@@ -10,25 +10,25 @@ import Foundation
 @Observable
 final class EncryptionService {
 
-    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let textEncryptor: any TextMessageEncrypting
+    private let fileEncryptor: any StreamingFileEncrypting
     private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
-        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         textEncryptor: any TextMessageEncrypting,
+        fileEncryptor: any StreamingFileEncrypting,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
-        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.textEncryptor = textEncryptor
+        self.fileEncryptor = fileEncryptor
         self.diskSpaceChecker = diskSpaceChecker
         self.temporaryArtifactStore = temporaryArtifactStore
     }
@@ -116,32 +116,14 @@ final class EncryptionService {
             encryptToSelfFingerprint: encryptToSelfFingerprint
         )
 
-        // Get signing key if requested (requires SE unwrap → Face ID)
-        var signingKey: Data?
-        if let signerFp = signWithFingerprint {
-            do {
-                signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
-            } catch {
-                throw CypherAirError.from(error) { _ in .authenticationFailed }
-            }
-        }
-
-        defer {
-            // Safety-net zeroing.
-            if signingKey != nil {
-                signingKey!.resetBytes(in: 0..<signingKey!.count)
-                signingKey = nil
-            }
-        }
-
         let outputArtifact = try temporaryArtifactStore.makeStreamingArtifact(for: inputURL)
 
         do {
-            try await messageAdapter.encryptFile(
+            try await fileEncryptor.encryptFile(
                 inputPath: inputPath,
                 outputPath: outputArtifact.fileURL.path,
                 recipientKeys: recipientKeys,
-                signingKey: signingKey,
+                signerFingerprint: signWithFingerprint,
                 selfKey: selfKey,
                 progress: progress
             )
@@ -152,12 +134,6 @@ final class EncryptionService {
         } catch {
             outputArtifact.cleanup()
             throw CypherAirError.encryptionFailed(reason: error.localizedDescription)
-        }
-
-        // Primary zeroing: immediately after engine call returns
-        if signingKey != nil {
-            signingKey!.resetBytes(in: 0..<signingKey!.count)
-            signingKey = nil
         }
 
         return outputArtifact

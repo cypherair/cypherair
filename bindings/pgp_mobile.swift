@@ -860,6 +860,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws
 
     /**
+     * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
+     */
+    func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: ProgressReporter?) throws
+
+    /**
      * Encrypt plaintext and sign it using a public certificate plus external P-256 signer.
      */
     func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?) throws  -> Data
@@ -1329,6 +1334,24 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
         FfiConverterString.lower(outputPath),
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
+        FfiConverterOptionData.lower(encryptToSelf),
+        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+}
+}
+
+    /**
+     * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
+     */
+open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: ProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterString.lower(outputPath),
+        FfiConverterSequenceData.lower(recipients),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterOptionData.lower(encryptToSelf),
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
     )
@@ -5719,6 +5742,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 55907) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 37387) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_p256_signer() != 51686) {

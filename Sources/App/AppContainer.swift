@@ -276,6 +276,13 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
+        let fileEncryptor = makePrivateKeyStreamingFileEncryptionService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         let cleartextSigner = makePrivateKeyCleartextSigningService(
             engine: engine,
             messageAdapter: messageAdapter,
@@ -300,10 +307,10 @@ final class AppContainer: @unchecked Sendable {
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
-                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
                 textEncryptor: textEncryptor,
+                fileEncryptor: fileEncryptor,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             decryptionService: DecryptionService(
@@ -346,6 +353,24 @@ final class AppContainer: @unchecked Sendable {
         secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyStreamingFileEncryptionService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyStreamingFileEncryptionService {
+        PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore

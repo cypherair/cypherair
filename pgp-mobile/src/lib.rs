@@ -543,6 +543,30 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
+    pub fn encrypt_file_with_external_p256_signer(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<(), PgpError> {
+        streaming::encrypt_file_with_external_p256_signer(
+            &input_path,
+            &output_path,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            signer,
+            encrypt_to_self.as_deref(),
+            progress,
+        )
+    }
+
     /// Decrypt a file using streaming I/O and preserve per-signature detailed results.
     pub fn decrypt_file_detailed(
         &self,

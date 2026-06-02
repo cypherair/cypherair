@@ -124,6 +124,34 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func encryptFileWithExternalP256Signer(
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selfKey: Data?,
+        progress: FileProgressReporter?
+    ) async throws {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            try await Self.performEncryptFileWithExternalP256Signer(
+                engine: engine,
+                inputPath: inputPath,
+                outputPath: outputPath,
+                recipientKeys: recipientKeys,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                selfKey: selfKey,
+                progress: progressBridge
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func decryptDetailed(
         ciphertext: Data,
         secretKeys: [Data],
@@ -438,6 +466,30 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             outputPath: outputPath,
             recipients: recipientKeys,
             signingKey: signingKey,
+            encryptToSelf: selfKey,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performEncryptFileWithExternalP256Signer(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selfKey: Data?,
+        progress: ProgressReporter?
+    ) async throws {
+        try engine.encryptFileWithExternalP256Signer(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            recipients: recipientKeys,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
             encryptToSelf: selfKey,
             progress: progress
         )

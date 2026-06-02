@@ -362,10 +362,10 @@ final class StreamingServiceTests: XCTestCase {
         mockDisk.availableBytes = 100  // Very low — 100 bytes available
         let diskChecker = DiskSpaceChecker(diskSpace: mockDisk)
         let encService = EncryptionService(
-            messageAdapter: stack.messageAdapter,
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
             textEncryptor: stack.textEncryptor,
+            fileEncryptor: stack.fileEncryptor,
             diskSpaceChecker: diskChecker
         )
 

@@ -361,10 +361,10 @@ final class EncryptScreenModelTests: XCTestCase {
         var configuration = EncryptView.Configuration()
         configuration.initialRecipientContactIds = [targetContactId]
         let encryptionService = EncryptionService(
-            messageAdapter: stack.messageAdapter,
             keyManagement: stack.keyManagement,
             contactService: opened.service,
-            textEncryptor: stack.textEncryptor
+            textEncryptor: stack.textEncryptor,
+            fileEncryptor: stack.fileEncryptor
         )
         let model = EncryptScreenModel(
             encryptionService: encryptionService,
@@ -955,10 +955,10 @@ final class EncryptScreenModelTests: XCTestCase {
         let resolvedContactService = contactService ?? stack.contactService
         let resolvedEncryptionService = contactService.map {
             EncryptionService(
-                messageAdapter: stack.messageAdapter,
                 keyManagement: stack.keyManagement,
                 contactService: $0,
-                textEncryptor: stack.textEncryptor
+                textEncryptor: stack.textEncryptor,
+                fileEncryptor: stack.fileEncryptor
             )
         } ?? stack.encryptionService
         return EncryptScreenModel(
