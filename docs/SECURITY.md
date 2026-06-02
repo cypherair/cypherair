@@ -249,8 +249,8 @@ external P-256 password encrypt APIs with public signing certificate bytes, the
 inspected signing-key fingerprint, and a loaded Security-owned signing handle;
 the callback result preserves typed cancellation and unavailable categories.
 Production policy still blocks Secure Enclave custody, blocked routes fail
-without software fallback, and streaming encrypt-plus-sign, certification,
-revocation, expiry/binding refresh, and decrypt remain outside this pilot.
+without software fallback, and certification, revocation, expiry/binding
+refresh, decrypt, and streaming file workflows remain outside this pilot.
 Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.
@@ -265,9 +265,27 @@ detached file signing API with public signing certificate bytes, the inspected
 signing-key fingerprint, a loaded Security-owned signing handle, and the
 existing progress bridge; the callback result preserves typed cancellation and
 unavailable categories. Production policy still blocks Secure Enclave custody,
-blocked routes fail without software fallback, and streaming encrypt-plus-sign,
-certification, revocation, expiry/binding refresh, and decrypt remain outside
-this pilot.
+blocked routes fail without software fallback, and certification, revocation,
+expiry/binding refresh, decrypt, and encryption workflows remain outside this
+pilot.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
+
+**Secure Enclave streaming file encrypt-plus-sign pilot note:** Phase 5F wires
+only optional signing for `EncryptionService.encryptFileStreaming` through the
+same private-operation router. Recipient lookup, disk-space checks,
+encrypt-to-self resolution, temporary artifact creation/protection/cleanup,
+streaming progress, binary file output, and SEIPDv1/SEIPDv2 selection remain
+owned by the streaming file-encryption path. Software-custody signer routes
+unwrap and zeroize the complete secret certificate exactly as before. Secure
+Enclave signer routes call the Rust/UniFFI external P-256 file-encryption API
+with public signing certificate bytes, the inspected signing-key fingerprint, a
+loaded Security-owned signing handle, optional encrypt-to-self material, and the
+existing progress bridge; the callback result preserves typed cancellation and
+unavailable categories. Production policy still blocks Secure Enclave custody,
+blocked routes fail without software fallback, and certification, revocation,
+expiry/binding refresh, and decrypt remain outside this pilot.
 Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.

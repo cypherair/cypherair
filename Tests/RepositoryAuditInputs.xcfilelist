@@ -322,6 +322,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyAccessService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift

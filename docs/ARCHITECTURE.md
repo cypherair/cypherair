@@ -83,13 +83,13 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 
 | Service | Responsibility |
 |---------|---------------|
-| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter. Text optional signing delegates to a private-key text encryption helper so software custody keeps the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
+| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter. Text and streaming file optional signing delegate to private-key encryption helpers so software custody keeps the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime APIs. |
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
 | `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Optional password-message signing delegates to a private-key password-message helper so software custody keeps the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. Password-based decrypt remains separate from the recipient-key/two-phase decrypt flow and does not use PKESK matching. |
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext and detached file signing route through private-operation helpers so software custody preserves the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
 | `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation, signing-class operations, and key-agreement operations are independently gated and remain production-unavailable unless an internal hidden/test policy enables a narrow route. |
-| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, and Phase 5E connects detached file signing; later streaming encrypt-plus-sign, signing-class, and decrypt workflows remain deferred. |
+| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, Phase 5E connects detached file signing, and Phase 5F connects streaming encrypt-plus-sign optional signing; certification, revocation, expiry/binding refresh, and decrypt workflows remain deferred. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -217,9 +217,9 @@ private signing dispatch to a text encryption helper. Software routes unwrap and
 zeroize the secret certificate exactly as before; Secure Enclave signer routes
 send only the public signing certificate, inspected signing-key fingerprint, and
 loaded signing handle through the external P-256 signer encrypt API. Production
-policy still blocks Secure Enclave custody, and password-message signing,
-streaming file encryption/signing, detached signing, certification, revocation,
-expiry/binding refresh, and decrypt remain deferred.
+policy still blocks Secure Enclave custody. Phase 5C did not change
+password-message signing, streaming file encryption/signing, detached signing,
+certification, revocation, expiry/binding refresh, or decrypt.
 
 Phase 5D extends the route-backed signer path only to password/SKESK optional
 signing. `PasswordMessageService` continues to own password encryption,
@@ -237,8 +237,18 @@ cancellation behavior. Software routes unwrap and zeroize the secret
 certificate exactly as before; Secure Enclave signer routes send only the public
 signing certificate, inspected signing-key fingerprint, loaded signing handle,
 and progress bridge through the external P-256 detached file signing API.
-Production policy still blocks Secure Enclave custody, and streaming
-encrypt-plus-sign remains deferred to Phase 5F.
+Production policy still blocks Secure Enclave custody.
+
+Phase 5F extends the same signer path only to streaming file encrypt-plus-sign.
+`EncryptionService.encryptFileStreaming` continues to own recipient lookup,
+disk-space checks, encrypt-to-self resolution, temporary artifact
+creation/protection/cleanup, streaming progress, and SEIPDv1/SEIPDv2 selection,
+then delegates optional private signing dispatch to a streaming file encryption
+helper. Software routes unwrap and zeroize the secret certificate exactly as
+before; Secure Enclave signer routes send only the public signing certificate,
+inspected signing-key fingerprint, loaded signing handle, optional self key, and
+progress bridge through the external P-256 file-encryption API. Production
+policy still blocks Secure Enclave custody.
 
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256

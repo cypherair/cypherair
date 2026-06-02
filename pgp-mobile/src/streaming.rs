@@ -281,39 +281,120 @@ pub fn encrypt_file(
     let certs = encrypt::collect_recipients(recipient_certs, encrypt_to_self, &policy)?;
     let recipient_keys = encrypt::build_recipients(&certs, &policy);
 
-    // Open input file and get size for progress
-    let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
-        reason: format!("Cannot open input file '{}': {e}", input_path),
-    })?;
-    let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut progress_reader = ProgressReader::new(input_file, total_bytes, progress);
-
-    // Open output file
-    let output_file = File::create(output_path).map_err(|e| PgpError::FileIoError {
-        reason: format!("Cannot create output file '{}': {e}", output_path),
-    })?;
+    let progress_reader = progress_reader_for_file(input_path, progress)?;
+    let output_file = output_file_for_path(output_path)?;
 
     // Build the Sequoia message pipeline: output → encryptor → [signer] → literal writer
     let message = Message::new(output_file);
 
     let message = Encryptor::for_recipients(message, recipient_keys)
         .build()
-        .map_err(|e| PgpError::EncryptionFailed {
-            reason: format!("Encryptor setup failed: {e}"),
+        .map_err(|e| {
+            secure_delete_file(std::path::Path::new(output_path));
+            PgpError::EncryptionFailed {
+                reason: format!("Encryptor setup failed: {e}"),
+            }
         })?;
 
-    let message = encrypt::setup_signer(message, signing_key, &policy)?;
+    let message = encrypt::setup_signer(message, signing_key, &policy).map_err(|error| {
+        secure_delete_file(std::path::Path::new(output_path));
+        error
+    })?;
 
-    let mut literal =
-        LiteralWriter::new(message)
-            .build()
-            .map_err(|e| PgpError::EncryptionFailed {
-                reason: format!("Literal writer setup failed: {e}"),
-            })?;
+    write_streaming_encrypted_file(
+        message,
+        progress_reader,
+        output_path,
+        StreamingFinalizeMode::Software,
+    )
+}
 
-    // Stream data through the pipeline with progress reporting
+/// Encrypt a file using a public certificate plus external P-256 signer.
+pub fn encrypt_file_with_external_p256_signer(
+    input_path: &str,
+    output_path: &str,
+    recipient_certs: &[Vec<u8>],
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+    encrypt_to_self: Option<&[u8]>,
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<(), PgpError> {
+    let policy = StandardPolicy::new();
+
+    let certs = encrypt::collect_recipients(recipient_certs, encrypt_to_self, &policy)?;
+    let recipient_keys = encrypt::build_recipients(&certs, &policy);
+
+    let progress_reader = progress_reader_for_file(input_path, progress)?;
+    let output_file = output_file_for_path(output_path)?;
+
+    let message = Message::new(output_file);
+
+    let message = Encryptor::for_recipients(message, recipient_keys)
+        .build()
+        .map_err(|e| {
+            secure_delete_file(std::path::Path::new(output_path));
+            PgpError::EncryptionFailed {
+                reason: format!("Encryptor setup failed: {e}"),
+            }
+        })?;
+
+    let message = encrypt::setup_external_p256_signer(
+        message,
+        signing_public_cert,
+        signing_key_fingerprint,
+        signer,
+        &policy,
+    )
+    .map_err(|error| {
+        secure_delete_file(std::path::Path::new(output_path));
+        error
+    })?;
+
+    write_streaming_encrypted_file(
+        message,
+        progress_reader,
+        output_path,
+        StreamingFinalizeMode::ExternalSigning,
+    )
+}
+
+fn progress_reader_for_file(
+    input_path: &str,
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<ProgressReader<File>, PgpError> {
+    let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
+        reason: format!("Cannot open input file '{}': {e}", input_path),
+    })?;
+    let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
+    Ok(ProgressReader::new(input_file, total_bytes, progress))
+}
+
+fn output_file_for_path(output_path: &str) -> Result<File, PgpError> {
+    File::create(output_path).map_err(|e| PgpError::FileIoError {
+        reason: format!("Cannot create output file '{}': {e}", output_path),
+    })
+}
+
+enum StreamingFinalizeMode {
+    Software,
+    ExternalSigning,
+}
+
+fn write_streaming_encrypted_file(
+    message: Message<'_>,
+    mut progress_reader: ProgressReader<File>,
+    output_path: &str,
+    finalize_mode: StreamingFinalizeMode,
+) -> Result<(), PgpError> {
+    let mut literal = LiteralWriter::new(message).build().map_err(|e| {
+        secure_delete_file(std::path::Path::new(output_path));
+        PgpError::EncryptionFailed {
+            reason: format!("Literal writer setup failed: {e}"),
+        }
+    })?;
+
     if let Err(e) = zeroing_copy(&mut progress_reader, &mut literal, STREAM_BUFFER_SIZE) {
-        // Clean up partial output on error
         drop(literal);
         secure_delete_file(std::path::Path::new(output_path));
         return Err(match e {
@@ -327,15 +408,19 @@ pub fn encrypt_file(
         });
     }
 
-    // Finalize the pipeline (flushes encryption/signature)
-    literal.finalize().map_err(|e| {
+    literal.finalize().map_err(|error| {
         secure_delete_file(std::path::Path::new(output_path));
-        PgpError::EncryptionFailed {
-            reason: format!("Finalize failed: {e}"),
+        match finalize_mode {
+            StreamingFinalizeMode::Software => PgpError::EncryptionFailed {
+                reason: format!("Finalize failed: {error}"),
+            },
+            StreamingFinalizeMode::ExternalSigning => {
+                map_external_signing_error(error, |reason| PgpError::SigningFailed {
+                    reason: format!("Finalize failed: {reason}"),
+                })
+            }
         }
-    })?;
-
-    Ok(())
+    })
 }
 
 /// Decrypt a file using streaming I/O and preserve detailed per-signature results.

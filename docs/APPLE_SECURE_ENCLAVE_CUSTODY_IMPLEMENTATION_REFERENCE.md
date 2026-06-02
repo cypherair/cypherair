@@ -299,6 +299,23 @@ map to sanitized unavailable categories. Streaming encrypt-plus-sign,
 certification, revocation, expiry/binding refresh, and decrypt remain outside
 PR 5E.
 
+Phase 5F is the fifth narrow workflow consumer. The Rust runtime streaming file
+encrypt API preserves the binary file-encryption path while accepting a public
+signing certificate, expected signing-key fingerprint, and the existing external
+P-256 signing provider. Recipient collection, encryptor setup, progress reading,
+zeroizing copy, output cleanup, and finalize behavior stay shared with software
+streaming file encryption. Rust rejects secret signing certificates, non-P-256
+or wrong-role signing certificates, fingerprint mismatches, malformed callback
+signatures, wrong digests, and wrong public-key signatures without falling back
+to secret-certificate signing. Swift routes only optional signing for
+`EncryptionService.encryptFileStreaming`: unsigned file encryption does not
+route, software routes keep the existing unwrap-and-zeroize behavior, Secure
+Enclave signer routes pass public signing certificate material, the loaded
+signing handle, optional encrypt-to-self material, and existing progress
+cancellation through the external signer file-encryption API, and blocked routes
+map to sanitized unavailable categories. Certification, revocation,
+expiry/binding refresh, and decrypt remain outside PR 5F.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -461,7 +478,7 @@ unsigned text encryption does not route, production policy blocks Secure
 Enclave signing, hidden/test policy can sign plus encrypt through a real
 catalog/router/public-binding inspector/shared mock handle store, handle/auth
 failures surface stable unavailable categories, blocked routes do not call FFI,
-and streaming file encryption remains untouched.
+and Phase 5C itself does not route streaming file encryption.
 
 Phase 5D coverage adds password-message optional signing through the same
 external signer route. Rust tests should verify v4/v6 public-only P-256 signed
@@ -477,6 +494,36 @@ sign password messages through a real catalog/router/public-binding
 inspector/shared mock handle store, handle/auth failures surface stable
 unavailable categories, blocked routes do not call FFI, and password decrypt,
 tamper, `noSkesk`, and `passwordRejected` coverage remains unchanged.
+
+Phase 5E coverage adds streaming detached file signing through the same external
+signer route. Rust tests should verify v4/v6 public-only P-256 detached file
+signatures verify, progress and callback cancellation are preserved, sanitized
+typed categories survive finalization, secret signing certificates, wrong
+fingerprints, non-P-256 or wrong-role certificates, malformed signatures, wrong
+digests, wrong public keys, and external failures all fail closed, and no
+secret-certificate fallback occurs. Swift tests should verify software detached
+file signing remains behavior-compatible and zeroizes unwrapped material,
+production policy blocks Secure Enclave signing, hidden/test policy can sign
+through a real catalog/router/public-binding inspector/shared mock handle store,
+handle/auth/progress/callback failures surface stable categories, blocked routes
+do not call FFI, and Phase 5E itself does not route streaming file encryption.
+
+Phase 5F coverage adds streaming file encrypt-plus-sign optional signing through
+the same external signer route. Rust tests should verify v4/v6 public-only P-256
+signed streaming file messages decrypt and verify, SEIPDv1/SEIPDv2 packet-format
+selection honors recipient and encrypt-to-self downgrade rules, progress and
+callback cancellation survive finalization, sanitized typed categories are
+preserved, secret signing certificates, wrong fingerprints, non-P-256 or
+wrong-role certificates, malformed signatures, wrong digests, wrong public keys,
+and external failures all fail closed, and no secret-certificate fallback
+occurs. Swift tests should verify unsigned file encryption does not route,
+software signed file encryption remains behavior-compatible and zeroizes
+unwrapped material, production policy blocks Secure Enclave signing, hidden/test
+policy can sign streaming files through a real catalog/router/public-binding
+inspector/shared mock handle store, explicit/default encrypt-to-self paths
+decrypt and verify, handle/auth/progress/callback failures surface stable
+categories, blocked routes do not call FFI, output cleanup occurs on failure,
+and text/password/detached/decrypt streaming coverage remains unchanged.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

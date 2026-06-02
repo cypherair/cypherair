@@ -366,6 +366,7 @@ final class StreamingServiceTests: XCTestCase {
             keyManagement: stack.keyManagement,
             contactService: stack.contactService,
             textEncryptor: stack.textEncryptor,
+            fileEncryptor: stack.fileEncryptor,
             diskSpaceChecker: diskChecker
         )
 

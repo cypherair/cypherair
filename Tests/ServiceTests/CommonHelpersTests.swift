@@ -1785,11 +1785,17 @@ final class CommonHelpersTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: messageAdapter
         )
+        let fileEncryptor = TestHelpers.makeFileEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
-            textEncryptor: textEncryptor
+            textEncryptor: textEncryptor,
+            fileEncryptor: fileEncryptor
         )
         let decryptionService = DecryptionService(
             messageAdapter: messageAdapter,
