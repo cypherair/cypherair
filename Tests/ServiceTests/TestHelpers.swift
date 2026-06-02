@@ -258,11 +258,17 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let detachedFileSigner = makeDetachedFileSigner(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
         let signingSvc = SigningService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc,
-            cleartextSigner: cleartextSigner
+            cleartextSigner: cleartextSigner,
+            detachedFileSigner: detachedFileSigner
         )
         let certificateSignatureSvc = CertificateSignatureService(
             certificateAdapter: certificateAdapter,
@@ -277,6 +283,7 @@ enum TestHelpers {
             contactService: contactSvc,
             textEncryptor: textEncryptor,
             passwordMessageEncryptor: passwordMessageEncryptor,
+            detachedFileSigner: detachedFileSigner,
             encryptionService: encryptionSvc,
             decryptionService: decryptionSvc,
             passwordMessageService: passwordMessageSvc,
@@ -301,6 +308,7 @@ enum TestHelpers {
         let contactService: ContactService
         let textEncryptor: any TextMessageEncrypting
         let passwordMessageEncryptor: any PasswordMessageEncrypting
+        let detachedFileSigner: any DetachedFileSigning
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
         let passwordMessageService: PasswordMessageService
@@ -373,6 +381,28 @@ enum TestHelpers {
         digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
     ) -> PrivateKeyPasswordMessageEncryptionService {
         PrivateKeyPasswordMessageEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makeDetachedFileSigner(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyDetachedFileSigningService {
+        PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: resolver,
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

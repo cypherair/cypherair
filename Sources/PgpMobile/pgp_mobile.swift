@@ -1014,6 +1014,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func signDetachedFile(inputPath: String, signerCert: Data, progress: ProgressReporter?) throws  -> Data
 
     /**
+     * Create a detached file signature using a public certificate and external P-256 signer.
+     */
+    func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: ProgressReporter?) throws  -> Data
+
+    /**
      * Validate contact-import data as a public certificate and return normalized metadata.
      *
      * Secret-bearing input is rejected with `InvalidKeyData` using a stable reason token.
@@ -1683,6 +1688,22 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Progre
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(signerCert),
+        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+
+    /**
+     * Create a detached file signature using a public certificate and external P-256 signer.
+     */
+open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: ProgressReporter?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
     )
 })
@@ -5770,6 +5791,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 18095) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_p256_signer() != 64206) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate() != 24365) {

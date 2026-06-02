@@ -575,6 +575,24 @@ impl PgpEngine {
         streaming::sign_detached_file(&input_path, &signer_cert, progress)
     }
 
+    /// Create a detached file signature using a public certificate and external P-256 signer.
+    pub fn sign_detached_file_with_external_p256_signer(
+        &self,
+        input_path: String,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        streaming::sign_detached_file_with_external_p256_signer(
+            &input_path,
+            &public_cert,
+            &signing_key_fingerprint,
+            signer,
+            progress,
+        )
+    }
+
     /// Verify a detached file signature using streaming I/O and preserve per-signature details.
     pub fn verify_detached_file_detailed(
         &self,

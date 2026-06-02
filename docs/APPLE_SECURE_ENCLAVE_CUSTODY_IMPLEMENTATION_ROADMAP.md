@@ -315,6 +315,14 @@ Recommended PR grouping:
   route, blocked routes surface sanitized unavailable categories, and
   production policy still blocks Secure Enclave custody.
 - PR 5E: streaming detached file signing.
+  **Implemented:** Phase 5E adds a Rust/UniFFI streaming detached file signing
+  API that can sign with a public-only P-256 certificate through the external
+  signer callback, and Swift routes only `SigningService.signDetachedStreaming`
+  through the private-operation router. Software routes retain the existing
+  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
+  material plus a loaded signing handle and existing progress/cancellation
+  reporting, blocked routes surface sanitized unavailable categories, and
+  production policy still blocks Secure Enclave custody.
 - PR 5F: streaming encrypt-plus-sign.
 - PR 5G: expiry and binding-refresh signing route, or explicit unsupported
   closeout.

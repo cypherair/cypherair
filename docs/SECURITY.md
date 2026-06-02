@@ -249,8 +249,25 @@ external P-256 password encrypt APIs with public signing certificate bytes, the
 inspected signing-key fingerprint, and a loaded Security-owned signing handle;
 the callback result preserves typed cancellation and unavailable categories.
 Production policy still blocks Secure Enclave custody, blocked routes fail
-without software fallback, and file streaming, detached signing, certification,
+without software fallback, and streaming encrypt-plus-sign, certification,
 revocation, expiry/binding refresh, and decrypt remain outside this pilot.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
+
+**Secure Enclave detached file signing pilot note:** Phase 5E wires only
+`SigningService.signDetachedStreaming` through the same private-operation
+router. File selection, detached-signature output handling, streaming progress,
+and detached verification remain owned by the signing path. Software-custody
+signer routes unwrap and zeroize the complete secret certificate exactly as
+before. Secure Enclave signer routes call the Rust/UniFFI external P-256
+detached file signing API with public signing certificate bytes, the inspected
+signing-key fingerprint, a loaded Security-owned signing handle, and the
+existing progress bridge; the callback result preserves typed cancellation and
+unavailable categories. Production policy still blocks Secure Enclave custody,
+blocked routes fail without software fallback, and streaming encrypt-plus-sign,
+certification, revocation, expiry/binding refresh, and decrypt remain outside
+this pilot.
 Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.
