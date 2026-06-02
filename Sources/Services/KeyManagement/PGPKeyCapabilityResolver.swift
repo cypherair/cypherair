@@ -6,29 +6,34 @@ struct PGPKeyCapabilityResolver: Sendable {
         var secureEnclaveGenerationSupport: PGPKeyOperationSupport
         var secureEnclaveSigningOperationSupport: PGPKeyOperationSupport
         var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
+        var secureEnclaveRefreshBindingOperationSupport: PGPKeyOperationSupport
 
         static let production = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .unavailable,
-            secureEnclaveKeyAgreementOperationSupport: .unavailable
+            secureEnclaveKeyAgreementOperationSupport: .unavailable,
+            secureEnclaveRefreshBindingOperationSupport: .unavailable
         )
 
         static let testSecureEnclavePrivateOperations = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveGeneration = Policy(
             secureEnclaveGenerationSupport: .supported,
             secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveSigningRoutes = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .supported,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
     }
 
@@ -137,9 +142,10 @@ struct PGPKeyCapabilityResolver: Sendable {
         case .sign,
              .certify,
              .revoke,
-             .modifyExpiry,
-             .refreshBinding:
+             .modifyExpiry:
             return resolutionForPolicySupport(policy.secureEnclaveSigningOperationSupport)
+        case .refreshBinding:
+            return resolutionForPolicySupport(policy.secureEnclaveRefreshBindingOperationSupport)
         case .decrypt:
             return resolutionForPolicySupport(policy.secureEnclaveKeyAgreementOperationSupport)
         case .exportPrivateMaterial:

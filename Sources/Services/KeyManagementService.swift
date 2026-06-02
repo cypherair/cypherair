@@ -468,9 +468,10 @@ final class KeyManagementService: @unchecked Sendable {
     // MARK: - Key Expiry Modification
 
     /// Modify the expiration time of an existing certificate.
-    /// Requires device authentication to access the SE-wrapped private key.
     ///
-    /// Uses the unlocked private-key control domain for the SE access-control mode.
+    /// Software custody unwraps the SE-wrapped secret certificate using the unlocked
+    /// private-key control domain. Secure Enclave custody uses the public-only
+    /// external signer route and does not create a pending bundle or recovery journal.
     func modifyExpiry(
         fingerprint: String,
         newExpirySeconds: UInt64?
@@ -485,12 +486,12 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     /// Modify the expiration time of an existing certificate.
-    /// Requires device authentication to access the SE-wrapped private key.
     ///
-    /// SECURITY: The full certificate (with secret key) is needed to re-sign binding signatures.
-    /// After modification, the updated cert is re-wrapped with a new SE key and stored.
-    /// Uses the pending-item pattern to prevent key loss on crash: new items are stored
-    /// under temporary names before old items are deleted.
+    /// SECURITY: Software custody needs the full certificate to re-sign binding
+    /// signatures, then re-wraps and promotes the updated secret certificate through
+    /// the pending-item recovery pattern. Secure Enclave custody keeps the secret key
+    /// non-exportable and mutates only the public certificate via the external signer
+    /// route, without pending software bundles or modify-expiry recovery journal entries.
     ///
     /// - Parameters:
     ///   - fingerprint: Fingerprint of the key to modify.
@@ -607,6 +608,10 @@ final class KeyManagementService: @unchecked Sendable {
             publicBindingInspector: publicBindingInspector,
             handleStore: handleStore
         )
+    }
+
+    func configurePrivateKeyExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
+        mutationService.configureExpiryMutationService(service)
     }
 
     @concurrent

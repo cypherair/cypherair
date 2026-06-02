@@ -330,7 +330,10 @@ mod secret_transfer;
 mod secure_enclave_generation;
 mod selector_discovery;
 
-pub use expiry::{modify_expiry, ModifyExpiryResult};
+pub use expiry::{
+    modify_expiry, modify_expiry_with_external_p256_signer, ModifyExpiryPublicResult,
+    ModifyExpiryResult,
+};
 pub use generation::{generate_key, generate_key_with_profile};
 pub use key_info::parse_key_info;
 pub use profile::{detect_profile, get_key_version};

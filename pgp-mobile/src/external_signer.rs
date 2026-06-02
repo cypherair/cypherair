@@ -217,12 +217,13 @@ fn external_signing_error_to_signer_error(
 mod tests {
     use super::*;
 
+    use openpgp::cert::prelude::*;
     use openpgp::crypto::Password;
     use openpgp::packet::{key, signature, Packet, UserID};
     use openpgp::parse::Parse;
     use openpgp::policy::StandardPolicy;
     use openpgp::serialize::Serialize;
-    use openpgp::types::{Features, KeyFlags, SignatureType};
+    use openpgp::types::{Features, KeyFlags, ReasonForRevocation, SignatureType};
     use std::sync::{Arc, Mutex};
 
     use crate::decrypt::SignatureStatus;
@@ -268,6 +269,13 @@ mod tests {
     }
 
     fn build_candidate(version: CandidateVersion) -> openpgp::Result<CandidateMaterial> {
+        build_candidate_with_expiry(version, None)
+    }
+
+    fn build_candidate_with_expiry(
+        version: CandidateVersion,
+        expiry_seconds: Option<u64>,
+    ) -> openpgp::Result<CandidateMaterial> {
         let primary: Key<key::SecretParts, key::PrimaryRole> = match version {
             CandidateVersion::V4 => key::Key4::generate_ecc(true, Curve::NistP256)?.into(),
             CandidateVersion::V6 => key::Key6::generate_ecc(true, Curve::NistP256)?.into(),
@@ -294,6 +302,8 @@ mod tests {
             signature::SignatureBuilder::new(SignatureType::PositiveCertification)
                 .set_hash_algo(HashAlgorithm::SHA256)
                 .set_key_flags(KeyFlags::empty().set_certification().set_signing())?;
+        let validity = expiry_seconds.map(std::time::Duration::from_secs);
+        user_id_builder = user_id_builder.set_key_validity_period(validity)?;
         if matches!(version, CandidateVersion::V4) {
             user_id_builder = user_id_builder.set_features(Features::empty().set_seipdv1())?;
         }
@@ -312,7 +322,8 @@ mod tests {
             &cert,
             signature::SignatureBuilder::new(SignatureType::SubkeyBinding)
                 .set_hash_algo(HashAlgorithm::SHA256)
-                .set_key_flags(KeyFlags::empty().set_transport_encryption())?,
+                .set_key_flags(KeyFlags::empty().set_transport_encryption())?
+                .set_key_validity_period(validity)?,
         )?;
         cert = cert
             .insert_packets(vec![Packet::from(subkey), subkey_binding.into()])?
@@ -631,6 +642,216 @@ mod tests {
         }
     }
 
+    fn first_transport_subkey_expiry(public_cert: &[u8]) -> std::time::SystemTime {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("certificate should parse");
+        cert.keys()
+            .subkeys()
+            .with_policy(&policy, None)
+            .for_transport_encryption()
+            .next()
+            .expect("certificate should have a transport-encryption subkey")
+            .key_expiration_time()
+            .expect("transport-encryption subkey should have explicit expiry")
+    }
+
+    fn assert_transport_subkey_live_at(public_cert: &[u8], time: std::time::SystemTime) {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("certificate should parse");
+        assert!(
+            cert.keys()
+                .subkeys()
+                .with_policy(&policy, Some(time))
+                .supported()
+                .alive()
+                .for_transport_encryption()
+                .next()
+                .is_some(),
+            "transport-encryption subkey should remain live and policy-valid at the reference time"
+        );
+    }
+
+    fn assert_primary_live_at(public_cert: &[u8], time: std::time::SystemTime) {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("certificate should parse");
+        cert.with_policy(&policy, Some(time))
+            .expect("certificate should have a policy-valid binding")
+            .primary_key()
+            .alive()
+            .expect("primary key should be live at the reference time");
+    }
+
+    fn assert_primary_expired_now(public_cert: &[u8]) {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("certificate should parse");
+        assert!(
+            cert.with_policy(&policy, None)
+                .expect("certificate should have a policy-valid binding")
+                .primary_key()
+                .alive()
+                .is_err(),
+            "primary key should be expired now"
+        );
+    }
+
+    fn assert_no_transport_subkey_live_now(public_cert: &[u8]) {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("certificate should parse");
+        assert!(
+            cert.keys()
+                .subkeys()
+                .with_policy(&policy, None)
+                .supported()
+                .alive()
+                .for_transport_encryption()
+                .next()
+                .is_none(),
+            "transport-encryption subkey should be expired now"
+        );
+    }
+
+    fn sleep_past(time: std::time::SystemTime) {
+        let now = std::time::SystemTime::now();
+        if let Ok(wait) = time.duration_since(now) {
+            std::thread::sleep(wait + std::time::Duration::from_secs(1));
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ExpiryBindingSignatureHashes {
+        direct_key: HashAlgorithm,
+        user_ids: Vec<HashAlgorithm>,
+        subkeys: Vec<HashAlgorithm>,
+        backsigs: Vec<HashAlgorithm>,
+    }
+
+    fn expiry_binding_signature_hashes(cert_data: &[u8]) -> ExpiryBindingSignatureHashes {
+        let policy = StandardPolicy::new();
+        let cert = openpgp::Cert::from_bytes(cert_data).expect("certificate should parse");
+        let valid_cert = cert
+            .with_policy(&policy, None)
+            .expect("certificate should have a policy-valid binding");
+        let direct_key = valid_cert
+            .primary_key()
+            .direct_key_signature()
+            .expect("certificate should have a direct-key signature")
+            .hash_algo();
+        let user_ids = valid_cert
+            .userids()
+            .revoked(false)
+            .map(|user_id| user_id.binding_signature().hash_algo())
+            .collect();
+        let mut subkeys = Vec::new();
+        let mut backsigs = Vec::new();
+        for subkey in valid_cert.keys().subkeys().revoked(false) {
+            let binding = subkey.binding_signature();
+            subkeys.push(binding.hash_algo());
+            backsigs.extend(binding.embedded_signatures().map(|sig| sig.hash_algo()));
+        }
+
+        ExpiryBindingSignatureHashes {
+            direct_key,
+            user_ids,
+            subkeys,
+            backsigs,
+        }
+    }
+
+    fn assert_expiry_binding_hashes(
+        cert_data: &[u8],
+        expected_hash: HashAlgorithm,
+        expected_backsig_count: Option<usize>,
+    ) {
+        let hashes = expiry_binding_signature_hashes(cert_data);
+        assert_eq!(hashes.direct_key, expected_hash);
+        assert!(
+            !hashes.user_ids.is_empty(),
+            "certificate should have user ID binding signatures"
+        );
+        assert!(
+            !hashes.subkeys.is_empty(),
+            "certificate should have expiring subkey binding signatures"
+        );
+        assert!(
+            hashes.user_ids.iter().all(|hash| *hash == expected_hash),
+            "unexpected User ID binding hashes: {:?}",
+            hashes.user_ids
+        );
+        assert!(
+            hashes.subkeys.iter().all(|hash| *hash == expected_hash),
+            "unexpected subkey binding hashes: {:?}",
+            hashes.subkeys
+        );
+        if let Some(expected_backsig_count) = expected_backsig_count {
+            assert_eq!(hashes.backsigs.len(), expected_backsig_count);
+        }
+        assert!(
+            hashes.backsigs.iter().all(|hash| *hash == expected_hash),
+            "unexpected backsig hashes: {:?}",
+            hashes.backsigs
+        );
+    }
+
+    fn software_signing_subkey_secret_cert() -> Vec<u8> {
+        let (cert, _) = CertBuilder::new()
+            .set_cipher_suite(CipherSuite::Cv25519)
+            .set_profile(openpgp::Profile::RFC4880)
+            .expect("profile should configure")
+            .set_validity_period(Some(std::time::Duration::from_secs(60)))
+            .add_userid("Software Signing Subkey <signing-subkey@example.test>")
+            .add_signing_subkey()
+            .generate()
+            .expect("software signing-subkey cert should generate");
+        let mut cert_data = Vec::new();
+        cert.as_tsk()
+            .serialize(&mut cert_data)
+            .expect("secret cert should serialize");
+        cert_data
+    }
+
+    fn insert_key_revocation(cert_data: &[u8], revocation_cert: &[u8]) -> Vec<u8> {
+        let cert = openpgp::Cert::from_bytes(cert_data).expect("certificate should parse");
+        let is_tsk = cert.is_tsk();
+        let revocation =
+            Packet::from_bytes(revocation_cert).expect("revocation packet should parse");
+        let (revoked_cert, _) = cert
+            .insert_packets(vec![revocation])
+            .expect("revocation should insert");
+        let mut output = Vec::new();
+        if is_tsk {
+            revoked_cert
+                .as_tsk()
+                .serialize(&mut output)
+                .expect("revoked secret cert should serialize");
+        } else {
+            revoked_cert
+                .serialize(&mut output)
+                .expect("revoked public cert should serialize");
+        }
+        output
+    }
+
+    fn revoke_public_candidate(
+        public_cert: &[u8],
+        signer: &mut dyn Signer,
+        hash_algo: HashAlgorithm,
+    ) -> Vec<u8> {
+        let cert = openpgp::Cert::from_bytes(public_cert).expect("candidate should parse");
+        let revocation = CertRevocationBuilder::new()
+            .set_reason_for_revocation(ReasonForRevocation::KeyRetired, b"")
+            .expect("revocation reason should configure")
+            .build(signer, &cert, hash_algo)
+            .expect("revocation should build");
+        let (revoked_cert, _) = cert
+            .insert_packets(vec![Packet::from(revocation)])
+            .expect("revocation should insert");
+        let mut output = Vec::new();
+        revoked_cert
+            .serialize(&mut output)
+            .expect("revoked public cert should serialize");
+        output
+    }
+
     #[test]
     fn test_external_signer_builds_valid_public_only_p256_certificates() {
         for version in CandidateVersion::all() {
@@ -702,6 +923,466 @@ mod tests {
             .expect("runtime external detached signature should verify");
             assert_eq!(result.legacy_status, SignatureStatus::Valid);
         }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_updates_public_cert_for_v4_and_v6() {
+        for version in CandidateVersion::all() {
+            let material =
+                build_candidate_with_expiry(version, Some(60)).expect("candidate should build");
+            let original_subkey_expiry = first_transport_subkey_expiry(&material.public_cert);
+            let after_original_subkey_expiry =
+                original_subkey_expiry + std::time::Duration::from_secs(1);
+            let original_fingerprint = signing_key_fingerprint(&material);
+            let provider = runtime_provider(material.signing_keypair);
+
+            let updated = keys::modify_expiry_with_external_p256_signer(
+                &material.public_cert,
+                &original_fingerprint,
+                provider.clone(),
+                Some(60 * 60 * 24 * 30),
+            )
+            .expect("runtime external expiry modification should succeed");
+            assert_valid_public_candidate(version, &updated.public_key_data);
+            assert!(updated.key_info.expiry_timestamp.is_some());
+            assert_eq!(updated.key_info.key_version, version.expected_key_version());
+            assert_transport_subkey_live_at(&updated.public_key_data, after_original_subkey_expiry);
+
+            let updated_cert =
+                openpgp::Cert::from_bytes(&updated.public_key_data).expect("updated cert parses");
+            assert!(!updated_cert.is_tsk());
+            assert_eq!(
+                updated_cert.primary_key().key().fingerprint().to_hex(),
+                original_fingerprint.to_uppercase()
+            );
+
+            let removed = keys::modify_expiry_with_external_p256_signer(
+                &updated.public_key_data,
+                &original_fingerprint,
+                provider,
+                None,
+            )
+            .expect("runtime external expiry removal should succeed");
+            assert_valid_public_candidate(version, &removed.public_key_data);
+            assert_eq!(removed.key_info.expiry_timestamp, None);
+            assert_transport_subkey_live_at(&removed.public_key_data, after_original_subkey_expiry);
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_keeps_sha256_binding_hashes() {
+        for version in CandidateVersion::all() {
+            let material =
+                build_candidate_with_expiry(version, Some(60)).expect("candidate should build");
+            let original_fingerprint = signing_key_fingerprint(&material);
+            let provider = runtime_provider(material.signing_keypair);
+
+            let updated = keys::modify_expiry_with_external_p256_signer(
+                &material.public_cert,
+                &original_fingerprint,
+                provider.clone(),
+                Some(60 * 60 * 24 * 30),
+            )
+            .expect("runtime external expiry modification should succeed");
+            assert_expiry_binding_hashes(&updated.public_key_data, HashAlgorithm::SHA256, None);
+
+            let removed = keys::modify_expiry_with_external_p256_signer(
+                &updated.public_key_data,
+                &original_fingerprint,
+                provider,
+                None,
+            )
+            .expect("runtime external expiry removal should succeed");
+            assert_expiry_binding_hashes(&removed.public_key_data, HashAlgorithm::SHA256, None);
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_recovers_expired_public_cert_for_v4_and_v6() {
+        for version in CandidateVersion::all() {
+            let material =
+                build_candidate_with_expiry(version, Some(1)).expect("candidate should build");
+            let original_subkey_expiry = first_transport_subkey_expiry(&material.public_cert);
+            sleep_past(original_subkey_expiry);
+            assert_primary_expired_now(&material.public_cert);
+            assert_no_transport_subkey_live_now(&material.public_cert);
+
+            let original_fingerprint = signing_key_fingerprint(&material);
+            let provider = runtime_provider(material.signing_keypair);
+            let updated = keys::modify_expiry_with_external_p256_signer(
+                &material.public_cert,
+                &original_fingerprint,
+                provider.clone(),
+                Some(60 * 60 * 24 * 30),
+            )
+            .expect("runtime external expiry modification should recover expired public cert");
+            assert_valid_public_candidate(version, &updated.public_key_data);
+            let after_update = std::time::SystemTime::now() + std::time::Duration::from_secs(1);
+            assert_primary_live_at(&updated.public_key_data, after_update);
+            assert_transport_subkey_live_at(&updated.public_key_data, after_update);
+
+            let removed = keys::modify_expiry_with_external_p256_signer(
+                &updated.public_key_data,
+                &original_fingerprint,
+                provider,
+                None,
+            )
+            .expect("runtime external expiry removal should recover expired public cert");
+            assert_valid_public_candidate(version, &removed.public_key_data);
+            assert_eq!(removed.key_info.expiry_timestamp, None);
+            let after_removal = std::time::SystemTime::now() + std::time::Duration::from_secs(1);
+            assert_primary_live_at(&removed.public_key_data, after_removal);
+            assert_transport_subkey_live_at(&removed.public_key_data, after_removal);
+        }
+    }
+
+    #[test]
+    fn test_software_modify_expiry_preserves_profile_binding_hashes() {
+        for (label, profile) in [
+            ("Universal", keys::KeyProfile::Universal),
+            ("Advanced", keys::KeyProfile::Advanced),
+        ] {
+            let generated = keys::generate_key_with_profile(
+                format!("Software Hash Preservation {label}"),
+                Some(format!(
+                    "software-hash-preservation-{}@example.test",
+                    label.to_lowercase()
+                )),
+                Some(60),
+                profile,
+            )
+            .expect("software key should generate");
+            assert_expiry_binding_hashes(&generated.public_key_data, HashAlgorithm::SHA512, None);
+
+            let updated = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 30))
+                .expect("software expiry modification should succeed");
+            assert_expiry_binding_hashes(&updated.public_key_data, HashAlgorithm::SHA512, None);
+
+            let removed = keys::modify_expiry(&updated.cert_data, None)
+                .expect("software expiry removal should succeed");
+            assert_expiry_binding_hashes(&removed.public_key_data, HashAlgorithm::SHA512, None);
+        }
+    }
+
+    #[test]
+    fn test_software_modify_expiry_preserves_signing_subkey_backsig_hash() {
+        let cert_data = software_signing_subkey_secret_cert();
+        let public_cert = openpgp::Cert::from_bytes(&cert_data)
+            .expect("software signing-subkey cert should parse");
+        let mut public_key_data = Vec::new();
+        public_cert
+            .serialize(&mut public_key_data)
+            .expect("public cert should serialize");
+        assert_expiry_binding_hashes(&public_key_data, HashAlgorithm::SHA512, Some(1));
+
+        let updated = keys::modify_expiry(&cert_data, Some(60 * 60 * 24 * 30))
+            .expect("software expiry modification should succeed");
+        assert_expiry_binding_hashes(&updated.public_key_data, HashAlgorithm::SHA512, Some(1));
+
+        let removed = keys::modify_expiry(&updated.cert_data, None)
+            .expect("software expiry removal should succeed");
+        assert_expiry_binding_hashes(&removed.public_key_data, HashAlgorithm::SHA512, Some(1));
+    }
+
+    #[test]
+    fn test_software_modify_expiry_refreshes_transport_subkey_binding() {
+        let generated = keys::generate_key_with_profile(
+            "Expiring Software".to_string(),
+            Some("expiring-software@example.test".to_string()),
+            Some(60),
+            keys::KeyProfile::Universal,
+        )
+        .expect("software key should generate");
+        let original_subkey_expiry = first_transport_subkey_expiry(&generated.public_key_data);
+        let after_original_subkey_expiry =
+            original_subkey_expiry + std::time::Duration::from_secs(1);
+
+        let updated = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 30))
+            .expect("software expiry modification should succeed");
+        assert_transport_subkey_live_at(&updated.public_key_data, after_original_subkey_expiry);
+
+        let removed = keys::modify_expiry(&updated.cert_data, None)
+            .expect("software expiry removal should succeed");
+        assert_transport_subkey_live_at(&removed.public_key_data, after_original_subkey_expiry);
+    }
+
+    #[test]
+    fn test_software_modify_expiry_recovers_expired_transport_subkey_binding() {
+        for (label, profile) in [
+            ("Universal", keys::KeyProfile::Universal),
+            ("Advanced", keys::KeyProfile::Advanced),
+        ] {
+            let generated = keys::generate_key_with_profile(
+                format!("Expired Software {label}"),
+                Some(format!(
+                    "expired-software-{}@example.test",
+                    label.to_lowercase()
+                )),
+                Some(1),
+                profile,
+            )
+            .expect("software key should generate");
+            let original_subkey_expiry = first_transport_subkey_expiry(&generated.public_key_data);
+            sleep_past(original_subkey_expiry);
+            assert_primary_expired_now(&generated.public_key_data);
+            assert_no_transport_subkey_live_now(&generated.public_key_data);
+
+            let updated = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 30))
+                .expect("software expiry modification should recover expired cert");
+            let after_update = std::time::SystemTime::now() + std::time::Duration::from_secs(1);
+            assert_primary_live_at(&updated.public_key_data, after_update);
+            assert_transport_subkey_live_at(&updated.public_key_data, after_update);
+
+            let removed = keys::modify_expiry(&updated.cert_data, None)
+                .expect("software expiry removal should recover expired cert");
+            let after_removal = std::time::SystemTime::now() + std::time::Duration::from_secs(1);
+            assert_primary_live_at(&removed.public_key_data, after_removal);
+            assert_transport_subkey_live_at(&removed.public_key_data, after_removal);
+        }
+    }
+
+    #[test]
+    fn test_modify_expiry_rejects_revoked_software_certificate() {
+        let generated = keys::generate_key_with_profile(
+            "Revoked Software".to_string(),
+            Some("revoked-software@example.test".to_string()),
+            Some(60),
+            keys::KeyProfile::Universal,
+        )
+        .expect("software key should generate");
+        let revoked_secret =
+            insert_key_revocation(&generated.cert_data, &generated.revocation_cert);
+
+        let result = keys::modify_expiry(&revoked_secret, Some(60 * 60));
+
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_rejects_revoked_public_cert_without_callback() {
+        let mut material = build_candidate_with_expiry(CandidateVersion::V4, Some(60))
+            .expect("candidate should build");
+        let expected_fingerprint = signing_key_fingerprint(&material);
+        let revoked_public = revoke_public_candidate(
+            &material.public_cert,
+            &mut material.signing_keypair,
+            HashAlgorithm::SHA256,
+        );
+
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &revoked_public,
+            &expected_fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_cancellation_is_preserved() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &signing_key_fingerprint(&material),
+            Arc::new(CancelledRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+
+        assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_sanitizes_callback_failures() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &signing_key_fingerprint(&material),
+            Arc::new(FailingRuntimeSigningProvider {
+                category: ExternalP256SigningFailureCategory::PrivateHandleMissing,
+            }),
+            Some(60 * 60),
+        );
+
+        match result {
+            Err(PgpError::ExternalP256SigningFailed { category }) => {
+                assert_eq!(
+                    category,
+                    ExternalP256SigningFailureCategory::PrivateHandleMissing
+                );
+            }
+            other => panic!("expected sanitized ExternalP256SigningFailed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_rejects_invalid_responses() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let expected_fingerprint = signing_key_fingerprint(&material);
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &expected_fingerprint,
+            Arc::new(MalformedRuntimeSigningProvider {
+                r: vec![1u8; P256_SCALAR_LENGTH - 1],
+                s: vec![1u8; P256_SCALAR_LENGTH],
+            }),
+            Some(60 * 60),
+        );
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let expected_fingerprint = signing_key_fingerprint(&material);
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &expected_fingerprint,
+            Arc::new(MalformedRuntimeSigningProvider {
+                r: vec![0u8; P256_SCALAR_LENGTH],
+                s: vec![1u8; P256_SCALAR_LENGTH],
+            }),
+            Some(60 * 60),
+        );
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let expected_fingerprint = signing_key_fingerprint(&material);
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &expected_fingerprint,
+            Arc::new(MalformedRuntimeSigningProvider {
+                r: vec![1u8; P256_SCALAR_LENGTH],
+                s: vec![0u8; P256_SCALAR_LENGTH],
+            }),
+            Some(60 * 60),
+        );
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let expected_fingerprint = signing_key_fingerprint(&material);
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &expected_fingerprint,
+            Arc::new(WrongDigestRuntimeSigningProvider {
+                keypair: Mutex::new(material.signing_keypair),
+            }),
+            Some(60 * 60),
+        );
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let other = build_candidate(CandidateVersion::V4).expect("other candidate should build");
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &signing_key_fingerprint(&material),
+            runtime_provider(other.signing_keypair),
+            Some(60 * 60),
+        );
+        assert!(matches!(result, Err(PgpError::KeyGenerationFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_rejects_mismatched_fingerprint() {
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let other = build_candidate(CandidateVersion::V4).expect("other should build");
+        let wrong_fingerprint = signing_key_fingerprint(&other);
+
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &wrong_fingerprint,
+            runtime_provider(material.signing_keypair),
+            Some(60 * 60),
+        );
+
+        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_rejects_secret_non_p256_and_wrong_role_inputs() {
+        let secret = keys::generate_key_with_profile(
+            "Software Secret".to_string(),
+            Some("software-secret@example.test".to_string()),
+            None,
+            keys::KeyProfile::Universal,
+        )
+        .expect("software key should generate");
+        let secret_result = keys::modify_expiry_with_external_p256_signer(
+            &secret.cert_data,
+            &secret.fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+        assert!(matches!(
+            secret_result,
+            Err(PgpError::InvalidKeyData { .. })
+        ));
+
+        let non_p256_result = keys::modify_expiry_with_external_p256_signer(
+            &secret.public_key_data,
+            &secret.fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+        assert!(matches!(
+            non_p256_result,
+            Err(PgpError::SigningFailed { .. })
+        ));
+
+        let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+        let cert = openpgp::Cert::from_bytes(&material.public_cert).expect("candidate parses");
+        let key_agreement_fingerprint = cert
+            .keys()
+            .subkeys()
+            .next()
+            .expect("candidate has key-agreement subkey")
+            .key()
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+        let wrong_role_result = keys::modify_expiry_with_external_p256_signer(
+            &material.public_cert,
+            &key_agreement_fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+        assert!(matches!(
+            wrong_role_result,
+            Err(PgpError::SigningFailed { .. })
+        ));
+    }
+
+    #[test]
+    fn test_external_signer_runtime_modify_expiry_requires_primary_signer_fingerprint() {
+        let (cert, _) = CertBuilder::new()
+            .set_cipher_suite(CipherSuite::P256)
+            .add_userid("P-256 With Signing Subkey <p256-subkey@example.test>")
+            .add_signing_subkey()
+            .generate()
+            .expect("P-256 signing-subkey cert should generate");
+        let mut public_cert = Vec::new();
+        cert.serialize(&mut public_cert)
+            .expect("public certificate should serialize");
+        let policy = StandardPolicy::new();
+        let signing_subkey_fingerprint = cert
+            .keys()
+            .subkeys()
+            .with_policy(&policy, None)
+            .for_signing()
+            .next()
+            .expect("certificate should have signing subkey")
+            .key()
+            .fingerprint()
+            .to_hex()
+            .to_lowercase();
+
+        let result = keys::modify_expiry_with_external_p256_signer(
+            &public_cert,
+            &signing_subkey_fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            Some(60 * 60),
+        );
+
+        assert!(matches!(result, Err(PgpError::SigningFailed { .. })));
     }
 
     #[test]

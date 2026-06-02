@@ -11,6 +11,7 @@ final class KeyMutationService {
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    private var expiryMutationService: (any PrivateKeyExpiryMutationRouting)?
 
     init(
         keyAdapter: PGPKeyOperationAdapter,
@@ -34,15 +35,18 @@ final class KeyMutationService {
         self.privateKeyControlStore = privateKeyControlStore
     }
 
+    func configureExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
+        expiryMutationService = service
+    }
+
     func modifyExpiry(
         fingerprint: String,
         newExpirySeconds: UInt64?
     ) async throws -> PGPKeyIdentity {
-        let authMode = try privateKeyControlStore.requireUnlockedAuthMode()
         return try await modifyExpiry(
             fingerprint: fingerprint,
             newExpirySeconds: newExpirySeconds,
-            authMode: authMode
+            authMode: nil
         )
     }
 
@@ -51,6 +55,51 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
+        try await modifyExpiry(
+            fingerprint: fingerprint,
+            newExpirySeconds: newExpirySeconds,
+            authMode: Optional(authMode)
+        )
+    }
+
+    private func modifyExpiry(
+        fingerprint: String,
+        newExpirySeconds: UInt64?,
+        authMode: AuthenticationMode?
+    ) async throws -> PGPKeyIdentity {
+        switch routeModifyExpiry(fingerprint: fingerprint) {
+        case .softwareSecretCertificate(let route):
+            let effectiveAuthMode: AuthenticationMode
+            if let authMode {
+                effectiveAuthMode = authMode
+            } else {
+                effectiveAuthMode = try privateKeyControlStore.requireUnlockedAuthMode()
+            }
+            return try await modifySoftwareExpiry(
+                route: route,
+                newExpirySeconds: newExpirySeconds,
+                authMode: effectiveAuthMode
+            )
+
+        case .secureEnclaveSigner(let route):
+            return try await modifySecureEnclaveExpiry(
+                route: route,
+                newExpirySeconds: newExpirySeconds
+            )
+
+        case .blocked(let resolution):
+            throw CypherAirError.keyOperationUnavailable(
+                category: resolution.failureCategory ?? .operationUnavailableByPolicy
+            )
+        }
+    }
+
+    private func modifySoftwareExpiry(
+        route: SoftwareSecretCertificateRoute,
+        newExpirySeconds: UInt64?,
+        authMode: AuthenticationMode
+    ) async throws -> PGPKeyIdentity {
+        let fingerprint = route.identity.fingerprint
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
@@ -64,7 +113,7 @@ final class KeyMutationService {
             result.certData.resetBytes(in: 0..<result.certData.count)
         }
 
-        guard let existingIdentity = catalogStore.identity(for: fingerprint) else {
+        guard catalogStore.containsKey(fingerprint: fingerprint) else {
             throw CypherAirError.noMatchingKey
         }
 
@@ -116,16 +165,64 @@ final class KeyMutationService {
             throw error
         }
 
-        var updated = existingIdentity
-        updated.isExpired = result.metadata.isExpired
-        updated.publicKeyData = result.publicKeyData
-        updated.expiryDate = result.metadata.expiryTimestamp.map {
-            Date(timeIntervalSince1970: TimeInterval($0))
-        }
+        let updated = try catalogStore.updateExpiry(
+            metadata: result.metadata,
+            publicKeyData: result.publicKeyData
+        )
 
-        try catalogStore.updateExpiry(updated)
         try privateKeyControlStore.clearModifyExpiryJournal()
         return updated
+    }
+
+    private func modifySecureEnclaveExpiry(
+        route: SecureEnclaveSignerRoute,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPKeyIdentity {
+        guard let expiryMutationService else {
+            throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+        }
+
+        let result = try await expiryMutationService.modifySecureEnclaveExpiry(
+            route: route,
+            newExpirySeconds: newExpirySeconds
+        )
+
+        let updated = try catalogStore.updateExpiry(
+            metadata: result.metadata,
+            publicKeyData: result.publicKeyData
+        )
+
+        return updated
+    }
+
+    private func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute {
+        if let expiryMutationService {
+            return expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
+        }
+
+        guard let identity = catalogStore.identity(for: fingerprint) else {
+            return .blocked(.unavailable(.metadataAssociationMismatch))
+        }
+
+        let resolution = PGPKeyCapabilityResolver().resolution(
+            for: .modifyExpiry,
+            identity: identity
+        )
+        guard resolution.support == .supported else {
+            return .blocked(resolution)
+        }
+
+        switch identity.privateKeyCustodyKind {
+        case .softwareSecretCertificate:
+            return .softwareSecretCertificate(
+                SoftwareSecretCertificateRoute(
+                    identity: identity,
+                    operation: .modifyExpiry
+                )
+            )
+        case .appleSecureEnclavePrivateOperations:
+            return .blocked(.unavailable(.operationUnavailableByPolicy))
+        }
     }
 
     func deleteKey(fingerprint: String) throws {

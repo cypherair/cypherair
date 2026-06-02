@@ -204,8 +204,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             .sign,
             .certify,
             .revoke,
-            .modifyExpiry,
-            .refreshBinding
+            .modifyExpiry
         ]
 
         for operation in signingOperations {
@@ -220,6 +219,14 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             )
         }
 
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .refreshBinding,
+                configuration: .compatibleP256V4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .notImplemented(.operationNotImplementedForCustody)
+        )
         XCTAssertEqual(
             resolver.resolution(
                 for: .decrypt,

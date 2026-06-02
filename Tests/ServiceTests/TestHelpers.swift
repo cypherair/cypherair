@@ -240,6 +240,11 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let expiryMutator = makeExpiryMutator(
+            engine: engine,
+            keyManagement: keyMgmt
+        )
+        keyMgmt.configurePrivateKeyExpiryMutationService(expiryMutator)
 
         let encryptionSvc = EncryptionService(
             keyManagement: keyMgmt,
@@ -439,6 +444,27 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makeExpiryMutator(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        keyAdapter: PGPKeyOperationAdapter? = nil,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyExpiryMutationService {
+        PrivateKeyExpiryMutationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            keyAdapter: keyAdapter ?? PGPKeyOperationAdapter(engine: engine),
             digestSigner: digestSigner
         )
     }

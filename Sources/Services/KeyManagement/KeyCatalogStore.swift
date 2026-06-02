@@ -90,14 +90,41 @@ final class KeyCatalogStore {
         }
     }
 
-    func updateExpiry(_ identity: PGPKeyIdentity) throws {
-        try metadataStore.update(identity)
-
-        guard let index = keys.firstIndex(where: { $0.fingerprint == identity.fingerprint }) else {
-            return
+    func updateExpiry(
+        metadata: PGPKeyMetadata,
+        publicKeyData: Data
+    ) throws -> PGPKeyIdentity {
+        guard let index = keys.firstIndex(where: { $0.fingerprint == metadata.fingerprint }) else {
+            throw CypherAirError.noMatchingKey
         }
 
-        keys[index] = identity
+        let current = keys[index]
+        guard metadata.fingerprint.caseInsensitiveCompare(current.fingerprint) == .orderedSame else {
+            throw CypherAirError.invalidKeyData(reason: "Modified certificate fingerprint mismatch.")
+        }
+
+        let updated = PGPKeyIdentity(
+            fingerprint: current.fingerprint,
+            keyVersion: metadata.keyVersion,
+            profile: metadata.profile,
+            userId: metadata.userId,
+            hasEncryptionSubkey: metadata.hasEncryptionSubkey,
+            isRevoked: metadata.isRevoked,
+            isExpired: metadata.isExpired,
+            isDefault: current.isDefault,
+            isBackedUp: current.isBackedUp,
+            publicKeyData: publicKeyData,
+            revocationCert: current.revocationCert,
+            primaryAlgo: metadata.primaryAlgo,
+            subkeyAlgo: metadata.subkeyAlgo,
+            expiryDate: metadata.expiryDate,
+            openPGPConfigurationIdentity: current.openPGPConfigurationIdentity,
+            privateKeyCustodyKind: current.privateKeyCustodyKind
+        )
+
+        try metadataStore.update(updated)
+        keys[index] = updated
+        return updated
     }
 
     func removeKey(fingerprint: String) throws {
