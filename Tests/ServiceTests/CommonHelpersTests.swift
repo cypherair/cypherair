@@ -1796,10 +1796,16 @@ final class CommonHelpersTests: XCTestCase {
             keyManagement: keyManagement,
             contactService: contactService
         )
+        let passwordMessageEncryptor = TestHelpers.makePasswordMessageEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
         let passwordMessageService = PasswordMessageService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            passwordEncryptor: passwordMessageEncryptor
         )
         let cleartextSigner = TestHelpers.makeCleartextSigner(
             engine: engine,

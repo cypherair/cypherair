@@ -320,6 +320,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PGPKeyOperationFailureMapper.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyAccessService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift

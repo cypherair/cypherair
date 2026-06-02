@@ -231,11 +231,29 @@ external P-256 signer encrypt API with public signing certificate bytes, the
 inspected signing-key fingerprint, and a loaded Security-owned signing handle;
 the callback result preserves typed cancellation and unavailable categories.
 Production policy still blocks Secure Enclave custody, blocked routes fail
-without software fallback, and password-message signing, file streaming,
-detached signing, certification, revocation, expiry/binding refresh, and decrypt
-remain outside this pilot. Failure mapping must stay sanitized and must not
-include fingerprints, handle tags, public binding bytes, Keychain locators,
-plaintext, private material, session keys, or temporary capability paths.
+without software fallback, and password-message signing before Phase 5D, file
+streaming, detached signing, certification, revocation, expiry/binding refresh,
+and decrypt remain outside this pilot. Failure mapping must stay sanitized and
+must not include fingerprints, handle tags, public binding bytes, Keychain
+locators, plaintext, private material, session keys, or temporary capability
+paths.
+
+**Secure Enclave password-message signing pilot note:** Phase 5D wires only
+optional signing for `PasswordMessageService.encryptText` and
+`PasswordMessageService.encryptBinary` through the same private-operation router.
+Password encryption/decryption, SKESK handling, password-message format
+selection, and verification remain owned by the password-message path.
+Software-custody signer routes unwrap and zeroize the complete secret
+certificate exactly as before. Secure Enclave signer routes call the Rust/UniFFI
+external P-256 password encrypt APIs with public signing certificate bytes, the
+inspected signing-key fingerprint, and a loaded Security-owned signing handle;
+the callback result preserves typed cancellation and unavailable categories.
+Production policy still blocks Secure Enclave custody, blocked routes fail
+without software fallback, and file streaming, detached signing, certification,
+revocation, expiry/binding refresh, and decrypt remain outside this pilot.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
 
 ### ProtectedData Device-Binding Note
 

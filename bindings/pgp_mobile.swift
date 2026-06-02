@@ -849,6 +849,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
 
     /**
+     * Encrypt plaintext with a password, sign externally, and return binary ciphertext.
+     */
+    func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider) throws  -> Data
+
+    /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
@@ -863,6 +868,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Encrypt plaintext with a password and return ASCII-armored ciphertext.
      */
     func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
+
+    /**
+     * Encrypt plaintext with a password and sign it using a public certificate plus external P-256 signer.
+     */
+    func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider) throws  -> Data
 
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
@@ -1287,6 +1297,23 @@ open func encryptBinaryWithPassword(plaintext: Data, password: String, format: P
 }
 
     /**
+     * Encrypt plaintext with a password, sign externally, and return binary ciphertext.
+     */
+open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
+    )
+})
+}
+
+    /**
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
@@ -1331,6 +1358,23 @@ open func encryptWithPassword(plaintext: Data, password: String, format: Passwor
         FfiConverterString.lower(password),
         FfiConverterTypePasswordMessageFormat_lower(format),
         FfiConverterOptionData.lower(signingKey),$0
+    )
+})
+}
+
+    /**
+     * Encrypt plaintext with a password and sign it using a public certificate plus external P-256 signer.
+     */
+open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password_and_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
     )
 })
 }
@@ -5650,6 +5694,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password() != 45737) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 2313) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 55907) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5657,6 +5704,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 3472) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 13100) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 10460) {
