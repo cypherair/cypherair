@@ -516,6 +516,38 @@ mod tests {
         }
     }
 
+    fn dearmor_message(data: &[u8]) -> Vec<u8> {
+        crate::armor::decode_armor(data)
+            .expect("message should dearmor cleanly")
+            .0
+    }
+
+    fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
+        let mut has_v1 = false;
+        let mut has_v2 = false;
+        let mut ppr =
+            openpgp::parse::PacketParser::from_bytes(ciphertext).expect("ciphertext should parse");
+        while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+            if let openpgp::Packet::SEIP(seip) = &pp.packet {
+                if seip.version() == 1 {
+                    has_v1 = true;
+                } else if seip.version() == 2 {
+                    has_v2 = true;
+                }
+            }
+            let (_, next) = pp.next().expect("packet parser should advance");
+            ppr = next;
+        }
+        (has_v1, has_v2)
+    }
+
+    fn assert_message_format(ciphertext: &[u8], expect_v1: bool, expect_v2: bool) {
+        let binary = dearmor_message(ciphertext);
+        let (has_v1, has_v2) = detect_message_format(&binary);
+        assert_eq!(has_v1, expect_v1, "unexpected SEIPDv1 presence");
+        assert_eq!(has_v2, expect_v2, "unexpected SEIPDv2 presence");
+    }
+
     fn external_operation_failed() -> ExternalP256SigningError {
         ExternalP256SigningError::Failed {
             category: ExternalP256SigningFailureCategory::ExternalOperationFailed,
@@ -608,6 +640,11 @@ mod tests {
             )
             .expect("runtime external sign-plus-encrypt should succeed");
 
+            match version {
+                CandidateVersion::V4 => assert_message_format(&ciphertext, true, false),
+                CandidateVersion::V6 => assert_message_format(&ciphertext, false, true),
+            }
+
             let result = decrypt::decrypt_detailed(
                 &ciphertext,
                 &[recipient.cert_data],
@@ -615,6 +652,89 @@ mod tests {
             )
             .expect("recipient should decrypt signed message");
             assert_eq!(result.plaintext, plaintext.as_bytes());
+            assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_encrypt_mixed_recipients_downgrades_to_seipdv1() {
+        let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
+        let recipient_v4 = keys::generate_key_with_profile(
+            "Recipient v4".to_string(),
+            Some("recipient-v4@example.test".to_string()),
+            None,
+            keys::KeyProfile::Universal,
+        )
+        .expect("v4 recipient should generate");
+        let recipient_v6 = keys::generate_key_with_profile(
+            "Recipient v6".to_string(),
+            Some("recipient-v6@example.test".to_string()),
+            None,
+            keys::KeyProfile::Advanced,
+        )
+        .expect("v6 recipient should generate");
+        let plaintext = b"runtime external mixed recipients";
+
+        let ciphertext = encrypt::encrypt_with_external_p256_signer(
+            plaintext,
+            &[
+                recipient_v4.public_key_data.clone(),
+                recipient_v6.public_key_data.clone(),
+            ],
+            &material.public_cert,
+            &signing_key_fingerprint(&material),
+            runtime_provider(material.signing_keypair),
+            None,
+        )
+        .expect("runtime external mixed-recipient encrypt should succeed");
+
+        assert_message_format(&ciphertext, true, false);
+
+        for secret in [recipient_v4.cert_data, recipient_v6.cert_data] {
+            let result =
+                decrypt::decrypt_detailed(&ciphertext, &[secret], &[material.public_cert.clone()])
+                    .expect("recipient should decrypt mixed-recipient message");
+            assert_eq!(result.plaintext, plaintext);
+            assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        }
+    }
+
+    #[test]
+    fn test_external_signer_runtime_encrypt_to_self_downgrades_and_self_decrypts() {
+        let material = build_candidate(CandidateVersion::V6).expect("candidate should build");
+        let recipient_v6 = keys::generate_key_with_profile(
+            "Recipient v6".to_string(),
+            Some("recipient-v6@example.test".to_string()),
+            None,
+            keys::KeyProfile::Advanced,
+        )
+        .expect("v6 recipient should generate");
+        let self_v4 = keys::generate_key_with_profile(
+            "Self v4".to_string(),
+            Some("self-v4@example.test".to_string()),
+            None,
+            keys::KeyProfile::Universal,
+        )
+        .expect("v4 self key should generate");
+        let plaintext = b"runtime external encrypt to self downgrade";
+
+        let ciphertext = encrypt::encrypt_with_external_p256_signer(
+            plaintext,
+            &[recipient_v6.public_key_data.clone()],
+            &material.public_cert,
+            &signing_key_fingerprint(&material),
+            runtime_provider(material.signing_keypair),
+            Some(&self_v4.public_key_data),
+        )
+        .expect("runtime external encrypt-to-self should succeed");
+
+        assert_message_format(&ciphertext, true, false);
+
+        for secret in [recipient_v6.cert_data, self_v4.cert_data] {
+            let result =
+                decrypt::decrypt_detailed(&ciphertext, &[secret], &[material.public_cert.clone()])
+                    .expect("recipient or self key should decrypt encrypt-to-self message");
+            assert_eq!(result.plaintext, plaintext);
             assert_eq!(result.legacy_status, SignatureStatus::Valid);
         }
     }

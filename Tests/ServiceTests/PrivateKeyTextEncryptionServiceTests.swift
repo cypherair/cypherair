@@ -96,6 +96,39 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.legacyStatus, .valid)
     }
 
+    func test_secureEnclaveV6RouteSignsAndVerifies() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
+        XCTAssertEqual(fixture.identity.keyVersion, 6)
+        XCTAssertEqual(fixture.identity.profile, .advanced)
+        XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
+        XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        var recipient = try makeRecipient(profile: .advanced)
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(
+            router: router,
+            unwrapper: unwrapper,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+
+        let ciphertext = try await service.encryptText(
+            Data("secure enclave v6 signed text".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: fixture.identity.fingerprint,
+            selfKey: nil
+        )
+
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+        let result = try decrypt(
+            ciphertext,
+            recipientSecret: recipient.certData,
+            verificationKeys: [fixture.identity.publicKeyData]
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave v6 signed text")
+        XCTAssertEqual(result.legacyStatus, .valid)
+    }
+
     func test_secureEnclaveTextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
@@ -144,6 +177,50 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed text")
         XCTAssertEqual(result.legacyStatus, .valid)
+    }
+
+    func test_secureEnclaveTextSigningWithSelfKeyUsesRealRouterAndDoesNotUnwrap() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            ),
+            softwarePrivateKeyAccess: unwrapper,
+            messageAdapter: messageAdapter,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        var recipient = try makeRecipient(name: "Recipient With Self")
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        var selfKey = try makeRecipient(name: "Self Recipient")
+        defer { selfKey.certData.resetBytes(in: 0..<selfKey.certData.count) }
+
+        let ciphertext = try await service.encryptText(
+            Data("secure enclave text with self key".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: fixture.identity.fingerprint,
+            selfKey: selfKey.publicKeyData
+        )
+
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+        for secret in [recipient.certData, selfKey.certData] {
+            let result = try decrypt(
+                ciphertext,
+                recipientSecret: secret,
+                verificationKeys: [fixture.identity.publicKeyData]
+            )
+            XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave text with self key")
+            XCTAssertEqual(result.legacyStatus, .valid)
+        }
     }
 
     func test_productionPolicyBlocksSecureEnclaveTextSigning() async throws {
@@ -205,6 +282,33 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             XCTAssertEqual(category, .privateHandleMissing)
         } catch {
             XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+    }
+
+    func test_secureEnclaveCancellationMapsToOperationCancelledWithoutSoftwareFallback() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(
+            router: router,
+            unwrapper: unwrapper,
+            digestSigner: ThrowingTextDigestSigner(error: CancellationError())
+        )
+
+        do {
+            _ = try await service.encryptText(
+                Data("cancel text signing".utf8),
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: fixture.identity.fingerprint,
+                selfKey: nil
+            )
+            XCTFail("Expected cancellation to throw")
+        } catch CypherAirError.operationCancelled {
+            XCTAssertEqual(unwrapper.unwrapRequests, [])
+        } catch {
+            XCTFail("Expected operationCancelled, got \(error)")
         }
     }
 
@@ -330,7 +434,9 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         )
     }
 
-    private func makeSecureEnclaveRouteFixture() async throws -> TextSecureEnclaveRouteFixture {
+    private func makeSecureEnclaveRouteFixture(
+        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+    ) async throws -> TextSecureEnclaveRouteFixture {
         let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
         let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
         let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
@@ -362,13 +468,14 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             signing: signingHandle,
             keyAgreement: keyAgreementHandle
         )
+        let label = configurationIdentity == .modernP256V6 ? "v6" : "v4"
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(
-            name: "Secure Enclave Text Encrypt",
-            email: "secure-text-encrypt@example.invalid",
+            name: "Secure Enclave Text Encrypt \(label)",
+            email: "secure-text-encrypt-\(label)@example.invalid",
             expirySeconds: 3600,
-            configuration: PGPKeyConfiguration.Identity.compatibleP256V4.configuration,
+            configuration: configurationIdentity.configuration,
             handlePair: handlePair,
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
@@ -387,7 +494,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             primaryAlgo: material.metadata.primaryAlgo,
             subkeyAlgo: material.metadata.subkeyAlgo,
             expiryDate: material.metadata.expiryDate,
-            openPGPConfigurationIdentity: .compatibleP256V4,
+            openPGPConfigurationIdentity: configurationIdentity,
             privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
         )
         let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
