@@ -855,6 +855,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws
 
     /**
+     * Encrypt plaintext and sign it using a public certificate plus external P-256 signer.
+     */
+    func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?) throws  -> Data
+
+    /**
      * Encrypt plaintext with a password and return ASCII-armored ciphertext.
      */
     func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
@@ -1296,6 +1301,23 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
     )
 }
+}
+
+    /**
+     * Encrypt plaintext and sign it using a public certificate plus external P-256 signer.
+     */
+open func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterSequenceData.lower(recipients),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
+        FfiConverterOptionData.lower(encryptToSelf),$0
+    )
+})
 }
 
     /**
@@ -5629,6 +5651,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 55907) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_p256_signer() != 51686) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 3472) {

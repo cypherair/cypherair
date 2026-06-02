@@ -68,7 +68,7 @@ pub fn sign_cleartext_with_external_p256_signer(
     sign_cleartext_with_signer(text, external_signer)
 }
 
-fn select_external_p256_signing_key(
+pub(crate) fn select_external_p256_signing_key(
     public_cert_data: &[u8],
     signing_key_fingerprint: &str,
     policy: &StandardPolicy,

@@ -1,0 +1,482 @@
+import Security
+import XCTest
+@testable import CypherAir
+
+final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
+    private let engine = PgpEngine()
+
+    func test_unsignedTextEncryptionDoesNotRouteOrUnwrapSigner() async throws {
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let router = StaticTextPrivateKeyOperationRouter(
+            route: .blocked(.unavailable(.operationUnavailableByPolicy))
+        )
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        let ciphertext = try await service.encryptText(
+            Data("unsigned text".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: nil,
+            selfKey: nil
+        )
+
+        XCTAssertEqual(router.requests, [])
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+        let result = try decrypt(ciphertext, recipientSecret: recipient.certData, verificationKeys: [])
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "unsigned text")
+        XCTAssertEqual(result.legacyStatus, .notSigned)
+    }
+
+    func test_softwareRouteSignsWithUnwrappedSecretCertificate() async throws {
+        var signer = try engine.generateKey(
+            name: "Software Signer",
+            email: "software@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        defer { signer.certData.resetBytes(in: 0..<signer.certData.count) }
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let identity = try identity(from: signer, isDefault: true)
+        let router = StaticTextPrivateKeyOperationRouter(
+            route: .softwareSecretCertificate(
+                SoftwareSecretCertificateRoute(identity: identity, operation: .sign)
+            )
+        )
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: signer.certData)
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        let ciphertext = try await service.encryptText(
+            Data("software signed text".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: identity.fingerprint,
+            selfKey: nil
+        )
+
+        XCTAssertEqual(router.requests, [
+            PrivateKeyOperationRequest(fingerprint: identity.fingerprint, operation: .sign)
+        ])
+        XCTAssertEqual(unwrapper.unwrapRequests, [identity.fingerprint])
+        let result = try decrypt(
+            ciphertext,
+            recipientSecret: recipient.certData,
+            verificationKeys: [identity.publicKeyData]
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "software signed text")
+        XCTAssertEqual(result.legacyStatus, .valid)
+    }
+
+    func test_secureEnclaveRouteSignsWithoutUnwrappingSecretCertificate() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(
+            router: router,
+            unwrapper: unwrapper,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+
+        let ciphertext = try await service.encryptText(
+            Data("secure enclave signed text".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: fixture.identity.fingerprint,
+            selfKey: nil
+        )
+
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+        let result = try decrypt(
+            ciphertext,
+            recipientSecret: recipient.certData,
+            verificationKeys: [fixture.identity.publicKeyData]
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave signed text")
+        XCTAssertEqual(result.legacyStatus, .valid)
+    }
+
+    func test_secureEnclaveTextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let textEncryptor = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
+        defer { TestHelpers.cleanupTempDir(contactsDirectory) }
+        var recipient = try makeRecipient(name: "Route Recipient")
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        try contactService.importContact(publicKeyData: recipient.publicKeyData)
+        let recipientInfo = try engine.parseKeyInfo(keyData: recipient.publicKeyData)
+        let recipientContactId = try XCTUnwrap(
+            contactService.contactId(forFingerprint: recipientInfo.fingerprint)
+        )
+        let encryptionService = EncryptionService(
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            contactService: contactService,
+            textEncryptor: textEncryptor
+        )
+
+        let ciphertext = try await encryptionService.encryptText(
+            "secure enclave routed text",
+            recipientContactIds: [recipientContactId],
+            signWithFingerprint: fixture.identity.fingerprint,
+            encryptToSelf: false
+        )
+
+        XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
+        let result = try decrypt(
+            ciphertext,
+            recipientSecret: recipient.certData,
+            verificationKeys: [fixture.identity.publicKeyData]
+        )
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed text")
+        XCTAssertEqual(result.legacyStatus, .valid)
+    }
+
+    func test_productionPolicyBlocksSecureEnclaveTextSigning() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        let service = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        )
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+
+        do {
+            _ = try await service.encryptText(
+                Data("blocked by production policy".utf8),
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: fixture.identity.fingerprint,
+                selfKey: nil
+            )
+            XCTFail("Expected production policy to block Secure Enclave signing")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+    }
+
+    func test_secureEnclaveMissingHandleBlocksWithoutSoftwareFallback() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try keyManagement.loadKeys()
+        let service = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+        )
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+
+        do {
+            _ = try await service.encryptText(
+                Data("missing handle".utf8),
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: fixture.identity.fingerprint,
+                selfKey: nil
+            )
+            XCTFail("Expected missing handle to block")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .privateHandleMissing)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+    }
+
+    func test_secureEnclaveCallbackFailuresMapToUnavailableCategoriesWithoutSoftwareFallback() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let cases: [(SecureEnclaveCustodyHandleError, PGPKeyOperationFailureCategory)] = [
+            (.localAuthenticationCancelled(.signing), .localAuthenticationCancelled),
+            (.localAuthenticationFailed(.signing), .localAuthenticationFailed),
+            (.privateOperationRoleMismatch(expected: .signing, actual: .keyAgreement), .privateOperationRoleMismatch),
+            (.handlePublicKeyBindingMismatch(.signing), .handlePublicKeyBindingMismatch),
+        ]
+
+        for (error, expectedCategory) in cases {
+            let router = StaticTextPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
+            let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+            let service = makeService(
+                router: router,
+                unwrapper: unwrapper,
+                digestSigner: ThrowingTextDigestSigner(error: error)
+            )
+
+            do {
+                _ = try await service.encryptText(
+                    Data("callback failure".utf8),
+                    recipientKeys: [recipient.publicKeyData],
+                    signerFingerprint: fixture.identity.fingerprint,
+                    selfKey: nil
+                )
+                XCTFail("Expected callback failure to throw")
+            } catch CypherAirError.keyOperationUnavailable(let category) {
+                XCTAssertEqual(category, expectedCategory)
+            } catch {
+                XCTFail("Expected keyOperationUnavailable, got \(error)")
+            }
+            XCTAssertEqual(unwrapper.unwrapRequests, [])
+        }
+    }
+
+    func test_blockedRouteThrowsUnavailableCategoryWithoutUnwrappingOrFFISigning() async throws {
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+        let router = StaticTextPrivateKeyOperationRouter(
+            route: .blocked(.unavailable(.operationUnavailableByPolicy))
+        )
+        let unwrapper = RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        do {
+            _ = try await service.encryptText(
+                Data("blocked".utf8),
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: "blocked-fingerprint",
+                selfKey: nil
+            )
+            XCTFail("Expected blocked route to throw")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+    }
+
+    private func makeService(
+        router: StaticTextPrivateKeyOperationRouter,
+        unwrapper: RecordingTextSoftwareSecretCertificateUnwrapper,
+        messageAdapter: PGPMessageOperationAdapter? = nil,
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyTextEncryptionService {
+        PrivateKeyTextEncryptionService(
+            router: router,
+            softwarePrivateKeyAccess: unwrapper,
+            messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
+            digestSigner: digestSigner
+        )
+    }
+
+    private func makeRecipient(
+        name: String = "Recipient",
+        profile: KeyProfile = .universal
+    ) throws -> GeneratedKey {
+        try engine.generateKey(
+            name: name,
+            email: "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))@example.invalid",
+            expirySeconds: nil,
+            profile: profile
+        )
+    }
+
+    private func identity(from generated: GeneratedKey, isDefault: Bool) throws -> PGPKeyIdentity {
+        let keyInfo = try engine.parseKeyInfo(keyData: generated.certData)
+        return PGPKeyIdentity(
+            fingerprint: keyInfo.fingerprint,
+            keyVersion: UInt8(keyInfo.keyVersion),
+            profile: .universal,
+            userId: keyInfo.userId,
+            hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
+            isRevoked: keyInfo.isRevoked,
+            isExpired: keyInfo.isExpired,
+            isDefault: isDefault,
+            isBackedUp: false,
+            publicKeyData: generated.publicKeyData,
+            revocationCert: generated.revocationCert,
+            primaryAlgo: keyInfo.primaryAlgo,
+            subkeyAlgo: keyInfo.subkeyAlgo,
+            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+    }
+
+    private func decrypt(
+        _ ciphertext: Data,
+        recipientSecret: Data,
+        verificationKeys: [Data]
+    ) throws -> DecryptDetailedResult {
+        let binary = try engine.dearmor(armored: ciphertext)
+        return try engine.decryptDetailed(
+            ciphertext: binary,
+            secretKeys: [recipientSecret],
+            verificationKeys: verificationKeys
+        )
+    }
+
+    private func makeSecureEnclaveRouteFixture() async throws -> TextSecureEnclaveRouteFixture {
+        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
+        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
+        let handleSetIdentifier = "text-encrypt-\(UUID().uuidString.lowercased())"
+        let signingReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .signing
+        )
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .keyAgreement
+        )
+        let signingHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try SecureEnclaveCustodyHandlePublicBinding(
+                reference: signingReference,
+                publicKeyX963: signingPublicKeyX963
+            ),
+            privateKey: signingPrivateKey
+        )
+        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try SecureEnclaveCustodyHandlePublicBinding(
+                reference: keyAgreementReference,
+                publicKeyX963: keyAgreementPublicKeyX963
+            ),
+            privateKey: keyAgreementPrivateKey
+        )
+        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
+            signing: signingHandle,
+            keyAgreement: keyAgreementHandle
+        )
+        let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
+            engine: engine
+        ).generatePublicCertificate(
+            name: "Secure Enclave Text Encrypt",
+            email: "secure-text-encrypt@example.invalid",
+            expirySeconds: 3600,
+            configuration: PGPKeyConfiguration.Identity.compatibleP256V4.configuration,
+            handlePair: handlePair,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        let identity = PGPKeyIdentity(
+            fingerprint: material.metadata.fingerprint,
+            keyVersion: material.metadata.keyVersion,
+            profile: material.metadata.profile,
+            userId: material.metadata.userId,
+            hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
+            isRevoked: material.metadata.isRevoked,
+            isExpired: material.metadata.isExpired,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: material.publicKeyData,
+            revocationCert: material.revocationCert,
+            primaryAlgo: material.metadata.primaryAlgo,
+            subkeyAlgo: material.metadata.subkeyAlgo,
+            expiryDate: material.metadata.expiryDate,
+            openPGPConfigurationIdentity: .compatibleP256V4,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
+            engine: engine
+        ).inspectPublicBindings(publicKeyData: material.publicKeyData)
+
+        return TextSecureEnclaveRouteFixture(
+            identity: identity,
+            route: SecureEnclaveSignerRoute(
+                identity: identity,
+                operation: .sign,
+                publicBindingInspection: inspection,
+                signingHandle: signingHandle
+            ),
+            keyAgreementHandle: keyAgreementHandle
+        )
+    }
+
+    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256
+        ]
+        var error: Unmanaged<CFError>?
+        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to create test P-256 key."
+            )
+        }
+        return key
+    }
+
+    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw CypherAirError.keyGenerationFailed(reason: "Missing test public key.")
+        }
+        var error: Unmanaged<CFError>?
+        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to export test P-256 public key."
+            )
+        }
+        return data
+    }
+}
+
+private struct TextSecureEnclaveRouteFixture {
+    let identity: PGPKeyIdentity
+    let route: SecureEnclaveSignerRoute
+    let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
+}
+
+private final class StaticTextPrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {
+    private let routeResult: PrivateKeyOperationRoute
+    private(set) var requests: [PrivateKeyOperationRequest] = []
+
+    init(route: PrivateKeyOperationRoute) {
+        routeResult = route
+    }
+
+    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+        requests.append(request)
+        return routeResult
+    }
+}
+
+private final class RecordingTextSoftwareSecretCertificateUnwrapper: SoftwareSecretCertificateUnwrapping {
+    private let secretCert: Data
+    private(set) var unwrapRequests: [String] = []
+
+    init(secretCert: Data) {
+        self.secretCert = secretCert
+    }
+
+    func unwrapPrivateKey(fingerprint: String) async throws -> Data {
+        unwrapRequests.append(fingerprint)
+        return secretCert
+    }
+}
+
+private struct ThrowingTextDigestSigner: SecureEnclaveCustodyDigestSigning {
+    let error: Error
+
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        throw error
+    }
+}

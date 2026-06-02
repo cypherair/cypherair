@@ -221,6 +221,22 @@ Sign-plus-encrypt, password-message signing, detached file signing,
 certification, revocation, expiry/binding refresh, and decrypt remain outside
 this pilot.
 
+**Secure Enclave text sign-plus-encrypt pilot note:** Phase 5C wires only
+optional signing for `EncryptionService.encryptText` through the same router.
+Recipient resolution, encrypt-to-self, profile/message-format selection, and
+unsigned text encryption remain the existing encryption-service behavior.
+Software-custody signer routes unwrap and zeroize the complete secret
+certificate exactly as before. Secure Enclave signer routes call the Rust/UniFFI
+external P-256 signer encrypt API with public signing certificate bytes, the
+inspected signing-key fingerprint, and a loaded Security-owned signing handle;
+the callback result preserves typed cancellation and unavailable categories.
+Production policy still blocks Secure Enclave custody, blocked routes fail
+without software fallback, and password-message signing, file streaming,
+detached signing, certification, revocation, expiry/binding refresh, and decrypt
+remain outside this pilot. Failure mapping must stay sanitized and must not
+include fingerprints, handle tags, public binding bytes, Keychain locators,
+plaintext, private material, session keys, or temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

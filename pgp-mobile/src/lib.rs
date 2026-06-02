@@ -188,6 +188,26 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt plaintext and sign it using a public certificate plus external P-256 signer.
+    pub fn encrypt_with_external_p256_signer(
+        &self,
+        plaintext: Vec<u8>,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        encrypt::encrypt_with_external_p256_signer(
+            &plaintext,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            signer,
+            encrypt_to_self.as_deref(),
+        )
+    }
+
     /// Encrypt plaintext and return binary ciphertext (.gpg format).
     pub fn encrypt_binary(
         &self,

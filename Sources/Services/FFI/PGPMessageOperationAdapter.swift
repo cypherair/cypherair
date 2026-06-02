@@ -77,6 +77,29 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func encryptWithExternalP256Signer(
+        plaintext: Data,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selfKey: Data?
+    ) async throws -> Data {
+        do {
+            return try await Self.performEncryptWithExternalP256Signer(
+                engine: engine,
+                plaintext: plaintext,
+                recipientKeys: recipientKeys,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                selfKey: selfKey
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func encryptFile(
         inputPath: String,
         outputPath: String,
@@ -329,6 +352,26 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             plaintext: plaintext,
             recipients: recipientKeys,
             signingKey: signingKey,
+            encryptToSelf: selfKey
+        )
+    }
+
+    @concurrent
+    private static func performEncryptWithExternalP256Signer(
+        engine: PgpEngine,
+        plaintext: Data,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selfKey: Data?
+    ) async throws -> Data {
+        try engine.encryptWithExternalP256Signer(
+            plaintext: plaintext,
+            recipients: recipientKeys,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
             encryptToSelf: selfKey
         )
     }

@@ -252,6 +252,21 @@ categories. Sign-plus-encrypt, password-message signing, detached file signing,
 certification, revocation, expiry/binding refresh, and decrypt remain outside
 PR 5B.
 
+Phase 5C is the second narrow workflow consumer. The Rust runtime text encrypt
+API accepts recipient certificates, optional encrypt-to-self certificate, a
+public signing certificate, expected signing-key fingerprint, and the existing
+external P-256 signing provider. Rust rejects secret signing certificates,
+non-P-256 or wrong-role signing certificates, fingerprint mismatches, malformed
+callback signatures, wrong digests, and wrong public-key signatures without
+falling back to secret-certificate signing. Swift routes only optional signing
+for `EncryptionService.encryptText`: unsigned text encryption does not route,
+software routes keep the existing unwrap-and-zeroize behavior, Secure Enclave
+signer routes pass public signing certificate material and the loaded signing
+handle to the external signer encrypt API, and blocked routes map to sanitized
+unavailable categories. Password-message signing, streaming file
+encryption/signing, detached signing, certification, revocation,
+expiry/binding refresh, and decrypt remain outside PR 5C.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -401,6 +416,20 @@ stays unchanged, Secure Enclave cleartext signing does not unwrap a software
 secret certificate, production policy blocks, hidden/test signing policy can
 sign and verify, missing/wrong handles and auth failures surface stable
 categories, and blocked routes do not call FFI signing.
+
+Phase 5C coverage adds text sign-plus-encrypt optional signing through the same
+external signer route. Rust tests should verify v4/v6 public-only P-256 signed
+encrypted messages decrypt and verify, callback cancellation and sanitized typed
+categories survive finalization, secret signing certificates, wrong
+fingerprints, non-P-256 or wrong-role certificates, malformed signatures, wrong
+digests, wrong public keys, and external failures all fail closed, and no
+secret-certificate fallback occurs. Swift tests should verify software signed
+text encryption remains behavior-compatible and zeroizes unwrapped material,
+unsigned text encryption does not route, production policy blocks Secure
+Enclave signing, hidden/test policy can sign plus encrypt through a real
+catalog/router/public-binding inspector/shared mock handle store, handle/auth
+failures surface stable unavailable categories, blocked routes do not call FFI,
+and streaming file encryption remains untouched.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

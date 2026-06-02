@@ -1948,10 +1948,16 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             certificateAdapter: certificateAdapter,
             contactsDomainStore: contactsDomainStore
         )
+        let textEncryptor = TestHelpers.makeTextEncryptor(
+            engine: engine,
+            keyManagement: keyManagement,
+            messageAdapter: messageAdapter
+        )
         let encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            textEncryptor: textEncryptor
         )
         let decryptionService = DecryptionService(
             messageAdapter: messageAdapter,

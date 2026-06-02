@@ -13,6 +13,7 @@ final class EncryptionService {
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let textEncryptor: any TextMessageEncrypting
     private let diskSpaceChecker: DiskSpaceChecker
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
@@ -20,12 +21,14 @@ final class EncryptionService {
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
+        textEncryptor: any TextMessageEncrypting,
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.textEncryptor = textEncryptor
         self.diskSpaceChecker = diskSpaceChecker
         self.temporaryArtifactStore = temporaryArtifactStore
     }
@@ -198,41 +201,12 @@ final class EncryptionService {
             encryptToSelfFingerprint: encryptToSelfFingerprint
         )
 
-        // Get signing key if requested (requires SE unwrap → Face ID)
-        var signingKey: Data?
-        if let signerFp = signWithFingerprint {
-            do {
-                signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
-            } catch {
-                throw CypherAirError.from(error) { _ in .authenticationFailed }
-            }
-        }
-
-        defer {
-            // Safety-net zeroing. Primary zeroing happens inline below.
-            if signingKey != nil {
-                signingKey!.resetBytes(in: 0..<signingKey!.count)
-                signingKey = nil
-            }
-        }
-
-        let result = try await messageAdapter.encrypt(
-            plaintext: plaintext,
+        return try await textEncryptor.encryptText(
+            plaintext,
             recipientKeys: recipientKeys,
-            signingKey: signingKey,
-            selfKey: selfKey,
-            binary: false
+            signerFingerprint: signWithFingerprint,
+            selfKey: selfKey
         )
-
-        // Primary zeroing: immediately after engine call returns, signingKey is most
-        // likely uniquely referenced (UniFFI lower() temporaries released). This
-        // maximizes the chance that resetBytes mutates the original buffer under COW.
-        if signingKey != nil {
-            signingKey!.resetBytes(in: 0..<signingKey!.count)
-            signingKey = nil
-        }
-
-        return result
     }
 
     private func resolvedEncryptToSelfKey(

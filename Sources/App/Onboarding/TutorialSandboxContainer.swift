@@ -119,10 +119,22 @@ final class TutorialSandboxContainer {
             contactsDomainStore: contactsDomainStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let textEncryptor = PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: SecureEnclaveCustodyHandleStore(
+                    keyStore: SystemSecureEnclaveCustodyKeyStore()
+                )
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
         self.encryptionService = EncryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
+            textEncryptor: textEncryptor,
             temporaryArtifactStore: temporaryArtifactStore
         )
         self.decryptionService = DecryptionService(
