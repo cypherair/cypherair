@@ -269,6 +269,13 @@ final class AppContainer: @unchecked Sendable {
     ) -> PgpServiceGraph {
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let textEncryptor = makePrivateKeyTextEncryptionService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         let cleartextSigner = makePrivateKeyCleartextSigningService(
             engine: engine,
             messageAdapter: messageAdapter,
@@ -282,6 +289,7 @@ final class AppContainer: @unchecked Sendable {
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
+                textEncryptor: textEncryptor,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             decryptionService: DecryptionService(
@@ -311,6 +319,24 @@ final class AppContainer: @unchecked Sendable {
                 selfTestAdapter: selfTestAdapter,
                 messageAdapter: messageAdapter
             )
+        )
+    }
+
+    private static func makePrivateKeyTextEncryptionService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyTextEncryptionService {
+        PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
         )
     }
 

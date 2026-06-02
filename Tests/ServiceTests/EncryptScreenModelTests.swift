@@ -363,7 +363,8 @@ final class EncryptScreenModelTests: XCTestCase {
         let encryptionService = EncryptionService(
             messageAdapter: stack.messageAdapter,
             keyManagement: stack.keyManagement,
-            contactService: opened.service
+            contactService: opened.service,
+            textEncryptor: stack.textEncryptor
         )
         let model = EncryptScreenModel(
             encryptionService: encryptionService,
@@ -956,7 +957,8 @@ final class EncryptScreenModelTests: XCTestCase {
             EncryptionService(
                 messageAdapter: stack.messageAdapter,
                 keyManagement: stack.keyManagement,
-                contactService: $0
+                contactService: $0,
+                textEncryptor: stack.textEncryptor
             )
         } ?? stack.encryptionService
         return EncryptScreenModel(

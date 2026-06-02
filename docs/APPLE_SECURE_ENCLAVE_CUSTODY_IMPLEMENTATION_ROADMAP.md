@@ -296,6 +296,14 @@ Recommended PR grouping:
   unavailable categories, and production policy still blocks Secure Enclave
   custody.
 - PR 5C: sign-plus-encrypt text optional signing.
+  **Implemented:** Phase 5C adds a Rust/UniFFI armored text encrypt API that can
+  sign with a public-only P-256 certificate through the external signer
+  callback, and Swift routes only `EncryptionService.encryptText` optional
+  signing through the private-operation router. Software routes retain the
+  existing unwrap-and-zeroize path, Secure Enclave signer routes use public
+  certificate material plus a loaded signing handle, unsigned text encryption
+  does not route, blocked routes surface sanitized unavailable categories, and
+  production policy still blocks Secure Enclave custody.
 - PR 5D: password-message optional signing.
 - PR 5E: streaming detached file signing.
 - PR 5F: streaming encrypt-plus-sign.
