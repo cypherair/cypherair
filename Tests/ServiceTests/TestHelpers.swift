@@ -230,6 +230,11 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let passwordMessageEncryptor = makePasswordMessageEncryptor(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
 
         let encryptionSvc = EncryptionService(
             messageAdapter: messageAdapter,
@@ -245,7 +250,8 @@ enum TestHelpers {
         let passwordMessageSvc = PasswordMessageService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
-            contactService: contactSvc
+            contactService: contactSvc,
+            passwordEncryptor: passwordMessageEncryptor
         )
         let cleartextSigner = makeCleartextSigner(
             engine: engine,
@@ -270,6 +276,7 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             contactService: contactSvc,
             textEncryptor: textEncryptor,
+            passwordMessageEncryptor: passwordMessageEncryptor,
             encryptionService: encryptionSvc,
             decryptionService: decryptionSvc,
             passwordMessageService: passwordMessageSvc,
@@ -293,6 +300,7 @@ enum TestHelpers {
         let keyManagement: KeyManagementService
         let contactService: ContactService
         let textEncryptor: any TextMessageEncrypting
+        let passwordMessageEncryptor: any PasswordMessageEncrypting
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
         let passwordMessageService: PasswordMessageService
@@ -343,6 +351,28 @@ enum TestHelpers {
         digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makePasswordMessageEncryptor(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyPasswordMessageEncryptionService {
+        PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: resolver,
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

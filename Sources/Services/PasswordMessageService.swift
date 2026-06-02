@@ -5,8 +5,8 @@ import Foundation
 /// This service is intentionally separate from recipient-key encryption and
 /// the two-phase `DecryptionService` flow. Its password-decrypt path does not
 /// use Secure Enclave unwrapping or PKESK recipient matching. If optional
-/// signing is requested during password-message encryption, it authenticates
-/// through `KeyManagementService.unwrapPrivateKey(...)` first.
+/// signing is requested during password-message encryption, private-key
+/// dispatch is delegated through the key-management router.
 @Observable
 final class PasswordMessageService {
     typealias DetailedDecryptOutcome = PasswordMessageDetailedDecryptOutcome
@@ -14,15 +14,18 @@ final class PasswordMessageService {
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let passwordEncryptor: any PasswordMessageEncrypting
 
     init(
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        passwordEncryptor: any PasswordMessageEncrypting
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.passwordEncryptor = passwordEncryptor
     }
 
     func encryptText(
@@ -71,36 +74,13 @@ final class PasswordMessageService {
         signWithFingerprint: String?,
         binary: Bool
     ) async throws -> Data {
-        var signingKey: Data?
-        if let signerFp = signWithFingerprint {
-            do {
-                signingKey = try await keyManagement.unwrapPrivateKey(fingerprint: signerFp)
-            } catch {
-                throw CypherAirError.from(error) { _ in .authenticationFailed }
-            }
-        }
-
-        defer {
-            if signingKey != nil {
-                signingKey!.resetBytes(in: 0..<signingKey!.count)
-                signingKey = nil
-            }
-        }
-
-        let result = try await messageAdapter.encryptWithPassword(
+        try await passwordEncryptor.encrypt(
             plaintext: plaintext,
             password: password,
             format: format,
-            signingKey: signingKey,
+            signerFingerprint: signWithFingerprint,
             binary: binary
         )
-
-        if signingKey != nil {
-            signingKey!.resetBytes(in: 0..<signingKey!.count)
-            signingKey = nil
-        }
-
-        return result
     }
 
     private func verificationContext() -> PGPMessageVerificationContext {

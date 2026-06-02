@@ -305,6 +305,15 @@ Recommended PR grouping:
   does not route, blocked routes surface sanitized unavailable categories, and
   production policy still blocks Secure Enclave custody.
 - PR 5D: password-message optional signing.
+  **Implemented:** Phase 5D adds Rust/UniFFI password-message encrypt APIs for
+  armored and binary outputs that can sign with a public-only P-256 certificate
+  through the external signer callback, and Swift routes only
+  `PasswordMessageService.encryptText` / `encryptBinary` optional signing
+  through the private-operation router. Software routes retain the existing
+  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
+  material plus a loaded signing handle, unsigned password encryption does not
+  route, blocked routes surface sanitized unavailable categories, and
+  production policy still blocks Secure Enclave custody.
 - PR 5E: streaming detached file signing.
 - PR 5F: streaming encrypt-plus-sign.
 - PR 5G: expiry and binding-refresh signing route, or explicit unsupported

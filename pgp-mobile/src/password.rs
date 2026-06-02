@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use openpgp::crypto::{Password, SessionKey};
 use openpgp::packet::{SEIP, SKESK};
 use openpgp::parse::Parse;
@@ -9,6 +11,7 @@ use crate::armor;
 use crate::decrypt::{self, SignatureStatus};
 use crate::encrypt;
 use crate::error::PgpError;
+use crate::keys::ExternalP256SigningProvider;
 use crate::signature_details::{DetailedSignatureEntry, SignatureVerificationState};
 
 /// Message format for password-encrypted messages.
@@ -59,6 +62,46 @@ pub fn encrypt_binary(
     signing_key: Option<&[u8]>,
 ) -> Result<Vec<u8>, PgpError> {
     encrypt_impl(plaintext, password, format, signing_key, true)
+}
+
+/// Encrypt plaintext with a password and sign it using a public certificate plus external P-256 signer.
+pub fn encrypt_with_external_p256_signer(
+    plaintext: &[u8],
+    password: &Password,
+    format: PasswordMessageFormat,
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+) -> Result<Vec<u8>, PgpError> {
+    encrypt_external_impl(
+        plaintext,
+        password,
+        format,
+        signing_public_cert,
+        signing_key_fingerprint,
+        signer,
+        false,
+    )
+}
+
+/// Encrypt plaintext with a password, sign externally, and return binary ciphertext.
+pub fn encrypt_binary_with_external_p256_signer(
+    plaintext: &[u8],
+    password: &Password,
+    format: PasswordMessageFormat,
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+) -> Result<Vec<u8>, PgpError> {
+    encrypt_external_impl(
+        plaintext,
+        password,
+        format,
+        signing_public_cert,
+        signing_key_fingerprint,
+        signer,
+        true,
+    )
 }
 
 /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
@@ -186,6 +229,52 @@ fn encrypt_impl(
 
     let message = encrypt::setup_signer(message, signing_key, &policy)?;
     encrypt::write_and_finalize(message, plaintext)?;
+
+    Ok(sink)
+}
+
+fn encrypt_external_impl(
+    plaintext: &[u8],
+    password: &Password,
+    format: PasswordMessageFormat,
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+    binary: bool,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = openpgp::policy::StandardPolicy::new();
+    let mut sink = Vec::new();
+    let message = Message::new(&mut sink);
+
+    let message = if binary {
+        message
+    } else {
+        Armorer::new(message)
+            .kind(openpgp::armor::Kind::Message)
+            .build()
+            .map_err(|e| PgpError::EncryptionFailed {
+                reason: format!("Armor setup failed: {e}"),
+            })?
+    };
+
+    let encryptor = Encryptor::with_passwords(message, std::iter::once(password.clone()))
+        .symmetric_algo(SymmetricAlgorithm::AES256);
+    let encryptor = match format {
+        PasswordMessageFormat::Seipdv1 => encryptor,
+        PasswordMessageFormat::Seipdv2 => encryptor.aead_algo(AEADAlgorithm::OCB),
+    };
+    let message = encryptor.build().map_err(|e| PgpError::EncryptionFailed {
+        reason: format!("Encryptor setup failed: {e}"),
+    })?;
+
+    let message = encrypt::setup_external_p256_signer(
+        message,
+        signing_public_cert,
+        signing_key_fingerprint,
+        signer,
+        &policy,
+    )?;
+    encrypt::write_and_finalize_external_signing(message, plaintext)?;
 
     Ok(sink)
 }

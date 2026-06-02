@@ -283,6 +283,13 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
+        let passwordEncryptor = makePrivateKeyPasswordMessageEncryptionService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
@@ -301,7 +308,8 @@ final class AppContainer: @unchecked Sendable {
             passwordMessageService: PasswordMessageService(
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
-                contactService: contactService
+                contactService: contactService,
+                passwordEncryptor: passwordEncryptor
             ),
             signingService: SigningService(
                 messageAdapter: messageAdapter,
@@ -348,6 +356,24 @@ final class AppContainer: @unchecked Sendable {
         secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
     ) -> PrivateKeyCleartextSigningService {
         PrivateKeyCleartextSigningService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyPasswordMessageEncryptionService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyPasswordMessageEncryptionService {
+        PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore

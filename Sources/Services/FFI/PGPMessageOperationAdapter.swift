@@ -192,6 +192,31 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func encryptWithPasswordAndExternalP256Signer(
+        plaintext: Data,
+        password: String,
+        format: PasswordMessageEnvelopeFormat,
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        binary: Bool
+    ) async throws -> Data {
+        do {
+            return try await Self.performEncryptWithPasswordAndExternalP256Signer(
+                engine: engine,
+                plaintext: plaintext,
+                password: password,
+                format: format.ffiValue,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                binary: binary
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func decryptWithPassword(
         ciphertext: Data,
         password: String,
@@ -450,6 +475,37 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             password: password,
             format: format,
             signingKey: signingKey
+        )
+    }
+
+    @concurrent
+    private static func performEncryptWithPasswordAndExternalP256Signer(
+        engine: PgpEngine,
+        plaintext: Data,
+        password: String,
+        format: PasswordMessageFormat,
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        binary: Bool
+    ) async throws -> Data {
+        if binary {
+            return try engine.encryptBinaryWithPasswordAndExternalP256Signer(
+                plaintext: plaintext,
+                password: password,
+                format: format,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signer: signingProvider
+            )
+        }
+        return try engine.encryptWithPasswordAndExternalP256Signer(
+            plaintext: plaintext,
+            password: password,
+            format: format,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider
         )
     }
 

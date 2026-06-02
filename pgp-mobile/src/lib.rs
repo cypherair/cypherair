@@ -261,6 +261,48 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt plaintext with a password and sign it using a public certificate plus external P-256 signer.
+    pub fn encrypt_with_password_and_external_p256_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        password::encrypt_with_external_p256_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            signer,
+        )
+    }
+
+    /// Encrypt plaintext with a password, sign externally, and return binary ciphertext.
+    pub fn encrypt_binary_with_password_and_external_p256_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        password::encrypt_binary_with_external_p256_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            signer,
+        )
+    }
+
     // ── Decryption ──────────────────────────────────────────────────
 
     /// Parse recipients of an encrypted message (Phase 1 — no auth needed).
