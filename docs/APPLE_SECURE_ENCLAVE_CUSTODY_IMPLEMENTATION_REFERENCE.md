@@ -316,6 +316,32 @@ cancellation through the external signer file-encryption API, and blocked routes
 map to sanitized unavailable categories. Certification, revocation,
 expiry/binding refresh, and decrypt remain outside PR 5F.
 
+Phase 5G is the sixth narrow workflow consumer. The Rust runtime expiry
+mutation API accepts only public certificate bytes, an expected signing-key
+fingerprint, and the existing external P-256 signing provider, then emits
+updated public certificate bytes and key metadata after Sequoia binding
+signature construction. Rust rejects secret certificates, non-P-256 or
+wrong-role signing certificates, fingerprint mismatches, malformed callback
+signatures, wrong digests, wrong public-key signatures, cancellation, and
+external failures without falling back to secret-certificate signing. Swift
+routes only `KeyMutationService.modifyExpiry`: software routes keep the
+existing unwrap-and-zeroize, Rust `modifyExpiry`, rewrap/promotion, pending
+bundle, recovery journal, and catalog behavior, while Secure Enclave signer
+routes pass stored public certificate material and the loaded signing handle to
+the external signer expiry API and update only public metadata/catalog state.
+Standalone `refreshBinding` remains explicitly not implemented for Secure
+Enclave custody because there is no current product or software workflow to
+route. Certification, revocation, and decrypt remain outside PR 5G.
+The Phase 5G follow-up refreshes explicit transport/ECDH subkey validity
+bindings in the shared Rust expiry helper instead of relying on primary
+direct-key/User ID expiry updates alone, and the public-only external API
+requires the expected signer fingerprint to match the primary key. A second
+follow-up keeps modify-expiry usable after a local key has already expired by
+using an expiry-specific primary signer selector that does not require `.alive()`
+while ordinary signing workflows still do, and makes Secure Enclave catalog
+writeback merge against the current identity so late results preserve local flags
+and cannot recreate deleted metadata.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -524,6 +550,26 @@ inspector/shared mock handle store, explicit/default encrypt-to-self paths
 decrypt and verify, handle/auth/progress/callback failures surface stable
 categories, blocked routes do not call FFI, output cleanup occurs on failure,
 and text/password/detached/decrypt streaming coverage remains unchanged.
+
+Phase 5G coverage adds modify-expiry binding signatures through the same
+external signer route. Rust tests should verify v4/v6 public-only P-256 expiry
+set/remove mutations preserve fingerprint and key version, update expiry
+metadata, and emit verifiable public certificate binding signatures. Rust
+tests should also cover extending and removing expiry after the local key has
+already expired. Rust negative tests should cover callback cancellation, typed
+callback failure categories, malformed or zero `r/s`, wrong digest, wrong public
+key, wrong fingerprint, secret certificate input, non-P-256 or wrong-role
+certificates, external failures, and no fallback to secret-certificate signing.
+Swift tests should verify software modify-expiry remains behavior-compatible and
+preserves zeroization plus pending-bundle recovery behavior, production policy
+blocks Secure Enclave modify-expiry, hidden/test policy can modify expiry
+through a real catalog/router/public-binding inspector/shared mock handle store
+for v4 and v6 fixtures including after expiry has passed, Secure Enclave
+writeback preserves current catalog flags and does not resurrect deleted
+metadata, no software unwrap or recovery journal path runs on Secure Enclave
+routes, handle/auth/callback failures surface stable categories, blocked routes
+do not call FFI, and `refreshBinding` remains explicitly not implemented without
+touching Security handles or FFI.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

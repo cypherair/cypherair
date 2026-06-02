@@ -977,6 +977,15 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func modifyExpiry(certData: Data, newExpirySeconds: UInt64?) throws  -> ModifyExpiryResult
 
     /**
+     * Modify the expiration time of a public-only P-256 certificate with an
+     * external signer.
+     *
+     * This is for Secure Enclave custody private operations: it returns only the
+     * updated public certificate and key metadata, never secret certificate bytes.
+     */
+    func modifyExpiryWithExternalP256Signer(publicCertData: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, newExpirySeconds: UInt64?) throws  -> ModifyExpiryPublicResult
+
+    /**
      * Parse a key and extract information (fingerprint, version, User ID, etc.).
      */
     func parseKeyInfo(keyData: Data) throws  -> KeyInfo
@@ -1613,6 +1622,25 @@ open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> Modi
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
+        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+    )
+})
+}
+
+    /**
+     * Modify the expiration time of a public-only P-256 certificate with an
+     * external signer.
+     *
+     * This is for Secure Enclave custody private operations: it returns only the
+     * updated public certificate and key metadata, never secret certificate bytes.
+     */
+open func modifyExpiryWithExternalP256Signer(publicCertData: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, newExpirySeconds: UInt64?)throws  -> ModifyExpiryPublicResult  {
+    return try  FfiConverterTypeModifyExpiryPublicResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCertData),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterOptionUInt64.lower(newExpirySeconds),$0
     )
 })
@@ -3060,6 +3088,76 @@ public func FfiConverterTypeKeyInfo_lift(_ buf: RustBuffer) throws -> KeyInfo {
 #endif
 public func FfiConverterTypeKeyInfo_lower(_ value: KeyInfo) -> RustBuffer {
     return FfiConverterTypeKeyInfo.lower(value)
+}
+
+
+/**
+ * Public-only result of modifying a Secure Enclave custody certificate's
+ * expiration time through an external signer.
+ */
+public struct ModifyExpiryPublicResult: Equatable, Hashable {
+    /**
+     * Updated public certificate in binary OpenPGP format.
+     */
+    public var publicKeyData: Data
+    /**
+     * Updated key info with new expiry status.
+     */
+    public var keyInfo: KeyInfo
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Updated public certificate in binary OpenPGP format.
+         */publicKeyData: Data,
+        /**
+         * Updated key info with new expiry status.
+         */keyInfo: KeyInfo) {
+        self.publicKeyData = publicKeyData
+        self.keyInfo = keyInfo
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ModifyExpiryPublicResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeModifyExpiryPublicResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ModifyExpiryPublicResult {
+        return
+            try ModifyExpiryPublicResult(
+                publicKeyData: FfiConverterData.read(from: &buf),
+                keyInfo: FfiConverterTypeKeyInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ModifyExpiryPublicResult, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.publicKeyData, into: &buf)
+        FfiConverterTypeKeyInfo.write(value.keyInfo, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeModifyExpiryPublicResult_lift(_ buf: RustBuffer) throws -> ModifyExpiryPublicResult {
+    return try FfiConverterTypeModifyExpiryPublicResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeModifyExpiryPublicResult_lower(_ value: ModifyExpiryPublicResult) -> RustBuffer {
+    return FfiConverterTypeModifyExpiryPublicResult.lower(value)
 }
 
 
@@ -5796,6 +5894,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 31305) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_p256_signer() != 59004) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {

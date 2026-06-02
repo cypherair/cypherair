@@ -20,6 +20,11 @@ struct PGPModifiedExpiryKeyMaterial {
     let metadata: PGPKeyMetadata
 }
 
+struct PGPPublicModifiedExpiryKeyMaterial {
+    let publicKeyData: Data
+    let metadata: PGPKeyMetadata
+}
+
 typealias PGPSecretDataZeroizer = @Sendable (inout Data) -> Void
 
 /// FFI-owned key generation, import/export, and key-mutation operations.
@@ -123,6 +128,25 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
             )
         } catch {
             throw PGPErrorMapper.map(error) { .keyGenerationFailed(reason: $0) }
+        }
+    }
+
+    func modifyExpiryWithExternalP256Signer(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        do {
+            return try await Self.performModifyExpiryWithExternalP256Signer(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                newExpirySeconds: newExpirySeconds
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
         }
     }
 
@@ -239,5 +263,25 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         )
         shouldZeroizeSecret = false
         return material
+    }
+
+    @concurrent
+    private static func performModifyExpiryWithExternalP256Signer(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        let result = try engine.modifyExpiryWithExternalP256Signer(
+            publicCertData: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
+            newExpirySeconds: newExpirySeconds
+        )
+        return PGPPublicModifiedExpiryKeyMaterial(
+            publicKeyData: result.publicKeyData,
+            metadata: PGPKeyMetadataAdapter.metadata(from: result.keyInfo)
+        )
     }
 }

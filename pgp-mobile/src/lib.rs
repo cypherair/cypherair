@@ -31,9 +31,9 @@ use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256SigningProvider,
-    GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryResult, PublicCertificateValidationResult,
-    S2kInfo, SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicBindingInspection,
-    SecureEnclavePublicCertificateInput, UserIdSelectorInput,
+    GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult, ModifyExpiryResult,
+    PublicCertificateValidationResult, S2kInfo, SecureEnclaveGeneratedPublicCertificate,
+    SecureEnclavePublicBindingInspection, SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -162,6 +162,26 @@ impl PgpEngine {
     ) -> Result<ModifyExpiryResult, PgpError> {
         let cert_data = Zeroizing::new(cert_data);
         keys::modify_expiry(&cert_data, new_expiry_seconds)
+    }
+
+    /// Modify the expiration time of a public-only P-256 certificate with an
+    /// external signer.
+    ///
+    /// This is for Secure Enclave custody private operations: it returns only the
+    /// updated public certificate and key metadata, never secret certificate bytes.
+    pub fn modify_expiry_with_external_p256_signer(
+        &self,
+        public_cert_data: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        new_expiry_seconds: Option<u64>,
+    ) -> Result<ModifyExpiryPublicResult, PgpError> {
+        keys::modify_expiry_with_external_p256_signer(
+            &public_cert_data,
+            &signing_key_fingerprint,
+            signer,
+            new_expiry_seconds,
+        )
     }
 
     // ── Encryption ──────────────────────────────────────────────────

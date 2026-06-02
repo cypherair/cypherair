@@ -119,27 +119,37 @@ final class TutorialSandboxContainer {
             contactsDomainStore: contactsDomainStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: SystemSecureEnclaveCustodyKeyStore()
+        )
+        let secureEnclaveDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            PrivateKeyExpiryMutationService(
+                router: keyManagement.makePrivateKeyOperationRouter(
+                    publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                    handleStore: secureEnclaveCustodyHandleStore
+                ),
+                keyAdapter: keyAdapter,
+                digestSigner: secureEnclaveDigestSigner
+            )
+        )
         let textEncryptor = PrivateKeyTextEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(
-                    keyStore: SystemSecureEnclaveCustodyKeyStore()
-                )
+                handleStore: secureEnclaveCustodyHandleStore
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: secureEnclaveDigestSigner
         )
         let fileEncryptor = PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(
-                    keyStore: SystemSecureEnclaveCustodyKeyStore()
-                )
+                handleStore: secureEnclaveCustodyHandleStore
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: secureEnclaveDigestSigner
         )
         self.encryptionService = EncryptionService(
             keyManagement: keyManagement,
@@ -157,24 +167,20 @@ final class TutorialSandboxContainer {
         let cleartextSigner = PrivateKeyCleartextSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(
-                    keyStore: SystemSecureEnclaveCustodyKeyStore()
-                )
+                handleStore: secureEnclaveCustodyHandleStore
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: secureEnclaveDigestSigner
         )
         let detachedFileSigner = PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(
-                    keyStore: SystemSecureEnclaveCustodyKeyStore()
-                )
+                handleStore: secureEnclaveCustodyHandleStore
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: secureEnclaveDigestSigner
         )
         self.signingService = SigningService(
             messageAdapter: messageAdapter,

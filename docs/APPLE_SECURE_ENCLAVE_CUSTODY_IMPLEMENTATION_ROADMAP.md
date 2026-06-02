@@ -337,7 +337,25 @@ Recommended PR grouping:
   surface sanitized unavailable categories, and production policy still blocks
   Secure Enclave custody.
 - PR 5G: expiry and binding-refresh signing route, or explicit unsupported
-  closeout.
+  closeout. **Implemented:** Phase 5G adds a Rust/UniFFI public-only expiry
+  mutation API that can emit binding signatures with the external P-256 signer
+  callback, and Swift routes only `KeyMutationService.modifyExpiry` through the
+  private-operation router. Software routes retain the existing
+  unwrap/zeroize, rewrap/promotion, pending-bundle recovery, catalog update, and
+  modify-expiry recovery journal flow. Secure Enclave signer routes use stored
+  public certificate material plus a loaded signing handle, update only public
+  metadata/catalog state, and do not create software pending bundles or recovery
+  journal entries. Standalone `refreshBinding` remains explicitly not
+  implemented for Secure Enclave custody, blocked routes surface sanitized
+  unavailable categories, and production policy still blocks Secure Enclave
+  custody. The Phase 5G follow-up refreshes explicit transport/ECDH subkey
+  validity bindings in addition to primary direct-key/User ID bindings, and
+  keeps the public-only external API primary-signer-only. A second follow-up
+  allows local modify-expiry to recover already-expired software and Secure
+  Enclave custody keys without weakening ordinary signing-route `.alive()`
+  requirements, and makes Secure Enclave public metadata writeback merge against
+  the current catalog identity so late results cannot overwrite newer flags or
+  resurrect deleted keys.
 - PR 5H: selective subkey and User ID revocation signing route.
 - PR 5I: contact certification signing route.
 - PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,

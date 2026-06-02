@@ -259,6 +259,7 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makePgpServiceGraph(
         engine: PgpEngine,
+        keyAdapter: PGPKeyOperationAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,
         contactImportAdapter: PGPContactImportAdapter,
         selfTestAdapter: PGPSelfTestOperationAdapter,
@@ -269,6 +270,15 @@ final class AppContainer: @unchecked Sendable {
     ) -> PgpServiceGraph {
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            makePrivateKeyExpiryMutationService(
+                engine: engine,
+                keyAdapter: keyAdapter,
+                keyManagement: keyManagement,
+                secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+                secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            )
+        )
         let textEncryptor = makePrivateKeyTextEncryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
@@ -431,6 +441,23 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyExpiryMutationService(
+        engine: PgpEngine,
+        keyAdapter: PGPKeyOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyExpiryMutationService {
+        PrivateKeyExpiryMutationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            keyAdapter: keyAdapter,
             digestSigner: secureEnclaveDigestSigner
         )
     }
@@ -688,6 +715,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let pgpServices = makePgpServiceGraph(
             engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             contactImportAdapter: contactImportAdapter,
             selfTestAdapter: selfTestAdapter,
@@ -996,6 +1024,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let pgpServices = makePgpServiceGraph(
             engine: engine,
+            keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
             contactImportAdapter: contactImportAdapter,
             selfTestAdapter: selfTestAdapter,

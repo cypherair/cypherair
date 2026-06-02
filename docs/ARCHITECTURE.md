@@ -89,7 +89,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext and detached file signing route through private-operation helpers so software custody preserves the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
 | `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation, signing-class operations, and key-agreement operations are independently gated and remain production-unavailable unless an internal hidden/test policy enables a narrow route. |
-| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, Phase 5E connects detached file signing, and Phase 5F connects streaming encrypt-plus-sign optional signing; certification, revocation, expiry/binding refresh, and decrypt workflows remain deferred. |
+| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, Phase 5E connects detached file signing, Phase 5F connects streaming encrypt-plus-sign optional signing, and Phase 5G connects modify-expiry binding signatures; certification, revocation, standalone binding refresh, and decrypt workflows remain deferred. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -250,6 +250,26 @@ inspected signing-key fingerprint, loaded signing handle, optional self key, and
 progress bridge through the external P-256 file-encryption API. Production
 policy still blocks Secure Enclave custody.
 
+Phase 5G extends the route-backed signer path only to modify-expiry binding
+signatures. `KeyMutationService` still owns software unwrap, Rust
+`modifyExpiry`, rewrap/promotion, pending-bundle crash recovery, catalog update,
+and recovery journal handling for software custody. Secure Enclave signer
+routes call a public-only Rust/UniFFI expiry mutation API with the stored public
+certificate, inspected signing-key fingerprint, and loaded signing handle, then
+update only public metadata/catalog state without creating pending software
+bundles or modify-expiry recovery journal entries. Production policy still
+blocks Secure Enclave custody. Standalone `refreshBinding` remains explicitly
+not implemented for Secure Enclave custody because there is no current product
+or software workflow to route.
+The Phase 5G follow-up makes the Rust expiry helper refresh explicit subkey
+validity bindings as well as direct-key/User ID bindings; `Cert::set_expiration_time`
+alone is not sufficient for SE-style ECDH subkeys that carry independent
+validity. Modify-expiry remains available for already-expired local keys by
+using expiry-specific signer selection that does not require current key
+liveness, while ordinary signing operations still do. Secure Enclave expiry
+writeback merges public metadata against the current catalog identity and must
+not overwrite newer local flags or resurrect deleted metadata.
+
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256
 public key plus the PKESK ephemeral public key; tests supply a software OpenSSL
@@ -296,7 +316,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
-| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing-handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Wired to hidden/test generation, Phase 5A router coverage, and Phase 5B/5C/5D hidden/test signer-route consumers while production policy still blocks Secure Enclave custody. |
+| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing-handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Wired to hidden/test generation, Phase 5A router coverage, and Phase 5B/5C/5D/5E/5F/5G hidden/test signer-route consumers while production policy still blocks Secure Enclave custody. |
 | `SecureEnclaveCustodyGenerationRecoveryService` | Hidden/test recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories for later router/recovery use. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |

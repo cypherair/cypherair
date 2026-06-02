@@ -779,6 +779,7 @@ private enum ArchitectureSourceAuditRules {
             "GeneratedKey",
             "KeyInfo",
             "KeyProfile",
+            "ModifyExpiryPublicResult",
             "ModifyExpiryResult",
             "P256EcdsaSignature",
             "PasswordDecryptResult",

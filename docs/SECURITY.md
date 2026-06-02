@@ -290,6 +290,33 @@ Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.
 
+**Secure Enclave expiry mutation signer-route note:** Phase 5G wires only
+`KeyMutationService.modifyExpiry` through the same private-operation router.
+Software-custody routes keep the existing unwrap, Rust `modifyExpiry`,
+rewrap/promotion, pending-bundle recovery, catalog update, recovery journal, and
+zeroization behavior. Secure Enclave signer routes call the Rust/UniFFI
+public-only expiry mutation API with stored public certificate bytes, the
+inspected signing-key fingerprint, and a loaded Security-owned signing handle;
+the callback result preserves typed cancellation and unavailable categories.
+The Secure Enclave path updates only public metadata/catalog state and must not
+create pending software bundles, modify-expiry recovery journal entries, or
+software fallback attempts. Production policy still blocks Secure Enclave
+custody, standalone `refreshBinding` remains explicitly not implemented for
+Secure Enclave custody, and certification, revocation, and decrypt remain
+outside this pilot.
+The Phase 5G follow-up also refreshes explicit subkey validity bindings for
+Secure Enclave-style ECDH subkeys; relying only on primary/User ID expiry
+bindings can leave transport subkeys expired after a public-only mutation.
+Modify-expiry can extend or remove expiry after a local key is already expired,
+using expiry-specific primary signer selection that does not relax ordinary
+signing workflow liveness checks. Secure Enclave expiry writeback must merge
+against the current catalog identity and fail if the identity was deleted, so
+late public-only signing results cannot overwrite newer local flags or recreate
+metadata.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
