@@ -10,7 +10,6 @@ import Foundation
 @Observable
 final class EncryptionService {
 
-    private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let textEncryptor: any TextMessageEncrypting
@@ -19,7 +18,6 @@ final class EncryptionService {
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
-        messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         textEncryptor: any TextMessageEncrypting,
@@ -27,7 +25,6 @@ final class EncryptionService {
         diskSpaceChecker: DiskSpaceChecker = DiskSpaceChecker(),
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
-        self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.textEncryptor = textEncryptor

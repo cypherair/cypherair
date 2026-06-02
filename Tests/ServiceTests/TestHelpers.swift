@@ -242,7 +242,6 @@ enum TestHelpers {
         )
 
         let encryptionSvc = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc,
             textEncryptor: textEncryptor,

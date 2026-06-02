@@ -203,7 +203,6 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
         let artifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempRoot)
         let encryptionService = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,
@@ -517,7 +516,6 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: tempRoot) }
         let artifactStore = AppTemporaryArtifactStore(temporaryDirectory: tempRoot)
         let encryptionService = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,

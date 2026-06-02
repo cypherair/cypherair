@@ -1959,7 +1959,6 @@ final class ProtectedDataFrameworkTests: XCTestCase {
             messageAdapter: messageAdapter
         )
         let encryptionService = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,

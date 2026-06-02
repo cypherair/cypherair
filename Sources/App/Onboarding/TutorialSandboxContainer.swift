@@ -142,7 +142,6 @@ final class TutorialSandboxContainer {
             digestSigner: SystemSecureEnclaveCustodyDigestSigner()
         )
         self.encryptionService = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,

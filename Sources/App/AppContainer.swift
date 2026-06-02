@@ -307,7 +307,6 @@ final class AppContainer: @unchecked Sendable {
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
-                messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
                 textEncryptor: textEncryptor,

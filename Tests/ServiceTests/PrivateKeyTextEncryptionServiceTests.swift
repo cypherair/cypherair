@@ -156,7 +156,6 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             contactService.contactId(forFingerprint: recipientInfo.fingerprint)
         )
         let encryptionService = EncryptionService(
-            messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             textEncryptor: textEncryptor,
