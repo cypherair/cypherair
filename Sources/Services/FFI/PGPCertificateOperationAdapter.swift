@@ -100,6 +100,29 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func generateUserIdCertificationWithExternalP256Signer(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        certificationKind: OpenPGPCertificationKind
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateUserIdCertificationWithExternalP256Signer(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                targetCert: targetCert,
+                selectedUserId: selectedUserId,
+                certificationKind: certificationKind.ffiValue
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func canonicalSignatureData(from signature: Data) async -> Data {
         (try? await Self.performDearmor(engine: engine, armored: signature)) ?? signature
     }
@@ -300,6 +323,28 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
             userIdSelector: PGPCertificateSelectionAdapter.userIdSelectorInput(
                 for: selectedUserId
             )
+        )
+    }
+
+    @concurrent
+    private static func performGenerateUserIdCertificationWithExternalP256Signer(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        certificationKind: CertificationKind
+    ) async throws -> Data {
+        try engine.generateUserIdCertificationBySelectorWithExternalP256Signer(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
+            targetCert: targetCert,
+            userIdSelector: PGPCertificateSelectionAdapter.userIdSelectorInput(
+                for: selectedUserId
+            ),
+            certificationKind: certificationKind
         )
     }
 }

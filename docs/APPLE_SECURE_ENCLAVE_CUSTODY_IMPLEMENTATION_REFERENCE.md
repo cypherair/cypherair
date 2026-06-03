@@ -361,6 +361,29 @@ external signer revocation APIs, and blocked routes map to sanitized unavailable
 categories. Key-level stored revocation-artifact export, contact certification,
 and decrypt remain outside PR 5H.
 
+Phase 5I is the eighth narrow workflow consumer. The Rust runtime User ID
+certification API accepts only public signer certificate bytes, an expected
+primary signing-key fingerprint, the existing external P-256 signing provider,
+a target certificate, and the selected User ID selector. It reuses Sequoia
+`UserID::certify` and passes SHA-256 explicitly only on the external P-256
+path; software certification keeps the existing builder defaults. Rust rejects
+secret signer certificates, non-P-256 or wrong-role primaries, signing or
+certification subkey fingerprints, primary keys missing signing or
+certification capability, key-level revoked or unresolved public certificates,
+selector mismatches, malformed callback signatures, wrong digests, wrong
+public-key signatures, cancellation, and external failures without falling back
+to secret-certificate signing. Expired but not revoked local signer
+certificates may still generate contact certifications. Swift routes only
+`CertificateSignatureService.generateUserIdCertification`: target User ID
+selector validation remains public-only before routing, software routes keep the
+unwrap-and-zeroize path, Secure Enclave signer routes pass stored public
+certificate material and the loaded signing handle to the external signer
+certification API, and blocked routes map to sanitized unavailable categories.
+Generated certification remains an artifact workflow and does not mutate
+Contacts, catalog metadata, keychain rows, trust state, or stored contact
+certificates. Direct-key certification generation, key-level revocation-artifact
+generation, and decrypt remain outside PR 5I.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -609,6 +632,26 @@ catalog/router/public-binding inspector/shared mock handle store, handle/auth
 and callback failures surface stable categories, no software fallback occurs, no
 catalog/keychain mutation occurs, and key-level stored revocation-artifact export
 remains unchanged.
+
+Phase 5I coverage adds User ID contact certification generation through the same
+external signer route. Rust tests should verify v4/v6 public-only P-256 User ID
+certification signatures verify for all certification kinds, duplicate User ID
+selectors keep occurrence semantics, external certifications use SHA-256 while
+software certification preserves its builder defaults, expired-but-not-revoked
+signer certificates remain usable, key-level revoked/unresolved certs fail
+before callback, primary-only signer selection rejects signing/certification
+subkey fingerprints and primaries missing certification capability, and
+cancellation, typed callback failure categories, malformed responses, wrong
+digests, wrong public keys, wrong fingerprints, selector misses, secret input,
+non-P-256 or wrong-role certs, and external failures fail closed without
+secret-certificate fallback. Swift tests should verify software contact
+certification remains behavior-compatible, selector validation happens before
+routing/handle lookup, production policy blocks Secure Enclave certification,
+hidden/test policy can generate v4/v6 certifications through a real
+catalog/router/public-binding inspector/shared mock handle store, handle/auth
+and callback failures surface stable categories, no software fallback occurs,
+and generated artifacts continue through the existing validation path without
+catalog/keychain/contact mutation.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

@@ -136,10 +136,16 @@ class ContactServiceTestCase: XCTestCase {
             name: "PR6 Certification Signer",
             email: "pr6-signer@example.invalid"
         )
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let certificateSignatureService = CertificateSignatureService(
-            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
-            contactService: service
+            contactService: service,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: engine,
+                keyManagement: keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let targetKey = try XCTUnwrap(service.availableKey(keyId: keyRecord.keyId))
         let selectedUserId = try XCTUnwrap(

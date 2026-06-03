@@ -315,7 +315,12 @@ final class AppStartupCoordinatorTests: XCTestCase {
         let certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: engine,
+                keyManagement: keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let qrService = QRService(contactImportAdapter: contactImportAdapter)
         let selfTestService = SelfTestService(

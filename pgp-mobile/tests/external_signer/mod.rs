@@ -16,7 +16,7 @@ use pgp_mobile::keys::{
 };
 use pgp_mobile::password;
 use pgp_mobile::signature_details::SignatureVerificationState;
-use pgp_mobile::{armor, decrypt, encrypt, sign, streaming, verify};
+use pgp_mobile::{armor, cert_signature, decrypt, encrypt, sign, streaming, verify};
 use sequoia_openpgp as openpgp;
 use tempfile::NamedTempFile;
 
@@ -600,6 +600,7 @@ fn insert_key_revocation(cert_data: &[u8], revocation_cert: &[u8]) -> Vec<u8> {
 }
 
 mod certificate;
+mod certification;
 mod cleartext;
 mod detached_file;
 mod expiry;

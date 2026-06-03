@@ -330,8 +330,29 @@ because the callback contract signs only SHA-256 digests. Key-level stored
 revocation-artifact export remains a public artifact export and missing Secure
 Enclave key-level artifacts still fail closed instead of being lazily
 regenerated. Production policy still blocks Secure Enclave custody, blocked
-routes fail without software fallback, and contact certification, decrypt, and
-key-level revocation-artifact generation remain outside this pilot.
+routes fail without software fallback, and decrypt plus key-level
+revocation-artifact generation remain outside this pilot.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
+
+**Secure Enclave contact certification signer-route note:** Phase 5I wires only
+User ID contact certification generation through the same private-operation
+router. `CertificateSignatureService` keeps target User ID selector validation,
+verification, generated-artifact validation, and signer identity resolution at
+the service boundary before private signing dispatch. Software-custody routes
+keep the existing unwrap/zeroize path and Sequoia certification hash defaults.
+Secure Enclave signer routes call a public-only Rust/UniFFI external P-256 User
+ID certification API with stored public certificate bytes, the inspected
+primary signing fingerprint, and a loaded Security-owned signing handle; the
+external builder passes SHA-256 explicitly because the callback contract signs
+only SHA-256 digests. Generated contact certification remains an exported or
+saved signature artifact only after the existing validation path accepts it; the
+signer route does not mutate Contacts, catalog metadata, keychain rows, trust
+state, or stored contact certificates. Production policy still blocks Secure
+Enclave custody, blocked routes fail without software fallback, and direct-key
+certification, decrypt, and key-level revocation-artifact generation remain
+outside this pilot.
 Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.

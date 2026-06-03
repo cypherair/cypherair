@@ -734,10 +734,16 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                 at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
             )
         }
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: stack.engine)
         let certificateSignatureService = CertificateSignatureService(
-            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
+            certificateAdapter: certificateAdapter,
             keyManagement: stack.keyManagement,
-            contactService: protectedContacts.service
+            contactService: protectedContacts.service,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Generate",
@@ -790,10 +796,16 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                 at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
             )
         }
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: stack.engine)
         let certificateSignatureService = CertificateSignatureService(
-            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
+            certificateAdapter: certificateAdapter,
             keyManagement: stack.keyManagement,
-            contactService: protectedContacts.service
+            contactService: protectedContacts.service,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Import",
@@ -1169,10 +1181,16 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                 at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
             )
         }
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: stack.engine)
         let certificateSignatureService = CertificateSignatureService(
-            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
+            certificateAdapter: certificateAdapter,
             keyManagement: stack.keyManagement,
-            contactService: protectedContacts.service
+            contactService: protectedContacts.service,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Save Clear",
@@ -1233,10 +1251,16 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                 at: protectedContacts.storageRoot.rootURL.deletingLastPathComponent()
             )
         }
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: stack.engine)
         let certificateSignatureService = CertificateSignatureService(
-            certificateAdapter: PGPCertificateOperationAdapter(engine: stack.engine),
+            certificateAdapter: certificateAdapter,
             keyManagement: stack.keyManagement,
-            contactService: protectedContacts.service
+            contactService: protectedContacts.service,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: stack.engine,
+                keyManagement: stack.keyManagement,
+                certificateAdapter: certificateAdapter
+            )
         )
         let (contactId, key, catalog) = try makeContactContext(
             name: "Details Export Clear",

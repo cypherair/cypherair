@@ -452,6 +452,27 @@ impl PgpEngine {
         )
     }
 
+    /// Generate raw User ID certification-signature bytes from a public-only
+    /// certificate through an external P-256 signing provider.
+    pub fn generate_user_id_certification_by_selector_with_external_p256_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        target_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+        certification_kind: CertificationKind,
+    ) -> Result<Vec<u8>, PgpError> {
+        cert_signature::generate_user_id_certification_by_selector_with_external_p256_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            signer,
+            &target_cert,
+            &user_id_selector,
+            certification_kind,
+        )
+    }
+
     // ── Key Export/Import ────────────────────────────────────────────
 
     /// Export a secret key protected with a passphrase (ASCII-armored).

@@ -924,6 +924,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
 
     /**
+     * Generate raw User ID certification-signature bytes from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+    func generateUserIdCertificationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
+
+    /**
      * Generate a User ID-specific revocation signature using an explicit selector.
      */
     func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput) throws  -> Data
@@ -1527,6 +1533,24 @@ open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCe
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signerSecretCert),
+        FfiConverterData.lower(targetCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
+        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+    )
+})
+}
+
+    /**
+     * Generate raw User ID certification-signature bytes from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+open func generateUserIdCertificationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
         FfiConverterTypeCertificationKind_lower(certificationKind),$0
@@ -5917,6 +5941,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 9110) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_p256_signer() != 38799) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 3390) {

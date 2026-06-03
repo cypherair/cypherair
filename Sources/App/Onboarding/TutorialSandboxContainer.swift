@@ -199,10 +199,20 @@ final class TutorialSandboxContainer {
             cleartextSigner: cleartextSigner,
             detachedFileSigner: detachedFileSigner
         )
+        let contactCertificationSigner = PrivateKeyContactCertificationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            certificateAdapter: certificateAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
         self.certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            certificationSigner: contactCertificationSigner
         )
         self.qrService = QRService(contactImportAdapter: contactImportAdapter)
         self.selfTestService = SelfTestService(
