@@ -1,0 +1,504 @@
+import Security
+import XCTest
+@testable import CypherAir
+
+final class PrivateKeyContactCertificationServiceTests: XCTestCase {
+    private let engine = PgpEngine()
+
+    func test_softwareUserIdCertificationRemainsBehaviorCompatibleAndZeroizes() async throws {
+        let stack = await TestHelpers.makeServiceStack(engine: engine)
+        defer { stack.cleanup() }
+        let signer = try await TestHelpers.generateProfileAKey(
+            service: stack.keyManagement,
+            name: "Software Certification Signer",
+            email: "software-certification-signer@example.invalid"
+        )
+        let target = try generatedTarget(profile: .universal)
+        let selectedUserId = try selectedUserId(
+            service: stack.certificateSignatureService,
+            targetCert: target.publicKeyData
+        )
+        let unwrapCountBefore = stack.mockSE.unwrapCallCount
+
+        let signature = try await stack.certificateSignatureService.generateUserIdCertification(
+            signerFingerprint: signer.fingerprint,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            certificationKind: .positive
+        )
+        let verification = try await stack.certificateSignatureService.verifyUserIdBindingSignature(
+            signature: signature,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId
+        )
+
+        XCTAssertEqual(verification.status, .valid)
+        XCTAssertEqual(verification.signerPrimaryFingerprint, signer.fingerprint)
+        XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore + 1)
+    }
+
+    func test_productionPolicyBlocksSecureEnclaveCertificationBeforeHandleLookup() async throws {
+        let stack = await TestHelpers.makeServiceStack(engine: engine)
+        defer { stack.cleanup() }
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+        try stack.keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.failInventory = true
+        let service = makeCertificateSignatureService(
+            stack: stack,
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: UnexpectedCertificationDigestSigner()
+        )
+        let target = try generatedTarget(profile: .universal)
+        let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
+
+        do {
+            _ = try await service.generateUserIdCertification(
+                signerFingerprint: fixture.identity.fingerprint,
+                targetCert: target.publicKeyData,
+                selectedUserId: selectedUserId,
+                certificationKind: .positive
+            )
+            XCTFail("Expected production policy to block Secure Enclave certification")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
+    }
+
+    func test_secureEnclaveCertificationUsesRealCatalogRouterAndSharedHandleStoreForV4AndV6()
+        async throws
+    {
+        for configurationIdentity in [
+            PGPKeyConfiguration.Identity.compatibleP256V4,
+            .modernP256V6,
+        ] {
+            let stack = await TestHelpers.makeServiceStack(engine: engine)
+            defer { stack.cleanup() }
+            let fixture = try await makeSecureEnclaveRouteFixture(
+                configurationIdentity: configurationIdentity
+            )
+            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.keyManagement.loadKeys()
+            let keyStore = MockSecureEnclaveCustodyKeyStore()
+            keyStore.insert(fixture.route.signingHandle)
+            keyStore.insert(fixture.keyAgreementHandle)
+            let service = makeCertificateSignatureService(
+                stack: stack,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            )
+            let target = try generatedTarget(profile: .universal)
+            let contactKey = try importedContactKey(
+                publicKeyData: target.publicKeyData,
+                contactService: stack.contactService
+            )
+            let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
+            let snapshot = catalogSnapshot(stack: stack)
+
+            let signature = try await service.generateUserIdCertification(
+                signerFingerprint: fixture.identity.fingerprint,
+                targetCert: target.publicKeyData,
+                selectedUserId: selectedUserId,
+                certificationKind: .positive
+            )
+            let verification = try await service.verifyUserIdBindingSignature(
+                signature: signature,
+                targetCert: target.publicKeyData,
+                selectedUserId: selectedUserId
+            )
+            let validation = try await service.validateUserIdCertificationArtifact(
+                signature: signature,
+                targetKey: contactKey,
+                targetCert: target.publicKeyData,
+                selectedUserId: selectedUserId,
+                source: .generated
+            )
+
+            XCTAssertEqual(verification.status, .valid)
+            XCTAssertEqual(verification.signerPrimaryFingerprint, fixture.identity.fingerprint)
+            XCTAssertEqual(verification.signingKeyFingerprint, nil)
+            XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
+            XCTAssertEqual(validation.verification.status, .valid)
+            XCTAssertTrue(validation.canSave)
+            XCTAssertEqual(fixture.identity.keyVersion, configurationIdentity.configuration.keyVersion)
+            XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, configurationIdentity)
+            XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+            XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
+            assertNoCatalogOrKeychainMutation(stack: stack, before: snapshot)
+        }
+    }
+
+    func test_secureEnclaveCertificationSelectorMismatchFailsBeforeHandleLookupOrUnwrap()
+        async throws
+    {
+        let stack = await TestHelpers.makeServiceStack(engine: engine)
+        defer { stack.cleanup() }
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+        try stack.keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.failInventory = true
+        let service = makeCertificateSignatureService(
+            stack: stack,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: UnexpectedCertificationDigestSigner()
+        )
+        let target = try generatedTarget(profile: .universal)
+        let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
+        let mismatchedSelector = UserIdSelectionOption(
+            occurrenceIndex: selectedUserId.occurrenceIndex,
+            userIdData: selectedUserId.userIdData + Data("-mismatch".utf8),
+            displayText: selectedUserId.displayText,
+            isCurrentlyPrimary: selectedUserId.isCurrentlyPrimary,
+            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked
+        )
+
+        do {
+            _ = try await service.generateUserIdCertification(
+                signerFingerprint: fixture.identity.fingerprint,
+                targetCert: target.publicKeyData,
+                selectedUserId: mismatchedSelector,
+                certificationKind: .positive
+            )
+            XCTFail("Expected selector mismatch to fail before routing")
+        } catch CypherAirError.invalidKeyData {
+            // Expected.
+        } catch {
+            XCTFail("Expected invalidKeyData, got \(error)")
+        }
+
+        XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
+    }
+
+    func test_secureEnclaveCertificationHandleFailuresDoNotFallback() async throws {
+        let cases: [(SecureEnclaveCustodyHandleError?, PGPKeyOperationFailureCategory)] = [
+            (nil, .privateHandleMissing),
+            (
+                .privateOperationRoleMismatch(expected: .signing, actual: .keyAgreement),
+                .privateOperationRoleMismatch
+            ),
+            (
+                .handlePublicKeyBindingMismatch(.signing),
+                .handlePublicKeyBindingMismatch
+            ),
+        ]
+
+        for (loadError, expectedCategory) in cases {
+            let stack = await TestHelpers.makeServiceStack(engine: engine)
+            defer { stack.cleanup() }
+            let fixture = try await makeSecureEnclaveRouteFixture()
+            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.keyManagement.loadKeys()
+            let keyStore = MockSecureEnclaveCustodyKeyStore()
+            if let loadError {
+                keyStore.insert(fixture.route.signingHandle)
+                keyStore.insert(fixture.keyAgreementHandle)
+                keyStore.failLoadError = loadError
+            }
+            let service = makeCertificateSignatureService(
+                stack: stack,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: UnexpectedCertificationDigestSigner()
+            )
+            let target = try generatedTarget(profile: .universal)
+            let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
+
+            do {
+                _ = try await service.generateUserIdCertification(
+                    signerFingerprint: fixture.identity.fingerprint,
+                    targetCert: target.publicKeyData,
+                    selectedUserId: selectedUserId,
+                    certificationKind: .positive
+                )
+                XCTFail("Expected Secure Enclave handle failure")
+            } catch CypherAirError.keyOperationUnavailable(let category) {
+                XCTAssertEqual(category, expectedCategory)
+            } catch {
+                XCTFail("Expected keyOperationUnavailable, got \(error)")
+            }
+
+            XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
+        }
+    }
+
+    func test_secureEnclaveCertificationCancellationAndCallbackFailuresDoNotFallback()
+        async throws
+    {
+        let cases: [(Error, ExpectedCertificationError)] = [
+            (CancellationError(), .operationCancelled),
+            (
+                SecureEnclaveCustodyHandleError.localAuthenticationCancelled(.signing),
+                .keyOperationUnavailable(.localAuthenticationCancelled)
+            ),
+            (
+                SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing),
+                .keyOperationUnavailable(.localAuthenticationFailed)
+            ),
+        ]
+
+        for (signingError, expectedError) in cases {
+            let stack = await TestHelpers.makeServiceStack(engine: engine)
+            defer { stack.cleanup() }
+            let fixture = try await makeSecureEnclaveRouteFixture()
+            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.keyManagement.loadKeys()
+            let keyStore = MockSecureEnclaveCustodyKeyStore()
+            keyStore.insert(fixture.route.signingHandle)
+            keyStore.insert(fixture.keyAgreementHandle)
+            let service = makeCertificateSignatureService(
+                stack: stack,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: ThrowingCertificationDigestSigner(error: signingError)
+            )
+            let target = try generatedTarget(profile: .universal)
+            let selectedUserId = try selectedUserId(service: service, targetCert: target.publicKeyData)
+
+            do {
+                _ = try await service.generateUserIdCertification(
+                    signerFingerprint: fixture.identity.fingerprint,
+                    targetCert: target.publicKeyData,
+                    selectedUserId: selectedUserId,
+                    certificationKind: .positive
+                )
+                XCTFail("Expected Secure Enclave signing failure")
+            } catch let error as CypherAirError {
+                assert(error, matches: expectedError)
+            } catch {
+                XCTFail("Expected CypherAirError, got \(error)")
+            }
+
+            XCTAssertEqual(stack.mockSE.unwrapCallCount, 0)
+        }
+    }
+
+    private func generatedTarget(profile: KeyProfile) throws -> GeneratedKey {
+        try engine.generateKey(
+            name: "Certification Target",
+            email: "certification-target@example.invalid",
+            expirySeconds: nil,
+            profile: profile
+        )
+    }
+
+    private func selectedUserId(
+        service: CertificateSignatureService,
+        targetCert: Data
+    ) throws -> UserIdSelectionOption {
+        try XCTUnwrap(service.selectionCatalog(targetCert: targetCert).userIds.first)
+    }
+
+    private func importedContactKey(
+        publicKeyData: Data,
+        contactService: ContactService
+    ) throws -> ContactKeySummary {
+        let result = try contactService.importContact(publicKeyData: publicKeyData)
+        guard case .added(_, let key) = result else {
+            throw XCTSkip("Expected contact to import for certification validation")
+        }
+        return key
+    }
+
+    private func makeCertificateSignatureService(
+        stack: TestHelpers.ServiceStack,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore,
+        digestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> CertificateSignatureService {
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        return CertificateSignatureService(
+            certificateAdapter: certificateAdapter,
+            keyManagement: stack.keyManagement,
+            contactService: stack.contactService,
+            certificationSigner: TestHelpers.makeContactCertificationSigner(
+                engine: engine,
+                keyManagement: stack.keyManagement,
+                certificateAdapter: certificateAdapter,
+                resolver: resolver,
+                handleStore: handleStore,
+                digestSigner: digestSigner
+            )
+        )
+    }
+
+    private func catalogSnapshot(
+        stack: TestHelpers.ServiceStack
+    ) -> (keys: [PGPKeyIdentity], saveCount: Int, deleteCount: Int) {
+        (stack.keyManagement.keys, stack.mockKC.saveCallCount, stack.mockKC.deleteCallCount)
+    }
+
+    private func assertNoCatalogOrKeychainMutation(
+        stack: TestHelpers.ServiceStack,
+        before: (keys: [PGPKeyIdentity], saveCount: Int, deleteCount: Int),
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(stack.keyManagement.keys, before.keys, file: file, line: line)
+        XCTAssertEqual(stack.mockKC.saveCallCount, before.saveCount, file: file, line: line)
+        XCTAssertEqual(stack.mockKC.deleteCallCount, before.deleteCount, file: file, line: line)
+    }
+
+    private func assert(
+        _ error: CypherAirError,
+        matches expected: ExpectedCertificationError,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        switch (error, expected) {
+        case (.operationCancelled, .operationCancelled):
+            break
+        case (.keyOperationUnavailable(let actualCategory), .keyOperationUnavailable(let expectedCategory)):
+            XCTAssertEqual(actualCategory, expectedCategory, file: file, line: line)
+        default:
+            XCTFail("Expected \(expected), got \(error)", file: file, line: line)
+        }
+    }
+
+    private func makeSecureEnclaveRouteFixture(
+        configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
+    ) async throws -> ContactCertificationSecureEnclaveRouteFixture {
+        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
+        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
+        let handleSetIdentifier = "contact-certification-\(UUID().uuidString.lowercased())"
+        let signingReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .signing
+        )
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .keyAgreement
+        )
+        let signingHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try SecureEnclaveCustodyHandlePublicBinding(
+                reference: signingReference,
+                publicKeyX963: signingPublicKeyX963
+            ),
+            privateKey: signingPrivateKey
+        )
+        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: try SecureEnclaveCustodyHandlePublicBinding(
+                reference: keyAgreementReference,
+                publicKeyX963: keyAgreementPublicKeyX963
+            ),
+            privateKey: keyAgreementPrivateKey
+        )
+        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
+            signing: signingHandle,
+            keyAgreement: keyAgreementHandle
+        )
+        let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
+            engine: engine
+        ).generatePublicCertificate(
+            name: "Secure Enclave Contact Certification",
+            email: "secure-contact-certification@example.invalid",
+            expirySeconds: 3600,
+            configuration: configurationIdentity.configuration,
+            handlePair: handlePair,
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        let identity = PGPKeyIdentity(
+            fingerprint: material.metadata.fingerprint,
+            keyVersion: material.metadata.keyVersion,
+            profile: material.metadata.profile,
+            userId: material.metadata.userId,
+            hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
+            isRevoked: material.metadata.isRevoked,
+            isExpired: material.metadata.isExpired,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: material.publicKeyData,
+            revocationCert: material.revocationCert,
+            primaryAlgo: material.metadata.primaryAlgo,
+            subkeyAlgo: material.metadata.subkeyAlgo,
+            expiryDate: material.metadata.expiryDate,
+            openPGPConfigurationIdentity: configurationIdentity,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+        let inspection = try PGPSecureEnclaveCustodyPublicBindingInspector(
+            engine: engine
+        ).inspectPublicBindings(publicKeyData: material.publicKeyData)
+
+        return ContactCertificationSecureEnclaveRouteFixture(
+            identity: identity,
+            route: SecureEnclaveSignerRoute(
+                identity: identity,
+                operation: .certify,
+                publicBindingInspection: inspection,
+                signingHandle: signingHandle
+            ),
+            keyAgreementHandle: keyAgreementHandle
+        )
+    }
+
+    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+        ]
+        var error: Unmanaged<CFError>?
+        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to create test P-256 key."
+            )
+        }
+        return key
+    }
+
+    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
+        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw CypherAirError.keyGenerationFailed(reason: "Missing test public key.")
+        }
+        var error: Unmanaged<CFError>?
+        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+            throw CypherAirError.keyGenerationFailed(
+                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
+                    ?? "Failed to export test P-256 public key."
+            )
+        }
+        return data
+    }
+}
+
+private struct ContactCertificationSecureEnclaveRouteFixture {
+    let identity: PGPKeyIdentity
+    let route: SecureEnclaveSignerRoute
+    let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
+}
+
+private enum ExpectedCertificationError {
+    case operationCancelled
+    case keyOperationUnavailable(PGPKeyOperationFailureCategory)
+}
+
+private struct UnexpectedCertificationDigestSigner: SecureEnclaveCustodyDigestSigning {
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        XCTFail("Digest signer should not be called")
+        throw CancellationError()
+    }
+}
+
+private struct ThrowingCertificationDigestSigner: SecureEnclaveCustodyDigestSigning {
+    let error: Error
+
+    func signSHA256Digest(
+        _ digest: Data,
+        using handle: SecureEnclaveCustodyLoadedHandle
+    ) throws -> SecureEnclaveP256RawSignature {
+        throw error
+    }
+}

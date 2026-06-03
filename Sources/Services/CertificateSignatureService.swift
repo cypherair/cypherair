@@ -31,15 +31,18 @@ final class CertificateSignatureService {
     private let certificateAdapter: PGPCertificateOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let certificationSigner: any ContactCertificationSigning
 
     init(
         certificateAdapter: PGPCertificateOperationAdapter,
         keyManagement: KeyManagementService,
-        contactService: ContactService
+        contactService: ContactService,
+        certificationSigner: any ContactCertificationSigning
     ) {
         self.certificateAdapter = certificateAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.certificationSigner = certificationSigner
     }
 
     /// Discover selector-bearing metadata for arbitrary target certificate bytes.
@@ -89,18 +92,8 @@ final class CertificateSignatureService {
             selectedUserId: selectedUserId
         )
 
-        var signerSecretCert: Data
-        do {
-            signerSecretCert = try await keyManagement.unwrapPrivateKey(fingerprint: signerFingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            signerSecretCert.resetBytes(in: 0..<signerSecretCert.count)
-        }
-
-        return try await certificateAdapter.generateUserIdCertification(
-            signerSecretCert: signerSecretCert,
+        return try await certificationSigner.generateUserIdCertification(
+            signerFingerprint: signerFingerprint,
             targetCert: targetCert,
             selectedUserId: validatedUserId,
             certificationKind: certificationKind

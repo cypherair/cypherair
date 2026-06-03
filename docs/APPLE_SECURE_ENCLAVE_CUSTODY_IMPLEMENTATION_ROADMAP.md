@@ -370,6 +370,18 @@ Recommended PR grouping:
   remains public-artifact-only, and production policy still blocks Secure
   Enclave custody.
 - PR 5I: contact certification signing route.
+  **Implemented:** Phase 5I adds a Rust/UniFFI public-only User ID
+  certification API that can sign with the external P-256 signer callback, and
+  Swift routes only existing User ID contact certification generation through
+  the private-operation router. Software routes retain the existing
+  unwrap-and-zeroize path and Sequoia certification hash defaults. Secure
+  Enclave signer routes use stored public certificate material, the inspected
+  primary signing fingerprint, and a loaded signing handle; the external
+  builder passes SHA-256 explicitly for the SHA-256-only callback contract.
+  Target User ID selector validation still happens before routing, blocked
+  routes surface sanitized unavailable categories, generated certification
+  remains an artifact-only contact workflow, and production policy still blocks
+  Secure Enclave custody.
 - PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,
   and tests.
 

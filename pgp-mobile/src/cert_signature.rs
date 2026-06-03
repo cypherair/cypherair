@@ -1,11 +1,16 @@
-use openpgp::packet::{Signature, UserID};
+use std::{sync::Arc, time::SystemTime};
+
+use openpgp::cert::amalgamation::ValidateAmalgamation;
+use openpgp::packet::{key, Key, Signature, UserID};
 use openpgp::parse::Parse;
+use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Marshal;
-use openpgp::types::SignatureType;
+use openpgp::types::{HashAlgorithm, RevocationStatus, SignatureType};
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
-use crate::keys::{find_user_id_by_selector, UserIdSelectorInput};
+use crate::external_signer::{map_external_signing_error, signer_for_provider};
+use crate::keys::{find_user_id_by_selector, ExternalP256SigningProvider, UserIdSelectorInput};
 
 /// OpenPGP certification signature kinds preserved across the FFI boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -120,13 +125,51 @@ pub fn generate_user_id_certification_by_selector(
             reason: format!("Failed to generate User ID certification: {e}"),
         })?;
 
-    let mut output = Vec::new();
-    openpgp::Packet::from(certification)
-        .serialize(&mut output)
-        .map_err(|e| PgpError::SigningFailed {
-            reason: format!("Failed to serialize User ID certification: {e}"),
+    serialize_user_id_certification(certification)
+}
+
+pub fn generate_user_id_certification_by_selector_with_external_p256_signer(
+    public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    signer: Arc<dyn ExternalP256SigningProvider>,
+    target_cert: &[u8],
+    user_id_selector: &UserIdSelectorInput,
+    certification_kind: CertificationKind,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+    let signer_cert = parse_public_cert_for_external_certification(public_cert)?;
+    ensure_external_certification_certificate_not_revoked(&signer_cert, &policy, reference_time)?;
+    let signing_public_key = select_external_certification_primary_signing_key(
+        &signer_cert,
+        signing_key_fingerprint,
+        &policy,
+        reference_time,
+    )?;
+
+    let target_cert_data = target_cert;
+    let target_cert = parse_cert(target_cert_data, "Invalid target certificate")?;
+    let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
+    let mut external_signer = signer_for_provider(signing_public_key, signer).map_err(|error| {
+        PgpError::SigningFailed {
+            reason: format!("External certification signer setup failed: {error}"),
+        }
+    })?;
+    let certification = user_id
+        .certify(
+            &mut external_signer,
+            &target_cert,
+            certification_kind.signature_type(),
+            Some(HashAlgorithm::SHA256),
+            None,
+        )
+        .map_err(|error| {
+            map_external_signing_error(error, |reason| PgpError::SigningFailed {
+                reason: format!("Failed to generate User ID certification: {reason}"),
+            })
         })?;
-    Ok(output)
+
+    serialize_user_id_certification(certification)
 }
 
 impl CertificationKind {
@@ -189,6 +232,101 @@ fn parse_cert(cert_data: &[u8], reason_prefix: &str) -> Result<openpgp::Cert, Pg
     openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
         reason: format!("{reason_prefix}: {e}"),
     })
+}
+
+fn parse_public_cert_for_external_certification(
+    public_cert: &[u8],
+) -> Result<openpgp::Cert, PgpError> {
+    let cert = parse_cert(
+        public_cert,
+        "Invalid external certification public certificate",
+    )?;
+    if cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "External certification requires a public certificate".to_string(),
+        });
+    }
+    Ok(cert)
+}
+
+fn ensure_external_certification_certificate_not_revoked(
+    cert: &openpgp::Cert,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
+) -> Result<(), PgpError> {
+    let valid_cert = cert
+        .with_policy(policy, Some(reference_time))
+        .map_err(|error| PgpError::SigningFailed {
+            reason: format!("External certification certificate is not policy-valid: {error}"),
+        })?;
+    match valid_cert.revocation_status() {
+        RevocationStatus::NotAsFarAsWeKnow => Ok(()),
+        RevocationStatus::Revoked(_) => Err(PgpError::SigningFailed {
+            reason: "Cannot generate certification for a revoked certificate".to_string(),
+        }),
+        RevocationStatus::CouldBe(_) => Err(PgpError::SigningFailed {
+            reason:
+                "Cannot generate certification for a certificate with unresolved revocation status"
+                    .to_string(),
+        }),
+    }
+}
+
+fn select_external_certification_primary_signing_key(
+    cert: &openpgp::Cert,
+    signing_key_fingerprint: &str,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
+) -> Result<Key<key::PublicParts, key::UnspecifiedRole>, PgpError> {
+    let expected_fingerprint = signing_key_fingerprint.trim();
+    if expected_fingerprint.is_empty() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "External certification signer expected fingerprint must not be empty"
+                .to_string(),
+        });
+    }
+
+    let primary_fingerprint = cert.primary_key().key().fingerprint().to_hex();
+    if !primary_fingerprint.eq_ignore_ascii_case(expected_fingerprint) {
+        return Err(PgpError::SigningFailed {
+            reason: "External certification requires the primary signing key".to_string(),
+        });
+    }
+
+    let primary = cert
+        .primary_key()
+        .with_policy(policy, Some(reference_time))
+        .map_err(|error| PgpError::SigningFailed {
+            reason: format!("No policy-valid external certification primary key found: {error}"),
+        })?;
+    if !primary.key().pk_algo().is_supported() {
+        return Err(PgpError::SigningFailed {
+            reason: "External certification primary signing key uses an unsupported algorithm"
+                .to_string(),
+        });
+    }
+    if !primary.for_signing() {
+        return Err(PgpError::SigningFailed {
+            reason: "External certification primary key is not signing-capable".to_string(),
+        });
+    }
+    if !primary.for_certification() {
+        return Err(PgpError::SigningFailed {
+            reason: "External certification primary key is not certification-capable".to_string(),
+        });
+    }
+
+    Ok(primary.key().role_as_unspecified().clone())
+}
+
+fn serialize_user_id_certification(certification: Signature) -> Result<Vec<u8>, PgpError> {
+    let mut output = Vec::new();
+    openpgp::Packet::from(certification)
+        .serialize(&mut output)
+        .map_err(|e| PgpError::SigningFailed {
+            reason: format!("Failed to serialize User ID certification: {e}"),
+        })?;
+    Ok(output)
 }
 
 fn certification_kind_from_signature_type(

@@ -279,6 +279,11 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let contactCertificationSigner = makeContactCertificationSigner(
+            engine: engine,
+            keyManagement: keyMgmt,
+            certificateAdapter: certificateAdapter
+        )
         let signingSvc = SigningService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
@@ -289,7 +294,8 @@ enum TestHelpers {
         let certificateSignatureSvc = CertificateSignatureService(
             certificateAdapter: certificateAdapter,
             keyManagement: keyMgmt,
-            contactService: contactSvc
+            contactService: contactSvc,
+            certificationSigner: contactCertificationSigner
         )
 
         return ServiceStack(
@@ -491,6 +497,28 @@ enum TestHelpers {
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: handleStore
             ),
+            certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makeContactCertificationSigner(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        certificateAdapter: PGPCertificateOperationAdapter? = nil,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeyContactCertificationService {
+        PrivateKeyContactCertificationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
             digestSigner: digestSigner
         )

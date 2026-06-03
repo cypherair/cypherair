@@ -323,6 +323,13 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
+        let contactCertificationSigner = makePrivateKeyContactCertificationService(
+            engine: engine,
+            certificateAdapter: certificateAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+        )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
@@ -354,7 +361,8 @@ final class AppContainer: @unchecked Sendable {
             certificateSignatureService: CertificateSignatureService(
                 certificateAdapter: certificateAdapter,
                 keyManagement: keyManagement,
-                contactService: contactService
+                contactService: contactService,
+                certificationSigner: contactCertificationSigner
             ),
             qrService: QRService(contactImportAdapter: contactImportAdapter),
             selfTestService: SelfTestService(
@@ -483,6 +491,24 @@ final class AppContainer: @unchecked Sendable {
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore
             ),
+            certificateAdapter: certificateAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyContactCertificationService(
+        engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeyContactCertificationService {
+        PrivateKeyContactCertificationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter,
             digestSigner: secureEnclaveDigestSigner
         )
