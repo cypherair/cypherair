@@ -2,6 +2,8 @@
 
 This file is the agent-oriented companion to `CLAUDE.md`. It exists so coding agents can quickly understand the project, constraints, sensitive boundaries, and required validation steps before making changes.
 
+`CLAUDE.md` and `AGENTS.md` must carry identical substance (hard constraints, sensitive boundaries, testing/release/Git policy). They differ only in reference syntax: `CLAUDE.md` uses `@docs/...` (auto-embedded into Claude Code's context) while this file uses plain `docs/...` pointers (for Codex and other tools). When the substance of one changes, mirror it to the other.
+
 ## Apple arm64e Status
 
 `docs/ARM64E_STATUS.md` is the source of truth for Apple `arm64e` support. Consult it when working on anything arm64e-related.
@@ -168,7 +170,7 @@ If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, trea
 
 ## Testing Expectations
 
-- Every change should preserve both Rust and Swift validation where relevant.
+- Every functional PR must include tests (security changes require both positive and negative tests); docs-only PRs may use the documentation consistency path instead of Rust/Xcode runs. Preserve both Rust and Swift validation where relevant.
 - Crypto behavior changes must be tested for both profiles.
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.

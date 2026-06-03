@@ -649,6 +649,14 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 The following files and functions are security-critical. Claude Code must **stop and describe proposed changes** before editing them. Do not make autonomous modifications.
 
+### Absolute Coding Invariants
+
+These hold for every change, independent of which file is touched:
+
+- **Secure random only.** Use `SecRandomCopyBytes` or CryptoKit (Swift) and the `getrandom` crate (Rust) for all security-relevant randomness. Never `arc4random` or `Int.random`.
+- **No secret logging — not even in DEBUG.** Never `print()`, `os_log()`, or `NSLog()` key material, passphrases, or decrypted content, including in DEBUG builds.
+- **Zero network, but local IPC is allowed.** The custom `cypherair://` URL scheme is local inter-process communication, not network access, and does not violate the zero-network rule.
+
 ### Files Requiring Human Review
 
 | File | Reason |

@@ -23,8 +23,10 @@ Packages/
 *.xcframework/
 PgpMobile.arm64e-build-manifest.json
 
-# Claude Code local worktrees (not project config)
+# Claude Code local/personal config (not shared project config)
 .claude/worktrees/
+.claude/settings.local.json
+CLAUDE.local.md
 
 # Local Codex/agent helper config
 .codex/

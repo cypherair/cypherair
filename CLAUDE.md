@@ -84,12 +84,12 @@ For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation w
 
 ## Hard Constraints — NEVER Violate
 
-1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession. Custom app URL scheme handling (`cypherair://`) is permitted — it is local IPC, not network access.
+1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession.
 2. **Minimal permissions.** The app configures only `NSFaceIDUsageDescription` as a usage description for LocalAuthentication-backed biometric flows. No camera, photo library, contacts, or network entitlements. All I/O through system pickers, Share Sheet, URL scheme.
 3. **AEAD hard-fail.** Authentication failure during decryption must abort immediately. Never show partial plaintext.
-4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content. Not even in DEBUG builds.
+4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
-6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate (delegates to `SecRandomCopyBytes` on Apple platforms). No `arc4random`, no `Int.random`.
+6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate.
 7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 8.
 8. **Profile-correct message format.** Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See @docs/TDD.md Section 1.4.
 
@@ -105,10 +105,10 @@ STOP and describe proposed changes before editing any file in these areas:
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
 - `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
 - `pgp-mobile/src/` — any Rust cryptographic code
-- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files — adding files, targets, build settings, or test wiring
-- `CypherAir.entitlements` — capability entitlements
-- `CypherAirMacOS.entitlements` — macOS capability entitlements
-- `CypherAir-Info.plist` — permission descriptions (only `NSFaceIDUsageDescription` permitted)
+- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files
+- `CypherAir.entitlements`
+- `CypherAirMacOS.entitlements`
+- `CypherAir-Info.plist`
 
 Full security model and red lines: @docs/SECURITY.md
 
@@ -130,7 +130,7 @@ Standard Mode (default) and High Security Mode, selectable in Settings; switchin
 
 ## Testing Requirements
 
-- Every PR must include tests. Security changes require both positive and negative tests.
+- Every functional PR must include tests. Security changes require both positive and negative tests. Docs-only PRs may use the documentation consistency path instead of Rust/Xcode runs (see @docs/TESTING.md and @docs/CODE_REVIEW.md).
 - Crypto tests: run for **both profiles**. Round-trip tests (encrypt→decrypt, sign→verify), tamper tests (1-bit flip → failure).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - MIE: test on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging diagnostics enabled; current device examples live in `docs/SECURITY.md`.
@@ -147,9 +147,11 @@ Standard Mode (default) and High Security Mode, selectable in Settings; switchin
 - Read and understand relevant source files before proposing edits.
 - Do not add features, refactor, or "improve" beyond what was asked.
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
-- Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
+- **Git/PR discipline.** Default to a topic branch, not `main`; submit work through a pull request. Commits should be signed; if the signing key is unavailable, ask the user rather than creating an unsigned commit. When merging PRs, prefer a regular merge commit unless the user asks otherwise. Commit messages use conventional prefixes — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
+- **Release metadata is user-owned.** Do not proactively modify `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION`; read them from the project, never invent/increment/reset them, and treat any such change already present as a user edit to keep. For formal stable releases / App Store candidates, follow @docs/APP_RELEASE_PROCESS.md (tag-first; do not rely on `workflow_dispatch` alone).
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
 - **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
 - **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
 - **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.
 - **Never run destructive git operations (checkout, reset, restore) on project files (*.pbxproj, *.entitlements, *.xctestplan, *.xcscheme) without explicit user approval.** These files are difficult to manually reconstruct if changes are lost.
+- **Keep CLAUDE.md and AGENTS.md in substance-sync.** AGENTS.md is the agent-oriented companion read by Codex and other tools. The two must carry identical substance (hard constraints, sensitive boundaries, testing/release/Git policy) and differ only in reference syntax — `@docs/...` here (auto-embedded into Claude Code's context) vs plain `docs/...` pointers in AGENTS.md. When you change the substance of one, mirror it to the other.
