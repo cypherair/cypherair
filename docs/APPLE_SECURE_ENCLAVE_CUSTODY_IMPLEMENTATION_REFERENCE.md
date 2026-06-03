@@ -342,6 +342,25 @@ while ordinary signing workflows still do, and makes Secure Enclave catalog
 writeback merge against the current identity so late results preserve local flags
 and cannot recreate deleted metadata.
 
+Phase 5H is the seventh narrow workflow consumer. The Rust runtime selective
+revocation APIs accept only public certificate bytes, an expected primary
+signing-key fingerprint, the existing external P-256 signing provider, and the
+selected subkey or User ID selector. They reuse Sequoia revocation builders and
+pass SHA-256 explicitly only on the external P-256 path; software subkey/User ID
+revocation keeps the existing builder defaults. Rust rejects secret
+certificates, non-P-256 or wrong-role primaries, signing subkey fingerprints,
+key-level revoked or unresolved public certificates, selector mismatches,
+malformed callback signatures, wrong digests, wrong public-key signatures,
+cancellation, and external failures without falling back to secret-certificate
+signing. Expired but not revoked local certificates may still export selective
+revocation. Swift routes only `SelectiveRevocationService` subkey/User ID
+revocation export: selector validation remains public-only before routing,
+software routes keep the unwrap-and-zeroize path, Secure Enclave signer routes
+pass stored public certificate material and the loaded signing handle to the
+external signer revocation APIs, and blocked routes map to sanitized unavailable
+categories. Key-level stored revocation-artifact export, contact certification,
+and decrypt remain outside PR 5H.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -570,6 +589,26 @@ metadata, no software unwrap or recovery journal path runs on Secure Enclave
 routes, handle/auth/callback failures surface stable categories, blocked routes
 do not call FFI, and `refreshBinding` remains explicitly not implemented without
 touching Security handles or FFI.
+
+Phase 5H coverage adds selective subkey and User ID revocation export through
+the same external signer route. Rust tests should verify v4/v6 public-only P-256
+subkey and User ID revocation signatures revoke the selected target after
+insertion, duplicate User ID selectors keep occurrence semantics, external
+revocation signatures use SHA-256 while software selective revocation preserves
+its builder defaults, expired-but-not-revoked certs remain usable, key-level
+revoked/unresolved certs fail before callback, primary-only signer selection
+rejects signing-capable subkey fingerprints, and cancellation, typed callback
+failure categories, malformed responses, wrong digests, wrong public keys,
+wrong fingerprints, selector misses, secret input, non-P-256 or wrong-role
+certs, and external failures fail closed without secret-certificate fallback.
+Swift tests should verify software selective revocation remains
+behavior-compatible, selector validation happens before routing/handle lookup,
+production policy blocks Secure Enclave selective revocation, hidden/test policy
+can generate subkey and User ID revocation through a real
+catalog/router/public-binding inspector/shared mock handle store, handle/auth
+and callback failures surface stable categories, no software fallback occurs, no
+catalog/keychain mutation occurs, and key-level stored revocation-artifact export
+remains unchanged.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

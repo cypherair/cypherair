@@ -149,6 +149,25 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func generateSubkeyRevocationWithExternalP256Signer(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        subkeyFingerprint: String
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateSubkeyRevocationWithExternalP256Signer(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                subkeyFingerprint: subkeyFingerprint
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
+        }
+    }
+
     func generateUserIdRevocation(
         secretCert: Data,
         selectedUserId: UserIdSelectionOption
@@ -161,6 +180,25 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
             )
         } catch {
             throw PGPErrorMapper.map(error) { .revocationError(reason: $0) }
+        }
+    }
+
+    func generateUserIdRevocationWithExternalP256Signer(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selectedUserId: UserIdSelectionOption
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateUserIdRevocationWithExternalP256Signer(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                signingProvider: signingProvider,
+                selectedUserId: selectedUserId
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256Signing(error)
         }
     }
 
@@ -228,6 +266,40 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         try engine.generateSubkeyRevocation(
             secretCert: secretCert,
             subkeyFingerprint: subkeyFingerprint
+        )
+    }
+
+    @concurrent
+    private static func performGenerateSubkeyRevocationWithExternalP256Signer(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        subkeyFingerprint: String
+    ) async throws -> Data {
+        try engine.generateSubkeyRevocationWithExternalP256Signer(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
+            subkeyFingerprint: subkeyFingerprint
+        )
+    }
+
+    @concurrent
+    private static func performGenerateUserIdRevocationWithExternalP256Signer(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        signingProvider: ExternalP256SigningProvider,
+        selectedUserId: UserIdSelectionOption
+    ) async throws -> Data {
+        try engine.generateUserIdRevocationBySelectorWithExternalP256Signer(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
+            userIdSelector: PGPCertificateSelectionAdapter.userIdSelectorInput(
+                for: selectedUserId
+            )
         )
     }
 }

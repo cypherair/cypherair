@@ -317,6 +317,25 @@ Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.
 
+**Secure Enclave selective revocation signer-route note:** Phase 5H wires only
+subkey and User ID selective revocation export through the same
+private-operation router. Selector validation remains public-only and must
+finish before any unwrap, handle lookup, authentication, or external-signing
+callback. Software-custody routes keep the existing unwrap/zeroize path and
+Sequoia revocation-builder hash defaults. Secure Enclave signer routes call
+public-only Rust/UniFFI external P-256 revocation APIs with stored public
+certificate bytes, the inspected primary signing fingerprint, and a loaded
+Security-owned signing handle; those external builders pass SHA-256 explicitly
+because the callback contract signs only SHA-256 digests. Key-level stored
+revocation-artifact export remains a public artifact export and missing Secure
+Enclave key-level artifacts still fail closed instead of being lazily
+regenerated. Production policy still blocks Secure Enclave custody, blocked
+routes fail without software fallback, and contact certification, decrypt, and
+key-level revocation-artifact generation remain outside this pilot.
+Failure mapping must stay sanitized and must not include fingerprints, handle
+tags, public binding bytes, Keychain locators, plaintext, private material,
+session keys, or temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

@@ -604,5 +604,6 @@ mod cleartext;
 mod detached_file;
 mod expiry;
 mod password_message;
+mod revocation;
 mod streaming_file_encrypt;
 mod text_encrypt;

@@ -357,6 +357,18 @@ Recommended PR grouping:
   the current catalog identity so late results cannot overwrite newer flags or
   resurrect deleted keys.
 - PR 5H: selective subkey and User ID revocation signing route.
+  **Implemented:** Phase 5H adds Rust/UniFFI public-only selective revocation
+  APIs for subkey and User ID revocation signatures through the external P-256
+  signer callback, and Swift routes only selective revocation export through
+  the private-operation router. Software routes retain the existing
+  unwrap-and-zeroize path and Sequoia revocation-builder hash defaults. Secure
+  Enclave signer routes use stored public certificate material, the inspected
+  primary signing fingerprint, and a loaded signing handle; external builders
+  pass SHA-256 explicitly for the SHA-256-only callback contract. Public
+  selector validation still happens before routing, blocked routes surface
+  sanitized unavailable categories, key-level stored revocation-artifact export
+  remains public-artifact-only, and production policy still blocks Secure
+  Enclave custody.
 - PR 5I: contact certification signing route.
 - PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,
   and tests.

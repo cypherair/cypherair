@@ -15,6 +15,7 @@ final class SelectiveRevocationService {
     private let certificateAdapter: PGPCertificateOperationAdapter
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
+    private var revocationRoutingService: (any PrivateKeySelectiveRevocationRouting)?
 
     init(
         certificateAdapter: PGPCertificateOperationAdapter,
@@ -24,6 +25,10 @@ final class SelectiveRevocationService {
         self.certificateAdapter = certificateAdapter
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
+    }
+
+    func configureRevocationRoutingService(_ service: any PrivateKeySelectiveRevocationRouting) {
+        revocationRoutingService = service
     }
 
     /// Generate and armor a subkey-scoped revocation signature for the given subkey selection.
@@ -46,18 +51,28 @@ final class SelectiveRevocationService {
             subkeySelection: subkeySelection
         )
 
-        // Once selector validation succeeds, SE unwrap may trigger a system auth prompt
-        // before the caller can observe task cancellation. Callers should treat dismissal
-        // as suppressing late results, not as a guarantee that auth never begins.
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
+        let binaryRevocation: Data
+        switch routeRevocation(fingerprint: identity.fingerprint, identity: identity) {
+        case .softwareSecretCertificate(let route):
+            binaryRevocation = try await generateSoftwareSubkeyRevocation(
+                route: route,
+                subkeyFingerprint: validatedSubkeyFingerprint
+            )
 
-        let binaryRevocation = try await certificateAdapter.generateSubkeyRevocation(
-            secretCert: secretKey,
-            subkeyFingerprint: validatedSubkeyFingerprint
-        )
+        case .secureEnclaveSigner(let route):
+            guard let revocationRoutingService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            binaryRevocation = try await revocationRoutingService.generateSecureEnclaveSubkeyRevocation(
+                route: route,
+                subkeyFingerprint: validatedSubkeyFingerprint
+            )
+
+        case .blocked(let resolution):
+            throw CypherAirError.keyOperationUnavailable(
+                category: resolution.failureCategory ?? .operationUnavailableByPolicy
+            )
+        }
 
         return try await certificateAdapter.armorSignature(binaryRevocation)
     }
@@ -83,18 +98,28 @@ final class SelectiveRevocationService {
             userIdSelection: userIdSelection
         )
 
-        // Once selector validation succeeds, SE unwrap may trigger a system auth prompt
-        // before the caller can observe task cancellation. Callers should treat dismissal
-        // as suppressing late results, not as a guarantee that auth never begins.
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
+        let binaryRevocation: Data
+        switch routeRevocation(fingerprint: identity.fingerprint, identity: identity) {
+        case .softwareSecretCertificate(let route):
+            binaryRevocation = try await generateSoftwareUserIdRevocation(
+                route: route,
+                selectedUserId: validatedUserIdSelection
+            )
 
-        let binaryRevocation = try await certificateAdapter.generateUserIdRevocation(
-            secretCert: secretKey,
-            selectedUserId: validatedUserIdSelection
-        )
+        case .secureEnclaveSigner(let route):
+            guard let revocationRoutingService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            binaryRevocation = try await revocationRoutingService.generateSecureEnclaveUserIdRevocation(
+                route: route,
+                selectedUserId: validatedUserIdSelection
+            )
+
+        case .blocked(let resolution):
+            throw CypherAirError.keyOperationUnavailable(
+                category: resolution.failureCategory ?? .operationUnavailableByPolicy
+            )
+        }
 
         return try await certificateAdapter.armorSignature(binaryRevocation)
     }
@@ -143,6 +168,69 @@ final class SelectiveRevocationService {
         return try certificateAdapter.validateUserIdSelection(
             userIdSelection,
             in: catalog
+        )
+    }
+
+    private func routeRevocation(
+        fingerprint: String,
+        identity: PGPKeyIdentity
+    ) -> PrivateKeyOperationRoute {
+        if let revocationRoutingService {
+            return revocationRoutingService.routeRevocation(fingerprint: fingerprint)
+        }
+
+        let resolution = PGPKeyCapabilityResolver().resolution(
+            for: .revoke,
+            identity: identity
+        )
+        guard resolution.support == .supported else {
+            return .blocked(resolution)
+        }
+
+        switch identity.privateKeyCustodyKind {
+        case .softwareSecretCertificate:
+            return .softwareSecretCertificate(
+                SoftwareSecretCertificateRoute(
+                    identity: identity,
+                    operation: .revoke
+                )
+            )
+        case .appleSecureEnclavePrivateOperations:
+            return .blocked(.unavailable(.operationUnavailableByPolicy))
+        }
+    }
+
+    private func generateSoftwareSubkeyRevocation(
+        route: SoftwareSecretCertificateRoute,
+        subkeyFingerprint: String
+    ) async throws -> Data {
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(
+            fingerprint: route.identity.fingerprint
+        )
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        return try await certificateAdapter.generateSubkeyRevocation(
+            secretCert: secretKey,
+            subkeyFingerprint: subkeyFingerprint
+        )
+    }
+
+    private func generateSoftwareUserIdRevocation(
+        route: SoftwareSecretCertificateRoute,
+        selectedUserId: UserIdSelectionOption
+    ) async throws -> Data {
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(
+            fingerprint: route.identity.fingerprint
+        )
+        defer {
+            secretKey.resetBytes(in: 0..<secretKey.count)
+        }
+
+        return try await certificateAdapter.generateUserIdRevocation(
+            secretCert: secretKey,
+            selectedUserId: selectedUserId
         )
     }
 }
