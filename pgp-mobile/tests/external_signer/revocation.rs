@@ -142,6 +142,21 @@ fn unresolved_revoked_public_cert(material: &CandidateMaterial) -> Vec<u8> {
     public
 }
 
+fn signing_only_primary_public_cert() -> (Vec<u8>, String) {
+    let (cert, _) = CertBuilder::new()
+        .set_cipher_suite(CipherSuite::P256)
+        .set_primary_key_flags(openpgp::types::KeyFlags::empty().set_signing())
+        .add_userid("Signing Only Primary <signing-only-primary@example.test>")
+        .add_transport_encryption_subkey()
+        .generate()
+        .expect("signing-only primary P-256 cert should generate");
+    let fingerprint = cert.primary_key().key().fingerprint().to_hex();
+    let mut public_cert = Vec::new();
+    cert.serialize(&mut public_cert)
+        .expect("public cert should serialize");
+    (public_cert, fingerprint)
+}
+
 #[test]
 fn test_external_signer_runtime_selective_revocations_revoke_targets_for_v4_and_v6() {
     for version in CandidateVersion::all() {
@@ -263,6 +278,29 @@ fn test_external_signer_runtime_selective_revocation_primary_only_before_callbac
         keys::generate_user_id_revocation_by_selector_with_external_p256_signer(
             &material.public_cert,
             &subkey_fingerprint,
+            Arc::new(UnexpectedRuntimeSigningProvider),
+            &user_id_selector,
+        ),
+    );
+}
+
+#[test]
+fn test_external_signer_runtime_selective_revocation_requires_certification_capable_primary_before_callback(
+) {
+    let (public_cert, primary_fingerprint) = signing_only_primary_public_cert();
+    let subkey_fingerprint = first_subkey_fingerprint(&public_cert);
+    let user_id_selector = first_user_id_selector(&public_cert);
+
+    assert_callback_not_triggered(keys::generate_subkey_revocation_with_external_p256_signer(
+        &public_cert,
+        &primary_fingerprint,
+        Arc::new(UnexpectedRuntimeSigningProvider),
+        &subkey_fingerprint,
+    ));
+    assert_callback_not_triggered(
+        keys::generate_user_id_revocation_by_selector_with_external_p256_signer(
+            &public_cert,
+            &primary_fingerprint,
             Arc::new(UnexpectedRuntimeSigningProvider),
             &user_id_selector,
         ),

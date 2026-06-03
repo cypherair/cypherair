@@ -113,6 +113,11 @@ fn select_external_revocation_primary_signing_key(
             reason: "External revocation primary key is not signing-capable".to_string(),
         });
     }
+    if !primary.for_certification() {
+        return Err(PgpError::RevocationError {
+            reason: "External revocation primary key is not certification-capable".to_string(),
+        });
+    }
 
     Ok(primary.key().role_as_unspecified().clone())
 }
