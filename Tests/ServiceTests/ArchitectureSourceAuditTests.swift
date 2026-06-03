@@ -66,6 +66,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.phase5ExternalSignerRuntimeContainment)
     }
 
+    func test_phase6ExternalKeyAgreementRuntimeStaysInsideFFISecurityAndRouterBoundary() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.phase6ExternalKeyAgreementRuntimeContainment)
+    }
+
     func test_phase5PrivateKeyHelpersRouteThroughExpectedOperationKinds() throws {
         let expectations: [(path: String, operation: String)] = [
             ("Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift", ".sign"),
@@ -99,7 +103,7 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         }
     }
 
-    func test_phase5UnsupportedOperationsRemainExplicit() throws {
+    func test_secureEnclaveUnsupportedAndGatedOperationsRemainExplicit() throws {
         let resolver = try RepositoryAuditLoader.loadString(
             relativePath: "Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift"
         )
@@ -865,6 +869,10 @@ private enum ArchitectureSourceAuditRules {
             "DiscoveredUserId",
             "FileDecryptDetailedResult",
             "FileVerifyDetailedResult",
+            "ExternalP256KeyAgreementError",
+            "ExternalP256KeyAgreementFailureCategory",
+            "ExternalP256KeyAgreementProvider",
+            "ExternalP256KeyAgreementRequest",
             "ExternalP256SigningError",
             "ExternalP256SigningFailureCategory",
             "ExternalP256SigningProvider",
@@ -874,6 +882,7 @@ private enum ArchitectureSourceAuditRules {
             "ModifyExpiryPublicResult",
             "ModifyExpiryResult",
             "P256EcdsaSignature",
+            "P256RawSharedSecret",
             "PasswordDecryptResult",
             "PasswordDecryptStatus",
             "PasswordMessageFormat",
@@ -910,6 +919,7 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
                     "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
                     "Sources/Services/FFI/PGPContactImportAdapter.swift",
+                    "Sources/Services/FFI/PGPExternalP256KeyAgreementProviderBridge.swift",
                     "Sources/Services/FFI/PGPExternalP256SigningProviderBridge.swift",
                     "Sources/Services/FFI/PGPKeyMetadataAdapter.swift",
                     "Sources/Services/FFI/PGPKeyOperationAdapter.swift",
@@ -918,6 +928,12 @@ private enum ArchitectureSourceAuditRules {
                     "Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift",
                     "Sources/Services/FFI/PGPSecureEnclaveCustodyPublicBindingInspector.swift",
                     "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
+                ]
+            ),
+            (
+                "Security key-agreement bridge owns the Apple ECDH callback request boundary.",
+                [
+                    "Sources/Security/SecureEnclaveCustodyKeyAgreement.swift",
                 ]
             ),
         ])
@@ -972,6 +988,7 @@ private enum ArchitectureSourceAuditRules {
             "PGPCertificateSelectionAdapter",
             "PGPCertificateOperationAdapter",
             "PGPContactImportAdapter",
+            "PGPExternalP256KeyAgreementProviderBridge",
             "PGPExternalP256SigningProviderBridge",
             "PGPKeyMetadataAdapter",
             "PGPKeyOperationAdapter",
@@ -1192,6 +1209,34 @@ private enum ArchitectureSourceAuditRules {
         ])
     )
 
+    static let phase6ExternalKeyAgreementRuntimeContainment = ArchitectureSourceAuditRule(
+        name: "Phase 6 external key-agreement runtime containment",
+        failureSummary: "External P-256 key-agreement runtime calls should stay inside FFI, Security, and router-owned foundation boundaries.",
+        pattern: phase6ExternalKeyAgreementRuntimePattern,
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "FFI adapter and provider bridge intentionally expose the external P-256 key-agreement callback API.",
+                [
+                    "Sources/Services/FFI/PGPErrorMapper.swift",
+                    "Sources/Services/FFI/PGPExternalP256KeyAgreementProviderBridge.swift",
+                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
+                ]
+            ),
+            (
+                "Security bridge owns Apple P-256 ECDH callback request handling without integrating workflow plaintext decrypt.",
+                [
+                    "Sources/Security/SecureEnclaveCustodyKeyAgreement.swift",
+                ]
+            ),
+        ])
+    )
+
     static let keyRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
         name: "Key route view workflow containment",
         failureSummary: "Key-management route Views should send intent to ScreenModels instead of calling key workflow services directly.",
@@ -1317,6 +1362,9 @@ private enum ArchitectureSourceAuditRules {
 
     private static let phase5ExternalSignerRuntimePattern =
         #"\b(?:PGPExternalP256SigningProviderBridge|PGPSecureEnclaveExternalSigningProviderBridge|[A-Za-z0-9_]*WithExternalP256Signer)\b"#
+
+    private static let phase6ExternalKeyAgreementRuntimePattern =
+        #"\b(?:PGPExternalP256KeyAgreementProviderBridge|ExternalP256KeyAgreementProvider|ExternalP256KeyAgreementRequest|ExternalP256KeyAgreementError|ExternalP256KeyAgreementFailureCategory|P256RawSharedSecret|[A-Za-z0-9_]*WithExternalP256KeyAgreement)\b"#
 
     private static func isContactsViewPath(_ path: String) -> Bool {
         path.hasPrefix("Sources/App/Contacts/")

@@ -1,4 +1,4 @@
-use crate::keys::ExternalP256SigningFailureCategory;
+use crate::keys::{ExternalP256KeyAgreementFailureCategory, ExternalP256SigningFailureCategory};
 
 /// PGP error types exposed across the FFI boundary.
 /// Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
@@ -70,6 +70,12 @@ pub enum PgpError {
     #[error("External P-256 signing failed: {}", category.stable_reason())]
     ExternalP256SigningFailed {
         category: ExternalP256SigningFailureCategory,
+    },
+
+    /// External P-256 key agreement failed with a sanitized callback category.
+    #[error("External P-256 key agreement failed: {}", category.stable_reason())]
+    ExternalP256KeyAgreementFailed {
+        category: ExternalP256KeyAgreementFailureCategory,
     },
 
     /// Armor encoding/decoding error.

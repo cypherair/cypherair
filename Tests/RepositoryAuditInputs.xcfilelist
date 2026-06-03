@@ -280,6 +280,7 @@ $(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleState.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveCustodyHandleStore.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveCustodyKeyStoring.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveCustodyDigestSigner.swift
+$(SRCROOT)/Sources/Security/SecureEnclaveCustodyKeyAgreement.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveCustodyLoadedHandle.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveCustodyLoadedHandlePair.swift
 $(SRCROOT)/Sources/Security/SecureEnclaveManageable.swift
@@ -302,6 +303,7 @@ $(SRCROOT)/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPContactImportAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyMetadataAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPKeyOperationAdapter.swift
+$(SRCROOT)/Sources/Services/FFI/PGPExternalP256KeyAgreementProviderBridge.swift
 $(SRCROOT)/Sources/Services/FFI/PGPExternalP256SigningProviderBridge.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageOperationAdapter.swift
 $(SRCROOT)/Sources/Services/FFI/PGPMessageResultMapper.swift

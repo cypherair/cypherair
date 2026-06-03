@@ -305,17 +305,19 @@ switches or direct external P-256 signer runtime calls. Standalone
 revocation-artifact generation, private export/backup, and product exposure
 remain outside Phase 5.
 
-The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
-That decryptor adapter is crate-private and receives only the recipient P-256
-public key plus the PKESK ephemeral public key; tests supply a software OpenSSL
-oracle for the raw 32-byte shared secret while Sequoia still owns OpenPGP ECDH
+Phase 6A promotes the test-backed external P-256 ECDH/session-key proof into a
+runtime Rust/UniFFI foundation API and Swift key-agreement bridge. The callback
+receives only the recipient P-256 public key plus the PKESK ephemeral public key
+and returns only a raw 32-byte shared secret from a loaded `.keyAgreement`
+handle after role and public-binding checks. Sequoia still owns OpenPGP ECDH
 KDF, AES Key Wrap unwrap, PKESK/session-key validation, payload authentication,
-and read-to-completion decryption. The negative matrix rejects signing-role
-keys, unsupported key/ciphertext shapes, wrong public-key bindings, shape-valid
-but wrong shared secrets, and tampered SEIPDv1/MDC or SEIPDv2/AEAD payloads
-without returning plaintext or falling back to stored secret-certificate
-decryption. It is not a UniFFI API, response-file bridge, Security handle store,
-or real Secure Enclave route.
+verification folding, and read-to-completion decryption. The negative matrix
+rejects signing-role keys, unsupported key/ciphertext shapes, wrong public-key
+bindings, malformed or wrong shared secrets, callback cancellation/failure, and
+tampered SEIPDv1/MDC or SEIPDv2/AEAD payloads without returning plaintext or
+falling back to stored secret-certificate decryption. This remains a foundation
+API and router route only; `DecryptionService`, file decrypt, UI, product copy,
+and production availability are deferred to later Phase 6 PRs.
 
 Phase 3A/3B/3C add the first Security-layer store, cleanup/recovery seams, and
 guarded device evidence for that future custody model. The store uses permanent
@@ -351,7 +353,8 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
-| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing-handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Wired to hidden/test generation, Phase 5A router coverage, and Phase 5B through Phase 5I hidden/test signer-route consumers while production policy still blocks Secure Enclave custody. |
+| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing/key-agreement handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Wired to hidden/test generation, Phase 5A router coverage, Phase 5B through Phase 5I hidden/test signer-route consumers, and the Phase 6A hidden/test key-agreement route foundation while production policy still blocks Secure Enclave custody. |
+| `SecureEnclaveCustodyKeyAgreement` | Security bridge for the Phase 6A key-agreement foundation. It validates loaded `.keyAgreement` handles, recipient public-key binding, P-256 ephemeral public-key shape, and `SecKeyCopyKeyExchangeResult` failures, returning only the raw shared secret to the Rust external key-agreement provider bridge. |
 | `SecureEnclaveCustodyGenerationRecoveryService` | Hidden/test recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories for later router/recovery use. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |

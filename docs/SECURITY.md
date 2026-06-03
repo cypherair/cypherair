@@ -371,6 +371,18 @@ key-level revocation-artifact generation, private export/backup, and product
 exposure remain outside Phase 5. Production policy still blocks Secure Enclave
 custody.
 
+**Secure Enclave key-agreement route foundation note:** Phase 6A adds the
+runtime external P-256 key-agreement callback, Swift Security bridge, and
+hidden/test router key-agreement route. Swift loads only the `.keyAgreement`
+handle, checks the recipient public binding and ephemeral P-256 public key, and
+returns only the raw 32-byte shared secret to Rust. Rust/Sequoia remains
+responsible for OpenPGP ECDH KDF, AES Key Wrap unwrap, session-key validation,
+payload authentication, verification folding, and plaintext release. Raw shared
+secrets and session keys must not be logged, persisted, surfaced in diagnostics,
+or returned to workflow services. `DecryptionService`, streaming file decrypt,
+UI/product copy, and production Secure Enclave custody availability remain
+deferred; production policy still blocks Secure Enclave custody.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

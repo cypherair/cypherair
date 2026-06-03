@@ -51,10 +51,6 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity
     ) -> PrivateKeyOperationRoute {
-        guard request.operation.requiredRole == .signing else {
-            return .blocked(.notImplemented(.operationNotImplementedForCustody))
-        }
-
         let configuration = identity.openPGPConfiguration
         guard configuration.algorithmSuite == .p256,
               configuration.keyVersion == identity.keyVersion else {
@@ -83,6 +79,27 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             return .blocked(.unavailable(.metadataAssociationMismatch))
         }
 
+        switch request.operation.requiredRole {
+        case .signing:
+            return routeSecureEnclaveSigningOperation(
+                request: request,
+                identity: identity,
+                inspection: inspection
+            )
+        case .keyAgreement:
+            return routeSecureEnclaveKeyAgreementOperation(
+                request: request,
+                identity: identity,
+                inspection: inspection
+            )
+        }
+    }
+
+    private func routeSecureEnclaveSigningOperation(
+        request: PrivateKeyOperationRequest,
+        identity: PGPKeyIdentity,
+        inspection: PGPSecureEnclaveCustodyPublicBindingInspection
+    ) -> PrivateKeyOperationRoute {
         do {
             let signingHandle = try handleStore.loadSigningHandle(
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
@@ -94,6 +111,34 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                     operation: request.operation,
                     publicBindingInspection: inspection,
                     signingHandle: signingHandle
+                )
+            )
+        } catch {
+            return .blocked(.unavailable(
+                PGPKeyOperationFailureMapper.category(
+                    for: error,
+                    fallback: .privateHandleInaccessible
+                )
+            ))
+        }
+    }
+
+    private func routeSecureEnclaveKeyAgreementOperation(
+        request: PrivateKeyOperationRequest,
+        identity: PGPKeyIdentity,
+        inspection: PGPSecureEnclaveCustodyPublicBindingInspection
+    ) -> PrivateKeyOperationRoute {
+        do {
+            let keyAgreementHandle = try handleStore.loadKeyAgreementHandle(
+                signingPublicKeyX963: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+            )
+            return .secureEnclaveKeyAgreement(
+                SecureEnclaveKeyAgreementRoute(
+                    identity: identity,
+                    operation: request.operation,
+                    publicBindingInspection: inspection,
+                    keyAgreementHandle: keyAgreementHandle
                 )
             )
         } catch {

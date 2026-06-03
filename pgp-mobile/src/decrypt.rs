@@ -9,6 +9,7 @@ use sequoia_openpgp as openpgp;
 use zeroize::Zeroize;
 
 use crate::error::PgpError;
+use crate::external_decryptor::ExternalP256DecryptorError;
 use crate::signature_details::{DecryptDetailedResult, LegacyFoldMode, SignatureCollector};
 
 /// Signature verification status for decrypted messages.
@@ -353,6 +354,20 @@ impl<'a> VerificationHelper for FixedSessionKeyDecryptHelper<'a> {
 /// MAINTENANCE: After Sequoia version bumps, verify that `openpgp::Error` variants still cover
 /// the expected cases. The string fallback provides defense-in-depth if new error paths appear.
 pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
+    if let Some(external_error) = e
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<ExternalP256DecryptorError>().copied())
+    {
+        return match external_error {
+            ExternalP256DecryptorError::OperationCancelled => PgpError::OperationCancelled,
+            ExternalP256DecryptorError::ExternalFailure(category) => {
+                PgpError::ExternalP256KeyAgreementFailed { category }
+            }
+            ExternalP256DecryptorError::InvalidRequest(_)
+            | ExternalP256DecryptorError::InvalidResponse(_) => PgpError::NoMatchingKey,
+        };
+    }
+
     // Strategy 1: Structured downcast — try direct anyhow → openpgp::Error
     // This path handles errors from DecryptorBuilder::with_policy().
     if let Some(openpgp_err) = e.downcast_ref::<openpgp::Error>() {

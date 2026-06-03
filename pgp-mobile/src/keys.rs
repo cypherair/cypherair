@@ -165,6 +165,101 @@ pub trait ExternalP256SigningProvider: Send + Sync {
     ) -> Result<P256EcdsaSignature, ExternalP256SigningError>;
 }
 
+/// Public material Rust sends to an external P-256 key-agreement provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ExternalP256KeyAgreementRequest {
+    /// 65-byte uncompressed X9.63 P-256 public key bound to the recipient subkey.
+    pub recipient_public_key: Vec<u8>,
+    /// 65-byte uncompressed X9.63 P-256 ephemeral public key from the PKESK packet.
+    pub ephemeral_public_key: Vec<u8>,
+}
+
+/// Raw P-256 ECDH shared secret returned by an external provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct P256RawSharedSecret {
+    /// 32-byte raw ECDH shared secret. Rust immediately validates and zeroizes it.
+    pub raw: Vec<u8>,
+}
+
+/// Sanitized failure categories that may cross the external P-256 key-agreement boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ExternalP256KeyAgreementFailureCategory {
+    HardwareUnavailable,
+    LocalAuthenticationRequired,
+    LocalAuthenticationCancelled,
+    LocalAuthenticationFailed,
+    LocalAuthenticationUnavailable,
+    LocalAuthenticationLockedOut,
+    PrivateHandleMissing,
+    PrivateHandleInaccessible,
+    PrivateHandleUnauthorized,
+    PrivateOperationRoleMismatch,
+    HandlePublicKeyBindingMismatch,
+    ExternalOperationFailed,
+}
+
+impl ExternalP256KeyAgreementFailureCategory {
+    pub(crate) fn stable_reason(self) -> &'static str {
+        match self {
+            ExternalP256KeyAgreementFailureCategory::HardwareUnavailable => "hardwareUnavailable",
+            ExternalP256KeyAgreementFailureCategory::LocalAuthenticationRequired => {
+                "localAuthenticationRequired"
+            }
+            ExternalP256KeyAgreementFailureCategory::LocalAuthenticationCancelled => {
+                "localAuthenticationCancelled"
+            }
+            ExternalP256KeyAgreementFailureCategory::LocalAuthenticationFailed => {
+                "localAuthenticationFailed"
+            }
+            ExternalP256KeyAgreementFailureCategory::LocalAuthenticationUnavailable => {
+                "localAuthenticationUnavailable"
+            }
+            ExternalP256KeyAgreementFailureCategory::LocalAuthenticationLockedOut => {
+                "localAuthenticationLockedOut"
+            }
+            ExternalP256KeyAgreementFailureCategory::PrivateHandleMissing => "privateHandleMissing",
+            ExternalP256KeyAgreementFailureCategory::PrivateHandleInaccessible => {
+                "privateHandleInaccessible"
+            }
+            ExternalP256KeyAgreementFailureCategory::PrivateHandleUnauthorized => {
+                "privateHandleUnauthorized"
+            }
+            ExternalP256KeyAgreementFailureCategory::PrivateOperationRoleMismatch => {
+                "privateOperationRoleMismatch"
+            }
+            ExternalP256KeyAgreementFailureCategory::HandlePublicKeyBindingMismatch => {
+                "handlePublicKeyBindingMismatch"
+            }
+            ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed => {
+                "externalOperationFailed"
+            }
+        }
+    }
+}
+
+/// Expected error returned by the foreign P-256 key-agreement callback.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum ExternalP256KeyAgreementError {
+    /// The callback failed with a sanitized shared operation category.
+    #[error("External P-256 key agreement failed: {}", category.stable_reason())]
+    Failed {
+        category: ExternalP256KeyAgreementFailureCategory,
+    },
+    /// The callback was cancelled before producing a shared secret.
+    #[error("External P-256 key agreement operation cancelled")]
+    OperationCancelled,
+}
+
+/// Foreign key-agreement callback for Secure Enclave runtime decryption.
+#[uniffi::export(with_foreign)]
+pub trait ExternalP256KeyAgreementProvider: Send + Sync {
+    /// Derive a raw P-256 shared secret for the supplied public request.
+    fn derive_shared_secret(
+        &self,
+        request: ExternalP256KeyAgreementRequest,
+    ) -> Result<P256RawSharedSecret, ExternalP256KeyAgreementError>;
+}
+
 /// Public-only Secure Enclave custody certificate generation result.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SecureEnclaveGeneratedPublicCertificate {

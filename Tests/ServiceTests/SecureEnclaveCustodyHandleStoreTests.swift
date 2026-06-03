@@ -142,6 +142,20 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertEqual(signing.binding, pair.signing)
     }
 
+    func test_loadKeyAgreementHandleLocatesCompletePairAndReturnsAgreementHandle() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "agreementlookup")
+        let pair = try store.createHandlePair()
+
+        let keyAgreement = try store.loadKeyAgreementHandle(
+            signingPublicKeyX963: pair.signing.publicKeyX963,
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+        )
+
+        XCTAssertEqual(keyAgreement.role, .keyAgreement)
+        XCTAssertEqual(keyAgreement.binding, pair.keyAgreement)
+    }
+
     func test_loadSigningHandleFailsClosedForMissingAgreementPeer() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)

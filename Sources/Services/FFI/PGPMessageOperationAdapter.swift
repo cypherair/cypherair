@@ -173,6 +173,31 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func decryptDetailedWithExternalP256KeyAgreement(
+        ciphertext: Data,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        keyAgreementProvider: ExternalP256KeyAgreementProvider,
+        verificationContext: PGPMessageVerificationContext
+    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
+        do {
+            let result = try await Self.performDecryptDetailedWithExternalP256KeyAgreement(
+                engine: engine,
+                ciphertext: ciphertext,
+                recipientPublicCert: recipientPublicCert,
+                keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+                keyAgreementProvider: keyAgreementProvider,
+                verificationKeys: verificationContext.verificationKeys
+            )
+            return PGPMessageResultMapper.decryptDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256KeyAgreement(error)
+        }
+    }
+
     func decryptFileDetailed(
         inputPath: String,
         outputPath: String,
@@ -505,6 +530,24 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         try engine.decryptDetailed(
             ciphertext: ciphertext,
             secretKeys: secretKeys,
+            verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performDecryptDetailedWithExternalP256KeyAgreement(
+        engine: PgpEngine,
+        ciphertext: Data,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        keyAgreementProvider: ExternalP256KeyAgreementProvider,
+        verificationKeys: [Data]
+    ) async throws -> DecryptDetailedResult {
+        try engine.decryptDetailedWithExternalP256KeyAgreement(
+            ciphertext: ciphertext,
+            recipientPublicCert: recipientPublicCert,
+            keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+            keyAgreementProvider: keyAgreementProvider,
             verificationKeys: verificationKeys
         )
     }

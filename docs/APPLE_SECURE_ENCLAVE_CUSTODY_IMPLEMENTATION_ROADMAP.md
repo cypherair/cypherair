@@ -444,6 +444,12 @@ Recommended PR grouping:
 - PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
   artifacts, no partial plaintext, docs, and tests.
 
+PR 6A is implemented as a foundation slice: it adds the runtime external P-256
+ECDH callback, Swift key-agreement bridge, Security handle lookup, and hidden/test
+router key-agreement route. It intentionally does not connect message or file
+decrypt workflows, UI, product copy, or production Secure Enclave custody
+availability.
+
 Entry conditions:
 
 - Hidden generation can create usable key-agreement handles.

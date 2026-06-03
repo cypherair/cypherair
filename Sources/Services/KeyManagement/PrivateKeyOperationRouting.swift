@@ -17,9 +17,17 @@ struct SecureEnclaveSignerRoute {
     let signingHandle: SecureEnclaveCustodyLoadedHandle
 }
 
+struct SecureEnclaveKeyAgreementRoute {
+    let identity: PGPKeyIdentity
+    let operation: PGPPrivateOperationKind
+    let publicBindingInspection: PGPSecureEnclaveCustodyPublicBindingInspection
+    let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
+}
+
 enum PrivateKeyOperationRoute {
     case softwareSecretCertificate(SoftwareSecretCertificateRoute)
     case secureEnclaveSigner(SecureEnclaveSignerRoute)
+    case secureEnclaveKeyAgreement(SecureEnclaveKeyAgreementRoute)
     case blocked(PGPKeyOperationResolution)
 }
 

@@ -557,6 +557,213 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
+ * Foreign key-agreement callback for Secure Enclave runtime decryption.
+ */
+public protocol ExternalP256KeyAgreementProvider: AnyObject, Sendable {
+
+    /**
+     * Derive a raw P-256 shared secret for the supplied public request.
+     */
+    func deriveSharedSecret(request: ExternalP256KeyAgreementRequest) throws  -> P256RawSharedSecret
+
+}
+/**
+ * Foreign key-agreement callback for Secure Enclave runtime decryption.
+ */
+open class ExternalP256KeyAgreementProviderImpl: ExternalP256KeyAgreementProvider, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_externalp256keyagreementprovider(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_pgp_mobile_fn_free_externalp256keyagreementprovider(handle, $0) }
+    }
+
+
+
+
+    /**
+     * Derive a raw P-256 shared secret for the supplied public request.
+     */
+open func deriveSharedSecret(request: ExternalP256KeyAgreementRequest)throws  -> P256RawSharedSecret  {
+    return try  FfiConverterTypeP256RawSharedSecret_lift(try rustCallWithError(FfiConverterTypeExternalP256KeyAgreementError_lift) {
+    uniffi_pgp_mobile_fn_method_externalp256keyagreementprovider_derive_shared_secret(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeExternalP256KeyAgreementRequest_lower(request),$0
+    )
+})
+}
+
+
+
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceExternalP256KeyAgreementProvider {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceExternalP256KeyAgreementProvider = UniffiVTableCallbackInterfaceExternalP256KeyAgreementProvider(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeExternalP256KeyAgreementProvider.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ExternalP256KeyAgreementProvider: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeExternalP256KeyAgreementProvider.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ExternalP256KeyAgreementProvider: handle missing in uniffiClone")
+            }
+        },
+        deriveSharedSecret: { (
+            uniffiHandle: UInt64,
+            request: RustBuffer,
+            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> P256RawSharedSecret in
+                guard let uniffiObj = try? FfiConverterTypeExternalP256KeyAgreementProvider.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try uniffiObj.deriveSharedSecret(
+                     request: try FfiConverterTypeExternalP256KeyAgreementRequest_lift(request)
+                )
+            }
+
+
+            let writeReturn = { uniffiOutReturn.pointee = FfiConverterTypeP256RawSharedSecret_lower($0) }
+            uniffiTraitInterfaceCallWithError(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn,
+                lowerError: FfiConverterTypeExternalP256KeyAgreementError_lower
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceExternalP256KeyAgreementProvider> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceExternalP256KeyAgreementProvider>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitExternalP256KeyAgreementProvider() {
+    uniffi_pgp_mobile_fn_init_callback_vtable_externalp256keyagreementprovider(UniffiCallbackInterfaceExternalP256KeyAgreementProvider.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256KeyAgreementProvider: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<ExternalP256KeyAgreementProvider>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = ExternalP256KeyAgreementProvider
+
+    public static func lift(_ handle: UInt64) throws -> ExternalP256KeyAgreementProvider {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExternalP256KeyAgreementProviderImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: ExternalP256KeyAgreementProvider) -> UInt64 {
+         if let rustImpl = value as? ExternalP256KeyAgreementProviderImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256KeyAgreementProvider {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExternalP256KeyAgreementProvider, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementProvider_lift(_ handle: UInt64) throws -> ExternalP256KeyAgreementProvider {
+    return try FfiConverterTypeExternalP256KeyAgreementProvider.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementProvider_lower(_ value: ExternalP256KeyAgreementProvider) -> UInt64 {
+    return FfiConverterTypeExternalP256KeyAgreementProvider.lower(value)
+}
+
+
+
+
+
+
+/**
  * Foreign signing callback for Secure Enclave-shaped certificate construction and runtime signing.
  */
 public protocol ExternalP256SigningProvider: AnyObject, Sendable {
@@ -796,6 +1003,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Decrypt a message and preserve per-signature detailed results.
      */
     func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptDetailedResult
+
+    /**
+     * Decrypt a message through a public-only P-256 recipient certificate and
+     * external key-agreement provider while preserving per-signature details.
+     */
+    func decryptDetailedWithExternalP256KeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data]) throws  -> DecryptDetailedResult
 
     /**
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
@@ -1206,6 +1419,23 @@ open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterSequenceData.lower(secretKeys),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+
+    /**
+     * Decrypt a message through a public-only P-256 recipient certificate and
+     * external key-agreement provider while preserving per-signature details.
+     */
+open func decryptDetailedWithExternalP256KeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data])throws  -> DecryptDetailedResult  {
+    return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),
+        FfiConverterData.lower(recipientPublicCert),
+        FfiConverterString.lower(keyAgreementSubkeyFingerprint),
+        FfiConverterTypeExternalP256KeyAgreementProvider_lower(keyAgreementProvider),
         FfiConverterSequenceData.lower(verificationKeys),$0
     )
 })
@@ -2754,6 +2984,75 @@ public func FfiConverterTypeDiscoveredUserId_lower(_ value: DiscoveredUserId) ->
 
 
 /**
+ * Public material Rust sends to an external P-256 key-agreement provider.
+ */
+public struct ExternalP256KeyAgreementRequest: Equatable, Hashable {
+    /**
+     * 65-byte uncompressed X9.63 P-256 public key bound to the recipient subkey.
+     */
+    public var recipientPublicKey: Data
+    /**
+     * 65-byte uncompressed X9.63 P-256 ephemeral public key from the PKESK packet.
+     */
+    public var ephemeralPublicKey: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 65-byte uncompressed X9.63 P-256 public key bound to the recipient subkey.
+         */recipientPublicKey: Data,
+        /**
+         * 65-byte uncompressed X9.63 P-256 ephemeral public key from the PKESK packet.
+         */ephemeralPublicKey: Data) {
+        self.recipientPublicKey = recipientPublicKey
+        self.ephemeralPublicKey = ephemeralPublicKey
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExternalP256KeyAgreementRequest: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256KeyAgreementRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256KeyAgreementRequest {
+        return
+            try ExternalP256KeyAgreementRequest(
+                recipientPublicKey: FfiConverterData.read(from: &buf),
+                ephemeralPublicKey: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ExternalP256KeyAgreementRequest, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.recipientPublicKey, into: &buf)
+        FfiConverterData.write(value.ephemeralPublicKey, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementRequest_lift(_ buf: RustBuffer) throws -> ExternalP256KeyAgreementRequest {
+    return try FfiConverterTypeExternalP256KeyAgreementRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementRequest_lower(_ value: ExternalP256KeyAgreementRequest) -> RustBuffer {
+    return FfiConverterTypeExternalP256KeyAgreementRequest.lower(value)
+}
+
+
+/**
  * Detailed result for file decrypt APIs.
  */
 public struct FileDecryptDetailedResult: Equatable, Hashable {
@@ -3380,6 +3679,65 @@ public func FfiConverterTypeP256EcdsaSignature_lift(_ buf: RustBuffer) throws ->
 #endif
 public func FfiConverterTypeP256EcdsaSignature_lower(_ value: P256EcdsaSignature) -> RustBuffer {
     return FfiConverterTypeP256EcdsaSignature.lower(value)
+}
+
+
+/**
+ * Raw P-256 ECDH shared secret returned by an external provider.
+ */
+public struct P256RawSharedSecret: Equatable, Hashable {
+    /**
+     * 32-byte raw ECDH shared secret. Rust immediately validates and zeroizes it.
+     */
+    public var raw: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 32-byte raw ECDH shared secret. Rust immediately validates and zeroizes it.
+         */raw: Data) {
+        self.raw = raw
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension P256RawSharedSecret: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeP256RawSharedSecret: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> P256RawSharedSecret {
+        return
+            try P256RawSharedSecret(
+                raw: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: P256RawSharedSecret, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.raw, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeP256RawSharedSecret_lift(_ buf: RustBuffer) throws -> P256RawSharedSecret {
+    return try FfiConverterTypeP256RawSharedSecret.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeP256RawSharedSecret_lower(_ value: P256RawSharedSecret) -> RustBuffer {
+    return FfiConverterTypeP256RawSharedSecret.lower(value)
 }
 
 
@@ -4518,6 +4876,235 @@ public func FfiConverterTypeDetailedSignatureStatus_lower(_ value: DetailedSigna
 
 
 /**
+ * Expected error returned by the foreign P-256 key-agreement callback.
+ */
+public enum ExternalP256KeyAgreementError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+
+
+    /**
+     * The callback failed with a sanitized shared operation category.
+     */
+    case Failed(category: ExternalP256KeyAgreementFailureCategory
+    )
+    /**
+     * The callback was cancelled before producing a shared secret.
+     */
+    case OperationCancelled
+
+
+
+
+
+
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+
+}
+
+#if compiler(>=6)
+extension ExternalP256KeyAgreementError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256KeyAgreementError: FfiConverterRustBuffer {
+    typealias SwiftType = ExternalP256KeyAgreementError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256KeyAgreementError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+
+
+
+        case 1: return .Failed(
+            category: try FfiConverterTypeExternalP256KeyAgreementFailureCategory.read(from: &buf)
+            )
+        case 2: return .OperationCancelled
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExternalP256KeyAgreementError, into buf: inout [UInt8]) {
+        switch value {
+
+
+
+
+
+        case let .Failed(category):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeExternalP256KeyAgreementFailureCategory.write(category, into: &buf)
+
+
+        case .OperationCancelled:
+            writeInt(&buf, Int32(2))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementError_lift(_ buf: RustBuffer) throws -> ExternalP256KeyAgreementError {
+    return try FfiConverterTypeExternalP256KeyAgreementError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementError_lower(_ value: ExternalP256KeyAgreementError) -> RustBuffer {
+    return FfiConverterTypeExternalP256KeyAgreementError.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Sanitized failure categories that may cross the external P-256 key-agreement boundary.
+ */
+
+public enum ExternalP256KeyAgreementFailureCategory: Equatable, Hashable {
+
+    case hardwareUnavailable
+    case localAuthenticationRequired
+    case localAuthenticationCancelled
+    case localAuthenticationFailed
+    case localAuthenticationUnavailable
+    case localAuthenticationLockedOut
+    case privateHandleMissing
+    case privateHandleInaccessible
+    case privateHandleUnauthorized
+    case privateOperationRoleMismatch
+    case handlePublicKeyBindingMismatch
+    case externalOperationFailed
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExternalP256KeyAgreementFailureCategory: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalP256KeyAgreementFailureCategory: FfiConverterRustBuffer {
+    typealias SwiftType = ExternalP256KeyAgreementFailureCategory
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalP256KeyAgreementFailureCategory {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .hardwareUnavailable
+
+        case 2: return .localAuthenticationRequired
+
+        case 3: return .localAuthenticationCancelled
+
+        case 4: return .localAuthenticationFailed
+
+        case 5: return .localAuthenticationUnavailable
+
+        case 6: return .localAuthenticationLockedOut
+
+        case 7: return .privateHandleMissing
+
+        case 8: return .privateHandleInaccessible
+
+        case 9: return .privateHandleUnauthorized
+
+        case 10: return .privateOperationRoleMismatch
+
+        case 11: return .handlePublicKeyBindingMismatch
+
+        case 12: return .externalOperationFailed
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExternalP256KeyAgreementFailureCategory, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .hardwareUnavailable:
+            writeInt(&buf, Int32(1))
+
+
+        case .localAuthenticationRequired:
+            writeInt(&buf, Int32(2))
+
+
+        case .localAuthenticationCancelled:
+            writeInt(&buf, Int32(3))
+
+
+        case .localAuthenticationFailed:
+            writeInt(&buf, Int32(4))
+
+
+        case .localAuthenticationUnavailable:
+            writeInt(&buf, Int32(5))
+
+
+        case .localAuthenticationLockedOut:
+            writeInt(&buf, Int32(6))
+
+
+        case .privateHandleMissing:
+            writeInt(&buf, Int32(7))
+
+
+        case .privateHandleInaccessible:
+            writeInt(&buf, Int32(8))
+
+
+        case .privateHandleUnauthorized:
+            writeInt(&buf, Int32(9))
+
+
+        case .privateOperationRoleMismatch:
+            writeInt(&buf, Int32(10))
+
+
+        case .handlePublicKeyBindingMismatch:
+            writeInt(&buf, Int32(11))
+
+
+        case .externalOperationFailed:
+            writeInt(&buf, Int32(12))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementFailureCategory_lift(_ buf: RustBuffer) throws -> ExternalP256KeyAgreementFailureCategory {
+    return try FfiConverterTypeExternalP256KeyAgreementFailureCategory.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalP256KeyAgreementFailureCategory_lower(_ value: ExternalP256KeyAgreementFailureCategory) -> RustBuffer {
+    return FfiConverterTypeExternalP256KeyAgreementFailureCategory.lower(value)
+}
+
+
+
+/**
  * Expected error returned by the foreign P-256 signing callback.
  */
 public enum ExternalP256SigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
@@ -5053,6 +5640,11 @@ public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedErro
     case ExternalP256SigningFailed(category: ExternalP256SigningFailureCategory
     )
     /**
+     * External P-256 key agreement failed with a sanitized callback category.
+     */
+    case ExternalP256KeyAgreementFailed(category: ExternalP256KeyAgreementFailureCategory
+    )
+    /**
      * Armor encoding/decoding error.
      */
     case ArmorError(reason: String
@@ -5151,26 +5743,29 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
         case 14: return .ExternalP256SigningFailed(
             category: try FfiConverterTypeExternalP256SigningFailureCategory.read(from: &buf)
             )
-        case 15: return .ArmorError(
+        case 15: return .ExternalP256KeyAgreementFailed(
+            category: try FfiConverterTypeExternalP256KeyAgreementFailureCategory.read(from: &buf)
+            )
+        case 16: return .ArmorError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .S2kError(
+        case 17: return .S2kError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .Argon2idMemoryExceeded(
+        case 18: return .Argon2idMemoryExceeded(
             requiredMb: try FfiConverterUInt64.read(from: &buf)
             )
-        case 18: return .RevocationError(
+        case 19: return .RevocationError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .InternalError(
+        case 20: return .InternalError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .OperationCancelled
-        case 21: return .FileIoError(
+        case 21: return .OperationCancelled
+        case 22: return .FileIoError(
             reason: try FfiConverterString.read(from: &buf)
             )
-        case 22: return .KeyTooLargeForQr(
+        case 23: return .KeyTooLargeForQr(
             sizeBytes: try FfiConverterUInt64.read(from: &buf),
             maxBytes: try FfiConverterUInt64.read(from: &buf)
             )
@@ -5249,42 +5844,47 @@ public struct FfiConverterTypePgpError: FfiConverterRustBuffer {
             FfiConverterTypeExternalP256SigningFailureCategory.write(category, into: &buf)
 
 
-        case let .ArmorError(reason):
+        case let .ExternalP256KeyAgreementFailed(category):
             writeInt(&buf, Int32(15))
-            FfiConverterString.write(reason, into: &buf)
+            FfiConverterTypeExternalP256KeyAgreementFailureCategory.write(category, into: &buf)
 
 
-        case let .S2kError(reason):
+        case let .ArmorError(reason):
             writeInt(&buf, Int32(16))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case let .Argon2idMemoryExceeded(requiredMb):
+        case let .S2kError(reason):
             writeInt(&buf, Int32(17))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case let .Argon2idMemoryExceeded(requiredMb):
+            writeInt(&buf, Int32(18))
             FfiConverterUInt64.write(requiredMb, into: &buf)
 
 
         case let .RevocationError(reason):
-            writeInt(&buf, Int32(18))
-            FfiConverterString.write(reason, into: &buf)
-
-
-        case let .InternalError(reason):
             writeInt(&buf, Int32(19))
             FfiConverterString.write(reason, into: &buf)
 
 
-        case .OperationCancelled:
+        case let .InternalError(reason):
             writeInt(&buf, Int32(20))
+            FfiConverterString.write(reason, into: &buf)
+
+
+        case .OperationCancelled:
+            writeInt(&buf, Int32(21))
 
 
         case let .FileIoError(reason):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(22))
             FfiConverterString.write(reason, into: &buf)
 
 
         case let .KeyTooLargeForQr(sizeBytes,maxBytes):
-            writeInt(&buf, Int32(22))
+            writeInt(&buf, Int32(23))
             FfiConverterUInt64.write(sizeBytes, into: &buf)
             FfiConverterUInt64.write(maxBytes, into: &buf)
 
@@ -5880,6 +6480,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed() != 61958) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement() != 40270) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 34778) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6015,6 +6618,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 18125) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_externalp256keyagreementprovider_derive_shared_secret() != 34642) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 35195) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6025,6 +6631,7 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
 
+    uniffiCallbackInitExternalP256KeyAgreementProvider()
     uniffiCallbackInitExternalP256SigningProvider()
     uniffiCallbackInitProgressReporter()
     return InitializationResult.ok

@@ -9,7 +9,6 @@ pub mod cert_signature;
 pub mod decrypt;
 pub mod encrypt;
 pub mod error;
-#[cfg(test)]
 mod external_decryptor;
 mod external_signer;
 pub mod keys;
@@ -30,10 +29,11 @@ use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
 use crate::error::PgpError;
 use crate::keys::{
-    CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256SigningProvider,
-    GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult, ModifyExpiryResult,
-    PublicCertificateValidationResult, S2kInfo, SecureEnclaveGeneratedPublicCertificate,
-    SecureEnclavePublicBindingInspection, SecureEnclavePublicCertificateInput, UserIdSelectorInput,
+    CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256KeyAgreementProvider,
+    ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult,
+    ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
+    SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicBindingInspection,
+    SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
@@ -359,6 +359,25 @@ impl PgpEngine {
         let secret_keys: Vec<Zeroizing<Vec<u8>>> =
             secret_keys.into_iter().map(Zeroizing::new).collect();
         decrypt::decrypt_detailed(&ciphertext, &secret_keys, &verification_keys)
+    }
+
+    /// Decrypt a message through a public-only P-256 recipient certificate and
+    /// external key-agreement provider while preserving per-signature details.
+    pub fn decrypt_detailed_with_external_p256_key_agreement(
+        &self,
+        ciphertext: Vec<u8>,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        key_agreement_provider: Arc<dyn ExternalP256KeyAgreementProvider>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<DecryptDetailedResult, PgpError> {
+        external_decryptor::decrypt_detailed_with_external_p256_key_agreement(
+            &ciphertext,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            key_agreement_provider,
+            &verification_keys,
+        )
     }
 
     /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
