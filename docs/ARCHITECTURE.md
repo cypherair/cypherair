@@ -319,6 +319,12 @@ falling back to stored secret-certificate decryption. This remains a foundation
 API and router route only; `DecryptionService`, file decrypt, UI, product copy,
 and production availability are deferred to later Phase 6 PRs.
 
+The runtime Swift bridge uses X9.63 P-256 shape checks as a prefilter, then
+relies on Security key import/key exchange plus Rust/Sequoia session-key and
+payload-authentication validation for fail-closed enforcement. The generated
+certificate path still performs full public-point validation before storing
+Secure Enclave-shaped public material.
+
 Phase 3A/3B/3C add the first Security-layer store, cleanup/recovery seams, and
 guarded device evidence for that future custody model. The store uses permanent
 `SecKey` / `kSecClassKey` rows with `kSecAttrTokenIDSecureEnclave` to create two

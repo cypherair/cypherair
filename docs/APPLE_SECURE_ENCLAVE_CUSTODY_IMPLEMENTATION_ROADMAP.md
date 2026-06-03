@@ -448,7 +448,9 @@ PR 6A is implemented as a foundation slice: it adds the runtime external P-256
 ECDH callback, Swift key-agreement bridge, Security handle lookup, and hidden/test
 router key-agreement route. It intentionally does not connect message or file
 decrypt workflows, UI, product copy, or production Secure Enclave custody
-availability.
+availability. The follow-up hardens invalid callback responses as typed
+hard-abort failures, zeroizes Swift-owned shared-secret buffers at the Security
+to FFI handoff, and documents the runtime point-validation boundary.
 
 Entry conditions:
 

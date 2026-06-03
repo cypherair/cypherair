@@ -363,8 +363,18 @@ pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
             ExternalP256DecryptorError::ExternalFailure(category) => {
                 PgpError::ExternalP256KeyAgreementFailed { category }
             }
-            ExternalP256DecryptorError::InvalidRequest(_)
-            | ExternalP256DecryptorError::InvalidResponse(_) => PgpError::NoMatchingKey,
+            ExternalP256DecryptorError::InvalidRequest(_) => {
+                PgpError::ExternalP256KeyAgreementFailed {
+                    category:
+                        crate::keys::ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidRequest,
+                }
+            }
+            ExternalP256DecryptorError::InvalidResponse(_) => {
+                PgpError::ExternalP256KeyAgreementFailed {
+                    category:
+                        crate::keys::ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse,
+                }
+            }
         };
     }
 

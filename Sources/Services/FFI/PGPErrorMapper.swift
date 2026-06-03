@@ -174,6 +174,10 @@ enum PGPErrorMapper {
             return .privateOperationRoleMismatch
         case .handlePublicKeyBindingMismatch:
             return .handlePublicKeyBindingMismatch
+        case .externalOperationInvalidRequest:
+            return .externalOperationInvalidRequest
+        case .externalOperationInvalidResponse:
+            return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
         }

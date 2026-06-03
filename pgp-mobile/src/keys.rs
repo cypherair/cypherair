@@ -195,6 +195,8 @@ pub enum ExternalP256KeyAgreementFailureCategory {
     PrivateHandleUnauthorized,
     PrivateOperationRoleMismatch,
     HandlePublicKeyBindingMismatch,
+    ExternalOperationInvalidRequest,
+    ExternalOperationInvalidResponse,
     ExternalOperationFailed,
 }
 
@@ -229,6 +231,12 @@ impl ExternalP256KeyAgreementFailureCategory {
             }
             ExternalP256KeyAgreementFailureCategory::HandlePublicKeyBindingMismatch => {
                 "handlePublicKeyBindingMismatch"
+            }
+            ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidRequest => {
+                "externalOperationInvalidRequest"
+            }
+            ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse => {
+                "externalOperationInvalidResponse"
             }
             ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed => {
                 "externalOperationFailed"

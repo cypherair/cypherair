@@ -2,14 +2,32 @@ import Foundation
 import Security
 
 struct SecureEnclaveP256RawSharedSecret: Equatable, Sendable {
-    let raw: Data
+    private var rawStorage: Data
+
+    var raw: Data {
+        rawStorage
+    }
 
     init(raw: Data) throws {
         guard raw.count == 32,
               raw.contains(where: { $0 != 0 }) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
-        self.raw = raw
+        self.rawStorage = Self.copy(raw)
+    }
+
+    func rawCopy() -> Data {
+        Self.copy(rawStorage)
+    }
+
+    mutating func zeroize() {
+        rawStorage.resetBytes(in: 0..<rawStorage.count)
+    }
+
+    private static func copy(_ data: Data) -> Data {
+        data.withUnsafeBytes { buffer in
+            Data(buffer)
+        }
     }
 }
 
@@ -49,7 +67,7 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
         }
 
         var error: Unmanaged<CFError>?
-        guard let sharedSecret = SecKeyCopyKeyExchangeResult(
+        guard var sharedSecret = SecKeyCopyKeyExchangeResult(
             privateKey,
             algorithm,
             peerPublicKey,
@@ -58,6 +76,7 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
         ) as Data? else {
             throw Self.mapCFError(error)
         }
+        defer { sharedSecret.resetBytes(in: 0..<sharedSecret.count) }
         return try SecureEnclaveP256RawSharedSecret(raw: sharedSecret)
     }
 

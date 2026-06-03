@@ -16,11 +16,19 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
         request: ExternalP256KeyAgreementRequest
     ) throws -> P256RawSharedSecret {
         do {
-            let sharedSecret = try keyAgreement.deriveSharedSecret(
+            var sharedSecret = try keyAgreement.deriveSharedSecret(
                 request: request,
                 using: handle
             )
-            return P256RawSharedSecret(raw: sharedSecret.raw)
+            defer { sharedSecret.zeroize() }
+            var raw = sharedSecret.rawCopy()
+            defer { raw.resetBytes(in: 0..<raw.count) }
+            let ffiRaw = raw.withUnsafeBytes { buffer in
+                Data(buffer)
+            }
+            // UniFFI must copy this record across the callback boundary; Rust
+            // immediately validates and stores the received Vec in Zeroizing.
+            return P256RawSharedSecret(raw: ffiRaw)
         } catch is CancellationError {
             throw ExternalP256KeyAgreementError.OperationCancelled
         } catch let error as SecureEnclaveCustodyHandleError {
@@ -68,14 +76,16 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
              .publicCertificateAssociationMismatch,
              .publicMaterialUnavailable,
              .revocationArtifactUnavailable,
-             .externalOperationInvalidRequest,
-             .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
              .migrationOrRecoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
+        case .externalOperationInvalidRequest:
+            return .externalOperationInvalidRequest
+        case .externalOperationInvalidResponse:
+            return .externalOperationInvalidResponse
         }
     }
 }

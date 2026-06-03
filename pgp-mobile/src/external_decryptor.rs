@@ -205,6 +205,8 @@ fn should_propagate_runtime_error(error: ExternalP256DecryptorError) -> bool {
         error,
         ExternalP256DecryptorError::OperationCancelled
             | ExternalP256DecryptorError::ExternalFailure(_)
+            | ExternalP256DecryptorError::InvalidRequest(_)
+            | ExternalP256DecryptorError::InvalidResponse(_)
     )
 }
 

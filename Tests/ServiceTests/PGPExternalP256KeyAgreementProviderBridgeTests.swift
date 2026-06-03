@@ -88,6 +88,32 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
         }
     }
 
+    func test_providerBridgeRejectsShapeValidOffCurveEphemeralPublicKey() throws {
+        let localPrivateKey = try Self.makeEphemeralP256PrivateKey()
+        let localPublicKey = try Self.publicKeyX963(from: localPrivateKey)
+        let handle = try Self.handle(
+            role: .keyAgreement,
+            publicKeyX963: localPublicKey,
+            privateKey: localPrivateKey
+        )
+        let request = ExternalP256KeyAgreementRequest(
+            recipientPublicKey: localPublicKey,
+            ephemeralPublicKey: Self.shapeValidOffCurvePublicKey()
+        )
+        let bridge = PGPExternalP256KeyAgreementProviderBridge(
+            handle: handle,
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+        )
+
+        XCTAssertThrowsError(try bridge.deriveSharedSecret(request: request)) { error in
+            XCTAssertEqual(
+                error as? ExternalP256KeyAgreementError,
+                .Failed(category: .privateHandleInaccessible)
+            )
+        }
+    }
+
+
     private static func makeEphemeralP256PrivateKey() throws -> SecKey {
         let attributes: [String: Any] = [
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
@@ -171,6 +197,13 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
     private static func publicKey(byte: UInt8) -> Data {
         var data = Data([0x04])
         data.append(Data(repeating: byte, count: 64))
+        return data
+    }
+
+    private static func shapeValidOffCurvePublicKey() -> Data {
+        var data = Data([0x04])
+        data.append(Data(repeating: 0x00, count: 63))
+        data.append(0x01)
         return data
     }
 }

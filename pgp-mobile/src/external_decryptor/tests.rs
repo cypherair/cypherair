@@ -234,7 +234,13 @@ where
                         ka.key().clone().role_into_unspecified(),
                         &mut self.key_agreement_operation,
                     )?;
-                    if let Some((algo, session_key)) = pkesk.decrypt(&mut decryptor, sym_algo) {
+                    let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
+                    if let Some(error) = decryptor.take_last_error() {
+                        if should_propagate_runtime_error(error) {
+                            return Err(error.into());
+                        }
+                    }
+                    if let Some((algo, session_key)) = decrypted {
                         self.telemetry.record_recovered_session_key();
                         if decrypt(algo, &session_key) {
                             self.telemetry.record_accepted_payload_key();
@@ -765,7 +771,12 @@ fn test_runtime_external_key_agreement_api_rejects_invalid_response_and_wrong_se
         zero_secret.clone(),
         Vec::new(),
     );
-    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        })
+    ));
     assert!(zero_secret.request_count() > 0);
 
     let unexpected = Arc::new(FixedRuntimeKeyAgreementProvider::new(Ok(
@@ -785,6 +796,93 @@ fn test_runtime_external_key_agreement_api_rejects_invalid_response_and_wrong_se
         unexpected.request_count(),
         0,
         "wrong key-agreement selector must fail before callback"
+    );
+}
+
+#[test]
+fn test_external_key_agreement_boundary_errors_map_to_typed_categories() {
+    let invalid_request = crate::decrypt::classify_decrypt_error(
+        ExternalP256DecryptorError::InvalidRequest("bad request").into(),
+    );
+    assert!(matches!(
+        invalid_request,
+        PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidRequest
+        }
+    ));
+
+    let invalid_response = crate::decrypt::classify_decrypt_error(
+        ExternalP256DecryptorError::InvalidResponse("bad response").into(),
+    );
+    assert!(matches!(
+        invalid_response,
+        PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        }
+    ));
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_hard_aborts_invalid_response_before_later_pkesk() {
+    let first = build_candidate(CandidateVersion::V4).expect("first candidate should build");
+    let second = build_candidate(CandidateVersion::V4).expect("second candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"must not try later pkesk after invalid response",
+        &[first.public_cert.clone(), second.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let policy = StandardPolicy::new();
+    let first_cert =
+        openpgp::Cert::from_bytes(&first.public_cert).expect("first recipient cert should parse");
+    let second_cert =
+        openpgp::Cert::from_bytes(&second.public_cert).expect("second recipient cert should parse");
+    let first_public = public_point_for(&first.agreement_public_key);
+    let second_public = public_point_for(&second.agreement_public_key);
+    let second_scalar = second.agreement_scalar.clone();
+    let operation_calls = Arc::new(AtomicUsize::new(0));
+    let operation_calls_for_assertion = Arc::clone(&operation_calls);
+
+    let helper = ExternalDecryptHelper {
+        recipient_certs: vec![first_cert, second_cert],
+        verifier_certs: Vec::new(),
+        key_agreement_operation: move |request: ExternalP256KeyAgreementRequest| {
+            operation_calls.fetch_add(1, Ordering::SeqCst);
+            if request.recipient_public_key() == first_public.as_slice() {
+                return Ok(ExternalP256SharedSecret::new(vec![
+                    0u8;
+                    P256_SHARED_SECRET_LENGTH
+                ]));
+            }
+            if request.recipient_public_key() == second_public.as_slice() {
+                return derive_shared_secret_with_openssl(
+                    &second_scalar,
+                    request.recipient_public_key(),
+                    request.ephemeral_public_key(),
+                )
+                .map(ExternalP256SharedSecret::new)
+                .map_err(|_| external_operation_failed());
+            }
+            Err(ExternalP256DecryptorError::InvalidRequest(
+                "unexpected recipient public key",
+            ))
+        },
+        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        telemetry: ExternalDecryptTelemetry::default(),
+    };
+
+    let result = decrypt_with_helper(&ciphertext, &policy, helper);
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        })
+    ));
+    assert_eq!(
+        operation_calls_for_assertion.load(Ordering::SeqCst),
+        1,
+        "invalid callback response must hard-abort before later PKESKs"
     );
 }
 
@@ -864,7 +962,12 @@ fn test_external_decryptor_failure_does_not_fallback_to_secret_certificate_decry
     };
 
     let result = decrypt_with_helper(&ciphertext, &policy, helper);
-    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed
+        })
+    ));
 }
 
 #[test]

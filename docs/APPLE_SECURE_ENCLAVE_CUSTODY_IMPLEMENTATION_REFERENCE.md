@@ -413,6 +413,13 @@ and payload/session-key failures without software fallback. PR 6A does not wire
 `DecryptionService`, file decrypt, UI, product copy, or production availability;
 message and file plaintext workflows remain deferred to Phase 6B/6C.
 
+PR 6A follow-up hardens that boundary: malformed or zero shared-secret callback
+responses abort the external operation before any later PKESK is tried, Swift
+zeroizes the mutable shared-secret buffers it owns before and after the UniFFI
+handoff, and runtime point handling is documented as shape prefilter plus
+Security/Rust fail-closed validation rather than a substitute for the
+generation-time curve validation.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must

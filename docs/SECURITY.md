@@ -383,6 +383,12 @@ or returned to workflow services. `DecryptionService`, streaming file decrypt,
 UI/product copy, and production Secure Enclave custody availability remain
 deferred; production policy still blocks Secure Enclave custody.
 
+Swift zeroizes the mutable shared-secret buffers it owns during the Security to
+FFI handoff. A UniFFI record copy is still required to cross the generated
+callback boundary; Rust immediately validates that copy, wraps it in
+`Zeroizing`, and hard-aborts malformed or zero shared-secret responses instead
+of continuing to later PKESKs.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

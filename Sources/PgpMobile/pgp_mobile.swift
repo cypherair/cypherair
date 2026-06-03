@@ -4982,6 +4982,8 @@ public enum ExternalP256KeyAgreementFailureCategory: Equatable, Hashable {
     case privateHandleUnauthorized
     case privateOperationRoleMismatch
     case handlePublicKeyBindingMismatch
+    case externalOperationInvalidRequest
+    case externalOperationInvalidResponse
     case externalOperationFailed
 
 
@@ -5026,7 +5028,11 @@ public struct FfiConverterTypeExternalP256KeyAgreementFailureCategory: FfiConver
 
         case 11: return .handlePublicKeyBindingMismatch
 
-        case 12: return .externalOperationFailed
+        case 12: return .externalOperationInvalidRequest
+
+        case 13: return .externalOperationInvalidResponse
+
+        case 14: return .externalOperationFailed
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -5080,8 +5086,16 @@ public struct FfiConverterTypeExternalP256KeyAgreementFailureCategory: FfiConver
             writeInt(&buf, Int32(11))
 
 
-        case .externalOperationFailed:
+        case .externalOperationInvalidRequest:
             writeInt(&buf, Int32(12))
+
+
+        case .externalOperationInvalidResponse:
+            writeInt(&buf, Int32(13))
+
+
+        case .externalOperationFailed:
+            writeInt(&buf, Int32(14))
 
         }
     }

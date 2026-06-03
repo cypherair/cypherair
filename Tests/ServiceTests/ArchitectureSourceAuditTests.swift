@@ -70,6 +70,21 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.phase6ExternalKeyAgreementRuntimeContainment)
     }
 
+    func test_phase6KeyAgreementSharedSecretHandoffZeroizesSwiftTemporaryBuffers() throws {
+        let securityBridge = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/Security/SecureEnclaveCustodyKeyAgreement.swift"
+        )
+        XCTAssertTrue(securityBridge.contains("mutating func zeroize()"))
+        XCTAssertTrue(securityBridge.contains("defer { sharedSecret.resetBytes(in: 0..<sharedSecret.count) }"))
+
+        let ffiBridge = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/Services/FFI/PGPExternalP256KeyAgreementProviderBridge.swift"
+        )
+        XCTAssertTrue(ffiBridge.contains("defer { sharedSecret.zeroize() }"))
+        XCTAssertTrue(ffiBridge.contains("defer { raw.resetBytes(in: 0..<raw.count) }"))
+        XCTAssertTrue(ffiBridge.contains("UniFFI must copy this record across the callback boundary"))
+    }
+
     func test_phase5PrivateKeyHelpersRouteThroughExpectedOperationKinds() throws {
         let expectations: [(path: String, operation: String)] = [
             ("Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift", ".sign"),
