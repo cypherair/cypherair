@@ -511,6 +511,23 @@ impl PgpEngine {
         keys::generate_subkey_revocation(&secret_cert, &subkey_fingerprint)
     }
 
+    /// Generate a subkey-specific revocation signature from a public-only
+    /// certificate through an external P-256 signing provider.
+    pub fn generate_subkey_revocation_with_external_p256_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        subkey_fingerprint: String,
+    ) -> Result<Vec<u8>, PgpError> {
+        keys::generate_subkey_revocation_with_external_p256_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            signer,
+            &subkey_fingerprint,
+        )
+    }
+
     /// Generate a User ID-specific revocation signature using an explicit selector.
     pub fn generate_user_id_revocation_by_selector(
         &self,
@@ -519,6 +536,23 @@ impl PgpEngine {
     ) -> Result<Vec<u8>, PgpError> {
         let secret_cert = Zeroizing::new(secret_cert);
         keys::generate_user_id_revocation_by_selector(&secret_cert, &user_id_selector)
+    }
+
+    /// Generate a User ID-specific revocation signature from a public-only
+    /// certificate through an external P-256 signing provider.
+    pub fn generate_user_id_revocation_by_selector_with_external_p256_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        signer: Arc<dyn ExternalP256SigningProvider>,
+        user_id_selector: UserIdSelectorInput,
+    ) -> Result<Vec<u8>, PgpError> {
+        keys::generate_user_id_revocation_by_selector_with_external_p256_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            signer,
+            &user_id_selector,
+        )
     }
 
     // ── Armor ───────────────────────────────────────────────────────

@@ -133,6 +133,16 @@ final class TutorialSandboxContainer {
                 digestSigner: secureEnclaveDigestSigner
             )
         )
+        keyManagement.configurePrivateKeySelectiveRevocationService(
+            PrivateKeySelectiveRevocationService(
+                router: keyManagement.makePrivateKeyOperationRouter(
+                    publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                    handleStore: secureEnclaveCustodyHandleStore
+                ),
+                certificateAdapter: certificateAdapter,
+                digestSigner: secureEnclaveDigestSigner
+            )
+        )
         let textEncryptor = PrivateKeyTextEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

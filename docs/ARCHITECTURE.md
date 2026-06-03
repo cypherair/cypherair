@@ -89,7 +89,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 | `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext and detached file signing route through private-operation helpers so software custody preserves the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
 | `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
 | `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation, signing-class operations, and key-agreement operations are independently gated and remain production-unavailable unless an internal hidden/test policy enables a narrow route. |
-| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, Phase 5E connects detached file signing, Phase 5F connects streaming encrypt-plus-sign optional signing, and Phase 5G connects modify-expiry binding signatures; certification, revocation, standalone binding refresh, and decrypt workflows remain deferred. |
+| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Phase 5B connects cleartext message signing to this router, Phase 5C connects text sign-plus-encrypt optional signing, Phase 5D connects password/SKESK optional signing, Phase 5E connects detached file signing, Phase 5F connects streaming encrypt-plus-sign optional signing, Phase 5G connects modify-expiry binding signatures, and Phase 5H connects selective subkey/User ID revocation export; contact certification, key-level revocation-artifact generation, standalone binding refresh, and decrypt workflows remain deferred. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns selector-validated certificate-signature workflows and signer identity resolution at the service boundary. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -269,6 +269,18 @@ using expiry-specific signer selection that does not require current key
 liveness, while ordinary signing operations still do. Secure Enclave expiry
 writeback merges public metadata against the current catalog identity and must
 not overwrite newer local flags or resurrect deleted metadata.
+
+Phase 5H extends the route-backed signer path only to selective subkey and User
+ID revocation export. `SelectiveRevocationService` still owns public-only
+selector validation before any private operation and still returns armored
+signatures without mutating catalog metadata, keychain rows, or
+`PGPKeyIdentity.revocationCert`. Software routes keep the existing
+unwrap/zeroize path and Sequoia revocation-builder defaults; Secure Enclave
+signer routes use stored public certificate material, the inspected primary
+signing fingerprint, and a loaded signing handle through public-only external
+P-256 revocation APIs. Key-level stored revocation-artifact export remains a
+public artifact export and is not lazily regenerated. Production policy still
+blocks Secure Enclave custody.
 
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256

@@ -614,6 +614,12 @@ final class KeyManagementService: @unchecked Sendable {
         mutationService.configureExpiryMutationService(service)
     }
 
+    func configurePrivateKeySelectiveRevocationService(
+        _ service: any PrivateKeySelectiveRevocationRouting
+    ) {
+        selectiveRevocationService.configureRevocationRoutingService(service)
+    }
+
     @concurrent
     private static func discoverSelectionCatalogOffMainActor(
         certificateAdapter: PGPCertificateOperationAdapter,

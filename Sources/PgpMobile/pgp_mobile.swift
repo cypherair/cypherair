@@ -913,6 +913,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String) throws  -> Data
 
     /**
+     * Generate a subkey-specific revocation signature from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+    func generateSubkeyRevocationWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, subkeyFingerprint: String) throws  -> Data
+
+    /**
      * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
      */
     func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
@@ -921,6 +927,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Generate a User ID-specific revocation signature using an explicit selector.
      */
     func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput) throws  -> Data
+
+    /**
+     * Generate a User ID-specific revocation signature from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+    func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, userIdSelector: UserIdSelectorInput) throws  -> Data
 
     /**
      * Get the key version from binary certificate data.
@@ -1492,6 +1504,22 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
 }
 
     /**
+     * Generate a subkey-specific revocation signature from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+open func generateSubkeyRevocationWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, subkeyFingerprint: String)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
+        FfiConverterString.lower(subkeyFingerprint),$0
+    )
+})
+}
+
+    /**
      * Generate raw certification-signature bytes for an explicitly selected User ID occurrence.
      */
 open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
@@ -1514,6 +1542,22 @@ open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: U
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+    )
+})
+}
+
+    /**
+     * Generate a User ID-specific revocation signature from a public-only
+     * certificate through an external P-256 signing provider.
+     */
+open func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, userIdSelector: UserIdSelectorInput)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
     )
 })
@@ -5869,10 +5913,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_p256_signer() != 60188) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 9110) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 3390) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer() != 47447) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_get_key_version() != 2783) {

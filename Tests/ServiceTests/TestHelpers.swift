@@ -245,6 +245,12 @@ enum TestHelpers {
             keyManagement: keyMgmt
         )
         keyMgmt.configurePrivateKeyExpiryMutationService(expiryMutator)
+        keyMgmt.configurePrivateKeySelectiveRevocationService(
+            makeSelectiveRevocationService(
+                engine: engine,
+                keyManagement: keyMgmt
+            )
+        )
 
         let encryptionSvc = EncryptionService(
             keyManagement: keyMgmt,
@@ -465,6 +471,27 @@ enum TestHelpers {
                 handleStore: handleStore
             ),
             keyAdapter: keyAdapter ?? PGPKeyOperationAdapter(engine: engine),
+            digestSigner: digestSigner
+        )
+    }
+
+    static func makeSelectiveRevocationService(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        certificateAdapter: PGPCertificateOperationAdapter? = nil,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+    ) -> PrivateKeySelectiveRevocationService {
+        PrivateKeySelectiveRevocationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
             digestSigner: digestSigner
         )
     }

@@ -279,6 +279,15 @@ final class AppContainer: @unchecked Sendable {
                 secureEnclaveDigestSigner: secureEnclaveDigestSigner
             )
         )
+        keyManagement.configurePrivateKeySelectiveRevocationService(
+            makePrivateKeySelectiveRevocationService(
+                engine: engine,
+                certificateAdapter: certificateAdapter,
+                keyManagement: keyManagement,
+                secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+                secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            )
+        )
         let textEncryptor = makePrivateKeyTextEncryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
@@ -458,6 +467,23 @@ final class AppContainer: @unchecked Sendable {
                 handleStore: secureEnclaveCustodyHandleStore
             ),
             keyAdapter: keyAdapter,
+            digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeySelectiveRevocationService(
+        engine: PgpEngine,
+        certificateAdapter: PGPCertificateOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+    ) -> PrivateKeySelectiveRevocationService {
+        PrivateKeySelectiveRevocationService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            certificateAdapter: certificateAdapter,
             digestSigner: secureEnclaveDigestSigner
         )
     }
