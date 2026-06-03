@@ -357,6 +357,20 @@ Failure mapping must stay sanitized and must not include fingerprints, handle
 tags, public binding bytes, Keychain locators, plaintext, private material,
 session keys, or temporary capability paths.
 
+**Secure Enclave Phase 5 closure audit note:** Phase 5J adds audit coverage and
+documentation only; it does not add a Rust/UniFFI operation, Security handle
+semantics, UI surface, product copy, or production availability switch. The
+Phase 5 support matrix is closed for signing-class hidden/test consumers:
+cleartext signing, text/file/password sign-plus-encrypt, detached file signing,
+modify-expiry, selective subkey/User ID revocation export, and User ID contact
+certification all dispatch through router-owned helpers. Workflow services must
+not grow local custody switches or direct external P-256 signer runtime calls,
+and Secure Enclave signer routes must continue to fail without software
+fallback. Standalone `refreshBinding`, decrypt/ECDH, direct-key certification,
+key-level revocation-artifact generation, private export/backup, and product
+exposure remain outside Phase 5. Production policy still blocks Secure Enclave
+custody.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

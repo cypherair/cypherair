@@ -383,7 +383,17 @@ Recommended PR grouping:
   remains an artifact-only contact workflow, and production policy still blocks
   Secure Enclave custody.
 - PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,
-  and tests.
+  and tests. **Implemented:** Phase 5J adds a closure source audit that keeps
+  workflow-local custody switches out of signing-class services, confines
+  external P-256 signer runtime calls to FFI adapters, hidden generation, and
+  router-owned private-key helpers, and asserts the 5B-5I helpers route through
+  the expected private-operation kinds. The closure also records the Phase 5
+  support matrix: cleartext signing, text/file/password sign-plus-encrypt,
+  detached file signing, modify-expiry, selective subkey/User ID revocation
+  export, and User ID contact certification use the router-backed signer route;
+  standalone `refreshBinding`, decrypt/ECDH, direct-key certification,
+  key-level revocation-artifact generation, private export/backup, and product
+  exposure remain outside Phase 5.
 
 Entry conditions:
 

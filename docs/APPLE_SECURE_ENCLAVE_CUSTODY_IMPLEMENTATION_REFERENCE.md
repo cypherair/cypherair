@@ -384,6 +384,20 @@ Contacts, catalog metadata, keychain rows, trust state, or stored contact
 certificates. Direct-key certification generation, key-level revocation-artifact
 generation, and decrypt remain outside PR 5I.
 
+Phase 5J closes the signing-class workflow integration phase with source-audit
+and documentation coverage only. It does not add a Rust/UniFFI operation or
+route a new user workflow. The closure audit checks that workflow services do
+not grow local Secure Enclave custody switches or direct external P-256 signer
+runtime calls, that external signer runtime calls stay confined to FFI adapters,
+hidden generation, and router-owned private-key helpers, and that the 5B-5I
+helpers route through the expected private-operation vocabulary. The Phase 5
+support matrix is now explicit: cleartext signing, text/file/password
+sign-plus-encrypt, detached file signing, modify-expiry, selective subkey/User
+ID revocation export, and User ID contact certification are signer-route
+consumers; standalone `refreshBinding`, decrypt/ECDH, direct-key
+certification, key-level revocation-artifact generation, private export/backup,
+and product exposure remain outside Phase 5.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must
@@ -652,6 +666,15 @@ catalog/router/public-binding inspector/shared mock handle store, handle/auth
 and callback failures surface stable categories, no software fallback occurs,
 and generated artifacts continue through the existing validation path without
 catalog/keychain/contact mutation.
+
+Phase 5J coverage adds closure source-audit assertions rather than new runtime
+cryptographic APIs. Swift tests should verify workflow services cannot bypass
+router-owned helpers with direct custody switches or external P-256 signer
+calls, that external signer runtime calls remain contained to the FFI/generation
+and Phase 5 helper boundary, that each 5B-5I helper still constructs the
+expected `PrivateKeyOperationRequest`, and that `refreshBinding` plus
+decrypt/key-agreement remain explicit unsupported/not-implemented outcomes for
+Phase 5.
 
 Hardware evidence requirements are owned by
 [Security Requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md#hardware-evidence-requirements)

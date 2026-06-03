@@ -294,6 +294,17 @@ certification remains an exported/validated signature artifact and does not
 mutate Contacts, catalog metadata, keychain rows, trust state, or stored contact
 certificates. Production policy still blocks Secure Enclave custody.
 
+Phase 5J closes the signing-class workflow integration phase with audit and
+documentation coverage. No new Rust/UniFFI API or user workflow is added. The
+closure audit asserts that cleartext signing, text/password/file
+sign-plus-encrypt, detached file signing, modify-expiry, selective subkey/User
+ID revocation export, and User ID contact certification stay behind
+router-owned helpers; workflow services must not introduce local custody
+switches or direct external P-256 signer runtime calls. Standalone
+`refreshBinding`, decrypt/ECDH, direct-key certification, key-level
+revocation-artifact generation, private export/backup, and product exposure
+remain outside Phase 5.
+
 The Rust crate also carries a test-backed external P-256 ECDH/session-key proof.
 That decryptor adapter is crate-private and receives only the recipient P-256
 public key plus the PKESK ephemeral public key; tests supply a software OpenSSL
