@@ -27,8 +27,12 @@ use crate::decrypt::{decrypt_with_helper, SignatureStatus};
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::external_signer::{ExternalP256Signature, ExternalP256Signer, ExternalP256SignerError};
-use crate::keys;
+use crate::keys::{
+    self, ExternalP256KeyAgreementError, ExternalP256KeyAgreementFailureCategory,
+    ExternalP256KeyAgreementProvider, P256RawSharedSecret,
+};
 use crate::signature_details::{LegacyFoldMode, SignatureCollector};
+use crate::PgpEngine;
 
 #[derive(Clone, Copy, Debug)]
 enum CandidateVersion {
@@ -62,6 +66,87 @@ struct CandidateMaterial {
     signing_keypair: openpgp::crypto::KeyPair,
     agreement_public_key: Key<key::PublicParts, key::UnspecifiedRole>,
     agreement_scalar: Vec<u8>,
+}
+
+struct RuntimeKeyAgreementProvider {
+    agreement_scalar: Vec<u8>,
+    request_count: Arc<AtomicUsize>,
+    captured_requests: Arc<Mutex<Vec<ExternalP256KeyAgreementRequest>>>,
+}
+
+impl RuntimeKeyAgreementProvider {
+    fn new(agreement_scalar: Vec<u8>) -> Self {
+        Self {
+            agreement_scalar,
+            request_count: Arc::new(AtomicUsize::new(0)),
+            captured_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn request_count(&self) -> usize {
+        self.request_count.load(Ordering::SeqCst)
+    }
+
+    fn captured_requests(&self) -> Vec<ExternalP256KeyAgreementRequest> {
+        self.captured_requests.lock().unwrap().clone()
+    }
+}
+
+impl ExternalP256KeyAgreementProvider for RuntimeKeyAgreementProvider {
+    fn derive_shared_secret(
+        &self,
+        request: ExternalP256KeyAgreementRequest,
+    ) -> Result<P256RawSharedSecret, ExternalP256KeyAgreementError> {
+        self.request_count.fetch_add(1, Ordering::SeqCst);
+        self.captured_requests.lock().unwrap().push(request.clone());
+        derive_shared_secret_with_openssl(
+            &self.agreement_scalar,
+            request.recipient_public_key(),
+            request.ephemeral_public_key(),
+        )
+        .map(|raw| P256RawSharedSecret { raw })
+        .map_err(|_| ExternalP256KeyAgreementError::Failed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed,
+        })
+    }
+}
+
+struct FixedRuntimeKeyAgreementProvider {
+    response: Result<P256RawSharedSecret, ExternalP256KeyAgreementError>,
+    request_count: Arc<AtomicUsize>,
+}
+
+impl FixedRuntimeKeyAgreementProvider {
+    fn new(response: Result<P256RawSharedSecret, ExternalP256KeyAgreementError>) -> Self {
+        Self {
+            response,
+            request_count: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn request_count(&self) -> usize {
+        self.request_count.load(Ordering::SeqCst)
+    }
+}
+
+impl ExternalP256KeyAgreementProvider for FixedRuntimeKeyAgreementProvider {
+    fn derive_shared_secret(
+        &self,
+        _request: ExternalP256KeyAgreementRequest,
+    ) -> Result<P256RawSharedSecret, ExternalP256KeyAgreementError> {
+        self.request_count.fetch_add(1, Ordering::SeqCst);
+        match &self.response {
+            Ok(response) => Ok(response.clone()),
+            Err(ExternalP256KeyAgreementError::Failed { category }) => {
+                Err(ExternalP256KeyAgreementError::Failed {
+                    category: *category,
+                })
+            }
+            Err(ExternalP256KeyAgreementError::OperationCancelled) => {
+                Err(ExternalP256KeyAgreementError::OperationCancelled)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -149,7 +234,13 @@ where
                         ka.key().clone().role_into_unspecified(),
                         &mut self.key_agreement_operation,
                     )?;
-                    if let Some((algo, session_key)) = pkesk.decrypt(&mut decryptor, sym_algo) {
+                    let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
+                    if let Some(error) = decryptor.take_last_error() {
+                        if should_propagate_runtime_error(error) {
+                            return Err(error.into());
+                        }
+                    }
+                    if let Some((algo, session_key)) = decrypted {
                         self.telemetry.record_recovered_session_key();
                         if decrypt(algo, &session_key) {
                             self.telemetry.record_accepted_payload_key();
@@ -291,10 +382,14 @@ fn oracle_for(
             request.ephemeral_public_key(),
         )
         .map(ExternalP256SharedSecret::new)
-        .map_err(|_| {
-            ExternalP256DecryptorError::ExternalFailure("external P-256 ECDH oracle failed")
-        })
+        .map_err(|_| external_operation_failed())
     }
+}
+
+fn external_operation_failed() -> ExternalP256DecryptorError {
+    ExternalP256DecryptorError::ExternalFailure(
+        ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed,
+    )
 }
 
 fn derive_shared_secret_with_openssl(
@@ -539,6 +634,259 @@ fn test_external_decryptor_signed_messages_preserve_signature_status() {
 }
 
 #[test]
+fn test_runtime_external_key_agreement_api_decrypts_v4_and_v6_messages() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime external key agreement {}", version.label()).into_bytes();
+        let ciphertext =
+            encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                .expect("encryption to public-only candidate should succeed");
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine
+            .decrypt_detailed_with_external_p256_key_agreement(
+                ciphertext,
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider.clone(),
+                Vec::new(),
+            )
+            .expect("runtime external key agreement should decrypt");
+
+        assert_eq!(result.plaintext, plaintext);
+        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert!(provider.request_count() > 0);
+        let requests = provider.captured_requests();
+        assert!(!requests.is_empty());
+        assert_eq!(
+            requests[0].recipient_public_key(),
+            public_point_for(&material.agreement_public_key)
+        );
+        assert_eq!(
+            requests[0].ephemeral_public_key().len(),
+            P256_PUBLIC_KEY_LENGTH
+        );
+    }
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_preserves_signature_status() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let mut material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime signed decrypt {}", version.label()).into_bytes();
+        let signer = signer_for(&material.signing_public_key, &mut material.signing_keypair)
+            .expect("external signer should initialize");
+        let ciphertext = encrypt_signed_binary(&plaintext, &material.public_cert, signer)
+            .expect("signed encryption should succeed");
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine
+            .decrypt_detailed_with_external_p256_key_agreement(
+                ciphertext,
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider,
+                vec![material.public_cert.clone()],
+            )
+            .expect("runtime external key agreement should decrypt signed message");
+
+        assert_eq!(result.plaintext, plaintext);
+        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    }
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_maps_callback_cancel_and_failure() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"callback error",
+        &[material.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let cancelled = Arc::new(FixedRuntimeKeyAgreementProvider::new(Err(
+        ExternalP256KeyAgreementError::OperationCancelled,
+    )));
+
+    let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+        ciphertext.clone(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        cancelled.clone(),
+        Vec::new(),
+    );
+    assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    assert!(cancelled.request_count() > 0);
+
+    let failed = Arc::new(FixedRuntimeKeyAgreementProvider::new(Err(
+        ExternalP256KeyAgreementError::Failed {
+            category: ExternalP256KeyAgreementFailureCategory::LocalAuthenticationFailed,
+        },
+    )));
+    let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+        ciphertext,
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        failed.clone(),
+        Vec::new(),
+    );
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::LocalAuthenticationFailed
+        })
+    ));
+    assert!(failed.request_count() > 0);
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_rejects_invalid_response_and_wrong_selector() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"invalid response",
+        &[material.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let zero_secret = Arc::new(FixedRuntimeKeyAgreementProvider::new(Ok(
+        P256RawSharedSecret {
+            raw: vec![0u8; P256_SHARED_SECRET_LENGTH],
+        },
+    )));
+
+    let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+        ciphertext.clone(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        zero_secret.clone(),
+        Vec::new(),
+    );
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        })
+    ));
+    assert!(zero_secret.request_count() > 0);
+
+    let unexpected = Arc::new(FixedRuntimeKeyAgreementProvider::new(Ok(
+        P256RawSharedSecret {
+            raw: vec![1u8; P256_SHARED_SECRET_LENGTH],
+        },
+    )));
+    let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+        ciphertext,
+        material.public_cert.clone(),
+        material.signing_public_key.fingerprint().to_hex(),
+        unexpected.clone(),
+        Vec::new(),
+    );
+    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert_eq!(
+        unexpected.request_count(),
+        0,
+        "wrong key-agreement selector must fail before callback"
+    );
+}
+
+#[test]
+fn test_external_key_agreement_boundary_errors_map_to_typed_categories() {
+    let invalid_request = crate::decrypt::classify_decrypt_error(
+        ExternalP256DecryptorError::InvalidRequest("bad request").into(),
+    );
+    assert!(matches!(
+        invalid_request,
+        PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidRequest
+        }
+    ));
+
+    let invalid_response = crate::decrypt::classify_decrypt_error(
+        ExternalP256DecryptorError::InvalidResponse("bad response").into(),
+    );
+    assert!(matches!(
+        invalid_response,
+        PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        }
+    ));
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_hard_aborts_invalid_response_before_later_pkesk() {
+    let first = build_candidate(CandidateVersion::V4).expect("first candidate should build");
+    let second = build_candidate(CandidateVersion::V4).expect("second candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"must not try later pkesk after invalid response",
+        &[first.public_cert.clone(), second.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let policy = StandardPolicy::new();
+    let first_cert =
+        openpgp::Cert::from_bytes(&first.public_cert).expect("first recipient cert should parse");
+    let second_cert =
+        openpgp::Cert::from_bytes(&second.public_cert).expect("second recipient cert should parse");
+    let first_public = public_point_for(&first.agreement_public_key);
+    let second_public = public_point_for(&second.agreement_public_key);
+    let second_scalar = second.agreement_scalar.clone();
+    let operation_calls = Arc::new(AtomicUsize::new(0));
+    let operation_calls_for_assertion = Arc::clone(&operation_calls);
+
+    let helper = ExternalDecryptHelper {
+        recipient_certs: vec![first_cert, second_cert],
+        verifier_certs: Vec::new(),
+        key_agreement_operation: move |request: ExternalP256KeyAgreementRequest| {
+            operation_calls.fetch_add(1, Ordering::SeqCst);
+            if request.recipient_public_key() == first_public.as_slice() {
+                return Ok(ExternalP256SharedSecret::new(vec![
+                    0u8;
+                    P256_SHARED_SECRET_LENGTH
+                ]));
+            }
+            if request.recipient_public_key() == second_public.as_slice() {
+                return derive_shared_secret_with_openssl(
+                    &second_scalar,
+                    request.recipient_public_key(),
+                    request.ephemeral_public_key(),
+                )
+                .map(ExternalP256SharedSecret::new)
+                .map_err(|_| external_operation_failed());
+            }
+            Err(ExternalP256DecryptorError::InvalidRequest(
+                "unexpected recipient public key",
+            ))
+        },
+        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        telemetry: ExternalDecryptTelemetry::default(),
+    };
+
+    let result = decrypt_with_helper(&ciphertext, &policy, helper);
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse
+        })
+    ));
+    assert_eq!(
+        operation_calls_for_assertion.load(Ordering::SeqCst),
+        1,
+        "invalid callback response must hard-abort before later PKESKs"
+    );
+}
+
+#[test]
 fn test_external_decryptor_request_binds_recipient_and_ephemeral_public_points() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let plaintext = b"request binding proof";
@@ -608,17 +956,18 @@ fn test_external_decryptor_failure_does_not_fallback_to_secret_certificate_decry
     let helper = ExternalDecryptHelper {
         recipient_certs: vec![recipient_cert],
         verifier_certs: Vec::new(),
-        key_agreement_operation: |_request| {
-            Err(ExternalP256DecryptorError::ExternalFailure(
-                "external P-256 ECDH oracle failed",
-            ))
-        },
+        key_agreement_operation: |_request| Err(external_operation_failed()),
         collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
         telemetry: ExternalDecryptTelemetry::default(),
     };
 
     let result = decrypt_with_helper(&ciphertext, &policy, helper);
-    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed
+        })
+    ));
 }
 
 #[test]
@@ -705,9 +1054,7 @@ fn test_external_decryptor_wrong_public_binding_fails_closed() {
                 request.ephemeral_public_key(),
             )
             .map(ExternalP256SharedSecret::new)
-            .map_err(|_| {
-                ExternalP256DecryptorError::ExternalFailure("external P-256 ECDH oracle failed")
-            })
+            .map_err(|_| external_operation_failed())
         };
 
         let result =

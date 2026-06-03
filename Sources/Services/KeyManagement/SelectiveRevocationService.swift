@@ -68,6 +68,9 @@ final class SelectiveRevocationService {
                 subkeyFingerprint: validatedSubkeyFingerprint
             )
 
+        case .secureEnclaveKeyAgreement:
+            throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
+
         case .blocked(let resolution):
             throw CypherAirError.keyOperationUnavailable(
                 category: resolution.failureCategory ?? .operationUnavailableByPolicy
@@ -114,6 +117,9 @@ final class SelectiveRevocationService {
                 route: route,
                 selectedUserId: validatedUserIdSelection
             )
+
+        case .secureEnclaveKeyAgreement:
+            throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):
             throw CypherAirError.keyOperationUnavailable(

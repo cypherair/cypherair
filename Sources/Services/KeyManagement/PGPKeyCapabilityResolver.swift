@@ -35,6 +35,13 @@ struct PGPKeyCapabilityResolver: Sendable {
             secureEnclaveKeyAgreementOperationSupport: .notImplemented,
             secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
+
+        static let testSecureEnclaveKeyAgreementRoutes = Policy(
+            secureEnclaveGenerationSupport: .unavailable,
+            secureEnclaveSigningOperationSupport: .notImplemented,
+            secureEnclaveKeyAgreementOperationSupport: .supported,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+        )
     }
 
     struct MetadataAvailability: Equatable, Sendable {

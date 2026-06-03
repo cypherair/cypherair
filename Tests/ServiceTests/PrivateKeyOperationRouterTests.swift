@@ -136,6 +136,61 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
+    func test_keyAgreementPolicyRoutesSecureEnclaveDecryptOperation() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-agreement" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveKeyAgreementRoutes,
+            inspector: inspector,
+            keyStore: keyStore
+        )
+
+        let route = router.route(for: PrivateKeyOperationRequest(
+            fingerprint: identity.fingerprint,
+            operation: .decrypt
+        ))
+
+        guard case .secureEnclaveKeyAgreement(let keyAgreementRoute) = route else {
+            return XCTFail("Expected Secure Enclave key-agreement route")
+        }
+        XCTAssertEqual(keyAgreementRoute.identity.fingerprint, identity.fingerprint)
+        XCTAssertEqual(keyAgreementRoute.operation, .decrypt)
+        XCTAssertEqual(keyAgreementRoute.keyAgreementHandle.binding, pair.keyAgreement)
+        XCTAssertEqual(
+            keyAgreementRoute.publicBindingInspection.keyAgreementPublicKeyX963,
+            pair.keyAgreement.publicKeyX963
+        )
+    }
+
+    func test_keyAgreementPolicyBlocksSigningClassOperationsBeforeInspection() throws {
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.error = CypherAirError.invalidKeyData(reason: "Unexpected public binding inspection")
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveKeyAgreementRoutes,
+            inspector: inspector,
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        )
+
+        assertBlocked(
+            router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .notImplemented(.operationNotImplementedForCustody)
+        )
+        XCTAssertEqual(inspector.inspectCallCount, 0)
+    }
+
     func test_missingIdentityReturnsSanitizedBlockedRoute() throws {
         let router = try makeRouter(
             identities: [],
@@ -259,6 +314,30 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
+            )),
+            .unavailable(.privateHandleMissing)
+        )
+    }
+
+    func test_missingKeyAgreementHandleBlocksWithoutSoftwareFallback() throws {
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(
+            identity: identity,
+            signingPublicKeyX963: makePublicKey(byte: 0x71),
+            keyAgreementPublicKeyX963: makePublicKey(byte: 0x72)
+        )
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveKeyAgreementRoutes,
+            inspector: inspector,
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        )
+
+        assertBlocked(
+            router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .decrypt
             )),
             .unavailable(.privateHandleMissing)
         )

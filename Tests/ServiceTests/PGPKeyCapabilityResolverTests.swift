@@ -245,6 +245,47 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         )
     }
 
+    func test_secureEnclaveKeyAgreementRoutePolicySupportsDecryptOnly() {
+        let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclaveKeyAgreementRoutes)
+
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .decrypt,
+                configuration: .modernP256V6,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .supported
+        )
+
+        let signingOperations: [PGPKeyOperationKind] = [
+            .sign,
+            .certify,
+            .revoke,
+            .modifyExpiry,
+            .refreshBinding
+        ]
+        for operation in signingOperations {
+            XCTAssertEqual(
+                resolver.resolution(
+                    for: operation,
+                    configuration: .modernP256V6,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .notImplemented(.operationNotImplementedForCustody),
+                "Expected \(operation) to remain blocked under key-agreement-only policy."
+            )
+        }
+
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .modernP256V6,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unavailable(.operationUnavailableByPolicy)
+        )
+    }
+
     func test_secureEnclavePrivateExportUnsupportedAndPublicMaterialUsesMetadataAvailability() {
         let resolver = PGPKeyCapabilityResolver(policy: .testSecureEnclavePrivateOperations)
 

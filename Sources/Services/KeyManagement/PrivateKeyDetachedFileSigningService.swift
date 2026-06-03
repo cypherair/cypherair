@@ -67,6 +67,9 @@ final class PrivateKeyDetachedFileSigningService: DetachedFileSigning, @unchecke
                 progress: progress
             )
 
+        case .secureEnclaveKeyAgreement:
+            throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
+
         case .blocked(let resolution):
             throw CypherAirError.keyOperationUnavailable(
                 category: resolution.failureCategory ?? .operationUnavailableByPolicy

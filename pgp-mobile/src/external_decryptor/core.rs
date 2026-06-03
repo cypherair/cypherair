@@ -5,29 +5,25 @@ use openpgp::crypto::{ecdh, mem::Protected, mpi, Decryptor, SessionKey};
 use openpgp::packet::{key, Key};
 use openpgp::types::{Curve, PublicKeyAlgorithm};
 
+use crate::keys::{ExternalP256KeyAgreementFailureCategory, ExternalP256KeyAgreementRequest};
+
 pub(crate) const P256_PUBLIC_KEY_LENGTH: usize = 65;
 pub(crate) const P256_SHARED_SECRET_LENGTH: usize = 32;
 pub(crate) const P256_UNCOMPRESSED_POINT_TAG: u8 = 0x04;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ExternalP256KeyAgreementRequest {
-    recipient_public_key: Vec<u8>,
-    ephemeral_public_key: Vec<u8>,
-}
-
 impl ExternalP256KeyAgreementRequest {
-    fn new(recipient_public_key: Vec<u8>, ephemeral_public_key: Vec<u8>) -> Self {
+    pub(crate) fn new(recipient_public_key: Vec<u8>, ephemeral_public_key: Vec<u8>) -> Self {
         Self {
             recipient_public_key,
             ephemeral_public_key,
         }
     }
 
-    pub(crate) fn recipient_public_key(&self) -> &[u8] {
+    pub fn recipient_public_key(&self) -> &[u8] {
         &self.recipient_public_key
     }
 
-    pub(crate) fn ephemeral_public_key(&self) -> &[u8] {
+    pub fn ephemeral_public_key(&self) -> &[u8] {
         &self.ephemeral_public_key
     }
 }
@@ -44,21 +40,16 @@ impl ExternalP256SharedSecret {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum ExternalP256DecryptorError {
+    #[error("external P-256 decryptor invalid request: {0}")]
     InvalidRequest(&'static str),
+    #[error("external P-256 decryptor invalid response: {0}")]
     InvalidResponse(&'static str),
-    ExternalFailure(&'static str),
-}
-
-impl ExternalP256DecryptorError {
-    fn sanitized_reason(self) -> &'static str {
-        match self {
-            ExternalP256DecryptorError::InvalidRequest(reason)
-            | ExternalP256DecryptorError::InvalidResponse(reason)
-            | ExternalP256DecryptorError::ExternalFailure(reason) => reason,
-        }
-    }
+    #[error("external P-256 key agreement failed: {}", .0.stable_reason())]
+    ExternalFailure(ExternalP256KeyAgreementFailureCategory),
+    #[error("external P-256 key agreement operation cancelled")]
+    OperationCancelled,
 }
 
 pub(crate) struct ExternalP256Decryptor<F>
@@ -69,6 +60,7 @@ where
 {
     public_key: Key<key::PublicParts, key::UnspecifiedRole>,
     key_agreement_operation: F,
+    last_error: Option<ExternalP256DecryptorError>,
 }
 
 impl<F> ExternalP256Decryptor<F>
@@ -81,14 +73,17 @@ where
         public_key: Key<key::PublicParts, key::UnspecifiedRole>,
         key_agreement_operation: F,
     ) -> openpgp::Result<Self> {
-        Self::validate_public_key(&public_key).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-        })?;
+        Self::validate_public_key(&public_key)?;
 
         Ok(Self {
             public_key,
             key_agreement_operation,
+            last_error: None,
         })
+    }
+
+    pub(crate) fn take_last_error(&mut self) -> Option<ExternalP256DecryptorError> {
+        self.last_error.take()
     }
 
     fn validate_public_key(
@@ -159,14 +154,12 @@ where
     ) -> openpgp::Result<SessionKey> {
         let ephemeral_public_key = match ciphertext {
             mpi::Ciphertext::ECDH { e, .. } => {
-                Self::validate_public_point(e.value()).map_err(|error| {
-                    openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-                })?;
+                Self::validate_public_point(e.value())?;
                 e.value().to_vec()
             }
             _ => {
-                return Err(openpgp::Error::InvalidOperation(
-                    "external P-256 decryptor supports ECDH ciphertext only".to_string(),
+                return Err(ExternalP256DecryptorError::InvalidRequest(
+                    "external P-256 decryptor supports ECDH ciphertext only",
                 )
                 .into())
             }
@@ -175,8 +168,8 @@ where
         let recipient_public_key = match self.public_key.mpis() {
             mpi::PublicKey::ECDH { q, .. } => q.value().to_vec(),
             _ => {
-                return Err(openpgp::Error::InvalidOperation(
-                    "external P-256 decryptor requires an ECDH public key".to_string(),
+                return Err(ExternalP256DecryptorError::InvalidRequest(
+                    "external P-256 decryptor requires an ECDH public key",
                 )
                 .into())
             }
@@ -184,12 +177,17 @@ where
 
         let request =
             ExternalP256KeyAgreementRequest::new(recipient_public_key, ephemeral_public_key);
-        let shared_secret = (self.key_agreement_operation)(request).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-        })?;
-        Self::validate_shared_secret(&shared_secret).map_err(|error| {
-            openpgp::Error::InvalidOperation(error.sanitized_reason().to_string())
-        })?;
+        let shared_secret = match (self.key_agreement_operation)(request) {
+            Ok(shared_secret) => shared_secret,
+            Err(error) => {
+                self.last_error = Some(error);
+                return Err(error.into());
+            }
+        };
+        if let Err(error) = Self::validate_shared_secret(&shared_secret) {
+            self.last_error = Some(error);
+            return Err(error.into());
+        }
 
         let shared_secret = Protected::from(shared_secret.raw.as_slice());
         ecdh::decrypt_unwrap(&self.public_key, &shared_secret, ciphertext, plaintext_len)

@@ -232,12 +232,15 @@ Phase 5A implements the router foundation only. The shared Swift vocabulary is
 key-agreement handles. The implemented route outcomes are software
 secret-certificate route, Secure Enclave signer route, and blocked
 `PGPKeyOperationResolution`; the successful Secure Enclave key-agreement route
-remains future Phase 6 work. The Phase 5A router resolves local identity by
+is introduced in Phase 6A. The Phase 5A router resolves local identity by
 fingerprint, consults resolver policy before Security handle lookup, validates
 stored public-certificate bindings and key-version/fingerprint association, and
-loads only the signing handle by public bindings. Production policy still blocks
-Secure Enclave private operations, and no product workflow consumes the router
-in this foundation PR.
+loads only the signing handle by public bindings.
+
+Phase 6A extends this foundation with the successful Secure Enclave
+key-agreement route under hidden/test policy only. Production policy still
+blocks Secure Enclave private operations, and no plaintext workflow consumes the
+key-agreement route in PR 6A.
 
 Phase 5B is the first workflow consumer and is intentionally narrow. The Rust
 runtime cleartext signing API accepts only public certificate bytes, an expected
@@ -397,6 +400,25 @@ ID revocation export, and User ID contact certification are signer-route
 consumers; standalone `refreshBinding`, decrypt/ECDH, direct-key
 certification, key-level revocation-artifact generation, private export/backup,
 and product exposure remain outside Phase 5.
+
+Phase 6A promotes the Rust external P-256 ECDH proof into a runtime
+Rust/UniFFI foundation API and adds the Swift Security key-agreement bridge plus
+router key-agreement route. Swift supplies only the raw 32-byte P-256 shared
+secret from a loaded `.keyAgreement` handle after role and public-binding
+checks; Rust/Sequoia still owns OpenPGP ECDH KDF, AES Key Wrap unwrap,
+session-key validation, payload authentication, and verification folding. The
+API rejects secret certificate input, wrong role or fingerprint, malformed or
+zero shared secrets, public-binding mismatch, callback cancellation/failure,
+and payload/session-key failures without software fallback. PR 6A does not wire
+`DecryptionService`, file decrypt, UI, product copy, or production availability;
+message and file plaintext workflows remain deferred to Phase 6B/6C.
+
+PR 6A follow-up hardens that boundary: malformed or zero shared-secret callback
+responses abort the external operation before any later PKESK is tried, Swift
+zeroizes the mutable shared-secret buffers it owns before and after the UniFFI
+handoff, and runtime point handling is documented as shape prefilter plus
+Security/Rust fail-closed validation rather than a substitute for the
+generation-time curve validation.
 
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services

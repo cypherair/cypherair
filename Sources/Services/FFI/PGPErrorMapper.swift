@@ -48,6 +48,24 @@ enum PGPErrorMapper {
         }
     }
 
+    static func mapExternalP256KeyAgreement(_ error: Error) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        }
+        guard let pgpError = error as? PgpError else {
+            return .corruptData(reason: error.localizedDescription)
+        }
+
+        switch pgpError {
+        case .OperationCancelled:
+            return .operationCancelled
+        case .ExternalP256KeyAgreementFailed(let category):
+            return .keyOperationUnavailable(category: externalP256KeyAgreementCategory(for: category))
+        default:
+            return map(pgpError)
+        }
+    }
+
     static func map(_ pgpError: PgpError) -> CypherAirError {
         switch pgpError {
         case .AeadAuthenticationFailed:
@@ -74,6 +92,8 @@ enum PGPErrorMapper {
             return .signingFailed(reason: reason)
         case .ExternalP256SigningFailed(let category):
             return .keyOperationUnavailable(category: externalP256SigningCategory(for: category))
+        case .ExternalP256KeyAgreementFailed(let category):
+            return .keyOperationUnavailable(category: externalP256KeyAgreementCategory(for: category))
         case .ArmorError(let reason):
             return .armorError(reason: reason)
         case .IntegrityCheckFailed:
@@ -123,6 +143,41 @@ enum PGPErrorMapper {
             return .privateOperationRoleMismatch
         case .handlePublicKeyBindingMismatch:
             return .handlePublicKeyBindingMismatch
+        case .externalOperationFailed:
+            return .externalOperationFailed
+        }
+    }
+
+    private static func externalP256KeyAgreementCategory(
+        for category: ExternalP256KeyAgreementFailureCategory
+    ) -> PGPKeyOperationFailureCategory {
+        switch category {
+        case .hardwareUnavailable:
+            return .hardwareUnavailable
+        case .localAuthenticationRequired:
+            return .localAuthenticationRequired
+        case .localAuthenticationCancelled:
+            return .localAuthenticationCancelled
+        case .localAuthenticationFailed:
+            return .localAuthenticationFailed
+        case .localAuthenticationUnavailable:
+            return .localAuthenticationUnavailable
+        case .localAuthenticationLockedOut:
+            return .localAuthenticationLockedOut
+        case .privateHandleMissing:
+            return .privateHandleMissing
+        case .privateHandleInaccessible:
+            return .privateHandleInaccessible
+        case .privateHandleUnauthorized:
+            return .privateHandleUnauthorized
+        case .privateOperationRoleMismatch:
+            return .privateOperationRoleMismatch
+        case .handlePublicKeyBindingMismatch:
+            return .handlePublicKeyBindingMismatch
+        case .externalOperationInvalidRequest:
+            return .externalOperationInvalidRequest
+        case .externalOperationInvalidResponse:
+            return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
         }
