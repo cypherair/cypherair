@@ -54,6 +54,67 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.privateOperationCustodySwitchContainment)
     }
 
+    func test_phase5KeyManagementCustodySwitchesStayInExplicitBoundaries() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.phase5KeyManagementCustodySwitchContainment)
+    }
+
+    func test_phase5WorkflowServicesDoNotCallExternalSignerRuntimeDirectly() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.phase5WorkflowExternalSignerContainment)
+    }
+
+    func test_phase5ExternalSignerRuntimeStaysInsideFFIAndRouterOwnedHelpers() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.phase5ExternalSignerRuntimeContainment)
+    }
+
+    func test_phase5PrivateKeyHelpersRouteThroughExpectedOperationKinds() throws {
+        let expectations: [(path: String, operation: String)] = [
+            ("Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift", ".sign"),
+            ("Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift", ".sign"),
+            ("Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift", ".sign"),
+            ("Sources/Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift", ".sign"),
+            ("Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift", ".sign"),
+            ("Sources/Services/KeyManagement/PrivateKeyExpiryMutationService.swift", ".modifyExpiry"),
+            ("Sources/Services/KeyManagement/PrivateKeySelectiveRevocationService.swift", ".revoke"),
+            ("Sources/Services/KeyManagement/PrivateKeyContactCertificationService.swift", ".certify"),
+        ]
+
+        for expectation in expectations {
+            let contents = try RepositoryAuditLoader.loadString(relativePath: expectation.path)
+            XCTAssertTrue(
+                contents.contains("router.route("),
+                "\(expectation.path) must dispatch through PrivateKeyOperationRouter."
+            )
+            XCTAssertTrue(
+                contents.contains("PrivateKeyOperationRequest("),
+                "\(expectation.path) must build an app-owned private-operation request."
+            )
+            XCTAssertTrue(
+                contents.contains("operation: \(expectation.operation)"),
+                "\(expectation.path) must route through \(expectation.operation)."
+            )
+            XCTAssertTrue(
+                contents.contains("PGPExternalP256SigningProviderBridge("),
+                "\(expectation.path) must keep external P-256 signing behind the shared bridge."
+            )
+        }
+    }
+
+    func test_phase5UnsupportedOperationsRemainExplicit() throws {
+        let resolver = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift"
+        )
+        XCTAssertTrue(resolver.contains("secureEnclaveRefreshBindingOperationSupport"))
+        XCTAssertTrue(resolver.contains("secureEnclaveKeyAgreementOperationSupport"))
+        XCTAssertTrue(resolver.contains("case .refreshBinding:"))
+        XCTAssertTrue(resolver.contains("case .decrypt:"))
+
+        let operationKind = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/Models/PGPPrivateOperationKind.swift"
+        )
+        XCTAssertTrue(operationKind.contains("case refreshBinding"))
+        XCTAssertTrue(operationKind.contains("case decrypt"))
+    }
+
     func test_keyRouteViews_doNotOrchestrateKeyManagementWorkflows() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.keyRouteViewWorkflowContainment)
     }
@@ -140,6 +201,28 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             allowedPath: "Sources/App/Contacts/Import/LegacyImportLoader.swift",
             allowedContents: "struct LegacyImportLoader { let adapter = PGPCertificateSelectionAdapter.self }",
             cleanContents: "struct ImportLoader {}"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.phase5ExternalSignerRuntimeContainment.withTemporaryExceptions([
+                "Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Services/NewSigningWorkflow.swift",
+            violatingContents: "struct NewSigningWorkflow { func run() { _ = PGPExternalP256SigningProviderBridge.self } }",
+            allowedPath: "Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift",
+            allowedContents: "struct PrivateKeyCleartextSigningService { func run() { _ = PGPExternalP256SigningProviderBridge.self } }",
+            cleanContents: "struct PrivateKeyCleartextSigningService {}"
+        )
+
+        try assertRuleBehavior(
+            ArchitectureSourceAuditRules.phase5KeyManagementCustodySwitchContainment.withTemporaryExceptions([
+                "Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift": "fixture exception"
+            ]),
+            violatingPath: "Sources/Services/KeyManagement/NewWorkflowHelper.swift",
+            violatingContents: "struct NewWorkflowHelper { func run(identity: PGPKeyIdentity) { _ = identity.privateKeyCustodyKind } }",
+            allowedPath: "Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift",
+            allowedContents: "struct PrivateKeyOperationRouter { func run(identity: PGPKeyIdentity) { _ = identity.privateKeyCustodyKind } }",
+            cleanContents: "struct PrivateKeyOperationRouter {}"
         )
 
         try assertRuleBehavior(
@@ -483,6 +566,15 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.appLayerFFIAdapterUsage.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.phase5WorkflowExternalSignerContainment.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.phase5ExternalSignerRuntimeContainment.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.phase5KeyManagementCustodySwitchContainment.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.contactsRouteViewWorkflowContainment.violations(in: [source]).isEmpty
@@ -1006,6 +1098,100 @@ private enum ArchitectureSourceAuditRules {
         temporaryExceptions: temporaryExceptions([])
     )
 
+    static let phase5KeyManagementCustodySwitchContainment = ArchitectureSourceAuditRule(
+        name: "Phase 5 key-management custody switch containment",
+        failureSummary: "Key-management custody switches should stay in resolver/router/storage/export boundaries or documented legacy fallbacks.",
+        pattern: #"\b(?:PGPPrivateKeyCustodyKind|privateKeyCustodyKind)\b|\.\s*appleSecureEnclavePrivateOperations\b"#,
+        scope: { path in
+            path.hasPrefix("Sources/Services/KeyManagement/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "The resolver owns operation/custody policy decisions.",
+                [
+                    "Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift",
+                ]
+            ),
+            (
+                "The router owns Secure Enclave signer-route selection after resolver approval.",
+                [
+                    "Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift",
+                ]
+            ),
+            (
+                "Hidden/test generation and recovery classify Secure Enclave custody metadata and handle state.",
+                [
+                    "Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryService.swift",
+                    "Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift",
+                ]
+            ),
+            (
+                "Catalog/export boundaries preserve custody metadata and enforce Secure Enclave private-export unsupported outcomes.",
+                [
+                    "Sources/Services/KeyManagement/KeyCatalogStore.swift",
+                    "Sources/Services/KeyManagement/KeyExportService.swift",
+                ]
+            ),
+            (
+                "Phase 5G/5H keep narrow compatibility fallbacks for unconfigured tests; app and tutorial composition roots inject router-backed helpers.",
+                [
+                    "Sources/Services/KeyManagement/KeyMutationService.swift",
+                    "Sources/Services/KeyManagement/SelectiveRevocationService.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let phase5WorkflowExternalSignerContainment = ArchitectureSourceAuditRule(
+        name: "Phase 5 workflow external signer containment",
+        failureSummary: "Workflow services should delegate external P-256 signer runtime calls to private-key helpers.",
+        pattern: phase5ExternalSignerRuntimePattern,
+        scope: { path in
+            phase5WorkflowServicePaths.contains(path)
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let phase5ExternalSignerRuntimeContainment = ArchitectureSourceAuditRule(
+        name: "Phase 5 external signer runtime containment",
+        failureSummary: "External P-256 signer runtime calls should stay inside FFI adapters, hidden generation, and router-owned private-key helpers.",
+        pattern: phase5ExternalSignerRuntimePattern,
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "FFI adapters and the shared provider bridge intentionally touch generated external signer APIs.",
+                [
+                    "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPExternalP256SigningProviderBridge.swift",
+                    "Sources/Services/FFI/PGPKeyOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPMessageOperationAdapter.swift",
+                    "Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift",
+                ]
+            ),
+            (
+                "Router-owned Phase 5 helpers are the only service boundary allowed to invoke external signer runtime adapters.",
+                [
+                    "Sources/Services/KeyManagement/PrivateKeyCleartextSigningService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyContactCertificationService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyExpiryMutationService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeySelectiveRevocationService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift",
+                ]
+            ),
+        ])
+    )
+
     static let keyRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
         name: "Key route view workflow containment",
         failureSummary: "Key-management route Views should send intent to ScreenModels instead of calling key workflow services directly.",
@@ -1120,6 +1306,17 @@ private enum ArchitectureSourceAuditRules {
         "Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift",
         "Sources/App/Keys/SelectiveRevocationView.swift",
     ]
+
+    private static let phase5WorkflowServicePaths: Set<String> = [
+        "Sources/Services/CertificateSignatureService.swift",
+        "Sources/Services/EncryptionService.swift",
+        "Sources/Services/KeyManagementService.swift",
+        "Sources/Services/PasswordMessageService.swift",
+        "Sources/Services/SigningService.swift",
+    ]
+
+    private static let phase5ExternalSignerRuntimePattern =
+        #"\b(?:PGPExternalP256SigningProviderBridge|PGPSecureEnclaveExternalSigningProviderBridge|[A-Za-z0-9_]*WithExternalP256Signer)\b"#
 
     private static func isContactsViewPath(_ path: String) -> Bool {
         path.hasPrefix("Sources/App/Contacts/")
