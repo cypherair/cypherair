@@ -168,7 +168,7 @@ If `CURRENT_PROJECT_VERSION` or `MARKETING_VERSION` has changed in any way, trea
 
 ## Testing Expectations
 
-- Every change should preserve both Rust and Swift validation where relevant.
+- Every functional PR must include tests (security changes require both positive and negative tests); docs-only PRs may use the documentation consistency path instead of Rust/Xcode runs. Preserve both Rust and Swift validation where relevant.
 - Crypto behavior changes must be tested for both profiles.
 - Add negative tests for failure paths, not only happy paths.
 - Secure Enclave / biometric tests must be guarded for real hardware availability.

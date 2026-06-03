@@ -60,7 +60,7 @@ CypherAir is a three-layer application: a SwiftUI presentation layer, a Swift se
 Sources/
 ├── App/              # SwiftUI views, navigation, onboarding
 ├── Services/         # Encryption, signing, key management, contacts, QR
-├── Security/         # SE wrapping, Keychain, auth modes, memory zeroing
+├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData, memory zeroing
 ├── Models/           # Data types, PGP key representations, error types
 ├── Extensions/       # Swift/Foundation extensions
 └── Resources/        # Assets, String Catalog
@@ -107,9 +107,10 @@ The current app structure keeps maintainability and safety work behind stable us
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # 2. Refresh the XCFramework artifact and generated bindings used by Xcode.
-# For local validation, force-download the latest attested arm64e stage1
-# prerelease so the result matches GitHub-hosted packaging.
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=latest \
+# build-xcframework.sh consumes a pinned arm64e stage1 prerelease; `latest` is
+# rejected. Use the pinned ARM64E_STAGE1_RELEASE_TAG value from CLAUDE.md
+# (Build Commands) or docs/ARM64E_STATUS.md (the arm64e source of truth).
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=<pinned-tag> \
     ./build-xcframework.sh --release
 
 # 3. Validate Swift unit + FFI behavior locally
