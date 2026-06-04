@@ -13,7 +13,9 @@ use openpgp::packet::{key, signature, Key, Packet, UserID};
 use openpgp::parse::stream::{DecryptionHelper, MessageStructure, VerificationHelper};
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message, Signer as StreamSigner};
+use openpgp::serialize::stream::{
+    Encryptor, LiteralWriter, Message, Recipient, Signer as StreamSigner,
+};
 use openpgp::serialize::Serialize;
 use openpgp::types::{Curve, Features, HashAlgorithm, KeyFlags, SignatureType};
 use openssl::bn::{BigNum, BigNumContext};
@@ -522,6 +524,77 @@ fn encrypt_signed_binary(
     Ok(sink)
 }
 
+fn build_rsa_recipient_cert() -> openpgp::Result<Vec<u8>> {
+    let (cert, _revocation) = openpgp::cert::CertBuilder::new()
+        .set_cipher_suite(openpgp::cert::CipherSuite::RSA2k)
+        .add_userid("RSA Recipient <rsa-recipient@example.test>")
+        .add_transport_encryption_subkey()
+        .generate()?;
+    let mut public_cert = Vec::new();
+    cert.serialize(&mut public_cert)?;
+    Ok(public_cert)
+}
+
+/// Encrypt to multiple recipients in order while hiding every recipient keyid
+/// behind the wildcard id (GnuPG `--throw-keyids` / `--hidden-recipient` style).
+/// PKESKs are emitted in `recipient_certs` order, so a non-matching packet can be
+/// placed before the intended recipient's packet.
+fn encrypt_hidden_recipients_binary(
+    plaintext: &[u8],
+    recipient_certs: &[&[u8]],
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let certs: Vec<openpgp::Cert> = recipient_certs
+        .iter()
+        .map(|bytes| openpgp::Cert::from_bytes(bytes))
+        .collect::<openpgp::Result<Vec<_>>>()
+        .map_err(|e| PgpError::InvalidKeyData {
+            reason: format!("Invalid recipient cert: {e}"),
+        })?;
+
+    let mut recipients: Vec<Recipient> = Vec::new();
+    for cert in &certs {
+        for ka in cert
+            .keys()
+            .with_policy(&policy, None)
+            .supported()
+            .alive()
+            .for_transport_encryption()
+        {
+            let recipient: Recipient = ka.into();
+            let hidden = recipient
+                .set_key_handle(openpgp::KeyHandle::KeyID(openpgp::KeyID::wildcard()))
+                .map_err(|e| PgpError::EncryptionFailed {
+                    reason: format!("Failed to hide recipient keyid: {e}"),
+                })?;
+            recipients.push(hidden);
+        }
+    }
+
+    let mut sink = Vec::new();
+    let message = Message::new(&mut sink);
+    let message = Encryptor::for_recipients(message, recipients)
+        .build()
+        .map_err(|e| PgpError::EncryptionFailed {
+            reason: format!("Encryptor setup failed: {e}"),
+        })?;
+    let mut literal =
+        LiteralWriter::new(message)
+            .build()
+            .map_err(|e| PgpError::EncryptionFailed {
+                reason: format!("Literal writer setup failed: {e}"),
+            })?;
+    literal
+        .write_all(plaintext)
+        .map_err(|e| PgpError::EncryptionFailed {
+            reason: format!("Write failed: {e}"),
+        })?;
+    literal.finalize().map_err(|e| PgpError::EncryptionFailed {
+        reason: format!("Finalize failed: {e}"),
+    })?;
+    Ok(sink)
+}
+
 fn assert_valid_public_candidate(version: CandidateVersion, public_cert: &[u8]) {
     let parsed = openpgp::Cert::from_bytes(public_cert).expect("candidate should parse");
     assert!(
@@ -882,6 +955,103 @@ fn test_runtime_external_key_agreement_api_hard_aborts_invalid_response_before_l
         1,
         "invalid callback response must hard-abort before later PKESKs"
     );
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_decrypts_hidden_recipient_message_skipping_non_ecdh_pkesk(
+) {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let rsa_recipient = build_rsa_recipient_cert().expect("RSA recipient cert should build");
+    let plaintext = b"hidden recipient mixed RSA and P-256".to_vec();
+    // Hidden (wildcard) recipients; the non-ECDH RSA PKESK is emitted before the
+    // P-256 ECDH PKESK. A wildcard recipient speculatively matches our key, so the
+    // RSA packet reaches prepare_request and is rejected as a non-match: it must be
+    // skipped, not treated as a definitive failure for the whole message.
+    let ciphertext = encrypt_hidden_recipients_binary(
+        &plaintext,
+        &[rsa_recipient.as_slice(), material.public_cert.as_slice()],
+    )
+    .expect("hidden multi-recipient encryption should succeed");
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    let result = engine
+        .decrypt_detailed_with_external_p256_key_agreement(
+            ciphertext,
+            material.public_cert.clone(),
+            material.agreement_public_key.fingerprint().to_hex(),
+            provider.clone(),
+            Vec::new(),
+        )
+        .expect("non-ECDH wildcard PKESK must be skipped and the P-256 PKESK decrypted");
+
+    assert_eq!(result.plaintext, plaintext);
+    assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+    // The external operation runs only for the ECDH PKESK; the RSA PKESK is
+    // rejected by prepare_request before the callback.
+    assert!(provider.request_count() > 0);
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_decrypts_hidden_recipient_message_with_other_ecdh_recipient_first(
+) {
+    let engine = PgpEngine::new();
+    let other = build_candidate(CandidateVersion::V4).expect("other candidate should build");
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let plaintext = b"hidden recipient two ECDH recipients".to_vec();
+    // Hidden (wildcard) recipients; a different P-256 recipient's PKESK is emitted
+    // first. Its session-key unwrap fails for our key without recording a
+    // definitive error, so decryption must continue to our own PKESK.
+    let ciphertext = encrypt_hidden_recipients_binary(
+        &plaintext,
+        &[
+            other.public_cert.as_slice(),
+            material.public_cert.as_slice(),
+        ],
+    )
+    .expect("hidden multi-recipient encryption should succeed");
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    let result = engine
+        .decrypt_detailed_with_external_p256_key_agreement(
+            ciphertext,
+            material.public_cert.clone(),
+            material.agreement_public_key.fingerprint().to_hex(),
+            provider,
+            Vec::new(),
+        )
+        .expect("the other recipient's wildcard PKESK must be skipped and ours decrypted");
+
+    assert_eq!(result.plaintext, plaintext);
+}
+
+#[test]
+fn test_runtime_external_key_agreement_api_hidden_recipient_genuine_failure_hard_aborts() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let plaintext = b"hidden recipient genuine failure".to_vec();
+    let ciphertext =
+        encrypt_hidden_recipients_binary(&plaintext, &[material.public_cert.as_slice()])
+            .expect("hidden single-recipient encryption should succeed");
+    let cancelled = Arc::new(FixedRuntimeKeyAgreementProvider::new(Err(
+        ExternalP256KeyAgreementError::OperationCancelled,
+    )));
+
+    // Even though the recipient is hidden (a speculative match), a genuine external
+    // operation failure must fail closed rather than be swallowed as no-matching-key.
+    let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+        ciphertext,
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        cancelled.clone(),
+        Vec::new(),
+    );
+    assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    assert!(cancelled.request_count() > 0);
 }
 
 #[test]

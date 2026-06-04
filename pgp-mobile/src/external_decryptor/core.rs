@@ -86,6 +86,28 @@ pub(crate) enum ExternalP256DecryptorError {
     OperationCancelled,
 }
 
+impl ExternalP256DecryptorError {
+    /// Distinguish a genuinely attempted external key-agreement operation that
+    /// failed from a pre-callback "this PKESK is not a valid ECDH request for
+    /// this key" rejection.
+    ///
+    /// `InvalidRequest` is recorded by `prepare_request` *before* the external
+    /// operation runs (non-ECDH ciphertext or malformed point). For a
+    /// wildcard/hidden recipient that speculatively matches every key, such a
+    /// rejection means "this packet is addressed to someone else", so the helper
+    /// can skip it and keep trying later PKESKs. The remaining variants mean the
+    /// external callback was actually invoked and failed (or returned a malformed
+    /// response), which must fail closed instead of being skipped.
+    pub(crate) fn is_external_operation_failure(&self) -> bool {
+        match self {
+            ExternalP256DecryptorError::InvalidRequest(_) => false,
+            ExternalP256DecryptorError::InvalidResponse(_)
+            | ExternalP256DecryptorError::ExternalFailure(_)
+            | ExternalP256DecryptorError::OperationCancelled => true,
+        }
+    }
+}
+
 pub(crate) struct ExternalP256Decryptor<F>
 where
     F: FnMut(

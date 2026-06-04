@@ -57,6 +57,11 @@ impl DecryptionHelper for ExternalDecryptHelper {
         let policy = StandardPolicy::new();
 
         for pkesk in pkesks {
+            // An explicit recipient keyid that matches this key means the PKESK
+            // is genuinely addressed to it. A wildcard / hidden recipient
+            // (`recipient() == None`) speculatively matches every key, so a
+            // matching key here may simply not be the intended recipient.
+            let explicit_recipient = pkesk.recipient().is_some();
             for ka in self
                 .recipient_cert
                 .keys()
@@ -78,10 +83,19 @@ impl DecryptionHelper for ExternalDecryptHelper {
                 )?;
                 let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
                 if let Some(error) = decryptor.take_last_error() {
-                    // Any recorded error is a definitive failure for the only
-                    // matching key-agreement subkey: hard-abort fail-closed
-                    // instead of falling through to a generic "no matching key".
-                    return Err(error.into());
+                    // Hard-abort fail-closed when the PKESK is explicitly
+                    // addressed to this key, or when the external key-agreement
+                    // operation was actually attempted and failed: never silently
+                    // downgrade a genuine failure to "no matching key".
+                    //
+                    // For a wildcard / hidden recipient, a pre-callback rejection
+                    // (e.g. a non-ECDH packet intended for a different recipient)
+                    // is a non-match: skip it and keep trying later PKESKs instead
+                    // of failing an otherwise-decryptable multi-recipient message.
+                    if explicit_recipient || error.is_external_operation_failure() {
+                        return Err(error.into());
+                    }
+                    continue;
                 }
                 if let Some((algo, session_key)) = decrypted {
                     if decrypt(algo, &session_key) {
