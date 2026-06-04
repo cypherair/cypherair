@@ -149,6 +149,11 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
                 engine: engine,
                 keyManagement: keyManagement,
                 messageAdapter: messageAdapter
+            ),
+            fileDecryptor: TestHelpers.makeFileDecryptor(
+                engine: engine,
+                keyManagement: keyManagement,
+                messageAdapter: messageAdapter
             )
         )
         let passwordMessageEncryptor = TestHelpers.makePasswordMessageEncryptor(

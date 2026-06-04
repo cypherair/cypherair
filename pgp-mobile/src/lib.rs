@@ -681,6 +681,33 @@ impl PgpEngine {
         )
     }
 
+    /// Decrypt a file using streaming I/O through a public-only P-256 recipient
+    /// certificate and external key-agreement provider, preserving per-signature details.
+    ///
+    /// The session key is acquired via the external P-256 key-agreement callback (no
+    /// secret certificate is unwrapped). Payload authentication and the success-only
+    /// output contract remain Sequoia/streaming responsibilities.
+    pub fn decrypt_file_detailed_with_external_p256_key_agreement(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        key_agreement_provider: Arc<dyn ExternalP256KeyAgreementProvider>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    ) -> Result<FileDecryptDetailedResult, PgpError> {
+        external_decryptor::decrypt_file_detailed_with_external_p256_key_agreement(
+            &input_path,
+            &output_path,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            key_agreement_provider,
+            &verification_keys,
+            progress,
+        )
+    }
+
     /// Create a detached signature for a file using streaming I/O.
     /// Returns the ASCII-armored signature.
     pub fn sign_detached_file(

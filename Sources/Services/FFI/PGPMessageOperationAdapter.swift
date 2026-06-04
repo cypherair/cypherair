@@ -224,6 +224,36 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func decryptFileWithExternalP256KeyAgreement(
+        inputPath: String,
+        outputPath: String,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        keyAgreementProvider: ExternalP256KeyAgreementProvider,
+        verificationContext: PGPMessageVerificationContext,
+        progress: FileProgressReporter?
+    ) async throws -> DetailedSignatureVerification {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            let result = try await Self.performDecryptFileWithExternalP256KeyAgreement(
+                engine: engine,
+                inputPath: inputPath,
+                outputPath: outputPath,
+                recipientPublicCert: recipientPublicCert,
+                keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+                keyAgreementProvider: keyAgreementProvider,
+                verificationKeys: verificationContext.verificationKeys,
+                progress: progressBridge
+            )
+            return PGPMessageResultMapper.fileDecryptDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalP256KeyAgreement(error)
+        }
+    }
+
     func encryptWithPassword(
         plaintext: Data,
         password: String,
@@ -565,6 +595,28 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
             inputPath: inputPath,
             outputPath: outputPath,
             secretKeys: secretKeys,
+            verificationKeys: verificationKeys,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performDecryptFileWithExternalP256KeyAgreement(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        keyAgreementProvider: ExternalP256KeyAgreementProvider,
+        verificationKeys: [Data],
+        progress: ProgressReporter?
+    ) async throws -> FileDecryptDetailedResult {
+        try engine.decryptFileDetailedWithExternalP256KeyAgreement(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            recipientPublicCert: recipientPublicCert,
+            keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+            keyAgreementProvider: keyAgreementProvider,
             verificationKeys: verificationKeys,
             progress: progress
         )

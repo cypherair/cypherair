@@ -263,11 +263,17 @@ enum TestHelpers {
             keyManagement: keyMgmt,
             messageAdapter: messageAdapter
         )
+        let fileDecryptor = makeFileDecryptor(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
         let decryptionSvc = DecryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             contactService: contactSvc,
-            messageDecryptor: messageDecryptor
+            messageDecryptor: messageDecryptor,
+            fileDecryptor: fileDecryptor
         )
         let passwordMessageSvc = PasswordMessageService(
             messageAdapter: messageAdapter,
@@ -389,6 +395,28 @@ enum TestHelpers {
         keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: keyAgreement
+        )
+    }
+
+    static func makeFileDecryptor(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
+    ) -> PrivateKeyStreamingFileDecryptionService {
+        PrivateKeyStreamingFileDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: resolver,
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

@@ -443,7 +443,11 @@ Recommended PR grouping:
   consumed by `DecryptionService`, while the Phase 1/Phase 2 boundary, matched-key
   guard, and verification-context construction stay in the service.
 - PR 6C: streaming file decrypt integration with success-only output, progress,
-  cancellation, cleanup, and tamper coverage.
+  cancellation, cleanup, and tamper coverage. **Implemented:** streaming
+  recipient-key file decrypt (`DecryptionService.decryptFileStreamingDetailed`)
+  now routes through a router-owned `PrivateKeyStreamingFileDecryptionService`,
+  while the Phase 1/Phase 2 boundary, matched-key guard, verification-context
+  construction, and temporary-artifact ownership stay in the service.
 - PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
   artifacts, no partial plaintext, docs, and tests.
 
@@ -469,6 +473,26 @@ session-key, callback, and tamper paths fail closed with sanitized categories an
 no software fallback. Streaming file decrypt (PR 6C), UI, product copy, and
 production Secure Enclave custody availability remain deferred; production policy
 still blocks Secure Enclave custody.
+
+PR 6C is implemented as the second plaintext-workflow slice, for streaming file
+decrypt only. `DecryptionService.decryptFileStreamingDetailed` keeps Phase 1 file
+recipient parsing unauthenticated, keeps the matched-key guard before any
+private-key access, keeps building the verification context, and keeps ownership
+of the temporary output artifact, success-only file protection, and
+cleanup-on-error; it then delegates custody dispatch to the router-owned
+`PrivateKeyStreamingFileDecryptionService`. Software custody keeps the existing
+unwrap-and-zeroize secret-certificate streaming decrypt; Secure Enclave custody
+loads only the `.keyAgreement` handle and calls a new external P-256
+key-agreement streaming file decrypt API (a generic streaming helper shared with
+the software path). Rust/Sequoia continue to own ECDH KDF, AES Key Wrap unwrap,
+session-key validation, payload authentication, verification folding, and the
+success-only `.tmp`-then-rename output contract, so v4 SEIPDv1/MDC and v6
+SEIPDv2/AEAD tampering still fail closed with no partial plaintext, and streaming
+progress, cancellation, and temporary-artifact cleanup are preserved. Recipient
+mismatch, wrong-binding, session-key, callback, and tamper paths fail closed with
+sanitized categories and no software fallback. UI, product copy, and production
+Secure Enclave custody availability remain deferred; production policy still
+blocks Secure Enclave custody.
 
 Entry conditions:
 

@@ -328,6 +328,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyMessageDecryptionService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeySelectiveRevocationService.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift

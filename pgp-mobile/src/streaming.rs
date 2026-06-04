@@ -457,14 +457,8 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
         verifier_certs.push(cert);
     }
 
-    // Open input file with progress reporting
-    let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
-        reason: format!("Cannot open input file '{}': {e}", input_path),
-    })?;
-    let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
-    let progress_reader = ProgressReader::new(input_file, total_bytes, progress);
-
-    // Construct the decryption helper
+    // Construct the software recipient-key decryption helper and stream to a
+    // success-only output file through the shared streaming machinery.
     let helper = DecryptHelper {
         policy: &policy,
         secret_certs: &certs,
@@ -474,12 +468,58 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
         ),
     };
 
-    // Build decryptor from file reader
+    let helper = decrypt_file_with_helper(input_path, output_path, &policy, helper, progress)?;
+
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
+
+    Ok(FileDecryptDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
+        signatures,
+    })
+}
+
+/// Stream-decrypt a file through any `DecryptionHelper`/`VerificationHelper` while
+/// preserving the success-only output contract.
+///
+/// This is the streaming analog of `decrypt::decrypt_with_helper`: the software
+/// recipient-key helper (`DecryptHelper`) and the external P-256 key-agreement helper
+/// (`external_decryptor::ExternalDecryptHelper`) both share this temp-file machinery.
+///
+/// SECURITY: Decrypted bytes are written to a randomly-suffixed `.tmp` file and the
+/// final output is produced by `fs::rename` ONLY after a full successful decrypt and
+/// payload authentication. Any error (AEAD failure, MDC failure, cancellation, I/O
+/// error, or an external key-agreement callback failure during session-key
+/// acquisition) securely deletes the temp file before returning. No partial plaintext
+/// is ever released to the final output path.
+pub(crate) fn decrypt_file_with_helper<'a, H>(
+    input_path: &str,
+    output_path: &str,
+    policy: &'a StandardPolicy<'a>,
+    helper: H,
+    progress: Option<Arc<dyn ProgressReporter>>,
+) -> Result<H, PgpError>
+where
+    H: VerificationHelper + DecryptionHelper,
+{
+    // Open input file with progress reporting
+    let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
+        reason: format!("Cannot open input file '{}': {e}", input_path),
+    })?;
+    let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
+    let progress_reader = ProgressReader::new(input_file, total_bytes, progress);
+
+    // Build decryptor from file reader. Session-key acquisition (software KeyPair or
+    // external P-256 key agreement) runs in the helper's `decrypt` callback here, so
+    // classify any acquisition failure (including external callback failures).
     let mut decryptor = DecryptorBuilder::from_reader(progress_reader)
         .map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse message: {e}"),
         })?
-        .with_policy(&policy, None, helper)
+        .with_policy(policy, None, helper)
         .map_err(|e| classify_decrypt_error(e))?;
 
     // Write to temp file first (AEAD hard-fail: no partial plaintext).
@@ -527,7 +567,7 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
     })?;
     drop(temp_file);
 
-    // Extract signature verification results
+    // Extract the helper (carrying signature verification results) before rename.
     let helper = decryptor.into_helper();
 
     // Rename temp → final output (atomic on same filesystem)
@@ -538,16 +578,7 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
         }
     })?;
 
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
-
-    Ok(FileDecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
-        summary_state,
-        summary_entry_index,
-        signatures,
-    })
+    Ok(helper)
 }
 
 /// Create a detached signature for a file using streaming I/O.
