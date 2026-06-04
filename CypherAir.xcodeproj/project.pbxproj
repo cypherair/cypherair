@@ -388,6 +388,7 @@
 				Services/KeyManagement/PrivateKeyContactCertificationService.swift,
 				Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift,
 				Services/KeyManagement/PrivateKeyExpiryMutationService.swift,
+				Services/KeyManagement/PrivateKeyMessageDecryptionService.swift,
 				Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift,
 				Services/KeyManagement/PrivateKeySelectiveRevocationService.swift,
 				Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift,

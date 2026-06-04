@@ -258,10 +258,16 @@ enum TestHelpers {
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor
         )
+        let messageDecryptor = makeMessageDecryptor(
+            engine: engine,
+            keyManagement: keyMgmt,
+            messageAdapter: messageAdapter
+        )
         let decryptionSvc = DecryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
-            contactService: contactSvc
+            contactService: contactSvc,
+            messageDecryptor: messageDecryptor
         )
         let passwordMessageSvc = PasswordMessageService(
             messageAdapter: messageAdapter,
@@ -369,6 +375,28 @@ enum TestHelpers {
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
             digestSigner: digestSigner
+        )
+    }
+
+    static func makeMessageDecryptor(
+        engine: PgpEngine,
+        keyManagement: KeyManagementService,
+        messageAdapter: PGPMessageOperationAdapter,
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
+        handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: MockSecureEnclaveCustodyKeyStore()
+        ),
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
+    ) -> PrivateKeyMessageDecryptionService {
+        PrivateKeyMessageDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: resolver,
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: handleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: keyAgreement
         )
     }
 

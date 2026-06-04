@@ -330,6 +330,12 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
+        let messageDecryptor = makePrivateKeyMessageDecryptionService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
+        )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
@@ -343,6 +349,7 @@ final class AppContainer: @unchecked Sendable {
                 messageAdapter: messageAdapter,
                 keyManagement: keyManagement,
                 contactService: contactService,
+                messageDecryptor: messageDecryptor,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             passwordMessageService: PasswordMessageService(
@@ -423,6 +430,23 @@ final class AppContainer: @unchecked Sendable {
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
             digestSigner: secureEnclaveDigestSigner
+        )
+    }
+
+    private static func makePrivateKeyMessageDecryptionService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore
+    ) -> PrivateKeyMessageDecryptionService {
+        PrivateKeyMessageDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
         )
     }
 

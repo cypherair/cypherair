@@ -118,6 +118,31 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         }
     }
 
+    func test_phase6MessageDecryptionHelperRoutesThroughKeyAgreementOperation() throws {
+        let path = "Sources/Services/KeyManagement/PrivateKeyMessageDecryptionService.swift"
+        let contents = try RepositoryAuditLoader.loadString(relativePath: path)
+        XCTAssertTrue(
+            contents.contains("router.route("),
+            "\(path) must dispatch through PrivateKeyOperationRouter."
+        )
+        XCTAssertTrue(
+            contents.contains("PrivateKeyOperationRequest("),
+            "\(path) must build an app-owned private-operation request."
+        )
+        XCTAssertTrue(
+            contents.contains("operation: .decrypt"),
+            "\(path) must route through .decrypt."
+        )
+        XCTAssertTrue(
+            contents.contains("PGPExternalP256KeyAgreementProviderBridge("),
+            "\(path) must keep external P-256 key agreement behind the shared bridge."
+        )
+        XCTAssertFalse(
+            contents.contains("WithExternalP256Signer"),
+            "\(path) must not invoke the external P-256 signer runtime."
+        )
+    }
+
     func test_secureEnclaveUnsupportedAndGatedOperationsRemainExplicit() throws {
         let resolver = try RepositoryAuditLoader.loadString(
             relativePath: "Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift"
@@ -1226,7 +1251,7 @@ private enum ArchitectureSourceAuditRules {
 
     static let phase6ExternalKeyAgreementRuntimeContainment = ArchitectureSourceAuditRule(
         name: "Phase 6 external key-agreement runtime containment",
-        failureSummary: "External P-256 key-agreement runtime calls should stay inside FFI, Security, and router-owned foundation boundaries.",
+        failureSummary: "External P-256 key-agreement runtime calls should stay inside FFI, Security, and router-owned helper boundaries.",
         pattern: phase6ExternalKeyAgreementRuntimePattern,
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1244,9 +1269,15 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
-                "Security bridge owns Apple P-256 ECDH callback request handling without integrating workflow plaintext decrypt.",
+                "Security bridge owns Apple P-256 ECDH callback request handling.",
                 [
                     "Sources/Security/SecureEnclaveCustodyKeyAgreement.swift",
+                ]
+            ),
+            (
+                "Router-owned Phase 6 decrypt helper is the only service boundary allowed to consume the external P-256 key-agreement route.",
+                [
+                    "Sources/Services/KeyManagement/PrivateKeyMessageDecryptionService.swift",
                 ]
             ),
         ])

@@ -168,10 +168,20 @@ final class TutorialSandboxContainer {
             fileEncryptor: fileEncryptor,
             temporaryArtifactStore: temporaryArtifactStore
         )
+        let messageDecryptor = PrivateKeyMessageDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+        )
         self.decryptionService = DecryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
+            messageDecryptor: messageDecryptor,
             temporaryArtifactStore: temporaryArtifactStore
         )
         let cleartextSigner = PrivateKeyCleartextSigningService(
