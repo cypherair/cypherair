@@ -3,6 +3,19 @@
 > Purpose: Swift coding standards, SwiftUI patterns, and project-wide conventions for CypherAir.
 > Audience: Human developers and AI coding tools.
 
+## 0. Engineering Principle
+
+When building a feature or fixing an issue, prefer the solution that is architecturally correct
+for long-term software governance over the smallest patch against the current code. If the
+existing structure pushes toward awkward or fragile fixes, a larger refactor — or a substantial
+rewrite of the affected area — is acceptable and encouraged when it produces a cleaner, more
+maintainable design.
+
+This governs the *depth* of a change, not its *scope*. It is not license to expand into unrelated
+cleanup: keep the work focused on delivering the requested task (see the scoping rules in
+`CLAUDE.md` and `AGENTS.md`), and let the intended architecture — not a smaller diff — determine
+the shape of the change.
+
 ## 1. Swift Style
 
 ### Naming

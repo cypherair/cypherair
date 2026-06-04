@@ -145,7 +145,8 @@ Standard Mode (default) and High Security Mode, selectable in Settings; switchin
 ## Workflow Reminders
 
 - Read and understand relevant source files before proposing edits.
-- Do not add features, refactor, or "improve" beyond what was asked.
+- Do not add unrequested features or expand into unrelated changes. Within the requested scope, prefer the architecturally-correct solution over a minimal patch (next bullet).
+- **Architecturally-correct over the smallest patch.** When the existing structure forces awkward or fragile fixes, a larger refactor — or a substantial rewrite of the affected area — is acceptable and encouraged when it yields a cleaner, more maintainable design. This sets the *depth* of the change, not its *scope*; keep it focused on the requested task and balance it against small, reviewable diffs. See docs/CONVENTIONS.md "Engineering Principle".
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.

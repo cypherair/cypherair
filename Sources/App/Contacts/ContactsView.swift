@@ -104,8 +104,8 @@ private extension ContactsScreenHostView {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(model.tagFilters) { tag in
-                                TagFilterChipButton(
-                                    tag: tag,
+                                CypherTagChip(
+                                    title: tag.displayName,
                                     isSelected: model.isTagFilterSelected(tag.tagId),
                                     toggle: {
                                         withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
@@ -285,29 +285,5 @@ private struct ContactRowView: View {
             }
         }
         .accessibilityIdentifier("contacts.row")
-    }
-}
-
-private struct TagFilterChipButton: View {
-    let tag: ContactTagSummary
-    let isSelected: Bool
-    let toggle: () -> Void
-
-    var body: some View {
-        if isSelected {
-            Button(action: toggle) {
-                Label(tag.displayName, systemImage: "checkmark.circle.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .accessibilityLabel(tag.displayName)
-        } else {
-            Button(action: toggle) {
-                Label(tag.displayName, systemImage: "tag")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .accessibilityLabel(tag.displayName)
-        }
     }
 }

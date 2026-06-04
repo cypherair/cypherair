@@ -817,22 +817,6 @@
         }
       }
     },
-    "common.dismiss" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dismiss"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭"
-          }
-        }
-      }
-    },
     "common.done" : {
       "localizations" : {
         "en" : {
@@ -4097,22 +4081,6 @@
         }
       }
     },
-    "encrypt.addByTag" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add from Tag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从标签添加"
-          }
-        }
-      }
-    },
     "encrypt.button" : {
       "localizations" : {
         "en" : {
@@ -4321,6 +4289,70 @@
         }
       }
     },
+    "encrypt.recipients.addAllShown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add All Shown (%d)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加显示的全部（%d）"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.addHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds this recipient"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加此收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.allAdded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All recipients added"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加全部收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.clearTagFilters" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
+    },
     "encrypt.recipients.noMatches" : {
       "localizations" : {
         "en" : {
@@ -4333,6 +4365,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有匹配收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.noneAvailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recipients available yet. Add a contact's public key to encrypt to them."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无可用收件人。请先添加联系人的公钥以便向其加密。"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.remove" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@"
           }
         }
       }
@@ -4388,15 +4452,33 @@
     "encrypt.selectedRecipients.count" : {
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d recipients selected"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld recipient selected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld recipients selected"
+                }
+              }
+            }
           }
         },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选择 %d 个收件人"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已选择 %lld 个收件人"
+                }
+              }
+            }
           }
         }
       }
@@ -4429,134 +4511,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名密钥"
-          }
-        }
-      }
-    },
-    "encrypt.tagPicker.add" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加"
-          }
-        }
-      }
-    },
-    "encrypt.tagPicker.added" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Added"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已添加"
-          }
-        }
-      }
-    },
-    "encrypt.tagPicker.addMissing" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Missing"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加缺少项"
-          }
-        }
-      }
-    },
-    "encrypt.tagPicker.availableTags" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d tags"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d 个标签"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.skipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已从 %1$@ 添加可用收件人。已跳过 %2$d 个需要首选加密密钥的联系人。"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitle" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d available"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d 个可用"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitleSelected" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d of %2$d selected"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选 %1$d / %2$d"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.subtitleWithSkipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d available, %2$d skipped"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$d 个可用，%2$d 个跳过"
           }
         }
       }
@@ -7649,6 +7603,54 @@
         }
       }
     },
+    "home.defaultKey.backedUp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backUpNow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back up now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens key details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开密钥详情"
+          }
+        }
+      }
+    },
     "home.encrypt" : {
       "localizations" : {
         "en" : {
@@ -7953,6 +7955,22 @@
         }
       }
     },
+    "import.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Public Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入公钥"
+          }
+        }
+      }
+    },
     "import.conflict.ambiguousStrong" : {
       "localizations" : {
         "en" : {
@@ -8045,22 +8063,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此密钥匹配一个现有 User ID，但指纹不同。它可能是真实的密钥替换，也可能是冒充尝试。"
-          }
-        }
-      }
-    },
-    "import.confirm.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Import Public Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导入公钥"
           }
         }
       }

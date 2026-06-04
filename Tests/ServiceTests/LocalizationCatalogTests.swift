@@ -82,16 +82,47 @@ final class LocalizationCatalogTests: XCTestCase {
                 XCTFail("Missing \(locale) localization for \(key)")
                 continue
             }
-            guard let stringUnit = localization.stringUnit else {
-                XCTFail("Missing string unit for \(key) (\(locale))")
-                continue
-            }
+            assertLocalizationTranslated(localization, key: key, locale: locale)
+        }
+    }
+
+    /// A locale is fully translated when it carries a top-level translated string unit,
+    /// or — for pluralized entries — plural variations whose categories (including the
+    /// required `other`) are each translated.
+    private func assertLocalizationTranslated(
+        _ localization: StringCatalogLocalization,
+        key: String,
+        locale: String
+    ) {
+        if let stringUnit = localization.stringUnit {
             XCTAssertEqual(
                 stringUnit.state,
                 "translated",
                 "\(key) (\(locale)) should be translated"
             )
+            return
         }
+
+        if let plural = localization.variations?.plural, !plural.isEmpty {
+            XCTAssertNotNil(
+                plural["other"],
+                "\(key) (\(locale)) plural variations must include the 'other' category"
+            )
+            for (category, variation) in plural.sorted(by: { $0.key < $1.key }) {
+                guard let stringUnit = variation.stringUnit else {
+                    XCTFail("Missing string unit for \(key) (\(locale)) plural category \(category)")
+                    continue
+                }
+                XCTAssertEqual(
+                    stringUnit.state,
+                    "translated",
+                    "\(key) (\(locale)) plural category \(category) should be translated"
+                )
+            }
+            return
+        }
+
+        XCTFail("Missing string unit for \(key) (\(locale))")
     }
 
     private func loadCatalog(at relativePath: String) throws -> StringCatalog {
@@ -205,6 +236,15 @@ private struct StringCatalogEntry: Decodable {
 }
 
 private struct StringCatalogLocalization: Decodable {
+    let stringUnit: StringCatalogStringUnit?
+    let variations: StringCatalogVariations?
+}
+
+private struct StringCatalogVariations: Decodable {
+    let plural: [String: StringCatalogPluralVariation]?
+}
+
+private struct StringCatalogPluralVariation: Decodable {
     let stringUnit: StringCatalogStringUnit?
 }
 

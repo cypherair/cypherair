@@ -86,34 +86,50 @@ struct HomeView: View {
     private var defaultKeyInfo: some View {
         Group {
             if let defaultKey = keyManagement.defaultKey {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "key.fill")
-                            .foregroundStyle(.tint)
-                            .accessibilityHidden(true)
-                        if let userId = defaultKey.userId {
-                            Text(userId)
-                                .font(.headline)
-                        } else {
-                            Text(defaultKey.shortKeyId)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(defaultKey.profile.displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                NavigationLink(value: AppRoute.keyDetail(fingerprint: defaultKey.fingerprint)) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "key.fill")
+                                    .foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
+                                if let userId = defaultKey.userId {
+                                    Text(userId)
+                                        .font(.headline)
+                                } else {
+                                    Text(defaultKey.shortKeyId)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(defaultKey.profile.displayName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
 
-                    FingerprintView(
-                        fingerprint: defaultKey.fingerprint,
-                        font: .caption.monospaced(),
-                        foregroundColor: .secondary,
-                        expandsHorizontally: false
-                    )
+                            FingerprintView(
+                                fingerprint: defaultKey.fingerprint,
+                                font: .caption.monospaced(),
+                                foregroundColor: .secondary,
+                                expandsHorizontally: false
+                            )
+
+                            KeyBackupStatusBadge(isBackedUp: defaultKey.isBackedUp, style: .badge)
+                        }
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .padding()
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: defaultKeyCornerRadius, style: .continuous))
                 }
-                .padding()
-                .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: defaultKeyCornerRadius, style: .continuous))
+                .buttonStyle(.plain)
+                .cypherPressFeedback()
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(Text(String(localized: "home.defaultKey.hint", defaultValue: "Opens key details")))
+                .accessibilityIdentifier("home.defaultKey")
             }
         }
     }

@@ -18,6 +18,7 @@ $(SRCROOT)/Sources/App/Common/CypherMotion.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationButtonLabel.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationCancelSection.swift
 $(SRCROOT)/Sources/App/Common/CypherPressFeedbackModifier.swift
+$(SRCROOT)/Sources/App/Common/CypherTagChip.swift
 $(SRCROOT)/Sources/App/Common/CypherTextInputs.swift
 $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
@@ -25,6 +26,7 @@ $(SRCROOT)/Sources/App/Common/FileImportRequestGate.swift
 $(SRCROOT)/Sources/App/Common/FileOperationAction.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift
 $(SRCROOT)/Sources/App/Common/IdentityDisplayPresentation.swift
+$(SRCROOT)/Sources/App/Common/KeyBackupStatusBadge.swift
 $(SRCROOT)/Sources/App/Common/MacPresentationPolish.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift
@@ -71,7 +73,7 @@ $(SRCROOT)/Sources/App/Decrypt/DecryptView.swift
 $(SRCROOT)/Sources/App/Decrypt/Support/ArmoredTextMessageClassifier.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptInputSections.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptOptionsSection.swift
-$(SRCROOT)/Sources/App/Encrypt/EncryptRecipientTagPickerSheet.swift
+$(SRCROOT)/Sources/App/Encrypt/EncryptRecipientChooser.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptRecipientsSection.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptResultSections.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptScreenFormView.swift

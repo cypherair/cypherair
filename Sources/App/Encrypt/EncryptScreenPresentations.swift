@@ -2,22 +2,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension View {
-    func encryptScreenPresentations(
-        model: EncryptScreenModel,
-        isRecipientTagPickerPresented: Binding<Bool>
-    ) -> some View {
-        modifier(
-            EncryptScreenPresentations(
-                model: model,
-                isRecipientTagPickerPresented: isRecipientTagPickerPresented
-            )
-        )
+    func encryptScreenPresentations(model: EncryptScreenModel) -> some View {
+        modifier(EncryptScreenPresentations(model: model))
     }
 }
 
 private struct EncryptScreenPresentations: ViewModifier {
     let model: EncryptScreenModel
-    @Binding var isRecipientTagPickerPresented: Bool
 
     func body(content: Content) -> some View {
         @Bindable var model = model
@@ -89,9 +80,6 @@ private struct EncryptScreenPresentations: ViewModifier {
                 Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
             } message: {
                 Text(model.unverifiedRecipientsWarningMessage)
-            }
-            .sheet(isPresented: $isRecipientTagPickerPresented) {
-                RecipientTagPickerSheet(model: model)
             }
     }
 }
