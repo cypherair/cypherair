@@ -14,7 +14,6 @@ $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactStore.swift
 $(SRCROOT)/Sources/App/Common/ColorTheme+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherAirError+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
-$(SRCROOT)/Sources/App/Common/CypherChipFlowLayout.swift
 $(SRCROOT)/Sources/App/Common/CypherMotion.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationButtonLabel.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationCancelSection.swift

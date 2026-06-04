@@ -85,6 +85,13 @@ final class MacUISmokeTests: XCTestCase {
         element("sidebar.encrypt").tap()
 
         waitForScreenReady("encrypt.ready")
+
+        // The recipient chooser shows available recipients by default — the
+        // preloaded contact appears as an addable candidate without searching.
+        XCTAssertTrue(
+            element("encrypt.recipient.candidate").waitForExistence(timeout: 10),
+            "Expected the preloaded contact to appear as an addable recipient by default."
+        )
     }
 
     func test_settingsRoot_opensThemePicker() throws {

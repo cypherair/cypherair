@@ -4305,18 +4305,66 @@
         }
       }
     },
-    "encrypt.recipients.addAllInTag" : {
+    "encrypt.recipients.addAllShown" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add All (%d)"
+            "value" : "Add All Shown (%d)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "全部添加（%d）"
+            "value" : "添加显示的全部（%d）"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.addHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds this recipient"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加此收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.allAdded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All recipients added"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加全部收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.clearTagFilters" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
           }
         }
       }
@@ -4337,18 +4385,18 @@
         }
       }
     },
-    "encrypt.recipients.none" : {
+    "encrypt.recipients.noneAvailable" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No recipients yet"
+            "value" : "No recipients available yet. Add a contact's public key to encrypt to them."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "尚未选择收件人"
+            "value" : "暂无可用收件人。请先添加联系人的公钥以便向其加密。"
           }
         }
       }
@@ -4369,22 +4417,6 @@
         }
       }
     },
-    "encrypt.recipients.someUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some selected recipients are no longer available. Clear All to remove them."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分所选收件人已不可用。点按“全部清空”将其移除。"
-          }
-        }
-      }
-    },
     "encrypt.recipients.staleSelection" : {
       "localizations" : {
         "en" : {
@@ -4397,22 +4429,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收件人选择已变化。请检查收件人后再重试。"
-          }
-        }
-      }
-    },
-    "encrypt.recipients.tagAllSkipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contacts with this tag need a preferred encryption key before they can receive messages."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此标签下的联系人需要先设置首选加密密钥才能接收消息。"
           }
         }
       }
@@ -4452,15 +4468,33 @@
     "encrypt.selectedRecipients.count" : {
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%d recipients selected"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld recipient selected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld recipients selected"
+                }
+              }
+            }
           }
         },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选择 %d 个收件人"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已选择 %lld 个收件人"
+                }
+              }
+            }
           }
         }
       }
@@ -4493,22 +4527,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "签名密钥"
-          }
-        }
-      }
-    },
-    "encrypt.tagSelection.skipped" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已从 %1$@ 添加可用收件人。已跳过 %2$d 个需要首选加密密钥的联系人。"
           }
         }
       }

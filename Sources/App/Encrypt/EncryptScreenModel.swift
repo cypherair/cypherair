@@ -8,16 +8,6 @@ private struct InitialRecipientSelectionSignature: Equatable {
     }
 }
 
-struct RecipientTagSelectionOption: Identifiable, Hashable, Sendable {
-    var id: String { tagId }
-
-    let tagId: String
-    let displayName: String
-    let contactCount: Int
-    let selectableContactIds: [String]
-    let skippedContactCount: Int
-}
-
 struct EncryptFileRequest {
     let fileURL: URL
     let recipientContactIds: [String]
@@ -66,7 +56,7 @@ final class EncryptScreenModel {
     var plaintext = ""
     var recipientSearchText = ""
     var selectedRecipients: Set<String> = []
-    var activeRecipientFilterTagId: String?
+    private var rawSelectedRecipientTagFilterIds: Set<String> = []
     var signMessage = true
     var signerFingerprint: String?
     var ciphertext: Data?
@@ -84,8 +74,6 @@ final class EncryptScreenModel {
         }
     }
     var showUnverifiedRecipientsWarning = false
-    var tagSelectionSkippedContactCount = 0
-    var tagSelectionSkippedTagName: String?
     var textInputSectionEpoch = 0
 
     init(
@@ -160,49 +148,60 @@ final class EncryptScreenModel {
         }
     }
 
-    var encryptableContacts: [ContactRecipientSummary] {
-        contactService.recipientContacts(matching: recipientSearchText)
-    }
-
-    /// Candidate recipients for the chooser's reveal-on-focus list, filtered by
-    /// the active search text and (optionally) the active tag filter. Kept
-    /// distinct from `encryptableContacts`, which intentionally ignores the tag
-    /// filter so existing callers and tests are unaffected.
+    /// Candidate recipients matching the active search text and the selected tag
+    /// filters (any-of). This is the list the chooser shows; tags + search refine
+    /// it but never gate whether recipients appear at all.
     var filteredRecipientContacts: [ContactRecipientSummary] {
-        let tagFilterIds: Set<String> = activeRecipientFilterTagId.map { [$0] } ?? []
-        return contactService.recipientContacts(matching: recipientSearchText, tagFilterIds: tagFilterIds)
+        contactService.recipientContacts(
+            matching: recipientSearchText,
+            tagFilterIds: selectedRecipientTagFilterIds
+        )
     }
 
-    /// The currently selected recipients resolved to summaries, in presentation
-    /// order, dropping any ids that are no longer available.
+    /// Filtered candidates that are not already selected — the rows the user can add.
+    var addableRecipientContacts: [ContactRecipientSummary] {
+        filteredRecipientContacts.filter { !selectedRecipients.contains($0.contactId) }
+    }
+
+    /// The current selection resolved to summaries, in presentation order, dropping
+    /// ids that no longer resolve to an available recipient. Single source of truth
+    /// for the "Selected" group; kept consistent with `effectiveRecipientContactIds`.
     var selectedRecipientSummaries: [ContactRecipientSummary] {
+        guard contactsAvailability.isAvailable else {
+            return []
+        }
         let summariesByContactId = Dictionary(
-            uniqueKeysWithValues: contactService.recipientContacts(matching: "").map { ($0.contactId, $0) }
+            uniqueKeysWithValues: contactService.availableRecipientContacts.map { ($0.contactId, $0) }
         )
         return effectiveRecipientContactIds.compactMap { summariesByContactId[$0] }
     }
 
-    /// True when there is a non-empty recipient selection but at least one selected
-    /// id no longer resolves to an available recipient (e.g. the contact was deleted
-    /// while the Encrypt view stayed alive). The chooser surfaces this so Clear All
-    /// stays reachable instead of falling through to an empty "No recipients yet".
-    var hasUnavailableSelectedRecipients: Bool {
-        selectedRecipientSummaries.count < selectedRecipients.count
-    }
-
-    /// True when the active recipient tag filter resolves to a tag whose contacts are
-    /// all skipped because none has a preferred encryption key, so the candidate list
-    /// is empty for a reason worth explaining rather than a generic "no matches".
-    var activeRecipientFilterTagIsSkippedOnly: Bool {
-        guard let activeId = activeRecipientFilterTagId,
-              let option = recipientTagOptions.first(where: { $0.tagId == activeId }) else {
+    /// True when any recipient is available to choose from — used to tell
+    /// "no contacts yet" apart from "no matches for the current filter".
+    var hasAvailableRecipients: Bool {
+        guard contactsAvailability.isAvailable else {
             return false
         }
-        return option.selectableContactIds.isEmpty && option.skippedContactCount > 0
+        return !contactService.availableRecipientContacts.isEmpty
     }
 
+    /// True when a search query or any tag filter is currently narrowing the list.
+    var hasActiveRecipientSearchOrFilter: Bool {
+        !ContactsSearchIndex.normalizedSearchText(recipientSearchText).isEmpty ||
+            !selectedRecipientTagFilterIds.isEmpty
+    }
+
+    /// The selected recipient ids resolved against live contacts: stale ids (whose
+    /// contact was deleted) are dropped while contacts are available, so display,
+    /// count, the unverified check, and `encryptButtonDisabled` all reflect reality.
+    /// While contacts are locked the raw selection is preserved — it cannot be
+    /// resolved yet and must survive a transient lock.
     var effectiveRecipientContactIds: [String] {
-        dedupedContactIds(Array(selectedRecipients))
+        guard contactsAvailability.isAvailable else {
+            return dedupedContactIds(Array(selectedRecipients))
+        }
+        let availableIds = Set(contactService.availableRecipientContacts.map(\.contactId))
+        return dedupedContactIds(Array(selectedRecipients.intersection(availableIds)))
     }
 
     var contactsAvailability: ContactsAvailability {
@@ -221,26 +220,30 @@ final class EncryptScreenModel {
         unverifiedContacts(for: effectiveRecipientContactIds)
     }
 
-    var recipientTagOptions: [RecipientTagSelectionOption] {
+    /// Tags available as quick filters for the candidate list (mirrors the Contacts
+    /// screen's tag strip).
+    var recipientTagFilters: [ContactTagSummary] {
         guard contactsAvailability.isAvailable else {
             return []
         }
-        let recipientContactIdsByTagId = contactService.recipientContacts(matching: "")
-            .reduce(into: [String: [String]]()) { partialResult, contact in
-                for tagId in contact.tagIds {
-                    partialResult[tagId, default: []].append(contact.contactId)
-                }
-            }
-        return contactService.contactTagSummaries().map { tag in
-            let selectableContactIds = dedupedContactIds(recipientContactIdsByTagId[tag.tagId] ?? [])
-            return RecipientTagSelectionOption(
-                tagId: tag.tagId,
-                displayName: tag.displayName,
-                contactCount: tag.contactCount,
-                selectableContactIds: selectableContactIds,
-                skippedContactCount: max(tag.contactCount - selectableContactIds.count, 0)
-            )
+        return contactService.contactTagSummaries()
+    }
+
+    /// The active tag filters, pruned to tags that still exist so a deleted tag
+    /// silently leaves the filter instead of stranding the list on a dead filter.
+    var selectedRecipientTagFilterIds: Set<String> {
+        get {
+            ContactTagSummary.prunedTagFilterIds(rawSelectedRecipientTagFilterIds, availableTags: recipientTagFilters)
         }
+        set {
+            rawSelectedRecipientTagFilterIds = ContactTagSummary.prunedTagFilterIds(newValue, availableTags: recipientTagFilters)
+        }
+    }
+
+    /// The currently selected tag filters as summaries (for the "Clear" affordance).
+    var selectedRecipientTagFilters: [ContactTagSummary] {
+        let selectedIds = selectedRecipientTagFilterIds
+        return recipientTagFilters.filter { selectedIds.contains($0.tagId) }
     }
 
     var encryptButtonDisabled: Bool {
@@ -304,21 +307,6 @@ final class EncryptScreenModel {
         )
     }
 
-    var tagSelectionSkipMessage: String? {
-        guard tagSelectionSkippedContactCount > 0,
-              let tagSelectionSkippedTagName else {
-            return nil
-        }
-        return String.localizedStringWithFormat(
-            String(
-                localized: "encrypt.tagSelection.skipped",
-                defaultValue: "%1$@ added available recipients. %2$d contacts were skipped because they need a preferred encryption key."
-            ),
-            tagSelectionSkippedTagName,
-            tagSelectionSkippedContactCount
-        )
-    }
-
     func handleAppear() {
         applyPrefilledPlaintextIfNeeded(from: configuration)
         let initialRecipientSelectionSignature = InitialRecipientSelectionSignature(configuration: configuration)
@@ -367,36 +355,36 @@ final class EncryptScreenModel {
         }
     }
 
-    /// Sets (or clears, with `nil`) the tag that filters the candidate list.
-    /// This is a browse filter only — it does not change the selected recipients.
-    func setRecipientFilterTag(_ tagId: String?) {
-        activeRecipientFilterTagId = tagId
+    /// Toggles a tag in the multi-select filter (browse only — does not change the
+    /// selected recipients). Mirrors the Contacts screen's tag-filter behavior.
+    func toggleRecipientTagFilter(_ tagId: String) {
+        let availableTagIds = Set(recipientTagFilters.map(\.tagId))
+        var selectedIds = selectedRecipientTagFilterIds
+        if selectedIds.contains(tagId) {
+            selectedIds.remove(tagId)
+        } else if availableTagIds.contains(tagId) {
+            selectedIds.insert(tagId)
+        }
+        selectedRecipientTagFilterIds = selectedIds
     }
 
-    func selectRecipients(withTagId tagId: String) {
-        guard let option = recipientTagOptions.first(where: { $0.tagId == tagId }) else {
-            return
-        }
-        selectedRecipients.formUnion(option.selectableContactIds)
-        tagSelectionSkippedContactCount = option.skippedContactCount
-        tagSelectionSkippedTagName = option.displayName
+    func isRecipientTagFilterSelected(_ tagId: String) -> Bool {
+        selectedRecipientTagFilterIds.contains(tagId)
+    }
+
+    func clearRecipientTagFilters() {
+        rawSelectedRecipientTagFilterIds.removeAll()
+    }
+
+    /// Adds every currently-visible candidate (search ∩ tag-filtered, already
+    /// encryptable, not yet selected) to the selection. Scoped to what is shown so
+    /// it can never add a recipient hidden by the active filter.
+    func addAllVisibleRecipients() {
+        selectedRecipients.formUnion(addableRecipientContacts.map(\.contactId))
     }
 
     func clearRecipients() {
         selectedRecipients.removeAll()
-        tagSelectionSkippedContactCount = 0
-        tagSelectionSkippedTagName = nil
-    }
-
-    func dismissTagSelectionSkipMessage() {
-        tagSelectionSkippedContactCount = 0
-        tagSelectionSkippedTagName = nil
-    }
-
-    func selectedRecipientCount(for tagOption: RecipientTagSelectionOption) -> Int {
-        tagOption.selectableContactIds.reduce(0) { count, contactId in
-            count + (selectedRecipients.contains(contactId) ? 1 : 0)
-        }
     }
 
     func requestFileImport() {
@@ -694,14 +682,12 @@ final class EncryptScreenModel {
         plaintext = ""
         recipientSearchText = ""
         selectedRecipients.removeAll()
-        activeRecipientFilterTagId = nil
+        rawSelectedRecipientTagFilterIds.removeAll()
         ciphertext = nil
         selectedFileURL = nil
         selectedFileName = nil
         showFileImporter = false
         showUnverifiedRecipientsWarning = false
-        tagSelectionSkippedContactCount = 0
-        tagSelectionSkippedTagName = nil
         exportController.finish()
         textInputSectionEpoch &+= 1
     }

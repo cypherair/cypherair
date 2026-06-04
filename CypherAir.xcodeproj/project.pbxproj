@@ -72,7 +72,6 @@
 				App/Common/AuthLifecycleTraceEnvironment.swift,
 				"App/Common/ColorTheme+Presentation.swift",
 				"App/Common/CypherAirError+Presentation.swift",
-				App/Common/CypherChipFlowLayout.swift,
 				App/Common/CypherMotion.swift,
 				App/Common/CypherMultilineTextInput.swift,
 				App/Common/CypherOperationButtonLabel.swift,
