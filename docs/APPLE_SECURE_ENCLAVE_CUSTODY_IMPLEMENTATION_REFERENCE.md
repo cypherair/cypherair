@@ -461,6 +461,23 @@ routes map to sanitized unavailable categories, and there is no software fallbac
 for a Secure Enclave key-agreement route. Production policy still blocks Secure
 Enclave custody.
 
+Phase 6D closes the decrypt/key-agreement-class workflow integration phase with
+source-audit and documentation coverage only. It adds no Rust/UniFFI operation,
+Security handle semantics, UI, product copy, or production availability switch. A
+workflow source-audit asserts `DecryptionService` never calls the external P-256
+key-agreement runtime directly, completing the closed Phase 6 support matrix:
+in-memory message decrypt (6B) and streaming file decrypt (6C) for v4/v6 are the
+only external key-agreement decrypt consumers, both router-owned and without
+software fallback. New Rust and Swift tests cover mixed-recipient message and file
+decrypt (the key-agreement subkey selected past a non-matching recipient's PKESK),
+repeated decrypt operations that stay consistent and leave no residual `.tmp`
+scratch artifact, and no-partial-plaintext hard-fail on a tampered mixed-recipient
+payload; a guarded device test exercises a real Secure Enclave `.keyAgreement`
+P-256 handle end to end. Standalone `refreshBinding`, direct-key certification,
+key-level revocation-artifact generation, private export/backup, and product
+exposure remain outside Phase 6, and production policy still blocks Secure Enclave
+custody.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must

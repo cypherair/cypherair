@@ -449,7 +449,22 @@ Recommended PR grouping:
   while the Phase 1/Phase 2 boundary, matched-key guard, verification-context
   construction, and temporary-artifact ownership stay in the service.
 - PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
-  artifacts, no partial plaintext, docs, and tests.
+  artifacts, no partial plaintext, docs, and tests. **Implemented:** Phase 6D adds
+  cross-cutting decrypt-class closure coverage over the existing Phase 6A-6C routes
+  without a new Rust/UniFFI operation, Security handle semantics, UI, or production
+  availability switch. Rust and Swift tests cover mixed-recipient message/file
+  decrypt (the external key-agreement subkey selected past a non-matching
+  recipient's PKESK), repeated decrypt operations that stay consistent and leave no
+  residual scratch artifact, and no-partial-plaintext hard-fail on a tampered
+  mixed-recipient payload. A workflow source-audit closure asserts
+  `DecryptionService` never calls the external P-256 key-agreement runtime directly,
+  recording the closed Phase 6 support matrix: in-memory message decrypt (6B) and
+  streaming file decrypt (6C) for v4/v6 dispatch through the router-owned
+  key-agreement decrypt helpers with no software fallback. A guarded device test
+  exercises a real Secure Enclave `.keyAgreement` P-256 handle end to end on Secure
+  Enclave hardware (Apple Silicon Mac or SE-capable device). Production policy still
+  blocks Secure Enclave custody; UI, product copy, and production availability
+  remain deferred to Phase 7/9.
 
 PR 6A is implemented as a foundation slice: it adds the runtime external P-256
 ECDH callback, Swift key-agreement bridge, Security handle lookup, and hidden/test

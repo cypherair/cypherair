@@ -337,6 +337,23 @@ payload-authentication validation for fail-closed enforcement. The generated
 certificate path still performs full public-point validation before storing
 Secure Enclave-shaped public material.
 
+Phase 6C extends the same key-agreement route to streaming recipient-key file
+decrypt (`DecryptionService.decryptFileStreamingDetailed`) through a router-owned
+`PrivateKeyStreamingFileDecryptionService`, preserving the Phase 1/Phase 2
+boundary, temporary-artifact ownership, success-only `.tmp`-then-rename output, and
+no-partial-plaintext tamper behavior. Phase 6D then closes the
+decrypt/key-agreement-class phase with audit and documentation coverage only: a
+workflow source-audit asserts `DecryptionService` never calls the external P-256
+key-agreement runtime directly, recording the closed Phase 6 support matrix —
+in-memory message decrypt (6B) and streaming file decrypt (6C) for v4/v6 dispatch
+through the router-owned key-agreement decrypt helpers with no software fallback.
+Phase 6D adds mixed-recipient, repeated-operation, and no-partial-plaintext Rust
+and Swift tests plus a guarded device test that exercises a real Secure Enclave
+`.keyAgreement` P-256 handle on Secure Enclave hardware. Standalone binding
+refresh, direct-key certification, key-level revocation-artifact generation,
+private export/backup, and product exposure remain outside Phase 6; production
+policy still blocks Secure Enclave custody.
+
 Phase 3A/3B/3C add the first Security-layer store, cleanup/recovery seams, and
 guarded device evidence for that future custody model. The store uses permanent
 `SecKey` / `kSecClassKey` rows with `kSecAttrTokenIDSecureEnclave` to create two

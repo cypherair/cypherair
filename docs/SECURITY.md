@@ -440,6 +440,30 @@ not include fingerprints, handle tags, public binding bytes, Keychain locators,
 plaintext, private material, shared secrets, session keys, or temporary
 capability paths.
 
+**Secure Enclave Phase 6 closure audit note:** Phase 6D closes the
+decrypt/key-agreement-class workflow integration phase with cross-cutting test and
+documentation coverage only. It does not add a Rust/UniFFI operation, Security
+handle semantics, UI surface, product copy, or production availability switch. The
+closed Phase 6 support matrix routes in-memory recipient-key message decrypt (6B)
+and streaming recipient-key file decrypt (6C) for v4 and v6 through the
+router-owned `PrivateKeyMessageDecryptionService` and
+`PrivateKeyStreamingFileDecryptionService` key-agreement decrypt helpers, with no
+software fallback for a Secure Enclave key-agreement route. A workflow source-audit
+closure asserts `DecryptionService` never calls the external P-256 key-agreement
+runtime directly. New Rust and Swift tests cover mixed-recipient message and file
+decrypt (the external key-agreement subkey selected past a non-matching recipient's
+PKESK), repeated decrypt operations that stay consistent and leave no residual
+`.tmp` scratch artifact, and no-partial-plaintext hard-fail on a tampered
+mixed-recipient payload for v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD alike. A guarded
+device test exercises a real Secure Enclave `.keyAgreement` P-256 handle end to end
+on Secure Enclave hardware — available on Apple Silicon / T2 Macs and SE-capable
+iPhones/iPads, since the A19/A19 Pro requirement is for MIE, not Secure Enclave.
+Production policy still blocks Secure Enclave custody; UI, product copy, and
+production availability remain deferred to Phase 7/9. Failure mapping stays
+sanitized and must not include fingerprints, handle tags, public binding bytes,
+Keychain locators, plaintext, private material, shared secrets, session keys, or
+temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
