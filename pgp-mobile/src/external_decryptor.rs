@@ -15,7 +15,9 @@ use crate::keys::{
     ExternalP256KeyAgreementError, ExternalP256KeyAgreementProvider,
     ExternalP256KeyAgreementRequest,
 };
-use crate::signature_details::{DecryptDetailedResult, LegacyFoldMode, SignatureCollector};
+use crate::signature_details::{
+    DecryptDetailedResult, FileDecryptDetailedResult, LegacyFoldMode, SignatureCollector,
+};
 
 pub(crate) use core::{
     ExternalP256Decryptor, ExternalP256DecryptorError, ExternalP256SharedSecret,
@@ -149,6 +151,60 @@ pub(crate) fn decrypt_detailed_with_external_p256_key_agreement(
         summary_entry_index,
         signatures,
         plaintext,
+    })
+}
+
+/// Streaming-file analog of `decrypt_detailed_with_external_p256_key_agreement`.
+///
+/// Public-only recipient certificate validation, key-agreement subkey selection, and
+/// the `ExternalDecryptHelper` are identical to the in-memory path. Only the transport
+/// differs: streaming temp-file I/O with progress/cancellation is delegated to
+/// `streaming::decrypt_file_with_helper`, which enforces the success-only output
+/// contract. Sequoia still owns ECDH KDF, AES Key Wrap unwrap, session-key validation,
+/// payload authentication, verification folding, and plaintext release. There is no
+/// secret-certificate path and no software fallback.
+pub(crate) fn decrypt_file_detailed_with_external_p256_key_agreement(
+    input_path: &str,
+    output_path: &str,
+    recipient_public_cert_data: &[u8],
+    key_agreement_subkey_fingerprint: &str,
+    key_agreement_provider: Arc<dyn ExternalP256KeyAgreementProvider>,
+    verification_keys: &[Vec<u8>],
+    progress: Option<Arc<dyn crate::streaming::ProgressReporter>>,
+) -> Result<FileDecryptDetailedResult, PgpError> {
+    let recipient_cert = openpgp::Cert::from_bytes(recipient_public_cert_data).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: format!("Invalid recipient public certificate: {e}"),
+        }
+    })?;
+    if recipient_cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "External P-256 key agreement requires a public-only certificate".to_string(),
+        });
+    }
+
+    select_external_p256_key_agreement_key(&recipient_cert, key_agreement_subkey_fingerprint)?;
+
+    let verifier_certs = parse_verification_certs(verification_keys)?;
+    let policy = StandardPolicy::new();
+    let helper = ExternalDecryptHelper {
+        recipient_cert,
+        verifier_certs,
+        expected_key_agreement_fingerprint: key_agreement_subkey_fingerprint.to_string(),
+        key_agreement_provider,
+        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+    };
+    let helper =
+        crate::streaming::decrypt_file_with_helper(input_path, output_path, &policy, helper, progress)?;
+    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
+        helper.collector.into_parts();
+
+    Ok(FileDecryptDetailedResult {
+        legacy_status,
+        legacy_signer_fingerprint,
+        summary_state,
+        summary_entry_index,
+        signatures,
     })
 }
 

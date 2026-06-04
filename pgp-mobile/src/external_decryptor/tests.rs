@@ -1417,3 +1417,390 @@ fn test_external_decryptor_payload_authentication_hard_fails_after_session_key_a
             }
     }
 }
+
+// ── Streaming file decrypt (Phase 6C) ───────────────────────────────────
+
+/// RAII temporary directory for streaming-file decrypt tests.
+struct StreamingTempDir {
+    path: std::path::PathBuf,
+}
+
+impl StreamingTempDir {
+    fn new(tag: &str) -> Self {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let path = std::env::temp_dir().join(format!(
+            "cypherair-se-file-decrypt-{tag}-{}-{n}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&path).expect("temp dir should be creatable");
+        Self { path }
+    }
+
+    fn input_path(&self) -> std::path::PathBuf {
+        self.path.join("input.gpg")
+    }
+
+    fn output_path(&self) -> std::path::PathBuf {
+        self.path.join("decrypted.bin")
+    }
+
+    /// Count leftover `.tmp` scratch files in the directory (must be zero on any failure).
+    fn leftover_temp_files(&self) -> usize {
+        std::fs::read_dir(&self.path)
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "tmp"))
+                    .count()
+            })
+            .unwrap_or(0)
+    }
+}
+
+impl Drop for StreamingTempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+/// Progress reporter that cancels once `cancel_after` input bytes have been read.
+struct CancelAfterBytes {
+    cancel_after: u64,
+    calls: Arc<AtomicUsize>,
+}
+
+impl CancelAfterBytes {
+    fn new(cancel_after: u64) -> Self {
+        Self {
+            cancel_after,
+            calls: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+}
+
+impl crate::streaming::ProgressReporter for CancelAfterBytes {
+    fn on_progress(&self, bytes_processed: u64, _total_bytes: u64) -> bool {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        bytes_processed < self.cancel_after
+    }
+}
+
+fn write_input_file(dir: &StreamingTempDir, ciphertext: &[u8]) -> std::path::PathBuf {
+    let path = dir.input_path();
+    std::fs::write(&path, ciphertext).expect("input ciphertext should be writable");
+    path
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_decrypts_v4_and_v6_files() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime external file decrypt {}", version.label())
+            .repeat(64)
+            .into_bytes();
+        let ciphertext =
+            encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                .expect("encryption to public-only candidate should succeed");
+        let dir = StreamingTempDir::new(version.label());
+        let input = write_input_file(&dir, &ciphertext);
+        let output = dir.output_path();
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine
+            .decrypt_file_detailed_with_external_p256_key_agreement(
+                input.to_string_lossy().into_owned(),
+                output.to_string_lossy().into_owned(),
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider.clone(),
+                Vec::new(),
+                None,
+            )
+            .expect("runtime external key agreement should decrypt file");
+
+        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert!(provider.request_count() > 0);
+        let decrypted = std::fs::read(&output).expect("output file should exist on success");
+        assert_eq!(decrypted, plaintext);
+        assert_eq!(
+            dir.leftover_temp_files(),
+            0,
+            "no scratch temp file should remain after success"
+        );
+    }
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_preserves_signature_status() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let mut material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime signed file decrypt {}", version.label()).into_bytes();
+        let signer = signer_for(&material.signing_public_key, &mut material.signing_keypair)
+            .expect("external signer should initialize");
+        let ciphertext = encrypt_signed_binary(&plaintext, &material.public_cert, signer)
+            .expect("signed encryption should succeed");
+        let dir = StreamingTempDir::new(version.label());
+        let input = write_input_file(&dir, &ciphertext);
+        let output = dir.output_path();
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine
+            .decrypt_file_detailed_with_external_p256_key_agreement(
+                input.to_string_lossy().into_owned(),
+                output.to_string_lossy().into_owned(),
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider,
+                vec![material.public_cert.clone()],
+                None,
+            )
+            .expect("runtime external key agreement should decrypt signed file");
+
+        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        let decrypted = std::fs::read(&output).expect("output file should exist on success");
+        assert_eq!(decrypted, plaintext);
+    }
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_payload_tamper_hard_fails_with_no_output() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime file payload hard fail {}", version.label())
+            .repeat(600)
+            .into_bytes();
+        let ciphertext =
+            encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                .expect("encryption to public-only candidate should succeed");
+        assert_message_format(version, &ciphertext);
+        let tampered = tamper_near_payload_tail(&ciphertext);
+        let dir = StreamingTempDir::new(version.label());
+        let input = write_input_file(&dir, &tampered);
+        let output = dir.output_path();
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+            input.to_string_lossy().into_owned(),
+            output.to_string_lossy().into_owned(),
+            material.public_cert.clone(),
+            material.agreement_public_key.fingerprint().to_hex(),
+            provider.clone(),
+            Vec::new(),
+            None,
+        );
+
+        assert!(
+            provider.request_count() > 0,
+            "tampered {} payload should still exercise the external ECDH callback",
+            version.label()
+        );
+        match result {
+            Err(PgpError::AeadAuthenticationFailed)
+            | Err(PgpError::IntegrityCheckFailed)
+            | Err(PgpError::NoMatchingKey)
+            | Err(PgpError::CorruptData { .. }) => {}
+            Err(other) => panic!(
+                "tampered {} file should fail as payload authentication/corruption, got: {other:?}",
+                version.label()
+            ),
+            Ok(_) => panic!(
+                "tampered {} file must not release plaintext to the output path",
+                version.label()
+            ),
+        }
+        assert!(
+            !output.exists(),
+            "no plaintext output file may exist after a {} payload hard-fail",
+            version.label()
+        );
+        assert_eq!(
+            dir.leftover_temp_files(),
+            0,
+            "scratch temp file must be securely deleted after hard-fail"
+        );
+    }
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_callback_failure_and_cancel_leave_no_output() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"file callback error",
+        &[material.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+
+    // Callback failure → sanitized typed category, no output.
+    let dir = StreamingTempDir::new("callback-fail");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let failed = Arc::new(FixedRuntimeKeyAgreementProvider::new(Err(
+        ExternalP256KeyAgreementError::Failed {
+            category: ExternalP256KeyAgreementFailureCategory::LocalAuthenticationFailed,
+        },
+    )));
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        failed.clone(),
+        Vec::new(),
+        None,
+    );
+    assert!(matches!(
+        result,
+        Err(PgpError::ExternalP256KeyAgreementFailed {
+            category: ExternalP256KeyAgreementFailureCategory::LocalAuthenticationFailed
+        })
+    ));
+    assert!(failed.request_count() > 0);
+    assert!(!output.exists(), "callback failure must not produce output");
+    assert_eq!(dir.leftover_temp_files(), 0);
+
+    // Callback cancellation → OperationCancelled, no output.
+    let dir = StreamingTempDir::new("callback-cancel");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let cancelled = Arc::new(FixedRuntimeKeyAgreementProvider::new(Err(
+        ExternalP256KeyAgreementError::OperationCancelled,
+    )));
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        cancelled.clone(),
+        Vec::new(),
+        None,
+    );
+    assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    assert!(cancelled.request_count() > 0);
+    assert!(!output.exists(), "cancelled callback must not produce output");
+    assert_eq!(dir.leftover_temp_files(), 0);
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_wrong_selector_fails_before_callback() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"file wrong selector",
+        &[material.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let dir = StreamingTempDir::new("wrong-selector");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        // The signing fingerprint, not the key-agreement subkey: must fail public-only.
+        material.signing_public_key.fingerprint().to_hex(),
+        provider.clone(),
+        Vec::new(),
+        None,
+    );
+    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert_eq!(
+        provider.request_count(),
+        0,
+        "wrong key-agreement selector must fail before any callback"
+    );
+    assert!(!output.exists());
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_recipient_mismatch_fails_closed() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let other = build_candidate(CandidateVersion::V4).expect("other candidate should build");
+    // Encrypt to a DIFFERENT recipient than the route binds.
+    let ciphertext = encrypt::encrypt_binary(
+        b"file recipient mismatch",
+        &[other.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let dir = StreamingTempDir::new("recipient-mismatch");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        provider,
+        Vec::new(),
+        None,
+    );
+    assert!(matches!(result, Err(PgpError::NoMatchingKey)));
+    assert!(!output.exists());
+    assert_eq!(dir.leftover_temp_files(), 0);
+}
+
+#[test]
+fn test_runtime_external_key_agreement_file_api_progress_cancellation_cleans_up() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    // Large plaintext so payload streaming spans multiple 64 KiB reads.
+    let plaintext = vec![0x42u8; 256 * 1024];
+    let ciphertext =
+        encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+            .expect("encryption should succeed");
+    let dir = StreamingTempDir::new("progress-cancel");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+    let progress = Arc::new(CancelAfterBytes::new(64 * 1024));
+    let dyn_progress: Arc<dyn crate::streaming::ProgressReporter> = progress.clone();
+
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        provider,
+        Vec::new(),
+        Some(dyn_progress),
+    );
+
+    assert!(matches!(result, Err(PgpError::OperationCancelled)));
+    assert!(progress.calls.load(Ordering::SeqCst) > 0);
+    assert!(
+        !output.exists(),
+        "cancelled streaming decrypt must not produce output"
+    );
+    assert_eq!(
+        dir.leftover_temp_files(),
+        0,
+        "scratch temp file must be securely deleted after cancellation"
+    );
+}
