@@ -132,12 +132,7 @@ private struct KeyRowView: View {
                         color: .accentColor
                     )
                 }
-                if !key.isBackedUp {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .font(.caption)
-                        .accessibilityLabel(String(localized: "keys.notBackedUp", defaultValue: "Not backed up"))
-                }
+                KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .compact)
             }
             Text(key.profile.displayName)
                 .font(.caption)

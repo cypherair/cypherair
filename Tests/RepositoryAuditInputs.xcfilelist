@@ -26,6 +26,7 @@ $(SRCROOT)/Sources/App/Common/FileImportRequestGate.swift
 $(SRCROOT)/Sources/App/Common/FileOperationAction.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift
 $(SRCROOT)/Sources/App/Common/IdentityDisplayPresentation.swift
+$(SRCROOT)/Sources/App/Common/KeyBackupStatusBadge.swift
 $(SRCROOT)/Sources/App/Common/MacPresentationPolish.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift

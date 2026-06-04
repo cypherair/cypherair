@@ -187,19 +187,7 @@ private struct KeyDetailScreenHostView: View {
                         HStack {
                             Text(String(localized: "keydetail.backup", defaultValue: "Backup Status"))
                             Spacer()
-                            if key.isBackedUp {
-                                Label(
-                                    String(localized: "keydetail.backed", defaultValue: "Backed Up"),
-                                    systemImage: "checkmark.circle.fill"
-                                )
-                                .foregroundStyle(.green)
-                            } else {
-                                Label(
-                                    String(localized: "keydetail.notBacked", defaultValue: "Not Backed Up"),
-                                    systemImage: "exclamationmark.triangle.fill"
-                                )
-                                .foregroundStyle(.orange)
-                            }
+                            KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .inline)
                         }
 
                         NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {

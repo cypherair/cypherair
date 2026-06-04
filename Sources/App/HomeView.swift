@@ -114,7 +114,7 @@ struct HomeView: View {
                                 expandsHorizontally: false
                             )
 
-                            backupBadge(for: defaultKey)
+                            KeyBackupStatusBadge(isBackedUp: defaultKey.isBackedUp, style: .badge)
                         }
 
                         Image(systemName: "chevron.right")
@@ -131,23 +131,6 @@ struct HomeView: View {
                 .accessibilityHint(Text(String(localized: "home.defaultKey.hint", defaultValue: "Opens key details")))
                 .accessibilityIdentifier("home.defaultKey")
             }
-        }
-    }
-
-    @ViewBuilder
-    private func backupBadge(for key: PGPKeyIdentity) -> some View {
-        if key.isBackedUp {
-            CypherStatusBadge(
-                title: String(localized: "home.defaultKey.backedUp", defaultValue: "Backed up"),
-                systemImage: "checkmark.circle.fill",
-                color: .green
-            )
-        } else {
-            CypherStatusBadge(
-                title: String(localized: "home.defaultKey.backUpNow", defaultValue: "Back up now"),
-                systemImage: "exclamationmark.triangle.fill",
-                color: .orange
-            )
         }
     }
 

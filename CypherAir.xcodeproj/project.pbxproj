@@ -85,6 +85,7 @@
 				App/Common/FileOperationAction.swift,
 				App/Common/FingerprintView.swift,
 				App/Common/IdentityDisplayPresentation.swift,
+				App/Common/KeyBackupStatusBadge.swift,
 				App/Common/MacPresentationPolish.swift,
 				App/Common/OperationController.swift,
 				App/Common/OutputHandling.swift,
