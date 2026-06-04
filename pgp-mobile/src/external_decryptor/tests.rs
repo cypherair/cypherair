@@ -1863,3 +1863,203 @@ fn test_runtime_external_key_agreement_file_api_early_cancellation_maps_to_cance
         "scratch temp file must be securely deleted after early cancellation"
     );
 }
+
+// ── Phase 6D closure: mixed recipients, repeated operations, no partial plaintext ──
+
+/// A file encrypted to several named ECDH recipients (the external key-agreement
+/// recipient emitted second) must select the matching PKESK by key-agreement subkey
+/// fingerprint and decrypt without leaving any scratch artifact.
+#[test]
+fn test_runtime_external_key_agreement_file_api_decrypts_mixed_recipient_file() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let other = build_candidate(version).expect("other candidate should build");
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime mixed-recipient file decrypt {}", version.label())
+            .repeat(64)
+            .into_bytes();
+        // Two named recipients; the external key-agreement recipient is emitted second.
+        let ciphertext = encrypt::encrypt_binary(
+            &plaintext,
+            &[other.public_cert.clone(), material.public_cert.clone()],
+            None,
+            None,
+        )
+        .expect("multi-recipient encryption should succeed");
+        let dir = StreamingTempDir::new(version.label());
+        let input = write_input_file(&dir, &ciphertext);
+        let output = dir.output_path();
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine
+            .decrypt_file_detailed_with_external_p256_key_agreement(
+                input.to_string_lossy().into_owned(),
+                output.to_string_lossy().into_owned(),
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider.clone(),
+                Vec::new(),
+                None,
+            )
+            .expect("mixed-recipient file should decrypt via the key-agreement subkey");
+
+        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert!(provider.request_count() > 0);
+        let decrypted = std::fs::read(&output).expect("output file should exist on success");
+        assert_eq!(decrypted, plaintext);
+        assert_eq!(
+            dir.leftover_temp_files(),
+            0,
+            "no scratch temp file should remain after mixed-recipient success"
+        );
+    }
+}
+
+/// Repeating the same external key-agreement message decrypt must return identical
+/// plaintext each time and exercise the callback at least once per run, proving no
+/// cached or partial state is carried between operations.
+#[test]
+fn test_runtime_external_key_agreement_api_repeated_message_decrypts_are_consistent() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let plaintext = b"runtime repeated message decrypt".to_vec();
+    let ciphertext =
+        encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+            .expect("encryption should succeed");
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    let mut previous_request_count = 0;
+    for iteration in 0..3 {
+        let result = engine
+            .decrypt_detailed_with_external_p256_key_agreement(
+                ciphertext.clone(),
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider.clone(),
+                Vec::new(),
+            )
+            .unwrap_or_else(|e| panic!("repeated decrypt {iteration} should succeed: {e:?}"));
+        assert_eq!(result.plaintext, plaintext);
+        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        let request_count = provider.request_count();
+        assert!(
+            request_count > previous_request_count,
+            "each repeated decrypt must invoke the external callback at least once"
+        );
+        previous_request_count = request_count;
+    }
+}
+
+/// Repeating the same external key-agreement file decrypt to the same output path must
+/// produce the same plaintext each time and never accumulate leftover scratch artifacts.
+#[test]
+fn test_runtime_external_key_agreement_file_api_repeated_decrypts_leave_no_residual_artifacts() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let plaintext = vec![0x37u8; 96 * 1024];
+    let ciphertext =
+        encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+            .expect("encryption should succeed");
+    let dir = StreamingTempDir::new("repeated-file");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+
+    for iteration in 0..3 {
+        let result = engine
+            .decrypt_file_detailed_with_external_p256_key_agreement(
+                input.to_string_lossy().into_owned(),
+                output.to_string_lossy().into_owned(),
+                material.public_cert.clone(),
+                material.agreement_public_key.fingerprint().to_hex(),
+                provider.clone(),
+                Vec::new(),
+                None,
+            )
+            .unwrap_or_else(|e| panic!("repeated file decrypt {iteration} should succeed: {e:?}"));
+        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        let decrypted = std::fs::read(&output).expect("output file should exist on success");
+        assert_eq!(decrypted, plaintext);
+        assert_eq!(
+            dir.leftover_temp_files(),
+            0,
+            "repeated file decrypt {iteration} must leave no scratch temp file"
+        );
+    }
+}
+
+/// A tampered mixed-recipient file (the external key-agreement recipient present) must
+/// still hard-fail with no plaintext output and no scratch artifact, for v4 SEIPDv1/MDC
+/// and v6 SEIPDv2/AEAD alike.
+#[test]
+fn test_runtime_external_key_agreement_file_api_mixed_recipient_payload_tamper_yields_no_output() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let other = build_candidate(version).expect("other candidate should build");
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("mixed-recipient tamper hard fail {}", version.label())
+            .repeat(600)
+            .into_bytes();
+        let ciphertext = encrypt::encrypt_binary(
+            &plaintext,
+            &[other.public_cert.clone(), material.public_cert.clone()],
+            None,
+            None,
+        )
+        .expect("multi-recipient encryption should succeed");
+        assert_message_format(version, &ciphertext);
+        let tampered = tamper_near_payload_tail(&ciphertext);
+        let dir = StreamingTempDir::new(version.label());
+        let input = write_input_file(&dir, &tampered);
+        let output = dir.output_path();
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+            input.to_string_lossy().into_owned(),
+            output.to_string_lossy().into_owned(),
+            material.public_cert.clone(),
+            material.agreement_public_key.fingerprint().to_hex(),
+            provider.clone(),
+            Vec::new(),
+            None,
+        );
+
+        assert!(
+            provider.request_count() > 0,
+            "tampered mixed-recipient {} payload should still reach the external ECDH callback",
+            version.label()
+        );
+        match result {
+            Err(PgpError::AeadAuthenticationFailed)
+            | Err(PgpError::IntegrityCheckFailed)
+            | Err(PgpError::NoMatchingKey)
+            | Err(PgpError::CorruptData { .. }) => {}
+            Err(other) => panic!(
+                "tampered mixed-recipient {} file should fail closed, got: {other:?}",
+                version.label()
+            ),
+            Ok(_) => panic!(
+                "tampered mixed-recipient {} file must not release plaintext",
+                version.label()
+            ),
+        }
+        assert!(
+            !output.exists(),
+            "no plaintext output may exist after a mixed-recipient {} hard-fail",
+            version.label()
+        );
+        assert_eq!(
+            dir.leftover_temp_files(),
+            0,
+            "scratch temp file must be securely deleted after mixed-recipient hard-fail"
+        );
+    }
+}

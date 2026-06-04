@@ -335,6 +335,151 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         try await assertSecureEnclaveTamperHardFails(configurationIdentity: .modernP256V6)
     }
 
+    // MARK: - Phase 6D closure (mixed recipients, repeated operations, no partial plaintext)
+
+    func test_secureEnclaveRouteDecryptsMixedRecipientFileWithoutUnwrap() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let otherRecipient = try engine.generateKey(
+            name: "Other File Recipient",
+            email: "other-file-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let adapter = PGPMessageOperationAdapter(engine: engine)
+        let plaintext = "secure enclave mixed-recipient file decrypt 🔐"
+        // Two named recipients; the Secure Enclave key-agreement recipient is second.
+        let ciphertext = try await adapter.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipientKeys: [otherRecipient.publicKeyData, fixture.identity.publicKeyData],
+            signingKey: nil,
+            selfKey: nil,
+            binary: true
+        )
+        let input = try makeTemporaryFile(ciphertext)
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
+        let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        let verification = try await service.decryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
+            recipientFingerprint: fixture.identity.fingerprint,
+            verificationContext: verificationContext(for: fixture.identity),
+            progress: nil
+        )
+
+        XCTAssertEqual(try readOutput(output), plaintext)
+        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(router.requests, [
+            PrivateKeyOperationRequest(fingerprint: fixture.identity.fingerprint, operation: .decrypt)
+        ])
+        XCTAssertEqual(
+            unwrapper.unwrapRequests, [],
+            "Mixed-recipient Secure Enclave file decrypt must not unwrap a secret certificate"
+        )
+        try assertNoResidualScratch(besideOutput: output)
+    }
+
+    func test_secureEnclaveRepeatedFileDecryptsLeaveNoResidualArtifacts() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let adapter = PGPMessageOperationAdapter(engine: engine)
+        // Large enough that the streaming payload spans multiple reads and a scratch
+        // temp file is actually created and renamed on each run.
+        let plaintext = String(repeating: "secure enclave repeated file decrypt ", count: 512)
+        let ciphertext = try await adapter.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipientKeys: [fixture.identity.publicKeyData],
+            signingKey: nil,
+            selfKey: nil,
+            binary: true
+        )
+        let input = try makeTemporaryFile(ciphertext)
+        defer { cleanup(input) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
+        let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        for iteration in 0..<3 {
+            let output = makeTemporaryOutputURL()
+            let verification = try await service.decryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
+                recipientFingerprint: fixture.identity.fingerprint,
+                verificationContext: verificationContext(for: fixture.identity),
+                progress: nil
+            )
+            XCTAssertEqual(verification.legacyStatus, .notSigned)
+            XCTAssertEqual(
+                try readOutput(output), plaintext,
+                "Repeated Secure Enclave file decrypt \(iteration) must produce identical plaintext"
+            )
+            try assertNoResidualScratch(besideOutput: output)
+            cleanup(output)
+        }
+
+        XCTAssertEqual(
+            unwrapper.unwrapRequests, [],
+            "Repeated Secure Enclave file decrypt must not unwrap a secret certificate"
+        )
+    }
+
+    func test_secureEnclaveMixedRecipientFileTamperHardFailsWithoutPartialOutput() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let otherRecipient = try engine.generateKey(
+            name: "Other Tamper Recipient",
+            email: "other-tamper-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let adapter = PGPMessageOperationAdapter(engine: engine)
+        let plaintext = String(repeating: "mixed-recipient tamper target ", count: 600)
+        let ciphertext = try await adapter.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipientKeys: [otherRecipient.publicKeyData, fixture.identity.publicKeyData],
+            signingKey: nil,
+            selfKey: nil,
+            binary: true
+        )
+        // Tamper near the payload tail so the intact PKESK still recovers a session key
+        // and the failure lands on payload authentication (no partial plaintext).
+        var tampered = ciphertext
+        XCTAssertGreaterThan(tampered.count, 16)
+        tampered[tampered.count - 8] ^= 0x01
+        let input = try makeTemporaryFile(tampered)
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+        let router = StaticStreamingPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
+        let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper)
+
+        do {
+            _ = try await service.decryptFile(
+                inputPath: input.path,
+                outputPath: output.path,
+                recipientFingerprint: fixture.identity.fingerprint,
+                verificationContext: verificationContext(for: fixture.identity),
+                progress: nil
+            )
+            XCTFail("Expected tampered mixed-recipient file to hard-fail without releasing plaintext")
+        } catch let error as CypherAirError {
+            switch error {
+            case .aeadAuthenticationFailed, .integrityCheckFailed, .corruptData:
+                break
+            default:
+                XCTFail("Expected payload-authentication hard-fail, got \(error)")
+            }
+        }
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: output.path),
+            "No plaintext output file may exist after a mixed-recipient payload hard-fail"
+        )
+        try assertNoResidualScratch(besideOutput: output)
+        XCTAssertEqual(unwrapper.unwrapRequests, [])
+    }
+
     // MARK: - Shared assertions
 
     private func assertSecureEnclaveRouteDecryptsFile(
@@ -506,6 +651,27 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
+    }
+
+    /// Asserts no streaming scratch file remains beside the output. The Rust streaming
+    /// path writes to `<output>.<hex>.tmp` and renames on success / securely deletes on
+    /// error, so any sibling whose name starts with the (unique) output file name and
+    /// ends in `.tmp` is a leaked partial-plaintext scratch artifact.
+    private func assertNoResidualScratch(
+        besideOutput output: URL,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let directory = output.deletingLastPathComponent()
+        let prefix = output.lastPathComponent
+        let siblings = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        let scratch = siblings.filter { $0.hasPrefix(prefix) && $0.hasSuffix(".tmp") }
+        XCTAssertTrue(
+            scratch.isEmpty,
+            "Streaming decrypt must leave no scratch artifact beside the output, found: \(scratch)",
+            file: file,
+            line: line
+        )
     }
 
     private func softwareIdentity(

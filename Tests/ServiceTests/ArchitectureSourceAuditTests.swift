@@ -70,6 +70,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.phase6ExternalKeyAgreementRuntimeContainment)
     }
 
+    func test_phase6WorkflowServicesDoNotCallExternalKeyAgreementRuntimeDirectly() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.phase6WorkflowExternalKeyAgreementContainment)
+    }
+
     func test_phase6KeyAgreementSharedSecretHandoffZeroizesSwiftTemporaryBuffers() throws {
         let securityBridge = try RepositoryAuditLoader.loadString(
             relativePath: "Sources/Security/SecureEnclaveCustodyKeyAgreement.swift"
@@ -638,6 +642,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.phase5WorkflowExternalSignerContainment.violations(in: [source]).isEmpty
+        )
+        XCTAssertTrue(
+            ArchitectureSourceAuditRules.phase6WorkflowExternalKeyAgreementContainment.violations(in: [source]).isEmpty
         )
         XCTAssertTrue(
             ArchitectureSourceAuditRules.phase5ExternalSignerRuntimeContainment.violations(in: [source]).isEmpty
@@ -1309,6 +1316,17 @@ private enum ArchitectureSourceAuditRules {
         ])
     )
 
+    static let phase6WorkflowExternalKeyAgreementContainment = ArchitectureSourceAuditRule(
+        name: "Phase 6 workflow external key-agreement containment",
+        failureSummary: "Decrypt-class workflow services should delegate external P-256 key-agreement runtime calls to router-owned private-key decrypt helpers.",
+        pattern: phase6ExternalKeyAgreementRuntimePattern,
+        scope: { path in
+            phase6WorkflowServicePaths.contains(path)
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
     static let keyRouteViewWorkflowContainment = ArchitectureSourceAuditRule(
         name: "Key route view workflow containment",
         failureSummary: "Key-management route Views should send intent to ScreenModels instead of calling key workflow services directly.",
@@ -1430,6 +1448,10 @@ private enum ArchitectureSourceAuditRules {
         "Sources/Services/KeyManagementService.swift",
         "Sources/Services/PasswordMessageService.swift",
         "Sources/Services/SigningService.swift",
+    ]
+
+    private static let phase6WorkflowServicePaths: Set<String> = [
+        "Sources/Services/DecryptionService.swift",
     ]
 
     private static let phase5ExternalSignerRuntimePattern =
