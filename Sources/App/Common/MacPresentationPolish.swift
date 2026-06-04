@@ -19,16 +19,10 @@ struct CypherStatusBadge: View {
     let color: Color
     let systemImage: String?
 
-    init(title: String, color: Color) {
+    init(title: String, systemImage: String? = nil, color: Color) {
         self.title = title
-        self.color = color
-        self.systemImage = nil
-    }
-
-    init(title: String, systemImage: String, color: Color) {
-        self.title = title
-        self.color = color
         self.systemImage = systemImage
+        self.color = color
     }
 
     var body: some View {
