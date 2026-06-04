@@ -328,6 +328,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyExpiryMutationService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyMessageDecryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeySelectiveRevocationService.swift
+$(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
