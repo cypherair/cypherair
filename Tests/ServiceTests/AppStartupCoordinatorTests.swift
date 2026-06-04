@@ -282,7 +282,12 @@ final class AppStartupCoordinatorTests: XCTestCase {
         let decryptionService = DecryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            contactService: contactService
+            contactService: contactService,
+            messageDecryptor: TestHelpers.makeMessageDecryptor(
+                engine: engine,
+                keyManagement: keyManagement,
+                messageAdapter: messageAdapter
+            )
         )
         let passwordMessageEncryptor = TestHelpers.makePasswordMessageEncryptor(
             engine: engine,

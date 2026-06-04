@@ -420,6 +420,26 @@ handoff, and runtime point handling is documented as shape prefilter plus
 Security/Rust fail-closed validation rather than a substitute for the
 generation-time curve validation.
 
+Phase 6B is the first decrypt-class workflow consumer and is intentionally narrow
+to in-memory message decrypt. The shared route vocabulary gains no new case: the
+existing `.decrypt` operation maps to the key-agreement role, and the router
+already returns the successful Secure Enclave key-agreement route from Phase 6A.
+A new router-owned `PrivateKeyMessageDecryptionService` (protocol
+`RecipientMessageDecrypting`) is the only decrypt consumer allowed to touch the
+external P-256 key-agreement runtime: software-custody routes keep the existing
+unwrap-and-zeroize behavior and call the standard detailed decrypt FFI, Secure
+Enclave key-agreement routes pass the stored public certificate, the inspected
+key-agreement subkey fingerprint, and the loaded `.keyAgreement` handle to the
+external decrypt API, the `.secureEnclaveSigner` route is rejected as a role
+mismatch, and blocked routes map to sanitized unavailable categories.
+`DecryptionService` keeps Phase 1 recipient parsing, the matched-key guard, and
+verification-context construction, then delegates to the new consumer; its
+streaming file decrypt path is unchanged and remains a Phase 6C concern. Payload
+authentication, verification folding, and success-only plaintext release stay
+inside the Sequoia decrypt pipeline, and there is no software fallback for a
+Secure Enclave key-agreement route. Production policy still blocks Secure Enclave
+custody.
+
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
 must not grow separate custody switches that bypass the router. The router must

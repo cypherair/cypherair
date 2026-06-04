@@ -389,6 +389,28 @@ callback boundary; Rust immediately validates that copy, wraps it in
 `Zeroizing`, and hard-aborts malformed or zero shared-secret responses instead
 of continuing to later PKESKs.
 
+**Secure Enclave message decrypt route note:** Phase 6B wires only in-memory
+recipient-key message decrypt (`DecryptionService.decryptDetailed` and the
+`decryptMessageDetailed` convenience) through the same private-operation router.
+`DecryptionService` keeps its security-critical Phase 1/Phase 2 boundary: Phase 1
+recipient parsing stays unauthenticated, the matched-key guard stays before any
+private-key access, and the verification context is still built by the service.
+Custody dispatch moves into a router-owned `PrivateKeyMessageDecryptionService`:
+software-custody routes unwrap and zeroize the complete secret certificate
+exactly as before, while Secure Enclave routes load only the `.keyAgreement`
+handle and call the Phase 6A external P-256 key-agreement decrypt API. Rust and
+Sequoia continue to own OpenPGP ECDH KDF, AES Key Wrap unwrap, session-key
+validation, payload authentication, verification folding, and success-only
+plaintext release; the v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD hard-fail and
+no-partial-plaintext contracts are unchanged. Recipient mismatch, wrong-binding,
+session-key, and callback failures fail closed with sanitized categories and
+without software fallback. Streaming file decrypt, UI/product copy, and
+production Secure Enclave custody availability remain deferred to Phase 6C and
+later; production policy still blocks Secure Enclave custody. Failure mapping
+must stay sanitized and must not include fingerprints, handle tags, public
+binding bytes, Keychain locators, plaintext, private material, shared secrets,
+session keys, or temporary capability paths.
+
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be

@@ -268,7 +268,7 @@ ForEach(fingerprintSegments, id: \.self) { segment in
 
 ## 7. Git Conventions
 
-- **Branch names:** `feature/<description>`, `fix/<description>`, `refactor/<description>`.
+- **Branch names:** `feature/<description>`, `fix/<description>`, `refactor/<description>`. Automated-contributor branches may instead use an authoring prefix (`claude-<topic>` / `codex-<topic>`) or the staged `<topic>-pr<NN>-<description>` series shape used by long-running integration work; the prefix should reflect the actual author rather than being copied from a prior series.
 - **Commit messages:** Conventional format — `feat: add encrypt-to-self toggle`, `fix: AEAD hard-fail not triggered on empty ciphertext`, `test: add tamper detection round-trip`, `docs: update SE wrapping diagram`.
 - **PR scope:** One logical change per PR. Do not bundle unrelated changes.
 - **Never commit to `main` directly.** Always use feature branches and PRs.

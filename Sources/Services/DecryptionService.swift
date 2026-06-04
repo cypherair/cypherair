@@ -13,17 +13,20 @@ final class DecryptionService {
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
+    private let messageDecryptor: any RecipientMessageDecrypting
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         contactService: ContactService,
+        messageDecryptor: any RecipientMessageDecrypting,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
+        self.messageDecryptor = messageDecryptor
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
@@ -112,21 +115,16 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
+        // Custody-specific private-key access is owned by the router-backed
+        // message decryptor: software custody unwraps and zeroizes a secret
+        // certificate; Secure Enclave custody uses the external P-256
+        // key-agreement route. Payload authentication and success-only plaintext
+        // release remain the Sequoia decrypt pipeline's responsibility.
         let context = verificationContext()
 
-        return try await messageAdapter.decryptDetailed(
+        return try await messageDecryptor.decryptDetailed(
             ciphertext: phase1.ciphertext,
-            secretKeys: [secretKey],
+            recipientFingerprint: matchedKey.fingerprint,
             verificationContext: context
         )
     }

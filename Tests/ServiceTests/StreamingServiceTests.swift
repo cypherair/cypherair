@@ -477,10 +477,16 @@ final class StreamingServiceTests: XCTestCase {
         // Now remove all local keys so nothing matches
         // We need a fresh decryption service with no local keys
         let (emptyKeyMgmt, _, _, _) = TestHelpers.makeKeyManagement()
+        let emptyMessageAdapter = PGPMessageOperationAdapter(engine: engine)
         let decSvc = DecryptionService(
-            messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            messageAdapter: emptyMessageAdapter,
             keyManagement: emptyKeyMgmt,
-            contactService: stack.contactService
+            contactService: stack.contactService,
+            messageDecryptor: TestHelpers.makeMessageDecryptor(
+                engine: engine,
+                keyManagement: emptyKeyMgmt,
+                messageAdapter: emptyMessageAdapter
+            )
         )
 
         do {
