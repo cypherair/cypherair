@@ -152,63 +152,32 @@ Deferred scope:
 Goal: implement Security-layer storage and lifecycle for distinct Secure Enclave
 signing and key-agreement private-operation handles.
 
-Recommended PR grouping:
+Phase status: completed in the current implementation. The Security layer can
+create, load, inspect, delete, inventory, and reset-clean distinct signing and
+key-agreement P-256 Secure Enclave custody handles behind hidden interfaces, with
+guarded device evidence on real hardware.
 
-- PR 3A: add handle creation, loading, role binding, public-key binding, and
-  deletion behind Security-owned interfaces.
-- PR 3B: add cleanup, local reset participation, and recovery classification for
-  metadata/handle disagreement.
-- PR 3C: add guarded device tests for access-control and handle-state failures.
+Completion anchor:
 
-Current implementation status:
+- Two distinct role-tagged P-256 handles (`.signing`, `.keyAgreement`) per handle
+  set, with `privateKeyUsage`, `biometryAny`, no device-passcode fallback, and the
+  data-protection Keychain domain; the `se-key`/`salt`/`sealed-key` software bundle
+  is not reused as the custody store.
+- Load and inspect are authoritative only when the stored role and uncompressed
+  X9.63 public-key binding match; role mismatch, public-key mismatch, missing,
+  partial, ambiguous, inaccessible, and cleanup failures fail closed through shared
+  sanitized categories.
+- Reset All Local Data inventories and deletes app-owned custody rows (including
+  malformed app-owned tags); no plaintext, private material, locators, fingerprints,
+  or temporary paths appear in logs or diagnostics.
+- Guarded device tests cover real creation/load/delete, biometric signing/ECDH
+  private operations, unauthorized-interaction failure, and handle-state mismatch.
 
-- PR 3A is implemented: the Security layer can create, load, inspect, and delete
-  distinct signing/key-agreement P-256 Secure Enclave custody handles behind
-  hidden interfaces.
-- PR 3B is implemented: the Security layer can inventory and reset-clean
-  app-owned custody handles, including malformed owned tags, validate remaining
-  handle count after Reset All Local Data, and classify expected metadata/handle
-  disagreement through shared sanitized failure categories.
-- PR 3C is implemented: guarded device tests exercise the production
-  Security-owned custody handle store on real Secure Enclave hardware, covering
-  handle creation/persistence, biometric private-operation access control,
-  missing/partial/wrong-public handle-state failures, cleanup, and sanitized
-  diagnostics.
+Deferred scope:
 
-Entry conditions:
-
-- Phase 1 can represent custody state without product exposure.
-- Phase 2 has a proven external-operation shape to consume handles.
-- The phase-specific plan explicitly calls out edits under `Sources/Security/`.
-
-Exit conditions:
-
-- Signing and key-agreement handles are distinct.
-- Reference access policy is enforced: `privateKeyUsage`, `biometryAny`, and no
-  device-passcode fallback.
-- Handle-related Keychain accessibility is evaluated against
-  `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` as reference material.
-- Role mismatch, public-key mismatch, missing handle, inaccessible handle, and
-  local reset cleanup fail closed.
-- The current `se-key` / `salt` / `sealed-key` software wrapping bundle is not
-  reused as the custody handle store.
-
-Validation:
-
-- Security-layer unit tests with mocks for success, failure, cleanup, and
-  recovery paths.
-- Device-only tests guarded for Secure Enclave availability.
-- No plaintext, private-key material, shared secrets, session keys, KEKs,
-  Keychain locators, stable fingerprints, or temporary capability paths in logs
-  or diagnostics.
-
-Rollback:
-
-- Delete or ignore newly created hidden/test handles through cleanup logic and
-  keep Secure Enclave custody unavailable. Existing software key bundles remain
-  authoritative for software custody. Rollback must leave hidden/test Secure
-  Enclave metadata discoverable and cleanable, keep mismatches fail-closed, and
-  avoid orphaning handles.
+- The store stays hidden and production-blocked; it is connected only to the
+  hidden/test generation, signer-route, and key-agreement consumers added in later
+  phases, not to product generation or UI.
 
 ## Phase 4: Hidden Secure Enclave Generation
 
@@ -216,216 +185,67 @@ Goal: create hidden or test-only end-to-end generation for Secure Enclave
 custody keys, including public certificate construction, metadata, handles, and
 revocation artifact availability.
 
-Recommended PR grouping:
+Phase status: completed in the current implementation. Hidden/test-only
+end-to-end generation creates Secure Enclave custody keys with public certificate
+construction, metadata, handles, recovery classification, and public-artifact
+export.
 
-- PR 4A: integrate model, Security handles, and Rust certificate construction
-  for hidden v4 and v6 generation. **Implemented:** hidden/test generation now
-  creates Security-owned P-256 handle pairs, uses a narrow UniFFI external
-  signer callback for public-only certificate/revocation construction, persists
-  P-256 Secure Enclave custody metadata only, and leaves software-key behavior
-  and UI exposure unchanged.
-- PR 4B: add generation cleanup, partial-failure recovery, and local reset
-  behavior. **Implemented:** stored hidden Secure Enclave public certificates
-  can be inspected for signing/key-agreement P-256 public bindings, and
-  KeyManagement now maintains a sanitized in-memory recovery report that
-  classifies metadata-only, handle-only, partial, ambiguous, wrong-public,
-  public-certificate mismatch, metadata mismatch, missing revocation, and
-  inventory/list-failure states. Reset All Local Data continues to delete
-  hidden metadata and all app-owned custody handles, while startup/load
-  classification does not silently delete orphan handles.
-- PR 4C: add public certificate and revocation artifact export coverage for
-  generated hidden keys. **Implemented:** hidden Secure Enclave custody public
-  certificates export from stored public material, stored key-level revocation
-  artifacts export without private-key access, missing revocation artifacts fail
-  closed, and Secure Enclave custody private-key backup/export remains
-  unsupported.
+Completion anchor:
 
-Entry conditions:
+- Hidden/test generation creates a P-256 handle pair and asks Rust to build a
+  public-only v4/v6 certificate bound to distinct signing and key-agreement public
+  keys plus a key-level revocation artifact, persisting only non-secret
+  `PGPKeyIdentity` metadata (no private material, handle locator, or access-control
+  policy).
+- Recovery classification compares stored public bindings with Security inventory
+  and keeps only a sanitized in-memory report for metadata-only, handle-only,
+  partial, ambiguous, wrong-public, mismatch, and missing-revocation states;
+  startup/load never silently deletes orphan handles.
+- Public-key and revocation export use stored public artifacts; missing revocation
+  fails closed and Secure Enclave private-key backup/export is unsupported.
+- Partial generation failure does not leave a normal-looking usable key, and
+  software generation defaults are unchanged.
 
-- Phases 1-3 provide model state, Rust external-operation capability, and
-  Security handles.
-- Product Design user commitments have an implementation-plan owner, even if UI
-  remains hidden.
+Deferred scope:
 
-Exit conditions:
-
-- Hidden/test generation creates a public certificate bound to distinct Secure
-  Enclave signing and key-agreement public keys.
-- Metadata records only non-secret state and does not store access-control
-  policy.
-- Partial generation failure does not leave a normal-looking usable key.
-- Existing software generation defaults remain unchanged.
-
-Validation:
-
-- Swift unit tests for hidden generation success, partial failure, cleanup,
-  metadata, public export, and revocation artifact presence.
-- Rust tests for generated public certificate validity where applicable.
-- Guarded hardware evidence for real handle generation when the phase plan
-  requires it.
-
-Rollback:
-
-- Keep the generation choice hidden, remove newly generated test keys through
-  local cleanup/reset paths, and leave software generation unchanged. Rollback
-  must reconcile metadata and handles so hidden/test state is discoverable,
-  cleanable, and never mistaken for a usable product key.
+- Generation stays hidden and production-blocked; product UI exposure is deferred.
 
 ## Phase 5: Signing-Class Workflow Integration
 
 Goal: route Product-approved signing-class MVP operations for Secure Enclave
 custody through the external signer path.
 
-Recommended PR grouping:
+Phase status: completed in the current implementation. Every Product-approved
+signing-class operation routes through the private-operation router and the
+external P-256 signer path, with software custody unchanged and Secure Enclave
+custody production-blocked.
 
-- PR 5A: private-operation router foundation, shared route vocabulary,
-  unsupported/unavailable outcomes, sanitized error mapping, hidden/test policy
-  hooks, and Security handle lookup helpers. This PR must not integrate a user
-  workflow. **Implemented:** Phase 5A adds internal Swift routing contracts,
-  independent resolver policy gates, software and Secure Enclave signer route
-  outcomes, blocked decrypt/key-agreement outcomes, a shared sanitized failure
-  mapper, and Security signing-handle lookup by public bindings. Production
-  remains unavailable and no workflow service consumes the router yet.
-- PR 5B: Rust/UniFFI external signer runtime API plus cleartext message signing
-  pilot. **Implemented:** Phase 5B adds a runtime Rust/UniFFI cleartext signing
-  API that accepts a public certificate, expected signing-key fingerprint, and
-  external P-256 signer callback; Swift wires only `SigningService.signCleartext`
-  through the router. Software routes still unwrap and zeroize secret
-  certificates as before, Secure Enclave signer routes use public certificate
-  material plus a loaded signing handle, blocked routes surface sanitized
-  unavailable categories, and production policy still blocks Secure Enclave
-  custody.
-- PR 5C: sign-plus-encrypt text optional signing.
-  **Implemented:** Phase 5C adds a Rust/UniFFI armored text encrypt API that can
-  sign with a public-only P-256 certificate through the external signer
-  callback, and Swift routes only `EncryptionService.encryptText` optional
-  signing through the private-operation router. Software routes retain the
-  existing unwrap-and-zeroize path, Secure Enclave signer routes use public
-  certificate material plus a loaded signing handle, unsigned text encryption
-  does not route, blocked routes surface sanitized unavailable categories, and
-  production policy still blocks Secure Enclave custody.
-- PR 5D: password-message optional signing.
-  **Implemented:** Phase 5D adds Rust/UniFFI password-message encrypt APIs for
-  armored and binary outputs that can sign with a public-only P-256 certificate
-  through the external signer callback, and Swift routes only
-  `PasswordMessageService.encryptText` / `encryptBinary` optional signing
-  through the private-operation router. Software routes retain the existing
-  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
-  material plus a loaded signing handle, unsigned password encryption does not
-  route, blocked routes surface sanitized unavailable categories, and
-  production policy still blocks Secure Enclave custody.
-- PR 5E: streaming detached file signing.
-  **Implemented:** Phase 5E adds a Rust/UniFFI streaming detached file signing
-  API that can sign with a public-only P-256 certificate through the external
-  signer callback, and Swift routes only `SigningService.signDetachedStreaming`
-  through the private-operation router. Software routes retain the existing
-  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
-  material plus a loaded signing handle and existing progress/cancellation
-  reporting, blocked routes surface sanitized unavailable categories, and
-  production policy still blocks Secure Enclave custody.
-- PR 5F: streaming encrypt-plus-sign.
-  **Implemented:** Phase 5F adds a Rust/UniFFI streaming file encrypt API that
-  can sign with a public-only P-256 certificate through the external signer
-  callback, and Swift routes only `EncryptionService.encryptFileStreaming`
-  optional signing through the private-operation router. File encryption still
-  owns recipient lookup, disk-space checks, encrypt-to-self resolution,
-  temporary artifact creation/protection/cleanup, progress, binary output, and
-  SEIPDv1/SEIPDv2 selection. Software routes retain the existing
-  unwrap-and-zeroize path, Secure Enclave signer routes use public certificate
-  material plus a loaded signing handle and existing progress/cancellation
-  reporting, unsigned streaming file encryption does not route, blocked routes
-  surface sanitized unavailable categories, and production policy still blocks
-  Secure Enclave custody.
-- PR 5G: expiry and binding-refresh signing route, or explicit unsupported
-  closeout. **Implemented:** Phase 5G adds a Rust/UniFFI public-only expiry
-  mutation API that can emit binding signatures with the external P-256 signer
-  callback, and Swift routes only `KeyMutationService.modifyExpiry` through the
-  private-operation router. Software routes retain the existing
-  unwrap/zeroize, rewrap/promotion, pending-bundle recovery, catalog update, and
-  modify-expiry recovery journal flow. Secure Enclave signer routes use stored
-  public certificate material plus a loaded signing handle, update only public
-  metadata/catalog state, and do not create software pending bundles or recovery
-  journal entries. Standalone `refreshBinding` remains explicitly not
-  implemented for Secure Enclave custody, blocked routes surface sanitized
-  unavailable categories, and production policy still blocks Secure Enclave
-  custody. The Phase 5G follow-up refreshes explicit transport/ECDH subkey
-  validity bindings in addition to primary direct-key/User ID bindings, and
-  keeps the public-only external API primary-signer-only. A second follow-up
-  allows local modify-expiry to recover already-expired software and Secure
-  Enclave custody keys without weakening ordinary signing-route `.alive()`
-  requirements, and makes Secure Enclave public metadata writeback merge against
-  the current catalog identity so late results cannot overwrite newer flags or
-  resurrect deleted keys.
-- PR 5H: selective subkey and User ID revocation signing route.
-  **Implemented:** Phase 5H adds Rust/UniFFI public-only selective revocation
-  APIs for subkey and User ID revocation signatures through the external P-256
-  signer callback, and Swift routes only selective revocation export through
-  the private-operation router. Software routes retain the existing
-  unwrap-and-zeroize path and Sequoia revocation-builder hash defaults. Secure
-  Enclave signer routes use stored public certificate material, the inspected
-  primary signing fingerprint, and a loaded signing handle; external builders
-  pass SHA-256 explicitly for the SHA-256-only callback contract. Public
-  selector validation still happens before routing, blocked routes surface
-  sanitized unavailable categories, key-level stored revocation-artifact export
-  remains public-artifact-only, and production policy still blocks Secure
-  Enclave custody.
-- PR 5I: contact certification signing route.
-  **Implemented:** Phase 5I adds a Rust/UniFFI public-only User ID
-  certification API that can sign with the external P-256 signer callback, and
-  Swift routes only existing User ID contact certification generation through
-  the private-operation router. Software routes retain the existing
-  unwrap-and-zeroize path and Sequoia certification hash defaults. Secure
-  Enclave signer routes use stored public certificate material, the inspected
-  primary signing fingerprint, and a loaded signing handle; the external
-  builder passes SHA-256 explicitly for the SHA-256-only callback contract.
-  Target User ID selector validation still happens before routing, blocked
-  routes surface sanitized unavailable categories, generated certification
-  remains an artifact-only contact workflow, and production policy still blocks
-  Secure Enclave custody.
-- PR 5J: Phase 5 closure audit for no workflow-local custody switches, docs,
-  and tests. **Implemented:** Phase 5J adds a closure source audit that keeps
-  workflow-local custody switches out of signing-class services, confines
-  external P-256 signer runtime calls to FFI adapters, hidden generation, and
-  router-owned private-key helpers, and asserts the 5B-5I helpers route through
-  the expected private-operation kinds. The closure also records the Phase 5
-  support matrix: cleartext signing, text/file/password sign-plus-encrypt,
-  detached file signing, modify-expiry, selective subkey/User ID revocation
-  export, and User ID contact certification use the router-backed signer route;
-  standalone `refreshBinding`, decrypt/ECDH, direct-key certification,
+Completion anchor:
+
+- `PrivateKeyOperationRouter` and `PGPKeyCapabilityResolver` provide the shared
+  route vocabulary, independent policy gates, software routes without unwrapping,
+  hidden/test Secure Enclave signer routes after public-binding checks, and a
+  shared sanitized failure mapper.
+- The signer route backs cleartext signing, text/password/file sign-plus-encrypt,
+  detached file signing, modify-expiry, selective subkey/User ID revocation export,
+  and User ID contact certification; each keeps the existing software
+  unwrap-and-zeroize path, sends only public certificate material plus a loaded
+  signing handle to Rust, and has no software fallback on a Secure Enclave route.
+- Modify-expiry refreshes explicit transport/ECDH subkey validity bindings, can
+  recover already-expired keys without weakening ordinary signing liveness, and
+  merges Secure Enclave public-metadata writeback against the current catalog
+  identity; revocation/certification selector validation stays public-only before
+  routing, and generated revocation/certification stay artifact-only.
+- A closure source audit keeps workflow-local custody switches out of signing-class
+  services and confines external P-256 signer runtime calls to FFI adapters, hidden
+  generation, and router-owned helpers.
+
+Deferred scope:
+
+- Standalone `refreshBinding`, decrypt/ECDH (Phase 6), direct-key certification,
   key-level revocation-artifact generation, private export/backup, and product
-  exposure remain outside Phase 5.
-
-Entry conditions:
-
-- Hidden generation can create usable signing handles.
-- Phase 5A establishes resolver/router contracts before signing-class workflow
-  PRs consume them.
-- Product Design still approves the exact signing-class operation set targeted
-  by the phase-specific plan.
-- The phase-specific plan names any operation that remains unsupported and why.
-
-Exit conditions:
-
-- Every supported signing-class operation uses the router and Secure Enclave
-  signer route.
-- Unsupported signing-class operations produce explicit unsupported outcomes.
-- No workflow-local custody switch bypasses the router.
-- No supported operation unwraps or synthesizes a complete secret certificate
-  for Secure Enclave custody.
-
-Validation:
-
-- Swift service tests for each supported signing-class workflow.
-- Rust tests for signature semantics and negative cases.
-- Wrong-role, wrong-public-binding, missing-handle, authentication-cancel, and
-  no-fallback tests.
-- Interop-oriented signature verification evidence for v4 where applicable.
-
-Rollback:
-
-- Mark incomplete signing-class operations unsupported for Secure Enclave
-  custody and keep product exposure disabled. Software-custody signing remains
-  unchanged.
+  exposure remain outside Phase 5. Production policy still blocks Secure Enclave
+  custody.
 
 ## Phase 6: Decrypt And Streaming Integration
 
@@ -433,98 +253,37 @@ Goal: route message and file decrypt workflows through Secure Enclave
 ECDH/session-key acquisition while preserving payload authentication and
 success-only plaintext release.
 
-Recommended PR grouping:
+Phase status: completed in the current implementation. Recipient-key message and
+streaming file decrypt route through the Secure Enclave ECDH/key-agreement path
+while payload authentication and success-only plaintext release stay in
+Rust/Sequoia.
 
-- PR 6A: external P-256 ECDH UniFFI callback, Swift key-agreement bridge, and
-  router key-agreement route. This PR must not release a plaintext workflow.
-- PR 6B: message decrypt integration for v4/v6, verification folding,
-  recipient mismatch, tamper, and no fallback. **Implemented:** in-memory
-  recipient-key message decrypt now routes through a `PrivateKeyMessageDecryptionService`
-  consumed by `DecryptionService`, while the Phase 1/Phase 2 boundary, matched-key
-  guard, and verification-context construction stay in the service.
-- PR 6C: streaming file decrypt integration with success-only output, progress,
-  cancellation, cleanup, and tamper coverage. **Implemented:** streaming
-  recipient-key file decrypt (`DecryptionService.decryptFileStreamingDetailed`)
-  now routes through a router-owned `PrivateKeyStreamingFileDecryptionService`,
-  while the Phase 1/Phase 2 boundary, matched-key guard, verification-context
-  construction, and temporary-artifact ownership stay in the service.
-- PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
-  artifacts, no partial plaintext, docs, and tests.
+Completion anchor:
 
-PR 6A is implemented as a foundation slice: it adds the runtime external P-256
-ECDH callback, Swift key-agreement bridge, Security handle lookup, and hidden/test
-router key-agreement route. It intentionally does not connect message or file
-decrypt workflows, UI, product copy, or production Secure Enclave custody
-availability. The follow-up hardens invalid callback responses as typed
-hard-abort failures, zeroizes Swift-owned shared-secret buffers at the Security
-to FFI handoff, and documents the runtime point-validation boundary.
+- `DecryptionService` keeps its security-critical Phase 1/Phase 2 boundary
+  (unauthenticated recipient parsing, matched-key guard before private-key access,
+  verification-context construction) and delegates custody dispatch to router-owned
+  `PrivateKeyMessageDecryptionService` and `PrivateKeyStreamingFileDecryptionService`.
+- Software custody keeps the existing unwrap-and-zeroize decrypt; Secure Enclave
+  custody loads only the `.keyAgreement` handle and calls the external P-256
+  key-agreement message/file-decrypt APIs, while Rust/Sequoia own ECDH KDF, AES Key
+  Wrap unwrap, session-key validation, payload authentication, verification folding,
+  and the success-only `.tmp`-then-rename file output.
+- v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD tampering fail closed with no partial
+  plaintext; recipient-mismatch, wrong-binding, session-key, callback, and
+  cancellation paths fail closed with sanitized categories and no software fallback;
+  streaming progress, cancellation, and temp cleanup are preserved.
+- The Phase 6 closure audit asserts `DecryptionService` never calls the external
+  key-agreement runtime directly, and adds mixed-recipient, repeated-operation, and
+  no-partial-plaintext Rust/Swift coverage plus a guarded real-hardware
+  `.keyAgreement` decrypt device test.
 
-PR 6B is implemented as the first plaintext-workflow slice for in-memory message
-decrypt only. `DecryptionService.decryptDetailed` (and the `decryptMessageDetailed`
-convenience) keeps Phase 1 recipient parsing unauthenticated, keeps the matched-key
-guard before any private-key access, and keeps building the verification context;
-it then delegates custody dispatch to the router-owned
-`PrivateKeyMessageDecryptionService`. Software custody keeps the existing
-unwrap-and-zeroize secret-certificate decrypt; Secure Enclave custody loads only
-the `.keyAgreement` handle and calls the Phase 6A external decrypt API for v4 and
-v6 messages, preserving Sequoia-owned payload authentication, verification
-folding, and success-only plaintext release. Recipient mismatch, wrong-binding,
-session-key, callback, and tamper paths fail closed with sanitized categories and
-no software fallback. Streaming file decrypt (PR 6C), UI, product copy, and
-production Secure Enclave custody availability remain deferred; production policy
-still blocks Secure Enclave custody.
+Deferred scope:
 
-PR 6C is implemented as the second plaintext-workflow slice, for streaming file
-decrypt only. `DecryptionService.decryptFileStreamingDetailed` keeps Phase 1 file
-recipient parsing unauthenticated, keeps the matched-key guard before any
-private-key access, keeps building the verification context, and keeps ownership
-of the temporary output artifact, success-only file protection, and
-cleanup-on-error; it then delegates custody dispatch to the router-owned
-`PrivateKeyStreamingFileDecryptionService`. Software custody keeps the existing
-unwrap-and-zeroize secret-certificate streaming decrypt; Secure Enclave custody
-loads only the `.keyAgreement` handle and calls a new external P-256
-key-agreement streaming file decrypt API (a generic streaming helper shared with
-the software path). Rust/Sequoia continue to own ECDH KDF, AES Key Wrap unwrap,
-session-key validation, payload authentication, verification folding, and the
-success-only `.tmp`-then-rename output contract, so v4 SEIPDv1/MDC and v6
-SEIPDv2/AEAD tampering still fail closed with no partial plaintext, and streaming
-progress, cancellation, and temporary-artifact cleanup are preserved. Recipient
-mismatch, wrong-binding, session-key, callback, and tamper paths fail closed with
-sanitized categories and no software fallback. UI, product copy, and production
-Secure Enclave custody availability remain deferred; production policy still
-blocks Secure Enclave custody.
-
-Entry conditions:
-
-- Hidden generation can create usable key-agreement handles.
-- Phase 2 ECDH/session-key behavior is proven through tests.
-- Phase 6A owns only the ECDH route foundation and must not release a plaintext
-  workflow.
-- Before PR 6C starts, its phase-specific plan must describe
-  temporary-artifact ownership, success-only output release, cancellation
-  cleanup, and file protection behavior for streaming file decrypt.
-
-Exit conditions:
-
-- Secure Enclave custody decrypt uses the ECDH/session-key route.
-- Payload authentication remains outside the router; Sequoia
-  read-to-completion/message-processed behavior remains the plaintext-release
-  gate.
-- v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD tampering fail closed.
-- Cancellation and authentication errors do not expose partial plaintext.
-- Streaming progress, cancellation, and cleanup behavior remain intact.
-
-Validation:
-
-- Rust and Swift tests for v4/v6 decrypt, tamper, recipient mismatch, session
-  validation failure, cancellation, and cleanup.
-- File decrypt tests for success-only output contracts.
-- Device-only tests for real ECDH handle use when hardware evidence is needed.
-
-Rollback:
-
-- Return Secure Enclave custody decrypt routes to explicit unsupported state.
-  Preserve all existing software-custody decrypt behavior and cleanup paths.
+- Standalone binding refresh, direct-key certification, key-level
+  revocation-artifact generation, private export/backup, UI, product copy, and
+  production availability remain deferred to Phase 7/9. Production policy still
+  blocks Secure Enclave custody.
 
 ## Phase 7: Product UI And Error Surfaces
 

@@ -24,6 +24,7 @@
         "DeviceSecureEnclaveTests",
         "DeviceSecureEnclaveCustodyHiddenGenerationTests",
         "DeviceSecureEnclaveCustodyHandleStoreTests",
+        "DeviceSecureEnclaveCustodyDecryptTests",
         "DeviceAuthenticationManagerTests",
         "DeviceModeSwitchTests",
         "DeviceProtectedDataRootSecretStoreTests",

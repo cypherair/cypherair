@@ -1,8 +1,10 @@
 # Technical Design Document (TDD)
 
+> **Status:** Canonical current-state.
 > **Version:** v4.4
 > **Companion to:** [PRD](PRD.md) v4.4
 > **Audience:** Developers, Security Auditors
+> **Last reviewed:** 2026-06-04.
 
 ## 1. OpenPGP Library: Sequoia PGP
 
@@ -85,53 +87,42 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Current Profile A/B identities normalize to software custody; P-256 Secure Enclave custody is representable only as future/hidden vocabulary. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`. Key operation resolution adds non-persistent sanitized failure categories so resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping plans can distinguish unsupported, unavailable, not-yet-implemented, local-authentication, handle, binding, OpenPGP semantic, payload-authentication, migration/recovery, fallback, and cleanup failures without storing private-operation state.
 
-**Rust external signer proof:** Phase 2A adds a Rust-only, test-backed P-256 external signer boundary proof. The proof builds v4/v6 public-only Secure Enclave-shaped certificates and signs cleartext/detached data through the same Sequoia stream-signing path, while the test substitute performs only the private ECDSA operation. It does not change shipped software-key behavior, add response-file bridging, store Security handles, or permit secret-certificate fallback in the proof path. The later hidden Phase 4A public-certificate callback boundary uses callback-specific UniFFI errors with typed sanitized categories, so cancellation and handle/auth/hardware failures do not cross Sequoia as free-form strings.
+**External P-256 private-operation seam:** Secure Enclave custody (a hidden/test
+future model — see [SECURITY.md](SECURITY.md) §3) delegates only the private
+scalar operation to an external callback through Sequoia's `Signer`/`Decryptor`
+traits. External signing builds v4/v6 public-only certificates and signs
+cleartext/detached/encrypt/expiry/revocation/certification data through the shared
+Sequoia signing stream; the callback receives a public key plus SHA-256 digest and
+returns a fixed-width nonzero ECDSA `r/s` that Rust verifies against that key and
+digest. External ECDH decrypts SEIPDv1/MDC and SEIPDv2/AEAD messages; the callback
+returns only a raw 32-byte shared secret, while Sequoia retains the OpenPGP ECDH
+KDF, AES Key Wrap unwrap, session-key validation, payload authentication, and
+signature verification. The seam never stores Security handles or secret-certificate
+material, never bridges response files, and never falls back to secret-certificate
+signing or decryption. The hidden generation callback boundary uses
+callback-specific UniFFI errors with typed sanitized categories so cancellation and
+handle/auth/hardware failures do not cross Sequoia as free-form strings. The
+negative matrix rejects wrong roles, wrong public bindings, wrong or unverified
+`r/s`, unsupported key/ciphertext shapes, wrong (or shape-valid-but-wrong) shared
+secrets, and tampered payloads — which must hard-fail after session-key acceptance
+without releasing plaintext.
 
-**Rust external ECDH proof:** Phase 2B adds a Rust-only, test-backed P-256 external ECDH/session-key boundary proof. The proof decrypts v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages for public-only Secure Enclave-shaped candidates through the same Sequoia payload path, while the test substitute performs only raw P-256 shared-secret derivation with OpenSSL. Sequoia still owns the OpenPGP ECDH KDF, AES Key Wrap unwrap, session-key validation, signature verification, and payload authentication. It does not add response-file bridging, expose UniFFI APIs, store Security handles, use real Secure Enclave hardware, or permit secret-certificate fallback in the proof path.
-
-**Rust external-operation negative matrix:** Phase 2C closes the Rust proof matrix around wrong roles, wrong public bindings, session-key validation failure, and payload authentication hard-fail. Signer tests reject key-agreement-role keys and unverified `r/s` responses; decryptor tests reject signing-role keys, unsupported key/ciphertext shapes, wrong public-key bindings, and shape-valid but wrong shared secrets. Tampered public-only v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD messages must fail after session-key acceptance without returning plaintext or falling back to secret-certificate material.
-
-**Security custody handle store:** Phase 3A/3B/3C add a Swift Security-layer
-handle-store, cleanup, recovery-classification, and guarded device-evidence
-contract for future Secure Enclave custody. It creates two distinct permanent P-256 Secure Enclave `SecKey`
-handles (`signing` and `keyAgreement`) with a custody-specific biometrics-only
-private-key usage access policy and the data-protection Keychain domain. It does
-not set `kSecAttrCanSign` or `kSecAttrCanDerive` creation flags; role isolation is
-an app-level handle-reference, public-binding, and future router-policy contract.
-It records only Security-private random role tags, validates 65-byte
-uncompressed public-key binding shape on load, rolls back partial creation,
-inventories app-owned custody rows by raw application-tag prefix, cleans
-complete/partial/malformed rows during Reset All Local Data, treats missing
-deletes as idempotent cleanup, and classifies wrong-role, wrong-public binding,
-missing, partial, ambiguous, inaccessible, reset-cleanup, and
-metadata/handle-disagreement failures through shared sanitized categories. It
-adds device-only evidence that the production Security rows work on real Secure
-Enclave hardware for biometric signing/ECDH private operations and fail closed
-for unauthorized interaction and handle-state mismatch. It does not change
-current software-key generation, ProtectedData schemas, UI, Rust/UniFFI, or
-certificate construction.
-
-**Hidden Secure Enclave custody generation:** Phase 4A adds a hidden/test-only
-generation seam that creates Security-owned P-256 signing and key-agreement
-handles, then asks Rust/Sequoia to construct a public-only v4/v6 certificate and
-key-level revocation artifact through an in-process external P-256 signer
-callback. Rust validates P-256 public points, enforces SHA-256 digests and
-fixed-width nonzero ECDSA `r/s`, verifies the response against the signing
-public key and digest, and rejects wrong-digest/wrong-public-key/malformed
-responses without secret-certificate fallback. Swift persists only
-`PGPKeyIdentity` metadata with P-256 configuration and Secure Enclave custody;
-it does not store a secret cert, Apple handle locator, access-control policy,
-or response-file bridge. Phase 4B closes the hidden recovery seam by inspecting
-stored public certificates for public P-256 role bindings, locating matching
-Security handles by public binding, and maintaining only a sanitized in-memory
-metadata/handle recovery report. The report classifies public material,
-revocation artifact, handle availability, metadata association, and inventory
-failures through shared categories without persisting locators or deleting
-startup orphan handles. Phase 4C closes public-artifact export behavior:
-public-key export armors stored public certificate bytes, revocation export
-armors the stored key-level revocation packet, missing Secure Enclave revocation
-artifacts fail closed, and private-key backup/export remains unsupported for
-Secure Enclave custody.
+**Secure Enclave custody handle store and generation:** A Swift Security-layer
+store owns two distinct permanent P-256 Secure Enclave `SecKey` handles (`.signing`
+and `.keyAgreement`) plus their lifecycle, public-binding/role load checks,
+partial-creation rollback, inventory, idempotent delete, Reset All Local Data
+cleanup (including malformed app-owned rows), and sanitized failure classification;
+the access-control flags, application-tag format, and non-disclosure red lines are
+owned by [SECURITY.md](SECURITY.md) §3. Hidden/test generation creates the handle
+pair and asks Rust/Sequoia to build a public-only v4/v6 certificate plus key-level
+revocation artifact through the external signer callback, persisting only
+`PGPKeyIdentity` metadata with P-256 configuration and Secure Enclave custody — no
+secret cert, handle locator, or access-control policy. Recovery classification
+inspects stored public certificates, locates handles by public binding, and keeps
+only a sanitized in-memory metadata/handle report without persisting locators or
+deleting startup orphan handles. Public-key and revocation export use stored public
+artifacts; missing revocation fails closed and private-key backup/export is
+unsupported.
 
 ### 1.4 Encryption Format Auto-Selection
 

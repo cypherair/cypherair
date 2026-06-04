@@ -316,6 +316,80 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         try await assertSecureEnclaveTamperHardFails(configurationIdentity: .modernP256V6)
     }
 
+    // MARK: - Phase 6D closure (mixed recipients, repeated operations)
+
+    func test_secureEnclaveRouteDecryptsMixedRecipientMessageWithoutUnwrap() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let otherRecipient = try engine.generateKey(
+            name: "Other Recipient",
+            email: "other-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let plaintext = "secure enclave mixed-recipient decrypt 🔐"
+        // Two named recipients; the Secure Enclave key-agreement recipient is second so
+        // the matching PKESK is selected past a non-matching recipient's packet.
+        let ciphertext = try await messageAdapter.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipientKeys: [otherRecipient.publicKeyData, fixture.identity.publicKeyData],
+            signingKey: nil,
+            selfKey: nil,
+            binary: true
+        )
+        let router = StaticPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
+        let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper, messageAdapter: messageAdapter)
+
+        let result = try await service.decryptDetailed(
+            ciphertext: ciphertext,
+            recipientFingerprint: fixture.identity.fingerprint,
+            verificationContext: verificationContext(for: fixture.identity)
+        )
+
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), plaintext)
+        XCTAssertEqual(router.requests, [
+            PrivateKeyOperationRequest(fingerprint: fixture.identity.fingerprint, operation: .decrypt)
+        ])
+        XCTAssertEqual(
+            unwrapper.unwrapRequests, [],
+            "Mixed-recipient Secure Enclave decrypt must not unwrap a secret certificate"
+        )
+    }
+
+    func test_secureEnclaveRepeatedMessageDecryptsStayConsistentWithoutUnwrap() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        let plaintext = "secure enclave repeated decrypt"
+        let ciphertext = try await messageAdapter.encrypt(
+            plaintext: Data(plaintext.utf8),
+            recipientKeys: [fixture.identity.publicKeyData],
+            signingKey: nil,
+            selfKey: nil,
+            binary: true
+        )
+        let router = StaticPrivateKeyOperationRouter(route: .secureEnclaveKeyAgreement(fixture.route))
+        let unwrapper = RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        let service = makeService(router: router, unwrapper: unwrapper, messageAdapter: messageAdapter)
+
+        for iteration in 0..<3 {
+            let result = try await service.decryptDetailed(
+                ciphertext: ciphertext,
+                recipientFingerprint: fixture.identity.fingerprint,
+                verificationContext: verificationContext(for: fixture.identity)
+            )
+            XCTAssertEqual(
+                String(data: result.plaintext, encoding: .utf8), plaintext,
+                "Repeated Secure Enclave decrypt \(iteration) must return identical plaintext"
+            )
+        }
+
+        XCTAssertEqual(
+            unwrapper.unwrapRequests, [],
+            "Repeated Secure Enclave decrypt must not unwrap a secret certificate"
+        )
+    }
+
     // MARK: - Shared assertions
 
     private func assertSecureEnclaveRouteDecrypts(
