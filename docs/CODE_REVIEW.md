@@ -7,6 +7,7 @@
 
 - [ ] When a review concern intersects with an established pattern, reviewers should examine the broader context around that pattern, including relevant call chains, active documentation, comparable implementations, and other relevant evidence. Established patterns are context to evaluate, not proof that the behavior is correct; feedback should address the pattern itself when the evidence shows the design or its application is risky.
 - [ ] Review findings should match the evidence. When the evidence supports a possible risk, describe the risk and the checks behind it; avoid presenting it as a confirmed defect unless the evidence supports that conclusion.
+- [ ] Evaluate whether a change is implemented at the right altitude. Prefer solutions that are architecturally correct for long-term maintainability over minimal patches; when the existing structure forces awkward or fragile fixes, a deeper refactor of the affected area can be the better outcome. See [CONVENTIONS.md](CONVENTIONS.md) "Engineering Principle".
 
 ## All Code PRs
 
