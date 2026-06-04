@@ -385,30 +385,11 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         _ error: Unmanaged<CFError>?,
         role: PGPPrivateOperationRole
     ) -> SecureEnclaveCustodyHandleError {
-        guard let error else {
-            return .privateHandleInaccessible(role)
-        }
-        let cfError = error.takeRetainedValue()
-        return mapStatus(OSStatus(CFErrorGetCode(cfError)), role: role)
+        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: role)
     }
 
     private static func mapStatus(_ status: OSStatus, role: PGPPrivateOperationRole) -> SecureEnclaveCustodyHandleError {
-        switch status {
-        case errSecNotAvailable:
-            return .hardwareUnavailable
-        case errSecItemNotFound:
-            return .privateHandleMissing(role)
-        case errSecDuplicateItem:
-            return .privateHandleInaccessible(role)
-        case errSecUserCanceled:
-            return .localAuthenticationCancelled(role)
-        case errSecAuthFailed:
-            return .localAuthenticationFailed(role)
-        case errSecInteractionNotAllowed:
-            return .privateHandleUnauthorized(role)
-        default:
-            return .privateHandleInaccessible(role)
-        }
+        SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
     }
 
     private static func applicationTagData(from attributes: [String: Any]) -> Data? {

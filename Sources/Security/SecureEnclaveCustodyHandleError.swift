@@ -1,9 +1,11 @@
 import Foundation
+import Security
 
 enum SecureEnclaveCustodyHandleError: Error, Equatable {
     case invalidHandleSetIdentifier
     case invalidApplicationTag
     case invalidPublicKey(PGPPrivateOperationRole)
+    case invalidPeerPublicKey(PGPPrivateOperationRole)
     case accessPolicyUnavailable
     case hardwareUnavailable
     case localAuthenticationCancelled(PGPPrivateOperationRole)
@@ -23,6 +25,10 @@ enum SecureEnclaveCustodyHandleError: Error, Equatable {
              .invalidApplicationTag,
              .invalidPublicKey:
             return .privateHandleInaccessible
+        case .invalidPeerPublicKey:
+            // Untrusted peer input (e.g. the PKESK ephemeral point), not a
+            // fault of the local custody handle.
+            return .externalOperationInvalidRequest
         case .accessPolicyUnavailable:
             return .localAuthenticationUnavailable
         case .hardwareUnavailable:
@@ -54,5 +60,44 @@ enum SecureEnclaveCustodyHandleError: Error, Equatable {
             return true
         }
         return false
+    }
+}
+
+/// Maps Security-framework `OSStatus` / `CFError` results to role-tagged
+/// `SecureEnclaveCustodyHandleError` values. Shared by the digest signer,
+/// key-agreement, and key-store paths so status classification stays consistent
+/// across operations rather than being re-implemented per call site.
+enum SecureEnclaveCustodyOSStatusMapper {
+    static func handleError(
+        for status: OSStatus,
+        role: PGPPrivateOperationRole
+    ) -> SecureEnclaveCustodyHandleError {
+        switch status {
+        case errSecNotAvailable:
+            return .hardwareUnavailable
+        case errSecItemNotFound:
+            return .privateHandleMissing(role)
+        case errSecDuplicateItem:
+            return .privateHandleInaccessible(role)
+        case errSecUserCanceled:
+            return .localAuthenticationCancelled(role)
+        case errSecAuthFailed:
+            return .localAuthenticationFailed(role)
+        case errSecInteractionNotAllowed:
+            return .privateHandleUnauthorized(role)
+        default:
+            return .privateHandleInaccessible(role)
+        }
+    }
+
+    static func handleError(
+        for error: Unmanaged<CFError>?,
+        role: PGPPrivateOperationRole
+    ) -> SecureEnclaveCustodyHandleError {
+        guard let error else {
+            return .privateHandleInaccessible(role)
+        }
+        let code = OSStatus(CFErrorGetCode(error.takeRetainedValue()))
+        return handleError(for: code, role: role)
     }
 }

@@ -82,6 +82,12 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
+        // `externalOperationInvalidRequest` is reachable for key agreement:
+        // invalidPeerPublicKey (e.g. an off-curve ephemeral point) maps here.
+        // `externalOperationInvalidResponse` has no handle-error source today but
+        // is mapped for parity. Unlike the signing bridge (which has no peer key
+        // and folds both into externalOperationFailed), these are kept distinct so
+        // the peer-input category survives to the caller.
         case .externalOperationInvalidRequest:
             return .externalOperationInvalidRequest
         case .externalOperationInvalidResponse:

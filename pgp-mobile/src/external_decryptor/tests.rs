@@ -236,9 +236,7 @@ where
                     )?;
                     let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
                     if let Some(error) = decryptor.take_last_error() {
-                        if should_propagate_runtime_error(error) {
-                            return Err(error.into());
-                        }
+                        return Err(error.into());
                     }
                     if let Some((algo, session_key)) = decrypted {
                         self.telemetry.record_recovered_session_key();
@@ -887,6 +885,53 @@ fn test_runtime_external_key_agreement_api_hard_aborts_invalid_response_before_l
 }
 
 #[test]
+fn test_runtime_external_key_agreement_api_payload_authentication_hard_fails() {
+    let engine = PgpEngine::new();
+    for version in CandidateVersion::all() {
+        let material = build_candidate(version).expect("candidate should build");
+        let plaintext = format!("runtime payload hard fail {}", version.label())
+            .repeat(600)
+            .into_bytes();
+        let ciphertext =
+            encrypt::encrypt_binary(&plaintext, &[material.public_cert.clone()], None, None)
+                .expect("encryption to public-only candidate should succeed");
+        assert_message_format(version, &ciphertext);
+        let tampered = tamper_near_payload_tail(&ciphertext);
+        let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+            material.agreement_scalar.clone(),
+        ));
+
+        let result = engine.decrypt_detailed_with_external_p256_key_agreement(
+            tampered,
+            material.public_cert.clone(),
+            material.agreement_public_key.fingerprint().to_hex(),
+            provider.clone(),
+            Vec::new(),
+        );
+
+        assert!(
+            provider.request_count() > 0,
+            "tampered {} payload should still exercise the external ECDH callback",
+            version.label()
+        );
+        match result {
+            Err(PgpError::AeadAuthenticationFailed)
+            | Err(PgpError::IntegrityCheckFailed)
+            | Err(PgpError::NoMatchingKey)
+            | Err(PgpError::CorruptData { .. }) => {}
+            Err(other) => panic!(
+                "tampered {} payload should fail as payload authentication/corruption, got: {other:?}",
+                version.label()
+            ),
+            Ok(_) => panic!(
+                "tampered {} payload must not release plaintext through the runtime API",
+                version.label()
+            ),
+        }
+    }
+}
+
+#[test]
 fn test_external_decryptor_request_binds_recipient_and_ephemeral_public_points() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let plaintext = b"request binding proof";
@@ -1028,6 +1073,47 @@ fn test_external_decryptor_rejects_unsupported_keys_and_invalid_response_shape()
     };
 
     assert!(decryptor.decrypt(&ciphertext, None).is_err());
+}
+
+#[test]
+fn test_external_decryptor_records_last_error_on_request_validation_failures() {
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+
+    // Non-ECDH ciphertext: request validation must record the failure so the
+    // helper loop can hard-abort (PKESK::decrypt turns the Err into None).
+    let mut decryptor = ExternalP256Decryptor::new(
+        material.agreement_public_key.clone(),
+        |_request| -> Result<ExternalP256SharedSecret, ExternalP256DecryptorError> {
+            panic!("key-agreement callback must not run for an invalid request")
+        },
+    )
+    .expect("valid decryptor should initialize");
+    let rsa_ciphertext = mpi::Ciphertext::RSA {
+        c: mpi::MPI::new(&[1u8; P256_SHARED_SECRET_LENGTH]),
+    };
+    assert!(decryptor.decrypt(&rsa_ciphertext, None).is_err());
+    assert!(matches!(
+        decryptor.take_last_error(),
+        Some(ExternalP256DecryptorError::InvalidRequest(_))
+    ));
+
+    // Malformed ephemeral point (too short): same recording requirement.
+    let mut decryptor = ExternalP256Decryptor::new(
+        material.agreement_public_key,
+        |_request| -> Result<ExternalP256SharedSecret, ExternalP256DecryptorError> {
+            panic!("key-agreement callback must not run for an invalid request")
+        },
+    )
+    .expect("valid decryptor should initialize");
+    let malformed_ephemeral = mpi::Ciphertext::ECDH {
+        e: mpi::MPI::new(&[P256_UNCOMPRESSED_POINT_TAG; P256_PUBLIC_KEY_LENGTH - 1]),
+        key: vec![1u8; 40].into_boxed_slice(),
+    };
+    assert!(decryptor.decrypt(&malformed_ephemeral, None).is_err());
+    assert!(matches!(
+        decryptor.take_last_error(),
+        Some(ExternalP256DecryptorError::InvalidRequest(_))
+    ));
 }
 
 #[test]

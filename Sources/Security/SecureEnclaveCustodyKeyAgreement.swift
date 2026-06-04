@@ -54,7 +54,9 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
         }
         guard SecureEnclaveCustodyHandlePublicBinding
             .hasUncompressedP256X963PublicKeyShape(request.ephemeralPublicKey) else {
-            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
+            // The ephemeral point is untrusted peer input from the PKESK packet,
+            // not a fault of the local key-agreement handle.
+            throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
         guard let privateKey = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleMissing(.keyAgreement)
@@ -76,6 +78,14 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
         ) as Data? else {
             throw Self.mapCFError(error)
         }
+        // KNOWN LIMITATION: SecKeyCopyKeyExchangeResult returns the shared secret
+        // as an immutable CFData bridged to Data. `resetBytes` triggers Data's
+        // copy-on-write, so it may zero a fresh copy while the original CFData
+        // backing lingers until ARC releases it. The SecKey-backed custody handle
+        // leaves no zeroizable alternative here (cf. SECURITY.md §9.1 on String);
+        // exposure is bounded by the short lifetime, ASLR, and MIE. The validated
+        // SecureEnclaveP256RawSharedSecret copy below is the carrier; this defer is
+        // best-effort scrubbing of the transient bridged buffer.
         defer { sharedSecret.resetBytes(in: 0..<sharedSecret.count) }
         return try SecureEnclaveP256RawSharedSecret(raw: sharedSecret)
     }
@@ -92,7 +102,11 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
             attributes as CFDictionary,
             &error
         ) else {
-            throw mapCFError(error)
+            // SecKeyCreateWithData rejects malformed/off-curve peer points. This
+            // is invalid peer input, not a local handle fault — release the CFError
+            // to balance its +1 retain, then surface an invalid-request category.
+            _ = error?.takeRetainedValue()
+            throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
         return publicKey
     }
@@ -100,23 +114,6 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
     private static func mapCFError(
         _ error: Unmanaged<CFError>?
     ) -> SecureEnclaveCustodyHandleError {
-        guard let error else {
-            return .privateHandleInaccessible(.keyAgreement)
-        }
-        let code = OSStatus(CFErrorGetCode(error.takeRetainedValue()))
-        switch code {
-        case errSecUserCanceled:
-            return .localAuthenticationCancelled(.keyAgreement)
-        case errSecAuthFailed:
-            return .localAuthenticationFailed(.keyAgreement)
-        case errSecInteractionNotAllowed:
-            return .privateHandleUnauthorized(.keyAgreement)
-        case errSecItemNotFound:
-            return .privateHandleMissing(.keyAgreement)
-        case errSecNotAvailable:
-            return .hardwareUnavailable
-        default:
-            return .privateHandleInaccessible(.keyAgreement)
-        }
+        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: .keyAgreement)
     }
 }

@@ -108,7 +108,7 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
         XCTAssertThrowsError(try bridge.deriveSharedSecret(request: request)) { error in
             XCTAssertEqual(
                 error as? ExternalP256KeyAgreementError,
-                .Failed(category: .privateHandleInaccessible)
+                .Failed(category: .externalOperationInvalidRequest)
             )
         }
     }
