@@ -438,7 +438,10 @@ Recommended PR grouping:
 - PR 6A: external P-256 ECDH UniFFI callback, Swift key-agreement bridge, and
   router key-agreement route. This PR must not release a plaintext workflow.
 - PR 6B: message decrypt integration for v4/v6, verification folding,
-  recipient mismatch, tamper, and no fallback.
+  recipient mismatch, tamper, and no fallback. **Implemented:** in-memory
+  recipient-key message decrypt now routes through a `PrivateKeyMessageDecryptionService`
+  consumed by `DecryptionService`, while the Phase 1/Phase 2 boundary, matched-key
+  guard, and verification-context construction stay in the service.
 - PR 6C: streaming file decrypt integration with success-only output, progress,
   cancellation, cleanup, and tamper coverage.
 - PR 6D: Phase 6 closure audit for mixed recipients, repeated operation
@@ -451,6 +454,21 @@ decrypt workflows, UI, product copy, or production Secure Enclave custody
 availability. The follow-up hardens invalid callback responses as typed
 hard-abort failures, zeroizes Swift-owned shared-secret buffers at the Security
 to FFI handoff, and documents the runtime point-validation boundary.
+
+PR 6B is implemented as the first plaintext-workflow slice for in-memory message
+decrypt only. `DecryptionService.decryptDetailed` (and the `decryptMessageDetailed`
+convenience) keeps Phase 1 recipient parsing unauthenticated, keeps the matched-key
+guard before any private-key access, and keeps building the verification context;
+it then delegates custody dispatch to the router-owned
+`PrivateKeyMessageDecryptionService`. Software custody keeps the existing
+unwrap-and-zeroize secret-certificate decrypt; Secure Enclave custody loads only
+the `.keyAgreement` handle and calls the Phase 6A external decrypt API for v4 and
+v6 messages, preserving Sequoia-owned payload authentication, verification
+folding, and success-only plaintext release. Recipient mismatch, wrong-binding,
+session-key, callback, and tamper paths fail closed with sanitized categories and
+no software fallback. Streaming file decrypt (PR 6C), UI, product copy, and
+production Secure Enclave custody availability remain deferred; production policy
+still blocks Secure Enclave custody.
 
 Entry conditions:
 
