@@ -112,10 +112,6 @@ final class ContactsScreenModel {
         _ tagFilterIds: Set<String>,
         availableTags: [ContactTagSummary]
     ) -> Set<String> {
-        guard !tagFilterIds.isEmpty else {
-            return []
-        }
-        let availableTagIds = Set(availableTags.map(\.tagId))
-        return tagFilterIds.intersection(availableTagIds)
+        ContactTagSummary.prunedTagFilterIds(tagFilterIds, availableTags: availableTags)
     }
 }
