@@ -1016,6 +1016,16 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
 
     /**
+     * Decrypt a file using streaming I/O through a public-only P-256 recipient
+     * certificate and external key-agreement provider, preserving per-signature details.
+     *
+     * The session key is acquired via the external P-256 key-agreement callback (no
+     * secret certificate is unwrapped). Payload authentication and the success-only
+     * output contract remain Sequoia/streaming responsibilities.
+     */
+    func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
+
+    /**
      * Decrypt a password-encrypted message without falling back to recipient-key decryption.
      */
     func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data]) throws  -> PasswordDecryptResult
@@ -1451,6 +1461,29 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
         FfiConverterString.lower(inputPath),
         FfiConverterString.lower(outputPath),
         FfiConverterSequenceData.lower(secretKeys),
+        FfiConverterSequenceData.lower(verificationKeys),
+        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+    )
+})
+}
+
+    /**
+     * Decrypt a file using streaming I/O through a public-only P-256 recipient
+     * certificate and external key-agreement provider, preserving per-signature details.
+     *
+     * The session key is acquired via the external P-256 key-agreement callback (no
+     * secret certificate is unwrapped). Payload authentication and the success-only
+     * output contract remain Sequoia/streaming responsibilities.
+     */
+open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileDecryptDetailedResult  {
+    return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterString.lower(outputPath),
+        FfiConverterData.lower(recipientPublicCert),
+        FfiConverterString.lower(keyAgreementSubkeyFingerprint),
+        FfiConverterTypeExternalP256KeyAgreementProvider_lower(keyAgreementProvider),
         FfiConverterSequenceData.lower(verificationKeys),
         FfiConverterOptionTypeProgressReporter.lower(progress),$0
     )
@@ -6498,6 +6531,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 34778) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement() != 61069) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {

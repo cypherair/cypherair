@@ -177,11 +177,21 @@ final class TutorialSandboxContainer {
             messageAdapter: messageAdapter,
             keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
         )
+        let fileDecryptor = PrivateKeyStreamingFileDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+        )
         self.decryptionService = DecryptionService(
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             contactService: contactService,
             messageDecryptor: messageDecryptor,
+            fileDecryptor: fileDecryptor,
             temporaryArtifactStore: temporaryArtifactStore
         )
         let cleartextSigner = PrivateKeyCleartextSigningService(

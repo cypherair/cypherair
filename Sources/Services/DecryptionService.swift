@@ -14,6 +14,7 @@ final class DecryptionService {
     private let keyManagement: KeyManagementService
     private let contactService: ContactService
     private let messageDecryptor: any RecipientMessageDecrypting
+    private let fileDecryptor: any StreamingFileDecrypting
     private let temporaryArtifactStore: AppTemporaryArtifactStore
 
     init(
@@ -21,12 +22,14 @@ final class DecryptionService {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         messageDecryptor: any RecipientMessageDecrypting,
+        fileDecryptor: any StreamingFileDecrypting,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()
     ) {
         self.messageAdapter = messageAdapter
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.messageDecryptor = messageDecryptor
+        self.fileDecryptor = fileDecryptor
         self.temporaryArtifactStore = temporaryArtifactStore
     }
 
@@ -144,16 +147,13 @@ final class DecryptionService {
             throw CypherAirError.noMatchingKey
         }
 
-        var secretKey: Data
-        do {
-            secretKey = try await keyManagement.unwrapPrivateKey(fingerprint: matchedKey.fingerprint)
-        } catch {
-            throw CypherAirError.from(error) { _ in .authenticationFailed }
-        }
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
+        // Custody-specific private-key access is owned by the router-backed streaming
+        // file decryptor: software custody unwraps and zeroizes a secret certificate;
+        // Secure Enclave custody uses the external P-256 key-agreement route. This
+        // service keeps ownership of the temporary output artifact, success-only file
+        // protection, and cleanup. Payload authentication and the success-only
+        // plaintext-to-output release remain the Sequoia/streaming pipeline's
+        // responsibility.
         let context = verificationContext()
 
         let inputFilename = (phase1.inputPath as NSString).lastPathComponent
@@ -161,10 +161,10 @@ final class DecryptionService {
 
         let verification: DetailedSignatureVerification
         do {
-            verification = try await messageAdapter.decryptFileDetailed(
+            verification = try await fileDecryptor.decryptFile(
                 inputPath: phase1.inputPath,
                 outputPath: outputArtifact.fileURL.path,
-                secretKeys: [secretKey],
+                recipientFingerprint: matchedKey.fingerprint,
                 verificationContext: context,
                 progress: progress
             )

@@ -486,6 +486,11 @@ final class StreamingServiceTests: XCTestCase {
                 engine: engine,
                 keyManagement: emptyKeyMgmt,
                 messageAdapter: emptyMessageAdapter
+            ),
+            fileDecryptor: TestHelpers.makeFileDecryptor(
+                engine: engine,
+                keyManagement: emptyKeyMgmt,
+                messageAdapter: emptyMessageAdapter
             )
         )
 

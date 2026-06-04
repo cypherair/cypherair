@@ -336,6 +336,12 @@ final class AppContainer: @unchecked Sendable {
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
         )
+        let fileDecryptor = makePrivateKeyStreamingFileDecryptionService(
+            engine: engine,
+            messageAdapter: messageAdapter,
+            keyManagement: keyManagement,
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
+        )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
             encryptionService: EncryptionService(
@@ -350,6 +356,7 @@ final class AppContainer: @unchecked Sendable {
                 keyManagement: keyManagement,
                 contactService: contactService,
                 messageDecryptor: messageDecryptor,
+                fileDecryptor: fileDecryptor,
                 temporaryArtifactStore: temporaryArtifactStore
             ),
             passwordMessageService: PasswordMessageService(
@@ -440,6 +447,23 @@ final class AppContainer: @unchecked Sendable {
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
+            router: keyManagement.makePrivateKeyOperationRouter(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
+            softwarePrivateKeyAccess: keyManagement,
+            messageAdapter: messageAdapter,
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+        )
+    }
+
+    private static func makePrivateKeyStreamingFileDecryptionService(
+        engine: PgpEngine,
+        messageAdapter: PGPMessageOperationAdapter,
+        keyManagement: KeyManagementService,
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore
+    ) -> PrivateKeyStreamingFileDecryptionService {
+        PrivateKeyStreamingFileDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore
