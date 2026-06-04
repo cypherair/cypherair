@@ -66,6 +66,7 @@ final class EncryptScreenModel {
     var plaintext = ""
     var recipientSearchText = ""
     var selectedRecipients: Set<String> = []
+    var activeRecipientFilterTagId: String?
     var signMessage = true
     var signerFingerprint: String?
     var ciphertext: Data?
@@ -161,6 +162,24 @@ final class EncryptScreenModel {
 
     var encryptableContacts: [ContactRecipientSummary] {
         contactService.recipientContacts(matching: recipientSearchText)
+    }
+
+    /// Candidate recipients for the chooser's reveal-on-focus list, filtered by
+    /// the active search text and (optionally) the active tag filter. Kept
+    /// distinct from `encryptableContacts`, which intentionally ignores the tag
+    /// filter so existing callers and tests are unaffected.
+    var filteredRecipientContacts: [ContactRecipientSummary] {
+        let tagFilterIds: Set<String> = activeRecipientFilterTagId.map { [$0] } ?? []
+        return contactService.recipientContacts(matching: recipientSearchText, tagFilterIds: tagFilterIds)
+    }
+
+    /// The currently selected recipients resolved to summaries, in presentation
+    /// order, dropping any ids that are no longer available.
+    var selectedRecipientSummaries: [ContactRecipientSummary] {
+        let summariesByContactId = Dictionary(
+            uniqueKeysWithValues: contactService.recipientContacts(matching: "").map { ($0.contactId, $0) }
+        )
+        return effectiveRecipientContactIds.compactMap { summariesByContactId[$0] }
     }
 
     var effectiveRecipientContactIds: [String] {
@@ -327,6 +346,12 @@ final class EncryptScreenModel {
         } else {
             selectedRecipients.remove(contactId)
         }
+    }
+
+    /// Sets (or clears, with `nil`) the tag that filters the candidate list.
+    /// This is a browse filter only — it does not change the selected recipients.
+    func setRecipientFilterTag(_ tagId: String?) {
+        activeRecipientFilterTagId = tagId
     }
 
     func selectRecipients(withTagId tagId: String) {
@@ -650,6 +675,7 @@ final class EncryptScreenModel {
         plaintext = ""
         recipientSearchText = ""
         selectedRecipients.removeAll()
+        activeRecipientFilterTagId = nil
         ciphertext = nil
         selectedFileURL = nil
         selectedFileName = nil

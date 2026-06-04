@@ -2,7 +2,6 @@ import SwiftUI
 
 struct EncryptScreenFormView: View {
     let model: EncryptScreenModel
-    @Binding var isRecipientTagPickerPresented: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -27,18 +26,14 @@ struct EncryptScreenFormView: View {
                     .disabled(operation.isRunning)
             }
 
-            EncryptRecipientsSection(
-                model: model,
-                openTagPicker: {
-                    isRecipientTagPickerPresented = true
-                }
-            )
-            .disabled(operation.isRunning)
+            EncryptRecipientsSection(model: model)
+                .disabled(operation.isRunning)
 
             EncryptOptionsSection(model: model)
                 .disabled(operation.isRunning)
 
             EncryptResultSections(model: model)
         }
+        .screenReady("encrypt.ready")
     }
 }

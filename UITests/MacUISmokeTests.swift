@@ -79,6 +79,14 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("contactcertification.ready")
     }
 
+    func test_mainFlow_encryptTool_recipientChooserRenders() throws {
+        launchMain(preloadContact: true)
+
+        element("sidebar.encrypt").tap()
+
+        waitForScreenReady("encrypt.ready")
+    }
+
     func test_settingsRoot_opensThemePicker() throws {
         launchSettings()
 

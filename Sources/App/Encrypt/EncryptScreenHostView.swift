@@ -6,7 +6,6 @@ struct EncryptScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: EncryptScreenModel
-    @State private var isRecipientTagPickerPresented = false
 
     init(
         encryptionService: EncryptionService,
@@ -39,10 +38,7 @@ struct EncryptScreenHostView: View {
     var body: some View {
         @Bindable var model = model
 
-        EncryptScreenFormView(
-            model: model,
-            isRecipientTagPickerPresented: $isRecipientTagPickerPresented
-        )
+        EncryptScreenFormView(model: model)
         .scrollDismissesKeyboardInteractivelyIfAvailable()
         #if os(macOS)
         .formStyle(.grouped)
@@ -54,10 +50,7 @@ struct EncryptScreenHostView: View {
             placement: .automatic,
             prompt: String(localized: "encrypt.search.prompt", defaultValue: "Recipients, tags, fingerprints")
         )
-        .encryptScreenPresentations(
-            model: model,
-            isRecipientTagPickerPresented: $isRecipientTagPickerPresented
-        )
+        .encryptScreenPresentations(model: model)
         .onChange(of: runtimeSyncKey) { _, _ in
             model.updateConfiguration(configuration)
         }

@@ -17,14 +17,36 @@ enum MacPresentationWidth {
 struct CypherStatusBadge: View {
     let title: String
     let color: Color
+    let systemImage: String?
+
+    init(title: String, color: Color) {
+        self.title = title
+        self.color = color
+        self.systemImage = nil
+    }
+
+    init(title: String, systemImage: String, color: Color) {
+        self.title = title
+        self.color = color
+        self.systemImage = systemImage
+    }
 
     var body: some View {
-        Text(title)
+        badgeLabel
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(color.opacity(0.14), in: Capsule())
             .foregroundStyle(color)
+    }
+
+    @ViewBuilder
+    private var badgeLabel: some View {
+        if let systemImage {
+            Label(title, systemImage: systemImage)
+        } else {
+            Text(title)
+        }
     }
 }
 

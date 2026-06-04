@@ -4321,6 +4321,22 @@
         }
       }
     },
+    "encrypt.recipients.addAllInTag" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add All (%d)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部添加（%d）"
+          }
+        }
+      }
+    },
     "encrypt.recipients.noMatches" : {
       "localizations" : {
         "en" : {
@@ -4333,6 +4349,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有匹配收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recipients yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未选择收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.remove" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@"
           }
         }
       }
@@ -7645,6 +7693,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "解密"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backedUp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backUpNow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back up now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens key details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开密钥详情"
           }
         }
       }

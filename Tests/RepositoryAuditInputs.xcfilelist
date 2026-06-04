@@ -14,10 +14,12 @@ $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactStore.swift
 $(SRCROOT)/Sources/App/Common/ColorTheme+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherAirError+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
+$(SRCROOT)/Sources/App/Common/CypherChipFlowLayout.swift
 $(SRCROOT)/Sources/App/Common/CypherMotion.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationButtonLabel.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationCancelSection.swift
 $(SRCROOT)/Sources/App/Common/CypherPressFeedbackModifier.swift
+$(SRCROOT)/Sources/App/Common/CypherTagChip.swift
 $(SRCROOT)/Sources/App/Common/CypherTextInputs.swift
 $(SRCROOT)/Sources/App/Common/DetailedSignatureSectionView.swift
 $(SRCROOT)/Sources/App/Common/FileExportController.swift
@@ -71,7 +73,7 @@ $(SRCROOT)/Sources/App/Decrypt/DecryptView.swift
 $(SRCROOT)/Sources/App/Decrypt/Support/ArmoredTextMessageClassifier.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptInputSections.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptOptionsSection.swift
-$(SRCROOT)/Sources/App/Encrypt/EncryptRecipientTagPickerSheet.swift
+$(SRCROOT)/Sources/App/Encrypt/EncryptRecipientChooser.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptRecipientsSection.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptResultSections.swift
 $(SRCROOT)/Sources/App/Encrypt/EncryptScreenFormView.swift

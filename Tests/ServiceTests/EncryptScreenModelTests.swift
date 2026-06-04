@@ -512,6 +512,114 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_filteredRecipientContacts_appliesActiveTagFilterWithoutAffectingEncryptableContacts() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptRecipientFilterTag")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let tagged = try stack.engine.generateKey(
+            name: "Tagged Member",
+            email: "filter-tagged@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let untagged = try stack.engine.generateKey(
+            name: "Untagged Member",
+            email: "filter-untagged@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: tagged.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: untagged.publicKeyData, verificationState: .verified)
+        let taggedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: tagged.fingerprint))
+        let untaggedContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: untagged.fingerprint))
+        let tag = try opened.service.addTag(named: "Filtered", toContactId: taggedContactId)
+
+        let model = makeModel(contactService: opened.service)
+
+        XCTAssertEqual(
+            Set(model.filteredRecipientContacts.map(\.contactId)),
+            Set([taggedContactId, untaggedContactId])
+        )
+
+        model.setRecipientFilterTag(tag.tagId)
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [taggedContactId])
+        // The tag filter must not change `encryptableContacts`, which existing
+        // callers and tests rely on.
+        XCTAssertEqual(
+            Set(model.encryptableContacts.map(\.contactId)),
+            Set([taggedContactId, untaggedContactId])
+        )
+
+        model.setRecipientFilterTag(nil)
+        XCTAssertEqual(
+            Set(model.filteredRecipientContacts.map(\.contactId)),
+            Set([taggedContactId, untaggedContactId])
+        )
+    }
+
+    @MainActor
+    func test_setRecipientFilterTag_togglesAndResetsOnContentClearButNotOnClearRecipients() {
+        let model = makeModel()
+
+        model.setRecipientFilterTag("tag-1")
+        XCTAssertEqual(model.activeRecipientFilterTagId, "tag-1")
+
+        model.setRecipientFilterTag(nil)
+        XCTAssertNil(model.activeRecipientFilterTagId)
+
+        // Clearing the selected recipients must NOT reset the browse filter.
+        model.setRecipientFilterTag("tag-1")
+        model.clearRecipients()
+        XCTAssertEqual(model.activeRecipientFilterTagId, "tag-1")
+
+        // A content-clear (e.g. app backgrounding) resets the browse filter.
+        model.handleContentClearGenerationChange()
+        XCTAssertNil(model.activeRecipientFilterTagId)
+    }
+
+    @MainActor
+    func test_selectedRecipientSummaries_resolvesSelectedIdsAndDropsStale() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptSelectedSummaries")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let first = try stack.engine.generateKey(
+            name: "Summary First",
+            email: "summary-first@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let second = try stack.engine.generateKey(
+            name: "Summary Second",
+            email: "summary-second@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: second.publicKeyData, verificationState: .verified)
+        let firstContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: first.fingerprint))
+        let secondContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: second.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        model.selectedRecipients = [firstContactId, secondContactId, "stale-contact-id"]
+
+        let summaryIds = model.selectedRecipientSummaries.map(\.contactId)
+        XCTAssertEqual(Set(summaryIds), Set([firstContactId, secondContactId]))
+        XCTAssertFalse(summaryIds.contains("stale-contact-id"))
+        // Resolved summaries follow presentation order with stale ids dropped.
+        XCTAssertEqual(summaryIds, model.effectiveRecipientContactIds.filter { $0 != "stale-contact-id" })
+    }
+
+    @MainActor
     func test_requestEncryptFailsAndClearsStaleDirectRecipientSelection() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStaleDirectRecipient")
