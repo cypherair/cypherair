@@ -345,8 +345,8 @@
 				Security/SecureEnclaveCustodyHandleReference.swift,
 				Security/SecureEnclaveCustodyHandleState.swift,
 				Security/SecureEnclaveCustodyHandleStore.swift,
-				Security/SecureEnclaveCustodyKeyStoring.swift,
 				Security/SecureEnclaveCustodyKeyAgreement.swift,
+				Security/SecureEnclaveCustodyKeyStoring.swift,
 				Security/SecureEnclaveCustodyLoadedHandle.swift,
 				Security/SecureEnclaveCustodyLoadedHandlePair.swift,
 				Security/SecureEnclaveManageable.swift,
@@ -384,21 +384,21 @@
 				Services/KeyManagement/KeyProvisioningCommitCoordinator.swift,
 				Services/KeyManagement/KeyProvisioningInvalidationGate.swift,
 				Services/KeyManagement/KeyProvisioningService.swift,
-				Services/KeyManagement/PGPKeyOperationFailureMapper.swift,
 				Services/KeyManagement/PGPKeyCapabilityResolver.swift,
+				Services/KeyManagement/PGPKeyOperationFailureMapper.swift,
+				Services/KeyManagement/PrivateKeyAccessService.swift,
 				Services/KeyManagement/PrivateKeyCleartextSigningService.swift,
 				Services/KeyManagement/PrivateKeyContactCertificationService.swift,
 				Services/KeyManagement/PrivateKeyDetachedFileSigningService.swift,
 				Services/KeyManagement/PrivateKeyExpiryMutationService.swift,
 				Services/KeyManagement/PrivateKeyMessageDecryptionService.swift,
+				Services/KeyManagement/PrivateKeyOperationRouter.swift,
+				Services/KeyManagement/PrivateKeyOperationRouting.swift,
 				Services/KeyManagement/PrivateKeyPasswordMessageEncryptionService.swift,
 				Services/KeyManagement/PrivateKeySelectiveRevocationService.swift,
 				Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift,
 				Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift,
 				Services/KeyManagement/PrivateKeyTextEncryptionService.swift,
-				Services/KeyManagement/PrivateKeyOperationRouter.swift,
-				Services/KeyManagement/PrivateKeyOperationRouting.swift,
-				Services/KeyManagement/PrivateKeyAccessService.swift,
 				Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryReport.swift,
 				Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryService.swift,
 				Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift,
@@ -890,7 +890,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14301;
+				CURRENT_PROJECT_VERSION = 14302;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1118,7 +1118,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14301;
+				CURRENT_PROJECT_VERSION = 14302;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1266,7 +1266,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14301;
+				CURRENT_PROJECT_VERSION = 14302;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
