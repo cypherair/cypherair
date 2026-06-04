@@ -548,6 +548,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
         model.setRecipientFilterTag(tag.tagId)
         XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [taggedContactId])
+        // A tag with a selectable recipient is not "skipped-only".
+        XCTAssertFalse(model.activeRecipientFilterTagIsSkippedOnly)
         // The tag filter must not change `encryptableContacts`, which existing
         // callers and tests rely on.
         XCTAssertEqual(
@@ -617,6 +619,96 @@ final class EncryptScreenModelTests: XCTestCase {
         XCTAssertFalse(summaryIds.contains("stale-contact-id"))
         // Resolved summaries follow presentation order with stale ids dropped.
         XCTAssertEqual(summaryIds, model.effectiveRecipientContactIds.filter { $0 != "stale-contact-id" })
+    }
+
+    @MainActor
+    func test_hasUnavailableSelectedRecipients_reflectsStaleSelectedIds() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptUnavailableSelected")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let valid = try stack.engine.generateKey(
+            name: "Available Recipient",
+            email: "available-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
+        let validContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: valid.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+
+        model.selectedRecipients = []
+        XCTAssertFalse(model.hasUnavailableSelectedRecipients)
+
+        model.selectedRecipients = [validContactId]
+        XCTAssertFalse(model.hasUnavailableSelectedRecipients)
+
+        // A live contact plus a stale id (e.g. its contact was deleted) is partial-stale.
+        model.selectedRecipients = [validContactId, "stale-contact-id"]
+        XCTAssertTrue(model.hasUnavailableSelectedRecipients)
+
+        // A selection made only of stale ids must still report unavailable so the
+        // chooser keeps Clear All reachable instead of looking empty.
+        model.selectedRecipients = ["stale-contact-id"]
+        XCTAssertTrue(model.hasUnavailableSelectedRecipients)
+    }
+
+    @MainActor
+    func test_activeRecipientFilterTagIsSkippedOnly_trueWhenAllTagContactsLackPreferredKey() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptSkippedOnlyTag")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let first = try stack.engine.generateKey(
+            name: "Skipped First",
+            email: "skipped-first@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let second = try stack.engine.generateKey(
+            name: "Skipped Second",
+            email: "skipped-second@example.invalid",
+            expirySeconds: nil,
+            profile: .advanced
+        )
+        try opened.service.importContact(publicKeyData: first.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: second.publicKeyData, verificationState: .verified)
+        let firstContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: first.fingerprint))
+        let secondContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: second.fingerprint))
+        let tag = try opened.service.addTag(named: "All Skipped", toContactId: firstContactId)
+        _ = try opened.service.addTag(named: "All Skipped", toContactId: secondContactId)
+
+        // Demote both contacts' keys so neither remains a preferred recipient.
+        var snapshot = try opened.service.currentContactsDomainSnapshot()
+        for index in snapshot.keyRecords.indices
+            where snapshot.keyRecords[index].contactId == firstContactId
+                || snapshot.keyRecords[index].contactId == secondContactId {
+            snapshot.keyRecords[index].usageState = .historical
+        }
+        try opened.harness.store.replaceSnapshot(snapshot)
+        try await opened.service.relockProtectedData()
+        let reopened = await makeReopenedProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+
+        let model = makeModel(contactService: reopened.service)
+        let option = try XCTUnwrap(model.recipientTagOptions.first { $0.tagId == tag.tagId })
+        XCTAssertTrue(option.selectableContactIds.isEmpty)
+        XCTAssertEqual(option.skippedContactCount, 2)
+
+        XCTAssertFalse(model.activeRecipientFilterTagIsSkippedOnly) // no active filter yet
+        model.setRecipientFilterTag(tag.tagId)
+        XCTAssertTrue(model.activeRecipientFilterTagIsSkippedOnly)
     }
 
     @MainActor

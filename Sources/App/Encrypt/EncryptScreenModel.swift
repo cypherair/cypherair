@@ -182,6 +182,25 @@ final class EncryptScreenModel {
         return effectiveRecipientContactIds.compactMap { summariesByContactId[$0] }
     }
 
+    /// True when there is a non-empty recipient selection but at least one selected
+    /// id no longer resolves to an available recipient (e.g. the contact was deleted
+    /// while the Encrypt view stayed alive). The chooser surfaces this so Clear All
+    /// stays reachable instead of falling through to an empty "No recipients yet".
+    var hasUnavailableSelectedRecipients: Bool {
+        selectedRecipientSummaries.count < selectedRecipients.count
+    }
+
+    /// True when the active recipient tag filter resolves to a tag whose contacts are
+    /// all skipped because none has a preferred encryption key, so the candidate list
+    /// is empty for a reason worth explaining rather than a generic "no matches".
+    var activeRecipientFilterTagIsSkippedOnly: Bool {
+        guard let activeId = activeRecipientFilterTagId,
+              let option = recipientTagOptions.first(where: { $0.tagId == activeId }) else {
+            return false
+        }
+        return option.selectableContactIds.isEmpty && option.skippedContactCount > 0
+    }
+
     var effectiveRecipientContactIds: [String] {
         dedupedContactIds(Array(selectedRecipients))
     }

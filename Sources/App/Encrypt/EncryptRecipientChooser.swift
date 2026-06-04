@@ -55,8 +55,11 @@ struct EncryptRecipientChooser: View {
 
     @ViewBuilder
     private var selectedRecipientsContent: some View {
-        let selected = model.selectedRecipientSummaries
-        if selected.isEmpty {
+        // Drive the "has a selection" UI off the raw selection, not the resolved
+        // summaries — so a selection made only of stale ids (e.g. the contact was
+        // deleted) still shows the count + Clear All instead of looking empty while
+        // the Encrypt button stays enabled.
+        if model.selectedRecipients.isEmpty {
             Text(String(localized: "encrypt.recipients.none", defaultValue: "No recipients yet"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -79,18 +82,33 @@ struct EncryptRecipientChooser: View {
                 .controlSize(.small)
             }
 
-            CypherChipFlowLayout(spacing: 8) {
-                ForEach(selected) { contact in
-                    RecipientSelectedChip(
-                        contact: contact,
-                        defaultKeyVersion: model.defaultKeyVersion,
-                        remove: {
-                            withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
-                                model.toggleRecipient(contact.contactId, isOn: false)
+            let selected = model.selectedRecipientSummaries
+            if !selected.isEmpty {
+                CypherChipFlowLayout(spacing: 8) {
+                    ForEach(selected) { contact in
+                        RecipientSelectedChip(
+                            contact: contact,
+                            defaultKeyVersion: model.defaultKeyVersion,
+                            remove: {
+                                withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                                    model.toggleRecipient(contact.contactId, isOn: false)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
+            }
+
+            if model.hasUnavailableSelectedRecipients {
+                Label(
+                    String(
+                        localized: "encrypt.recipients.someUnavailable",
+                        defaultValue: "Some selected recipients are no longer available. Clear All to remove them."
+                    ),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
             }
         }
     }
@@ -137,8 +155,20 @@ struct EncryptRecipientChooser: View {
 
         let candidates = model.filteredRecipientContacts
         if candidates.isEmpty {
-            Text(String(localized: "encrypt.recipients.noMatches", defaultValue: "No matching recipients"))
-                .foregroundStyle(.secondary)
+            if model.activeRecipientFilterTagIsSkippedOnly {
+                Label(
+                    String(
+                        localized: "encrypt.recipients.tagAllSkipped",
+                        defaultValue: "Contacts with this tag need a preferred encryption key before they can receive messages."
+                    ),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            } else {
+                Text(String(localized: "encrypt.recipients.noMatches", defaultValue: "No matching recipients"))
+                    .foregroundStyle(.secondary)
+            }
         } else {
             ForEach(candidates) { contact in
                 Toggle(isOn: Binding(
