@@ -249,13 +249,10 @@ struct SecureEnclaveCustodyHandleStore {
         signingPublicKeyX963: Data,
         keyAgreementPublicKeyX963: Data
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        let pair = try locateHandlePair(
+        try loadHandle(
+            forRole: .signing,
             signingPublicKeyX963: signingPublicKeyX963,
             keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-        )
-        return try loadHandle(
-            reference: pair.signing.reference,
-            expectedPublicKeyX963: pair.signing.publicKeyX963
         )
     }
 
@@ -263,13 +260,26 @@ struct SecureEnclaveCustodyHandleStore {
         signingPublicKeyX963: Data,
         keyAgreementPublicKeyX963: Data
     ) throws -> SecureEnclaveCustodyLoadedHandle {
+        try loadHandle(
+            forRole: .keyAgreement,
+            signingPublicKeyX963: signingPublicKeyX963,
+            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
+        )
+    }
+
+    private func loadHandle(
+        forRole role: PGPPrivateOperationRole,
+        signingPublicKeyX963: Data,
+        keyAgreementPublicKeyX963: Data
+    ) throws -> SecureEnclaveCustodyLoadedHandle {
         let pair = try locateHandlePair(
             signingPublicKeyX963: signingPublicKeyX963,
             keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
         )
+        let binding = role == .signing ? pair.signing : pair.keyAgreement
         return try loadHandle(
-            reference: pair.keyAgreement.reference,
-            expectedPublicKeyX963: pair.keyAgreement.publicKeyX963
+            reference: binding.reference,
+            expectedPublicKeyX963: binding.publicKeyX963
         )
     }
 

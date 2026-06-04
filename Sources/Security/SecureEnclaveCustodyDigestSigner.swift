@@ -160,21 +160,6 @@ struct SystemSecureEnclaveCustodyDigestSigner: SecureEnclaveCustodyDigestSigning
     private static func mapCFError(
         _ error: Unmanaged<CFError>?
     ) -> SecureEnclaveCustodyHandleError {
-        guard let error else {
-            return .privateHandleInaccessible(.signing)
-        }
-        let code = OSStatus(CFErrorGetCode(error.takeRetainedValue()))
-        switch code {
-        case errSecUserCanceled:
-            return .localAuthenticationCancelled(.signing)
-        case errSecAuthFailed:
-            return .localAuthenticationFailed(.signing)
-        case errSecInteractionNotAllowed:
-            return .privateHandleUnauthorized(.signing)
-        case errSecNotAvailable:
-            return .hardwareUnavailable
-        default:
-            return .privateHandleInaccessible(.signing)
-        }
+        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: .signing)
     }
 }

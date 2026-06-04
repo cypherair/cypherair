@@ -78,9 +78,10 @@ impl DecryptionHelper for ExternalDecryptHelper {
                 )?;
                 let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
                 if let Some(error) = decryptor.take_last_error() {
-                    if should_propagate_runtime_error(error) {
-                        return Err(error.into());
-                    }
+                    // Any recorded error is a definitive failure for the only
+                    // matching key-agreement subkey: hard-abort fail-closed
+                    // instead of falling through to a generic "no matching key".
+                    return Err(error.into());
                 }
                 if let Some((algo, session_key)) = decrypted {
                     if decrypt(algo, &session_key) {
@@ -162,14 +163,10 @@ fn select_external_p256_key_agreement_key(
             reason: "Ambiguous external P-256 key-agreement subkey".to_string(),
         });
     }
-    ExternalP256Decryptor::new(key.key().clone().role_into_unspecified(), |_request| {
-        Err(ExternalP256DecryptorError::ExternalFailure(
-            crate::keys::ExternalP256KeyAgreementFailureCategory::ExternalOperationFailed,
-        ))
-    })
-    .map(|_| ())
-    .map_err(|e| PgpError::InvalidKeyData {
-        reason: format!("Invalid external P-256 key-agreement subkey: {e}"),
+    core::validate_p256_ecdh_public_key(&key.key().clone().role_into_unspecified()).map_err(|e| {
+        PgpError::InvalidKeyData {
+            reason: format!("Invalid external P-256 key-agreement subkey: {e}"),
+        }
     })
 }
 
@@ -198,16 +195,6 @@ fn external_key_agreement_error_to_decryptor_error(
             ExternalP256DecryptorError::OperationCancelled
         }
     }
-}
-
-fn should_propagate_runtime_error(error: ExternalP256DecryptorError) -> bool {
-    matches!(
-        error,
-        ExternalP256DecryptorError::OperationCancelled
-            | ExternalP256DecryptorError::ExternalFailure(_)
-            | ExternalP256DecryptorError::InvalidRequest(_)
-            | ExternalP256DecryptorError::InvalidResponse(_)
-    )
 }
 
 #[cfg(test)]

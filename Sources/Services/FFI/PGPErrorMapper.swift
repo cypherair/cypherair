@@ -55,15 +55,9 @@ enum PGPErrorMapper {
         guard let pgpError = error as? PgpError else {
             return .corruptData(reason: error.localizedDescription)
         }
-
-        switch pgpError {
-        case .OperationCancelled:
-            return .operationCancelled
-        case .ExternalP256KeyAgreementFailed(let category):
-            return .keyOperationUnavailable(category: externalP256KeyAgreementCategory(for: category))
-        default:
-            return map(pgpError)
-        }
+        // `map` already handles .OperationCancelled and .ExternalP256KeyAgreementFailed
+        // identically; this wrapper only differs by its non-PgpError fallback above.
+        return map(pgpError)
     }
 
     static func map(_ pgpError: PgpError) -> CypherAirError {

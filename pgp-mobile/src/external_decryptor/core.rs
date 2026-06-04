@@ -11,6 +11,40 @@ pub(crate) const P256_PUBLIC_KEY_LENGTH: usize = 65;
 pub(crate) const P256_SHARED_SECRET_LENGTH: usize = 32;
 pub(crate) const P256_UNCOMPRESSED_POINT_TAG: u8 = 0x04;
 
+/// Validate that `public_key` is an ECDH P-256 key with a well-formed
+/// uncompressed public point. Shared by `ExternalP256Decryptor::new` and the
+/// key-agreement subkey selector so both validate identically without building
+/// a throwaway decryptor.
+pub(crate) fn validate_p256_ecdh_public_key(
+    public_key: &Key<key::PublicParts, key::UnspecifiedRole>,
+) -> Result<(), ExternalP256DecryptorError> {
+    match (public_key.pk_algo(), public_key.mpis()) {
+        (
+            PublicKeyAlgorithm::ECDH,
+            mpi::PublicKey::ECDH {
+                curve: Curve::NistP256,
+                q,
+                ..
+            },
+        ) => validate_public_point(q.value()),
+        _ => Err(ExternalP256DecryptorError::InvalidRequest(
+            "external P-256 decryptor requires an ECDH P-256 public key",
+        )),
+    }
+}
+
+fn validate_public_point(bytes: &[u8]) -> Result<(), ExternalP256DecryptorError> {
+    if bytes.len() != P256_PUBLIC_KEY_LENGTH
+        || bytes.first().copied() != Some(P256_UNCOMPRESSED_POINT_TAG)
+    {
+        return Err(ExternalP256DecryptorError::InvalidRequest(
+            "external P-256 decryptor received an invalid public point",
+        ));
+    }
+
+    Ok(())
+}
+
 impl ExternalP256KeyAgreementRequest {
     pub(crate) fn new(recipient_public_key: Vec<u8>, ephemeral_public_key: Vec<u8>) -> Self {
         Self {
@@ -73,7 +107,7 @@ where
         public_key: Key<key::PublicParts, key::UnspecifiedRole>,
         key_agreement_operation: F,
     ) -> openpgp::Result<Self> {
-        Self::validate_public_key(&public_key)?;
+        validate_p256_ecdh_public_key(&public_key)?;
 
         Ok(Self {
             public_key,
@@ -86,34 +120,48 @@ where
         self.last_error.take()
     }
 
-    fn validate_public_key(
-        public_key: &Key<key::PublicParts, key::UnspecifiedRole>,
-    ) -> Result<(), ExternalP256DecryptorError> {
-        match (public_key.pk_algo(), public_key.mpis()) {
-            (
-                PublicKeyAlgorithm::ECDH,
-                mpi::PublicKey::ECDH {
-                    curve: Curve::NistP256,
-                    q,
-                    ..
-                },
-            ) => Self::validate_public_point(q.value()),
-            _ => Err(ExternalP256DecryptorError::InvalidRequest(
-                "external P-256 decryptor requires an ECDH P-256 public key",
-            )),
-        }
+    /// Build the external key-agreement request from the ciphertext and the
+    /// recipient public key. Validation only — borrows `self` immutably and
+    /// returns the typed error so `decrypt` records every failure in one place.
+    fn prepare_request(
+        &self,
+        ciphertext: &mpi::Ciphertext,
+    ) -> Result<ExternalP256KeyAgreementRequest, ExternalP256DecryptorError> {
+        let ephemeral_public_key = match ciphertext {
+            mpi::Ciphertext::ECDH { e, .. } => {
+                validate_public_point(e.value())?;
+                e.value().to_vec()
+            }
+            _ => {
+                return Err(ExternalP256DecryptorError::InvalidRequest(
+                    "external P-256 decryptor supports ECDH ciphertext only",
+                ))
+            }
+        };
+
+        let recipient_public_key = match self.public_key.mpis() {
+            mpi::PublicKey::ECDH { q, .. } => q.value().to_vec(),
+            _ => {
+                return Err(ExternalP256DecryptorError::InvalidRequest(
+                    "external P-256 decryptor requires an ECDH public key",
+                ))
+            }
+        };
+
+        Ok(ExternalP256KeyAgreementRequest::new(
+            recipient_public_key,
+            ephemeral_public_key,
+        ))
     }
 
-    fn validate_public_point(bytes: &[u8]) -> Result<(), ExternalP256DecryptorError> {
-        if bytes.len() != P256_PUBLIC_KEY_LENGTH
-            || bytes.first().copied() != Some(P256_UNCOMPRESSED_POINT_TAG)
-        {
-            return Err(ExternalP256DecryptorError::InvalidRequest(
-                "external P-256 decryptor received an invalid public point",
-            ));
-        }
-
-        Ok(())
+    /// Record a failure for out-of-band retrieval and convert it for return.
+    /// Sequoia's `PKESK::decrypt` swallows the returned `Err` into `None`, so
+    /// every error path in `decrypt` funnels through here; the helper loop then
+    /// hard-aborts via `take_last_error` instead of silently downgrading to a
+    /// generic "no matching key".
+    fn record(&mut self, error: ExternalP256DecryptorError) -> openpgp::anyhow::Error {
+        self.last_error = Some(error);
+        error.into()
     }
 
     fn validate_shared_secret(
@@ -152,41 +200,16 @@ where
         ciphertext: &mpi::Ciphertext,
         plaintext_len: Option<usize>,
     ) -> openpgp::Result<SessionKey> {
-        let ephemeral_public_key = match ciphertext {
-            mpi::Ciphertext::ECDH { e, .. } => {
-                Self::validate_public_point(e.value())?;
-                e.value().to_vec()
-            }
-            _ => {
-                return Err(ExternalP256DecryptorError::InvalidRequest(
-                    "external P-256 decryptor supports ECDH ciphertext only",
-                )
-                .into())
-            }
+        let request = match self.prepare_request(ciphertext) {
+            Ok(request) => request,
+            Err(error) => return Err(self.record(error)),
         };
-
-        let recipient_public_key = match self.public_key.mpis() {
-            mpi::PublicKey::ECDH { q, .. } => q.value().to_vec(),
-            _ => {
-                return Err(ExternalP256DecryptorError::InvalidRequest(
-                    "external P-256 decryptor requires an ECDH public key",
-                )
-                .into())
-            }
-        };
-
-        let request =
-            ExternalP256KeyAgreementRequest::new(recipient_public_key, ephemeral_public_key);
         let shared_secret = match (self.key_agreement_operation)(request) {
             Ok(shared_secret) => shared_secret,
-            Err(error) => {
-                self.last_error = Some(error);
-                return Err(error.into());
-            }
+            Err(error) => return Err(self.record(error)),
         };
         if let Err(error) = Self::validate_shared_secret(&shared_secret) {
-            self.last_error = Some(error);
-            return Err(error.into());
+            return Err(self.record(error));
         }
 
         let shared_secret = Protected::from(shared_secret.raw.as_slice());
