@@ -143,6 +143,31 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         )
     }
 
+    func test_phase6FileDecryptionHelperRoutesThroughKeyAgreementOperation() throws {
+        let path = "Sources/Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift"
+        let contents = try RepositoryAuditLoader.loadString(relativePath: path)
+        XCTAssertTrue(
+            contents.contains("router.route("),
+            "\(path) must dispatch through PrivateKeyOperationRouter."
+        )
+        XCTAssertTrue(
+            contents.contains("PrivateKeyOperationRequest("),
+            "\(path) must build an app-owned private-operation request."
+        )
+        XCTAssertTrue(
+            contents.contains("operation: .decrypt"),
+            "\(path) must route through .decrypt."
+        )
+        XCTAssertTrue(
+            contents.contains("PGPExternalP256KeyAgreementProviderBridge("),
+            "\(path) must keep external P-256 key agreement behind the shared bridge."
+        )
+        XCTAssertFalse(
+            contents.contains("WithExternalP256Signer"),
+            "\(path) must not invoke the external P-256 signer runtime."
+        )
+    }
+
     func test_secureEnclaveUnsupportedAndGatedOperationsRemainExplicit() throws {
         let resolver = try RepositoryAuditLoader.loadString(
             relativePath: "Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift"
@@ -1275,9 +1300,10 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
-                "Router-owned Phase 6 decrypt helper is the only service boundary allowed to consume the external P-256 key-agreement route.",
+                "Router-owned Phase 6 decrypt helpers are the only service boundary allowed to consume the external P-256 key-agreement route.",
                 [
                     "Sources/Services/KeyManagement/PrivateKeyMessageDecryptionService.swift",
+                    "Sources/Services/KeyManagement/PrivateKeyStreamingFileDecryptionService.swift",
                 ]
             ),
         ])
