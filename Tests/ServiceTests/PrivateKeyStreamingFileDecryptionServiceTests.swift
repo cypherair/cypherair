@@ -373,15 +373,28 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
     ) async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: configurationIdentity)
         let adapter = PGPMessageOperationAdapter(engine: engine)
+        // Large plaintext so the SEIPD body is substantial and the tail tamper lands
+        // well inside the encrypted payload rather than the PKESK header.
+        let plaintext = String(repeating: "tamper target file plaintext ", count: 600)
         let ciphertext = try await adapter.encrypt(
-            plaintext: Data("tamper target file plaintext".utf8),
+            plaintext: Data(plaintext.utf8),
             recipientKeys: [fixture.identity.publicKeyData],
             signingKey: nil,
             selfKey: nil,
             binary: true
         )
+        // Tamper near the payload tail (mirrors the Rust `tamper_near_payload_tail`
+        // helper). This deliberately targets the SEIPD payload — the MDC for a v4
+        // SEIPDv1 message, the AEAD chunk/tag for a v6 SEIPDv2 message — so the decrypt
+        // exercises payload authentication after the external P-256 key agreement has
+        // already recovered a valid session key from the (intact) PKESK, rather than
+        // failing at session-key recovery.
         var tampered = ciphertext
-        tampered[tampered.count / 2] ^= 0x01
+        XCTAssertGreaterThan(
+            tampered.count, 16,
+            "ciphertext should be long enough to tamper near the payload tail"
+        )
+        tampered[tampered.count - 8] ^= 0x01
         let input = try makeTemporaryFile(tampered)
         let output = makeTemporaryOutputURL()
         defer { cleanup(input, output) }
@@ -400,15 +413,17 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             )
             XCTFail("Expected tampered file to hard-fail without releasing plaintext")
         } catch let error as CypherAirError {
+            // A payload-tail tamper must fail at payload authentication, never via a
+            // session-key/role miss (`.noMatchingKey`) — the intact PKESK guarantees the
+            // session key is recovered first. `.corruptData` is tolerated only for a
+            // structural parse failure at the tampered tail.
             switch error {
             case .aeadAuthenticationFailed,
                  .integrityCheckFailed,
-                 .corruptData,
-                 .noMatchingKey,
-                 .keyOperationUnavailable:
+                 .corruptData:
                 break
             default:
-                XCTFail("Expected payload/session hard-fail, got \(error)")
+                XCTFail("Expected payload-authentication hard-fail, got \(error)")
             }
         }
 

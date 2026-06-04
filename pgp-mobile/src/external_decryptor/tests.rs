@@ -1807,3 +1807,59 @@ fn test_runtime_external_key_agreement_file_api_progress_cancellation_cleans_up(
         "scratch temp file must be securely deleted after cancellation"
     );
 }
+
+/// Cancelling at the very first progress callback — before any payload is streamed —
+/// must surface as `OperationCancelled`, not `CorruptData`.
+///
+/// This guards the early parse-stage classification in
+/// `streaming::decrypt_file_with_helper`: decryptor setup
+/// (`DecryptorBuilder::from_reader` / `with_policy`) pulls the first bytes through the
+/// `ProgressReader`, so a cancel during setup must be classified the same way as a
+/// cancel during the later read loop. No output file or scratch temp may remain.
+#[test]
+fn test_runtime_external_key_agreement_file_api_early_cancellation_maps_to_cancelled() {
+    let engine = PgpEngine::new();
+    let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
+    let ciphertext = encrypt::encrypt_binary(
+        b"early progress cancel",
+        &[material.public_cert.clone()],
+        None,
+        None,
+    )
+    .expect("encryption should succeed");
+    let dir = StreamingTempDir::new("early-cancel");
+    let input = write_input_file(&dir, &ciphertext);
+    let output = dir.output_path();
+    let provider = Arc::new(RuntimeKeyAgreementProvider::new(
+        material.agreement_scalar.clone(),
+    ));
+    // Cancel as soon as the first byte is read — i.e. during decryptor setup, before
+    // any payload is streamed to the temp file.
+    let progress = Arc::new(CancelAfterBytes::new(1));
+    let dyn_progress: Arc<dyn crate::streaming::ProgressReporter> = progress.clone();
+
+    let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
+        input.to_string_lossy().into_owned(),
+        output.to_string_lossy().into_owned(),
+        material.public_cert.clone(),
+        material.agreement_public_key.fingerprint().to_hex(),
+        provider,
+        Vec::new(),
+        Some(dyn_progress),
+    );
+
+    assert!(
+        matches!(result, Err(PgpError::OperationCancelled)),
+        "early cancellation must classify as OperationCancelled, got: {result:?}"
+    );
+    assert!(progress.calls.load(Ordering::SeqCst) > 0);
+    assert!(
+        !output.exists(),
+        "early-cancelled streaming decrypt must not produce output"
+    );
+    assert_eq!(
+        dir.leftover_temp_files(),
+        0,
+        "scratch temp file must be securely deleted after early cancellation"
+    );
+}

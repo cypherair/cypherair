@@ -512,15 +512,17 @@ where
     let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
     let progress_reader = ProgressReader::new(input_file, total_bytes, progress);
 
-    // Build decryptor from file reader. Session-key acquisition (software KeyPair or
-    // external P-256 key agreement) runs in the helper's `decrypt` callback here, so
-    // classify any acquisition failure (including external callback failures).
+    // Build decryptor from file reader. Both stages route through
+    // `classify_decrypt_error`: the parse stage can surface a progress-callback
+    // cancellation (`StreamingCancelled`) as the first bytes are pulled, and the policy
+    // stage runs the helper's `decrypt` callback where session-key acquisition (software
+    // `KeyPair` or external P-256 key agreement) happens. Classifying both keeps a
+    // user-initiated cancel reported as `OperationCancelled` rather than `CorruptData`,
+    // while genuine parse/decrypt failures still map to their fail-closed categories.
     let mut decryptor = DecryptorBuilder::from_reader(progress_reader)
-        .map_err(|e| PgpError::CorruptData {
-            reason: format!("Failed to parse message: {e}"),
-        })?
+        .map_err(classify_decrypt_error)?
         .with_policy(policy, None, helper)
-        .map_err(|e| classify_decrypt_error(e))?;
+        .map_err(classify_decrypt_error)?;
 
     // Write to temp file first (AEAD hard-fail: no partial plaintext).
     // Use a random suffix to prevent predictable temp file paths (M3 fix).
