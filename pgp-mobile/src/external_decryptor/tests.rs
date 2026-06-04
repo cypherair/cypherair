@@ -1689,7 +1689,10 @@ fn test_runtime_external_key_agreement_file_api_callback_failure_and_cancel_leav
     );
     assert!(matches!(result, Err(PgpError::OperationCancelled)));
     assert!(cancelled.request_count() > 0);
-    assert!(!output.exists(), "cancelled callback must not produce output");
+    assert!(
+        !output.exists(),
+        "cancelled callback must not produce output"
+    );
     assert_eq!(dir.leftover_temp_files(), 0);
 }
 

@@ -194,8 +194,13 @@ pub(crate) fn decrypt_file_detailed_with_external_p256_key_agreement(
         key_agreement_provider,
         collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
     };
-    let helper =
-        crate::streaming::decrypt_file_with_helper(input_path, output_path, &policy, helper, progress)?;
+    let helper = crate::streaming::decrypt_file_with_helper(
+        input_path,
+        output_path,
+        &policy,
+        helper,
+        progress,
+    )?;
     let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
         helper.collector.into_parts();
 
