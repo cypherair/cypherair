@@ -434,11 +434,32 @@ external decrypt API, the `.secureEnclaveSigner` route is rejected as a role
 mismatch, and blocked routes map to sanitized unavailable categories.
 `DecryptionService` keeps Phase 1 recipient parsing, the matched-key guard, and
 verification-context construction, then delegates to the new consumer; its
-streaming file decrypt path is unchanged and remains a Phase 6C concern. Payload
+streaming file decrypt path is wired separately in Phase 6C (below). Payload
 authentication, verification folding, and success-only plaintext release stay
 inside the Sequoia decrypt pipeline, and there is no software fallback for a
 Secure Enclave key-agreement route. Production policy still blocks Secure Enclave
 custody.
+
+Phase 6C is the second decrypt-class workflow consumer and is intentionally
+narrow to streaming file decrypt. It reuses the same `.decrypt` operation,
+`.keyAgreement` role, and Phase 6A external key-agreement runtime; no new route
+case is added. A new router-owned `PrivateKeyStreamingFileDecryptionService`
+(protocol `StreamingFileDecrypting`) is the only file-decrypt consumer allowed to
+touch the external P-256 key-agreement runtime: software-custody routes keep the
+existing unwrap-and-zeroize behavior and call the standard streaming file decrypt
+FFI, and Secure Enclave key-agreement routes pass the stored public certificate,
+the inspected key-agreement subkey fingerprint, and the loaded `.keyAgreement`
+handle to a new external streaming file decrypt API. The Rust streaming path
+factors a shared generic helper so both custody paths reuse the same
+`.tmp`-then-rename success-only output, progress, cancellation, and secure
+temp-cleanup machinery. `DecryptionService.decryptFileStreamingDetailed` keeps
+Phase 1 file recipient parsing, the matched-key guard, verification-context
+construction, and ownership of the temporary output artifact, success-only file
+protection, and cleanup-on-error, then delegates custody dispatch to the new
+consumer. The `.secureEnclaveSigner` route is rejected as a role mismatch, blocked
+routes map to sanitized unavailable categories, and there is no software fallback
+for a Secure Enclave key-agreement route. Production policy still blocks Secure
+Enclave custody.
 
 The router centralizes custody-specific dispatch. Signing, decryption,
 encryption, password-message, certificate-signature, and key-management services
