@@ -177,7 +177,10 @@ final class LocalDataResetService {
         keyManagement.resetInMemoryStateAfterLocalDataReset()
         contactService.resetInMemoryStateAfterLocalDataReset()
         protectedDataSessionCoordinator.resetAfterLocalDataReset()
-        appSessionOrchestrator.resetAfterLocalDataReset(
+        // `AppSessionOrchestrator` is `@MainActor`-isolated; hop to the main actor
+        // for this single state mutation. The surrounding reset I/O stays off the
+        // main actor (this method remains nonisolated `async`).
+        await appSessionOrchestrator.resetAfterLocalDataReset(
             preserveAuthentication: authenticationContext != nil
         )
         validateResetPostConditions(

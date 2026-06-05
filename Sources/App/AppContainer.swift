@@ -562,6 +562,10 @@ final class AppContainer: @unchecked Sendable {
         )
     }
 
+    // `@MainActor`: this composition root constructs `AppSessionOrchestrator`,
+    // which is main-actor-isolated. Called from `CypherAirApp.init` (App is
+    // main-actor) and from `@MainActor` test cases.
+    @MainActor
     static func makeDefault(
         authTraceEnabled: Bool = false
     ) -> AppContainer {
@@ -885,6 +889,7 @@ final class AppContainer: @unchecked Sendable {
     }
 
     #if DEBUG
+    @MainActor
     static func makeUITest(
         requiresManualAuthentication: Bool = false,
         preloadContact: Bool = false,

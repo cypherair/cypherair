@@ -1178,7 +1178,11 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
     }
 
-    func test_handleResume_stalePostAuthenticationCompletionRequestsFreshActiveResume() async {
+    // A successful auth straddled by a background→active round-trip (here during
+    // post-auth) is terminal: the app unblurs directly with no fresh resume and a
+    // single authentication attempt. Previously this routed through a second
+    // "fresh" resume; that indirection is what double-prompted under grace==0.
+    func test_handleResume_successDuringBackgroundReactivation_unblursWithoutFreshResume() async {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("ProtectedDataPostAuthenticationFreshResume")
         )
@@ -1225,30 +1229,330 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
 
         orchestrator.handleSceneDidEnterBackground()
         orchestrator.handleSceneDidBecomeActive(source: "unit.activeAfterBackground")
+        // Still blurred while post-auth is in flight.
         XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
 
         await postAuthenticationGate.resume()
         let staleResult = await staleResumeTask.value
 
         XCTAssertTrue(staleResult.attemptedAuthentication)
-        XCTAssertFalse(staleResult.shouldArmAuthenticationSettle)
-        XCTAssertTrue(staleResult.shouldStartFreshResume)
-        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
-
-        let freshResult = await orchestrator.handleResumeForLifecycle(
-            localizedReason: "Fresh resume after stale completion should run grace check",
-            source: "unit.freshAfterStale"
-        )
-
-        XCTAssertFalse(freshResult.attemptedAuthentication)
-        XCTAssertFalse(freshResult.shouldArmAuthenticationSettle)
-        XCTAssertFalse(freshResult.shouldStartFreshResume)
+        XCTAssertTrue(staleResult.shouldArmAuthenticationSettle)
+        XCTAssertFalse(staleResult.shouldStartFreshResume)
         let authenticationAttemptCount = await authenticationAttempts.currentValue()
         XCTAssertEqual(authenticationAttemptCount, 1)
         XCTAssertEqual(orchestrator.contentClearGeneration, 1)
         XCTAssertEqual(orchestrator.postAuthenticationGeneration, 1)
         XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    // T1 — headline grace==0 regression: a background→active round-trip during a
+    // successful resume must NOT trigger a second Face ID prompt.
+    func test_handleResume_grace0_successDuringBackgroundReactivation_doesNotDoublePrompt() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataGrace0FreshResume")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.grace0-fresh-resume",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let postAuthenticationGate = AsyncSuspensionGate()
+        let authenticationAttempts = AsyncIntegerCounter()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                _ = await authenticationAttempts.next()
+                return .authenticated(context: nil)
+            },
+            postAuthenticationHandler: { _, source in
+                if source == "unit.grace0PostAuth" {
+                    await postAuthenticationGate.suspend()
+                }
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let resumeTask = Task {
+            await orchestrator.handleResumeForLifecycle(
+                localizedReason: "Immediately-grace resume races with background and active",
+                source: "unit.grace0PostAuth"
+            )
+        }
+        while !(await postAuthenticationGate.isSuspended()) {
+            await Task.yield()
+        }
+
+        // App passes through background then returns while the first (successful)
+        // auth's post-auth work is still in flight.
+        orchestrator.handleSceneDidEnterBackground()
+        orchestrator.handleSceneDidBecomeActive(source: "unit.activeAfterBackground")
+
+        await postAuthenticationGate.resume()
+        let result = await resumeTask.value
+
+        XCTAssertTrue(result.attemptedAuthentication)
+        XCTAssertTrue(result.shouldArmAuthenticationSettle)
+        XCTAssertFalse(result.shouldStartFreshResume)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+        XCTAssertFalse(orchestrator.authFailed)
+        let authenticationAttemptCount = await authenticationAttempts.currentValue()
+        XCTAssertEqual(
+            authenticationAttemptCount,
+            1,
+            "grace==0 must not trigger a second Face ID prompt after a successful auth"
+        )
+    }
+
+    // T2 — backgrounded-success boundary: if the scene is still backgrounded at
+    // completion, keep the hard blur and discard the handoff context so it cannot
+    // open protected data while backgrounded.
+    func test_handleResume_grace0_backgroundedSuccess_keepsBlurAndDiscardsContext() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataGrace0BackgroundedSuccess")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.grace0-backgrounded-success",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let postAuthenticationGate = AsyncSuspensionGate()
+        let handoffContext = LAContext()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                .authenticated(context: handoffContext)
+            },
+            postAuthenticationHandler: { _, source in
+                if source == "unit.backgroundedSuccess" {
+                    await postAuthenticationGate.suspend()
+                }
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let resumeTask = Task {
+            await orchestrator.handleResumeForLifecycle(
+                localizedReason: "Backgrounded success keeps hard blur",
+                source: "unit.backgroundedSuccess"
+            )
+        }
+        while !(await postAuthenticationGate.isSuspended()) {
+            await Task.yield()
+        }
+
+        // App goes to background during post-auth and stays there.
+        orchestrator.handleSceneDidEnterBackground()
+
+        await postAuthenticationGate.resume()
+        let result = await resumeTask.value
+
+        XCTAssertTrue(result.attemptedAuthentication)
+        XCTAssertFalse(result.shouldArmAuthenticationSettle)
+        XCTAssertFalse(result.shouldStartFreshResume)
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
+        // The just-minted handoff context must not survive while backgrounded.
+        XCTAssertNil(orchestrator.consumeAuthenticatedContextForProtectedData())
+        handoffContext.invalidate()
+    }
+
+    // T3 — concurrency: a second resume that arrives while the first is parked
+    // inside relock must observe the in-flight flag and bail (single prompt).
+    func test_handleResume_concurrentEntryDuringRelock_doesNotDoublePrompt() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataConcurrentResumeEntry")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.concurrent-resume-entry",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockGate = AsyncSuspensionGate()
+        let relockParticipant = SuspendingRelockParticipant(gate: relockGate)
+        coordinator.registerRelockParticipant(relockParticipant)
+
+        let authenticationAttempts = AsyncIntegerCounter()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                _ = await authenticationAttempts.next()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        // First resume parks inside relockCurrentSession() — the exact window
+        // between `guard !isAuthenticating` and the in-flight flag set.
+        let firstResume = Task {
+            await orchestrator.handleResumeForLifecycle(
+                localizedReason: "First resume parks in relock",
+                source: "unit.concurrentA"
+            )
+        }
+        while !(await relockGate.isSuspended()) {
+            await Task.yield()
+        }
+
+        // Second resume enters while the first is parked; it must bail.
+        let secondResume = await orchestrator.handleResumeForLifecycle(
+            localizedReason: "Second resume must be suppressed",
+            source: "unit.concurrentB"
+        )
+        XCTAssertFalse(secondResume.attemptedAuthentication)
+        XCTAssertFalse(secondResume.shouldStartFreshResume)
+
+        await relockGate.resume()
+        let firstResult = await firstResume.value
+
+        XCTAssertTrue(firstResult.attemptedAuthentication)
+        let authenticationAttemptCount = await authenticationAttempts.currentValue()
+        XCTAssertEqual(authenticationAttemptCount, 1, "Only one resume may reach the Face ID prompt")
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+    }
+
+    // T4 — macOS path: resign/active (there is no `.background` on macOS) behaves
+    // the same as background/active — single prompt, app revealed.
+    func test_handleResume_grace0_successDuringResignReactivation_doesNotDoublePrompt() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataGrace0ResignReactivation")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.grace0-resign-reactivation",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let postAuthenticationGate = AsyncSuspensionGate()
+        let authenticationAttempts = AsyncIntegerCounter()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                _ = await authenticationAttempts.next()
+                return .authenticated(context: nil)
+            },
+            postAuthenticationHandler: { _, source in
+                if source == "unit.resignPostAuth" {
+                    await postAuthenticationGate.suspend()
+                }
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let resumeTask = Task {
+            await orchestrator.handleResumeForLifecycle(
+                localizedReason: "Immediately-grace resume races with resign and active",
+                source: "unit.resignPostAuth"
+            )
+        }
+        while !(await postAuthenticationGate.isSuspended()) {
+            await Task.yield()
+        }
+
+        orchestrator.handleSceneDidResignActive()
+        orchestrator.handleSceneDidBecomeActive(source: "unit.activeAfterResign")
+
+        await postAuthenticationGate.resume()
+        let result = await resumeTask.value
+
+        XCTAssertTrue(result.attemptedAuthentication)
+        XCTAssertTrue(result.shouldArmAuthenticationSettle)
+        XCTAssertFalse(result.shouldStartFreshResume)
+        XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+        let authenticationAttemptCount = await authenticationAttempts.currentValue()
+        XCTAssertEqual(authenticationAttemptCount, 1)
+    }
+
+    // T5 — the untouched failure path: a prompt cancelled by backgrounding must
+    // still request a fresh resume (re-prompt) on return.
+    func test_handleResume_grace0_cancelledDuringBackground_stillRequestsFreshResume() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataGrace0CancelledDuringBackground")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator()
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.grace0-cancelled-during-background",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let evaluateGate = AsyncSuspensionGate()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await evaluateGate.suspend()
+                throw AuthenticationError.cancelled
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+
+        let resumeTask = Task {
+            await orchestrator.handleResumeForLifecycle(
+                localizedReason: "Prompt is cancelled by a real background",
+                source: "unit.cancelledDuringBackground"
+            )
+        }
+        while !(await evaluateGate.isSuspended()) {
+            await Task.yield()
+        }
+
+        orchestrator.handleSceneDidEnterBackground()
+        orchestrator.handleSceneDidBecomeActive(source: "unit.activeAfterBackground")
+
+        await evaluateGate.resume()
+        let result = await resumeTask.value
+
+        XCTAssertTrue(result.attemptedAuthentication)
+        XCTAssertTrue(result.shouldStartFreshResume)
+        XCTAssertFalse(result.shouldArmAuthenticationSettle)
+        XCTAssertTrue(orchestrator.authFailed)
+        XCTAssertTrue(orchestrator.isPrivacyScreenBlurred)
     }
 
     func test_handleResume_graceValidWhileBackgroundKeepsHardBlur() async {

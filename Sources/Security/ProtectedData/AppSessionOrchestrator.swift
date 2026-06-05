@@ -2,6 +2,7 @@ import Foundation
 import LocalAuthentication
 
 @Observable
+@MainActor
 final class AppSessionOrchestrator {
     struct ResumeLifecycleResult: Equatable {
         let attemptedAuthentication: Bool
@@ -30,7 +31,6 @@ final class AppSessionOrchestrator {
     private var pendingAuthenticatedContext: LAContext?
     private var isAuthenticationSettleBlurActive = false
     private var isSceneCurrentlyActive = true
-    private var sceneActivityGeneration: UInt64 = 0
     private var resumeInvalidationGeneration: UInt64 = 0
 
     var isPrivacyScreenBlurred = false
@@ -221,13 +221,11 @@ final class AppSessionOrchestrator {
 
     func handleSceneDidBecomeActive(source: String = "sceneActive") {
         isSceneCurrentlyActive = true
-        sceneActivityGeneration += 1
         traceStore?.record(
             category: .session,
             name: "session.handleSceneDidBecomeActive",
             metadata: [
                 "source": source,
-                "sceneActivityGeneration": String(sceneActivityGeneration),
                 "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
             ]
         )
@@ -255,6 +253,12 @@ final class AppSessionOrchestrator {
         )
     }
 
+    // Unlike `handleSceneDidResignActive`, this is intentionally NOT guarded by
+    // `isOperationAuthenticationPromptInProgress`. A system biometric sheet makes
+    // the app `.inactive`/resign-active transiently (which the resign guard must
+    // ignore), but it does not background the app. A real `.background` means the
+    // app genuinely left the foreground, so the handoff context is discarded and
+    // resume completions invalidated even mid-operation — real background wins.
     func handleSceneDidEnterBackground() {
         invalidateResumeCompletions(reason: "sceneBackground")
         clearAuthenticationSettleBlur()
@@ -347,15 +351,24 @@ final class AppSessionOrchestrator {
                     "source": source
                 ]
             )
+            // Mark the resume in flight synchronously, BEFORE the first `await`
+            // (`relockCurrentSession()`) below. A second resume Task that arrives
+            // while this one is suspended in relock then observes
+            // `isAuthenticating == true` at the `guard` above and returns
+            // `.noAuthentication`, so it cannot start a duplicate prompt. Under
+            // `@MainActor` there is no suspension between the guard's read and this
+            // write, so the check-then-set is atomic. The co-located `defer`
+            // guarantees the flag is cleared on every exit of this branch.
+            isAuthenticating = true
+            defer { isAuthenticating = false }
+
             requestContentClear()
             await protectedDataSessionCoordinator.relockCurrentSession()
 
             clearAuthenticationSettleBlur()
-            isAuthenticating = true
             authFailed = false
             clearAuthenticationFailure()
             isPrivacyScreenBlurred = true
-            defer { isAuthenticating = false }
 
             do {
                 traceHandleResumeStage(
@@ -388,13 +401,20 @@ final class AppSessionOrchestrator {
                         source: source
                     )
                     recordPostAuthenticationCompletion(source: source)
-                    let completion = currentResumeCompletion(
-                        resumeGeneration: resumeGeneration,
-                        source: source
-                    )
                     authFailed = false
                     clearAuthenticationFailure()
-                    if completion.isCurrent {
+                    // A successful authentication is terminal: it is never re-run.
+                    // The privacy overlay is decided purely by the CURRENT scene
+                    // state, not by resume-generation staleness. If the scene is in
+                    // the foreground now, reveal the app — the user just
+                    // authenticated, so a background round-trip that already
+                    // resolved must not force a second prompt (the grace==0
+                    // duplicate-prompt fix). If the scene is still backgrounded,
+                    // keep the hard blur and discard the just-stored handoff
+                    // context so it cannot open protected data while backgrounded;
+                    // the next real resume re-evaluates grace (and re-locks under
+                    // "Immediately").
+                    if isSceneCurrentlyActive {
                         clearAuthenticationSettleBlur()
                         isPrivacyScreenBlurred = false
                         traceStore?.record(
@@ -404,30 +424,37 @@ final class AppSessionOrchestrator {
                                 "reason": "authenticated",
                                 "attemptedAuthentication": "true",
                                 "source": source,
-                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
+                                "resumeGeneration": String(resumeGeneration),
+                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
+                                "sceneActive": "true"
                             ]
                         )
+                        return ResumeLifecycleResult(
+                            attemptedAuthentication: true,
+                            shouldArmAuthenticationSettle: true,
+                            shouldStartFreshResume: false
+                        )
                     } else {
-                        discardPendingAuthenticatedContext(reason: "staleResumeCompletion")
+                        discardPendingAuthenticatedContext(reason: "backgroundedSuccess")
                         isPrivacyScreenBlurred = true
                         traceStore?.record(
                             category: .session,
                             name: "session.handleResume.exit",
                             metadata: [
-                                "reason": "staleAuthenticated",
+                                "reason": "backgroundedSuccess",
                                 "attemptedAuthentication": "true",
                                 "source": source,
                                 "resumeGeneration": String(resumeGeneration),
                                 "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                                "sceneActive": isSceneCurrentlyActive ? "true" : "false"
+                                "sceneActive": "false"
                             ]
                         )
+                        return ResumeLifecycleResult(
+                            attemptedAuthentication: true,
+                            shouldArmAuthenticationSettle: false,
+                            shouldStartFreshResume: false
+                        )
                     }
-                    return ResumeLifecycleResult(
-                        attemptedAuthentication: true,
-                        shouldArmAuthenticationSettle: completion.isCurrent,
-                        shouldStartFreshResume: completion.shouldStartFreshResume
-                    )
                 } else {
                     discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
                     let completion = currentResumeCompletion(
@@ -536,14 +563,12 @@ final class AppSessionOrchestrator {
 
     private func invalidateResumeCompletions(reason: String) {
         isSceneCurrentlyActive = false
-        sceneActivityGeneration += 1
         resumeInvalidationGeneration += 1
         traceStore?.record(
             category: .session,
             name: "session.resumeInvalidation",
             metadata: [
                 "reason": reason,
-                "sceneActivityGeneration": String(sceneActivityGeneration),
                 "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
             ]
         )
