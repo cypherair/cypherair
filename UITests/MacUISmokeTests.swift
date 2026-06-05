@@ -87,10 +87,10 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("encrypt.ready")
 
         // The recipient chooser shows available recipients by default — the
-        // preloaded contact appears as an addable candidate without searching.
+        // preloaded contact appears as a selectable row without searching.
         XCTAssertTrue(
-            element("encrypt.recipient.candidate").waitForExistence(timeout: 10),
-            "Expected the preloaded contact to appear as an addable recipient by default."
+            element("encrypt.recipient.row").waitForExistence(timeout: 10),
+            "Expected the preloaded contact to appear as a selectable recipient row by default."
         )
     }
 

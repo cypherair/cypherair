@@ -4289,54 +4289,6 @@
         }
       }
     },
-    "encrypt.recipients.addAllShown" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add All Shown (%d)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加显示的全部（%d）"
-          }
-        }
-      }
-    },
-    "encrypt.recipients.addHint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adds this recipient"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加此收件人"
-          }
-        }
-      }
-    },
-    "encrypt.recipients.allAdded" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All recipients added"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已添加全部收件人"
-          }
-        }
-      }
-    },
     "encrypt.recipients.clearTagFilters" : {
       "localizations" : {
         "en" : {
@@ -4385,18 +4337,34 @@
         }
       }
     },
-    "encrypt.recipients.remove" : {
+    "encrypt.recipients.removeStale" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove %@"
+            "value" : "Remove unavailable recipients"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "移除 %@"
+            "value" : "移除不可用的收件人"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.selectAllShown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select All Shown (%d)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择显示的全部（%d）"
           }
         }
       }
@@ -4413,6 +4381,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收件人选择已变化。请检查收件人后再重试。"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.staleWarning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some selected recipients are no longer available."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已选收件人已不可用。"
           }
         }
       }
@@ -7631,6 +7615,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "立即备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backupStatus.backedUp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup status: backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份状态：已备份"
+          }
+        }
+      }
+    },
+    "home.defaultKey.backupStatus.needsBackup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup status: needs backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份状态：需要备份"
           }
         }
       }

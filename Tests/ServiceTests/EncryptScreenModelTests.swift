@@ -631,8 +631,11 @@ final class EncryptScreenModelTests: XCTestCase {
         let summaryIds = model.selectedRecipientSummaries.map(\.contactId)
         XCTAssertEqual(Set(summaryIds), Set([firstContactId, secondContactId]))
         XCTAssertFalse(summaryIds.contains("stale-contact-id"))
-        // Resolved summaries follow presentation order with stale ids dropped.
-        XCTAssertEqual(summaryIds, model.effectiveRecipientContactIds.filter { $0 != "stale-contact-id" })
+        // Resolved summaries follow presentation order (by display name: "Summary
+        // First" before "Summary Second") with the stale id dropped. Asserted against
+        // an explicit expected order rather than effectiveRecipientContactIds, which
+        // would be self-referential.
+        XCTAssertEqual(summaryIds, [firstContactId, secondContactId])
     }
 
     @MainActor
@@ -669,6 +672,168 @@ final class EncryptScreenModelTests: XCTestCase {
         model.selectedRecipients = ["stale-contact-id"]
         XCTAssertTrue(model.effectiveRecipientContactIds.isEmpty)
         XCTAssertTrue(model.encryptButtonDisabled)
+    }
+
+    @MainActor
+    func test_staleSelectedRecipientGatesButtonUntilRemoved() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStaleGate")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let valid = try stack.engine.generateKey(
+            name: "Valid Recipient",
+            email: "valid-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: valid.publicKeyData, verificationState: .verified)
+        let validContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: valid.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        model.plaintext = "Secret"
+        model.encryptToSelf = false
+        model.selectedRecipients = [validContactId, "stale-contact-id"]
+
+        // The displayed count stays honest (valid only), but a stale selected id keeps
+        // the button disabled — it is never enabled-yet-erroring.
+        XCTAssertTrue(model.hasStaleSelectedRecipients)
+        XCTAssertEqual(model.effectiveRecipientContactIds, [validContactId])
+        XCTAssertTrue(model.encryptButtonDisabled)
+
+        model.removeStaleRecipients()
+
+        // Removing the unavailable recipient reconciles the selection and enables Encrypt.
+        XCTAssertEqual(model.selectedRecipients, [validContactId])
+        XCTAssertFalse(model.hasStaleSelectedRecipients)
+        XCTAssertFalse(model.encryptButtonDisabled)
+    }
+
+    @MainActor
+    func test_togglingRecipientDoesNotReorderFilteredList() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStableList")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let alpha = try stack.engine.generateKey(
+            name: "Stable Alpha",
+            email: "stable-alpha@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let bravo = try stack.engine.generateKey(
+            name: "Stable Bravo",
+            email: "stable-bravo@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let charlie = try stack.engine.generateKey(
+            name: "Stable Charlie",
+            email: "stable-charlie@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        for key in [alpha, bravo, charlie] {
+            try opened.service.importContact(publicKeyData: key.publicKeyData, verificationState: .verified)
+        }
+        let bravoContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: bravo.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        let order = model.filteredRecipientContacts.map(\.contactId)
+        XCTAssertEqual(order.count, 3)
+
+        // Selecting the middle recipient must not reorder the list (spatial stability).
+        model.toggleRecipient(bravoContactId, isOn: true)
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), order)
+
+        // Deselecting must also leave the order untouched.
+        model.toggleRecipient(bravoContactId, isOn: false)
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), order)
+    }
+
+    @MainActor
+    func test_recipientTagFilters_excludesTagsWithNoEncryptableMember() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptEncryptableTagFilter")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let encryptable = try stack.engine.generateKey(
+            name: "Active Member",
+            email: "active-tag-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let nonEncryptable = try stack.engine.generateKey(
+            name: "Inactive Member",
+            email: "inactive-tag-member@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: encryptable.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: nonEncryptable.publicKeyData, verificationState: .verified)
+        let encryptableContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: encryptable.fingerprint))
+        let nonEncryptableContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: nonEncryptable.fingerprint))
+        let activeTag = try opened.service.addTag(named: "Active", toContactId: encryptableContactId)
+        let doomedTag = try opened.service.addTag(named: "Doomed", toContactId: nonEncryptableContactId)
+
+        // Strip the second contact of a preferred (encryptable) key so it stops being a
+        // recipient candidate, then relock/reopen to pick up the edited snapshot.
+        var snapshot = try opened.service.currentContactsDomainSnapshot()
+        for index in snapshot.keyRecords.indices
+            where snapshot.keyRecords[index].contactId == nonEncryptableContactId {
+            snapshot.keyRecords[index].usageState = .historical
+        }
+        try opened.harness.store.replaceSnapshot(snapshot)
+        try await opened.service.relockProtectedData()
+        let reopened = await makeReopenedProtectedContactService(
+            harness: opened.harness,
+            contactsDirectory: opened.contactsDirectory
+        )
+
+        let model = makeModel(contactService: reopened.service)
+        let filterTagIds = Set(model.recipientTagFilters.map(\.tagId))
+        // The tag whose only member can be encrypted to is offered; the tag whose only
+        // member is no longer encryptable is not (every chip resolves to ≥1 recipient).
+        XCTAssertTrue(filterTagIds.contains(activeTag.tagId))
+        XCTAssertFalse(filterTagIds.contains(doomedTag.tagId))
+    }
+
+    @MainActor
+    func test_selectAllShownSelectsEveryVisibleRecipient() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptSelectAllShown")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let only = try stack.engine.generateKey(
+            name: "Solo Recipient",
+            email: "solo-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: only.publicKeyData, verificationState: .verified)
+        let onlyContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: only.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        // A single visible candidate — the old "Add All Shown" button hid itself when
+        // only one row remained; "Select All Shown" now covers it.
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [onlyContactId])
+        model.addAllVisibleRecipients()
+        XCTAssertEqual(model.effectiveRecipientContactIds, [onlyContactId])
     }
 
     @MainActor

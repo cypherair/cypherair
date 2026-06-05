@@ -20,6 +20,7 @@ struct CypherTagChip: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .accessibilityLabel(title)
+            .accessibilityAddTraits(.isSelected)
         } else {
             Button(action: toggle) {
                 Label(title, systemImage: unselectedSystemImage)

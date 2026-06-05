@@ -4,15 +4,15 @@ import Foundation
 @Observable
 final class ContactsScreenModel {
     private let contactService: ContactService
-    private var rawSelectedTagFilterIds: Set<String> = []
+    private var tagFilterState = TagFilterState()
 
     var searchText = ""
     var selectedTagFilterIds: Set<String> {
         get {
-            prunedTagFilterIds(rawSelectedTagFilterIds, availableTags: tagFilters)
+            tagFilterState.selectedIds(availableTags: tagFilters)
         }
         set {
-            rawSelectedTagFilterIds = prunedTagFilterIds(newValue, availableTags: tagFilters)
+            tagFilterState.replace(with: newValue, availableTags: tagFilters)
         }
     }
     var deleteError: String?
@@ -34,7 +34,7 @@ final class ContactsScreenModel {
         let filters = tagFilters
         return contactService.contactIdentities(
             matching: searchText,
-            tagFilterIds: prunedTagFilterIds(rawSelectedTagFilterIds, availableTags: filters)
+            tagFilterIds: tagFilterState.selectedIds(availableTags: filters)
         )
     }
 
@@ -47,7 +47,7 @@ final class ContactsScreenModel {
 
     var selectedTagFilters: [ContactTagSummary] {
         let filters = tagFilters
-        let selectedIds = prunedTagFilterIds(rawSelectedTagFilterIds, availableTags: filters)
+        let selectedIds = tagFilterState.selectedIds(availableTags: filters)
         return filters.filter { selectedIds.contains($0.tagId) }
     }
 
@@ -57,43 +57,33 @@ final class ContactsScreenModel {
 
     var hasActiveSearchOrFilters: Bool {
         !ContactsSearchIndex.normalizedSearchText(searchText).isEmpty ||
-            !prunedTagFilterIds(rawSelectedTagFilterIds, availableTags: tagFilters).isEmpty
+            !tagFilterState.selectedIds(availableTags: tagFilters).isEmpty
     }
 
     func toggleTagFilter(_ tagId: String) {
-        let filters = tagFilters
-        let availableTagIds = Set(filters.map(\.tagId))
-        var selectedIds = prunedTagFilterIds(rawSelectedTagFilterIds, availableTags: filters)
-
-        if selectedIds.contains(tagId) {
-            selectedIds.remove(tagId)
-        } else if availableTagIds.contains(tagId) {
-            selectedIds.insert(tagId)
-        }
-        rawSelectedTagFilterIds = selectedIds
+        tagFilterState.toggle(tagId, availableTags: tagFilters)
     }
 
     func isTagFilterSelected(_ tagId: String) -> Bool {
-        selectedTagFilterIds.contains(tagId)
+        tagFilterState.isSelected(tagId, availableTags: tagFilters)
     }
 
     func applyTagSuggestion(_ tagId: String) {
         let filters = tagFilters
-        let availableTagIds = Set(filters.map(\.tagId))
-        guard availableTagIds.contains(tagId) else {
+        guard Set(filters.map(\.tagId)).contains(tagId) else {
             return
         }
-        rawSelectedTagFilterIds = [tagId]
+        tagFilterState.replace(with: [tagId], availableTags: filters)
         searchText = ""
     }
 
     func clearTagFilters() {
-        rawSelectedTagFilterIds.removeAll()
+        tagFilterState.clear()
     }
 
     func clearTransientInput() {
         searchText = ""
-        rawSelectedTagFilterIds.removeAll()
+        tagFilterState.clear()
     }
 
     func deleteContacts(at indexSet: IndexSet, from contacts: [ContactIdentitySummary]) {
@@ -106,12 +96,5 @@ final class ContactsScreenModel {
                 showDeleteError = true
             }
         }
-    }
-
-    private func prunedTagFilterIds(
-        _ tagFilterIds: Set<String>,
-        availableTags: [ContactTagSummary]
-    ) -> Set<String> {
-        ContactTagSummary.prunedTagFilterIds(tagFilterIds, availableTags: availableTags)
     }
 }

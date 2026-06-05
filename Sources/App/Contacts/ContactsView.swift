@@ -97,41 +97,18 @@ private struct ContactsScreenHostView: View {
 private extension ContactsScreenHostView {
     var contactsList: some View {
         let contacts = model.visibleContacts
+        let selectedTagIds = model.selectedTagFilterIds
 
         return List {
             if !model.tagFilters.isEmpty {
                 Section {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(model.tagFilters) { tag in
-                                CypherTagChip(
-                                    title: tag.displayName,
-                                    isSelected: model.isTagFilterSelected(tag.tagId),
-                                    toggle: {
-                                        withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
-                                            model.toggleTagFilter(tag.tagId)
-                                        }
-                                    }
-                                )
-                            }
-
-                            if !model.selectedTagFilters.isEmpty {
-                                Button {
-                                    withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
-                                        model.clearTagFilters()
-                                    }
-                                } label: {
-                                    Label(
-                                        String(localized: "contacts.clearTagFilters", defaultValue: "Clear"),
-                                        systemImage: "xmark.circle"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                                .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                            }
-                        }
-                    }
+                    TagFilterStrip(
+                        tags: model.tagFilters,
+                        selectedIds: selectedTagIds,
+                        clearTitle: String(localized: "contacts.clearTagFilters", defaultValue: "Clear"),
+                        toggle: { model.toggleTagFilter($0) },
+                        clear: { model.clearTagFilters() }
+                    )
                 } header: {
                     Text(String(localized: "contacts.filterTags", defaultValue: "Filter Tags"))
                 }
@@ -165,7 +142,7 @@ private extension ContactsScreenHostView {
         )
         .animation(
             CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
-            value: model.selectedTagFilterIds
+            value: selectedTagIds
         )
         .animation(
             CypherMotion.quickEaseOut(reduceMotion: reduceMotion),
