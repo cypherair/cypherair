@@ -70,11 +70,13 @@ authentication. Each platform uses what it actually offers.
    produce a false away event.
 4. **On macOS, authentication is presented in-app** (embedded, non-resigning), so a genuine
    app-switch is distinguishable from authentication *by construction*.
-5. **Per-operation authentication, not session reuse.** Every sensitive operation
-   authenticates independently. The unlock authentication is **never** reused to authorize a
-   later encryption / signing / decryption. Within a single operation, the just-authenticated
-   context is consumed by that same operation only (one user action = one biometric);
-   `touchIDAuthenticationAllowableReuseDuration` stays `0`.
+5. **The app-unlock authentication is never reused for key use.** The authentication that
+   unlocks the app must not later authorize a routine key-use flow (encryption, signing,
+   decryption); each such operation authenticates on its own. This is a narrow separation
+   between the app-unlock gate and key use — **not** a blanket rule that every workflow
+   re-authenticates, and not the headline property to validate. A single coherent user action
+   that spans several keys (e.g. an auth-mode switch that re-wraps every key) still authenticates
+   once for that action, exactly as today.
 6. **"Immediately" keeps its literal meaning** on every platform. We remove the ambiguity at
    its source rather than redefining the security setting.
 
@@ -197,8 +199,12 @@ Supported inline policies are biometric / Apple-Watch only
 
 ## 7. Per-operation authentication design (macOS)
 
-Per-operation private-key biometrics (sign / decrypt / certify / rewrap) are presented in-app,
-**per operation**, with the same one-biometric-per-operation posture as today:
+Routine key-use biometrics (sign / decrypt / certify) authenticate **per operation** — each
+key-use operation authenticates on its own, exactly as today. What changes on macOS is only the
+*presentation*: the per-operation biometric renders **in-app** (§6, §8) instead of through the
+detached system sheet. (An auth-mode switch / key re-wrap is a single user action and authenticates
+once for that action even though it touches every key — see §2, principle 5; its in-app
+presentation and explanatory page are covered in §6.2.)
 
 1. Create a fresh `LAContext`; pair it with an in-window `LAAuthenticationView`.
 2. `context.evaluateAccessControl(accessControl, operation:, localizedReason:)` — the biometric
@@ -210,9 +216,11 @@ Per-operation private-key biometrics (sign / decrypt / certify / rewrap) are pre
    - Custody path: load the `SecKey` with `kSecUseAuthenticationContext: ctx`.
 
 Properties:
-- **One biometric per operation.** The context authenticates exactly one operation and is then
-  discarded. There is **no cross-operation reuse**, and the unlock authentication is **never**
-  reused for a later operation. Reuse-duration stays `0`.
+- **The app-unlock authentication is not what authorizes a key-use operation.** Each routine
+  key-use operation authenticates on its own context, which authorizes that operation and is then
+  discarded; the context that unlocked the app is never reused to authorize encryption, signing,
+  or decryption. This is the narrow rule from §2 (principle 5) — it does **not** claim a single
+  user action can never cover several keys, and it is not the property the PoC exists to prove.
 - **No detached prompt.** Step 2 is the only authentication UI and it is in-window, so the app
   does not resign — preserving "Immediately".
 - The off-main execution of the Secure Enclave operation and all memory zeroization are
@@ -241,12 +249,15 @@ principal structural change and is validated by the P0 PoC (see the companion pl
 This redesign must preserve every current invariant (see [SECURITY.md](SECURITY.md) §4–§5, §10):
 
 - ProtectedData relock is **fail-closed**; the authenticated `LAContext` handoff to protected
-  domains happens **only on unlock**, never reused for operations.
+  domains happens **only on unlock**, and is never reused to authorize a key-use operation.
 - Grace / auto-lock **fails closed** (unavailable settings snapshot → immediate authentication).
 - The boot-authentication early-readable exception is unchanged.
 - Standard vs High-Security `LAPolicy` selection and the SE access-control flags are unchanged.
 - The `DecryptionService` Phase 1 / Phase 2 boundary is unchanged.
-- Per-operation biometric posture is preserved (one biometric per operation; no session reuse).
+- The narrow unlock-vs-key-use separation is preserved: the app-unlock authentication is never
+  reused to authorize a key-use operation, and routine key-use operations authenticate on their
+  own (§2, principle 5). This is unchanged from today and is **not** broadened into a blanket
+  per-operation re-authentication rule.
 - No secret logging; zero network.
 - **macOS Standard-mode fallback (accepted consequence).** If P0 finds no safe public-API in-app
   password path, macOS drops the Standard-mode *password* fallback for this in-app authenticated

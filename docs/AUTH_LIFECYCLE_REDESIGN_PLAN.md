@@ -15,8 +15,13 @@
 
 ## 1. P0 — pre-implementation validation (macOS PoC)
 
-A small, throwaway macOS spike to de-risk the in-app authentication direction **before** the
-rewrite. It must run on a real Mac with Touch ID. Acceptance items:
+A throwaway macOS validation spike to de-risk the in-app authentication direction **before** the
+rewrite. It runs on a real Mac with Touch ID. **The goal is the highest practical fidelity to the
+real production path, not the smallest diff.** On the dedicated throwaway branch the spike *may*
+touch production, red-line, and project files when that makes the validation closer to the real
+path — chasing a minimal diff would make the test unrealistic and seriously reduce its value. None
+of the PoC code merges to `main`; only the findings and the resulting doc updates are carried back.
+Acceptance items:
 
 1. **No resign.** An inline `LAAuthenticationView` driving `evaluateAccessControl` /
    `evaluatePolicy` does **not** post `NSApplication.didResignActiveNotification` (and
@@ -31,16 +36,20 @@ rewrite. It must run on a real Mac with Touch ID. Acceptance items:
 3. **Per-operation context consumption — custody path.** The same context drives a custody
    `SecKey` operation (`SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`) loaded with
    `kSecUseAuthenticationContext: ctx`, no second prompt.
-4. **No cross-operation reuse.** With reuse-duration `0`, a *second* operation requires a *new*
-   authentication (confirm the prior context does not silently authorize it).
+4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
+   does **not** silently authorize a later key-use operation (encryption / signing / decryption) —
+   that operation triggers its own authentication. This validates the narrow separation in DESIGN
+   §2 (principle 5); it is **not** a test that every operation must re-authenticate, and a single
+   user action spanning several keys (auth-mode switch / re-wrap) still authenticates once.
 5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /
    login-password path exists through public APIs (credential verification without weakening the
    model or logging secrets). **Decision rule (pre-approved):** if it is not safely achievable,
    drop the Standard-mode password fallback on macOS for this flow and require biometrics on macOS
    (and update SECURITY.md §4). Either outcome unblocks P4/P5.
-6. **Mode-switch / rewrap under the presenter.** Validate the `AuthenticationManager` re-wrap flow's
-   per-key authentication when presented in-app on macOS: one in-window prompt per required
-   authentication, no resign, and the SECURITY.md §4 atomicity / crash-recovery semantics preserved.
+6. **Mode-switch / rewrap under the presenter.** Validate that the `AuthenticationManager` re-wrap
+   flow authenticates **once for the whole action** when presented in-app on macOS — a single
+   in-window prompt for the switch even though it re-wraps every key (exactly as today) — with no
+   resign and the SECURITY.md §4 atomicity / crash-recovery semantics preserved.
 7. **visionOS — deferred (no hardware).** visionOS follows the iOS direction by decision; on-device
    Optic-ID + `ScenePhase` confirmation is deferred until hardware is available and tracked as an
    unvalidated assumption, not a design fork.
@@ -49,7 +58,9 @@ PoC findings are recorded back into this document and the design before P1 begin
 
 ## 2. Phasing (each phase is its own PR)
 
-- **P0 — Validation PoC** (above). No production code.
+- **P0 — Validation PoC** (above). Throwaway branch only: it may touch production / red-line /
+  project files for fidelity (§1), but none of its code merges to `main` — only findings/docs
+  carry back.
 - **P1 — macOS single window.** Remove the standalone `Settings { }` scene; route macOS settings
   into the main window. Independent of the auth rework; ships first to simplify the surface. (§3.4)
 - **P2 — `AppLockController` + stop reacting to `.active`.** Introduce the explicit lock state
@@ -146,8 +157,10 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
   and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
   password field must validate credentials safely (no secret logging; correct failure mapping).
-- **Security posture unchanged.** One biometric per operation; the unlock context is never reused
-  for operations; reuse-duration `0`; relock fail-closed; Phase 1/2 boundary intact.
+- **Security posture unchanged.** The app-unlock authentication is never reused to authorize a
+  key-use operation, and routine key-use operations authenticate on their own (DESIGN §2,
+  principle 5); relock fail-closed; Phase 1/2 boundary intact. (This is the narrow
+  unlock-vs-key-use rule, not a blanket per-operation re-authentication mandate.)
 
 ## 6. SE-custody prompt — tracking
 
@@ -189,8 +202,9 @@ Folding in the reviewer's direction (2026-06-05).
 **Remaining validation items (P0 / technical validation):**
 1. **In-app password-field feasibility** — whether a safe public-API credential path exists; drives
    decision (5) above. (P0 item 5)
-2. **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's per-key
-   in-app authentication on macOS, with atomicity + crash recovery preserved. (P0 item 6)
+2. **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single
+   in-app authentication for the whole switch on macOS (one prompt even though it re-wraps every key,
+   exactly as today), with atomicity + crash recovery preserved. (P0 item 6)
 3. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
    (P0 item 7)
 
