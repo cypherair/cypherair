@@ -52,7 +52,7 @@ private final class TracePolicyEvaluatorProbe: @unchecked Sendable {
     }
 }
 
-private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable {
+private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     private let base: MockSecureEnclave
     private let unwrapError: Error
 
