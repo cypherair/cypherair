@@ -13,12 +13,20 @@ private enum PrivacyScreenLifecycleSuppressionScope: String {
     case operationPromptSettle
 }
 
-/// Filters transient resign/activate cycles caused by system biometric prompts
-/// so privacy re-auth runs only for real app resume events.
+/// Filters the transient resign/activate cycle a system biometric sheet causes —
+/// for BOTH the privacy and operation channels — so app-session re-auth runs only
+/// for real app resume events. `PrivacyScreenModifier` feeds the UNION prompt
+/// snapshot, so a privacy-channel biometric (App Access change / auth-mode switch)
+/// is suppressed just like an operation prompt.
 ///
-/// Operation-prompt lifecycle suppression is deliberately bounded: a completed
-/// operation prompt can only influence lifecycle decisions during a short
-/// settle window, and real background transitions always win.
+/// Suppression is cycle-paired: it arms on the prompt-induced `.inactive` and is
+/// consumed on the paired `.active` (the sheet dismissal), surviving an arbitrarily
+/// long Face ID. The `operationPromptSettleWindow` is only a generous safety bound
+/// to clear a stuck arm if the paired `.active` never arrives — NOT the suppression
+/// duration; an on-device trace showed the real `.active` lands ~2.4 s after the
+/// prompt ends, far beyond the old 1.0 s window. Once consumed, the generation is
+/// latched as ignored so a later genuine background still re-locks, and a real
+/// `.background` always wins.
 struct PrivacyScreenLifecycleGate {
     private struct OperationPromptSettleState {
         let generation: UInt64
@@ -38,7 +46,7 @@ struct PrivacyScreenLifecycleGate {
 
     init(
         traceStore: AuthLifecycleTraceStore? = nil,
-        operationPromptSettleWindow: TimeInterval = 1.0,
+        operationPromptSettleWindow: TimeInterval = 30.0,
         now: @escaping () -> Date = Date.init
     ) {
         self.traceStore = traceStore

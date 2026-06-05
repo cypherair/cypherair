@@ -4,10 +4,21 @@ import Security
 import XCTest
 @testable import CypherAir
 
-final class PromptObservingSecureEnclave: SecureEnclaveManageable {
+final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     let base: MockSecureEnclave
     let coordinator: CypherAir.AuthenticationPromptCoordinator
-    private(set) var sawOperationPromptInProgressDuringReconstruct = false
+    private let observationLock = NSLock()
+    private var sawOperationPromptInProgressDuringReconstructStorage = false
+
+    /// Whether the operation-prompt depth was > 0 when `reconstructKey` ran.
+    /// `reconstructKey` now runs off the main actor (the SE unwrap is hopped off-main
+    /// in `PrivateKeyAccessService`), so this is written off-main and read on the main
+    /// actor by tests; guard it with a lock.
+    var sawOperationPromptInProgressDuringReconstruct: Bool {
+        observationLock.lock()
+        defer { observationLock.unlock() }
+        return sawOperationPromptInProgressDuringReconstructStorage
+    }
 
     init(
         base: MockSecureEnclave,
@@ -53,7 +64,85 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable {
         from data: Data,
         authenticationContext: LAContext?
     ) throws -> any SEKeyHandle {
-        sawOperationPromptInProgressDuringReconstruct = coordinator.isOperationPromptInProgress
+        let inProgress = coordinator.isOperationPromptInProgress
+        observationLock.lock()
+        sawOperationPromptInProgressDuringReconstructStorage = inProgress
+        observationLock.unlock()
+        return try base.reconstructKey(
+            from: data,
+            authenticationContext: authenticationContext
+        )
+    }
+}
+
+/// SE mock whose `reconstructKey` blocks (synchronously) until released. Used to prove
+/// that `PrivateKeyAccessService` runs the SE reconstruct OFF the main actor, so the
+/// main actor stays free during the (blocking) Secure Enclave biometric — the property
+/// that lets the app-session lifecycle gate observe the operation prompt in-progress.
+final class BlockingReconstructSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
+    let base: MockSecureEnclave
+    private let lock = NSLock()
+    private var didStartReconstructStorage = false
+    private let releaseGate = DispatchSemaphore(value: 0)
+
+    /// Set (off-main) when `reconstructKey` begins; read on the main actor by the test.
+    var didStartReconstruct: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return didStartReconstructStorage
+    }
+
+    init(base: MockSecureEnclave) {
+        self.base = base
+    }
+
+    /// Unblocks the in-flight `reconstructKey`.
+    func releaseReconstruct() {
+        releaseGate.signal()
+    }
+
+    static var isAvailable: Bool { MockSecureEnclave.isAvailable }
+
+    func generateWrappingKey(
+        accessControl: SecAccessControl?,
+        authenticationContext: LAContext?
+    ) throws -> any SEKeyHandle {
+        try base.generateWrappingKey(
+            accessControl: accessControl,
+            authenticationContext: authenticationContext
+        )
+    }
+
+    func wrap(
+        privateKey: Data,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> WrappedKeyBundle {
+        try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+    }
+
+    func unwrap(
+        bundle: WrappedKeyBundle,
+        using handle: any SEKeyHandle,
+        fingerprint: String
+    ) throws -> Data {
+        try base.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+    }
+
+    func deleteKey(_ handle: any SEKeyHandle) throws {
+        try base.deleteKey(handle)
+    }
+
+    func reconstructKey(
+        from data: Data,
+        authenticationContext: LAContext?
+    ) throws -> any SEKeyHandle {
+        lock.lock()
+        didStartReconstructStorage = true
+        lock.unlock()
+        // Block this thread until the test releases. If reconstruct ran on the main
+        // actor (the bug), this would stall the main thread; the fix runs it off-main.
+        releaseGate.wait()
         return try base.reconstructKey(
             from: data,
             authenticationContext: authenticationContext

@@ -149,6 +149,19 @@ final class AppSessionOrchestrator {
         authenticationPromptCoordinator.operationAuthenticationPromptSnapshot
     }
 
+    /// True while ANY app-owned biometric prompt (privacy OR operation) is on
+    /// screen. Used to suppress the spurious app-session resume the prompt's own
+    /// `.inactive`/`.active` cycle would otherwise trigger.
+    var isAnyAuthenticationPromptInProgress: Bool {
+        authenticationPromptCoordinator.isAnyAuthenticationPromptInProgress
+    }
+
+    /// Union snapshot over both prompt channels, fed to the lifecycle gate so it
+    /// suppresses prompt-induced lifecycle cycles for privacy prompts too.
+    var anyAuthenticationPromptSnapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot {
+        authenticationPromptCoordinator.anyAuthenticationPromptSnapshot
+    }
+
     var hasProtectedDataAuthorizationHandoffContext: Bool {
         pendingAuthenticatedContext != nil
     }
@@ -232,7 +245,7 @@ final class AppSessionOrchestrator {
     }
 
     func handleSceneDidResignActive() {
-        guard !isOperationAuthenticationPromptInProgress else {
+        guard !isAnyAuthenticationPromptInProgress else {
             traceStore?.record(
                 category: .session,
                 name: "session.handleSceneDidResignActive",
@@ -320,7 +333,7 @@ final class AppSessionOrchestrator {
             return .noAuthentication
         }
 
-        guard !isOperationAuthenticationPromptInProgress else {
+        guard !isAnyAuthenticationPromptInProgress else {
             traceStore?.record(
                 category: .session,
                 name: "session.handleResume.exit",

@@ -162,6 +162,53 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         XCTAssertFalse(coordinator.isOperationPromptInProgress)
     }
 
+    /// Regression guard for the grace=0 double Face ID / cleared-result bug: the Secure
+    /// Enclave reconstruct (a synchronous, blocking biometric) must run OFF the main
+    /// actor so the main thread stays free while the biometric sheet is up. That is what
+    /// lets the app-session lifecycle gate observe the operation prompt in-progress
+    /// (`isInProgress == true`) when the system delivers the transient `.inactive` and
+    /// suppress it — instead of (under the bug) only delivering it after the prompt
+    /// already ended and mistaking it for a real backgrounding that clears content and
+    /// re-prompts. If the reconstruct regressed back onto the main actor, the main-actor
+    /// `waitUntil` below would never make progress and the test would time out.
+    @MainActor
+    func test_unwrapPrivateKey_runsReconstructOffMainActor_keepingMainActorFree() async throws {
+        let coordinator = CypherAir.AuthenticationPromptCoordinator()
+        let blockingSecureEnclave = BlockingReconstructSecureEnclave(base: mockSE)
+        let promptAwareService = KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: blockingSecureEnclave,
+            keychain: mockKC,
+            authenticator: mockAuth,
+            authenticationPromptCoordinator: coordinator,
+            privateKeyControlStore: privateKeyControlStore
+        )
+        let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
+
+        // Run the unwrap on the main actor, mirroring production (OperationController's
+        // `Task { @MainActor in ... }`).
+        let unwrapTask = Task { @MainActor in
+            try await promptAwareService.unwrapPrivateKey(fingerprint: identity.fingerprint)
+        }
+
+        await waitUntil("reconstruct started off the main actor") {
+            blockingSecureEnclave.didStartReconstruct
+        }
+
+        // The main actor is responsive while the blocking biometric runs off-main, and
+        // the operation prompt is still in progress (depth > 0) — precisely the window in
+        // which the lifecycle gate must observe the operation to suppress the transient
+        // `.inactive`/`.active` cycle.
+        XCTAssertTrue(coordinator.isOperationPromptInProgress)
+
+        blockingSecureEnclave.releaseReconstruct()
+        let privateKeyData = try await unwrapTask.value
+
+        XCTAssertFalse(privateKeyData.isEmpty)
+        XCTAssertFalse(coordinator.isOperationPromptInProgress)
+    }
+
     func test_unwrapPrivateKey_unknownFingerprint_throwsError() async {
         do {
             _ = try await service.unwrapPrivateKey(fingerprint: "unknown-fp")

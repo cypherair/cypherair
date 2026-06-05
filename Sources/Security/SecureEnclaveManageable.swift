@@ -4,7 +4,9 @@ import Security
 
 /// Result of wrapping a private key with the Secure Enclave.
 /// Contains the three Keychain items that must be stored together.
-struct WrappedKeyBundle {
+/// `Sendable`: immutable `Data` fields only; crosses the actor boundary into the
+/// off-main reconstruct/unwrap in `PrivateKeyAccessService`.
+struct WrappedKeyBundle: Sendable {
     /// SE key dataRepresentation (for Keychain storage).
     let seKeyData: Data
     /// Random HKDF salt.
@@ -27,7 +29,13 @@ protocol SEKeyHandle {
 ///
 /// SECURITY-CRITICAL: Changes to this protocol require human review.
 /// See SECURITY.md Section 7.
-protocol SecureEnclaveManageable {
+///
+/// `Sendable` so an instance can be handed to the off-main reconstruct/unwrap in
+/// `PrivateKeyAccessService` (the synchronous SE biometric must not block the main
+/// actor). Both conformers are already safe to share: `HardwareSecureEnclave` is a
+/// struct whose only field is an `@unchecked Sendable` trace store, and
+/// `MockSecureEnclave` is `@unchecked Sendable`.
+protocol SecureEnclaveManageable: Sendable {
     /// Generate a new P-256 wrapping key in the Secure Enclave.
     /// The access control flags determine auth requirements (Standard vs High Security).
     ///

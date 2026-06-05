@@ -64,7 +64,9 @@ struct PrivacyScreenModifier: ViewModifier {
                     name: "scenePhase.observed",
                     metadata: ["phase": scenePhaseName(newPhase)]
                 )
-                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
+                // Union snapshot (privacy + operation) so the gate suppresses the
+                // transient lifecycle cycle a biometric sheet on EITHER channel causes.
+                let operationPrompt = appSessionOrchestrator.anyAuthenticationPromptSnapshot
                 switch newPhase {
                 case .inactive:
                     switch lifecycleGate.shouldHandleInactive(
@@ -103,7 +105,9 @@ struct PrivacyScreenModifier: ViewModifier {
             #endif
             #if os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
+                // Union snapshot (privacy + operation) so the gate suppresses the
+                // transient lifecycle cycle a biometric sheet on EITHER channel causes.
+                let operationPrompt = appSessionOrchestrator.anyAuthenticationPromptSnapshot
                 switch lifecycleGate.shouldHandleResignActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,
                     operationPrompt: operationPrompt
@@ -117,7 +121,9 @@ struct PrivacyScreenModifier: ViewModifier {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                let operationPrompt = appSessionOrchestrator.operationAuthenticationPromptSnapshot
+                // Union snapshot (privacy + operation) so the gate suppresses the
+                // transient lifecycle cycle a biometric sheet on EITHER channel causes.
+                let operationPrompt = appSessionOrchestrator.anyAuthenticationPromptSnapshot
                 appSessionOrchestrator.handleSceneDidBecomeActive(source: "sceneActive")
                 switch lifecycleGate.shouldHandleBecomeActive(
                     isAuthenticating: appSessionOrchestrator.isAuthenticating,

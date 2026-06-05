@@ -340,7 +340,13 @@ final class PrivacyScreenLifecycleGateTests: XCTestCase {
 
     func test_privacyScreenLifecycleGate_expiredOperationPromptGenerationHandlesRealLifecycle() {
         let promptEndedAt = Date(timeIntervalSinceReferenceDate: 4_000)
-        var gate = PrivacyScreenLifecycleGate(now: { promptEndedAt.addingTimeInterval(1.1) })
+        // Explicit small settle window to exercise the safety-expiry bound. Production
+        // uses a generous default (30 s) so a real ~2.4 s Face ID `.active` never
+        // expires — see test_…_lateActiveWithinSettleWindow… for that path.
+        var gate = PrivacyScreenLifecycleGate(
+            operationPromptSettleWindow: 1.0,
+            now: { promptEndedAt.addingTimeInterval(1.1) }
+        )
         let prompt = operationPromptSnapshot(
             generation: 1,
             depth: 0,
