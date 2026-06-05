@@ -70,6 +70,10 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private var operationPromptSessionGenerationValue: UInt64 = 0
     private var lastOperationPromptBeganAt: Date?
     private var lastOperationPromptEndedAt: Date?
+    private var anyPromptAttemptGenerationValue: UInt64 = 0
+    private var anyPromptSessionGenerationValue: UInt64 = 0
+    private var lastAnyPromptBeganAt: Date?
+    private var lastAnyPromptEndedAt: Date?
     private var nextPromptID: UInt64 = 1
     private var privacyPromptStack: [PromptTraceContext] = []
     private var operationPromptStack: [PromptTraceContext] = []
@@ -107,6 +111,35 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 depth: operationPromptDepth,
                 lastBeganAt: lastOperationPromptBeganAt,
                 lastEndedAt: lastOperationPromptEndedAt
+            )
+        }
+    }
+
+    /// Whether ANY app-owned authentication prompt — privacy OR operation — is in
+    /// progress. Privacy prompts cover the app-session resume / auth-mode switch /
+    /// App Access Protection change; operation prompts cover private-key
+    /// signing/decryption.
+    var isAnyAuthenticationPromptInProgress: Bool {
+        lock.withLock {
+            privacyPromptDepth + operationPromptDepth > 0
+        }
+    }
+
+    /// Snapshot over the UNION of both prompt channels, shaped like the operation
+    /// snapshot so the app-session lifecycle gate can consume it directly. The gate
+    /// uses this to suppress the transient `.inactive`/`.active` a system biometric
+    /// sheet causes on EITHER channel — a privacy-channel biometric (App Access /
+    /// mode switch) is otherwise invisible to the operation-only snapshot.
+    /// `lastEndedAt` is reported only once the combined depth returns to 0, so a
+    /// nested cross-channel prompt never leaks a premature "ended" instant.
+    var anyAuthenticationPromptSnapshot: OperationAuthenticationPromptSnapshot {
+        lock.withLock {
+            OperationAuthenticationPromptSnapshot(
+                generation: anyPromptAttemptGenerationValue,
+                sessionGeneration: anyPromptSessionGenerationValue,
+                depth: privacyPromptDepth + operationPromptDepth,
+                lastBeganAt: lastAnyPromptBeganAt,
+                lastEndedAt: lastAnyPromptEndedAt
             )
         }
     }
@@ -235,6 +268,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             context: PromptTraceContext
         ) in
             let resolvedContext: PromptTraceContext
+            let combinedDepthBefore = privacyPromptStack.count + operationPromptStack.count
             switch kind {
             case .privacy:
                 if delta > 0 {
@@ -271,6 +305,21 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                     }
                 }
                 operationPromptDepth = operationPromptStack.count
+            }
+            // Union (privacy + operation) prompt tracking. The lifecycle gate keys
+            // off this so a system biometric sheet on EITHER channel suppresses the
+            // transient resign/activate cycle it causes — regardless of how long the
+            // biometric takes.
+            let combinedDepthAfter = privacyPromptStack.count + operationPromptStack.count
+            if delta > 0 {
+                anyPromptAttemptGenerationValue &+= 1
+                if combinedDepthBefore == 0 {
+                    anyPromptSessionGenerationValue = anyPromptAttemptGenerationValue
+                }
+                lastAnyPromptBeganAt = timestamp
+                lastAnyPromptEndedAt = nil
+            } else if combinedDepthBefore > 0, combinedDepthAfter == 0 {
+                lastAnyPromptEndedAt = timestamp
             }
             return (
                 privacyPromptDepth,

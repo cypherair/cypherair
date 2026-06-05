@@ -798,7 +798,12 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
             protectedDataSessionCoordinator: coordinator,
             authenticationPromptCoordinator: authPromptCoordinator
         )
-        var gate = ProtectedDataTestAppPrivacyScreenLifecycleGate(now: clock.now)
+        // Explicit small settle window to exercise the safety-expiry bound. Production
+        // uses a generous default so a real ~2.4 s Face ID `.active` never expires.
+        var gate = ProtectedDataTestAppPrivacyScreenLifecycleGate(
+            operationPromptSettleWindow: 1.0,
+            now: clock.now
+        )
 
         authPromptCoordinator.beginOperationPrompt()
         XCTAssertEqual(
@@ -849,6 +854,228 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         XCTAssertNotNil(orchestrator.lastAuthenticationDate)
         XCTAssertFalse(orchestrator.authFailed)
         XCTAssertFalse(orchestrator.isPrivacyScreenBlurred)
+    }
+
+    // Regression for the on-device repro (auth-traces-2026-06-05-duplicate-auth):
+    // an OPERATION biometric (encrypt-sign / sign / export) under grace=0 raises a
+    // sheet (`.inactive` while the prompt is active) and the dismissal `.active`
+    // arrives ~2.4 s later — well past the old 1.0 s settle window. With the
+    // generous default window, the gate must still recognise the dismissal as the
+    // prompt's own and suppress it: NO content clear, NO second evaluate.
+    func test_operationPromptLateActive_withinDefaultSettleWindow_doesNotRelockOrReprompt() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataOperationLateActive")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let clock = ProtectedDataTestMutableDateProvider(Date(timeIntervalSinceReferenceDate: 9_000))
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator(now: clock.now)
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.operation-late-active",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        // Default (generous) settle window — production behaviour.
+        var gate = ProtectedDataTestAppPrivacyScreenLifecycleGate(now: clock.now)
+
+        authPromptCoordinator.beginOperationPrompt()
+        // Sheet appears: `.inactive` while the operation prompt is in progress.
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: orchestrator.isAuthenticating,
+                operationPrompt: orchestrator.anyAuthenticationPromptSnapshot
+            ),
+            .suppress
+        )
+        authPromptCoordinator.endOperationPrompt()
+        // The dismissal `.active` lands ~2.4 s later — past the old 1.0 s window.
+        clock.value = clock.value.addingTimeInterval(2.4)
+
+        let endedPrompt = orchestrator.anyAuthenticationPromptSnapshot
+        orchestrator.handleSceneDidBecomeActive(source: "unit.operationLateActive")
+        let attemptedAuthentication: Bool
+        switch gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: endedPrompt
+        ) {
+        case .handle:
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Operation prompt dismissal must not resume"
+            )
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.operationLateActive")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
+            attemptedAuthentication = false
+        }
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertFalse(attemptedAuthentication, "The operation prompt's own dismissal must not trigger a resume")
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertEqual(relockParticipant.relockCallCount, 0)
+        XCTAssertFalse(didEvaluate)
+    }
+
+    // Same repro for a PRIVACY biometric (Change App Access Protection / mode
+    // switch). Previously the gate was blind to the privacy channel and always
+    // re-prompted; the union snapshot now suppresses it identically.
+    func test_privacyPromptLateActive_withinDefaultSettleWindow_doesNotRelockOrReprompt() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataPrivacyLateActive")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let clock = ProtectedDataTestMutableDateProvider(Date(timeIntervalSinceReferenceDate: 9_000))
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator(now: clock.now)
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.privacy-late-active",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        var gate = ProtectedDataTestAppPrivacyScreenLifecycleGate(now: clock.now)
+
+        let privacyContext = authPromptCoordinator.beginPrivacyPrompt()
+        // Sheet appears: `.inactive` while the PRIVACY prompt is in progress.
+        XCTAssertEqual(
+            gate.shouldHandleResignActive(
+                isAuthenticating: orchestrator.isAuthenticating,
+                operationPrompt: orchestrator.anyAuthenticationPromptSnapshot
+            ),
+            .suppress
+        )
+        authPromptCoordinator.endPrivacyPrompt(privacyContext)
+        clock.value = clock.value.addingTimeInterval(2.4)
+
+        let endedPrompt = orchestrator.anyAuthenticationPromptSnapshot
+        orchestrator.handleSceneDidBecomeActive(source: "unit.privacyLateActive")
+        let attemptedAuthentication: Bool
+        switch gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: endedPrompt
+        ) {
+        case .handle:
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Privacy prompt dismissal must not resume"
+            )
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.privacyLateActive")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
+            attemptedAuthentication = false
+        }
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertFalse(attemptedAuthentication, "A privacy biometric's own dismissal must not trigger a resume")
+        XCTAssertEqual(orchestrator.contentClearGeneration, 0)
+        XCTAssertEqual(relockParticipant.relockCallCount, 0)
+        XCTAssertFalse(didEvaluate)
+    }
+
+    // Security guard: a genuine background→return with NO app-owned prompt involved
+    // must still re-lock + re-prompt under grace=0.
+    func test_genuineResignActive_withNoPromptActive_relocksAndReprompts() async {
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
+            baseDirectory: makeTemporaryDirectory("ProtectedDataGenuineResume")
+        )
+        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let clock = ProtectedDataTestMutableDateProvider(Date(timeIntervalSinceReferenceDate: 9_000))
+        let authPromptCoordinator = CypherAir.AuthenticationPromptCoordinator(now: clock.now)
+        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRightStoreClient(),
+            domainKeyManager: domainKeyManager,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.genuine-resume",
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        let relockParticipant = MockProtectedDataRelockParticipant()
+        coordinator.registerRelockParticipant(relockParticipant)
+        let didEvaluateAuthentication = AsyncBooleanFlag()
+        let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
+            currentRegistryProvider: {
+                throw ProtectedDataError.invalidRegistry("Not used in this test")
+            },
+            shouldBypassPrivacyAuthentication: { false },
+            gracePeriodProvider: { 0 },
+            evaluateAppAuthentication: { _ in
+                await didEvaluateAuthentication.setTrue()
+                return .authenticated(context: nil)
+            },
+            protectedDataSessionCoordinator: coordinator,
+            authenticationPromptCoordinator: authPromptCoordinator
+        )
+        var gate = ProtectedDataTestAppPrivacyScreenLifecycleGate(now: clock.now)
+
+        // No app-owned prompt is active: a genuine resign/activate.
+        switch gate.shouldHandleResignActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: orchestrator.anyAuthenticationPromptSnapshot
+        ) {
+        case .handle:
+            orchestrator.handleSceneDidResignActive()
+        case .blurOnly:
+            orchestrator.handleAuthenticationSettleInactive(source: "unit.genuineResume")
+        case .settleTransientBlur, .suppress:
+            break
+        }
+        orchestrator.handleSceneDidBecomeActive(source: "unit.genuineResume")
+        let attemptedAuthentication: Bool
+        switch gate.shouldHandleBecomeActive(
+            isAuthenticating: orchestrator.isAuthenticating,
+            operationPrompt: orchestrator.anyAuthenticationPromptSnapshot
+        ) {
+        case .handle:
+            attemptedAuthentication = await orchestrator.handleResume(
+                localizedReason: "Genuine background must re-lock"
+            )
+        case .settleTransientBlur:
+            orchestrator.handleAuthenticationSettleActive(source: "unit.genuineResume")
+            attemptedAuthentication = false
+        case .blurOnly, .suppress:
+            attemptedAuthentication = false
+        }
+        let didEvaluate = await didEvaluateAuthentication.currentValue()
+
+        XCTAssertTrue(attemptedAuthentication, "A real background with no biometric must re-lock under grace=0")
+        XCTAssertEqual(orchestrator.contentClearGeneration, 1)
+        XCTAssertEqual(relockParticipant.relockCallCount, 1)
+        XCTAssertTrue(didEvaluate)
     }
 
     func test_authenticationSettleInactive_blursWithoutRelockOrAuthentication() async throws {
