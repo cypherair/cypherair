@@ -52,8 +52,8 @@ Confirmed against the installed 26.x SDKs and Apple documentation:
 
 | Fact | iOS / iPadOS | macOS | visionOS |
 |---|---|---|---|
-| Biometric prompt drives the app to | `.inactive` (never `.background`) | resign-active (no `.background` phase exists) | `.inactive` (assumed; to validate) |
-| App-switcher snapshot captured at | `.background` | n/a (no foreground snapshot) | to validate |
+| Biometric prompt drives the app to | `.inactive` (never `.background`) | resign-active (no `.background` phase exists) | `.inactive` (assumed iOS-equivalent; validation deferred — no hardware) |
+| App-switcher snapshot captured at | `.background` | n/a (no foreground snapshot) | assumed iOS-equivalent; validation deferred — no hardware |
 | Embedded in-app auth view available | **no** | **yes** (`LAAuthenticationView` macOS 12+; SwiftUI `LocalAuthenticationView` macOS-only; `LARight.authorize(in:)` macOS 13+) | **no** |
 
 The asymmetry is the heart of the design: iOS has an unambiguous `.background` signal but no
@@ -119,7 +119,9 @@ reacts to `.active`, an operation prompt can never trigger a lock evaluation.
 *locks* — clears decrypted content and requires re-authentication — only after the **auto-lock
 interval** elapses following an away event, or on screen-lock / explicit "Lock Now". The
 current "grace period" setting becomes this auto-lock interval; **"Immediately" (0) means lock
-as soon as the away event occurs**, on every platform.
+as soon as the away event occurs**, on every platform. (Decided: the existing grace setting is
+reused as the unified auto-lock interval for now; a separate macOS-specific setting is an optional
+future study.)
 
 "Away event" and why no gate is needed, per platform:
 
@@ -144,24 +146,33 @@ unambiguous `.background`; on macOS by ensuring authentication never resigns the
   The biometric is **auto-invoked** when the lock screen appears; a retry affordance and the
   existing biometrics-locked-out messaging are preserved.
 - The system biometric sheet is acceptable here because lock keys off `.background`.
+- **visionOS follows the iOS direction by decision** (custom lock surface + auto-invoked Optic ID).
+  No visionOS hardware is currently available, so its behavior is assumed iOS-equivalent and marked
+  **unvalidated** (on-device confirmation deferred) rather than separately designed.
 
 ### macOS
 - **Cosmetic cover** on resign (optional/visual).
-- **Lock screen** rendered **in-window** with embedded authentication (§6); in-app password
-  field fallback for Standard mode / biometrics unavailable.
+- **Lock screen** rendered **in-window** with embedded authentication (§6). Standard-mode and
+  biometrics-unavailable fallback follows the §6.2 decision: an in-app password field if it can be
+  done safely through public APIs, otherwise biometric-only on macOS for this flow.
 - **Sensitive settings flows** (App Access Protection change; auth-mode switch / key rewrap)
   use **dedicated explanatory pages** (§6.2) with the authentication control hosted inline.
 
 ## 6. macOS in-app authentication
 
 ### 6.1 Mechanism
-Use the macOS-only embedded APIs so authentication renders inside the app's own window:
+Use the macOS-only embedded APIs so authentication renders inside the app's own window. The
+**chosen primary direction** (decided) is `LAAuthenticationView` + `LAContext`: it stays on the
+same LocalAuthentication / `LAContext` path the app already uses and only changes the
+*presentation* on macOS.
 
 - `LAAuthenticationView` (NSView, macOS 12+): pair it with an `LAContext`. When
   `evaluatePolicy` or `evaluateAccessControl` is called on that context, "the UI will be
-  presented using this view rather than using the standard authentication alert."
-- Alternative: `LARight.authorize(localizedReason:in:completion:)` (macOS 13+) presents
-  authorization UI inside a supplied `NSWindow`.
+  presented using this view rather than using the standard authentication alert." **This is the
+  path validated first (P0).**
+- `LARight.authorize(localizedReason:in:completion:)` (macOS 13+) is a **secondary fallback**,
+  considered only if the primary cannot meet a specific need; it is a different (authorization-
+  rights) model and is **not** the path to validate first.
 
 Because the UI renders in-window, the app **does not resign active** for authentication, which
 is what makes the macOS lock model in §4 sound.
@@ -171,10 +182,13 @@ Supported inline policies are biometric / Apple-Watch only
 `deviceOwnerAuthentication` for convenience). There is no inline passcode entry, so:
 
 ### 6.2 In-app password fallback and explanatory pages
-- **Password fallback (Passwords-style).** Standard mode and the biometrics-unavailable /
-  locked-out cases pair the inline biometric with an **in-app password / login-password field**
-  on the same surface, mirroring Apple Passwords. (Credential validation approach is a
-  technical-plan open item.)
+- **Password fallback (decided direction).** *Preferred:* pair the inline biometric with an
+  **in-app password / login-password field** on the same surface (Passwords-style) for Standard
+  mode and the biometrics-unavailable / locked-out cases. *Accepted fallback (pre-approved):* if a
+  safe in-app password path is **not** achievable through public APIs, the Standard-mode password
+  fallback is **removed on macOS for this flow** — these protected / authenticated operations then
+  require biometric authentication on macOS (no password fallback). Which outcome applies is a P0
+  validation item; both are pre-approved. See §9 for the security consequence.
 - **Explanatory pages for sensitive changes.** App Access Protection changes and auth-mode
   switches present a dedicated page showing the consequences, requirements, and preflight
   checks (e.g. "no backup exists", "biometrics unavailable", "this re-wraps all keys") with the
@@ -234,6 +248,12 @@ This redesign must preserve every current invariant (see [SECURITY.md](SECURITY.
 - The `DecryptionService` Phase 1 / Phase 2 boundary is unchanged.
 - Per-operation biometric posture is preserved (one biometric per operation; no session reuse).
 - No secret logging; zero network.
+- **macOS Standard-mode fallback (accepted consequence).** If P0 finds no safe public-API in-app
+  password path, macOS drops the Standard-mode *password* fallback for this in-app authenticated
+  flow and requires biometrics on macOS for these operations. This is a deliberate, **macOS-only**
+  presentation-layer restriction; the Secure Enclave access-control flags are unchanged, and
+  iOS / iPadOS / visionOS keep the system passcode fallback. If this path is taken, SECURITY.md §4
+  is updated to record the macOS deviation.
 
 Red-line files touched by the implementation (`AppSessionOrchestrator`, `Sources/Security/
 ProtectedData/*`, `AuthenticationManager`, `SecureEnclaveManager`, entitlements) require

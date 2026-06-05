@@ -33,11 +33,17 @@ rewrite. It must run on a real Mac with Touch ID. Acceptance items:
    `kSecUseAuthenticationContext: ctx`, no second prompt.
 4. **No cross-operation reuse.** With reuse-duration `0`, a *second* operation requires a *new*
    authentication (confirm the prior context does not silently authorize it).
-5. **In-app password fallback.** Validate the Passwords-style in-app password / login-password
-   field path for Standard mode / biometrics-unavailable, including how the credential is
-   verified (candidate approaches in §7).
-6. **visionOS probe.** Empirically confirm Optic-ID + `ScenePhase` behavior assumed in the design
-   (biometric → `.inactive`, not `.background`).
+5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /
+   login-password path exists through public APIs (credential verification without weakening the
+   model or logging secrets). **Decision rule (pre-approved):** if it is not safely achievable,
+   drop the Standard-mode password fallback on macOS for this flow and require biometrics on macOS
+   (and update SECURITY.md §4). Either outcome unblocks P4/P5.
+6. **Mode-switch / rewrap under the presenter.** Validate the `AuthenticationManager` re-wrap flow's
+   per-key authentication when presented in-app on macOS: one in-window prompt per required
+   authentication, no resign, and the SECURITY.md §4 atomicity / crash-recovery semantics preserved.
+7. **visionOS — deferred (no hardware).** visionOS follows the iOS direction by decision; on-device
+   Optic-ID + `ScenePhase` confirmation is deferred until hardware is available and tracked as an
+   unvalidated assumption, not a design fork.
 
 PoC findings are recorded back into this document and the design before P1 begins.
 
@@ -51,8 +57,8 @@ PoC findings are recorded back into this document and the design before P1 begin
   current lock UI temporarily (derived from the new state); extend tracing to the new states.
   This is the core behavioral fix.
 - **P3 — Decoupled cosmetic cover.** Extract the cover into its own modifier keyed only to scene
-  activity; remove the cosmetic responsibility from the lock overlay. Finalize the cover trigger
-  (`.inactive` vs `.background`-only on iOS).
+  activity; remove the cosmetic responsibility from the lock overlay. Cover trigger is **decided:
+  `.inactive`** for now (a later move to `.background`-only on iOS is an optional refinement).
 - **P4 — macOS in-app auth surfaces.** Embedded unlock screen + in-app password fallback;
   explanatory pages for App Access change & mode switch; introduce `AuthenticationPresenting`.
 - **P5 — macOS in-app per-operation auth.** Route per-op auth through the presenter using
@@ -135,8 +141,11 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   the new model behind the same observable behavior before P7 removes the old machinery.
 - **macOS PoC dependency.** P4/P5 depend on the P0 "no-resign" and "per-op context consumption"
   results. If "no-resign" fails, revisit the macOS away-event model before building P4/P5.
-- **Passcode fallback correctness.** The in-app password field must validate credentials safely
-  (no secret logging; correct failure mapping). Approach selected from §7 after the PoC.
+- **macOS Standard-mode fallback (decided, conditional).** Preferred is a safe in-app password
+  field; if P0 shows that is not achievable through public APIs, the **pre-approved** outcome is to
+  remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
+  and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
+  password field must validate credentials safely (no secret logging; correct failure mapping).
 - **Security posture unchanged.** One biometric per operation; the unlock context is never reused
   for operations; reuse-duration `0`; relock fail-closed; Phase 1/2 boundary intact.
 
@@ -158,21 +167,32 @@ Consequences for tracking (do not drop):
   single in-app prompt with no content clear / relock.
 - The already-shipped off-main custody hop stays (responsiveness; independent of this work).
 
-## 7. Open questions
+## 7. Decisions & remaining validation items
 
-1. **`LAAuthenticationView` vs `LARight.authorize(in:)`** for the embedded surfaces; whether to
-   model unlock / sensitive changes as `LARight`s (persisted authorization state) or as direct
-   `LAContext` evaluations.
-2. **In-app password-field credential validation** — how the Standard-mode / fallback password is
-   verified (e.g. `LAContext` with a credential, a keychain-backed check) without weakening the
-   security model or logging secrets.
-3. **macOS auto-lock interval control** — reuse the existing grace setting as the unified
-   auto-lock interval, or add a distinct macOS setting; default value.
-4. **Cover trigger on iOS** — `.inactive` (snapshot-safe; brief flash behind a biometric) vs
-   `.background`-only (no flash; relies on snapshot-at-background timing).
-5. **visionOS specifics** — Optic-ID + scenePhase behavior; whether any in-window auth affordance exists.
-6. **`AuthenticationManager` mode-switch** under the in-app presenter — the re-wrap flow's
-   per-key authentication presentation on macOS.
+Folding in the reviewer's direction (2026-06-05).
+
+**Decided (folded into the design):**
+1. **macOS embedded mechanism.** `LAAuthenticationView` + `LAContext` (`evaluateAccessControl` /
+   `evaluatePolicy`) is the primary direction and the one to validate first — it stays on the
+   `LAContext` path used today and only changes the macOS presentation. `LARight.authorize(in:)` is
+   a secondary fallback, used only if the primary cannot meet a need.
+2. **macOS auto-lock interval.** Reuse the existing grace setting as the unified auto-lock interval
+   for now. A separate macOS-specific setting is an optional future study, out of scope here.
+3. **iOS cover trigger.** `.inactive` for now (snapshot-safe; accepts a brief cosmetic flash behind
+   a biometric sheet). A later move to `.background`-only is an optional refinement.
+4. **visionOS.** Follow the iOS direction. On-device validation is deferred (no visionOS hardware);
+   iOS-equivalent behavior is tracked as an unvalidated assumption, not a design fork.
+5. **Password fallback (conditional, pre-approved).** Prefer a safe in-app password field; if P0
+   shows it is not achievable through public APIs, remove the Standard-mode password fallback on
+   macOS for this flow (biometrics required on macOS) and update SECURITY.md §4.
+
+**Remaining validation items (P0 / technical validation):**
+1. **In-app password-field feasibility** — whether a safe public-API credential path exists; drives
+   decision (5) above. (P0 item 5)
+2. **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's per-key
+   in-app authentication on macOS, with atomicity + crash recovery preserved. (P0 item 6)
+3. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
+   (P0 item 7)
 
 ---
 
