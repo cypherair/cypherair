@@ -4305,6 +4305,40 @@
         }
       }
     },
+    "encrypt.recipients.hiddenByFilter" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld selected recipient hidden by the current filter"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld selected recipients hidden by the current filter"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个已选收件人被当前筛选隐藏"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "encrypt.recipients.noMatches" : {
       "localizations" : {
         "en" : {
@@ -4365,6 +4399,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择显示的全部（%d）"
+          }
+        }
+      }
+    },
+    "encrypt.recipients.showAll" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show All"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示全部"
           }
         }
       }

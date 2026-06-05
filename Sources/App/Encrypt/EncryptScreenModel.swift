@@ -191,6 +191,22 @@ final class EncryptScreenModel {
             !selectedRecipientTagFilterIds.isEmpty
     }
 
+    /// How many selected recipients the active search/tag filter is hiding from the
+    /// list (their row isn't shown because they don't match the filter). `0` when no
+    /// filter is active — every selected recipient appears then. Built from
+    /// `selectedRecipientSummaries`, so stale selections are already excluded (those
+    /// are surfaced separately via `hasStaleSelectedRecipients`) and the two notices
+    /// never double-count.
+    var hiddenSelectedRecipientCount: Int {
+        guard hasActiveRecipientSearchOrFilter else {
+            return 0
+        }
+        let visibleIds = Set(filteredRecipientContacts.map(\.contactId))
+        return selectedRecipientSummaries.reduce(into: 0) { count, contact in
+            count += visibleIds.contains(contact.contactId) ? 0 : 1
+        }
+    }
+
     /// The selected recipient ids resolved against live contacts: stale ids (whose
     /// contact was deleted) are dropped while contacts are available, so display,
     /// count, the unverified check, and `encryptButtonDisabled` all reflect reality.
@@ -380,6 +396,13 @@ final class EncryptScreenModel {
     }
 
     func clearRecipientTagFilters() {
+        recipientTagFilterState.clear()
+    }
+
+    /// Clears the active search text and tag filters without touching the selection,
+    /// so selected recipients hidden by the filter become visible again ("Show All").
+    func clearRecipientSearchAndFilters() {
+        recipientSearchText = ""
         recipientTagFilterState.clear()
     }
 

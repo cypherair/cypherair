@@ -837,6 +837,62 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_hiddenSelectedRecipientCount_surfacesAndRevealsFilteredSelections() async throws {
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptHiddenSelected")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let shown = try stack.engine.generateKey(
+            name: "Shown Recipient",
+            email: "shown-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        let hidden = try stack.engine.generateKey(
+            name: "Other Recipient",
+            email: "other-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: shown.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: hidden.publicKeyData, verificationState: .verified)
+        let shownContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: shown.fingerprint))
+        let hiddenContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: hidden.fingerprint))
+        let tag = try opened.service.addTag(named: "Shown", toContactId: shownContactId)
+
+        let model = makeModel(contactService: opened.service)
+        model.selectedRecipients = [shownContactId, hiddenContactId]
+
+        // No filter: every selected recipient appears in the list, nothing is hidden.
+        XCTAssertEqual(model.hiddenSelectedRecipientCount, 0)
+
+        // A tag filter matching only one selected recipient hides the other from the
+        // list — surfaced via the count.
+        model.toggleRecipientTagFilter(tag.tagId)
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [shownContactId])
+        XCTAssertEqual(model.hiddenSelectedRecipientCount, 1)
+
+        // The search path hides it too.
+        model.toggleRecipientTagFilter(tag.tagId)
+        model.recipientSearchText = "Shown"
+        XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [shownContactId])
+        XCTAssertEqual(model.hiddenSelectedRecipientCount, 1)
+
+        // "Show All" clears search + tag filters but keeps the selection intact.
+        model.toggleRecipientTagFilter(tag.tagId)
+        XCTAssertEqual(model.selectedRecipientTagFilterIds, [tag.tagId])
+        model.clearRecipientSearchAndFilters()
+        XCTAssertTrue(model.recipientSearchText.isEmpty)
+        XCTAssertTrue(model.selectedRecipientTagFilterIds.isEmpty)
+        XCTAssertEqual(model.hiddenSelectedRecipientCount, 0)
+        XCTAssertEqual(model.selectedRecipients, [shownContactId, hiddenContactId])
+    }
+
+    @MainActor
     func test_recipientTagFilter_prunesDeletedTagFromActiveFilter() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagFilterPrune")

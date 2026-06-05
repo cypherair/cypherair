@@ -23,6 +23,7 @@ struct EncryptRecipientChooser: View {
         let tags = model.recipientTagFilters
         let selectedTagIds = model.selectedRecipientTagFilterIds
         let selectedCount = model.effectiveRecipientContactIds.count
+        let hiddenSelectedCount = model.hiddenSelectedRecipientCount
         let addableCount = recipients.reduce(into: 0) { count, contact in
             count += selectedIds.contains(contact.contactId) ? 0 : 1
         }
@@ -43,6 +44,10 @@ struct EncryptRecipientChooser: View {
                 if addableCount > 0 {
                     selectAllShownButton(count: addableCount)
                 }
+            }
+
+            if hiddenSelectedCount > 0 {
+                hiddenSelectedNotice(count: hiddenSelectedCount)
             }
 
             if model.hasStaleSelectedRecipients {
@@ -111,6 +116,29 @@ struct EncryptRecipientChooser: View {
             Label(selectAllShownTitle(count: count), systemImage: "person.2.badge.plus")
         }
         .controlSize(.small)
+    }
+
+    // MARK: Filter-hidden selection surface
+
+    @ViewBuilder
+    private func hiddenSelectedNotice(count: Int) -> some View {
+        HStack {
+            Label(hiddenSelectedSummary(count: count), systemImage: "eye.slash")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                withAnimation(CypherMotion.quickEaseOut(reduceMotion: reduceMotion)) {
+                    model.clearRecipientSearchAndFilters()
+                }
+            } label: {
+                Label(
+                    String(localized: "encrypt.recipients.showAll", defaultValue: "Show All"),
+                    systemImage: "eye"
+                )
+            }
+            .controlSize(.small)
+        }
     }
 
     // MARK: Stale-selection surface
@@ -190,6 +218,14 @@ struct EncryptRecipientChooser: View {
         String(
             localized: "encrypt.selectedRecipients.count",
             defaultValue: "\(count) recipients selected"
+        )
+    }
+
+    private func hiddenSelectedSummary(count: Int) -> String {
+        // Count interpolated so the String Catalog resolves the correct plural.
+        String(
+            localized: "encrypt.recipients.hiddenByFilter",
+            defaultValue: "\(count) selected recipients hidden by the current filter"
         )
     }
 }
