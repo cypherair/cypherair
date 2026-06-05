@@ -108,6 +108,16 @@ final class LocalizationCatalogTests: XCTestCase {
                 plural["other"],
                 "\(key) (\(locale)) plural variations must include the 'other' category"
             )
+            // English grammar distinguishes singular, so an `en` pluralized entry
+            // must also carry a `one` category — otherwise count == 1 falls back to
+            // the plural form ("1 recipients selected"). Locales like zh-Hans have a
+            // single plural form and legitimately omit `one`.
+            if locale == "en" {
+                XCTAssertNotNil(
+                    plural["one"],
+                    "\(key) (en) plural variations must include the 'one' category"
+                )
+            }
             for (category, variation) in plural.sorted(by: { $0.key < $1.key }) {
                 guard let stringUnit = variation.stringUnit else {
                     XCTFail("Missing string unit for \(key) (\(locale)) plural category \(category)")

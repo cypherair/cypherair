@@ -22,6 +22,10 @@ struct KeyBackupStatusBadge: View {
         switch style {
         case .badge:
             CypherStatusBadge(title: badgeTitle, systemImage: systemImage, color: color)
+                // The badge is folded into the Home card's combined accessibility
+                // element; without this override the bare imperative "Back up now"
+                // reads as an offered action. A declarative status phrase frames it.
+                .accessibilityLabel(badgeAccessibilityLabel)
         case .inline:
             Label(inlineTitle, systemImage: systemImage)
                 .foregroundStyle(color)
@@ -43,10 +47,22 @@ struct KeyBackupStatusBadge: View {
         isBackedUp ? .green : .orange
     }
 
+    // This badge intentionally owns its per-style copy (badgeTitle / inlineTitle /
+    // compactLabel) as the single source of truth for the backed-up vs needs-backup
+    // decision. Relocating those strings to the three call sites would fragment
+    // ownership and risk cross-surface drift for no real gain.
     private var badgeTitle: String {
         isBackedUp
             ? String(localized: "home.defaultKey.backedUp", defaultValue: "Backed up")
             : String(localized: "home.defaultKey.backUpNow", defaultValue: "Back up now")
+    }
+
+    /// A declarative status phrase (not the imperative visible title) for VoiceOver,
+    /// used only by `.badge` where the chip joins the Home card's combined element.
+    private var badgeAccessibilityLabel: String {
+        isBackedUp
+            ? String(localized: "home.defaultKey.backupStatus.backedUp", defaultValue: "Backup status: backed up")
+            : String(localized: "home.defaultKey.backupStatus.needsBackup", defaultValue: "Backup status: needs backup")
     }
 
     private var inlineTitle: String {
