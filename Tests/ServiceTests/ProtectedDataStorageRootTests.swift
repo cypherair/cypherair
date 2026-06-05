@@ -23,6 +23,9 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         )
     }
 
+    // `@MainActor`: `makeUITest` is main-actor-isolated (it constructs the
+    // main-actor `AppSessionOrchestrator`).
+    @MainActor
     func test_makeUITest_placesProtectedDataRootInsideApplicationSupport() {
         let container = AppAppContainer.makeUITest()
         defer { cleanupUITestContainer(container) }

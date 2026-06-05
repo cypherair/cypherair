@@ -203,6 +203,24 @@ final class MockProtectedDataRelockParticipant: ProtectedDataTestAppProtectedDat
     }
 }
 
+/// Relock participant that parks inside `relockProtectedData()` on a gate, so a
+/// resume Task suspends precisely inside `relockCurrentSession()` — the window
+/// between the orchestrator's `guard !isAuthenticating` and its in-flight flag
+/// set. Used to deterministically prove the double-entry race is closed.
+final class SuspendingRelockParticipant: ProtectedDataTestAppProtectedDataRelockParticipant {
+    let gate: AsyncSuspensionGate
+    private(set) var relockCallCount = 0
+
+    init(gate: AsyncSuspensionGate) {
+        self.gate = gate
+    }
+
+    func relockProtectedData() async throws {
+        relockCallCount += 1
+        await gate.suspend()
+    }
+}
+
 actor AsyncBooleanFlag {
     var value = false
 

@@ -207,6 +207,12 @@ struct PrivacyScreenLifecycleGate {
         return .handle
     }
 
+    // A real `.background` always wins: this unconditionally returns `true` so the
+    // orchestrator handles it, even mid–operation prompt. This is deliberately
+    // asymmetric with `shouldHandleInactive`/`shouldHandleResignActive`, which
+    // suppress the transient resign/activate the system biometric sheet causes.
+    // A backgrounded app genuinely left the foreground, so it must clear settle
+    // state and let the orchestrator invalidate/relock.
     mutating func shouldHandleBackground(
         operationPrompt: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot = .idle
     ) -> Bool {

@@ -361,9 +361,16 @@ struct CypherAirApp: App {
                 .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                 .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
                 .environment(tutorialStore)
+                // The shared authentication shield coordinator is lifecycle-driven
+                // by the main window's host (see `mainWindowSceneContent`). On
+                // macOS, `NSApplication` active/resign notifications are app-wide,
+                // so handling them here too would deliver every transition to the
+                // same coordinator twice. This Settings scene still renders the
+                // overlay from the shared @Observable coordinator, but must not be
+                // a second lifecycle driver.
                 .authenticationShieldHost(
                     container.authenticationShieldCoordinator,
-                    handlesLifecycleEvents: true
+                    handlesLifecycleEvents: false
                 )
             }
         }
