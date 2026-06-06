@@ -600,16 +600,7 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func makePrivateKeyOperationRouter(
-        resolver: PGPKeyCapabilityResolver = {
-            // P0 PoC (throwaway branch): enable the real custody routes when the harness is active.
-            // Production / non-harness keeps the default .production resolver (custody blocked).
-            #if DEBUG
-            if ProcessInfo.processInfo.environment["CYPHERAIR_POC_HARNESS"] == "1" {
-                return PGPKeyCapabilityResolver(policy: .pocFullCustody)
-            }
-            #endif
-            return PGPKeyCapabilityResolver()
-        }(),
+        resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore
     ) -> PrivateKeyOperationRouter {

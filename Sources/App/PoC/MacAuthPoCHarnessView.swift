@@ -26,8 +26,6 @@ struct MacAuthPoCHarnessView: View {
     @State private var keyCounter = 0
     @State private var item2Key: PGPKeyIdentity?
     @State private var item2Ciphertext: Data?
-    @State private var item3Key: PGPKeyIdentity?
-    @State private var item3Ciphertext: Data?
 
     var body: some View {
         ZStack {
@@ -45,11 +43,8 @@ struct MacAuthPoCHarnessView: View {
                     runButton("Item 2a — Setup (generate real key; may use the OLD system sheet)", id: "2a") { try await runItem2Setup() }
                     runButton("Item 2b — Measure DECRYPT (one in-window auth)", id: "2b") { try await runItem2MeasureDecrypt() }
                     runButton("Item 2c — Measure SIGN (one in-window auth)", id: "2c") { try await runItem2MeasureSign() }
-                    runButton("Item 3a — Setup custody (generate SE custody key)", id: "3a") { try await runItem3Setup() }
-                    runButton("Item 3b — Measure custody DECRYPT (in-window)", id: "3b") { try await runItem3MeasureDecrypt() }
-                    runButton("Item 3c — Measure custody SIGN (in-window)", id: "3c") { try await runItem3MeasureSign() }
                     runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
-                    Text("Items 4/6 wired in later increments.")
+                    Text("Items 3/4/6 wired in later increments.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -206,79 +201,6 @@ struct MacAuthPoCHarnessView: View {
         resignCount = 0
         becomeActiveCount = 0
         isActive = NSApplication.shared.isActive
-    }
-
-    /// Item 3a — SETUP: generate a REAL Secure Enclave custody identity (custody enabled on-branch
-    /// via pocFullCustody) + a test ciphertext (encrypt to it as a contact). Generation self-signs
-    /// the cert → may prompt; that is setup, NOT measured.
-    @MainActor
-    private func runItem3Setup() async throws {
-        keyCounter += 1
-        append("Item 3a: SETUP — generating a REAL custody (Secure Enclave) identity (may prompt; NOT measured)…")
-        let id = try await container.keyManagement.generateHiddenSecureEnclaveCustodyKey(
-            name: "PoC SE \(keyCounter)", email: nil, expirySeconds: nil, configurationIdentity: .compatibleP256V4)
-        generatedFingerprints.append(id.fingerprint)
-        _ = try container.contactService.importContact(publicKeyData: id.publicKeyData)
-        guard let contactId = container.contactService.contactId(forFingerprint: id.fingerprint) else {
-            append("Item 3a: FAIL — could not resolve contact id"); return
-        }
-        let ciphertext = try await container.encryptionService.encryptText(
-            "PoC item 3 plaintext", recipientContactIds: [contactId],
-            signWithFingerprint: nil, encryptToSelf: false)
-        item3Key = id
-        item3Ciphertext = ciphertext
-        append("Item 3a: SETUP DONE (custody key …\(id.fingerprint.suffix(8))). Let prompts/lifecycle settle, then 3b/3c.")
-    }
-
-    /// Item 3b — MEASURE custody decrypt. SE key-agreement op → `.useKeyKeyExchange`.
-    @MainActor
-    private func runItem3MeasureDecrypt() async throws {
-        guard let ciphertext = item3Ciphertext else { append("Item 3b: run Item 3a first."); return }
-        resetObservationCounters()
-        append("Item 3b: MEASURED in-window custody DECRYPT (.useKeyKeyExchange).")
-        try await measureCustodyOp("decrypt", operation: .useKeyKeyExchange) {
-            let (pt, _) = try await container.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
-            return String(data: pt, encoding: .utf8) == "PoC item 3 plaintext" ? "plaintext ok" : "plaintext MISMATCH"
-        }
-    }
-
-    /// Item 3c — MEASURE custody sign. SE signing op → `.useKeySign`.
-    @MainActor
-    private func runItem3MeasureSign() async throws {
-        guard let id = item3Key else { append("Item 3c: run Item 3a first."); return }
-        resetObservationCounters()
-        append("Item 3c: MEASURED in-window custody SIGN (.useKeySign).")
-        try await measureCustodyOp("sign", operation: .useKeySign) {
-            let sig = try await container.signingService.signCleartext("PoC item 3 sign", signerFingerprint: id.fingerprint)
-            return "signature \(sig.count) bytes"
-        }
-    }
-
-    /// Custody measured op: authenticate in-window with the role-correct `LAAccessControlOperation`,
-    /// deposit the context (interactionNotAllowed), run the real op. PASS = succeeds non-interactively
-    /// ⇒ the custody SecKey consumed the context bound at `loadKeys`.
-    @MainActor
-    private func measureCustodyOp(_ label: String, operation: LAAccessControlOperation, _ op: @escaping () async throws -> String) async throws {
-        guard let box = container.pocContextBox else { append("Item 3 \(label): FAIL — no context box"); return }
-        let resignBefore = resignCount
-        let ctx: LAContext
-        do {
-            ctx = try await presenter.authenticate(
-                accessControl: try SecureEnclaveCustodyAccessControlPolicy.privateKeyUsageBiometryAny.makeSecAccessControl(),
-                operation: operation,
-                localizedReason: "PoC item 3 \(label): authorize custody operation")
-        } catch {
-            append("Item 3 \(label): in-window auth failed: \(String(describing: type(of: error)))"); return
-        }
-        ctx.interactionNotAllowed = true
-        box.context = ctx
-        defer { box.context = nil }
-        do {
-            let detail = try await op()
-            append("Item 3 \(label): PASS — \(detail); consumed non-interactively; resignDelta=\(resignCount - resignBefore)")
-        } catch {
-            append("Item 3 \(label): NOT consumed — op threw \(String(describing: type(of: error))) under interactionNotAllowed.")
-        }
     }
 
     /// Authenticate in-window, deposit the context (with `interactionNotAllowed = true`), run the
