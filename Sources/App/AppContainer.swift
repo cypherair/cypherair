@@ -615,6 +615,18 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         #endif
+        #if DEBUG
+        // P0 PoC per-operation context provider (read by the software unwrap AND the custody
+        // key-store load). nil unless the harness is active.
+        let pocContextProvider: (@Sendable () -> LAContext?)?
+        if let pocContextBox {
+            pocContextProvider = { pocContextBox.context }
+        } else {
+            pocContextProvider = nil
+        }
+        #else
+        let pocContextProvider: (@Sendable () -> LAContext?)? = nil
+        #endif
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
@@ -690,7 +702,10 @@ final class AppContainer: @unchecked Sendable {
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+            keyStore: SystemSecureEnclaveCustodyKeyStore(
+                traceStore: authLifecycleTraceStore,
+                pocContextProvider: pocContextProvider
+            )
         )
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
@@ -712,14 +727,21 @@ final class AppContainer: @unchecked Sendable {
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
         #if DEBUG
-        let pocContextProvider: (@Sendable () -> LAContext?)?
-        if let pocContextBox {
-            pocContextProvider = { pocContextBox.context }
-        } else {
-            pocContextProvider = nil
-        }
+        // P0 PoC (throwaway branch): enable the REAL custody generation path when the harness is
+        // active, so `generateHiddenSecureEnclaveCustodyKey` works. nil otherwise (custody blocked).
+        let pocGenerationFactory: ((KeyCatalogStore, KeyProvisioningInvalidationGate, KeyProvisioningCommitCoordinator) -> SecureEnclaveCustodyGenerationService)? = pocHarness ? { catalogStore, gate, coordinator in
+            SecureEnclaveCustodyGenerationService(
+                certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
+                handleStore: secureEnclaveCustodyHandleStore,
+                digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+                catalogStore: catalogStore,
+                resolver: PGPKeyCapabilityResolver(policy: .pocFullCustody),
+                invalidationGate: gate,
+                commitCoordinator: coordinator
+            )
+        } : nil
         #else
-        let pocContextProvider: (@Sendable () -> LAContext?)? = nil
+        let pocGenerationFactory: ((KeyCatalogStore, KeyProvisioningInvalidationGate, KeyProvisioningCommitCoordinator) -> SecureEnclaveCustodyGenerationService)? = nil
         #endif
         let keyManagement = KeyManagementService(
             keyAdapter: keyAdapter,
@@ -732,6 +754,7 @@ final class AppContainer: @unchecked Sendable {
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
+            secureEnclaveCustodyGenerationServiceFactory: pocGenerationFactory,
             secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService,
             pocContextProvider: pocContextProvider
         )

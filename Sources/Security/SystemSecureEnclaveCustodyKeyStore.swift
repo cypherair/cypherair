@@ -1,11 +1,19 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
     private let traceStore: AuthLifecycleTraceStore?
+    /// P0 PoC (DEBUG harness only): supplies an in-window-authenticated per-operation `LAContext`
+    /// bound to the loaded `SecKey` via `kSecUseAuthenticationContext`. `nil` in production.
+    private let pocContextProvider: (@Sendable () -> LAContext?)?
 
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
+    init(
+        traceStore: AuthLifecycleTraceStore? = nil,
+        pocContextProvider: (@Sendable () -> LAContext?)? = nil
+    ) {
         self.traceStore = traceStore
+        self.pocContextProvider = pocContextProvider
     }
 
     func createKey(
@@ -99,6 +107,12 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         var query = baseQuery(reference: reference)
         query[kSecReturnRef as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitAll
+        // P0 PoC: bind an in-window-authenticated context to the loaded SecKey (mirrors
+        // KeychainManager.load) so the later SecKeyCreateSignature / SecKeyCopyKeyExchangeResult
+        // consume it with no second prompt. nil in production.
+        if let authenticationContext = pocContextProvider?() {
+            query[kSecUseAuthenticationContext as String] = authenticationContext
+        }
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
