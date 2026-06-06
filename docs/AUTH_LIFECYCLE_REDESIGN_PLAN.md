@@ -42,14 +42,19 @@ Acceptance items:
    was attempted and discontinued (the on-device run was an invalid experiment, not a custody
    feasibility result — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md)). Revisit when
    custody is product-shaped; the definition above remains the target for that future attempt.
-4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
-   does **not** silently authorize a later private-key operation (signing, decryption,
-   certification, revocation, or a key-expiry change) — that operation triggers its own
-   authentication. (Unsigned standalone encryption — recipient-key or password-protected — does not use the private-key
-   operation router, Secure Enclave, or private-key authentication; an encrypt-and-sign operation
-   authenticates for its signing step — see DESIGN §7.) This validates the narrow separation in DESIGN
-   §2 (principle 5); it is **not** a test that every operation must re-authenticate, and a single
-   user action spanning several keys (auth-mode switch / re-wrap) still authenticates once.
+4. **Unlock auth is not reused for key use — architectural requirement, NOT a PoC experiment.** The
+   authentication that unlocked the app must **never** silently authorize a later private-key
+   operation (signing, decryption, certification, revocation, or a key-expiry change); each such
+   operation authenticates on its own. (Unsigned standalone encryption — recipient-key or
+   password-protected — does not use the private-key operation router, Secure Enclave, or private-key
+   authentication; an encrypt-and-sign operation authenticates for its signing step — see DESIGN §7.)
+   This is the narrow separation in DESIGN §2 (principle 5); it is **not** a rule that every operation
+   must re-authenticate, and a single user action spanning several keys (auth-mode switch / re-wrap)
+   still authenticates once. **Reclassified (2026-06-06):** this boundary does not need a runtime
+   feasibility experiment — it is **guaranteed by implementation / code routing**, recorded as a
+   red-line requirement in §5 and DESIGN §2 (principle 5), and verified by code structure/review (the
+   app-unlock context is structurally isolated from the private-key operation path). It carries **no
+   P0 harness item**.
 5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /
    login-password path exists through public APIs (credential verification without weakening the
    model or logging secrets). **Decision rule (pre-approved):** if it is not safely achievable,
@@ -166,10 +171,18 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
   and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
   password field must validate credentials safely (no secret logging; correct failure mapping).
-- **Security posture unchanged.** The app-unlock authentication is never reused to authorize a
-  private-key operation, and private-key operations authenticate on their own (DESIGN §2,
-  principle 5); relock fail-closed; Phase 1/2 boundary intact. (This is the narrow
-  unlock-vs-key-use rule, not a blanket per-operation re-authentication mandate.)
+- **Security posture unchanged — unlock-vs-key-use is a code-routing requirement (former P0 item 4).**
+  The app-unlock authentication is never reused to authorize a private-key operation, and private-key
+  operations authenticate on their own (DESIGN §2, principle 5); relock fail-closed; Phase 1/2 boundary
+  intact. (This is the narrow unlock-vs-key-use rule, not a blanket per-operation re-authentication
+  mandate.) **This boundary is guaranteed by implementation, not a runtime experiment:** the app-unlock
+  `LAContext` lives only in `AppSessionOrchestrator.pendingAuthenticatedContext` and is consumed solely
+  by `consumeAuthenticatedContextForProtectedData()` → ProtectedData; the private-key operation path
+  runs on a separate `AuthenticationPromptCoordinator.withOperationPrompt` channel and holds **no**
+  reference to the app-unlock context (grep-verifiable). The macOS in-window per-operation presenter
+  must thread only an operation-scoped context and must **never** pass the app-unlock context into a
+  private-key operation. Enforced by code structure + review on every touching phase; no harness
+  experiment substitutes for it.
 
 ## 6. SE-custody prompt — tracking
 

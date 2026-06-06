@@ -64,8 +64,21 @@ restored to the pre–Item 3 checkpoint (`a6dcf43`). Validated Items 1/5/2 remai
 **Revisit** only when custody is product-shaped and validated together with the in-window auth
 model — not as a standalone narrow spike.
 
+## Architectural requirements (not PoC experiments)
+
+### Item 4 — unlock auth is not reused for key use — REQUIREMENT (not validated by harness)
+This boundary is **guaranteed by implementation / code routing**, not a runtime feasibility question,
+so it is **not** a PoC harness experiment. A read-only investigation confirmed the separation is
+already structurally enforced: the app-unlock `LAContext` lives only in
+`AppSessionOrchestrator.pendingAuthenticatedContext` and is consumed solely by
+`consumeAuthenticatedContextForProtectedData()` → ProtectedData; the private-key operation path runs
+on a separate `withOperationPrompt` channel (distinct `kind=operation` vs `kind=privacy` traces) and
+holds **no** reference to the app-unlock context (grep-verifiable). Recorded as a red-line requirement
+in [PLAN §1 item 4 / §5](AUTH_LIFECYCLE_REDESIGN_PLAN.md) and DESIGN §2 principle 5; the redesign must
+preserve it (the in-window per-operation presenter must never thread the app-unlock context into a key
+operation). Verified by code structure/review, not a harness run.
+
 ## Pending
-- **Item 4** — unlock authentication is not reused for key-use operations (our routing).
 - **Item 6** — mode-switch / rewrap under the in-window presenter.
 - **Item 7** — visionOS (deferred; no hardware).
 
