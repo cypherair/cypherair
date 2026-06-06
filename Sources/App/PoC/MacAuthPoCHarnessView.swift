@@ -57,11 +57,15 @@ struct MacAuthPoCHarnessView: View {
             // The in-window authentication surface. When the presenter has an active context,
             // the LAAuthenticationView renders the biometric INSIDE this window.
             if let ctx = presenter.activeContext {
-                LAAuthenticationViewHost(context: ctx, onReady: presenter.viewDidMount)
-                    .frame(width: 56, height: 56)
-                    .padding(18)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .transition(.opacity)
+                VStack(spacing: 12) {
+                    Text("Authenticate in-window").font(.headline)
+                    LAAuthenticationViewHost(context: ctx, onReady: presenter.viewDidMount)
+                        .frame(width: 160, height: 160)
+                }
+                .padding(28)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .shadow(radius: 24)
+                .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.15), value: presenter.activeContext != nil)
