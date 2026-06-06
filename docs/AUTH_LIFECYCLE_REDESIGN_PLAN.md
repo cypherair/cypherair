@@ -39,8 +39,9 @@ Acceptance items:
 4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
    does **not** silently authorize a later private-key operation (signing, decryption,
    certification, revocation, or a key-expiry change) — that operation triggers its own
-   authentication. (Standalone encryption is public-key-only and is not auth-gated; an
-   encrypt-and-sign operation authenticates for its signing step — see DESIGN §7.) This validates the narrow separation in DESIGN
+   authentication. (Unsigned standalone encryption — recipient-key or password-protected — does not use the private-key
+   operation router, Secure Enclave, or private-key authentication; an encrypt-and-sign operation
+   authenticates for its signing step — see DESIGN §7.) This validates the narrow separation in DESIGN
    §2 (principle 5); it is **not** a test that every operation must re-authenticate, and a single
    user action spanning several keys (auth-mode switch / re-wrap) still authenticates once.
 5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /

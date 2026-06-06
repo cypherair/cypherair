@@ -205,9 +205,9 @@ set. Today five are live: the routine message operations **signing, decryption, 
 the key-maintenance operations **revocation and key-expiry changes**, each authenticating on its own
 exactly as today; the sixth case, **binding refresh** (`refreshBinding`), is defined but **not yet
 implemented**. (In the custody model the signing-role operations resolve to the Secure Enclave
-**digest-signing** primitive and decryption to **key agreement**.) Standalone encryption uses only
-recipient **public** keys and needs no authentication; an encrypt-and-sign operation authenticates
-only for its **signing** step. What changes on macOS is only the
+**digest-signing** primitive and decryption to **key agreement**.) Unsigned standalone encryption — recipient-key or password-protected — does not touch the
+private-key operation router, the Secure Enclave, or private-key authentication; an encrypt-and-sign
+operation authenticates only for its **signing** step. What changes on macOS is only the
 *presentation*: the per-operation biometric renders **in-app** (§6, §8) instead of through the
 detached system sheet. (An auth-mode switch / key re-wrap is a single user action and authenticates
 once for that action even though it touches every key — see §2, principle 5; its in-app
