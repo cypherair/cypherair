@@ -68,3 +68,14 @@ model — not as a standalone narrow spike.
 - **Item 4** — unlock authentication is not reused for key-use operations (our routing).
 - **Item 6** — mode-switch / rewrap under the in-window presenter.
 - **Item 7** — visionOS (deferred; no hardware).
+
+## Investigations
+
+### Other macOS auth call sites still on the system sheet (2026-06-06)
+A read-only sweep of every macOS biometric trigger point found auth flows beyond the P0 items that
+still show the **old detached/system sheet** today — most notably **key generation/provisioning and
+import** (the SE-wrap self-ECDH prompts because no in-window `LAContext` is threaded into
+`generateWrappingKey`), plus **key export/backup** and **custody generation** (self-sign). The guided
+tutorial is mock-isolated (no real prompt). Full path inventory, choke-point analysis, and the
+migrate-or-handle action for each are recorded in
+[PLAN §8](AUTH_LIFECYCLE_REDESIGN_PLAN.md). Not fixed or validated now.

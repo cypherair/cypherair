@@ -217,6 +217,40 @@ Folding in the reviewer's direction (2026-06-05).
 3. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
    (P0 item 7)
 
+## 8. Other macOS auth call sites still on the system sheet (to migrate or explicitly handle)
+
+Beyond the per-operation **unwrap** path wired in §3.3, several macOS flows still trigger the **old
+detached/system LocalAuthentication sheet** today and are **not** named in the P0 items or the
+§3.2/§3.3 presenter wiring. They are tracked here so a later phase (P4/P5, or a follow-up) either
+migrates them to the in-window presenter or makes a deliberate decision to leave them on the system
+sheet. **None is fixed or validated now** (read-only sweep, 2026-06-06).
+
+The Secure-Enclave auth model has **two distinct choke points**; the redesign so far names only the
+first:
+- **Operation / unwrap** — `PrivateKeyAccessService.unwrapPrivateKey` →
+  `SecureEnclaveManager.reconstructKey(…authenticationContext:)`. Covered by §3.3.
+- **Provisioning / wrap** — `SecureEnclaveManager.generateWrappingKey(accessControl:authenticationContext:)`
+  + `wrap(…)`. The wrap-time self-ECDH (`sharedSecretFromKeyAgreement`) triggers Face ID unless a
+  pre-authenticated `LAContext` is threaded in. The `generateWrappingKey` source comment states the
+  context is passed precisely so the wrap self-ECDH does not "trigger Face ID again";
+  `PrivateKeyRewrapWorkflow` passes it (rewrap → no prompt), but **initial generation and import pass
+  `nil`** (`KeyProvisioningService`), so they prompt. This provisioning choke point is **not** named
+  in §3.2/§3.3.
+
+| Path | macOS prompt today | Origin (choke point) | Plan coverage | Action later |
+|------|--------------------|----------------------|---------------|--------------|
+| **Key generation / provisioning** | Detached sheet | wrap-time self-ECDH; `KeyProvisioningService.generateKey` (nil context) | **Not covered** | Authenticate in-window first, then thread the context into `generateWrappingKey(authenticationContext:)` — the pattern `PrivateKeyRewrapWorkflow` already uses for rewrap. |
+| **Key import / restore** | Detached sheet | same wrap-time self-ECDH; `KeyProvisioningService.importKey` (nil context) | **Not covered** | Same as generation. |
+| **Key export / backup** | Detached sheet | unwrap path; `KeyExportService` → `unwrapPrivateKey` → `reconstructKey` | **Rides the §3.3 unwrap path, but not named** (export is not in the `PGPPrivateOperationKind` set) | Confirm the presenter wraps `unwrapPrivateKey` for **all** callers so export is covered; otherwise migrate it explicitly. |
+| **SE custody generation (self-sign)** | Detached sheet | `SecKeyCreateSignature` during the custody cert self-sign (`SystemSecureEnclaveCustodyDigestSigner`) | Custody **deferred** (Item 3) | Fold into the product-shaped custody + in-window work when custody is productized (see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) → Deferred). |
+| **Guided tutorial** | None (isolated) | tutorial uses `Mock*` SE/Keychain primitives (`Sources/Security/Mocks`) | N/A — no real prompt | No migration; note only. Revisit if the tutorial ever uses real hardware-backed processing ([SECURITY.md](SECURITY.md) §6). |
+
+**Not gaps:** app-session unlock and ProtectedData root-secret access already thread
+`kSecUseAuthenticationContext` and are covered by the unlock presenter (§3.2) / DESIGN §7.
+
+This inventory is recorded on the PoC branch now; it is consolidated into the durable `main` docs
+when the branch is closed out.
+
 ---
 
 *This is a proposal / roadmap. Phases change shipped behavior only when implemented, tested, and
