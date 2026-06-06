@@ -35,34 +35,73 @@ non-interactively, i.e. no UI was needed). resign count 0.
   `evaluateAccessControl` (`AC=wrappingAC`); the biometry-only fallback was not needed.
 - Decrypt and sign are two distinct per-operation authentications (separate one-prompt operations).
 
+### Item 6 — Mode-switch / rewrap under the presenter — PASS
+The REAL `AuthenticationManager.switchMode` rewrap authenticates **once for the whole action** when its
+authority prompt is presented in-window: a single in-window prompt for the switch even though it re-wraps
+every key (exactly as today), with no resign (`resignDelta = 0`), the mode flips, and the recovery journal
+ends empty (SECURITY.md §4 atomicity / crash-recovery preserved). Forward switch and restore are **separate
+user-triggered single-auth steps** in the harness.
+- **Production seam:** the single authority auth routes through the injected
+  `localAuthenticationPolicyEvaluator`; the rewrap then reuses `lastEvaluatedContext` for every per-key SE
+  op — no second prompt.
+- **Deterministic proof:** `inWindowPresentCount == 1` for the whole N-key rewrap, with
+  `forbidInteractionAfterPolicySuccess` (any hidden second per-key prompt would throw under
+  `interactionNotAllowed` instead of silently re-prompting).
+- Commit `9428e6b`. (The legacy shield had to be suppressed first — see F1.)
+
+### Item 3 (narrow) — Custody-auth ↔ in-window compatibility — PASS
+A **narrow technical-compatibility probe** (not full custody product-flow — see Deferred) confirmed an
+in-window-authenticated `LAContext` is consumed by the **real custody Secure Enclave operations** with no
+second prompt, for both roles:
+- **Sign** (`.useKeySign`): `SystemSecureEnclaveCustodyDigestSigner` → `SecKeyCreateSignature`.
+- **ECDH** (`.useKeyKeyExchange`): `SystemSecureEnclaveCustodyKeyAgreement` → `SecKeyCopyKeyExchangeResult`.
+
+The context is threaded via **`kSecUseAuthenticationContext`** on the
+`SystemSecureEnclaveCustodyKeyStore.loadKeys` query (the §3.3 production seam, DEBUG-only in the probe),
+proven non-interactively (`interactionNotAllowed = true`, `resignDelta = 0`), one prompt each.
+- **Scope:** reuses the real custody op code + one representative custody SE key per role; **no** OpenPGP
+  router / Rust / generation service / resolver / role metadata — those self-tests/binds were the prompt
+  storm that made the earlier full-flow run an invalid experiment.
+- **New signal vs Item 2:** Item 2 used CryptoKit `authenticationContext:` and `.useKeyKeyExchange` only;
+  this probe covers the **Security-framework `kSecUseAuthenticationContext`** path and adds `.useKeySign`.
+- Commit `d3bbee0`.
+
 ## Findings / follow-ups (do not block P0)
 
-### F1 — Legacy post-auth `AuthenticationShield` flashes after in-window auth succeeds (→ P2)
-After a successful in-window Touch ID, the legacy post-auth `AuthenticationShield` overlay briefly
-appears — a visually disruptive flash. This is an integration artifact of the **old**
-lifecycle/shield machinery, not the new in-window auth UI. The redesign's P2 work
-(`AppLockController`, decoupled cosmetic cover, and removing the shield's reaction to
-`.active` / operation prompts) must eliminate it: a per-operation in-window auth must not trigger any
-post-auth shield. Track for P2.
+### F1 — Legacy `AuthenticationShield` occludes and deadlocks the in-window mode-switch auth (→ P2, blocking)
+The legacy `AuthenticationShield` is **not merely a cosmetic flash**. On the mode-switch path (the authority
+auth is wrapped in `AuthenticationManager` → `withPrivacyPrompt`), the shield raises at **`.zIndex(10)`** —
+*above* the harness's in-window `LAAuthenticationView` — and **occludes + deadlocks** the auth: the biometric
+renders underneath the opaque "Authenticating…" shield, unreachable, so `evaluatePolicy` never returns and
+the flow hangs. Items 1/2/5 dodged this only because they call the presenter directly, bypassing the prompt
+coordinator (no shield event).
+
+**PoC bypass (throwaway):** suppress the shield under `isPoCHarness` by resolving
+`CypherAirApp.mainWindowShieldCoordinator` to `nil` (a host with a nil coordinator renders nothing). This is
+safe because the **app-session unlock is owned by `.privacyScreen()` / `PrivacyScreenModifier`, not the
+shield host** — unlock and the privacy blur still work; only the cosmetic shield overlay is removed.
+
+**Consequence:** the P2 shield-**decouple** (stop the shield reacting to operation prompts) is a **functional
+prerequisite** for in-window auth, not a cosmetic nicety; full shield **removal** stays P7. Commit `9428e6b`.
+Track for P2.
 
 ## Deferred
 
-### Item 3 — custody per-operation consumption — DEFERRED
-Not validated via the PoC harness. **Why:** Secure Enclave custody is not yet productized, and a
-meaningful custody-auth validation likely needs a more **product-shaped custody flow combined with
-the new in-window authentication model** — so the narrow per-operation harness approach is
-**discontinued**, not continued as a standalone spike.
+### Item 3 — full custody product-flow validation — DEFERRED
+The narrow **custody-auth ↔ in-window compatibility** sub-question is now **validated** (see the
+**Item 3 (narrow)** entry under Validated). What remains deferred is the **full custody product-flow
+validation**: Secure Enclave custody is not yet productized, so a meaningful end-to-end validation needs the
+real product custody flow (generation + role-pair binding + router + metadata + revocation) combined with
+the in-window model — a future task, **not** a continuation of the narrow spike.
 
-This is a **deferral, not a custody feasibility failure.** The on-device attempt (Item 3a prompted
-repeatedly for Touch ID *during custody key generation* and ended in a cancellation error) was an
-**invalid experiment**: the real custody generation + per-operation authentication flow was not
-understood before wiring the harness, so the run carries no signal about custody-auth feasibility.
+The earlier *full-flow* harness attempt prompted repeatedly for Touch ID *during custody key generation* and
+ended in a cancellation error — an **invalid experiment** (the generation + per-op flow was not understood
+before wiring), reverted in `984af6c`. The narrow probe (commit `d3bbee0`) deliberately avoids that
+generation/router machinery and instead exercises only the per-operation auth seam, which is why it produced
+a clean signal where the full-flow attempt did not.
 
-On-branch, the harness wiring was implemented and then **reverted** (`984af6c`); the branch was
-restored to the pre–Item 3 checkpoint (`a6dcf43`). Validated Items 1/5/2 remain intact.
-
-**Revisit** only when custody is product-shaped and validated together with the in-window auth
-model — not as a standalone narrow spike.
+**Revisit** the full product-flow validation only when custody is product-shaped — alongside the in-window
+auth model, not as a standalone spike.
 
 ## Architectural requirements (not PoC experiments)
 
@@ -79,7 +118,6 @@ preserve it (the in-window per-operation presenter must never thread the app-unl
 operation). Verified by code structure/review, not a harness run.
 
 ## Pending
-- **Item 6** — mode-switch / rewrap under the in-window presenter.
 - **Item 7** — visionOS (deferred; no hardware).
 
 ## Investigations
@@ -92,3 +130,20 @@ import** (the SE-wrap self-ECDH prompts because no in-window `LAContext` is thre
 tutorial is mock-isolated (no real prompt). Full path inventory, choke-point analysis, and the
 migrate-or-handle action for each are recorded in
 [PLAN §8](AUTH_LIFECYCLE_REDESIGN_PLAN.md). Not fixed or validated now.
+
+## Architecture-audit boundary (harness-only; does not merge)
+
+The Item 3 narrow-probe harness uses the custody runtime (`ExternalP256KeyAgreementRequest`,
+`SystemSecureEnclaveCustodyKeyAgreement`) from `Sources/App/PoC`, which trips two architecture-audit guards
+in `CypherAir-UnitTests` (`ArchitectureSourceAuditTests`):
+- **`generatedFFITypes` containment** — the generated UniFFI type `ExternalP256KeyAgreementRequest` must not
+  appear in upper-layer source files.
+- **`phase6ExternalKeyAgreementRuntimeContainment`** — the external P-256 key-agreement runtime must stay
+  inside the FFI / Security / router-owned boundary, not `Sources/App`.
+
+These two unit tests are therefore **red on this branch** (signed UnitTests: 1382/1384), and that is
+**accepted**: the harness is DEBUG-only and **never merges** to `main`. The durable **production** seam these
+guards protect is unaffected — the in-window context reaches the custody op via `kSecUseAuthenticationContext`
+at `SystemSecureEnclaveCustodyKeyStore.loadKeys` (the §3.3 design target), which stays inside the Security
+boundary. The probe's result (Item 3 narrow PASS) stands independently of the harness's intentional boundary
+crossing; on carry-back to `main`, only the durable seam — not the harness wiring — is in scope.

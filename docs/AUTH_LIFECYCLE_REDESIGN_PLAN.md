@@ -36,12 +36,16 @@ Acceptance items:
 3. **Per-operation context consumption — custody path.** The same context drives a custody
    `SecKey` operation (`SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`) loaded with
    `kSecUseAuthenticationContext: ctx`, no second prompt.
-   **Deferred (PoC):** Secure Enclave custody is not yet productized, so this item is not validated
-   by the narrow per-operation harness. A meaningful custody-auth validation likely needs a more
-   product-shaped custody flow combined with the in-window authentication model; the harness spike
-   was attempted and discontinued (the on-device run was an invalid experiment, not a custody
-   feasibility result — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md)). Revisit when
-   custody is product-shaped; the definition above remains the target for that future attempt.
+   **Narrow probe validated (on-device, `d3bbee0`):** an in-window-authenticated `LAContext` satisfies the
+   real custody `SecKey` sign (`.useKeySign`) and ECDH (`.useKeyKeyExchange`) loaded via
+   `kSecUseAuthenticationContext` at `SystemSecureEnclaveCustodyKeyStore.loadKeys`, one prompt each, no
+   resign — so the §3.3 custody seam is technically compatible with the in-window model. This is a
+   **technical-compatibility** result only. **Full custody product-flow validation remains DEFERRED:**
+   Secure Enclave custody is not yet productized, so an end-to-end validation needs the product-shaped
+   custody flow (generation + role-pair binding + router + metadata) combined with the in-window model — a
+   future task, not a continuation of the narrow spike. See
+   [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) (Validated → Item 3 (narrow); Deferred → full
+   custody product-flow).
 4. **Unlock auth is not reused for key use — architectural requirement, NOT a PoC experiment.** The
    authentication that unlocked the app must **never** silently authorize a later private-key
    operation (signing, decryption, certification, revocation, or a key-expiry change); each such
@@ -64,6 +68,10 @@ Acceptance items:
    flow authenticates **once for the whole action** when presented in-app on macOS — a single
    in-window prompt for the switch even though it re-wraps every key (exactly as today) — with no
    resign and the SECURITY.md §4 atomicity / crash-recovery semantics preserved.
+   **Validated (on-device, `9428e6b`):** one in-window prompt for the whole N-key rewrap
+   (`inWindowPresentCount == 1`, proven with `forbidInteractionAfterPolicySuccess`), `resignDelta = 0`,
+   mode flips, recovery journal ends empty. (Required suppressing the legacy shield first — see
+   [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) → F1.)
 7. **visionOS — deferred (no hardware).** visionOS follows the iOS direction by decision; on-device
    Optic-ID + `ScenePhase` confirmation is deferred until hardware is available and tracked as an
    unvalidated assumption, not a design fork.
@@ -112,7 +120,10 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   for the grace=0 fix is removed in P7; any remaining operation-progress signal is presentational only.
 - `Sources/App/Common/AuthenticationShield*` (`AuthenticationShieldCoordinator`,
   `AuthenticationShieldHost`, `AuthenticationShieldOverlayView`) — superseded by the in-app
-  auth surfaces (macOS) and the lock screen; removed/slimmed in P7.
+  auth surfaces (macOS) and the lock screen. **Decoupled from operation prompts in P2** (a *functional*
+  prerequisite, not cosmetic: the PoC found the shield raises at `.zIndex(10)` and occludes/deadlocks the
+  in-window per-operation/mode-switch auth — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) →
+  F1), then removed/slimmed in P7.
 
 ### 3.2 macOS in-app authentication (new)
 - New `AuthenticationPresenting` protocol + a macOS implementation hosting `LAAuthenticationView`
@@ -166,6 +177,11 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   the new model behind the same observable behavior before P7 removes the old machinery.
 - **macOS PoC dependency.** P4/P5 depend on the P0 "no-resign" and "per-op context consumption"
   results. If "no-resign" fails, revisit the macOS away-event model before building P4/P5.
+- **Legacy shield occlusion (P2 prerequisite, per F1).** The PoC found the legacy `AuthenticationShield`
+  raises at `.zIndex(10)` and *occludes/deadlocks* the in-window per-operation/mode-switch auth (not a
+  cosmetic flash). P2's shield-decouple is therefore a **functional prerequisite** for the P5 in-window
+  per-op auth, not a cleanup; full removal stays P7. See
+  [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) → F1.
 - **macOS Standard-mode fallback (decided, conditional).** Preferred is a safe in-app password
   field; if P0 shows that is not achievable through public APIs, the **pre-approved** outcome is to
   remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
@@ -202,6 +218,15 @@ Consequences for tracking (do not drop):
   single in-app prompt with no content clear / relock.
 - The already-shipped off-main custody hop stays (responsiveness; independent of this work).
 
+**Narrow custody-compat probe (on-device, 2026-06-06, `d3bbee0`).** The in-window `LAContext` is consumed by
+the real custody SE sign (`.useKeySign`) and ECDH (`.useKeyKeyExchange`) via `kSecUseAuthenticationContext`
+at `SystemSecureEnclaveCustodyKeyStore.loadKeys`, one prompt each, no resign — confirming the §3.3 custody
+seam is technically compatible with the in-window model. This is the **narrow technical-compatibility**
+result only; **full custody product-flow validation stays deferred** until custody is product-shaped (the
+P7 on-device verification above). The probe harness deliberately crosses the FFI/custody architecture-audit
+boundary and is throwaway — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md) → *Architecture-audit
+boundary*.
+
 ## 7. Decisions & remaining validation items
 
 Folding in the reviewer's direction (2026-06-05).
@@ -221,13 +246,17 @@ Folding in the reviewer's direction (2026-06-05).
    shows it is not achievable through public APIs, remove the Standard-mode password fallback on
    macOS for this flow (biometrics required on macOS) and update SECURITY.md §4.
 
+**Validated (P0, on-device this PoC phase):**
+- **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single in-app
+  authentication for the whole switch on macOS (one prompt even though it re-wraps every key, exactly as
+  today), no resign, atomicity + crash recovery preserved. (P0 item 6, `9428e6b`)
+- **Custody-auth ↔ in-window compatibility (narrow)** — an in-window `LAContext` satisfies the real custody
+  `SecKey` sign + ECDH via `kSecUseAuthenticationContext`, one prompt each. **Full custody product-flow
+  validation remains deferred** (custody not productized). (P0 item 3 narrow, `d3bbee0`)
+- (Earlier phase: P0 items 1, 2, 5 — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md).)
+
 **Remaining validation items (P0 / technical validation):**
-1. **In-app password-field feasibility** — whether a safe public-API credential path exists; drives
-   decision (5) above. (P0 item 5)
-2. **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single
-   in-app authentication for the whole switch on macOS (one prompt even though it re-wraps every key,
-   exactly as today), with atomicity + crash recovery preserved. (P0 item 6)
-3. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
+1. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
    (P0 item 7)
 
 ## 8. Other macOS auth call sites still on the system sheet (to migrate or explicitly handle)
