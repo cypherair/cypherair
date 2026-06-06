@@ -22,6 +22,18 @@ final class AuthPoCPresenter {
     /// When non-nil, the harness renders an `LAAuthenticationView` bound to this context.
     private(set) var activeContext: LAContext?
 
+    /// Item 6 measurement: how many in-window presents `inWindowPolicyEvaluator` has driven.
+    /// The harness resets this to 0 around a `switchMode` run and asserts it equals 1 — i.e.
+    /// the whole multi-key rewrap authenticated with a single in-window prompt.
+    private(set) var inWindowPresentCount = 0
+
+    /// Item 6: when set, force `interactionNotAllowed = true` on the manager's context after a
+    /// successful in-window policy evaluation (before replying). Because the manager threads that
+    /// same context as `lastEvaluatedContext` into the per-key SE rewrap ops, a hidden SECOND
+    /// authentication then throws deterministically instead of silently presenting another Touch ID.
+    /// Default off so Items 1/5 are unaffected.
+    var forbidInteractionAfterPolicySuccess = false
+
     /// Resumed by the hosted view once its `NSView` is mounted, so `evaluate*` is only
     /// called after the view is actually in the hierarchy (LAAuthenticationView requires
     /// the paired view to exist before the context evaluates).
@@ -58,22 +70,35 @@ final class AuthPoCPresenter {
     /// Drives `AuthenticationManager.localAuthenticationPolicyEvaluator`: render the
     /// manager-supplied context in-window, then evaluate the manager's policy there.
     /// Used to run the REAL rewrap / app-session auth through the in-window presenter.
-    func inWindowPolicyEvaluator(
+    ///
+    /// `nonisolated` because the manager calls this synchronously from a non-main continuation
+    /// (`evaluateLocalAuthenticationPolicy`); the body hops to the main actor to drive the UI.
+    nonisolated func inWindowPolicyEvaluator(
         _ context: LAContext,
         _ policy: LAPolicy,
         _ reason: String,
         _ reply: @escaping (Bool, Error?) -> Void
     ) {
+        nonisolated(unsafe) let unsafeContext = context
+        nonisolated(unsafe) let unsafeReply = reply
         Task { @MainActor in
             do {
-                try await present(context)
-                context.evaluatePolicy(policy, localizedReason: reason) { success, error in
+                try await present(unsafeContext)
+                inWindowPresentCount += 1
+                let forbidInteraction = forbidInteractionAfterPolicySuccess
+                unsafeContext.evaluatePolicy(policy, localizedReason: reason) { success, error in
+                    if success && forbidInteraction {
+                        // The manager threads THIS context as `lastEvaluatedContext` into the
+                        // per-key SE rewrap ops; forbidding interaction makes any hidden second
+                        // prompt fail deterministically rather than present another Touch ID.
+                        unsafeContext.interactionNotAllowed = true
+                    }
                     Task { @MainActor in self.activeContext = nil }
-                    reply(success, error)
+                    unsafeReply(success, error)
                 }
             } catch {
                 self.activeContext = nil
-                reply(false, error)
+                unsafeReply(false, error)
             }
         }
     }

@@ -378,6 +378,20 @@ struct CypherAirApp: App {
         #endif
     }
 
+    /// P0 PoC (throwaway `poc/auth-lifecycle-macos` branch): the legacy authentication shield renders
+    /// at `.zIndex(10)` — above the harness's in-window `LAAuthenticationView`. The REAL `switchMode`
+    /// auth (Item 6) is wrapped in `withPrivacyPrompt`, which raises that shield and OCCLUDES the
+    /// in-window biometric, deadlocking the flow on "Authenticating…". The redesign removes this shield
+    /// (PLAN §3.1/§3.2, finding F1, P7). For the PoC harness ONLY, resolve a nil shield coordinator so
+    /// the overlay never renders. The app-session unlock (owned by `.privacyScreen()`) and the privacy
+    /// blur (`AppSessionOrchestrator.isPrivacyScreenBlurred`) are unaffected.
+    private var mainWindowShieldCoordinator: AuthenticationShieldCoordinator? {
+        #if DEBUG
+        if launchConfiguration.isPoCHarness { return nil }
+        #endif
+        return container.authenticationShieldCoordinator
+    }
+
     @ViewBuilder
     private var mainWindowContent: some View {
         #if os(macOS)
@@ -509,9 +523,9 @@ struct CypherAirApp: App {
             container.config.clearPostUnlockRecoveryLoadWarning()
             presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
         }
-        .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
+        .environment(\.authenticationShieldCoordinator, mainWindowShieldCoordinator)
         .authenticationShieldHost(
-            container.authenticationShieldCoordinator,
+            mainWindowShieldCoordinator,
             handlesLifecycleEvents: true
         )
         .onOpenURL { url in

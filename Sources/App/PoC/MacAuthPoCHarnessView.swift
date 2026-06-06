@@ -9,9 +9,10 @@ import SwiftUI
 /// `CYPHERAIR_POC_HARNESS=1`. It only DRIVES the real operations and OBSERVES — it implements
 /// no operation logic of its own.
 ///
-/// This increment wires items 1 (no resign / no false lock) and 5 (in-app password fallback).
-/// Items 2/3/4/6 (Secure Enclave seam consumption, custody, unlock-vs-key-use, rewrap) are
-/// added in later increments and are marked below.
+/// This harness wires items 1 (no resign / no false lock), 5 (in-app password fallback),
+/// 2 (per-operation Secure Enclave seam consumption), and 6 (mode-switch / rewrap under the
+/// in-window presenter). Items 3 (custody) and 4 (unlock-vs-key-use) are deferred / architectural
+/// per the findings doc — not harness experiments.
 struct MacAuthPoCHarnessView: View {
     let container: AppContainer
 
@@ -43,8 +44,11 @@ struct MacAuthPoCHarnessView: View {
                     runButton("Item 2a — Setup (generate real key; may use the OLD system sheet)", id: "2a") { try await runItem2Setup() }
                     runButton("Item 2b — Measure DECRYPT (one in-window auth)", id: "2b") { try await runItem2MeasureDecrypt() }
                     runButton("Item 2c — Measure SIGN (one in-window auth)", id: "2c") { try await runItem2MeasureSign() }
+                    runButton("Item 6 setup — ensure ≥2 real SE keys", id: "6setup") { try await runItem6Setup() }
+                    runButton("Item 6 — Mode-switch rewrap (one in-window auth)", id: "6") { await runItem6Measure() }
+                    runButton("Item 6 restore — switch back (one in-window auth)", id: "6restore") { await runItem6Restore() }
                     runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
-                    Text("Items 3/4/6 wired in later increments.")
+                    Text("Items 3/4 are deferred / architectural (not harness experiments).")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -195,6 +199,95 @@ struct MacAuthPoCHarnessView: View {
             let sig = try await container.signingService.signCleartext("PoC item 2 sign", signerFingerprint: id.fingerprint)
             return "signature \(sig.count) bytes"
         }
+    }
+
+    // MARK: - Item 6 (mode-switch / rewrap under the in-window presenter)
+
+    /// Item 6 setup — ensure ≥2 real SE-wrapped keys exist so the rewrap re-wraps MORE than one key
+    /// (the point being "one auth for the whole action even though it re-wraps every key"). Generation
+    /// may use the OLD system sheet; that is setup, NOT measured.
+    @MainActor
+    private func runItem6Setup() async throws {
+        while container.keyManagement.keys.count < 2 {
+            keyCounter += 1
+            append("Item 6 setup: generating real SE-wrapped key \(container.keyManagement.keys.count + 1)/2 (may use the OLD system sheet)…")
+            let id = try await container.keyManagement.generateKey(
+                name: "PoC SW \(keyCounter)", email: nil, expirySeconds: nil, profile: .universal)
+            generatedFingerprints.append(id.fingerprint)
+        }
+        append("Item 6 setup: DONE — \(container.keyManagement.keys.count) SE-wrapped key(s) present.")
+    }
+
+    /// Item 6 — measure ONE forward mode switch (current→opposite) with its single authority auth
+    /// rendered IN-WINDOW (via the evaluator seam). Restore is a SEPARATE user step (`runItem6Restore`)
+    /// so this stays a single, cleanly-dismissed in-window auth instead of two back-to-back prompts.
+    @MainActor
+    private func runItem6Measure() async { await runItem6OneSwitch(label: "measure") }
+
+    /// Item 6 restore — switch the mode back (current→opposite) as an explicit, separate user action.
+    @MainActor
+    private func runItem6Restore() async { await runItem6OneSwitch(label: "restore") }
+
+    /// Validate prerequisites, then run exactly ONE in-window mode switch (current→opposite).
+    @MainActor
+    private func runItem6OneSwitch(label: String) async {
+        guard let box = container.pocEvaluatorBox else { append("Item 6: FAIL — no evaluator box (harness not active?)"); return }
+        guard let current = container.authManager.currentMode else {
+            append("Item 6: PREREQUISITE — unlock first (authenticate the privacy shield / run any key op), then retry.")
+            return
+        }
+        let fingerprints = container.keyManagement.keys.map(\.fingerprint)
+        guard !fingerprints.isEmpty else { append("Item 6: run Item 6 setup first (need ≥1 SE-wrapped key)."); return }
+        let target: AuthenticationMode = current == .standard ? .highSecurity : .standard
+        _ = await runItem6Switch(box: box, from: current, to: target, fingerprints: fingerprints, label: label)
+    }
+
+    /// Run one real `switchMode` with the single authority auth rendered in-window, and assert the
+    /// Item 6 properties. Catches internally and logs; returns true on PASS.
+    @MainActor
+    private func runItem6Switch(
+        box: AuthPoCEvaluatorBox,
+        from: AuthenticationMode,
+        to: AuthenticationMode,
+        fingerprints: [String],
+        label: String
+    ) async -> Bool {
+        // Production-faithful backup flag (SettingsScreenModel uses the same). hasBackup only gates
+        // the High-Security `.backupRequired` pre-flight; the auth/rewrap mechanics are identical.
+        var hasBackup = container.keyManagement.keys.contains(where: \.isBackedUp)
+        if to == .highSecurity && !hasBackup {
+            hasBackup = true
+            append("Item 6 \(label): overriding hasBackup→true for High-Security (no real backup; mechanics identical).")
+        }
+        resetObservationCounters()
+        let resignBefore = resignCount
+        let presentsBefore = presenter.inWindowPresentCount
+        // Route the single authority auth through the in-window presenter; forbid a hidden second
+        // per-key prompt so it throws deterministically instead of presenting another Touch ID.
+        presenter.forbidInteractionAfterPolicySuccess = true
+        box.evaluator = presenter.inWindowPolicyEvaluator
+        defer {
+            box.evaluator = nil
+            presenter.forbidInteractionAfterPolicySuccess = false
+        }
+        append("Item 6 \(label): switching \(from.rawValue)→\(to.rawValue) over \(fingerprints.count) key(s) — one in-window Touch ID.")
+        do {
+            try await container.authManager.switchMode(
+                to: to, fingerprints: fingerprints, hasBackup: hasBackup,
+                authenticator: container.authManager)
+        } catch {
+            let journalEmpty = ((try? container.privateKeyControlStore.recoveryJournal()) ?? .empty) == .empty
+            let mode = container.authManager.currentMode?.rawValue ?? "nil"
+            append("Item 6 \(label): switchMode THREW \(String(describing: type(of: error))) — presents=\(presenter.inWindowPresentCount - presentsBefore); mode now \(mode) (want unchanged \(from.rawValue)); journal=\(journalEmpty ? "empty" : "NONEMPTY") ⇒ old keys recoverable.")
+            return false
+        }
+        let presents = presenter.inWindowPresentCount - presentsBefore
+        let resignDelta = resignCount - resignBefore
+        let newMode = container.authManager.currentMode
+        let journalEmpty = ((try? container.privateKeyControlStore.recoveryJournal()) ?? .empty) == .empty
+        let pass = presents == 1 && resignDelta == 0 && newMode == to && journalEmpty
+        append("Item 6 \(label): \(pass ? "PASS" : "FAIL") — presents=\(presents) (want 1), resignDelta=\(resignDelta) (want 0), mode \(from.rawValue)->\(newMode?.rawValue ?? "nil") (want \(to.rawValue)), journal=\(journalEmpty ? "empty" : "NONEMPTY"), N=\(fingerprints.count)")
+        return pass
     }
 
     private func resetObservationCounters() {
