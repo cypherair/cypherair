@@ -382,10 +382,21 @@ struct CypherAirApp: App {
         #if os(macOS)
         switch launchConfiguration.root {
         case .main:
+            #if DEBUG
+            if launchConfiguration.isPoCHarness {
+                MacAuthPoCHarnessView(container: container)
+            } else {
+                MacAppShellView(
+                    tutorialLaunchRelay: macTutorialLaunchRelay,
+                    tutorialHostAvailability: macTutorialHostAvailability
+                )
+            }
+            #else
             MacAppShellView(
                 tutorialLaunchRelay: macTutorialLaunchRelay,
                 tutorialHostAvailability: macTutorialHostAvailability
             )
+            #endif
         case .settings:
             MacSettingsRootView(
                 launchConfiguration: launchConfiguration,

@@ -42,6 +42,20 @@ struct PGPKeyCapabilityResolver: Sendable {
             secureEnclaveKeyAgreementOperationSupport: .supported,
             secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
+
+        #if DEBUG
+        /// P0 PoC (throwaway `poc/auth-lifecycle-macos` branch only): the real future
+        /// "Secure Enclave custody enabled" configuration — generation + signing +
+        /// key agreement all `.supported`. This is the production-future state the PoC
+        /// validates at full fidelity; it is wired only into the DEBUG PoC harness path
+        /// and is never selected on `main`.
+        static let pocFullCustody = Policy(
+            secureEnclaveGenerationSupport: .supported,
+            secureEnclaveSigningOperationSupport: .supported,
+            secureEnclaveKeyAgreementOperationSupport: .supported,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+        )
+        #endif
     }
 
     struct MetadataAvailability: Equatable, Sendable {

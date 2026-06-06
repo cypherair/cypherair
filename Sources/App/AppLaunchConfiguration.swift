@@ -16,6 +16,10 @@ struct AppLaunchConfiguration {
     let opensAuthModeConfirmation: Bool
     let preloadsUITestContact: Bool
     let isAuthTraceEnabled: Bool
+    /// P0 PoC (throwaway branch): mounts the macOS auth PoC harness inside the real app shell.
+    /// Independent of `isUITestMode`, so the app uses the real `makeDefault` container
+    /// (real Secure Enclave + Keychain), NOT the mock UITest container.
+    let isPoCHarness: Bool
 
     var usesUITestAppContainer: Bool {
         isUITestMode || isXCTestHost
@@ -43,6 +47,7 @@ struct AppLaunchConfiguration {
         guard allowsUITestLaunchOverrides else {
             self.root = .main
             self.isUITestMode = false
+            self.isPoCHarness = false
             self.isXCTestHost = false
             self.requiresManualAuthentication = false
             self.opensAuthModeConfirmation = false
@@ -54,6 +59,7 @@ struct AppLaunchConfiguration {
 
         self.root = Root(rawValue: environment["UITEST_ROOT"] ?? "main") ?? .main
         self.isUITestMode = environment["UITEST_ROOT"] != nil || environment["UITEST_SKIP_ONBOARDING"] != nil
+        self.isPoCHarness = environment["CYPHERAIR_POC_HARNESS"] == "1"
         self.isXCTestHost = detectsXCTestHost
         self.requiresManualAuthentication = environment["UITEST_REQUIRE_MANUAL_AUTH"] == "1"
         self.opensAuthModeConfirmation = environment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] == "1"
