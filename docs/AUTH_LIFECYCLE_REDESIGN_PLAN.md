@@ -37,8 +37,10 @@ Acceptance items:
    `SecKey` operation (`SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`) loaded with
    `kSecUseAuthenticationContext: ctx`, no second prompt.
 4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
-   does **not** silently authorize a later key-use operation (encryption / signing / decryption) —
-   that operation triggers its own authentication. This validates the narrow separation in DESIGN
+   does **not** silently authorize a later private-key operation (signing, decryption,
+   certification, revocation, or a key-expiry change) — that operation triggers its own
+   authentication. (Standalone encryption is public-key-only and is not auth-gated; an
+   encrypt-and-sign operation authenticates for its signing step — see DESIGN §7.) This validates the narrow separation in DESIGN
    §2 (principle 5); it is **not** a test that every operation must re-authenticate, and a single
    user action spanning several keys (auth-mode switch / re-wrap) still authenticates once.
 5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /
@@ -158,7 +160,7 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
   password field must validate credentials safely (no secret logging; correct failure mapping).
 - **Security posture unchanged.** The app-unlock authentication is never reused to authorize a
-  key-use operation, and routine key-use operations authenticate on their own (DESIGN §2,
+  private-key operation, and private-key operations authenticate on their own (DESIGN §2,
   principle 5); relock fail-closed; Phase 1/2 boundary intact. (This is the narrow
   unlock-vs-key-use rule, not a blanket per-operation re-authentication mandate.)
 
