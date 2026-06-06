@@ -1,5 +1,6 @@
 #if DEBUG && os(macOS)
 import AppKit
+import CryptoKit
 import LocalAuthentication
 import Security
 import SwiftUI
@@ -27,6 +28,8 @@ struct MacAuthPoCHarnessView: View {
     @State private var keyCounter = 0
     @State private var item2Key: PGPKeyIdentity?
     @State private var item2Ciphertext: Data?
+    @State private var item3SignRef: SecureEnclaveCustodyHandleReference?
+    @State private var item3AgreeRef: SecureEnclaveCustodyHandleReference?
 
     var body: some View {
         ZStack {
@@ -47,8 +50,11 @@ struct MacAuthPoCHarnessView: View {
                     runButton("Item 6 setup — ensure ≥2 real SE keys", id: "6setup") { try await runItem6Setup() }
                     runButton("Item 6 — Mode-switch rewrap (one in-window auth)", id: "6") { await runItem6Measure() }
                     runButton("Item 6 restore — switch back (one in-window auth)", id: "6restore") { await runItem6Restore() }
+                    runButton("Item 3 setup — create custody SE keys", id: "3setup") { await runItem3Setup() }
+                    runButton("Item 3 — Custody SIGN compat (one in-window auth)", id: "3sign") { await runItem3SignProbe() }
+                    runButton("Item 3 — Custody ECDH compat (one in-window auth)", id: "3ecdh") { await runItem3EcdhProbe() }
                     runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
-                    Text("Items 3/4 are deferred / architectural (not harness experiments).")
+                    Text("Item 3 = narrow custody-compat probe; Item 4 is architectural (not a harness experiment).")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -290,6 +296,101 @@ struct MacAuthPoCHarnessView: View {
         return pass
     }
 
+    // MARK: - Item 3 (custody-auth ↔ in-window compatibility probe)
+
+    /// A custody key store whose `loadKeys` binds the harness-deposited in-window context via
+    /// `kSecUseAuthenticationContext` (the real custody seam, DEBUG-only).
+    private func custodyKeyStore() -> SystemSecureEnclaveCustodyKeyStore {
+        let box = container.pocContextBox
+        return SystemSecureEnclaveCustodyKeyStore(traceStore: nil, pocContextProvider: { box?.context })
+    }
+
+    /// Item 3 setup — create ONE custody-style SE key per role (signing + keyAgreement) via the REAL
+    /// custody primitive. Key creation needs no biometric auth, so this does NOT prompt; it is unmeasured
+    /// setup. This is NOT full custody generation (no role-pair metadata / binding / revocation / router).
+    @MainActor
+    private func runItem3Setup() async {
+        guard SecureEnclave.isAvailable else { append("Item 3 setup: SKIP — Secure Enclave unavailable (e.g. simulator)."); return }
+        do {
+            let handleSetId = try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
+            let signRef = try SecureEnclaveCustodyHandleReference(handleSetIdentifier: handleSetId, role: .signing)
+            let agreeRef = try SecureEnclaveCustodyHandleReference(handleSetIdentifier: handleSetId, role: .keyAgreement)
+            let store = custodyKeyStore()
+            _ = try store.createKey(reference: signRef, accessPolicy: .privateKeyUsageBiometryAny)
+            _ = try store.createKey(reference: agreeRef, accessPolicy: .privateKeyUsageBiometryAny)
+            item3SignRef = signRef
+            item3AgreeRef = agreeRef
+            append("Item 3 setup: DONE — created custody SE keys (signing + keyAgreement), handleSet …\(handleSetId.suffix(6)).")
+        } catch {
+            append("Item 3 setup: FAIL — \(String(describing: type(of: error)))")
+        }
+    }
+
+    /// Item 3 SIGN — verify an in-window-authenticated context is consumed by the REAL custody ECDSA
+    /// signing op (`SecKeyCreateSignature`) via `kSecUseAuthenticationContext`, with no second prompt.
+    @MainActor
+    private func runItem3SignProbe() async {
+        guard let signRef = item3SignRef else { append("Item 3 SIGN: run Item 3 setup first."); return }
+        await measureCustodyOp("SIGN", reference: signRef, operation: .useKeySign) { handle in
+            let digest = Data(SHA256.hash(data: Data("PoC item 3 custody sign".utf8)))
+            let sig = try SystemSecureEnclaveCustodyDigestSigner().signSHA256Digest(digest, using: handle)
+            return "ECDSA r/s \(sig.r.count)+\(sig.s.count) bytes"
+        }
+    }
+
+    /// Item 3 ECDH — verify an in-window-authenticated context is consumed by the REAL custody ECDH op
+    /// (`SecKeyCopyKeyExchangeResult`) via `kSecUseAuthenticationContext`, with no second prompt.
+    @MainActor
+    private func runItem3EcdhProbe() async {
+        guard let agreeRef = item3AgreeRef else { append("Item 3 ECDH: run Item 3 setup first."); return }
+        await measureCustodyOp("ECDH", reference: agreeRef, operation: .useKeyKeyExchange) { handle in
+            let ephemeral = P256.KeyAgreement.PrivateKey()
+            let request = ExternalP256KeyAgreementRequest(
+                recipientPublicKey: handle.binding.publicKeyX963,
+                ephemeralPublicKey: ephemeral.publicKey.x963Representation)
+            var secret = try SystemSecureEnclaveCustodyKeyAgreement().deriveSharedSecret(request: request, using: handle)
+            defer { secret.zeroize() }
+            return "shared secret \(secret.raw.count) bytes"
+        }
+    }
+
+    /// Authenticate in-window for `operation`, deposit the context (`interactionNotAllowed = true`), load
+    /// the custody handle (binding the context via `kSecUseAuthenticationContext`), and run the real
+    /// custody op. PASS = the op succeeds non-interactively ⇒ the in-window auth carried to the SE op.
+    @MainActor
+    private func measureCustodyOp(
+        _ label: String,
+        reference: SecureEnclaveCustodyHandleReference,
+        operation: LAAccessControlOperation,
+        _ op: (SecureEnclaveCustodyLoadedHandle) throws -> String
+    ) async {
+        guard let box = container.pocContextBox else { append("Item 3 \(label): FAIL — no context box"); return }
+        let accessControl: SecAccessControl
+        do { accessControl = try SecureEnclaveCustodyAccessControlPolicy.privateKeyUsageBiometryAny.makeSecAccessControl() }
+        catch { append("Item 3 \(label): FAIL — access control \(String(describing: type(of: error)))"); return }
+        resetObservationCounters()
+        let resignBefore = resignCount
+        let ctx: LAContext
+        do {
+            ctx = try await presenter.authenticate(
+                accessControl: accessControl, operation: operation,
+                localizedReason: "PoC item 3 \(label): authorize custody SE private-key operation")
+        } catch {
+            append("Item 3 \(label): in-window auth failed — \(String(describing: type(of: error)))"); return
+        }
+        ctx.interactionNotAllowed = true
+        box.context = ctx
+        defer { box.context = nil }
+        do {
+            let handles = try custodyKeyStore().loadKeys(reference: reference)
+            guard let handle = handles.first else { append("Item 3 \(label): FAIL — no custody handle loaded"); return }
+            let detail = try op(handle)
+            append("Item 3 \(label): PASS — custody SE op consumed the in-window context non-interactively; \(detail); resignDelta=\(resignCount - resignBefore).")
+        } catch {
+            append("Item 3 \(label): NOT consumed — custody op threw \(String(describing: type(of: error))) under interactionNotAllowed (kSecUseAuthenticationContext did not carry the in-window auth to the SE op).")
+        }
+    }
+
     private func resetObservationCounters() {
         resignCount = 0
         becomeActiveCount = 0
@@ -353,6 +454,16 @@ struct MacAuthPoCHarnessView: View {
             }
         }
         generatedFingerprints.removeAll()
+
+        // Item 3 custody-compat probe keys (real custody delete path; also covered by Reset All Local Data).
+        let custodyStore = custodyKeyStore()
+        for (roleLabel, reference) in [("signing", item3SignRef), ("keyAgreement", item3AgreeRef)] {
+            guard let reference else { continue }
+            do { try custodyStore.deleteKey(reference: reference); append("• deleted custody \(roleLabel) key") }
+            catch { append("• custody \(roleLabel) delete failed: \(String(describing: type(of: error)))") }
+        }
+        item3SignRef = nil
+        item3AgreeRef = nil
     }
 
     // MARK: - Observation

@@ -1,12 +1,32 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
     private let traceStore: AuthLifecycleTraceStore?
+    #if DEBUG
+    /// P0 PoC (throwaway `poc/auth-lifecycle-macos` branch): the custody-compat probe supplies an
+    /// in-window-authenticated `LAContext` here so `loadKeys` binds it via `kSecUseAuthenticationContext`.
+    /// `nil` for the production-constructed store; the whole seam is compiled out of release.
+    private let pocContextProvider: (@Sendable () -> LAContext?)?
+    #endif
 
     init(traceStore: AuthLifecycleTraceStore? = nil) {
         self.traceStore = traceStore
+        #if DEBUG
+        self.pocContextProvider = nil
+        #endif
     }
+
+    #if DEBUG
+    init(
+        traceStore: AuthLifecycleTraceStore?,
+        pocContextProvider: @escaping @Sendable () -> LAContext?
+    ) {
+        self.traceStore = traceStore
+        self.pocContextProvider = pocContextProvider
+    }
+    #endif
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
@@ -99,6 +119,13 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         var query = baseQuery(reference: reference)
         query[kSecReturnRef as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitAll
+        #if DEBUG
+        // P0 PoC (custody-compat probe): bind an in-window-authenticated context so the later
+        // SecKeyCreateSignature / SecKeyCopyKeyExchangeResult consume it with no second prompt. nil otherwise.
+        if let authenticationContext = pocContextProvider?() {
+            query[kSecUseAuthenticationContext as String] = authenticationContext
+        }
+        #endif
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
