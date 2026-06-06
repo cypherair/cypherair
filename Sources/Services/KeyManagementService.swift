@@ -58,7 +58,8 @@ final class KeyManagementService: @unchecked Sendable {
             KeyProvisioningInvalidationGate,
             KeyProvisioningCommitCoordinator
         ) -> SecureEnclaveCustodyGenerationService)? = nil,
-        secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil
+        secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil,
+        pocContextProvider: (@Sendable () -> LAContext?)? = nil
     ) {
         let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
         let keyMetadataPersistence = metadataPersistence ?? metadataStore
@@ -69,7 +70,8 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            traceStore: authLifecycleTraceStore,
+            pocContextProvider: pocContextProvider
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()

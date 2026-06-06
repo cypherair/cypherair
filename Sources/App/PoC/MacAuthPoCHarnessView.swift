@@ -1,6 +1,7 @@
 #if DEBUG && os(macOS)
 import AppKit
 import LocalAuthentication
+import Security
 import SwiftUI
 
 /// P0 PoC harness (throwaway `poc/auth-lifecycle-macos` branch). Mounted inside the REAL app
@@ -21,6 +22,8 @@ struct MacAuthPoCHarnessView: View {
     @State private var isActive = NSApplication.shared.isActive
     @State private var observerTokens: [NSObjectProtocol] = []
     @State private var busy = false
+    @State private var generatedFingerprints: [String] = []
+    @State private var keyCounter = 0
 
     var body: some View {
         ZStack {
@@ -35,7 +38,9 @@ struct MacAuthPoCHarnessView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     runButton("Item 1 — No resign / no false lock", id: "1") { try await runItem1() }
                     runButton("Item 5 — In-app password fallback (observe)", id: "5") { try await runItem5() }
-                    Text("Items 2/3/4/6 wired in later increments.")
+                    runButton("Item 2 — Software per-op consumption (real decrypt + sign)", id: "2") { try await runItem2() }
+                    runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
+                    Text("Items 3/4/6 wired in later increments.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -136,6 +141,94 @@ struct MacAuthPoCHarnessView: View {
             localizedReason: "P0 PoC item 5: does in-window offer a password field?"
         )
         append("Item 5: completed. Record manually: was there an in-window password field? (expected: NO)")
+    }
+
+    /// Item 2: drive a REAL software-custody decrypt + sign through the real services; the
+    /// in-window-authenticated context is consumed by the real `reconstructKey` with no second
+    /// prompt (proven via `interactionNotAllowed`). Setup (key generation) is separate from the
+    /// measured operation.
+    @MainActor
+    private func runItem2() async throws {
+        keyCounter += 1
+        append("Item 2: setup — generating a real software key (this may prompt; not measured)…")
+        let id = try await container.keyManagement.generateKey(
+            name: "PoC SW \(keyCounter)", email: nil, expirySeconds: nil, profile: .universal)
+        generatedFingerprints.append(id.fingerprint)
+        _ = try container.contactService.importContact(publicKeyData: id.publicKeyData)
+        guard let contactId = container.contactService.contactId(forFingerprint: id.fingerprint) else {
+            append("Item 2: FAIL — could not resolve contact id"); return
+        }
+        let ciphertext = try await container.encryptionService.encryptText(
+            "PoC item 2 plaintext", recipientContactIds: [contactId],
+            signWithFingerprint: nil, encryptToSelf: false)
+        append("Item 2: setup done (key …\(id.fingerprint.suffix(8))). MEASURED ops below:")
+        try await measureSoftwareOp("decrypt") {
+            let (pt, _) = try await container.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
+            return String(data: pt, encoding: .utf8) == "PoC item 2 plaintext" ? "plaintext ok" : "plaintext MISMATCH"
+        }
+        try await measureSoftwareOp("sign") {
+            let sig = try await container.signingService.signCleartext("PoC item 2 sign", signerFingerprint: id.fingerprint)
+            return "signature \(sig.count) bytes"
+        }
+    }
+
+    /// Authenticate in-window, deposit the context (with `interactionNotAllowed = true`), run the
+    /// real op. PASS = the op succeeds non-interactively ⇒ the SE op consumed the pre-authenticated
+    /// context. The SE op for BOTH decrypt and sign is the wrapping key's self-ECDH → `.useKeyKeyExchange`.
+    @MainActor
+    private func measureSoftwareOp(_ label: String, _ op: @escaping () async throws -> String) async throws {
+        guard let box = container.pocContextBox else { append("Item 2 \(label): FAIL — no context box"); return }
+        let mode = container.authManager.currentMode ?? .standard
+        let resignBefore = resignCount
+        var acLabel = "wrappingAC"
+        let ctx: LAContext
+        do {
+            ctx = try await presenter.authenticate(
+                accessControl: try mode.createAccessControl(),
+                operation: .useKeyKeyExchange,
+                localizedReason: "PoC item 2 \(label): authorize private-key use")
+        } catch {
+            acLabel = "biometryOnly"
+            append("Item 2 \(label): wrapping AC rejected (\(String(describing: type(of: error)))); retrying biometry-only AC")
+            ctx = try await presenter.authenticate(
+                accessControl: try biometryOnlyAccessControl(),
+                operation: .useKeyKeyExchange,
+                localizedReason: "PoC item 2 \(label): authorize (biometry-only AC)")
+        }
+        ctx.interactionNotAllowed = true
+        box.context = ctx
+        defer { box.context = nil }
+        do {
+            let detail = try await op()
+            append("Item 2 \(label): PASS — \(detail); consumed non-interactively; resignDelta=\(resignCount - resignBefore); AC=\(acLabel)")
+        } catch {
+            append("Item 2 \(label): NOT consumed — op threw \(String(describing: type(of: error))) under interactionNotAllowed. AC=\(acLabel)")
+        }
+    }
+
+    private func biometryOnlyAccessControl() throws -> SecAccessControl {
+        var error: Unmanaged<CFError>?
+        guard let accessControl = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, [.biometryAny], &error) else {
+            _ = error?.takeRetainedValue()
+            throw CocoaError(.featureUnsupported)
+        }
+        return accessControl
+    }
+
+    /// Cleanup PoC-generated real keys via the REAL deletion path.
+    @MainActor
+    private func runCleanup() async throws {
+        append("Cleanup: deleting \(generatedFingerprints.count) PoC-generated key(s) via the real delete path…")
+        for fingerprint in generatedFingerprints {
+            do {
+                try await container.keyManagement.deleteKey(fingerprint: fingerprint)
+                append("• deleted …\(fingerprint.suffix(8))")
+            } catch {
+                append("• delete failed …\(fingerprint.suffix(8)): \(String(describing: type(of: error)))")
+            }
+        }
+        generatedFingerprints.removeAll()
     }
 
     // MARK: - Observation

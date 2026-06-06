@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
@@ -37,6 +38,12 @@ final class AppContainer: @unchecked Sendable {
     let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
+
+    #if DEBUG
+    /// P0 PoC injection holders. Set in `makeDefault` only when the harness is active; nil otherwise.
+    var pocContextBox: AuthPoCContextBox?
+    var pocEvaluatorBox: AuthPoCEvaluatorBox?
+    #endif
 
     init(
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
@@ -567,7 +574,8 @@ final class AppContainer: @unchecked Sendable {
     // main-actor) and from `@MainActor` test cases.
     @MainActor
     static func makeDefault(
-        authTraceEnabled: Bool = false
+        authTraceEnabled: Bool = false,
+        pocHarness: Bool = false
     ) -> AppContainer {
         let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
         let authLifecycleTraceStore = authentication.authLifecycleTraceStore
@@ -575,12 +583,38 @@ final class AppContainer: @unchecked Sendable {
         let authPromptCoordinator = authentication.authPromptCoordinator
         let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
         let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
-        let authManager = AuthenticationManager(
+        #if DEBUG
+        let pocContextBox: AuthPoCContextBox? = pocHarness ? AuthPoCContextBox() : nil
+        let pocEvaluatorBox: AuthPoCEvaluatorBox? = pocHarness ? AuthPoCEvaluatorBox() : nil
+        #endif
+        let authManager: AuthenticationManager
+        #if DEBUG
+        if let pocEvaluatorBox {
+            authManager = AuthenticationManager(
+                secureEnclave: secureEnclave,
+                keychain: keychain,
+                authenticationPromptCoordinator: authPromptCoordinator,
+                traceStore: authLifecycleTraceStore,
+                localAuthenticationPolicyEvaluator: { context, policy, reason, reply in
+                    pocEvaluatorBox.evaluate(context, policy, reason, reply)
+                }
+            )
+        } else {
+            authManager = AuthenticationManager(
+                secureEnclave: secureEnclave,
+                keychain: keychain,
+                authenticationPromptCoordinator: authPromptCoordinator,
+                traceStore: authLifecycleTraceStore
+            )
+        }
+        #else
+        authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        #endif
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
@@ -677,6 +711,16 @@ final class AppContainer: @unchecked Sendable {
         )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         protectedDataSessionCoordinator.registerRelockParticipant(privateKeyControlStore)
+        #if DEBUG
+        let pocContextProvider: (@Sendable () -> LAContext?)?
+        if let pocContextBox {
+            pocContextProvider = { pocContextBox.context }
+        } else {
+            pocContextProvider = nil
+        }
+        #else
+        let pocContextProvider: (@Sendable () -> LAContext?)? = nil
+        #endif
         let keyManagement = KeyManagementService(
             keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
@@ -688,7 +732,8 @@ final class AppContainer: @unchecked Sendable {
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
-            secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService
+            secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService,
+            pocContextProvider: pocContextProvider
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
         protectedDataSessionCoordinator.registerRelockParticipant(keyMetadataDomainStore)
@@ -851,7 +896,7 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
 
-        return AppContainer(
+        let container = AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
             authenticationShieldCoordinator: authenticationShieldCoordinator,
             authPromptCoordinator: authPromptCoordinator,
@@ -886,6 +931,11 @@ final class AppContainer: @unchecked Sendable {
             localDataResetService: localDataResetService,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
+        #if DEBUG
+        container.pocContextBox = pocContextBox
+        container.pocEvaluatorBox = pocEvaluatorBox
+        #endif
+        return container
     }
 
     #if DEBUG

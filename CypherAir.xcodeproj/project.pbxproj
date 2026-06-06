@@ -175,6 +175,7 @@
 				App/Onboarding/TutorialTaskHostView.swift,
 				App/Onboarding/TutorialView.swift,
 				App/PoC/AuthPoCPresenter.swift,
+				App/PoC/AuthPoCSeam.swift,
 				App/PoC/MacAuthPoCHarnessView.swift,
 				App/Settings/AboutView.swift,
 				App/Settings/AppIconPickerView.swift,

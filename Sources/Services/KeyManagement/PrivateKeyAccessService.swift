@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Owns Secure Enclave reconstruction and secret-certificate-material unwrap for callers.
 final class PrivateKeyAccessService {
@@ -6,17 +7,22 @@ final class PrivateKeyAccessService {
     private let bundleStore: KeyBundleStore
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
+    /// P0 PoC (DEBUG harness only): supplies an in-window-authenticated per-operation `LAContext`
+    /// that `reconstructKey` consumes (no second prompt). `nil` in production — unchanged behavior.
+    private let pocContextProvider: (@Sendable () -> LAContext?)?
 
     init(
         secureEnclave: any SecureEnclaveManageable,
         bundleStore: KeyBundleStore,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore? = nil
+        traceStore: AuthLifecycleTraceStore? = nil,
+        pocContextProvider: (@Sendable () -> LAContext?)? = nil
     ) {
         self.secureEnclave = secureEnclave
         self.bundleStore = bundleStore
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
+        self.pocContextProvider = pocContextProvider
     }
 
     /// Triggers device authentication and returns the unwrapped secret certificate material.
@@ -56,10 +62,16 @@ final class PrivateKeyAccessService {
                 // depth is still > 0, letting the existing gate suppression engage.
                 // `loadBundle` above stays on-main: it is a plain Keychain read with no
                 // biometric, so it does not block.
+                // P0 PoC: if the harness deposited an in-window-authenticated context, the SE op
+                // consumes it (no second prompt). `LAContext` is not Sendable; it is created on-main
+                // and consumed once off-main, never shared — `nonisolated(unsafe)` at the boundary.
+                let pocContext = pocContextProvider?()
+                nonisolated(unsafe) let unsafePocContext = pocContext
                 let unwrapped = try await Self.reconstructAndUnwrapOffMainActor(
                     secureEnclave: secureEnclave,
                     bundle: bundle,
                     fingerprint: fingerprint,
+                    authenticationContext: unsafePocContext,
                     traceStore: traceStore
                 )
                 traceStore?.record(
@@ -94,12 +106,13 @@ final class PrivateKeyAccessService {
         secureEnclave: any SecureEnclaveManageable,
         bundle: WrappedKeyBundle,
         fingerprint: String,
+        authenticationContext: LAContext?,
         traceStore: AuthLifecycleTraceStore?
     ) async throws -> Data {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
         let handle: any SEKeyHandle
         do {
-            handle = try secureEnclave.reconstructKey(from: bundle.seKeyData)
+            handle = try secureEnclave.reconstructKey(from: bundle.seKeyData, authenticationContext: authenticationContext)
             traceStore?.record(
                 category: .operation,
                 name: "privateKey.unwrap.reconstruct.finish",

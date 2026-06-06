@@ -44,7 +44,8 @@ struct CypherAirApp: App {
             )
         } else {
             container = AppContainer.makeDefault(
-                authTraceEnabled: launchConfiguration.isAuthTraceEnabled
+                authTraceEnabled: launchConfiguration.isAuthTraceEnabled,
+                pocHarness: launchConfiguration.isPoCHarness
             )
         }
         #else
