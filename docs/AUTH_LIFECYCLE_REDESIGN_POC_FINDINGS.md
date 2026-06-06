@@ -4,7 +4,8 @@
 > **not** merge; only these findings carry back to `main` to update
 > [AUTH_LIFECYCLE_REDESIGN_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_DESIGN.md) /
 > [_PLAN.md](AUTH_LIFECYCLE_REDESIGN_PLAN.md) and feed the P1–P7 phases.
-> Updated as each P0 item is validated on real hardware (Mac + Touch ID).
+> Updated as each P0 item is validated, deferred, or moved to a future phase, on real hardware
+> (Mac + Touch ID).
 
 ## Validated
 
@@ -44,8 +45,26 @@ lifecycle/shield machinery, not the new in-window auth UI. The redesign's P2 wor
 `.active` / operation prompts) must eliminate it: a per-operation in-window auth must not trigger any
 post-auth shield. Track for P2.
 
+## Deferred
+
+### Item 3 — custody per-operation consumption — DEFERRED
+Not validated via the PoC harness. **Why:** Secure Enclave custody is not yet productized, and a
+meaningful custody-auth validation likely needs a more **product-shaped custody flow combined with
+the new in-window authentication model** — so the narrow per-operation harness approach is
+**discontinued**, not continued as a standalone spike.
+
+This is a **deferral, not a custody feasibility failure.** The on-device attempt (Item 3a prompted
+repeatedly for Touch ID *during custody key generation* and ended in a cancellation error) was an
+**invalid experiment**: the real custody generation + per-operation authentication flow was not
+understood before wiring the harness, so the run carries no signal about custody-auth feasibility.
+
+On-branch, the harness wiring was implemented and then **reverted** (`984af6c`); the branch was
+restored to the pre–Item 3 checkpoint (`a6dcf43`). Validated Items 1/5/2 remain intact.
+
+**Revisit** only when custody is product-shaped and validated together with the in-window auth
+model — not as a standalone narrow spike.
+
 ## Pending
-- **Item 3** — custody per-operation consumption (real custody enabled on-branch).
 - **Item 4** — unlock authentication is not reused for key-use operations (our routing).
 - **Item 6** — mode-switch / rewrap under the in-window presenter.
 - **Item 7** — visionOS (deferred; no hardware).

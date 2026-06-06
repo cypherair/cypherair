@@ -36,6 +36,12 @@ Acceptance items:
 3. **Per-operation context consumption — custody path.** The same context drives a custody
    `SecKey` operation (`SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`) loaded with
    `kSecUseAuthenticationContext: ctx`, no second prompt.
+   **Deferred (PoC):** Secure Enclave custody is not yet productized, so this item is not validated
+   by the narrow per-operation harness. A meaningful custody-auth validation likely needs a more
+   product-shaped custody flow combined with the in-window authentication model; the harness spike
+   was attempted and discontinued (the on-device run was an invalid experiment, not a custody
+   feasibility result — see [POC findings](AUTH_LIFECYCLE_REDESIGN_POC_FINDINGS.md)). Revisit when
+   custody is product-shaped; the definition above remains the target for that future attempt.
 4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
    does **not** silently authorize a later private-key operation (signing, decryption,
    certification, revocation, or a key-expiry change) — that operation triggers its own
