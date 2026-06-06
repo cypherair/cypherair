@@ -71,8 +71,9 @@ authentication. Each platform uses what it actually offers.
 4. **On macOS, authentication is presented in-app** (embedded, non-resigning), so a genuine
    app-switch is distinguishable from authentication *by construction*.
 5. **The app-unlock authentication is never reused for key use.** The authentication that
-   unlocks the app must not later authorize a routine key-use flow (encryption, signing,
-   decryption); each such operation authenticates on its own. This is a narrow separation
+   unlocks the app must not later authorize a private-key operation (signing, decryption,
+   certification, revocation, or a key-expiry change); each such operation authenticates on its
+   own. This is a narrow separation
    between the app-unlock gate and key use — **not** a blanket rule that every workflow
    re-authenticates, and not the headline property to validate. A single coherent user action
    that spans several keys (e.g. an auth-mode switch that re-wraps every key) still authenticates
@@ -199,8 +200,14 @@ Supported inline policies are biometric / Apple-Watch only
 
 ## 7. Per-operation authentication design (macOS)
 
-Routine key-use biometrics (sign / decrypt / certify) authenticate **per operation** — each
-key-use operation authenticates on its own, exactly as today. What changes on macOS is only the
+Per-operation authentication applies to **private-key operations** — the `PGPPrivateOperationKind`
+set. Today five are live: the routine message operations **signing, decryption, certification** and
+the key-maintenance operations **revocation and key-expiry changes**, each authenticating on its own
+exactly as today; the sixth case, **binding refresh** (`refreshBinding`), is defined but **not yet
+implemented**. (In the custody model the signing-role operations resolve to the Secure Enclave
+**digest-signing** primitive and decryption to **key agreement**.) Unsigned standalone encryption — recipient-key or password-protected — does not touch the
+private-key operation router, the Secure Enclave, or private-key authentication; an encrypt-and-sign
+operation authenticates only for its **signing** step. What changes on macOS is only the
 *presentation*: the per-operation biometric renders **in-app** (§6, §8) instead of through the
 detached system sheet. (An auth-mode switch / key re-wrap is a single user action and authenticates
 once for that action even though it touches every key — see §2, principle 5; its in-app
@@ -216,10 +223,10 @@ presentation and explanatory page are covered in §6.2.)
    - Custody path: load the `SecKey` with `kSecUseAuthenticationContext: ctx`.
 
 Properties:
-- **The app-unlock authentication is not what authorizes a key-use operation.** Each routine
-  key-use operation authenticates on its own context, which authorizes that operation and is then
-  discarded; the context that unlocked the app is never reused to authorize encryption, signing,
-  or decryption. This is the narrow rule from §2 (principle 5) — it does **not** claim a single
+- **The app-unlock authentication is not what authorizes a private-key operation.** Each
+  private-key operation authenticates on its own context, which authorizes that operation and is then
+  discarded; the context that unlocked the app is never reused to authorize signing, decryption,
+  certification, or any other private-key operation. This is the narrow rule from §2 (principle 5) — it does **not** claim a single
   user action can never cover several keys, and it is not the property the PoC exists to prove.
 - **No detached prompt.** Step 2 is the only authentication UI and it is in-window, so the app
   does not resign — preserving "Immediately".
@@ -249,13 +256,13 @@ principal structural change and is validated by the P0 PoC (see the companion pl
 This redesign must preserve every current invariant (see [SECURITY.md](SECURITY.md) §4–§5, §10):
 
 - ProtectedData relock is **fail-closed**; the authenticated `LAContext` handoff to protected
-  domains happens **only on unlock**, and is never reused to authorize a key-use operation.
+  domains happens **only on unlock**, and is never reused to authorize a private-key operation.
 - Grace / auto-lock **fails closed** (unavailable settings snapshot → immediate authentication).
 - The boot-authentication early-readable exception is unchanged.
 - Standard vs High-Security `LAPolicy` selection and the SE access-control flags are unchanged.
 - The `DecryptionService` Phase 1 / Phase 2 boundary is unchanged.
 - The narrow unlock-vs-key-use separation is preserved: the app-unlock authentication is never
-  reused to authorize a key-use operation, and routine key-use operations authenticate on their
+  reused to authorize a private-key operation, and private-key operations authenticate on their
   own (§2, principle 5). This is unchanged from today and is **not** broadened into a blanket
   per-operation re-authentication rule.
 - No secret logging; zero network.
