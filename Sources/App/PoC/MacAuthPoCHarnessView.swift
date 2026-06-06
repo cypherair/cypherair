@@ -24,6 +24,8 @@ struct MacAuthPoCHarnessView: View {
     @State private var busy = false
     @State private var generatedFingerprints: [String] = []
     @State private var keyCounter = 0
+    @State private var item2Key: PGPKeyIdentity?
+    @State private var item2Ciphertext: Data?
 
     var body: some View {
         ZStack {
@@ -38,7 +40,8 @@ struct MacAuthPoCHarnessView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     runButton("Item 1 — No resign / no false lock", id: "1") { try await runItem1() }
                     runButton("Item 5 — In-app password fallback (observe)", id: "5") { try await runItem5() }
-                    runButton("Item 2 — Software per-op consumption (real decrypt + sign)", id: "2") { try await runItem2() }
+                    runButton("Item 2a — Setup (generate real key; may use the OLD system sheet)", id: "2a") { try await runItem2Setup() }
+                    runButton("Item 2b — Measure (in-window decrypt + sign)", id: "2b") { try await runItem2Measure() }
                     runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
                     Text("Items 3/4/6 wired in later increments.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -143,25 +146,40 @@ struct MacAuthPoCHarnessView: View {
         append("Item 5: completed. Record manually: was there an in-window password field? (expected: NO)")
     }
 
-    /// Item 2: drive a REAL software-custody decrypt + sign through the real services; the
-    /// in-window-authenticated context is consumed by the real `reconstructKey` with no second
-    /// prompt (proven via `interactionNotAllowed`). Setup (key generation) is separate from the
-    /// measured operation.
+    /// Item 2a — SETUP only (separated from measurement). Generates a real software key and a test
+    /// ciphertext. Key generation may trigger the OLD detached system sheet; that is setup, NOT
+    /// measured. Run this first, let prompts and lifecycle fully settle, then run Item 2b.
     @MainActor
-    private func runItem2() async throws {
+    private func runItem2Setup() async throws {
         keyCounter += 1
-        append("Item 2: setup — generating a real software key (this may prompt; not measured)…")
+        append("Item 2a: SETUP — generating a real software key (may use the OLD system sheet; NOT measured)…")
         let id = try await container.keyManagement.generateKey(
             name: "PoC SW \(keyCounter)", email: nil, expirySeconds: nil, profile: .universal)
         generatedFingerprints.append(id.fingerprint)
         _ = try container.contactService.importContact(publicKeyData: id.publicKeyData)
         guard let contactId = container.contactService.contactId(forFingerprint: id.fingerprint) else {
-            append("Item 2: FAIL — could not resolve contact id"); return
+            append("Item 2a: FAIL — could not resolve contact id"); return
         }
         let ciphertext = try await container.encryptionService.encryptText(
             "PoC item 2 plaintext", recipientContactIds: [contactId],
             signWithFingerprint: nil, encryptToSelf: false)
-        append("Item 2: setup done (key …\(id.fingerprint.suffix(8))). MEASURED ops below:")
+        item2Key = id
+        item2Ciphertext = ciphertext
+        append("Item 2a: SETUP DONE (key …\(id.fingerprint.suffix(8))). Let prompts/lifecycle settle, then tap Item 2b.")
+    }
+
+    /// Item 2b — MEASURE only. Pure in-window: authenticate in-window, deposit the context, run the
+    /// REAL decrypt + sign. Observation counters are reset first so setup's lifecycle events are
+    /// excluded from the measured result.
+    @MainActor
+    private func runItem2Measure() async throws {
+        guard let id = item2Key, let ciphertext = item2Ciphertext else {
+            append("Item 2b: run Item 2a (setup) first."); return
+        }
+        resignCount = 0
+        becomeActiveCount = 0
+        isActive = NSApplication.shared.isActive
+        append("Item 2b: MEASURED in-window ops (counters reset). Tap Touch ID in-window when prompted.")
         try await measureSoftwareOp("decrypt") {
             let (pt, _) = try await container.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
             return String(data: pt, encoding: .utf8) == "PoC item 2 plaintext" ? "plaintext ok" : "plaintext MISMATCH"
