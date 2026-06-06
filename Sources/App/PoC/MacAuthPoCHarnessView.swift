@@ -41,7 +41,8 @@ struct MacAuthPoCHarnessView: View {
                     runButton("Item 1 — No resign / no false lock", id: "1") { try await runItem1() }
                     runButton("Item 5 — In-app password fallback (observe)", id: "5") { try await runItem5() }
                     runButton("Item 2a — Setup (generate real key; may use the OLD system sheet)", id: "2a") { try await runItem2Setup() }
-                    runButton("Item 2b — Measure (in-window decrypt + sign)", id: "2b") { try await runItem2Measure() }
+                    runButton("Item 2b — Measure DECRYPT (one in-window auth)", id: "2b") { try await runItem2MeasureDecrypt() }
+                    runButton("Item 2c — Measure SIGN (one in-window auth)", id: "2c") { try await runItem2MeasureSign() }
                     runButton("Cleanup — delete PoC-generated keys", id: "cleanup") { try await runCleanup() }
                     Text("Items 3/4/6 wired in later increments.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -56,16 +57,14 @@ struct MacAuthPoCHarnessView: View {
             // The in-window authentication surface. When the presenter has an active context,
             // the LAAuthenticationView renders the biometric INSIDE this window.
             if let ctx = presenter.activeContext {
-                VStack(spacing: 12) {
-                    Text("Authenticate in-window").font(.headline)
-                    LAAuthenticationViewHost(context: ctx, onReady: presenter.viewDidMount)
-                        .frame(width: 160, height: 160)
-                }
-                .padding(28)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .shadow(radius: 24)
+                LAAuthenticationViewHost(context: ctx, onReady: presenter.viewDidMount)
+                    .frame(width: 56, height: 56)
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.15), value: presenter.activeContext != nil)
         .onAppear(perform: installObservers)
         .onDisappear(perform: removeObservers)
     }
@@ -168,26 +167,36 @@ struct MacAuthPoCHarnessView: View {
         append("Item 2a: SETUP DONE (key …\(id.fingerprint.suffix(8))). Let prompts/lifecycle settle, then tap Item 2b.")
     }
 
-    /// Item 2b — MEASURE only. Pure in-window: authenticate in-window, deposit the context, run the
-    /// REAL decrypt + sign. Observation counters are reset first so setup's lifecycle events are
-    /// excluded from the measured result.
+    /// Item 2b — MEASURE decrypt only. ONE in-window per-operation authentication. Counters reset
+    /// first so setup's lifecycle events are excluded.
     @MainActor
-    private func runItem2Measure() async throws {
-        guard let id = item2Key, let ciphertext = item2Ciphertext else {
-            append("Item 2b: run Item 2a (setup) first."); return
-        }
-        resignCount = 0
-        becomeActiveCount = 0
-        isActive = NSApplication.shared.isActive
-        append("Item 2b: MEASURED in-window ops (counters reset). Tap Touch ID in-window when prompted.")
+    private func runItem2MeasureDecrypt() async throws {
+        guard let ciphertext = item2Ciphertext else { append("Item 2b: run Item 2a (setup) first."); return }
+        resetObservationCounters()
+        append("Item 2b: MEASURED in-window DECRYPT — one authentication. Tap Touch ID in-window.")
         try await measureSoftwareOp("decrypt") {
             let (pt, _) = try await container.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
             return String(data: pt, encoding: .utf8) == "PoC item 2 plaintext" ? "plaintext ok" : "plaintext MISMATCH"
         }
+    }
+
+    /// Item 2c — MEASURE sign only. ONE in-window per-operation authentication (separate from 2b,
+    /// because decrypt and sign are two distinct private-key operations).
+    @MainActor
+    private func runItem2MeasureSign() async throws {
+        guard let id = item2Key else { append("Item 2c: run Item 2a (setup) first."); return }
+        resetObservationCounters()
+        append("Item 2c: MEASURED in-window SIGN — one authentication. Tap Touch ID in-window.")
         try await measureSoftwareOp("sign") {
             let sig = try await container.signingService.signCleartext("PoC item 2 sign", signerFingerprint: id.fingerprint)
             return "signature \(sig.count) bytes"
         }
+    }
+
+    private func resetObservationCounters() {
+        resignCount = 0
+        becomeActiveCount = 0
+        isActive = NSApplication.shared.isActive
     }
 
     /// Authenticate in-window, deposit the context (with `interactionNotAllowed = true`), run the
