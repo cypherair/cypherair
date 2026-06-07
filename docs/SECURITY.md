@@ -256,7 +256,10 @@ second interactive prompt.
 >   **force-re-wrapped** once (a dedicated, user-initiated migration action that **itself authenticates
 >   in-window biometric**, not under the old Standard system-sheet path), **dropping the `.devicePasscode`
 >   flag** — an access-control model change (these flags are security-critical; human review required), not a
->   presentation-only change.
+>   presentation-only change. The migration **applies the existing backup gate unchanged** — the same requirement
+>   that already gates Standard→High Security (this section's Mode-Switching step 1 and the `switchMode`
+>   `backupRequired` safety net), which blocks only when no private-key backup exists at all; the migration does not
+>   bypass or change it.
 > - **App-session authentication (`AppSessionAuthenticationPolicy`, §5).** macOS removes the `.userPresence`
 >   passcode-fallback path; macOS app unlock (and Local Data Reset's confirmation auth) become local-biometric-
 >   only (`.biometricsOnly`). The persisted root-secret Keychain item is **re-protected** once (a separate

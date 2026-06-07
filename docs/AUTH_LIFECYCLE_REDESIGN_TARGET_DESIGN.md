@@ -126,6 +126,9 @@ The redesign preserves every current invariant (see [SECURITY.md](SECURITY.md) �
 - The two authentication subsystems (§1) stay distinct; the app-unlock context is confined to app-session /
   Protected App-Data post-auth flows and is never routed into a private-key operation.
 - The `DecryptionService` Phase 1 / Phase 2 boundary is a permanent invariant.
+- The macOS biometric-only model **preserves the existing backup gate as-is** — at least one private-key backup
+  must exist (the shipped account-level `hasBackup` / `backupRequired` rule) before keys move to the biometric-only
+  flag set with no passcode fallback; the redesign neither adds a per-key rule nor weakens it.
 - No secret logging; zero network.
 
 One change is **intended and deliberate**, recorded here and in [SECURITY.md](SECURITY.md) §4: on macOS the
