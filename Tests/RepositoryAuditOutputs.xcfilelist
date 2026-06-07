@@ -5,6 +5,9 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/AppShellComposition.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/AppStartupCoordinator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppLifecycleObserver.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppLockSurfaceView.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/CosmeticPrivacyCover.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldCoordinator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldHost.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldOverlayView.swift

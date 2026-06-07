@@ -5,6 +5,9 @@ $(SRCROOT)/Sources/App/AppRoute.swift
 $(SRCROOT)/Sources/App/AppShellComposition.swift
 $(SRCROOT)/Sources/App/AppStartupCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
+$(SRCROOT)/Sources/App/Common/AppLifecycleObserver.swift
+$(SRCROOT)/Sources/App/Common/AppLockSurfaceView.swift
+$(SRCROOT)/Sources/App/Common/CosmeticPrivacyCover.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldHost.swift
 $(SRCROOT)/Sources/App/Common/AuthenticationShieldOverlayView.swift
