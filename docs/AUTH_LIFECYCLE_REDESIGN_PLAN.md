@@ -190,17 +190,12 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   operations authenticate on their own (DESIGN §2, principle 5); relock fail-closed; Phase 1/2 boundary
   intact. (This is the narrow unlock-vs-key-use rule, not a blanket per-operation re-authentication
   mandate.) **This boundary is guaranteed by implementation, not a runtime experiment:** the app-unlock
-  `LAContext` lives only in `AppSessionOrchestrator.pendingAuthenticatedContext`, is handed to ProtectedData
-  via `consumeAuthenticatedContextForProtectedData()`, and is reused **only** within app-session /
-  ProtectedData-owned post-auth flows — post-unlock domain opening
-  (`ProtectedDataPostUnlockCoordinator.openRegisteredDomains`, e.g. `key-metadata` / `protected-settings` /
-  `private-key-control`) and legacy metadata migration — and is **never** routed into a private-key
-  operation; the private-key operation path
-  runs on a separate `AuthenticationPromptCoordinator.withOperationPrompt` channel and holds **no**
-  reference to the app-unlock context (grep-verifiable). The macOS in-window per-operation presenter
-  must thread only an operation-scoped context and must **never** pass the app-unlock context into a
-  private-key operation. Enforced by code structure + review on every touching phase; no harness
-  experiment substitutes for it.
+  `LAContext` may be reused **only** within ProtectedData / app-session-owned post-auth flows, and is
+  **never** routed into a private-key operation — private-key operations authenticate on their own
+  operation-scoped context. The macOS in-window per-operation presenter must thread only that
+  operation-scoped context and must **never** pass the app-unlock context into a private-key
+  operation. Enforced by code structure + review on every touching phase; no harness experiment
+  substitutes for it.
 
 ## 6. SE-custody prompt — tracking
 

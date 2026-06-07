@@ -155,9 +155,9 @@ unambiguous `.background`; on macOS by ensuring authentication never resigns the
 
 ### macOS
 - **Cosmetic cover** on resign (optional/visual).
-- **Lock screen** rendered **in-window** with embedded authentication (§6). Standard-mode and
-  biometrics-unavailable fallback follows the §6.2 decision: an in-app password field if it can be
-  done safely through public APIs, otherwise biometric-only on macOS for this flow.
+- **Lock screen** rendered **in-window** with embedded authentication (§6). Per the §6.2 / P0 result
+  there is no safe in-app password field, so Standard-mode and biometrics-unavailable cases are
+  **biometric-only on macOS for this flow** (no in-app password fallback).
 - **Sensitive settings flows** (App Access Protection change; auth-mode switch / key rewrap)
   use **dedicated explanatory pages** (§6.2) with the authentication control hosted inline.
 
@@ -185,13 +185,12 @@ Supported inline policies are biometric / Apple-Watch only
 `deviceOwnerAuthentication` for convenience). There is no inline passcode entry, so:
 
 ### 6.2 In-app password fallback and explanatory pages
-- **Password fallback (decided direction).** *Preferred:* pair the inline biometric with an
-  **in-app password / login-password field** on the same surface (Passwords-style) for Standard
-  mode and the biometrics-unavailable / locked-out cases. *Accepted fallback (pre-approved):* if a
-  safe in-app password path is **not** achievable through public APIs, the Standard-mode password
-  fallback is **removed on macOS for this flow** — these protected / authenticated operations then
-  require biometric authentication on macOS (no password fallback). Which outcome applies is a P0
-  validation item; both are pre-approved. See §9 for the security consequence.
+- **Password fallback (resolved by P0).** P0 validated that no safe in-app password / login-password
+  field is achievable through public APIs — the embedded `LAAuthenticationView` exposes biometric /
+  Apple-Watch policies only, with no inline passcode entry (§6.1). The pre-approved consequence
+  therefore applies: the Standard-mode password fallback is **removed on macOS for these in-app
+  authenticated flows** — they require biometric authentication on macOS (no password fallback).
+  iOS / iPadOS / visionOS keep the system passcode fallback. See §9 for the security consequence.
 - **Explanatory pages for sensitive changes.** App Access Protection changes and auth-mode
   switches present a dedicated page showing the consequences, requirements, and preflight
   checks (e.g. "no backup exists", "biometrics unavailable", "this re-wraps all keys") with the
@@ -266,12 +265,13 @@ This redesign must preserve every current invariant (see [SECURITY.md](SECURITY.
   own (§2, principle 5). This is unchanged from today and is **not** broadened into a blanket
   per-operation re-authentication rule.
 - No secret logging; zero network.
-- **macOS Standard-mode fallback (accepted consequence).** If P0 finds no safe public-API in-app
-  password path, macOS drops the Standard-mode *password* fallback for this in-app authenticated
-  flow and requires biometrics on macOS for these operations. This is a deliberate, **macOS-only**
+- **macOS Standard-mode fallback (resolved by P0).** P0 found no safe public-API in-app password
+  path, so macOS drops the Standard-mode *password* fallback for these in-app authenticated flows
+  and requires biometrics on macOS for these operations. This is a deliberate, **macOS-only**
   presentation-layer restriction; the Secure Enclave access-control flags are unchanged, and
-  iOS / iPadOS / visionOS keep the system passcode fallback. If this path is taken, SECURITY.md §4
-  is updated to record the macOS deviation.
+  iOS / iPadOS / visionOS keep the system passcode fallback. SECURITY.md §4 now carries a
+  forward-looking note recording this macOS deviation; the current-state rewrite lands when the
+  redesign ships (P4/P5).
 
 Red-line files touched by the implementation (`AppSessionOrchestrator`, `Sources/Security/
 ProtectedData/*`, `AuthenticationManager`, `SecureEnclaveManager`, entitlements) require
