@@ -240,6 +240,15 @@ second interactive prompt.
 
 ## 4. Authentication Modes
 
+> **Planned change (auth redesign — unshipped).** When the in-window authentication redesign ships on
+> macOS (see [AUTH_LIFECYCLE_REDESIGN_PLAN.md](AUTH_LIFECYCLE_REDESIGN_PLAN.md) /
+> [AUTH_LIFECYCLE_REDESIGN_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_DESIGN.md)), the Standard-mode **password
+> fallback is removed on macOS for the in-app authenticated flows** (app unlock, mode switch,
+> per-operation auth) — biometrics required. High Security mode and iOS / iPadOS / visionOS are
+> unaffected. This is a presentation-layer restriction, not a change to the access-control flags or
+> `LAPolicy` selection below. **Current shipped behavior (this section) is unchanged until that phase
+> lands.**
+
 ### Standard Mode (default)
 
 ```swift

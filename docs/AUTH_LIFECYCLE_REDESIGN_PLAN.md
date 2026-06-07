@@ -36,14 +36,26 @@ Acceptance items:
 3. **Per-operation context consumption — custody path.** The same context drives a custody
    `SecKey` operation (`SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`) loaded with
    `kSecUseAuthenticationContext: ctx`, no second prompt.
-4. **Unlock auth is not reused for key use.** Confirm the authentication that unlocked the app
-   does **not** silently authorize a later private-key operation (signing, decryption,
-   certification, revocation, or a key-expiry change) — that operation triggers its own
-   authentication. (Unsigned standalone encryption — recipient-key or password-protected — does not use the private-key
-   operation router, Secure Enclave, or private-key authentication; an encrypt-and-sign operation
-   authenticates for its signing step — see DESIGN §7.) This validates the narrow separation in DESIGN
-   §2 (principle 5); it is **not** a test that every operation must re-authenticate, and a single
-   user action spanning several keys (auth-mode switch / re-wrap) still authenticates once.
+   **Narrow probe validated (on-device, P0 PoC):** an in-window-authenticated `LAContext` satisfies the
+   real custody `SecKey` sign (`.useKeySign`) and ECDH (`.useKeyKeyExchange`) loaded via
+   `kSecUseAuthenticationContext` at `SystemSecureEnclaveCustodyKeyStore.loadKeys`, one prompt each, no
+   resign — so the §3.3 custody seam is technically compatible with the in-window model. This is a
+   **technical-compatibility** result only. **Full custody product-flow validation remains DEFERRED:**
+   Secure Enclave custody is not yet productized, so an end-to-end validation needs the product-shaped
+   custody flow (generation + role-pair binding + router + metadata) combined with the in-window model — a
+   future task, not a continuation of the narrow spike.
+4. **Unlock auth is not reused for key use — architectural requirement, NOT a PoC experiment.** The
+   authentication that unlocked the app must **never** silently authorize a later private-key
+   operation (signing, decryption, certification, revocation, or a key-expiry change); each such
+   operation authenticates on its own. (Unsigned standalone encryption — recipient-key or
+   password-protected — does not use the private-key operation router, Secure Enclave, or private-key
+   authentication; an encrypt-and-sign operation authenticates for its signing step — see DESIGN §7.)
+   This is the narrow separation in DESIGN §2 (principle 5); it is **not** a rule that every operation
+   must re-authenticate, and a single user action spanning several keys (auth-mode switch / re-wrap)
+   still authenticates once. **Reclassified:** this boundary does not need a runtime feasibility
+   experiment — it is **guaranteed by implementation / code routing**, recorded as a red-line requirement
+   in §5 and DESIGN §2 (principle 5), and verified by code structure/review (the app-unlock context is
+   structurally isolated from the private-key operation path). It carries **no P0 harness item**.
 5. **In-app password fallback — feasibility decision.** Determine whether a safe in-app password /
    login-password path exists through public APIs (credential verification without weakening the
    model or logging secrets). **Decision rule (pre-approved):** if it is not safely achievable,
@@ -53,6 +65,9 @@ Acceptance items:
    flow authenticates **once for the whole action** when presented in-app on macOS — a single
    in-window prompt for the switch even though it re-wraps every key (exactly as today) — with no
    resign and the SECURITY.md §4 atomicity / crash-recovery semantics preserved.
+   **Validated (on-device, P0 PoC):** deterministically verified as a single in-window prompt for the
+   whole N-key rewrap, no resign, the mode flips, and the recovery journal ends empty. (Requires
+   decoupling the legacy shield first — see §3.1 / §5.)
 7. **visionOS — deferred (no hardware).** visionOS follows the iOS direction by decision; on-device
    Optic-ID + `ScenePhase` confirmation is deferred until hardware is available and tracked as an
    unvalidated assumption, not a design fork.
@@ -101,7 +116,9 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   for the grace=0 fix is removed in P7; any remaining operation-progress signal is presentational only.
 - `Sources/App/Common/AuthenticationShield*` (`AuthenticationShieldCoordinator`,
   `AuthenticationShieldHost`, `AuthenticationShieldOverlayView`) — superseded by the in-app
-  auth surfaces (macOS) and the lock screen; removed/slimmed in P7.
+  auth surfaces (macOS) and the lock screen. **Decoupled from operation prompts in P2** (a *functional*
+  prerequisite, not cosmetic: the P0 PoC found the shield raises at `.zIndex(10)` and occludes/deadlocks
+  the in-window per-operation/mode-switch auth), then removed/slimmed in P7.
 
 ### 3.2 macOS in-app authentication (new)
 - New `AuthenticationPresenting` protocol + a macOS implementation hosting `LAAuthenticationView`
@@ -155,15 +172,27 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   the new model behind the same observable behavior before P7 removes the old machinery.
 - **macOS PoC dependency.** P4/P5 depend on the P0 "no-resign" and "per-op context consumption"
   results. If "no-resign" fails, revisit the macOS away-event model before building P4/P5.
+- **Legacy shield occlusion (P2 prerequisite).** The P0 PoC found the legacy `AuthenticationShield`
+  raises at `.zIndex(10)` and *occludes/deadlocks* the in-window per-operation/mode-switch auth (not a
+  cosmetic flash). P2's shield-decouple is therefore a **functional prerequisite** for the P5 in-window
+  per-op auth, not a cleanup; full removal stays P7.
 - **macOS Standard-mode fallback (decided, conditional).** Preferred is a safe in-app password
   field; if P0 shows that is not achievable through public APIs, the **pre-approved** outcome is to
   remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
   and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
   password field must validate credentials safely (no secret logging; correct failure mapping).
-- **Security posture unchanged.** The app-unlock authentication is never reused to authorize a
-  private-key operation, and private-key operations authenticate on their own (DESIGN §2,
-  principle 5); relock fail-closed; Phase 1/2 boundary intact. (This is the narrow
-  unlock-vs-key-use rule, not a blanket per-operation re-authentication mandate.)
+- **Security posture unchanged — unlock-vs-key-use is a code-routing requirement (former P0 item 4).**
+  The app-unlock authentication is never reused to authorize a private-key operation, and private-key
+  operations authenticate on their own (DESIGN §2, principle 5); relock fail-closed; Phase 1/2 boundary
+  intact. (This is the narrow unlock-vs-key-use rule, not a blanket per-operation re-authentication
+  mandate.) **This boundary is guaranteed by implementation, not a runtime experiment:** the app-unlock
+  `LAContext` lives only in `AppSessionOrchestrator.pendingAuthenticatedContext` and is consumed solely
+  by `consumeAuthenticatedContextForProtectedData()` → ProtectedData; the private-key operation path
+  runs on a separate `AuthenticationPromptCoordinator.withOperationPrompt` channel and holds **no**
+  reference to the app-unlock context (grep-verifiable). The macOS in-window per-operation presenter
+  must thread only an operation-scoped context and must **never** pass the app-unlock context into a
+  private-key operation. Enforced by code structure + review on every touching phase; no harness
+  experiment substitutes for it.
 
 ## 6. SE-custody prompt — tracking
 
@@ -182,6 +211,13 @@ Consequences for tracking (do not drop):
 - **On-device verification** (P7): custody signing/key-agreement under the new model performs a
   single in-app prompt with no content clear / relock.
 - The already-shipped off-main custody hop stays (responsiveness; independent of this work).
+
+**Narrow custody-compat probe (on-device, P0 PoC).** The in-window `LAContext` is consumed by the real
+custody SE sign (`.useKeySign`) and ECDH (`.useKeyKeyExchange`) via `kSecUseAuthenticationContext` at
+`SystemSecureEnclaveCustodyKeyStore.loadKeys`, one prompt each, no resign — confirming the §3.3 custody
+seam is technically compatible with the in-window model. This is the **narrow technical-compatibility**
+result only; **full custody product-flow validation stays deferred** until custody is product-shaped (the
+P7 on-device verification above).
 
 ## 7. Decisions & remaining validation items
 
@@ -202,14 +238,54 @@ Folding in the reviewer's direction (2026-06-05).
    shows it is not achievable through public APIs, remove the Standard-mode password fallback on
    macOS for this flow (biometrics required on macOS) and update SECURITY.md §4.
 
+**Validated (P0, on-device):**
+- **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single in-app
+  authentication for the whole switch on macOS (one prompt even though it re-wraps every key, exactly as
+  today), no resign, atomicity + crash recovery preserved. (P0 item 6)
+- **Custody-auth ↔ in-window compatibility (narrow)** — an in-window `LAContext` satisfies the real custody
+  `SecKey` sign + ECDH via `kSecUseAuthenticationContext`, one prompt each. **Full custody product-flow
+  validation remains deferred** (custody not productized). (P0 item 3, narrow)
+- **No resign** (item 1), **per-operation context consumption — software path** (item 2), and the
+  **password-fallback decision** (item 5: no safe in-window password field → macOS requires biometrics for
+  these flows) are likewise validated/decided in the P0 PoC.
+
 **Remaining validation items (P0 / technical validation):**
-1. **In-app password-field feasibility** — whether a safe public-API credential path exists; drives
-   decision (5) above. (P0 item 5)
-2. **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single
-   in-app authentication for the whole switch on macOS (one prompt even though it re-wraps every key,
-   exactly as today), with atomicity + crash recovery preserved. (P0 item 6)
-3. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
+1. **visionOS on-device behavior** — Optic-ID + `ScenePhase`, confirmed when hardware is available.
    (P0 item 7)
+
+## 8. Other macOS auth call sites still on the system sheet (to migrate or explicitly handle)
+
+Beyond the per-operation **unwrap** path wired in §3.3, several macOS flows still trigger the **old
+detached/system LocalAuthentication sheet** today and are **not** named in the P0 items or the
+§3.2/§3.3 presenter wiring. They are tracked here so a later phase (P4/P5, or a follow-up) either
+migrates them to the in-window presenter or makes a deliberate decision to leave them on the system
+sheet. **None is fixed or validated yet** (read-only sweep during the P0 PoC).
+
+The Secure-Enclave auth model has **two distinct choke points**; the redesign so far names only the
+first:
+- **Operation / unwrap** — `PrivateKeyAccessService.unwrapPrivateKey` →
+  `SecureEnclaveManager.reconstructKey(…authenticationContext:)`. Covered by §3.3.
+- **Provisioning / wrap** — `SecureEnclaveManager.generateWrappingKey(accessControl:authenticationContext:)`
+  + `wrap(…)`. The wrap-time self-ECDH (`sharedSecretFromKeyAgreement`) triggers Face ID unless a
+  pre-authenticated `LAContext` is threaded in. The `generateWrappingKey` source comment states the
+  context is passed precisely so the wrap self-ECDH does not "trigger Face ID again";
+  `PrivateKeyRewrapWorkflow` passes it (rewrap → no prompt), but **initial generation and import pass
+  `nil`** (`KeyProvisioningService`), so they prompt. This provisioning choke point is **not** named
+  in §3.2/§3.3.
+
+| Path | macOS prompt today | Origin (choke point) | Plan coverage | Action later |
+|------|--------------------|----------------------|---------------|--------------|
+| **Key generation / provisioning** | Detached sheet | wrap-time self-ECDH; `KeyProvisioningService.generateKey` (nil context) | **Not covered** | Authenticate in-window first, then thread the context into `generateWrappingKey(authenticationContext:)` — the pattern `PrivateKeyRewrapWorkflow` already uses for rewrap. |
+| **Key import / restore** | Detached sheet | same wrap-time self-ECDH; `KeyProvisioningService.importKey` (nil context) | **Not covered** | Same as generation. |
+| **Key export / backup** | Detached sheet | unwrap path; `KeyExportService` → `unwrapPrivateKey` → `reconstructKey` | **Rides the §3.3 unwrap path, but not named** (export is not in the `PGPPrivateOperationKind` set) | Confirm the presenter wraps `unwrapPrivateKey` for **all** callers so export is covered; otherwise migrate it explicitly. |
+| **SE custody generation (self-sign)** | Detached sheet | `SecKeyCreateSignature` during the custody cert self-sign (`SystemSecureEnclaveCustodyDigestSigner`) | Custody **deferred** (§1 item 3) | Fold into the product-shaped custody + in-window work when custody is productized (custody product-flow deferred — see §6). |
+| **Guided tutorial** | None (isolated) | tutorial uses `Mock*` SE/Keychain primitives (`Sources/Security/Mocks`) | N/A — no real prompt | No migration; note only. Revisit if the tutorial ever uses real hardware-backed processing ([SECURITY.md](SECURITY.md) §6). |
+
+**Not gaps:** app-session unlock and ProtectedData root-secret access already thread
+`kSecUseAuthenticationContext` and are covered by the unlock presenter (§3.2) / DESIGN §7.
+
+This inventory is follow-up tracking for P4/P5 (or a dedicated follow-up); none of these is fixed or
+validated yet.
 
 ---
 
