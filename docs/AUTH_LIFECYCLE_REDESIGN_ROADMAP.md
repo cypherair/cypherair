@@ -60,11 +60,27 @@ Corollaries:
 - **No transitional permanent exceptions.** Every shipped macOS authentication surface moves in-window in one
   decisive cutover; the Secure Enclave Custody path (hidden / test-only) follows the same principle through its
   own seam when productized.
-- **Out of scope:** import-S2K passphrase entry (`ImportKeyView` / `CypherSecureTextField`) and password-message
-  / SKESK encrypt-decrypt are SwiftUI `SecureField` text entry, not private-key biometric — they are not
-  authentication surfaces and are not exceptions.
+- **Out of scope (passphrase text entry, not authentication surfaces):** import-S2K passphrase entry
+  (`ImportKeyView` / `CypherSecureTextField`) and **standalone** password-message / SKESK encrypt + decrypt are
+  SwiftUI `SecureField` text entry, not private-key biometric (password decrypt verifies signatures with *public*
+  keys only) — they are not authentication surfaces and are not exceptions.
+- **In scope (a private-key signing surface):** password-message encryption that **also signs**
+  (`PrivateKeyPasswordMessageEncryptionService` with a `signerFingerprint`) is a private-key signing operation. It
+  routes through the same signing seam as ordinary encrypt-and-sign (software
+  `PrivateKeyAccessService.unwrapPrivateKey` → `SecureEnclaveManager.reconstructKey`; custody external-P256-signer /
+  `loadKeys`), so its signing authorization uses the **same macOS in-window presenter / threaded-context path as
+  every other private-key signing operation** (§3 P3 / §4). Only the SKESK passphrase itself is `SecureField` text.
 
-## 3. Phases (foundation-first; each phase is its own PR)
+## 3. Phases (foundation-first; PR-sized steps)
+
+These phases are PR-sized implementation steps, **not independently shippable macOS milestones**. On macOS, **P1–P3
+are one coupled release**: P1 removes the cluster that disambiguated the *detached* system sheet, but macOS keeps the
+detached sheet — and the resign / `.inactive` → `.active` churn it generates — until P3 moves authentication
+in-window. Shipping P1's removal in a macOS build that still authenticates via the detached sheet would let
+`AppLockController`'s resign-based away rule misfire on the auth sheet's own resign (P0 proved only the *in-window*
+view avoids the resign). iOS / iPadOS / visionOS never needed that cluster (lock keys off `.background`, which the
+biometric prompt never triggers), so the P1 foundation is independently sound there. The direction is unchanged — the
+detached system-sheet path is eliminated decisively; the coupling is only a macOS delivery constraint.
 
 - **P0 — Validation PoC (DONE; frozen #469).** Results inlined in §1. No code merges to `main`.
 
@@ -80,10 +96,14 @@ Corollaries:
   `pendingAuthenticatedContext`, `consumeAuthenticatedContextForProtectedData`); the lock / blur / grace /
   settle responsibilities move to `AppLockController`. Re-target the DEBUG `AuthLifecycleTraceStore` to the new
   lock-state transitions. The cosmetic cover lands here so there is no cover-coverage gap. Preserve the merged
-  grace=0 behavior. *Why the shield can go here, before in-window auth lands:* its two jobs — cosmetic overlay
-  and `.active`-disambiguation timing — move to the cover subsystem and vanish (lock keys off `.background` on
-  iOS; macOS in-window auth never resigns); it is never an authentication path, and P0 (F1) proved it occludes
-  in-window auth, so it must be gone before P3. The independent `LocalDataResetRestartGate` is untouched here.
+  grace=0 behavior. *Why the cluster's removal is consolidated here:* its jobs — cosmetic overlay and
+  `.active`-disambiguation timing — are subsumed by the cover subsystem and the explicit lock state. On iOS this is
+  complete at P1 (lock keys off `.background`, which the biometric prompt never triggers). On macOS the
+  disambiguation is unnecessary only once authentication stops resigning the app — i.e. once P3 moves it in-window —
+  so although the removal is authored here, **on macOS P1 and P3 ship as one coupled release** and the cluster is not
+  shipped removed while macOS still uses the detached sheet (see the §3 delivery-coupling note). P0/F1 fixes the
+  within-release order: the shield occludes in-window auth, so it is torn down exactly as the in-window view is
+  mounted. The cluster is never an authentication path. The independent `LocalDataResetRestartGate` is untouched here.
 
 - **P2 — macOS single-window unification.**
   Remove the standalone macOS `Settings { }` scene; route settings into the main window; preserve Cmd-, via a
@@ -131,7 +151,14 @@ Corollaries:
     to take the `AuthenticationPresenting` seam on macOS and authenticate biometric-only via
     `evaluateAccessControl` against the existing key's access control (`.biometryAny` alone satisfies the
     Standard key's `[.biometryAny, .or, .devicePasscode]` OR-gate), then thread `lastEvaluatedContext` into the
-    re-wrap. Completion = persisted `.highSecurity` (`private-key-control`). Drops `.devicePasscode`.
+    re-wrap. Completion = persisted `.highSecurity` (`private-key-control`). Drops `.devicePasscode`. Because the
+    migration moves keys to the biometric-only flag set (dropping the passcode fallback), it **applies the existing
+    pre-High-Security backup gate unchanged and must not bypass it**: it routes through
+    `switchMode(to: .highSecurity, hasBackup:)`, which enforces the existing `AuthenticationError.backupRequired`
+    safety net, and the migration entry surfaces the same `requiresRiskAcknowledgement` warning the manual switch
+    shows. The gate is **account-level** — it blocks only when **no private-key backup exists at all** (`hasBackup`
+    = at least one key with `PGPKeyIdentity.isBackedUp`); the migration neither strengthens it to a per-key rule nor
+    weakens it.
   - **(AS) re-protect** `.userPresence` → `.biometricsOnly` via
     `ProtectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(from:to:authenticationContext:)` →
     `reprotectRootSecret` (its own in-window `evaluatePolicy` context, `interactionNotAllowed`; `SecItemUpdate`
@@ -147,7 +174,8 @@ Corollaries:
 
 - **P4 — iOS / iPadOS / visionOS custom lock surface.** A custom opaque lock surface with the biometric
   auto-invoked, retry and biometrics-locked-out messaging preserved, driven by `AppLockController`. The platform
-  authentication model is otherwise unchanged. Depends only on P1; independent of P3. visionOS remains an
+  authentication model is otherwise unchanged. Depends only on P1; independent of P3 (the macOS P1/P3 delivery
+  coupling does not apply here — iOS never used the detached-sheet disambiguation). visionOS remains an
   unvalidated assumption (no hardware).
 
 - **P5 (last) — Verification + current-state doc cutover.** macOS UI tests, device biometric tests, the hidden
@@ -166,7 +194,8 @@ Two distinct Secure-Enclave seams — they must not be collapsed:
   authenticated `LAContext` into both `reconstructKey(…authenticationContext:)` and
   `generateWrappingKey(…authenticationContext:)`. This is the pattern the other seams adopt.
 - **(b) The shared read seam** — `PrivateKeyAccessService.unwrapPrivateKey` → `reconstructKey`, which today
-  calls the **nil-context convenience overload** in `SecureEnclaveManageable`. Covers signing, message decrypt,
+  calls the **nil-context convenience overload** in `SecureEnclaveManageable`. Covers signing (including
+  password-message encryption that signs, via `PrivateKeyPasswordMessageEncryptionService`), message decrypt,
   file-streaming decrypt, certification, revocation export, and S2K export/backup. Fix: stop the convenience
   overload; thread the in-window-authenticated `LAContext`.
 - **(c) The key-expiry gap** — `KeyMutationService.modifySoftwareExpiry` re-wraps via `generateWrappingKey`
@@ -197,13 +226,20 @@ calling the convenience overloads and thread an in-window-authenticated context.
 | `LocalDataResetRestartGate` (two mounts) | **retained** — independent of the cluster; **two mounts → one (P2)**; its auth moves in-window (P3) |
 | — | **new:** `AppLockController`, decoupled cosmetic cover, `AuthenticationPresenting` + macOS impl, in-window lock surfaces, explanatory pages, `MacAuthMigrationCoordinator` + two independent Settings migration entries |
 
+The **(P1)** / **(P2)** / **(P3)** labels mark which phase performs each change, not independently shippable macOS
+milestones: on macOS the P1 removals and the P3 in-window cutover ship as one coupled release (see §3).
+
 ## 6. Red lines & tests
 
 - **Red-line review.** `AppSessionOrchestrator`, `Sources/Security/ProtectedData/*`, `AuthenticationManager`,
   `SecureEnclaveManager`, `AuthenticationMode.createAccessControl`, and entitlements require human security
   review per [SECURITY.md](SECURITY.md) §10. Each touching phase carries positive + negative + round-trip tests.
-- **No interim regression.** The merged grace=0 fix must keep working until superseded; P1 lands the new model
-  behind the same observable lock behavior.
+- **No interim regression (macOS delivery coupling).** The merged grace=0 fix keeps working until superseded. P1
+  may be an implementation PR slice, but on macOS the P1 cluster removal and the P3 in-window-auth cutover are
+  **coupled for delivery (shipped together)**: because macOS keeps the detached system sheet until P3, P1's removal
+  must not reach a shipped macOS build ahead of P3, or the new lock model would regress on the auth sheet's resign.
+  iOS observes the same lock behavior at P1 (lock keys off `.background`). The old detached system-sheet path is
+  still decisively eliminated — the coupling is a delivery constraint, not a softening of the direction.
 - **Tests.** `AppLockController` pure-state-machine unit tests; cosmetic-cover tests; macOS UI tests (in-window
   unlock, explanatory pages, single-window settings); device biometric tests (single prompt, no resign, content
   preserved across in-window auth; per-op inline auth); the two migration-action tests (PK re-wrap with
