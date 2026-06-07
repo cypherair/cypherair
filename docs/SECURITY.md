@@ -240,6 +240,32 @@ second interactive prompt.
 
 ## 4. Authentication Modes
 
+> **Planned change (auth-lifecycle redesign — unshipped).** When this redesign ships, macOS authentication is
+> presented **in-window** (the authentication prompt itself, via `LAAuthenticationView`) using **local
+> biometric authentication** (Touch ID). Apple Watch / companion authentication is **not** part of this target
+> (not validated in P0; different security semantics). Two **separate** macOS subsystems change, via two
+> **independent** one-time migrations (each its own in-window authentication; not one shared context, not the
+> crash-recovery path); keep them distinct (see
+> [AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) /
+> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md)):
+>
+> - **Private-key authentication (`AuthenticationMode`, this section).** macOS removes
+>   `AuthenticationMode.standard` (and its Standard/High mode-switch UI); macOS private-key operations are
+>   biometric-only — authorized by the SE key access-control flags `[.privateKeyUsage, .biometryAny]` plus an
+>   in-window-authenticated `LAContext`, not a passcode fallback. Existing macOS Standard keys are
+>   **force-re-wrapped** once (a dedicated, user-initiated migration action that **itself authenticates
+>   in-window biometric**, not under the old Standard system-sheet path), **dropping the `.devicePasscode`
+>   flag** — an access-control model change (these flags are security-critical; human review required), not a
+>   presentation-only change.
+> - **App-session authentication (`AppSessionAuthenticationPolicy`, §5).** macOS removes the `.userPresence`
+>   passcode-fallback path; macOS app unlock (and Local Data Reset's confirmation auth) become local-biometric-
+>   only (`.biometricsOnly`). The persisted root-secret Keychain item is **re-protected** once (a separate
+>   user-initiated migration action; `SecItemUpdate` on its access control, `[.userPresence]` → `[.biometryAny]`;
+>   payload unchanged). This is the **separate** app-session subsystem and is **not** "Standard Mode removal."
+>
+> iOS / iPadOS / visionOS are unaffected. **Current shipped behavior (this section and §5) is unchanged until
+> this change lands.**
+
 ### Standard Mode (default)
 
 ```swift
