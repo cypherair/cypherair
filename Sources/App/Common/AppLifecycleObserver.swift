@@ -5,8 +5,9 @@ import AppKit
 
 /// The single owner of the platform lifecycle signal (P1 of the auth-lifecycle
 /// redesign). It translates the platform's unambiguous away/foreground events into
-/// (a) the cosmetic-cover `isForegroundActive` binding and (b) `AppLockController`
-/// away/foreground calls.
+/// `AppLockController`'s foreground-active / away / foreground calls. The controller
+/// owns the foreground-active state (the cosmetic cover reads it), so there is no
+/// separate cover binding here.
 ///
 /// Per-platform away-event rule (TARGET §3):
 /// - iOS / iPadOS / visionOS: away = `ScenePhase.background` ONLY. A biometric
@@ -22,7 +23,6 @@ struct AppLifecycleObserverModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     let appLockController: AppLockController
-    @Binding var isForegroundActive: Bool
 
     func body(content: Content) -> some View {
         content
@@ -35,14 +35,14 @@ struct AppLifecycleObserverModifier: ViewModifier {
                 )
                 switch newPhase {
                 case .active:
-                    isForegroundActive = true
+                    appLockController.noteForegroundActive(true)
                     Task { await appLockController.handleForegroundActive(source: "scenePhase.active") }
                 case .inactive:
                     // Cover only — a biometric prompt produces `.inactive`, which is
                     // never an away event.
-                    isForegroundActive = false
+                    appLockController.noteForegroundActive(false)
                 case .background:
-                    isForegroundActive = false
+                    appLockController.noteForegroundActive(false)
                     appLockController.handleAwayEvent(source: "scenePhase.background")
                 @unknown default:
                     break
@@ -51,19 +51,19 @@ struct AppLifecycleObserverModifier: ViewModifier {
         #elseif os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
                 authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.macResign")
-                isForegroundActive = false
+                appLockController.noteForegroundActive(false)
                 appLockController.handleAwayEvent(source: "macResignActive")
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.macActive")
-                isForegroundActive = true
+                appLockController.noteForegroundActive(true)
                 Task { await appLockController.handleForegroundActive(source: "macBecomeActive") }
             }
             .onReceive(
                 DistributedNotificationCenter.default().publisher(for: Notification.Name("com.apple.screenIsLocked"))
             ) { _ in
                 authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.screenLock")
-                isForegroundActive = false
+                appLockController.noteForegroundActive(false)
                 appLockController.lockNow(source: "screenLock")
             }
         #endif
@@ -86,15 +86,14 @@ struct AppLifecycleObserverModifier: ViewModifier {
 }
 
 extension View {
-    /// Observe the platform lifecycle and drive the cosmetic cover + `AppLockController`.
+    /// Observe the platform lifecycle and drive `AppLockController`'s
+    /// foreground-active / away / foreground state.
     func appLifecycleObserver(
-        appLockController: AppLockController,
-        isForegroundActive: Binding<Bool>
+        appLockController: AppLockController
     ) -> some View {
         modifier(
             AppLifecycleObserverModifier(
-                appLockController: appLockController,
-                isForegroundActive: isForegroundActive
+                appLockController: appLockController
             )
         )
     }

@@ -273,6 +273,67 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(spy.relockCount, 0)
     }
 
+    // MARK: - Foreground-active gate (R2: lock-surface auto-invoke while backgrounded)
+
+    /// `handleForegroundActive` while NOT foreground-active is a pure no-op: it must
+    /// neither authenticate nor consume the away epoch, so a later genuine foreground
+    /// still authenticates. This is the lock surface's `.task` firing as the surface
+    /// is inserted during a background lock transition.
+    func test_foregroundActive_whileNotForegroundActive_isNoOp() async {
+        let spy = Spy()
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let controller = makeController(spy: spy)
+
+        // Lock surface auto-invoke while the app is not foreground-active.
+        controller.noteForegroundActive(false)
+        await controller.handleForegroundActive(source: "lockSurface.appear")
+        XCTAssertEqual(controller.lockState, .locked, "A not-foreground-active foreground call must not unlock.")
+        XCTAssertEqual(spy.evaluateCount, 0, "No auth may be attempted while not foreground-active.")
+        XCTAssertEqual(spy.relockCount, 0)
+        XCTAssertEqual(spy.contentClearCount, 0)
+
+        // The genuine foreground return then drives auth (epoch was not consumed).
+        controller.noteForegroundActive(true)
+        await controller.handleForegroundActive(source: "scenePhase.active")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 1, "The genuine foreground-active return authenticates.")
+    }
+
+    /// Repro of the reported bug: at grace=0, after a normal unlock, the lock surface
+    /// is inserted during the `.background` lock transition and its `.task` fires
+    /// `handleForegroundActive` while backgrounded. That call must be a no-op so the
+    /// FIRST genuine return auto-authenticates (previously it was gated as spurious).
+    func test_graceZero_lockSurfaceTaskDuringBackground_thenGenuineReturnAutoAuths() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let controller = makeController(spy: spy)
+
+        // Normal in-app unlock (foreground-active by default).
+        spy.lastAuthenticationDate = Date()
+        await controller.handleForegroundActive(source: "unlock")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 1)
+
+        // Background (grace=0): observer sets not-foreground, then the away locks.
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "scenePhase.background")
+        await settle()
+        XCTAssertEqual(controller.lockState, .locked)
+
+        // The lock surface is inserted during the background transition; its `.task`
+        // fires while backgrounded — must be a no-op (epoch not consumed).
+        await controller.handleForegroundActive(source: "lockSurface.appear")
+        XCTAssertEqual(controller.lockState, .locked, "The backgrounded lock-surface auto-invoke must not consume the epoch.")
+        XCTAssertEqual(spy.evaluateCount, 1)
+
+        // FIRST genuine return → auth auto-starts (the regressed behavior).
+        controller.noteForegroundActive(true)
+        await controller.handleForegroundActive(source: "scenePhase.active")
+        XCTAssertEqual(controller.lockState, .unlocked, "The first genuine return after a normal unlock auto-authenticates.")
+        XCTAssertEqual(spy.evaluateCount, 2)
+    }
+
     // MARK: - Away events
 
     func test_awayEvent_intervalZero_locksAndRelocks() async {

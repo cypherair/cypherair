@@ -95,6 +95,19 @@ final class AppLockController {
     /// `retryUnlock`, which bypasses this gate.
     private var handledAwayGeneration: Int?
 
+    /// Whether the app is genuinely foreground-active. Owned here as the single
+    /// source of truth and updated by the lifecycle observer via
+    /// `noteForegroundActive(_:)`. The cosmetic cover reads this
+    /// (`isCovered = !isForegroundActive`).
+    ///
+    /// It also gates `handleForegroundActive`: the lock surface auto-invokes
+    /// authentication when it appears, but at grace=0 the surface is inserted
+    /// *during* the background lock transition. Without this guard that auto-invoke
+    /// would start an unlock while the app is hidden and consume the away epoch
+    /// (`handledAwayGeneration`), suppressing the genuine foreground return.
+    /// Defaults to `true` because a cold launch is foreground.
+    private(set) var isForegroundActive = true
+
     /// Generation of lock-state transitions, used by views/tests as an
     /// `@Observable` change signal independent of equal states.
     private(set) var transitionGeneration = 0
@@ -147,6 +160,24 @@ final class AppLockController {
     }
 
     // MARK: - Lifecycle entry points (called by the lifecycle observer)
+
+    /// Update the foreground-active signal from the lifecycle observer (the single
+    /// owner of the platform signal). Pure bookkeeping — it performs no lock logic.
+    /// The observer must set this `true` *before* calling `handleForegroundActive`
+    /// on a genuine foreground, and `false` on `.inactive` / `.background` / resign /
+    /// screen-lock, so the lock surface's auto-invoke during a background lock
+    /// transition is a no-op and the genuine foreground return drives auth.
+    func noteForegroundActive(_ active: Bool) {
+        guard isForegroundActive != active else {
+            return
+        }
+        isForegroundActive = active
+        traceStore?.record(
+            category: .lifecycle,
+            name: "lock.foregroundActiveChanged",
+            metadata: ["active": active ? "true" : "false", "state": stateName(lockState)]
+        )
+    }
 
     /// A genuine away event for this platform: iOS/iPadOS/visionOS
     /// `ScenePhase.background`; macOS app-resign ∪ screen-lock ∪ "Lock Now".
@@ -213,6 +244,20 @@ final class AppLockController {
             if isLocked {
                 setLockState(.unlocked, source: "bypass:\(source)")
             }
+            return
+        }
+
+        // Only a genuine foreground-active state drives an unlock. The lock surface
+        // auto-invokes this on appear, and at grace=0 the surface is inserted during
+        // the background lock transition — that call must be a pure no-op (no
+        // `handledAwayGeneration` marking, no `runUnlockFlow`) so the away epoch is
+        // not consumed and the genuine `.active` return drives auth.
+        guard isForegroundActive else {
+            traceStore?.record(
+                category: .lifecycle,
+                name: "lock.foreground.notForegroundActiveIgnored",
+                metadata: ["source": source, "state": stateName(lockState)]
+            )
             return
         }
 

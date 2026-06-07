@@ -14,7 +14,6 @@ struct CypherAirApp: App {
     // MARK: - Shared Dependencies
 
     @State private var container: AppContainer
-    @State private var isForegroundActive = true
 
     @State private var loadWarningCoordinator: AppLoadWarningCoordinator
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
@@ -415,15 +414,14 @@ struct CypherAirApp: App {
                     .task {
                         await prepareUITestContactsIfNeeded()
                     }
-                    .cosmeticPrivacyCover(isCovered: !isForegroundActive)
+                    .cosmeticPrivacyCover(isCovered: !container.appLockController.isForegroundActive)
                     .overlay {
                         if container.appLockController.isLocked {
                             AppLockSurfaceView(appLockController: container.appLockController)
                         }
                     }
                     .appLifecycleObserver(
-                        appLockController: container.appLockController,
-                        isForegroundActive: $isForegroundActive
+                        appLockController: container.appLockController
                     )
                     .environment(container.appLockController)
                     .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
@@ -625,7 +623,7 @@ struct CypherAirApp: App {
         LoadWarningPresentationState(
             isAppLocked: container.appLockController.isLocked,
             isAuthenticating: container.appLockController.isAuthenticating,
-            isLockCoverVisible: !isForegroundActive,
+            isLockCoverVisible: !container.appLockController.isForegroundActive,
             hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
             allowsPreAuthenticationPresentation: launchConfiguration.usesUITestAppContainer
                 && !launchConfiguration.requiresManualAuthentication
