@@ -246,6 +246,7 @@ $(SRCROOT)/Sources/Security/PrivateKeyRewrapWorkflow.swift
 $(SRCROOT)/Sources/Security/Mocks/MockAuthenticator.swift
 $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
+$(SRCROOT)/Sources/Security/ProtectedData/AppLockController.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift

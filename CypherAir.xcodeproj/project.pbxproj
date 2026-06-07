@@ -310,6 +310,7 @@
 				Security/PrivateKeyModeSwitchAuthenticator.swift,
 				Security/PrivateKeyRewrapRecoveryCoordinator.swift,
 				Security/PrivateKeyRewrapWorkflow.swift,
+				Security/ProtectedData/AppLockController.swift,
 				Security/ProtectedData/AppSessionOrchestrator.swift,
 				Security/ProtectedData/ContactsDomainSnapshotCodec.swift,
 				Security/ProtectedData/ContactsDomainStore.swift,
