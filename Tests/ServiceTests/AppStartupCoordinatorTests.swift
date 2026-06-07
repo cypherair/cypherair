@@ -237,18 +237,23 @@ final class AppStartupCoordinatorTests: XCTestCase {
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
-            shouldBypassPrivacyAuthentication: { false },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
+        )
+        let appLockController = CypherAir.AppLockController(
             gracePeriodProvider: {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
-            evaluateAppAuthentication: { reason in
+            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
+            evaluateAppSessionAuthentication: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
-                    reason: reason
+                    reason: reason,
+                    source: source
                 )
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authPromptCoordinator
+            recordSuccessfulAuthentication: { appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: $0) },
+            discardHandoffContext: { appSessionOrchestrator.discardAuthorizationHandoffContext(reason: $0) },
+            relockProtectedData: { await protectedDataSessionCoordinator.relockCurrentSession() }
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
@@ -350,11 +355,12 @@ final class AppStartupCoordinatorTests: XCTestCase {
             selfTestService: selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            appLockController: appLockController,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
         )
         let container = AppContainer(
             authLifecycleTraceStore: nil,
-            authenticationShieldCoordinator: CypherAir.AuthenticationShieldCoordinator(),
+            appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: mockSE,
             keychain: mockKC,

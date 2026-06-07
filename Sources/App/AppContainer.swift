@@ -3,7 +3,7 @@ import Foundation
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
-    let authenticationShieldCoordinator: AuthenticationShieldCoordinator
+    let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
@@ -40,7 +40,7 @@ final class AppContainer: @unchecked Sendable {
 
     init(
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
-        authenticationShieldCoordinator: AuthenticationShieldCoordinator,
+        appLockController: AppLockController,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
@@ -75,7 +75,7 @@ final class AppContainer: @unchecked Sendable {
         defaultsSuiteName: String? = nil
     ) {
         self.authLifecycleTraceStore = authLifecycleTraceStore
-        self.authenticationShieldCoordinator = authenticationShieldCoordinator
+        self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
         self.secureEnclave = secureEnclave
         self.keychain = keychain
@@ -122,7 +122,6 @@ final class AppContainer: @unchecked Sendable {
 
     private struct AuthenticationPromptStack {
         let authLifecycleTraceStore: AuthLifecycleTraceStore
-        let authenticationShieldCoordinator: AuthenticationShieldCoordinator
         let authPromptCoordinator: AuthenticationPromptCoordinator
     }
 
@@ -139,18 +138,11 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeAuthenticationPromptStack(authTraceEnabled: Bool) -> AuthenticationPromptStack {
         let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authenticationShieldCoordinator = AuthenticationShieldCoordinator(
-            traceStore: authLifecycleTraceStore
-        )
         let authPromptCoordinator = AuthenticationPromptCoordinator(
-            shieldEventHandler: makeShieldEventHandler(
-                coordinator: authenticationShieldCoordinator
-            ),
             traceStore: authLifecycleTraceStore
         )
         return AuthenticationPromptStack(
             authLifecycleTraceStore: authLifecycleTraceStore,
-            authenticationShieldCoordinator: authenticationShieldCoordinator,
             authPromptCoordinator: authPromptCoordinator
         )
     }
@@ -571,7 +563,6 @@ final class AppContainer: @unchecked Sendable {
     ) -> AppContainer {
         let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
         let authLifecycleTraceStore = authentication.authLifecycleTraceStore
-        let authenticationShieldCoordinator = authentication.authenticationShieldCoordinator
         let authPromptCoordinator = authentication.authPromptCoordinator
         let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
         let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
@@ -756,16 +747,29 @@ final class AppContainer: @unchecked Sendable {
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
-            shouldBypassPrivacyAuthentication: { false },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            traceStore: authLifecycleTraceStore
+        )
+        let appLockController = AppLockController(
             gracePeriodProvider: {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
-            evaluateAppAuthenticationWithSource: { reason, source in
+            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
+            evaluateAppSessionAuthentication: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason,
                     source: source
                 )
+            },
+            recordSuccessfulAuthentication: { context in
+                appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
+            },
+            discardHandoffContext: { reason in
+                appSessionOrchestrator.discardAuthorizationHandoffContext(reason: reason)
+            },
+            relockProtectedData: {
+                await protectedDataSessionCoordinator.relockCurrentSession()
             },
             postAuthenticationHandler: { authenticationContext, source in
                 do {
@@ -809,12 +813,13 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                appSessionOrchestrator.recordPostAuthenticationCompletion()
             },
             contentClearHandler: {
                 protectedOrdinarySettingsCoordinator.relock()
+                appSessionOrchestrator.requestContentClear()
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authPromptCoordinator,
+            shouldBypassAuthentication: { false },
             traceStore: authLifecycleTraceStore
         )
         let pgpServices = makePgpServiceGraph(
@@ -842,6 +847,7 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
@@ -853,7 +859,7 @@ final class AppContainer: @unchecked Sendable {
 
         return AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
-            authenticationShieldCoordinator: authenticationShieldCoordinator,
+            appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -897,7 +903,6 @@ final class AppContainer: @unchecked Sendable {
     ) -> AppContainer {
         let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
         let authLifecycleTraceStore = authentication.authLifecycleTraceStore
-        let authenticationShieldCoordinator = authentication.authenticationShieldCoordinator
         let authPromptCoordinator = authentication.authPromptCoordinator
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
@@ -1064,16 +1069,29 @@ final class AppContainer: @unchecked Sendable {
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
-            shouldBypassPrivacyAuthentication: { !requiresManualAuthentication },
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
+            traceStore: authLifecycleTraceStore
+        )
+        let appLockController = AppLockController(
             gracePeriodProvider: {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
-            evaluateAppAuthenticationWithSource: { reason, source in
+            lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
+            evaluateAppSessionAuthentication: { reason, source in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
                     reason: reason,
                     source: source
                 )
+            },
+            recordSuccessfulAuthentication: { context in
+                appSessionOrchestrator.recordSuccessfulAppSessionAuthentication(context: context)
+            },
+            discardHandoffContext: { reason in
+                appSessionOrchestrator.discardAuthorizationHandoffContext(reason: reason)
+            },
+            relockProtectedData: {
+                await protectedDataSessionCoordinator.relockCurrentSession()
             },
             postAuthenticationHandler: { authenticationContext, source in
                 do {
@@ -1119,12 +1137,13 @@ final class AppContainer: @unchecked Sendable {
                     config: config,
                     privateKeyControlStore: privateKeyControlStore
                 )
+                appSessionOrchestrator.recordPostAuthenticationCompletion()
             },
             contentClearHandler: {
                 protectedOrdinarySettingsCoordinator.relock()
+                appSessionOrchestrator.requestContentClear()
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authPromptCoordinator,
+            shouldBypassAuthentication: { !requiresManualAuthentication },
             traceStore: authLifecycleTraceStore
         )
         let pgpServices = makePgpServiceGraph(
@@ -1154,6 +1173,7 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
+            appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
@@ -1164,7 +1184,7 @@ final class AppContainer: @unchecked Sendable {
 
         let container = AppContainer(
             authLifecycleTraceStore: authLifecycleTraceStore,
-            authenticationShieldCoordinator: authenticationShieldCoordinator,
+            appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
             secureEnclave: secureEnclave,
             keychain: keychain,
@@ -1258,20 +1278,6 @@ final class AppContainer: @unchecked Sendable {
             waiter.resume(returning: availability)
         }
         return availability
-    }
-
-    private static func makeShieldEventHandler(
-        coordinator: AuthenticationShieldCoordinator
-    ) -> AuthenticationPromptCoordinator.ShieldEventHandler {
-        { kind, delta in
-            await MainActor.run {
-                if delta > 0 {
-                    coordinator.begin(kind)
-                } else {
-                    coordinator.end(kind)
-                }
-            }
-        }
     }
 
     private static func preloadUITestContact(

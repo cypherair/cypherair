@@ -122,7 +122,6 @@ private struct ModifyExpiryScreenHostView: View {
         } message: { err in
             Text(err.localizedDescription)
         }
-        .authenticationShieldHost()
         .onDisappear {
             model.handleDisappear()
         }

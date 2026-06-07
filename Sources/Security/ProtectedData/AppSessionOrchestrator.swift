@@ -1,91 +1,43 @@
 import Foundation
 import LocalAuthentication
 
+/// App-session authentication concerns for Protected App-Data (P1 of the
+/// auth-lifecycle redesign). The lock state machine — lock state, blur/cover,
+/// grace, away/foreground and the former settle/resume bookkeeping — now lives in
+/// `AppLockController`. This type keeps the app-session-authentication concerns it
+/// owned before:
+///
+/// - **Authenticated-`LAContext` handoff custody (D1).** It stores the context a
+///   successful app-session unlock produced and hands it to `CypherAirApp` exactly
+///   once to authorize Protected App-Data. `AppLockController` drives the unlock
+///   and calls `recordSuccessfulAppSessionAuthentication(context:)` on success; it
+///   discards the context (fail-closed) on every away/relock/failure path. The
+///   context is produced by app-session `evaluatePolicy` and is **never** routed
+///   into a private-key operation.
+/// - **`lastAuthenticationDate`** — the grace clock the controller reads.
+/// - **`contentClearGeneration`** — the relock signal App views observe (via
+///   `.onChange`) to clear decrypted content. `requestContentClear()` bumps it.
+/// - **Local Data Reset hook** and the **Protected App-Data access gate**.
 @Observable
 @MainActor
 final class AppSessionOrchestrator {
-    struct ResumeLifecycleResult: Equatable {
-        let attemptedAuthentication: Bool
-        let shouldArmAuthenticationSettle: Bool
-        let shouldStartFreshResume: Bool
-
-        static let noAuthentication = ResumeLifecycleResult(
-            attemptedAuthentication: false,
-            shouldArmAuthenticationSettle: false,
-            shouldStartFreshResume: false
-        )
-    }
-
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let currentRegistryProvider: () throws -> ProtectedDataRegistry
-    private let shouldBypassPrivacyAuthentication: () -> Bool
-    private let gracePeriodProvider: () -> Int?
-    private let evaluateAppAuthentication: (String, String) async throws -> AppSessionAuthenticationResult
-    private let postAuthenticationHandler: (LAContext?, String) async -> Void
-    private let contentClearHandler: () -> Void
-    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let protectedDataAccessGateClassifier: ProtectedDataAccessGateClassifier
     private let traceStore: AuthLifecycleTraceStore?
 
-    private var hasAppearedOnce = false
     private var pendingAuthenticatedContext: LAContext?
-    private var isAuthenticationSettleBlurActive = false
-    private var isSceneCurrentlyActive = true
-    private var resumeInvalidationGeneration: UInt64 = 0
-
-    var isPrivacyScreenBlurred = false
-    var isAuthenticating = false
-    var authFailed = false
-    private(set) var authenticationFailureReason: AppSessionAuthenticationFailureReason?
     private(set) var contentClearGeneration = 0
     private(set) var postAuthenticationGeneration = 0
     private(set) var lastAuthenticationDate: Date?
 
-    convenience init(
-        currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
-        shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
-        gracePeriodProvider: @escaping () -> Int?,
-        evaluateAppAuthentication: @escaping (String) async throws -> AppSessionAuthenticationResult,
-        postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
-        contentClearHandler: @escaping () -> Void = {},
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
-        traceStore: AuthLifecycleTraceStore? = nil
-    ) {
-        self.init(
-            currentRegistryProvider: currentRegistryProvider,
-            shouldBypassPrivacyAuthentication: shouldBypassPrivacyAuthentication,
-            gracePeriodProvider: gracePeriodProvider,
-            evaluateAppAuthenticationWithSource: { reason, _ in
-                try await evaluateAppAuthentication(reason)
-            },
-            postAuthenticationHandler: postAuthenticationHandler,
-            contentClearHandler: contentClearHandler,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            authenticationPromptCoordinator: authenticationPromptCoordinator,
-            traceStore: traceStore
-        )
-    }
-
     init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
-        shouldBypassPrivacyAuthentication: @escaping () -> Bool = { false },
-        gracePeriodProvider: @escaping () -> Int?,
-        evaluateAppAuthenticationWithSource: @escaping (String, String) async throws -> AppSessionAuthenticationResult,
-        postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
-        contentClearHandler: @escaping () -> Void = {},
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.currentRegistryProvider = currentRegistryProvider
-        self.shouldBypassPrivacyAuthentication = shouldBypassPrivacyAuthentication
-        self.gracePeriodProvider = gracePeriodProvider
-        self.evaluateAppAuthentication = evaluateAppAuthenticationWithSource
-        self.postAuthenticationHandler = postAuthenticationHandler
-        self.contentClearHandler = contentClearHandler
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
-        self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.protectedDataAccessGateClassifier = ProtectedDataAccessGateClassifier(
             currentRegistryProvider: currentRegistryProvider,
             frameworkStateProvider: {
@@ -95,8 +47,9 @@ final class AppSessionOrchestrator {
         self.traceStore = traceStore
     }
 
+    // MARK: - App-session authentication record
+
     func recordAuthentication() {
-        clearAuthenticationFailure()
         lastAuthenticationDate = Date()
         traceStore?.record(
             category: .session,
@@ -105,11 +58,33 @@ final class AppSessionOrchestrator {
         )
     }
 
+    /// Store the handoff context a successful app-session unlock produced and record
+    /// the authentication. Called by `AppLockController` on a successful unlock
+    /// (D1: the orchestrator stays the handoff-context custodian).
+    func recordSuccessfulAppSessionAuthentication(context: LAContext?) {
+        replacePendingAuthenticatedContext(with: context, reason: "unlockHandoff")
+        recordAuthentication()
+    }
+
+    /// Bump the post-authentication generation App views observe (via `.onChange`)
+    /// to refresh after the post-unlock domain-open fan-out completes. Called from
+    /// the controller's post-authentication handler.
+    func recordPostAuthenticationCompletion() {
+        postAuthenticationGeneration += 1
+        traceStore?.record(
+            category: .session,
+            name: "session.postAuthentication.complete",
+            metadata: ["generation": String(postAuthenticationGeneration)]
+        )
+    }
+
+    // MARK: - Content clear (the view-observed relock signal)
+
+    /// Discard the handoff context and bump the content-clear generation App views
+    /// observe to clear decrypted content on relock. The settings relock is
+    /// performed by the caller (the controller's content-clear closure).
     func requestContentClear() {
-        clearAuthenticationSettleBlur()
-        clearAuthenticationFailure()
         discardPendingAuthenticatedContext(reason: "contentClear")
-        contentClearHandler()
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -119,13 +94,8 @@ final class AppSessionOrchestrator {
     }
 
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
-        clearAuthenticationSettleBlur()
         discardPendingAuthenticatedContext(reason: "localDataReset")
         lastAuthenticationDate = preserveAuthentication ? Date() : nil
-        isAuthenticating = false
-        isPrivacyScreenBlurred = false
-        authFailed = false
-        clearAuthenticationFailure()
         contentClearGeneration += 1
         traceStore?.record(
             category: .session,
@@ -137,556 +107,20 @@ final class AppSessionOrchestrator {
         )
     }
 
-    var isOperationAuthenticationPromptInProgress: Bool {
-        authenticationPromptCoordinator.isOperationPromptInProgress
-    }
-
-    var operationAuthenticationAttemptGeneration: UInt64 {
-        authenticationPromptCoordinator.operationPromptAttemptGeneration
-    }
-
-    var operationAuthenticationPromptSnapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot {
-        authenticationPromptCoordinator.operationAuthenticationPromptSnapshot
-    }
-
-    /// True while ANY app-owned biometric prompt (privacy OR operation) is on
-    /// screen. Used to suppress the spurious app-session resume the prompt's own
-    /// `.inactive`/`.active` cycle would otherwise trigger.
-    var isAnyAuthenticationPromptInProgress: Bool {
-        authenticationPromptCoordinator.isAnyAuthenticationPromptInProgress
-    }
-
-    /// Union snapshot over both prompt channels, fed to the lifecycle gate so it
-    /// suppresses prompt-induced lifecycle cycles for privacy prompts too.
-    var anyAuthenticationPromptSnapshot: AuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot {
-        authenticationPromptCoordinator.anyAuthenticationPromptSnapshot
-    }
+    // MARK: - Authenticated-context handoff custody (D1)
 
     var hasProtectedDataAuthorizationHandoffContext: Bool {
         pendingAuthenticatedContext != nil
     }
 
     func discardProtectedDataAuthorizationHandoffContextForPolicyChange() {
-        discardPendingAuthenticatedContext(reason: "appAccessPolicyChange")
+        discardAuthorizationHandoffContext(reason: "appAccessPolicyChange")
     }
 
-    var isGracePeriodExpired: Bool {
-        guard let lastAuthenticationDate else {
-            return true
-        }
-        return Date().timeIntervalSince(lastAuthenticationDate) > TimeInterval(effectiveGracePeriod())
-    }
-
-    @discardableResult
-    func handleInitialAppearance(
-        localizedReason: String,
-        source: String = "initialAppearance"
-    ) async -> Bool {
-        await handleInitialAppearanceForLifecycle(
-            localizedReason: localizedReason,
-            source: source
-        ).attemptedAuthentication
-    }
-
-    @discardableResult
-    func handleInitialAppearanceForLifecycle(
-        localizedReason: String,
-        source: String = "initialAppearance"
-    ) async -> ResumeLifecycleResult {
-        traceStore?.record(
-            category: .session,
-            name: "session.handleInitialAppearance.enter",
-            metadata: ["source": source]
-        )
-        guard !hasAppearedOnce else {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "alreadyAppeared", "source": source]
-            )
-            return .noAuthentication
-        }
-        hasAppearedOnce = true
-
-        if shouldBypassPrivacyAuthentication() {
-            clearAuthenticationSettleBlur()
-            authFailed = false
-            clearAuthenticationFailure()
-            isPrivacyScreenBlurred = false
-            traceStore?.record(
-                category: .session,
-                name: "session.handleInitialAppearance.exit",
-                metadata: ["reason": "bypass", "source": source]
-            )
-            return .noAuthentication
-        }
-
-        clearAuthenticationSettleBlur()
-        clearAuthenticationFailure()
-        isPrivacyScreenBlurred = true
-        traceStore?.record(
-            category: .session,
-            name: "session.handleInitialAppearance.exit",
-            metadata: ["reason": "delegatedToResume", "source": source]
-        )
-        return await handleResumeForLifecycle(localizedReason: localizedReason, source: source)
-    }
-
-    func handleSceneDidBecomeActive(source: String = "sceneActive") {
-        isSceneCurrentlyActive = true
-        traceStore?.record(
-            category: .session,
-            name: "session.handleSceneDidBecomeActive",
-            metadata: [
-                "source": source,
-                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
-            ]
-        )
-    }
-
-    func handleSceneDidResignActive() {
-        guard !isAnyAuthenticationPromptInProgress else {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleSceneDidResignActive",
-                metadata: ["result": "ignoredForOperationPrompt"]
-            )
-            return
-        }
-        invalidateResumeCompletions(reason: "sceneResignActive")
-        clearAuthenticationSettleBlur()
-        discardPendingAuthenticatedContext(reason: "sceneResignActive")
-        clearAuthenticationFailure()
-        isPrivacyScreenBlurred = true
-        authFailed = false
-        traceStore?.record(
-            category: .session,
-            name: "session.handleSceneDidResignActive",
-            metadata: ["result": "handled"]
-        )
-    }
-
-    // Unlike `handleSceneDidResignActive`, this is intentionally NOT guarded by
-    // `isOperationAuthenticationPromptInProgress`. A system biometric sheet makes
-    // the app `.inactive`/resign-active transiently (which the resign guard must
-    // ignore), but it does not background the app. A real `.background` means the
-    // app genuinely left the foreground, so the handoff context is discarded and
-    // resume completions invalidated even mid-operation — real background wins.
-    func handleSceneDidEnterBackground() {
-        invalidateResumeCompletions(reason: "sceneBackground")
-        clearAuthenticationSettleBlur()
-        discardPendingAuthenticatedContext(reason: "sceneBackground")
-        clearAuthenticationFailure()
-        isPrivacyScreenBlurred = true
-        authFailed = false
-        traceStore?.record(
-            category: .session,
-            name: "session.handleSceneDidEnterBackground",
-            metadata: ["result": "handled"]
-        )
-    }
-
-    @discardableResult
-    func handleResume(
-        localizedReason: String,
-        source: String = "unspecified"
-    ) async -> Bool {
-        await handleResumeForLifecycle(
-            localizedReason: localizedReason,
-            source: source
-        ).attemptedAuthentication
-    }
-
-    @discardableResult
-    func handleResumeForLifecycle(
-        localizedReason: String,
-        source: String = "unspecified"
-    ) async -> ResumeLifecycleResult {
-        traceStore?.record(
-            category: .session,
-            name: "session.handleResume.enter",
-            metadata: [
-                "source": source,
-                "operationPrompt": isOperationAuthenticationPromptInProgress ? "true" : "false",
-                "isAuthenticating": isAuthenticating ? "true" : "false",
-                "hasLastAuthenticationDate": lastAuthenticationDate == nil ? "false" : "true",
-                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
-            ]
-        )
-        let resumeGeneration = resumeInvalidationGeneration
-        if shouldBypassPrivacyAuthentication() {
-            clearAuthenticationSettleBlur()
-            authFailed = false
-            clearAuthenticationFailure()
-            if isSceneCurrentlyActive {
-                isPrivacyScreenBlurred = false
-            }
-            traceStore?.record(
-                category: .session,
-                name: "session.handleResume.exit",
-                metadata: [
-                    "reason": isSceneCurrentlyActive ? "bypass" : "bypassInactive",
-                    "attemptedAuthentication": "false",
-                    "source": source
-                ]
-            )
-            return .noAuthentication
-        }
-
-        guard !isAnyAuthenticationPromptInProgress else {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleResume.exit",
-                metadata: ["reason": "operationPromptInProgress", "attemptedAuthentication": "false", "source": source]
-            )
-            return .noAuthentication
-        }
-
-        guard !isAuthenticating else {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleResume.exit",
-                metadata: ["reason": "alreadyAuthenticating", "attemptedAuthentication": "false", "source": source]
-            )
-            return .noAuthentication
-        }
-
-        let gracePeriod = effectiveGracePeriod()
-        let graceExpired = isGracePeriodExpired
-        if gracePeriod == 0 || graceExpired {
-            traceStore?.record(
-                category: .session,
-                name: "session.handleResume.reauthRequired",
-                metadata: [
-                    "gracePeriod": String(gracePeriod),
-                    "graceAvailable": gracePeriodProvider() == nil ? "false" : "true",
-                    "graceExpired": graceExpired ? "true" : "false",
-                    "source": source
-                ]
-            )
-            // Mark the resume in flight synchronously, BEFORE the first `await`
-            // (`relockCurrentSession()`) below. A second resume Task that arrives
-            // while this one is suspended in relock then observes
-            // `isAuthenticating == true` at the `guard` above and returns
-            // `.noAuthentication`, so it cannot start a duplicate prompt. Under
-            // `@MainActor` there is no suspension between the guard's read and this
-            // write, so the check-then-set is atomic. The co-located `defer`
-            // guarantees the flag is cleared on every exit of this branch.
-            isAuthenticating = true
-            defer { isAuthenticating = false }
-
-            requestContentClear()
-            await protectedDataSessionCoordinator.relockCurrentSession()
-
-            clearAuthenticationSettleBlur()
-            authFailed = false
-            clearAuthenticationFailure()
-            isPrivacyScreenBlurred = true
-
-            do {
-                traceHandleResumeStage(
-                    "session.handleResume.evaluate.start",
-                    source: source
-                )
-                let result = try await evaluateAppAuthentication(localizedReason, source)
-                traceHandleResumeStage(
-                    "session.handleResume.evaluate.finish",
-                    source: source,
-                    metadata: [
-                        "result": result.isAuthenticated ? "authenticated" : "failed",
-                        "hasContext": result.context == nil ? "false" : "true"
-                    ]
-                )
-                if result.isAuthenticated {
-                    replacePendingAuthenticatedContext(with: result.context, reason: "resumeAuthenticated")
-                    recordAuthentication()
-                    traceHandleResumeStage(
-                        "session.handleResume.postAuth.start",
-                        source: source,
-                        metadata: ["hasContext": result.context == nil ? "false" : "true"]
-                    )
-                    await postAuthenticationHandler(
-                        borrowAuthenticatedContextForMetadataMigration(),
-                        source
-                    )
-                    traceHandleResumeStage(
-                        "session.handleResume.postAuth.finish",
-                        source: source
-                    )
-                    recordPostAuthenticationCompletion(source: source)
-                    authFailed = false
-                    clearAuthenticationFailure()
-                    // A successful authentication is terminal: it is never re-run.
-                    // The privacy overlay is decided purely by the CURRENT scene
-                    // state, not by resume-generation staleness. If the scene is in
-                    // the foreground now, reveal the app — the user just
-                    // authenticated, so a background round-trip that already
-                    // resolved must not force a second prompt (the grace==0
-                    // duplicate-prompt fix). If the scene is still backgrounded,
-                    // keep the hard blur and discard the just-stored handoff
-                    // context so it cannot open protected data while backgrounded;
-                    // the next real resume re-evaluates grace (and re-locks under
-                    // "Immediately").
-                    if isSceneCurrentlyActive {
-                        clearAuthenticationSettleBlur()
-                        isPrivacyScreenBlurred = false
-                        traceStore?.record(
-                            category: .session,
-                            name: "session.handleResume.exit",
-                            metadata: [
-                                "reason": "authenticated",
-                                "attemptedAuthentication": "true",
-                                "source": source,
-                                "resumeGeneration": String(resumeGeneration),
-                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                                "sceneActive": "true"
-                            ]
-                        )
-                        return ResumeLifecycleResult(
-                            attemptedAuthentication: true,
-                            shouldArmAuthenticationSettle: true,
-                            shouldStartFreshResume: false
-                        )
-                    } else {
-                        discardPendingAuthenticatedContext(reason: "backgroundedSuccess")
-                        isPrivacyScreenBlurred = true
-                        traceStore?.record(
-                            category: .session,
-                            name: "session.handleResume.exit",
-                            metadata: [
-                                "reason": "backgroundedSuccess",
-                                "attemptedAuthentication": "true",
-                                "source": source,
-                                "resumeGeneration": String(resumeGeneration),
-                                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                                "sceneActive": "false"
-                            ]
-                        )
-                        return ResumeLifecycleResult(
-                            attemptedAuthentication: true,
-                            shouldArmAuthenticationSettle: false,
-                            shouldStartFreshResume: false
-                        )
-                    }
-                } else {
-                    discardPendingAuthenticatedContext(reason: "resumeReturnedFalse")
-                    let completion = currentResumeCompletion(
-                        resumeGeneration: resumeGeneration,
-                        source: source
-                    )
-                    if completion.isCurrent {
-                        clearAuthenticationSettleBlur()
-                    }
-                    authFailed = true
-                    setAuthenticationFailureReason(.authenticationFailed, source: source)
-                    traceStore?.record(
-                        category: .session,
-                        name: "session.handleResume.exit",
-                        metadata: [
-                            "reason": completion.isCurrent ? "authenticationReturnedFalse" : "staleAuthenticationReturnedFalse",
-                            "attemptedAuthentication": "true",
-                            "source": source,
-                            "resumeGeneration": String(resumeGeneration),
-                            "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                            "sceneActive": isSceneCurrentlyActive ? "true" : "false"
-                        ]
-                    )
-                    return ResumeLifecycleResult(
-                        attemptedAuthentication: true,
-                        shouldArmAuthenticationSettle: completion.isCurrent,
-                        shouldStartFreshResume: completion.shouldStartFreshResume
-                    )
-                }
-            } catch {
-                traceHandleResumeStage(
-                    "session.handleResume.evaluate.throw",
-                    source: source,
-                    metadata: AuthErrorTraceMetadata.errorMetadata(error)
-                )
-                discardPendingAuthenticatedContext(reason: "resumeThrew")
-                let completion = currentResumeCompletion(
-                    resumeGeneration: resumeGeneration,
-                    source: source
-                )
-                if completion.isCurrent {
-                    clearAuthenticationSettleBlur()
-                }
-                authFailed = true
-                let failureReason = authenticationFailureReason(for: error)
-                setAuthenticationFailureReason(failureReason, source: source)
-                traceStore?.record(
-                    category: .session,
-                    name: "session.handleResume.exit",
-                    metadata: [
-                        "reason": "authenticationThrew",
-                        "attemptedAuthentication": "true",
-                        "source": source,
-                        "errorType": String(describing: type(of: error)),
-                        "failureReason": failureReason.rawValue,
-                        "resumeGeneration": String(resumeGeneration),
-                        "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                        "sceneActive": isSceneCurrentlyActive ? "true" : "false"
-                    ]
-                )
-                return ResumeLifecycleResult(
-                    attemptedAuthentication: true,
-                    shouldArmAuthenticationSettle: completion.isCurrent,
-                    shouldStartFreshResume: completion.shouldStartFreshResume
-                )
-            }
-        } else {
-            clearAuthenticationSettleBlur()
-            authFailed = false
-            clearAuthenticationFailure()
-            if isSceneCurrentlyActive {
-                isPrivacyScreenBlurred = false
-            } else {
-                isPrivacyScreenBlurred = true
-            }
-            traceStore?.record(
-                category: .session,
-                name: "session.handleResume.exit",
-                metadata: [
-                    "reason": isSceneCurrentlyActive ? "graceValid" : "graceValidInactive",
-                    "attemptedAuthentication": "false",
-                    "source": source
-                ]
-            )
-            return .noAuthentication
-        }
-    }
-
-    private func traceHandleResumeStage(
-        _ name: String,
-        source: String,
-        metadata: [String: String] = [:]
-    ) {
-        var mergedMetadata = metadata
-        mergedMetadata["source"] = source
-        traceStore?.record(
-            category: .session,
-            name: name,
-            metadata: mergedMetadata
-        )
-    }
-
-    private func effectiveGracePeriod() -> Int {
-        gracePeriodProvider() ?? 0
-    }
-
-    private func invalidateResumeCompletions(reason: String) {
-        isSceneCurrentlyActive = false
-        resumeInvalidationGeneration += 1
-        traceStore?.record(
-            category: .session,
-            name: "session.resumeInvalidation",
-            metadata: [
-                "reason": reason,
-                "resumeInvalidationGeneration": String(resumeInvalidationGeneration)
-            ]
-        )
-    }
-
-    private func currentResumeCompletion(
-        resumeGeneration: UInt64,
-        source: String
-    ) -> (isCurrent: Bool, shouldStartFreshResume: Bool) {
-        let isCurrent = resumeGeneration == resumeInvalidationGeneration && isSceneCurrentlyActive
-        let shouldStartFreshResume = !isCurrent && isSceneCurrentlyActive
-        traceStore?.record(
-            category: .session,
-            name: "session.handleResume.completionGeneration",
-            metadata: [
-                "source": source,
-                "resumeGeneration": String(resumeGeneration),
-                "resumeInvalidationGeneration": String(resumeInvalidationGeneration),
-                "isCurrent": isCurrent ? "true" : "false",
-                "sceneActive": isSceneCurrentlyActive ? "true" : "false",
-                "shouldStartFreshResume": shouldStartFreshResume ? "true" : "false"
-            ]
-        )
-        return (isCurrent, shouldStartFreshResume)
-    }
-
-    func handleAuthenticationSettleInactive(source: String = "authenticationSettle") {
-        isAuthenticationSettleBlurActive = true
-        isPrivacyScreenBlurred = true
-        traceStore?.record(
-            category: .session,
-            name: "session.authenticationSettle.inactive",
-            metadata: [
-                "source": source,
-                "result": "blurred",
-                "authFailed": authFailed ? "true" : "false",
-                "isAuthenticating": isAuthenticating ? "true" : "false"
-            ]
-        )
-    }
-
-    func handleAuthenticationSettleActive(source: String = "authenticationSettle") {
-        guard isAuthenticationSettleBlurActive else {
-            traceStore?.record(
-                category: .session,
-                name: "session.authenticationSettle.active",
-                metadata: [
-                    "source": source,
-                    "result": "ignored",
-                    "authFailed": authFailed ? "true" : "false",
-                    "isAuthenticating": isAuthenticating ? "true" : "false"
-                ]
-            )
-            return
-        }
-
-        isAuthenticationSettleBlurActive = false
-        let result: String
-        if authFailed {
-            result = "keptForAuthFailure"
-        } else if isAuthenticating {
-            result = "keptForAuthentication"
-        } else {
-            isPrivacyScreenBlurred = false
-            result = "hidden"
-        }
-
-        traceStore?.record(
-            category: .session,
-            name: "session.authenticationSettle.active",
-            metadata: [
-                "source": source,
-                "result": result,
-                "authFailed": authFailed ? "true" : "false",
-                "isAuthenticating": isAuthenticating ? "true" : "false"
-            ]
-        )
-    }
-
-    private func clearAuthenticationSettleBlur() {
-        isAuthenticationSettleBlurActive = false
-    }
-
-    @discardableResult
-    func retryPrivacyUnlock(
-        localizedReason: String,
-        source: String = "retryButton"
-    ) async -> Bool {
-        await retryPrivacyUnlockForLifecycle(
-            localizedReason: localizedReason,
-            source: source
-        ).attemptedAuthentication
-    }
-
-    @discardableResult
-    func retryPrivacyUnlockForLifecycle(
-        localizedReason: String,
-        source: String = "retryButton"
-    ) async -> ResumeLifecycleResult {
-        traceStore?.record(
-            category: .session,
-            name: "session.retryPrivacyUnlock",
-            metadata: ["source": source]
-        )
-        return await handleResumeForLifecycle(localizedReason: localizedReason, source: source)
+    /// Discard the pending handoff context (fail-closed). Used by the controller's
+    /// away / relock / failure paths.
+    func discardAuthorizationHandoffContext(reason: String) {
+        discardPendingAuthenticatedContext(reason: reason)
     }
 
     func consumeAuthenticatedContextForProtectedData() -> LAContext? {
@@ -715,6 +149,8 @@ final class AppSessionOrchestrator {
         return pendingAuthenticatedContext
     }
 
+    // MARK: - Protected App-Data access gate
+
     func evaluateProtectedDataAccessGate(
         startupBootstrapOutcome: ProtectedDataBootstrapOutcome,
         isFirstProtectedAccessInCurrentProcess: Bool
@@ -724,6 +160,8 @@ final class AppSessionOrchestrator {
             isFirstProtectedAccessInCurrentProcess: isFirstProtectedAccessInCurrentProcess
         )
     }
+
+    // MARK: - Private helpers
 
     private func replacePendingAuthenticatedContext(with context: LAContext?, reason: String) {
         let hadExistingContext = pendingAuthenticatedContext != nil
@@ -738,68 +176,6 @@ final class AppSessionOrchestrator {
                 "replacedExisting": hadExistingContext ? "true" : "false"
             ]
         )
-    }
-
-    private func recordPostAuthenticationCompletion(source: String) {
-        postAuthenticationGeneration += 1
-        traceStore?.record(
-            category: .session,
-            name: "session.postAuthentication.complete",
-            metadata: [
-                "generation": String(postAuthenticationGeneration),
-                "source": source
-            ]
-        )
-    }
-
-    private func setAuthenticationFailureReason(
-        _ reason: AppSessionAuthenticationFailureReason,
-        source: String
-    ) {
-        authenticationFailureReason = reason
-        traceStore?.record(
-            category: .session,
-            name: "session.authenticationFailure.reason",
-            metadata: [
-                "reason": reason.rawValue,
-                "source": source
-            ]
-        )
-    }
-
-    private func clearAuthenticationFailure() {
-        guard authenticationFailureReason != nil else {
-            return
-        }
-        authenticationFailureReason = nil
-        traceStore?.record(
-            category: .session,
-            name: "session.authenticationFailure.clear"
-        )
-    }
-
-    private func authenticationFailureReason(for error: Error) -> AppSessionAuthenticationFailureReason {
-        if let authenticationError = error as? AuthenticationError {
-            switch authenticationError {
-            case .appAccessBiometricsLockedOut:
-                return .biometricsLockedOut
-            case .biometricsUnavailable,
-                 .appAccessBiometricsUnavailable,
-                 .cancelled,
-                 .failed,
-                 .accessControlCreationFailed,
-                 .modeSwitchFailed,
-                 .noIdentities,
-                 .backupRequired:
-                return .authenticationFailed
-            }
-        }
-
-        if let laError = error as? LAError, laError.code == .biometryLockout {
-            return .biometricsLockedOut
-        }
-
-        return .authenticationFailed
     }
 
     private func discardPendingAuthenticatedContext(reason: String) {

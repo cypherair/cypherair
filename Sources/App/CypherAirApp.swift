@@ -14,6 +14,7 @@ struct CypherAirApp: App {
     // MARK: - Shared Dependencies
 
     @State private var container: AppContainer
+    @State private var isForegroundActive = true
 
     @State private var loadWarningCoordinator: AppLoadWarningCoordinator
     @State private var startupSnapshot: AppStartupCoordinator.AppStartupBootstrapSnapshot
@@ -359,19 +360,8 @@ struct CypherAirApp: App {
                 .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
                 .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
                 .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
-                .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
+                .environment(container.appLockController)
                 .environment(tutorialStore)
-                // The shared authentication shield coordinator is lifecycle-driven
-                // by the main window's host (see `mainWindowSceneContent`). On
-                // macOS, `NSApplication` active/resign notifications are app-wide,
-                // so handling them here too would deliver every transition to the
-                // same coordinator twice. This Settings scene still renders the
-                // overlay from the shared @Observable coordinator, but must not be
-                // a second lifecycle driver.
-                .authenticationShieldHost(
-                    container.authenticationShieldCoordinator,
-                    handlesLifecycleEvents: false
-                )
             }
         }
         #endif
@@ -425,7 +415,17 @@ struct CypherAirApp: App {
                     .task {
                         await prepareUITestContactsIfNeeded()
                     }
-                    .privacyScreen()
+                    .cosmeticPrivacyCover(isCovered: !isForegroundActive)
+                    .overlay {
+                        if container.appLockController.isLocked {
+                            AppLockSurfaceView(appLockController: container.appLockController)
+                        }
+                    }
+                    .appLifecycleObserver(
+                        appLockController: container.appLockController,
+                        isForegroundActive: $isForegroundActive
+                    )
+                    .environment(container.appLockController)
                     .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                     .environment(container.config)
                     .environment(container.protectedOrdinarySettingsCoordinator)
@@ -497,11 +497,6 @@ struct CypherAirApp: App {
             container.config.clearPostUnlockRecoveryLoadWarning()
             presentPendingLoadWarningIfPossible(source: "postUnlockRecovery")
         }
-        .environment(\.authenticationShieldCoordinator, container.authenticationShieldCoordinator)
-        .authenticationShieldHost(
-            container.authenticationShieldCoordinator,
-            handlesLifecycleEvents: true
-        )
         .onOpenURL { url in
             incomingURLRouter.handle(url)
         }
@@ -628,9 +623,9 @@ struct CypherAirApp: App {
 
     private var loadWarningPresentationState: LoadWarningPresentationState {
         LoadWarningPresentationState(
-            isShieldVisible: container.authenticationShieldCoordinator.isVisible,
-            isAuthenticating: container.appSessionOrchestrator.isAuthenticating,
-            isPrivacyScreenBlurred: container.appSessionOrchestrator.isPrivacyScreenBlurred,
+            isAppLocked: container.appLockController.isLocked,
+            isAuthenticating: container.appLockController.isAuthenticating,
+            isLockCoverVisible: !isForegroundActive,
             hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
             allowsPreAuthenticationPresentation: launchConfiguration.usesUITestAppContainer
                 && !launchConfiguration.requiresManualAuthentication

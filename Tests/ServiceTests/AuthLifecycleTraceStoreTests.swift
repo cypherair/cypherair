@@ -13,7 +13,6 @@ private typealias TraceAppSessionOrchestrator = CypherAir.AppSessionOrchestrator
 private typealias TraceAuthenticationPromptCoordinator = CypherAir.AuthenticationPromptCoordinator
 private typealias TraceAuthLifecycleTraceStore = CypherAir.AuthLifecycleTraceStore
 private typealias TraceProtectedDataError = CypherAir.ProtectedDataError
-private typealias TracePrivacyScreenLifecycleGate = CypherAir.PrivacyScreenLifecycleGate
 private typealias TraceAuthenticationManager = CypherAir.AuthenticationManager
 
 private final class TraceLineSink: @unchecked Sendable {
@@ -141,13 +140,6 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
-    }
-
-    private func settleShieldDismissal() async {
-        for _ in 0..<5 {
-            await Task.yield()
-        }
-        try? await Task.sleep(nanoseconds: 10_000_000)
     }
 
     private func makeIsolatedDefaults() -> (UserDefaults, String) {
@@ -366,54 +358,54 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
     func test_loadWarningPresentationGate_defersWhileAuthenticationPresentationIsActive() {
         XCTAssertTrue(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: false,
+                isAppLocked:false,
                 isAuthenticating: false,
-                isPrivacyScreenBlurred: false,
+                isLockCoverVisible:false,
                 hasAuthenticatedSession: true,
                 allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: true,
+                isAppLocked:true,
                 isAuthenticating: false,
-                isPrivacyScreenBlurred: false,
+                isLockCoverVisible:false,
                 hasAuthenticatedSession: true,
                 allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: false,
+                isAppLocked:false,
                 isAuthenticating: true,
-                isPrivacyScreenBlurred: false,
+                isLockCoverVisible:false,
                 hasAuthenticatedSession: true,
                 allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: false,
+                isAppLocked:false,
                 isAuthenticating: false,
-                isPrivacyScreenBlurred: true,
+                isLockCoverVisible:true,
                 hasAuthenticatedSession: true,
                 allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertFalse(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: false,
+                isAppLocked:false,
                 isAuthenticating: false,
-                isPrivacyScreenBlurred: false,
+                isLockCoverVisible:false,
                 hasAuthenticatedSession: false,
                 allowsPreAuthenticationPresentation: false
             )
         ))
         XCTAssertTrue(LoadWarningPresentationGate.canPresent(
             LoadWarningPresentationState(
-                isShieldVisible: false,
+                isAppLocked:false,
                 isAuthenticating: false,
-                isPrivacyScreenBlurred: false,
+                isLockCoverVisible:false,
                 hasAuthenticatedSession: false,
                 allowsPreAuthenticationPresentation: true
             )
@@ -508,9 +500,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 "prompt.operation.operation.await.start",
                 "prompt.operation.operation.await.finish",
                 "prompt.operation.endDepth.start",
-                "prompt.operation.endDepth.finish",
-                "prompt.operation.shieldEnd.start",
-                "prompt.operation.shieldEnd.finish"
+                "prompt.operation.endDepth.finish"
             ]
         )
 
@@ -546,9 +536,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 "prompt.operation.operation.await.start",
                 "prompt.operation.operation.await.throw",
                 "prompt.operation.endDepth.start",
-                "prompt.operation.endDepth.finish",
-                "prompt.operation.shieldEnd.start",
-                "prompt.operation.shieldEnd.finish"
+                "prompt.operation.endDepth.finish"
             ]
         )
 
@@ -580,9 +568,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 "prompt.privacy.operation.await.start",
                 "prompt.privacy.operation.await.finish",
                 "prompt.privacy.endDepth.start",
-                "prompt.privacy.endDepth.finish",
-                "prompt.privacy.shieldEnd.start",
-                "prompt.privacy.shieldEnd.finish"
+                "prompt.privacy.endDepth.finish"
             ]
         )
 
@@ -618,9 +604,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
                 "prompt.privacy.operation.await.start",
                 "prompt.privacy.operation.await.throw",
                 "prompt.privacy.endDepth.start",
-                "prompt.privacy.endDepth.finish",
-                "prompt.privacy.shieldEnd.start",
-                "prompt.privacy.shieldEnd.finish"
+                "prompt.privacy.endDepth.finish"
             ]
         )
 
@@ -737,95 +721,6 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertFalse(metadataKeys.contains("fingerprint"))
         XCTAssertFalse(metadataKeys.contains("privateKey"))
         XCTAssertFalse(metadataValues.contains(fixture.fingerprint))
-    }
-
-    func test_authenticationShieldCoordinator_recordsShieldTraceEventsIntoStoreAndSink() async {
-        let sink = TraceLineSink()
-        let store = TraceAuthLifecycleTraceStore(
-            isEnabled: true,
-            sink: { sink.append($0) }
-        )
-        let coordinator = CypherAir.AuthenticationShieldCoordinator(traceStore: store)
-
-        coordinator.begin(.operation)
-        coordinator.end(.operation)
-        await settleShieldDismissal()
-
-        let names = store.recentEntries.map(\.name)
-        XCTAssertTrue(names.contains("shield.begin"))
-        XCTAssertTrue(names.contains("shield.pendingDismissal.start"))
-        XCTAssertTrue(names.contains("shield.dismissal.complete"))
-
-        let lines = sink.snapshot()
-        XCTAssertTrue(lines.contains(where: { $0.contains("shield.begin") }))
-        XCTAssertTrue(lines.contains(where: { $0.contains("shield.dismissal.complete") }))
-    }
-
-    func test_authenticationShieldCoordinator_disabledTraceStoreDoesNotRecordShieldEvents() async {
-        let sink = TraceLineSink()
-        let store = TraceAuthLifecycleTraceStore(
-            isEnabled: false,
-            sink: { sink.append($0) }
-        )
-        let coordinator = CypherAir.AuthenticationShieldCoordinator(traceStore: store)
-
-        coordinator.begin(.privacy)
-        coordinator.end(.privacy)
-        await settleShieldDismissal()
-
-        XCTAssertTrue(store.recentEntries.isEmpty)
-        XCTAssertTrue(sink.snapshot().isEmpty)
-    }
-
-    func test_appSessionOrchestrator_recordsHandleResumeAndContentClearEvents() async {
-        let storageRoot = TraceProtectedDataStorageRoot(
-            baseDirectory: makeTemporaryDirectory("TraceStoreResume")
-        )
-        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
-
-        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        let authPromptCoordinator = TraceAuthenticationPromptCoordinator(traceStore: traceStore)
-        let coordinator = TraceProtectedDataSessionCoordinator(
-            rootSecretStore: CypherAir.MockProtectedDataRootSecretStore(),
-            legacyRightStoreClient: TraceTestRightStoreClient(),
-            domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot),
-            sharedRightIdentifier: "com.cypherair.tests.trace.resume",
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: traceStore
-        )
-        let orchestrator = TraceAppSessionOrchestrator(
-            currentRegistryProvider: {
-                throw TraceProtectedDataError.invalidRegistry("Not used in this trace test")
-            },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 0 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
-            protectedDataSessionCoordinator: coordinator,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: traceStore
-        )
-
-        let attemptedAuthentication = await orchestrator.handleResume(
-            localizedReason: "Trace handleResume"
-        )
-
-        XCTAssertTrue(attemptedAuthentication)
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.handleResume.enter" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.requestContentClear" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.pendingContext.discard" && $0.metadata["reason"] == "contentClear" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.pendingContext.store" && $0.metadata["reason"] == "resumeAuthenticated" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.recordAuthentication" }))
-        XCTAssertTrue(traceStore.recentEntries.contains(where: { $0.name == "session.handleResume.exit" }))
-        assertTraceNames(
-            traceStore.recentEntries.map(\.name),
-            containOrdered: [
-                "session.handleResume.evaluate.start",
-                "session.handleResume.evaluate.finish",
-                "session.handleResume.postAuth.start",
-                "session.handleResume.postAuth.finish",
-                "session.handleResume.exit"
-            ]
-        )
     }
 
     func test_authenticationManager_evaluateAppSessionIgnoresBypassKeyByDefault() async throws {
@@ -1386,48 +1281,4 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         )
     }
 
-    func test_privacyScreenLifecycleGate_recordsDecisionTagsWithoutChangingBehavior() {
-        let traceStore = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        let promptEndedAt = Date(timeIntervalSinceReferenceDate: 8_000)
-        var gate = TracePrivacyScreenLifecycleGate(
-            traceStore: traceStore,
-            now: { promptEndedAt.addingTimeInterval(0.1) }
-        )
-        let activePrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
-            generation: 1,
-            depth: 1,
-            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
-            lastEndedAt: nil
-        )
-        let endedPrompt = TraceAuthenticationPromptCoordinator.OperationAuthenticationPromptSnapshot(
-            generation: 1,
-            depth: 0,
-            lastBeganAt: promptEndedAt.addingTimeInterval(-1),
-            lastEndedAt: promptEndedAt
-        )
-
-        XCTAssertEqual(
-            gate.shouldHandleInactive(isAuthenticating: false, operationPrompt: activePrompt),
-            .suppress
-        )
-        XCTAssertEqual(
-            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
-            .suppress
-        )
-        XCTAssertEqual(
-            gate.shouldHandleBecomeActive(isAuthenticating: false, operationPrompt: endedPrompt),
-            .handle
-        )
-
-        let names = traceStore.recentEntries.map(\.name)
-        XCTAssertTrue(names.contains("gate.inactive"))
-        XCTAssertTrue(names.contains("gate.active"))
-        XCTAssertTrue(
-            traceStore.recentEntries.contains {
-                $0.name == "gate.inactive"
-                    && $0.metadata["decision"] == "suppressed"
-                    && $0.metadata["suppressionScope"] == "operationPromptActive"
-            }
-        )
-    }
 }
