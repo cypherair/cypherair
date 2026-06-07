@@ -21,6 +21,15 @@ final class AppLockControllerTests: XCTestCase {
         /// Invoked (on the main actor) the moment the auth stub suspends.
         var onAuthSuspended: (() -> Void)?
 
+        /// When true, the post-auth handler suspends until `resumePostAuth()` is called.
+        var pausePostAuth = false
+        var postAuthContinuation: CheckedContinuation<Void, Never>?
+        /// Invoked (on the main actor) the moment the post-auth handler suspends.
+        var onPostAuthSuspended: (() -> Void)?
+
+        /// Ordered log of the controller's fail-closed steps, for ordering assertions.
+        private(set) var operationLog: [String] = []
+
         private(set) var evaluateCount = 0
         private(set) var evaluateReasons: [String] = []
         private(set) var recordedContexts: [LAContext?] = []
@@ -33,6 +42,7 @@ final class AppLockControllerTests: XCTestCase {
         func evaluate(reason: String) async throws -> AppSessionAuthenticationResult {
             evaluateCount += 1
             evaluateReasons.append(reason)
+            operationLog.append("evaluate")
             if pauseAuth {
                 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                     authContinuation = continuation
@@ -48,14 +58,35 @@ final class AppLockControllerTests: XCTestCase {
             continuation?.resume()
         }
 
-        func recordSuccessful(_ context: LAContext?) { recordedContexts.append(context) }
+        func recordSuccessful(_ context: LAContext?) {
+            recordedContexts.append(context)
+            operationLog.append("record")
+        }
         func discard(_ reason: String) { discardReasons.append(reason) }
-        func relock() async { relockCount += 1 }
+        func relock() async {
+            relockCount += 1
+            operationLog.append("relock")
+        }
         func postAuth(_ context: LAContext?, _ source: String) async {
             postAuthCount += 1
             postAuthContexts.append(context)
+            operationLog.append("postAuth")
+            if pausePostAuth {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    postAuthContinuation = continuation
+                    onPostAuthSuspended?()
+                }
+            }
         }
-        func contentClear() { contentClearCount += 1 }
+        func resumePostAuth() {
+            let continuation = postAuthContinuation
+            postAuthContinuation = nil
+            continuation?.resume()
+        }
+        func contentClear() {
+            contentClearCount += 1
+            operationLog.append("contentClear")
+        }
     }
 
     private func makeController(spy: Spy) -> AppLockController {
@@ -107,6 +138,11 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertTrue(spy.recordedContexts.first.flatMap { $0 } === context)
         XCTAssertEqual(spy.postAuthCount, 1)
         XCTAssertTrue(spy.postAuthContexts.first.flatMap { $0 } === context)
+        XCTAssertEqual(
+            spy.operationLog,
+            ["contentClear", "relock", "evaluate", "record", "postAuth"],
+            "Fail-closed ordering: relock before the prompt; post-auth after the context is recorded."
+        )
     }
 
     func test_foregroundActive_authReturnsFalse_entersAuthenticationFailed() async {
@@ -197,8 +233,12 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive(source: "first")
         XCTAssertEqual(spy.evaluateCount, 1)
 
-        // Last auth is well past the grace window.
+        // Last auth is well past the grace window, and a genuine away (non-zero interval
+        // → deferred, stays unlocked) precedes the resume — re-auth requires a genuine
+        // resume, not a spurious `.active`.
         spy.lastAuthenticationDate = Date(timeIntervalSinceNow: -600)
+        controller.handleAwayEvent(source: "background")
+        await settle()
         await controller.handleForegroundActive(source: "graceExpired")
         XCTAssertEqual(spy.evaluateCount, 2)
     }
@@ -212,7 +252,11 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive(source: "first")
         XCTAssertEqual(controller.lockState, .unlocked)
 
-        // nil grace → 0 → any foreground round-trip re-authenticates.
+        // nil grace → 0 → a genuine away locks immediately, and the next resume
+        // re-authenticates (nil treated as Immediately).
+        controller.handleAwayEvent(source: "background")
+        await settle()
+        XCTAssertEqual(controller.lockState, .locked)
         await controller.handleForegroundActive(source: "again")
         XCTAssertEqual(spy.evaluateCount, 2)
     }
@@ -355,6 +399,93 @@ final class AppLockControllerTests: XCTestCase {
 
         XCTAssertEqual(controller.lockState, .locked, "A lock during auth wins; the unlock result is discarded.")
         XCTAssertEqual(spy.recordedContexts.count, 0, "No context is handed off for an invalidated unlock.")
+    }
+
+    func test_lockDuringPostAuth_relocksAndStaysLocked_realBackgroundWins() async {
+        let spy = Spy()
+        spy.gracePeriod = 180
+        spy.pausePostAuth = true
+        spy.authOutcome = .success(.authenticated(context: LAContext()))
+        let controller = makeController(spy: spy)
+        let suspended = expectation(description: "postAuth suspended")
+        spy.onPostAuthSuspended = { suspended.fulfill() }
+
+        async let unlock: Void = controller.handleForegroundActive(source: "unlock")
+        await fulfillment(of: [suspended], timeout: 2)
+
+        // lockNow is platform-agnostic (NOT subject to the macOS in-flight guard that
+        // swallows handleAwayEvent during controller-driven auth), so it actually
+        // invalidates the in-flight attempt on macOS where unit tests run — exercising
+        // "an away during the post-auth fan-out → discard + REAL relock."
+        controller.lockNow(source: "lockDuringPostAuth")
+        await settle()                                   // lockNow's enterLocked relocks + sets .locked
+        let relocksAfterLockNow = spy.relockCount
+        XCTAssertEqual(controller.lockState, .locked)
+
+        spy.resumePostAuth()
+        await unlock
+
+        XCTAssertEqual(controller.lockState, .locked, "Stays locked; the unlock result is discarded.")
+        XCTAssertGreaterThan(
+            spy.relockCount,
+            relocksAfterLockNow,
+            "The stale post-auth path must perform its OWN real relock — post-auth reopened Protected App-Data."
+        )
+    }
+
+    // MARK: - Spurious-foreground / duplicate-prompt loop regression (R1)
+
+    func test_graceZero_spuriousForegroundDoesNotReauth_noLoop() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        spy.authOutcome = .success(.authenticated(context: nil))
+        let controller = makeController(spy: spy)
+
+        await controller.handleForegroundActive(source: "cold")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 1)
+
+        // The biometric sheet's own dismissal (and Control Center / app-switcher peek /
+        // banner) deliver spurious `.active`s with no genuine `.background`. At grace=0
+        // these MUST NOT re-authenticate — that was the infinite Face ID loop.
+        for _ in 0..<6 {
+            await controller.handleForegroundActive(source: "scenePhase.active#spurious")
+        }
+        XCTAssertEqual(spy.evaluateCount, 1, "Spurious .active must not re-auth at grace=0 (no loop).")
+        XCTAssertEqual(controller.lockState, .unlocked)
+
+        // A genuine away at grace=0 locks; the next foreground is exactly one fresh prompt.
+        controller.handleAwayEvent(source: "scenePhase.background")
+        await settle()
+        XCTAssertEqual(controller.lockState, .locked)
+        await controller.handleForegroundActive(source: "scenePhase.active#genuineReturn")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 2, "Exactly one auth per genuine return.")
+    }
+
+    func test_authenticationFailed_spuriousForegroundDoesNotAutoRetry() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        spy.authOutcome = .success(.failed)
+        let controller = makeController(spy: spy)
+
+        await controller.handleForegroundActive(source: "cold")
+        XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
+        XCTAssertEqual(spy.evaluateCount, 1)
+
+        // A cancelled/failed auth must leave the retry affordance visible; the just-
+        // dismissed failed sheet's `.active` must NOT auto-retry (the cancel→reprompt loop).
+        for _ in 0..<5 {
+            await controller.handleForegroundActive(source: "scenePhase.active#postCancel")
+        }
+        XCTAssertEqual(spy.evaluateCount, 1, "A spurious .active after a failed/cancelled auth must not auto-retry.")
+        XCTAssertEqual(controller.authenticationFailure, .authenticationFailed)
+
+        // The explicit retry button still works (it bypasses the spurious-foreground gate).
+        spy.authOutcome = .success(.authenticated(context: nil))
+        await controller.retryUnlock(source: "retryButton")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 2)
     }
 
     // MARK: - Local Data Reset

@@ -85,6 +85,16 @@ final class AppLockController {
     /// discarded and not handed off ("real background wins").
     private var awayGeneration = 0
 
+    /// The away epoch (`awayGeneration`) the controller has already responded to with a
+    /// foreground decision (authenticated, stayed unlocked within grace, or is awaiting
+    /// an explicit retry after a failure). A foreground whose `awayGeneration` still
+    /// matches this is a spurious `.active` — the biometric sheet's own dismissal,
+    /// Control Center, an app-switcher peek, a banner — and must NOT re-trigger auth.
+    /// This closes both the grace=0 unlock loop and the cancelled/failed-state re-prompt
+    /// loop. `nil` = no epoch handled yet (cold launch). The explicit retry button uses
+    /// `retryUnlock`, which bypasses this gate.
+    private var handledAwayGeneration: Int?
+
     /// Generation of lock-state transitions, used by views/tests as an
     /// `@Observable` change signal independent of equal states.
     private(set) var transitionGeneration = 0
@@ -213,12 +223,33 @@ final class AppLockController {
             return
         }
 
+        // Spurious-foreground gate: a foreground whose away epoch we have already
+        // responded to (authenticated, stayed unlocked within grace, or are awaiting an
+        // explicit retry after a failure) is a non-away `.active` — the biometric
+        // sheet's own dismissal, Control Center, an app-switcher peek, a banner. It must
+        // NOT re-trigger auth. This closes the grace=0 unlock loop AND the
+        // cancelled/failed-state re-prompt loop. Only a new genuine away (which bumps
+        // `awayGeneration`) warrants a fresh response; the explicit retry button uses
+        // `retryUnlock`, which bypasses this.
+        if let handled = handledAwayGeneration, handled == awayGeneration {
+            traceStore?.record(
+                category: .lifecycle,
+                name: "lock.foreground.spuriousIgnored",
+                metadata: ["source": source, "state": stateName(lockState)]
+            )
+            return
+        }
+
         switch lockState {
         case .unlocked:
             // Within the grace window a foreground round-trip stays unlocked (no
             // re-auth, content preserved) — "cover ≠ lock". Past it, re-authenticate.
             if isGracePeriodExpired {
                 await runUnlockFlow(source: "graceExpired:\(source)")
+            } else {
+                // Genuine away, but within grace → stay unlocked and mark this epoch
+                // handled so a later spurious `.active` is a no-op.
+                handledAwayGeneration = awayGeneration
             }
         case .locked, .authenticationFailed:
             await runUnlockFlow(source: source)
@@ -247,7 +278,14 @@ final class AppLockController {
         awayGeneration &+= 1
         isDrivingAppSessionAuth = false
         discardHandoffContext("localDataReset")
-        setLockState(preserveAuthentication ? .unlocked : .locked, source: "localDataReset")
+        if preserveAuthentication {
+            // Stay unlocked and mark this epoch handled so a post-reset spurious
+            // `.active` is a no-op.
+            handledAwayGeneration = awayGeneration
+            setLockState(.unlocked, source: "localDataReset")
+        } else {
+            setLockState(.locked, source: "localDataReset")
+        }
     }
 
     // MARK: - Unlock flow
@@ -258,6 +296,12 @@ final class AppLockController {
         // guard and cannot start a duplicate prompt.
         isDrivingAppSessionAuth = true
         let attemptAwayGeneration = awayGeneration
+        // Mark this away epoch as being handled by a foreground response. Setting it
+        // here (not only on success) means a failed/cancelled attempt also marks the
+        // epoch, so the dismissal `.active` does not auto-retry; an attempt later
+        // invalidated by a genuine away leaves `handledAwayGeneration != awayGeneration`,
+        // so the next foreground correctly re-authenticates.
+        handledAwayGeneration = attemptAwayGeneration
         setLockState(.authenticating, source: "unlock.begin:\(source)")
         defer { isDrivingAppSessionAuth = false }
 
@@ -288,6 +332,11 @@ final class AppLockController {
             // self-induced resign is suppressed above, so this only fires for a real
             // iOS `.background`.
             guard attemptAwayGeneration == awayGeneration else {
+                // The freshly produced context was never handed to the orchestrator
+                // (recordSuccessfulAuthentication is skipped on this path), so invalidate
+                // it here. Nothing reopened Protected App-Data before this point (the
+                // top-of-flow relock still holds), so a state-only `.locked` is fail-closed.
+                result.context?.invalidate()
                 discardHandoffContext("staleUnlock")
                 if !isLockedState {
                     setLockState(.locked, source: "unlock.stale:\(source)")
@@ -298,6 +347,20 @@ final class AppLockController {
             if result.isAuthenticated {
                 recordSuccessfulAuthentication(result.context)
                 await postAuthenticationHandler(result.context, source)
+                // A genuine away during the post-auth fan-out: postAuthenticationHandler
+                // has already REOPENED Protected App-Data, so fail closed for real —
+                // relock, not just a UI state flip ("real background wins"). enterLocked
+                // discards the handoff, clears content, awaits the real relock, and
+                // settles `.locked`.
+                guard attemptAwayGeneration == awayGeneration else {
+                    traceStore?.record(
+                        category: .lifecycle,
+                        name: "lock.unlock.stalePostAuth",
+                        metadata: ["source": source]
+                    )
+                    await enterLocked(source: "stalePostAuth:\(source)")
+                    return
+                }
                 setLockState(.unlocked, source: "unlock.success:\(source)")
             } else {
                 discardHandoffContext("authReturnedFalse")
