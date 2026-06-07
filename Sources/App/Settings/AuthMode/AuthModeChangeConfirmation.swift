@@ -79,6 +79,5 @@ struct SettingsAuthModeConfirmationSheetView: View {
                 }
             }
         }
-        .authenticationShieldHost()
     }
 }

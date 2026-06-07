@@ -130,9 +130,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry.emptySteadyState(
@@ -159,9 +156,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry(
@@ -192,9 +186,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
         let registry = ProtectedDataRegistry(
@@ -244,9 +235,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { registry },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 
@@ -287,9 +275,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { registry },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 
@@ -335,9 +320,6 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { registry },
-            shouldBypassPrivacyAuthentication: { false },
-            gracePeriodProvider: { 180 },
-            evaluateAppAuthentication: { _ in .authenticated(context: nil) },
             protectedDataSessionCoordinator: coordinator
         )
 

@@ -5,9 +5,9 @@ $(SRCROOT)/Sources/App/AppRoute.swift
 $(SRCROOT)/Sources/App/AppShellComposition.swift
 $(SRCROOT)/Sources/App/AppStartupCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
-$(SRCROOT)/Sources/App/Common/AuthenticationShieldCoordinator.swift
-$(SRCROOT)/Sources/App/Common/AuthenticationShieldHost.swift
-$(SRCROOT)/Sources/App/Common/AuthenticationShieldOverlayView.swift
+$(SRCROOT)/Sources/App/Common/AppLifecycleObserver.swift
+$(SRCROOT)/Sources/App/Common/AppLockSurfaceView.swift
+$(SRCROOT)/Sources/App/Common/CosmeticPrivacyCover.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifact.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactError.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactStore.swift
@@ -31,8 +31,6 @@ $(SRCROOT)/Sources/App/Common/MacPresentationPolish.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift
 $(SRCROOT)/Sources/App/Common/PGPKeyProfile+Presentation.swift
-$(SRCROOT)/Sources/App/Common/PrivacyScreenLifecycleGate.swift
-$(SRCROOT)/Sources/App/Common/PrivacyScreenModifier.swift
 $(SRCROOT)/Sources/App/Common/SecurityScopedFileAccess.swift
 $(SRCROOT)/Sources/App/Common/SignatureIdentityCardView.swift
 $(SRCROOT)/Sources/App/Common/SignatureVerification+Presentation.swift
@@ -246,6 +244,7 @@ $(SRCROOT)/Sources/Security/PrivateKeyRewrapWorkflow.swift
 $(SRCROOT)/Sources/Security/Mocks/MockAuthenticator.swift
 $(SRCROOT)/Sources/Security/Mocks/MockKeychain.swift
 $(SRCROOT)/Sources/Security/Mocks/MockSecureEnclave.swift
+$(SRCROOT)/Sources/Security/ProtectedData/AppLockController.swift
 $(SRCROOT)/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ContactsDomainStore.swift

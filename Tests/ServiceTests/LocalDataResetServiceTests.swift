@@ -514,6 +514,7 @@ final class LocalDataResetServiceTests: XCTestCase {
             selfTestService: container.selfTestService,
             protectedDataSessionCoordinator: container.protectedDataSessionCoordinator,
             appSessionOrchestrator: container.appSessionOrchestrator,
+            appLockController: container.appLockController,
             temporaryArtifactStore: temporaryArtifactStore,
             legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: protectedDataRootSecretExists,

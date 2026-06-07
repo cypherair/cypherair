@@ -5,9 +5,9 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/AppShellComposition.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/AppStartupCoordinator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldCoordinator.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldHost.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AuthenticationShieldOverlayView.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppLifecycleObserver.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppLockSurfaceView.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/CosmeticPrivacyCover.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppTemporaryArtifact.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppTemporaryArtifactError.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/AppTemporaryArtifactStore.swift
@@ -31,8 +31,6 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/OperationController.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/OutputHandling.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/PGPKeyProfile+Presentation.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/PrivacyScreenLifecycleGate.swift
-$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/PrivacyScreenModifier.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/SecurityScopedFileAccess.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/SignatureIdentityCardView.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/App/Common/SignatureVerification+Presentation.swift
@@ -246,6 +244,7 @@ $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/Mocks/MockAuthenticator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/Mocks/MockKeychain.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/Mocks/MockSecureEnclave.swift
+$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/ProtectedData/AppLockController.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/ProtectedData/AppSessionOrchestrator.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift
 $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit/Sources/Security/ProtectedData/ContactsDomainStore.swift

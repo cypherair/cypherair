@@ -1,18 +1,18 @@
 import Foundation
 
 struct LoadWarningPresentationState: Equatable {
-    let isShieldVisible: Bool
+    let isAppLocked: Bool
     let isAuthenticating: Bool
-    let isPrivacyScreenBlurred: Bool
+    let isLockCoverVisible: Bool
     let hasAuthenticatedSession: Bool
     let allowsPreAuthenticationPresentation: Bool
 }
 
 enum LoadWarningPresentationGate {
     static func canPresent(_ state: LoadWarningPresentationState) -> Bool {
-        guard !state.isShieldVisible,
+        guard !state.isAppLocked,
               !state.isAuthenticating,
-              !state.isPrivacyScreenBlurred else {
+              !state.isLockCoverVisible else {
             return false
         }
         return state.hasAuthenticatedSession || state.allowsPreAuthenticationPresentation
@@ -51,9 +51,9 @@ final class AppLoadWarningCoordinator {
                 name: "loadWarning.pending",
                 metadata: [
                     "source": source,
-                    "shieldVisible": presentationState.isShieldVisible ? "true" : "false",
+                    "appLocked": presentationState.isAppLocked ? "true" : "false",
                     "isAuthenticating": presentationState.isAuthenticating ? "true" : "false",
-                    "privacyBlurred": presentationState.isPrivacyScreenBlurred ? "true" : "false",
+                    "lockCoverVisible": presentationState.isLockCoverVisible ? "true" : "false",
                     "hasAuthenticatedSession": presentationState.hasAuthenticatedSession ? "true" : "false",
                     "allowsPreAuthenticationPresentation": presentationState.allowsPreAuthenticationPresentation ? "true" : "false"
                 ]

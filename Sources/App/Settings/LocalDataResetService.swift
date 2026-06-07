@@ -32,6 +32,7 @@ final class LocalDataResetService {
     private let selfTestService: SelfTestService?
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     private let appSessionOrchestrator: AppSessionOrchestrator
+    private let appLockController: AppLockController
     private let fileManager: FileManager
     private let legacySelfTestReportsDirectory: URL
     private let temporaryArtifactStore: AppTemporaryArtifactStore
@@ -53,6 +54,7 @@ final class LocalDataResetService {
         selfTestService: SelfTestService? = nil,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
+        appLockController: AppLockController,
         temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
         fileManager: FileManager = .default,
         legacySelfTestReportsDirectory: URL? = nil,
@@ -73,6 +75,7 @@ final class LocalDataResetService {
         self.selfTestService = selfTestService
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
+        self.appLockController = appLockController
         self.fileManager = fileManager
         self.temporaryArtifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
         self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
@@ -181,6 +184,9 @@ final class LocalDataResetService {
         // for this single state mutation. The surrounding reset I/O stays off the
         // main actor (this method remains nonisolated `async`).
         await appSessionOrchestrator.resetAfterLocalDataReset(
+            preserveAuthentication: authenticationContext != nil
+        )
+        await appLockController.resetAfterLocalDataReset(
             preserveAuthentication: authenticationContext != nil
         )
         validateResetPostConditions(
