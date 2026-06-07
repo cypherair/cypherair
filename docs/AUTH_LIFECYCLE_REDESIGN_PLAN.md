@@ -61,6 +61,9 @@ Acceptance items:
    model or logging secrets). **Decision rule (pre-approved):** if it is not safely achievable,
    drop the Standard-mode password fallback on macOS for this flow and require biometrics on macOS
    (and update SECURITY.md §4). Either outcome unblocks P4/P5.
+   **Resolved (P0):** no safe in-window password field exists (the embedded `LAAuthenticationView` is
+   biometric/companion only) → the Standard-mode password fallback is dropped on macOS for these flows;
+   biometrics required on macOS. iOS / iPadOS / visionOS keep the system passcode fallback.
 6. **Mode-switch / rewrap under the presenter.** Validate that the `AuthenticationManager` re-wrap
    flow authenticates **once for the whole action** when presented in-app on macOS — a single
    in-window prompt for the switch even though it re-wraps every key (exactly as today) — with no
@@ -88,7 +91,8 @@ PoC findings are recorded back into this document and the design before P1 begin
 - **P3 — Decoupled cosmetic cover.** Extract the cover into its own modifier keyed only to scene
   activity; remove the cosmetic responsibility from the lock overlay. Cover trigger is **decided:
   `.inactive`** for now (a later move to `.background`-only on iOS is an optional refinement).
-- **P4 — macOS in-app auth surfaces.** Embedded unlock screen + in-app password fallback;
+- **P4 — macOS in-app auth surfaces.** Embedded unlock screen (biometrics required on macOS — no in-app
+  password fallback, per the P0 item 5 result);
   explanatory pages for App Access change & mode switch; introduce `AuthenticationPresenting`.
 - **P5 — macOS in-app per-operation auth.** Route per-op auth through the presenter using
   `evaluateAccessControl` + `authenticationContext` / `kSecUseAuthenticationContext`.
@@ -176,18 +180,22 @@ grace=0 protection working until P3–P7 supersede it (no interim regression win
   raises at `.zIndex(10)` and *occludes/deadlocks* the in-window per-operation/mode-switch auth (not a
   cosmetic flash). P2's shield-decouple is therefore a **functional prerequisite** for the P5 in-window
   per-op auth, not a cleanup; full removal stays P7.
-- **macOS Standard-mode fallback (decided, conditional).** Preferred is a safe in-app password
-  field; if P0 shows that is not achievable through public APIs, the **pre-approved** outcome is to
-  remove the Standard-mode password fallback on macOS for this flow (biometrics required on macOS)
-  and update SECURITY.md §4. iOS / iPadOS / visionOS keep the system passcode fallback. Any in-app
-  password field must validate credentials safely (no secret logging; correct failure mapping).
+- **macOS Standard-mode fallback (resolved by P0).** P0 confirmed there is **no safe in-window password
+  field** through public APIs (the embedded `LAAuthenticationView` is biometric/companion only), so — per
+  the pre-approved decision — the Standard-mode **password fallback is removed on macOS** for the in-app
+  authenticated flows: **biometrics required on macOS**. iOS / iPadOS / visionOS keep the system passcode
+  fallback. SECURITY.md §4 carries a forward-looking note now; its current-state rewrite lands with P4/P5.
 - **Security posture unchanged — unlock-vs-key-use is a code-routing requirement (former P0 item 4).**
   The app-unlock authentication is never reused to authorize a private-key operation, and private-key
   operations authenticate on their own (DESIGN §2, principle 5); relock fail-closed; Phase 1/2 boundary
   intact. (This is the narrow unlock-vs-key-use rule, not a blanket per-operation re-authentication
   mandate.) **This boundary is guaranteed by implementation, not a runtime experiment:** the app-unlock
-  `LAContext` lives only in `AppSessionOrchestrator.pendingAuthenticatedContext` and is consumed solely
-  by `consumeAuthenticatedContextForProtectedData()` → ProtectedData; the private-key operation path
+  `LAContext` lives only in `AppSessionOrchestrator.pendingAuthenticatedContext`, is handed to ProtectedData
+  via `consumeAuthenticatedContextForProtectedData()`, and is reused **only** within app-session /
+  ProtectedData-owned post-auth flows — post-unlock domain opening
+  (`ProtectedDataPostUnlockCoordinator.openRegisteredDomains`, e.g. `key-metadata` / `protected-settings` /
+  `private-key-control`) and legacy metadata migration — and is **never** routed into a private-key
+  operation; the private-key operation path
   runs on a separate `AuthenticationPromptCoordinator.withOperationPrompt` channel and holds **no**
   reference to the app-unlock context (grep-verifiable). The macOS in-window per-operation presenter
   must thread only an operation-scoped context and must **never** pass the app-unlock context into a
@@ -234,9 +242,10 @@ Folding in the reviewer's direction (2026-06-05).
    a biometric sheet). A later move to `.background`-only is an optional refinement.
 4. **visionOS.** Follow the iOS direction. On-device validation is deferred (no visionOS hardware);
    iOS-equivalent behavior is tracked as an unvalidated assumption, not a design fork.
-5. **Password fallback (conditional, pre-approved).** Prefer a safe in-app password field; if P0
-   shows it is not achievable through public APIs, remove the Standard-mode password fallback on
-   macOS for this flow (biometrics required on macOS) and update SECURITY.md §4.
+5. **Password fallback (resolved by P0).** P0 found no safe in-window password field through public APIs
+   → the Standard-mode password fallback is removed on macOS for the in-app authenticated flows
+   (biometrics required on macOS); iOS / iPadOS / visionOS keep the system passcode fallback. SECURITY.md
+   §4 has a forward-looking note pending the P4/P5 current-state rewrite.
 
 **Validated (P0, on-device):**
 - **Mode-switch / rewrap under the presenter** — the `AuthenticationManager` re-wrap flow's single in-app
