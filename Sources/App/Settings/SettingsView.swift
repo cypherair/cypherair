@@ -5,7 +5,6 @@ struct SettingsView: View {
     struct Configuration {
         enum ProtectedSettingsHostMode {
             case mainWindowLive
-            case settingsSceneProxy
             case tutorialSandbox
         }
 

@@ -23,8 +23,7 @@ struct CypherAirApp: App {
     @State private var incomingURLImportCoordinator: IncomingURLImportCoordinator
     @State private var launchConfiguration: AppLaunchConfiguration
     #if os(macOS)
-    @State private var macTutorialLaunchRelay = MacTutorialLaunchRelay()
-    @State private var macTutorialHostAvailability = MacTutorialHostAvailability()
+    @State private var macShellNavigationState = MacShellNavigationState()
     #endif
     #if os(iOS) || os(visionOS)
     @State private var iosPresentationState = TutorialOnboardingHandoffState()
@@ -324,6 +323,14 @@ struct CypherAirApp: App {
             // CypherAir uses a single-window design; multiple windows would create
             // independent privacy screen states leading to inconsistent security behavior.
             CommandGroup(replacing: .newItem) { }
+            // Restore the ⌘, Settings menu item that the standalone Settings scene used to
+            // provide automatically; in the single-window design it selects the Settings tab.
+            CommandGroup(replacing: .appSettings) {
+                Button(String(localized: "settings.title", defaultValue: "Settings…")) {
+                    macShellNavigationState.selectedTab = .settings
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
         }
         #elseif os(visionOS)
         Window(
@@ -337,33 +344,6 @@ struct CypherAirApp: App {
             mainWindowSceneContent
         }
         #endif
-
-        #if os(macOS)
-        Settings {
-            LocalDataResetRestartGate(
-                coordinator: localDataResetRestartCoordinator,
-                terminateAction: LocalDataResetRestartAction.terminateCurrentProcess
-            ) {
-                MacSettingsRootView(
-                    tutorialLaunchRelay: macTutorialLaunchRelay,
-                    tutorialHostAvailability: macTutorialHostAvailability
-                )
-                .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
-                .environment(container.config)
-                .environment(container.protectedOrdinarySettingsCoordinator)
-                .environment(container.authManager)
-                .environment(container.keyManagement)
-                .environment(container.selfTestService)
-                .environment(container.appSessionOrchestrator)
-                .environment(\.localDataResetService, container.localDataResetService)
-                .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
-                .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-                .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
-                .environment(container.appLockController)
-                .environment(tutorialStore)
-            }
-        }
-        #endif
     }
 
     @ViewBuilder
@@ -372,15 +352,8 @@ struct CypherAirApp: App {
         switch launchConfiguration.root {
         case .main:
             MacAppShellView(
-                tutorialLaunchRelay: macTutorialLaunchRelay,
-                tutorialHostAvailability: macTutorialHostAvailability
-            )
-        case .settings:
-            MacSettingsRootView(
-                launchConfiguration: launchConfiguration,
-                tutorialLaunchRelay: macTutorialLaunchRelay,
-                tutorialHostAvailability: macTutorialHostAvailability,
-                presentationHostMode: .mainWindow
+                navigationState: macShellNavigationState,
+                opensAuthModeConfirmation: launchConfiguration.opensAuthModeConfirmation
             )
         case .tutorial:
             TutorialView(
@@ -498,23 +471,6 @@ struct CypherAirApp: App {
         .onOpenURL { url in
             incomingURLRouter.handle(url)
         }
-        #if os(macOS)
-        .onAppear {
-            syncMacTutorialHostAvailability()
-        }
-        .onChange(of: incomingURLImportCoordinator.importConfirmationCoordinator.request?.id) { _, _ in
-            syncMacTutorialHostAvailability()
-        }
-        .onChange(of: incomingURLImportCoordinator.importError != nil) { _, _ in
-            syncMacTutorialHostAvailability()
-        }
-        .onChange(of: incomingURLImportCoordinator.isTutorialImportBlocked) { _, _ in
-            syncMacTutorialHostAvailability()
-        }
-        .onChange(of: loadWarningCoordinator.presentedWarning != nil) { _, _ in
-            syncMacTutorialHostAvailability()
-        }
-        #endif
     }
 
     @MainActor
@@ -744,32 +700,11 @@ struct CypherAirApp: App {
         switch launchConfiguration.root {
         case .tutorial:
             iosPresentationState.activePresentation = .tutorial(presentationContext: .inApp)
-        case .main, .settings:
+        case .main:
             if container.protectedOrdinarySettingsCoordinator.hasCompletedOnboarding == false {
                 iosPresentationState.activePresentation = .onboarding(initialPage: 0, context: .firstRun)
             }
         }
-    }
-    #endif
-
-    #if os(macOS)
-    private func syncMacTutorialHostAvailability() {
-        macTutorialHostAvailability.setAppLevelBlocker(
-            .importConfirmationSheet,
-            isActive: incomingURLImportCoordinator.importConfirmationCoordinator.request != nil
-        )
-        macTutorialHostAvailability.setAppLevelBlocker(
-            .importErrorAlert,
-            isActive: incomingURLImportCoordinator.importError != nil
-        )
-        macTutorialHostAvailability.setAppLevelBlocker(
-            .tutorialImportBlockedAlert,
-            isActive: incomingURLImportCoordinator.isTutorialImportBlocked
-        )
-        macTutorialHostAvailability.setAppLevelBlocker(
-            .loadWarningAlert,
-            isActive: loadWarningCoordinator.presentedWarning != nil
-        )
     }
     #endif
 

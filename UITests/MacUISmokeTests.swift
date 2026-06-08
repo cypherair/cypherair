@@ -95,7 +95,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_opensThemePicker() throws {
-        launchSettings()
+        launchMain()
+        openSettingsTab()
 
         tapSettingsRow("settings.theme")
 
@@ -103,7 +104,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_opensSelfTest() throws {
-        launchSettings()
+        launchMain()
+        openSettingsTab()
 
         tapSettingsRow("settings.selfTest")
 
@@ -111,7 +113,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_opensAbout() throws {
-        launchSettings()
+        launchMain()
+        openSettingsTab()
 
         tapSettingsRow("settings.about")
 
@@ -119,7 +122,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_aboutOpensSourceCompliance() throws {
-        launchSettings()
+        launchMain()
+        openSettingsTab()
 
         tapSettingsRow("settings.about")
         waitForScreenReady("about.ready")
@@ -130,7 +134,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_opensLicenseList() throws {
-        launchSettings()
+        launchMain()
+        openSettingsTab()
 
         element("settings.license").tap()
 
@@ -138,7 +143,8 @@ final class MacUISmokeTests: XCTestCase {
     }
 
     func test_settingsRoot_opensAuthModeConfirmation() throws {
-        launchSettings(openAuthModeConfirmation: true)
+        launchMain(extraEnvironment: ["UITEST_OPEN_AUTHMODE_CONFIRMATION": "1"])
+        openSettingsTab()
 
         waitForScreenReady("settings.authmode.ready")
         XCTAssertTrue(element("settings.mode.confirm").exists)
@@ -346,24 +352,6 @@ final class MacUISmokeTests: XCTestCase {
         prepareLaunchIgnoringSavedState()
         app.launch()
         waitForLaunchReadiness(rootReadyID: "main.ready")
-    }
-
-    private func launchSettings() {
-        launchSettings(openAuthModeConfirmation: false)
-    }
-
-    private func launchSettings(
-        openAuthModeConfirmation: Bool,
-        extraEnvironment: [String: String] = [:]
-    ) {
-        app.launchEnvironment["UITEST_ROOT"] = "settings"
-        app.launchEnvironment["UITEST_SKIP_ONBOARDING"] = "1"
-        app.launchEnvironment["UITEST_REQUIRE_MANUAL_AUTH"] = requiresManualAuthentication ? "1" : "0"
-        app.launchEnvironment["UITEST_OPEN_AUTHMODE_CONFIRMATION"] = openAuthModeConfirmation ? "1" : "0"
-        apply(extraEnvironment: extraEnvironment)
-        prepareLaunchIgnoringSavedState()
-        app.launch()
-        waitForLaunchReadiness(rootReadyID: "settings.ready")
     }
 
     private func launchTutorial(

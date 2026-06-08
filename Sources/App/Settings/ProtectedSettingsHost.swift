@@ -71,7 +71,6 @@ final class ProtectedSettingsHost {
 
     enum Mode: Equatable {
         case mainWindowLive
-        case settingsSceneProxy
         case tutorialSandbox
     }
 
@@ -83,12 +82,10 @@ final class ProtectedSettingsHost {
         case pendingRetryRequired
         case pendingResetRequired
         case frameworkUnavailable
-        case settingsSceneProxy
         case tutorialSandbox
     }
 
     let mode: Mode
-    private let openMainWindowAction: (() -> Void)?
     private let liveDependencies: ProtectedSettingsAccessCoordinator.Dependencies?
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -117,7 +114,6 @@ final class ProtectedSettingsHost {
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.mode = .mainWindowLive
-        self.openMainWindowAction = nil
         self.traceStore = traceStore
         let liveDependencies = ProtectedSettingsAccessCoordinator.Dependencies(
             evaluateAccessGate: evaluateAccessGate,
@@ -146,19 +142,15 @@ final class ProtectedSettingsHost {
 
     init(
         mode: Mode,
-        openMainWindowAction: (() -> Void)? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.mode = mode
-        self.openMainWindowAction = openMainWindowAction
         self.liveDependencies = nil
         self.traceStore = traceStore
         self.accessCoordinator = nil
         switch mode {
         case .mainWindowLive:
             self.sectionState = .locked
-        case .settingsSceneProxy:
-            self.sectionState = .settingsSceneProxy
         case .tutorialSandbox:
             self.sectionState = .tutorialSandbox
         }
@@ -372,10 +364,6 @@ final class ProtectedSettingsHost {
         )
     }
 
-    func openMainWindow() {
-        openMainWindowAction?()
-    }
-
     private func syncSectionStateFromStore(_ liveDependencies: ProtectedSettingsAccessCoordinator.Dependencies) {
         switch liveDependencies.currentDomainState() {
         case .locked:
@@ -450,8 +438,6 @@ final class ProtectedSettingsHost {
         switch mode {
         case .mainWindowLive:
             "mainWindowLive"
-        case .settingsSceneProxy:
-            "settingsSceneProxy"
         case .tutorialSandbox:
             "tutorialSandbox"
         }
@@ -505,8 +491,6 @@ final class ProtectedSettingsHost {
             "pendingResetRequired"
         case .frameworkUnavailable:
             "frameworkUnavailable"
-        case .settingsSceneProxy:
-            "settingsSceneProxy"
         case .tutorialSandbox:
             "tutorialSandbox"
         }
