@@ -231,6 +231,34 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.protectedDataAuthorizationConcreteKeychainErrorClassification)
     }
 
+    func test_legacyCleanup_item2_keyMetadataMigration_staysBehindCutoffExceptions() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupKeyMetadataMigrationSymbols)
+    }
+
+    func test_legacyCleanup_item3_privateKeyControlDefaults_staysBehindCutoffExceptions() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupPrivateKeyControlDefaultsSymbols)
+    }
+
+    func test_legacyCleanup_item4_protectedSettingsMigration_staysBehindCutoffException() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupProtectedSettingsMigrationSymbols)
+    }
+
+    func test_legacyCleanup_item5_contactsSnapshotMigration_staysBehindCutoffException() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupContactsSnapshotMigrationSymbols)
+    }
+
+    func test_legacyCleanup_item1A_rootSecretRightStore_staysBehindCutoffExceptions() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRootSecretRightStoreSymbols)
+    }
+
+    func test_legacyCleanup_item1B_rawRootSecret_staysBehindCutoffException() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRawRootSecretSymbols)
+    }
+
+    func test_legacyCleanup_item7_revocationBackfill_staysBehindCutoffExceptions() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRevocationBackfillSymbols)
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
@@ -1431,6 +1459,188 @@ private enum ArchitectureSourceAuditRules {
         },
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([])
+    )
+
+    // MARK: - Legacy-cleanup reintroduction guardrails (2026-06-08 support cutoff)
+    //
+    // Each rule forbids the Swift symbols a later legacy-cleanup PR removes (LEGACY_CLEANUP.md §2,
+    // maintainer-approved support cutoff dated 2026-06-08). Until that PR lands, the production file
+    // that still holds the symbol is listed as a temporary exception. The removal PR must delete the
+    // symbol AND its matching exception in lockstep: `assertRulePasses` fails if a symbol is gone but
+    // its exception remains, or if an exception is dropped while the symbol still exists. See
+    // docs/LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md §7.
+    //
+    // Item #9 (Swift) symbols — legacyStatus, legacySignerFingerprint, legacySignerIdentity,
+    // legacyVerification — are intentionally NOT covered here; they are added to this guardrail in
+    // PR-D4, after Track D removes them.
+
+    static let legacyCleanupKeyMetadataMigrationSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #2 key-metadata migration symbols",
+        failureSummary: "Legacy key-metadata migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "migrateLegacyMetadataIfNeeded",
+            "loadMigrationSourceSnapshot",
+            "cleanupMigrationSourceItems",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #2 key-metadata Keychain→ProtectedData migration; removed by PR-A2 (dead 2A chain) then PR-C2 (live 2B source) under the 2026-06-08 cutoff.",
+                [
+                    "Sources/Security/KeyMetadataStore.swift",
+                    "Sources/Security/ProtectedData/KeyMetadataDomainStore.swift",
+                    "Sources/Services/KeyManagement/KeyCatalogStore.swift",
+                    "Sources/Services/KeyManagementService.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let legacyCleanupPrivateKeyControlDefaultsSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #3 private-key-control defaults symbols",
+        failureSummary: "Legacy private-key-control defaults symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "legacyInitialPayload",
+            "cleanupLegacyDefaults",
+            "invalidLegacyAuthMode",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #3 private-key-control legacy UserDefaults import/cleanup; removed by PR-C1 under the 2026-06-08 cutoff. The ProtectedSettingsStore legacyInitialPayload occurrence is cleared by PR-C3.",
+                [
+                    "Sources/Security/ProtectedData/PrivateKeyControlStore.swift",
+                    "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+                    "Sources/Security/AuthenticationEvaluable.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let legacyCleanupProtectedSettingsMigrationSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #4 protected-settings migration symbols",
+        failureSummary: "Legacy protected-settings v1→v2 / ordinary-settings migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "requiresOrdinarySettingsMigration",
+            "migrateOpenedSettingsSnapshotIfNeeded",
+            "legacyOrdinarySettingsSnapshot",
+            "removeLegacySettingsSources",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #4 protected-settings v1→v2 + legacy ordinary-settings migration bridge; removed by PR-C3 under the 2026-06-08 cutoff. LegacyOrdinarySettingsStore is a live backend and stays.",
+                [
+                    "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let legacyCleanupContactsSnapshotMigrationSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #5 contacts snapshot migration symbols",
+        failureSummary: "Legacy contacts snapshot v1→v2 migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "LegacySnapshotV1",
+            "migrateLegacyV1Snapshot",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let legacyCleanupRootSecretRightStoreSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #1A root-secret right-store symbols",
+        failureSummary: "Legacy root-secret right-store migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "legacyRightStoreClient",
+            "migrateLegacySharedRightIfNeeded",
+            "legacyMigrationDeferred",
+            "allowLegacyMigration",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #1A legacy LARight right-store migration; removed by PR-C4 under the 2026-06-08 cutoff. The modern v2 envelope + device-binding stay.",
+                [
+                    "Sources/App/AppContainer.swift",
+                    "Sources/App/Settings/LocalDataResetService.swift",
+                    "Sources/Security/ProtectedData/ProtectedDataRootSecretCoordinator.swift",
+                    "Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift",
+                    "Sources/Security/ProtectedData/ProtectedDataPostUnlockCoordinator.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let legacyCleanupRawRootSecretSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #1B raw-v1 root-secret symbols",
+        failureSummary: "Legacy raw-v1 root-secret migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "migrateLegacyRawRootSecret",
+            "legacyV1Raw",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #1B raw-v1 root-secret migration; removed by PR-C5 under the 2026-06-08 cutoff. The anti-downgrade throw and CAPDSEF2 format-floor stay.",
+                [
+                    "Sources/Security/ProtectedData/ProtectedDataRightStoreClient.swift",
+                ]
+            ),
+        ])
+    )
+
+    static let legacyCleanupRevocationBackfillSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #7 revocation backfill symbols",
+        failureSummary: "Legacy imported-key revocation backfill symbol is removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "updateRevocation",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([
+            (
+                "Item #7 imported-key revocation backfill (KeyCatalogStore.updateRevocation + its only caller KeyExportService); removed by PR-B2 under the 2026-06-08 cutoff.",
+                [
+                    "Sources/Services/KeyManagement/KeyCatalogStore.swift",
+                    "Sources/Services/KeyManagement/KeyExportService.swift",
+                ]
+            ),
+        ])
     )
 
     private static let keyRouteViewPaths: Set<String> = [

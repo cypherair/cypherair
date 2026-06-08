@@ -270,60 +270,6 @@ class ContactServiceTestCase: XCTestCase {
         )
     }
 
-    func writeLegacyContactsV1Snapshot(
-        _ snapshot: LegacyContactsDomainSnapshotV1ForContactServiceTests,
-        generationIdentifier: Int,
-        harness: ContactsProtectedHarness
-    ) throws {
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        var plaintext = try encoder.encode(snapshot)
-        defer {
-            plaintext.protectedDataZeroize()
-        }
-        var domainMasterKey = try XCTUnwrap(
-            harness.domainKeyManager.unlockedDomainMasterKey(for: ContactsDomainStore.domainID)
-        )
-        defer {
-            domainMasterKey.protectedDataZeroize()
-        }
-        let envelope = try ProtectedDomainEnvelopeCodec.seal(
-            plaintext: plaintext,
-            domainID: ContactsDomainStore.domainID,
-            schemaVersion: 1,
-            generationIdentifier: generationIdentifier,
-            domainMasterKey: domainMasterKey
-        )
-        let pendingURL = harness.storageRoot.domainEnvelopeURL(
-            for: ContactsDomainStore.domainID,
-            slot: .pending
-        )
-        try harness.storageRoot.writeProtectedData(try encoder.encode(envelope), to: pendingURL)
-
-        let currentURL = harness.storageRoot.domainEnvelopeURL(
-            for: ContactsDomainStore.domainID,
-            slot: .current
-        )
-        let previousURL = harness.storageRoot.domainEnvelopeURL(
-            for: ContactsDomainStore.domainID,
-            slot: .previous
-        )
-        if try harness.storageRoot.managedItemExists(at: currentURL) {
-            try harness.storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
-        }
-        try harness.storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
-
-        try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
-            ProtectedDomainBootstrapMetadata(
-                schemaVersion: 1,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
-            ),
-            for: ContactsDomainStore.domainID
-        )
-    }
-
     func currentContactsEnvelope(in storageRoot: ProtectedDataStorageRoot) throws -> ProtectedDomainEnvelope {
         let data = try storageRoot.readManagedData(
             at: storageRoot.domainEnvelopeURL(
@@ -359,23 +305,4 @@ class ContactServiceTestCase: XCTestCase {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
         }
     }
-}
-
-struct LegacyContactsDomainSnapshotV1ForContactServiceTests: Encodable {
-    let schemaVersion: Int
-    let identities: [ContactIdentity]
-    let keyRecords: [ContactKeyRecord]
-    let recipientLists: [LegacyRecipientListForContactServiceTests]
-    let tags: [ContactTag]
-    let certificationArtifacts: [ContactCertificationArtifactReference]
-    let createdAt: Date
-    let updatedAt: Date
-}
-
-struct LegacyRecipientListForContactServiceTests: Encodable {
-    let recipientListId: String
-    let name: String
-    let memberContactIds: [String]
-    let createdAt: Date
-    let updatedAt: Date
 }
