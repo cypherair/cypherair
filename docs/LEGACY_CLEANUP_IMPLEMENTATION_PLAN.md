@@ -25,9 +25,10 @@ A maintainer has approved a support cutoff (date-based, above) for **every item 
 - **In scope:** Class 1 #1–6 (retained old-install migration), Class 2 #7–8 (revocation
   backfill, `PGPKeyIdentity` legacy decode), Class 3 #9 (Rust `legacy_*` + the Swift app-model
   legacy layer — **full retirement**, per maintainer decision).
-- **Excluded:** Class 4 (already removed — do not re-chase) and **Class 5 (permanent
-  interop/security — never remove):** v4/SEIPDv1/SEIPDv2/DEFLATE read-compat, S2K auto-detect,
-  the `CAPDSEF2` format-floor + SE device-binding, and profile-correct message-format selection.
+- **Excluded:** the items already removed (`LEGACY_CLEANUP.md` §3 — do not re-chase) and the
+  permanent interop/security surfaces (`LEGACY_CLEANUP.md` §4 — never remove): v4/SEIPDv1/SEIPDv2/
+  DEFLATE read-compat, S2K auto-detect, the `CAPDSEF2` format-floor + SE device-binding, and
+  profile-correct message-format selection.
 
 Every removal PR body must cite the cutoff label verbatim and prove old-install
 **fail-closed / recovery / reset** behavior for the path it deletes.
@@ -65,7 +66,7 @@ Validation shorthands used throughout:
 
 | PR | Adds / removes | Gate | Review | Validate |
 |----|----------------|------|--------|----------|
-| **PR-0** | Adds a source-audit test (reuse `RepositoryAuditLoader.swift` + `ArchitectureSourceAuditTests.swift`) that will forbid each removed symbol, initially behind per-symbol **exception lists**. Each later PR deletes its exception to *prove* the removal landed. Removes nothing. | none | No | VAL-SWIFT (update `RepositoryAudit*.xcfilelist` if adding files) |
+| **PR-0** | Adds a **Swift** source-audit test (reuse `RepositoryAuditLoader.swift` + `ArchitectureSourceAuditTests.swift`, which scan a build-time snapshot of `Sources/*.swift` only) that will forbid each removed **Swift** symbol, initially behind per-symbol **exception lists**; each later PR deletes its exception to *prove* the removal landed. The Rust symbols (#9) are out of this audit's reach — a separate Rust guard is added in Track D (see §7). Removes nothing. | none | No | VAL-SWIFT (update `RepositoryAudit*.xcfilelist` if adding files) |
 
 ### Track A — isolated / low-risk
 
@@ -101,7 +102,7 @@ security review.** Ordered least-to-most consequential; the Critical pair last.
 |----|-------------------|-----------|------|--------|----------|
 | **PR-D1** (Swift → modern API; **no Rust change**) | repoint `PGPMessageResultMapper.swift` (:11-152) to `summaryState` / `signatures[summaryEntryIndex]` and stop reading the FFI legacy fields (incl. the `PasswordDecryptResult` path :54-55); remove app-model `DetailedSignatureVerification.legacyStatus`/`legacySignerFingerprint`/`legacySignerIdentity` (:52-54), `legacyVerification` (:78-86), `VerificationState(legacyStatus:)` (:90-104) and the `SignatureVerification.swift:97` fallback; `SelfTestService.swift:242,264` → `summaryState == .verified`; `DetailedSignatureSectionView` drop the empty-`signatures` legacy fallback (render from `summaryState`); migrate ~23 Swift test files (~137 assertions) | keep the whole `summaryState`/`signatures` path | precedes D2 | self-test gate is security-adjacent — describe the equivalence | VAL-SWIFT (no XCFW yet — proves equivalence before touching Rust) |
 | **PR-D2 + D3** (Rust delete + bindings regen — **one PR** so `main` never has a broken Swift build) | drop `legacy_status`/`legacy_signer_fingerprint` from the 4 detailed-result structs (`signature_details.rs:37-79`) and from `SignatureCollector` (fields, assignments, `into_parts` slots, the `legacy_signer_fingerprint()` accessor); update the 6 producer sites across `decrypt.rs`, `external_decryptor.rs`, `verify.rs`, `streaming.rs`, `password.rs`; retire `PasswordDecryptResult.signature_status`/`signer_fingerprint`; rewire the "no observed results" error paths (`verify.rs:13-19`, `streaming.rs:720-726`) to compute `summary_state` directly; migrate ~19 Rust test files; regenerate **both** `Sources/PgpMobile/pgp_mobile.swift` and `bindings/pgp_mobile.swift` | **keep `LegacyFoldMode` / `legacy_stopped`** — they also drive `summary_state`/`summary_entry_index` (optionally rename to `SummaryFoldMode`/`summary_selected`); keep `state_from_legacy_status` as an internal helper or inline it | after D1 | **Yes** (`decrypt.rs`/`streaming.rs` §10) | VAL-RUST → VAL-XCFW → VAL-SWIFT |
-| **PR-D4** (close-out) | tighten the PR-0 guardrail to forbid every #9 symbol; final inventory moves for #9 | — | after D1–D3 | No | VAL-XCFW + VAL-RUST + VAL-SWIFT (full matrix) |
+| **PR-D4** (close-out) | tighten the Swift PR-0 guardrail to forbid the #9 **Swift** symbols, and add a **new Rust** forbidden-symbol test in `pgp-mobile` (a `#[test]` that reads `src/` via `CARGO_MANIFEST_DIR` and asserts `legacy_status`/`legacy_signer_fingerprint` are absent — no existing mechanism covers Rust); final inventory moves for #9 | — | after D1–D3 | No | VAL-XCFW + VAL-RUST + VAL-SWIFT (full matrix) |
 
 ## 4. Dependency graph
 
@@ -171,12 +172,14 @@ landed; restated here so PR authors don't re-introduce the ambiguity):
 
 ## 7. Reintroduction guardrails
 
-Reuse the existing source-audit mechanism (`Tests/ServiceTests/RepositoryAuditLoader.swift` +
-`ArchitectureSourceAuditTests.swift`, in `CypherAir-UnitTests`) to assert **zero matches in
-`Sources/` (excluding `Tests/`)** for the removed symbols:
+Two **separate** mechanisms — the Swift audit cannot see Rust, and no Rust guard exists yet.
 
-- #9: `legacyStatus`, `legacySignerFingerprint`, `legacySignerIdentity`, `legacyVerification`
-  (Swift); `legacy_status`, `legacy_signer_fingerprint` (Rust).
+**Swift guardrail (reuse existing).** `Tests/ServiceTests/RepositoryAuditLoader.swift` +
+`ArchitectureSourceAuditTests.swift` (in `CypherAir-UnitTests`) scan a build-time snapshot of
+`Sources/*.swift` only (hard-filtered to `.swift`, rooted at `Sources/`). Assert **zero matches
+under `Sources/`** for the removed **Swift** symbols:
+
+- #9 (Swift): `legacyStatus`, `legacySignerFingerprint`, `legacySignerIdentity`, `legacyVerification`.
 - #2: `migrateLegacyMetadataIfNeeded`, `loadMigrationSourceSnapshot`, `cleanupMigrationSourceItems`.
 - #3: `legacyInitialPayload`, `cleanupLegacyDefaults`, `invalidLegacyAuthMode`.
 - #4: `requiresOrdinarySettingsMigration`, `migrateOpenedSettingsSnapshotIfNeeded`,
@@ -186,10 +189,20 @@ Reuse the existing source-audit mechanism (`Tests/ServiceTests/RepositoryAuditLo
   `allowLegacyMigration`. #1B: `migrateLegacyRawRootSecret`, `legacyV1Raw`.
 - #7: `updateRevocation`.
 
-**Allowlist** the intentionally-kept `LegacyFoldMode`/`legacy_stopped` (or rename them to drop
-"legacy" so the forbidden-word check is unambiguous). Keep the Item-1B anti-downgrade negative
-test **permanent**. Land guardrails with per-symbol exceptions in PR-0; each PR deletes its
-exception to prove the removal.
+**Rust guardrail (new — must be created).** No Rust-side source audit exists, and the Swift
+`RepositoryAuditLoader` is Swift-only (snapshot of `Sources/*.swift`) and structurally cannot read
+`pgp-mobile/src`. Add a `pgp-mobile` `#[test]` that reads the crate source via `CARGO_MANIFEST_DIR`
+(the idiom already used by `pgp-mobile/tests/` fixtures) and asserts these are absent from
+`pgp-mobile/src/` — it runs under the existing `cargo test --manifest-path pgp-mobile/Cargo.toml`
+with no CI change (a CI `rg` step over `pgp-mobile/src` is a lighter alternative):
+
+- #9 (Rust): `legacy_status`, `legacy_signer_fingerprint` (and the `PasswordDecryptResult`
+  `signature_status` / `signer_fingerprint` fields).
+
+**Allowlist** the intentionally-kept `LegacyFoldMode` / `legacy_stopped` in the Rust guard (or
+rename them to drop "legacy" so the match is unambiguous). Keep the Item-1B anti-downgrade negative
+test **permanent**. Land the Swift guardrail (per-symbol exceptions) in PR-0 and the Rust guardrail
+in Track D; each PR deletes its exception to prove the removal.
 
 ## 8. Riskiest steps & de-risking
 
@@ -235,4 +248,4 @@ exception to prove the removal.
 - `Sources/Models/PGPKeyIdentity.swift` + `Sources/Services/KeyManagement/KeyExportService.swift` — #8/#7.
 - `pgp-mobile/src/signature_details.rs` (+ `decrypt.rs`, `external_decryptor.rs`, `verify.rs`, `streaming.rs`, `password.rs`) — #9 Rust; **keep `LegacyFoldMode`**.
 - `Sources/Services/FFI/PGPMessageResultMapper.swift` + `Sources/Models/DetailedSignatureVerification.swift` + `Sources/Models/SignatureVerification.swift` + `Sources/Services/SelfTestService.swift` — #9 Swift.
-- `Tests/ServiceTests/RepositoryAuditLoader.swift` + `Tests/ServiceTests/ArchitectureSourceAuditTests.swift` — guardrail mechanism (Track 0).
+- `Tests/ServiceTests/RepositoryAuditLoader.swift` + `Tests/ServiceTests/ArchitectureSourceAuditTests.swift` — **Swift** guardrail mechanism (Track 0; `Sources/*.swift` only). A new `pgp-mobile` `#[test]` is required for the **Rust** #9 symbols (Track D) — no existing Rust audit.
