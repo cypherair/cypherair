@@ -26,10 +26,7 @@ extension FFIIntegrationTests {
             observedFingerprints,
             Set([signerAInfo.fingerprint, signerBInfo.fingerprint])
         )
-        XCTAssertEqual(
-            detailed.signatures.first?.signerPrimaryFingerprint,
-            detailed.legacySignerFingerprint
-        )
+        XCTAssertEqual(detailed.summaryEntryIndex, 0)
     }
 
     func test_detailedVerifyDetached_fixtureKnownPlusUnknown_preservesNilUnknownFingerprint() throws {
@@ -77,7 +74,7 @@ extension FFIIntegrationTests {
             progress: nil
         )
 
-        XCTAssertEqual(detailed.legacyStatus, .valid)
+        XCTAssertEqual(detailed.summaryState, .verified)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertEqual(detailed.signatures[0].status, .valid)
         XCTAssertEqual(detailed.signatures[1].status, .valid)
@@ -115,10 +112,7 @@ extension FFIIntegrationTests {
             observedFingerprints,
             Set([signerAInfo.fingerprint, signerBInfo.fingerprint])
         )
-        XCTAssertEqual(
-            detailed.signatures.first?.signerPrimaryFingerprint,
-            detailed.legacySignerFingerprint
-        )
+        XCTAssertEqual(detailed.summaryEntryIndex, 0)
     }
 
     func test_detailedDecryptFile_fixtureMultiSigner_preservesEntries() throws {
@@ -165,8 +159,11 @@ extension FFIIntegrationTests {
             progress: nil
         )
 
-        XCTAssertEqual(fileDetailed.legacyStatus, .valid)
-        XCTAssertEqual(fileDetailed.legacySignerFingerprint, signerAInfo.fingerprint)
+        XCTAssertEqual(fileDetailed.summaryState, .verified)
+        XCTAssertEqual(
+            fileDetailed.signatures[Int(fileDetailed.summaryEntryIndex!)].signerPrimaryFingerprint,
+            signerAInfo.fingerprint
+        )
         XCTAssertEqual(fileDetailed.signatures.count, 2)
         XCTAssertTrue(fileDetailed.signatures.contains {
             $0.status == .valid && $0.signerPrimaryFingerprint == Optional(signerAInfo.fingerprint)
@@ -218,7 +215,7 @@ extension FFIIntegrationTests {
             verificationKeys: []
         )
 
-        XCTAssertEqual(detailed.legacyStatus, .notSigned)
+        XCTAssertEqual(detailed.summaryState, .notSigned)
         XCTAssertTrue(detailed.signatures.isEmpty)
     }
 
@@ -244,7 +241,7 @@ extension FFIIntegrationTests {
             signedMessage: signed,
             verificationKeys: [signer.publicKeyData]
         )
-        XCTAssertEqual(verifyDetailed.legacyStatus, .valid)
+        XCTAssertEqual(verifyDetailed.summaryState, .verified)
         XCTAssertEqual(verifyDetailed.signatures.count, 1)
 
         let ciphertext = try engine.encryptBinary(
@@ -258,7 +255,7 @@ extension FFIIntegrationTests {
             secretKeys: [recipient.certData],
             verificationKeys: [signer.publicKeyData]
         )
-        XCTAssertEqual(decryptDetailed.legacyStatus, .valid)
+        XCTAssertEqual(decryptDetailed.summaryState, .verified)
         XCTAssertEqual(decryptDetailed.signatures.count, 1)
     }
 }

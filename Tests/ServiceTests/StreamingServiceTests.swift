@@ -96,8 +96,8 @@ final class StreamingServiceTests: XCTestCase {
         XCTAssertEqual(decrypted, plaintext)
         // Signature should be valid (known signer is a contact)
         XCTAssertTrue(
-            sig.legacyStatus == .valid,
-            "Expected valid signature, got: \(sig.legacyStatus)"
+            sig.summaryState == .verified,
+            "Expected verified signature, got: \(sig.summaryState)"
         )
     }
 
@@ -136,8 +136,8 @@ final class StreamingServiceTests: XCTestCase {
         try assertCompleteFileProtection(at: outputURL)
         XCTAssertEqual(decrypted, plaintext)
         XCTAssertTrue(
-            sig.legacyStatus == .valid,
-            "Expected valid signature, got: \(sig.legacyStatus)"
+            sig.summaryState == .verified,
+            "Expected verified signature, got: \(sig.summaryState)"
         )
     }
 
@@ -252,8 +252,8 @@ final class StreamingServiceTests: XCTestCase {
             progress: nil
         )
         XCTAssertTrue(
-            verification.legacyStatus == .valid,
-            "Expected valid signature, got: \(verification.legacyStatus)"
+            verification.summaryState == .verified,
+            "Expected verified signature, got: \(verification.summaryState)"
         )
     }
 
@@ -279,8 +279,8 @@ final class StreamingServiceTests: XCTestCase {
             progress: nil
         )
         XCTAssertTrue(
-            verification.legacyStatus == .valid,
-            "Expected valid signature, got: \(verification.legacyStatus)"
+            verification.summaryState == .verified,
+            "Expected verified signature, got: \(verification.summaryState)"
         )
     }
 

@@ -764,28 +764,28 @@ final class ModelTests: XCTestCase {
 
     func test_signatureVerification_isWarning_forBad() {
         let verification = SignatureVerification(
-            status: .bad, signerFingerprint: nil
+            status: .bad, signerFingerprint: nil, verificationState: .invalid
         )
         XCTAssertTrue(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_forUnknown() {
         let verification = SignatureVerification(
-            status: .unknownSigner, signerFingerprint: "abc"
+            status: .unknownSigner, signerFingerprint: "abc", verificationState: .signerCertificateUnavailable
         )
         XCTAssertTrue(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_validIsFalse() {
         let verification = SignatureVerification(
-            status: .valid, signerFingerprint: "abc"
+            status: .valid, signerFingerprint: "abc", verificationState: .verified
         )
         XCTAssertFalse(verification.isWarning)
     }
 
     func test_signatureVerification_isWarning_notSignedIsFalse() {
         let verification = SignatureVerification(
-            status: .notSigned, signerFingerprint: nil
+            status: .notSigned, signerFingerprint: nil, verificationState: .notSigned
         )
         XCTAssertFalse(verification.isWarning)
     }
@@ -816,29 +816,66 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(detailed.summaryState, .signerCertificateUnavailable)
         XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
-        XCTAssertFalse(detailed.legacyVerification.requiresContactsContext)
-        XCTAssertNil(detailed.legacyVerification.contactsUnavailableReason)
+        XCTAssertFalse(detailed.summaryVerification.requiresContactsContext)
+        XCTAssertNil(detailed.summaryVerification.contactsUnavailableReason)
+    }
+
+    // MARK: - DetailedSignatureVerification.summaryVerification (no-entries row)
+
+    func test_summaryVerification_notSigned_rendersNotSignedRow() {
+        let detailed = DetailedSignatureVerification(summaryState: .notSigned, signatures: [])
+        let summary = detailed.summaryVerification
+
+        XCTAssertEqual(summary.verificationState, .notSigned)
+        XCTAssertEqual(summary.status, .notSigned)
+        XCTAssertNil(summary.signerFingerprint)
+        XCTAssertNil(summary.signerIdentity)
+        XCTAssertEqual(summary.symbolName, "minus.circle")
+        XCTAssertFalse(summary.isWarning)
+    }
+
+    func test_summaryVerification_emptySignaturesInvalid_rendersInvalidRowNotNotSigned() {
+        // A malformed signed message whose verifier setup fails yields empty `signatures`
+        // with an `.invalid` summary state. The no-entries row must surface "invalid", never
+        // collapse to "not signed", and `status` must stay consistent with `verificationState`.
+        let detailed = DetailedSignatureVerification(summaryState: .invalid, signatures: [])
+        let summary = detailed.summaryVerification
+
+        XCTAssertEqual(summary.verificationState, .invalid)
+        XCTAssertEqual(summary.status, .bad)
+        XCTAssertEqual(summary.symbolName, "xmark.seal.fill")
+        XCTAssertTrue(summary.isWarning)
+    }
+
+    func test_summaryVerification_emptySignaturesExpired_rendersExpiredRow() {
+        let detailed = DetailedSignatureVerification(summaryState: .expired, signatures: [])
+        let summary = detailed.summaryVerification
+
+        XCTAssertEqual(summary.verificationState, .expired)
+        XCTAssertEqual(summary.status, .expired)
+        XCTAssertEqual(summary.symbolName, "clock.badge.exclamationmark")
+        XCTAssertTrue(summary.isWarning)
     }
 
     // MARK: - SignatureVerification: statusColor
 
     func test_signatureVerification_statusColor_validIsGreen() {
         let verification = SignatureVerification(
-            status: .valid, signerFingerprint: nil
+            status: .valid, signerFingerprint: nil, verificationState: .verified
         )
         XCTAssertEqual(verification.statusColor, .green)
     }
 
     func test_signatureVerification_statusColor_badIsRed() {
         let verification = SignatureVerification(
-            status: .bad, signerFingerprint: nil
+            status: .bad, signerFingerprint: nil, verificationState: .invalid
         )
         XCTAssertEqual(verification.statusColor, .red)
     }
 
     func test_signatureVerification_statusColor_notSignedIsSecondary() {
         let verification = SignatureVerification(
-            status: .notSigned, signerFingerprint: nil
+            status: .notSigned, signerFingerprint: nil, verificationState: .notSigned
         )
         XCTAssertEqual(verification.statusColor, .secondary)
     }

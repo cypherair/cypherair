@@ -34,7 +34,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             verificationKeys: []
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "unsigned streaming file")
-        XCTAssertEqual(result.legacyStatus, .notSigned)
+        XCTAssertEqual(result.summaryState, .notSigned)
     }
 
     func test_softwareRouteSignsWithUnwrappedSecretCertificate() async throws {
@@ -78,7 +78,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             verificationKeys: [identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "software signed streaming file")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveRouteSignsFileWithoutUnwrappingSecretCertificate() async throws {
@@ -112,7 +112,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             verificationKeys: [fixture.identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave signed streaming file")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveV6RouteSignsFileAndVerifies() async throws {
@@ -150,7 +150,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             verificationKeys: [fixture.identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave v6 signed streaming file")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveFileSigningUsesRealCatalogRouterSharedHandleStoreAndDefaultSelfKey() async throws {
@@ -233,7 +233,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
                 verificationKeys: [fixture.identity.publicKeyData]
             )
             XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed streaming file")
-            XCTAssertEqual(result.legacyStatus, .valid)
+            XCTAssertEqual(result.summaryState, .verified)
         }
     }
 
@@ -271,7 +271,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
                 verificationKeys: [fixture.identity.publicKeyData]
             )
             XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave file with explicit self key")
-            XCTAssertEqual(result.legacyStatus, .valid)
+            XCTAssertEqual(result.summaryState, .verified)
         }
     }
 

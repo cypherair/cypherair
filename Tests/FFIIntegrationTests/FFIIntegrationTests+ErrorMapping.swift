@@ -242,8 +242,8 @@ extension FFIIntegrationTests {
         )
 
         XCTAssertEqual(
-            result.legacyStatus, .bad,
-            "Tampered cleartext signature must produce Bad status"
+            result.summaryState, .invalid,
+            "Tampered cleartext signature must produce Invalid summary state"
         )
     }
 
@@ -268,8 +268,8 @@ extension FFIIntegrationTests {
         )
 
         XCTAssertEqual(
-            result.legacyStatus, .unknownSigner,
-            "Signer not in verification_keys must produce UnknownSigner status"
+            result.summaryState, .signerCertificateUnavailable,
+            "Signer not in verification_keys must produce SignerCertificateUnavailable summary state"
         )
     }
 
@@ -430,8 +430,8 @@ extension FFIIntegrationTests {
         )
 
         XCTAssertEqual(
-            result.legacyStatus, .bad,
-            "Detached signature on tampered data must produce Bad status"
+            result.summaryState, .invalid,
+            "Detached signature on tampered data must produce Invalid summary state"
         )
     }
 

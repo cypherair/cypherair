@@ -70,18 +70,36 @@ here.
 
 | # | Item | Status | Anchors |
 |---|------|--------|---------|
-| 9 | Rust `legacy_status` / `legacy_signer_fingerprint` | The *simple* verify/decrypt FFI surface was removed, but these folded-summary fields **remain inside the detailed result and are still consumed in Swift** — an active-compat field, not dead code. | Rust: `signature_details.rs:38-85` (4 detailed-result structs + `LegacyFoldMode`; `SignatureCollector` `:89-212`), produced in `decrypt.rs:211-221`, `external_decryptor.rs:144-154`. Swift consumers: `PGPMessageResultMapper.swift:11-152`; generated `pgp_mobile.swift` legacy fields. |
+| 9 | Rust `legacy_status` / `legacy_signer_fingerprint` | **Swift consumers retired (PR-D1, 2026-06-08 cutoff).** The folded-summary fields still **remain inside the Rust detailed result + generated bindings**, now referenced only by FFI-result test fixtures; deleted in PR-D2+D3. | Rust: `signature_details.rs:38-85` (4 detailed-result structs + `LegacyFoldMode`; `SignatureCollector` `:89-212`), produced in `decrypt.rs:211-221`, `external_decryptor.rs:144-154`, `verify.rs`, `streaming.rs`, `password.rs`. Swift app-model consumers (now on `summaryState`/`signatures`): `PGPMessageResultMapper.swift`, `DetailedSignatureVerification`, `DetailedSignatureSectionView`, `SelfTestService`; generated `pgp_mobile.swift` legacy fields remain until PR-D2+D3. |
 
-**Removal gate:** removable only once Swift consumers move from `legacyStatus`/
-`legacySignerFingerprint` to `summaryState` / `signatures`. The concrete remaining blocker is
-**`SelfTestService.swift:242` and `:264`** — production self-test pass/fail is still gated on
-`verification.legacyStatus == .valid` with no `summaryState`/`signatures` path. Confirm and
-close that thread before retiring #9.
+**Removal gate / progress:** The Swift-side migration is **done** under the 2026-06-08 cutoff —
+PR-D1 repointed every Swift consumer (`PGPMessageResultMapper`, the `DetailedSignatureVerification`
+app model, `DetailedSignatureSectionView`, and the test suite) to `summaryState` / `signatures`, and
+closed the former blocker at **`SelfTestService.swift`** (self-test pass/fail now gates on
+`summaryState == .verified`). `Sources/` carries zero references to the app-model legacy fields.
+**Remaining for full retirement:** delete the Rust `legacy_status`/`legacy_signer_fingerprint` fields
+(and the `PasswordDecryptResult` equivalents) and regenerate the bindings in **PR-D2+D3**, then make
+the §2→§3 inventory move in **PR-D4**. Until then the FFI fields remain present, referenced only by
+FFI-result test fixtures.
 
 Scope note: only the `legacy_status`/`legacy_signer_fingerprint` fields (and the
 `PasswordDecryptResult.signature_status`/`signer_fingerprint` equivalents) are removed.
 `LegacyFoldMode`/`legacy_stopped` are **kept** — they also drive the modern
 `summaryState`/`summaryEntryIndex`.
+
+**Surfaced follow-up (not #9 scope; recorded by PR-D1).** Retiring the Swift legacy layer left
+state-model debt worth a separate, non-cutoff cleanup:
+- `SignatureVerification` still carries both a graded `status` (`MessageSignatureStatus`) and a
+  `verificationState` that can disagree. The message-row display already derives solely from
+  `verificationState` (`SignatureVerification+Presentation.swift`), so `status` is near-vestigial in
+  the message path. A "collapse the signature state model" pass could remove or fold `status` into
+  `verificationState` (note: `status` is still read by the **separate** `CertificateSignatureVerification`
+  path, which is unaffected).
+- `verify.rs` / `streaming.rs` can return an **empty `signatures` array with a failure `summaryState`**
+  (`Invalid`/`Expired`) on verifier-setup failure, so "empty signatures" is **not** equivalent to "not
+  signed"; the no-entries UI row renders from `summaryState` (`DetailedSignatureVerification.summaryVerification`).
+- Broader direction: after this cleanup wave, sweep for other stale compatibility layers that left
+  similarly complex app state behind.
 
 ## 3. Already done — do not re-chase
 

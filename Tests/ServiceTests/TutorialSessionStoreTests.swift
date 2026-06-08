@@ -349,7 +349,7 @@ final class TutorialSessionStoreTests: XCTestCase {
             verification: decryptResult.verification
         )
         XCTAssertTrue(store.isCompleted(.decryptAndVerify))
-        XCTAssertEqual(store.session.artifacts.decryptedVerification?.legacyStatus, .valid)
+        XCTAssertEqual(store.session.artifacts.decryptedVerification?.summaryState, .verified)
 
         let backup = try await container.keyManagement.exportKey(
             fingerprint: alice.fingerprint,

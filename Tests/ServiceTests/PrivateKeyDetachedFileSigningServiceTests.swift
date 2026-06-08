@@ -48,7 +48,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             identity: identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_secureEnclaveRouteSignsDetachedFileWithoutUnwrappingSecretCertificate() async throws {
@@ -79,7 +79,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             identity: fixture.identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_secureEnclaveV6RouteSignsDetachedFileAndVerifies() async throws {
@@ -114,7 +114,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             identity: fixture.identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_secureEnclaveDetachedFileSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
@@ -164,7 +164,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             identity: fixture.identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_productionPolicyBlocksSecureEnclaveDetachedFileSigning() async throws {

@@ -124,7 +124,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             signature: signature
         )
 
-        XCTAssertEqual(detailed.legacyStatus, .expired)
+        XCTAssertEqual(detailed.summaryState, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertEqual(detailed.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
@@ -156,7 +156,7 @@ final class SigningServiceDetailedResultTests: XCTestCase {
             signature: signature
         )
 
-        XCTAssertEqual(detailed.legacyStatus, .expired)
+        XCTAssertEqual(detailed.summaryState, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
         XCTAssertEqual(detailed.signatures[0].status, .expired)
         XCTAssertEqual(detailed.signatures[0].signerPrimaryFingerprint, expiredInfo.fingerprint)

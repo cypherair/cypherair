@@ -88,7 +88,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(decrypted.plaintext, plaintext,
             "Profile A decrypted plaintext must match original")
-        XCTAssertEqual(decrypted.legacyStatus, .valid,
+        XCTAssertEqual(decrypted.summaryState, .verified,
             "Profile A signature must verify")
 
         // 4. Cleartext sign (Ed25519 + SHA-512).
@@ -102,7 +102,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             signedMessage: signed,
             verificationKeys: [key.publicKeyData]
         )
-        XCTAssertEqual(verifyResult.legacyStatus, .valid,
+        XCTAssertEqual(verifyResult.summaryState, .verified,
             "Profile A cleartext signature must verify")
 
         // 6. Detached file sign.
@@ -122,7 +122,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData],
             progress: nil
         )
-        XCTAssertEqual(detachedVerify.legacyStatus, .valid,
+        XCTAssertEqual(detachedVerify.summaryState, .verified,
             "Profile A detached signature must verify")
     }
 
@@ -159,7 +159,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(decrypted.plaintext, plaintext,
             "Profile B decrypted plaintext must match original")
-        XCTAssertEqual(decrypted.legacyStatus, .valid,
+        XCTAssertEqual(decrypted.summaryState, .verified,
             "Profile B signature must verify")
 
         // 4. Cleartext sign (Ed448 + SHA-512).
@@ -173,7 +173,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             signedMessage: signed,
             verificationKeys: [key.publicKeyData]
         )
-        XCTAssertEqual(verifyResult.legacyStatus, .valid,
+        XCTAssertEqual(verifyResult.summaryState, .verified,
             "Profile B cleartext signature must verify")
 
         // 6. Detached file sign.
@@ -193,7 +193,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData],
             progress: nil
         )
-        XCTAssertEqual(detachedVerify.legacyStatus, .valid,
+        XCTAssertEqual(detachedVerify.summaryState, .verified,
             "Profile B detached signature must verify")
     }
 
@@ -225,7 +225,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [keyB.publicKeyData]
         )
         XCTAssertEqual(resultBA.plaintext, plaintext, "B→A decrypt must succeed")
-        XCTAssertEqual(resultBA.legacyStatus, .valid, "B→A signature must verify")
+        XCTAssertEqual(resultBA.summaryState, .verified, "B→A signature must verify")
 
         // A sender → B recipient: should auto-select SEIPDv2.
         let ciphertextAB = try engine.encrypt(
@@ -240,7 +240,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [keyA.publicKeyData]
         )
         XCTAssertEqual(resultAB.plaintext, plaintext, "A→B decrypt must succeed")
-        XCTAssertEqual(resultAB.legacyStatus, .valid, "A→B signature must verify")
+        XCTAssertEqual(resultAB.summaryState, .verified, "A→B signature must verify")
 
         // Mixed recipients (A + B): should produce SEIPDv1.
         let ciphertextMixed = try engine.encrypt(
@@ -374,13 +374,13 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let verifyA = try engine.verifyCleartextDetailed(
             signedMessage: signedA, verificationKeys: [keyA.publicKeyData]
         )
-        XCTAssertEqual(verifyA.legacyStatus, .valid, "SHA-512 + Ed25519 sign/verify failed")
+        XCTAssertEqual(verifyA.summaryState, .verified, "SHA-512 + Ed25519 sign/verify failed")
 
         let signedB = try engine.signCleartext(text: plaintext, signerCert: keyB.certData)
         let verifyB = try engine.verifyCleartextDetailed(
             signedMessage: signedB, verificationKeys: [keyB.publicKeyData]
         )
-        XCTAssertEqual(verifyB.legacyStatus, .valid, "SHA-512 + Ed448 sign/verify failed")
+        XCTAssertEqual(verifyB.summaryState, .verified, "SHA-512 + Ed448 sign/verify failed")
 
         // 3. Ed25519 via Profile A sign + verify (covered above in step 2).
 
@@ -433,7 +433,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [keyA.publicKeyData],
             progress: nil
         )
-        XCTAssertEqual(detVerifyA.legacyStatus, .valid, "Ed25519 detached sign/verify failed")
+        XCTAssertEqual(detVerifyA.summaryState, .verified, "Ed25519 detached sign/verify failed")
 
         let detSigB = try engine.signDetachedFile(
             inputPath: detachedURL.path,
@@ -446,7 +446,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [keyB.publicKeyData],
             progress: nil
         )
-        XCTAssertEqual(detVerifyB.legacyStatus, .valid, "Ed448 detached sign/verify failed")
+        XCTAssertEqual(detVerifyB.summaryState, .verified, "Ed448 detached sign/verify failed")
     }
 
     /// C8.3: Armor/dearmor exercises OpenSSL Base64 and binary parsing paths.
@@ -522,7 +522,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
             XCTAssertEqual(result.plaintext, plaintext,
                 "Profile A iteration \(i): plaintext mismatch")
-            XCTAssertEqual(result.legacyStatus, .valid,
+            XCTAssertEqual(result.summaryState, .verified,
                 "Profile A iteration \(i): signature invalid")
         }
     }
@@ -556,7 +556,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
             XCTAssertEqual(result.plaintext, plaintext,
                 "Profile B iteration \(i): plaintext mismatch")
-            XCTAssertEqual(result.legacyStatus, .valid,
+            XCTAssertEqual(result.summaryState, .verified,
                 "Profile B iteration \(i): signature invalid")
         }
     }
@@ -583,7 +583,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             let verifyA = try engine.verifyCleartextDetailed(
                 signedMessage: signedA, verificationKeys: [keyA.publicKeyData]
             )
-            XCTAssertEqual(verifyA.legacyStatus, .valid,
+            XCTAssertEqual(verifyA.summaryState, .verified,
                 "Profile A sign/verify iteration \(i) failed")
 
             // Profile B: Ed448 cleartext sign + verify.
@@ -591,7 +591,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             let verifyB = try engine.verifyCleartextDetailed(
                 signedMessage: signedB, verificationKeys: [keyB.publicKeyData]
             )
-            XCTAssertEqual(verifyB.legacyStatus, .valid,
+            XCTAssertEqual(verifyB.summaryState, .verified,
                 "Profile B sign/verify iteration \(i) failed")
         }
     }

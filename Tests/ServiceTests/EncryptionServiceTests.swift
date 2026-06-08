@@ -157,7 +157,7 @@ final class EncryptionServiceTests: XCTestCase {
             secretKeys: [secretKey],
             verificationKeys: [identity.publicKeyData]
         )
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     // MARK: - Encrypt-to-Self

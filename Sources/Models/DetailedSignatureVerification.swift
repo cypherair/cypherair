@@ -1,7 +1,7 @@
 import Foundation
 
-/// Additive message-signature verification result that preserves detailed per-signature outcomes
-/// while retaining a legacy compatibility bridge for existing consumers.
+/// Message-signature verification result carrying the folded summary state plus the detailed
+/// per-signature outcomes used by the UI.
 struct DetailedSignatureVerification: Equatable {
     struct Entry: Equatable {
         enum Status: Equatable {
@@ -49,37 +49,31 @@ struct DetailedSignatureVerification: Equatable {
         }
     }
 
-    let legacyStatus: MessageSignatureStatus
-    let legacySignerFingerprint: String?
-    let legacySignerIdentity: SignatureVerification.SignerIdentity?
     let summaryState: SignatureVerification.VerificationState
     let summaryEntryIndex: UInt64?
     let contactsUnavailableReason: ContactsAvailability?
     let signatures: [Entry]
 
     init(
-        legacyStatus: MessageSignatureStatus,
-        legacySignerFingerprint: String?,
-        legacySignerIdentity: SignatureVerification.SignerIdentity?,
-        summaryState: SignatureVerification.VerificationState? = nil,
+        summaryState: SignatureVerification.VerificationState,
         summaryEntryIndex: UInt64? = nil,
         contactsUnavailableReason: ContactsAvailability? = nil,
         signatures: [Entry]
     ) {
-        self.legacyStatus = legacyStatus
-        self.legacySignerFingerprint = legacySignerFingerprint
-        self.legacySignerIdentity = legacySignerIdentity
-        self.summaryState = summaryState ?? SignatureVerification.VerificationState(legacyStatus: legacyStatus)
+        self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.contactsUnavailableReason = contactsUnavailableReason
         self.signatures = signatures
     }
 
-    var legacyVerification: SignatureVerification {
+    /// Single-row verification used when there are no per-signature entries to render. Renders from
+    /// `summaryState`; `status` is derived from the state so the two cannot disagree. `summaryState`
+    /// may legitimately be `.invalid`/`.expired` with empty `signatures` (e.g. a malformed signed
+    /// message whose verifier setup failed), so this must not collapse to "not signed".
+    var summaryVerification: SignatureVerification {
         SignatureVerification(
-            status: legacyStatus,
-            signerFingerprint: legacySignerFingerprint,
-            signerIdentity: legacySignerIdentity,
+            status: MessageSignatureStatus(verificationState: summaryState),
+            signerFingerprint: nil,
             verificationState: summaryState,
             contactsUnavailableReason: contactsUnavailableReason
         )
@@ -88,21 +82,6 @@ struct DetailedSignatureVerification: Equatable {
 }
 
 extension SignatureVerification.VerificationState {
-    init(legacyStatus: MessageSignatureStatus) {
-        switch legacyStatus {
-        case .valid:
-            self = .verified
-        case .bad:
-            self = .invalid
-        case .unknownSigner:
-            self = .signerCertificateUnavailable
-        case .notSigned:
-            self = .notSigned
-        case .expired:
-            self = .expired
-        }
-    }
-
     init(entryStatus: DetailedSignatureVerification.Entry.Status) {
         switch entryStatus {
         case .valid:
@@ -113,6 +92,26 @@ extension SignatureVerification.VerificationState {
             self = .invalid
         case .expired:
             self = .expired
+        }
+    }
+}
+
+extension MessageSignatureStatus {
+    /// Graded status consistent with a verification state, for display models that still carry a
+    /// `status` field alongside `verificationState`. The dual-field redundancy is tracked for a later
+    /// "collapse the signature state model" cleanup (see LEGACY_CLEANUP §9 follow-up).
+    init(verificationState: SignatureVerification.VerificationState) {
+        switch verificationState {
+        case .verified:
+            self = .valid
+        case .invalid:
+            self = .bad
+        case .expired:
+            self = .expired
+        case .notSigned:
+            self = .notSigned
+        case .signerCertificateUnavailable, .contactsContextUnavailable:
+            self = .unknownSigner
         }
     }
 }

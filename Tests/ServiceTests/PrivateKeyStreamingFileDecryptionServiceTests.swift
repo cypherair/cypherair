@@ -40,7 +40,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(try readOutput(output), plaintext)
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
         XCTAssertEqual(router.requests, [
             PrivateKeyOperationRequest(fingerprint: identity.fingerprint, operation: .decrypt)
         ])
@@ -96,7 +96,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             progress: nil
         )
 
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
         XCTAssertEqual(verification.signatures.count, 1)
         XCTAssertEqual(verification.signatures.first?.signerPrimaryFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(verification.signatures.first?.signerIdentity?.source, .ownKey)
@@ -140,7 +140,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
         XCTAssertEqual(keyManagement.keys.map(\.fingerprint), [fixture.identity.fingerprint])
         XCTAssertEqual(try readOutput(output), plaintext)
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
     }
 
     func test_productionPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
@@ -371,7 +371,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(try readOutput(output), plaintext)
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
         XCTAssertEqual(router.requests, [
             PrivateKeyOperationRequest(fingerprint: fixture.identity.fingerprint, operation: .decrypt)
         ])
@@ -410,7 +410,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
                 verificationContext: verificationContext(for: fixture.identity),
                 progress: nil
             )
-            XCTAssertEqual(verification.legacyStatus, .notSigned)
+            XCTAssertEqual(verification.summaryState, .notSigned)
             XCTAssertEqual(
                 try readOutput(output), plaintext,
                 "Repeated Secure Enclave file decrypt \(iteration) must produce identical plaintext"
@@ -506,7 +506,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(try readOutput(output), plaintext)
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
         XCTAssertEqual(router.requests, [
             PrivateKeyOperationRequest(fingerprint: fixture.identity.fingerprint, operation: .decrypt)
         ])
