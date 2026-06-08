@@ -9,7 +9,9 @@
 > Last reviewed: 2026-06-08.
 > Note: This doc replaces the former `LEGACY_COMPATIBILITY_AUDIT.md` (2026-05-13 snapshot) and
 >   `LEGACY_CLEANUP_IMPLEMENTATION_REFERENCE.md` (Phases 1–7 roadmap), both removed when this
->   doc landed. It does **not** describe a pending code change — it catalogs candidates and gates.
+>   doc landed. It catalogs candidates and gates.
+> Companion execution plan: [LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md](LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md)
+>   — ordered PR sequence for the approved 2026-06-08 cutoff.
 
 This doc is an inventory, not an authorization to delete. Removal of any retained migration
 code is gated on a human-approved support cutoff (§1) and is performed in separate PRs (§5).
@@ -23,6 +25,11 @@ offline, so installs that still hold a legacy source can surface at any time.
 
 This rule is the same one stated in [ARCHITECTURE_REFACTOR_ROADMAP.md:26](ARCHITECTURE_REFACTOR_ROADMAP.md):
 *keep legacy migration support until a separate human-approved support cutoff exists.*
+
+**Cutoff status (2026-06-08):** a maintainer has approved the support cutoff for **all §2 items**.
+The ordered PR sequence that consumes it lives in
+[LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md](LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md); items move from §2
+to §3 here as each removal PR lands.
 
 ## 2. Cleanup to do later (gated)
 
@@ -40,7 +47,7 @@ hold the old source.
 | 3 | Private-key-control legacy defaults | legacy `UserDefaults` `authMode`/rewrap/modify-expiry → `private-key-control` domain | `PrivateKeyControlStore.swift:606,617,629` (reads), `:647-651` (`cleanupLegacyDefaults`), called at `:142,194,404`; keys in `AuthenticationEvaluable.swift:395-412` | Old-install migration support ends | **High** — auth-sensitive |
 | 4 | Protected-settings v1 → v2 + legacy ordinary settings | schema-v1 payload (`clipboardNotice` only) + legacy `com.cypherair.preference.*` `UserDefaults` → schema-v2 ordinary settings | `ProtectedSettingsStore.swift:14` (`PayloadV1`), `:25` (`requiresOrdinarySettingsMigration`), `:850-885,896`, `:1028-1041` (`legacyOrdinarySettingsSnapshot`/`removeLegacySettingsSources`); `ProtectedOrdinarySettingsPersistence.swift:17` (`LegacyOrdinarySettingsStore`) | Supported installs expected to hold schema v2 | **High** — can reset auth-adjacent settings / fail-open |
 | 5 | Contacts snapshot v1 → v2 | schema-v1 `ContactsDomainSnapshot` (`recipientLists`) → v2 (`recipientLists` dropped) | `ContactsDomainSnapshotCodec.swift:8` (`LegacySnapshotV1`), `:38-39,52-60` (`migrateLegacyV1Snapshot`); `ContactsDomainSnapshot.swift:4,27` | Supported installs expected to hold v2 contacts | Medium |
-| 6 | Local-data cleanup | removes legacy `Documents/self-test/`, orphan `com.cypherair.tutorial.<UUID>` defaults suites, legacy metadata-account rows, root-secret format-floor / legacy-cleanup markers | `AppTemporaryArtifactStore.swift:10,126` (`legacyTutorialDefaultsSuitePrefix`, `cleanupTutorialDefaultsSuites`); `AppStartupCoordinator.swift:131,134,143` (startup cleanup, `legacySelfTestReportDirectory`); `LocalDataResetService.swift:415,472` (reset enumeration + post-reset validation) | Those paths can no longer exist on supported installs | Medium — Reset-All correctness depends on exhaustive deletion |
+| 6 | Local-data cleanup | removes legacy `Documents/self-test/` + orphan `com.cypherair.tutorial.<UUID>` defaults suites, and (gated on #1/#2) the legacy right-store + metadata-account reset hooks. **Keep:** the root-secret format-floor / device-binding / legacy-cleanup markers are current security — Reset-All must keep *deleting* them; they are not removable code | `AppTemporaryArtifactStore.swift:10,126` (`legacyTutorialDefaultsSuitePrefix`, `cleanupTutorialDefaultsSuites`); `AppStartupCoordinator.swift:131,134,143` (startup cleanup, `legacySelfTestReportDirectory`); `LocalDataResetService.swift:415,472` (reset enumeration + post-reset validation) | Those paths can no longer exist on supported installs | Medium — Reset-All correctness depends on exhaustive deletion |
 
 > **Row 3 caveat:** Only the **legacy-defaults import/cleanup** is removable. The
 > rewrap **recovery-journal** logic in the same file is current behavior — keep it.
@@ -71,6 +78,11 @@ here.
 **`SelfTestService.swift:242` and `:264`** — production self-test pass/fail is still gated on
 `verification.legacyStatus == .valid` with no `summaryState`/`signatures` path. Confirm and
 close that thread before retiring #9.
+
+Scope note: only the `legacy_status`/`legacy_signer_fingerprint` fields (and the
+`PasswordDecryptResult.signature_status`/`signer_fingerprint` equivalents) are removed.
+`LegacyFoldMode`/`legacy_stopped` are **kept** — they also drive the modern
+`summaryState`/`summaryEntryIndex`.
 
 ## 3. Already done — do not re-chase
 
