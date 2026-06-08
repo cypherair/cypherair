@@ -94,7 +94,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertEqual(result.verification.summaryState, .verified)
         XCTAssertEqual(result.verification.signatures.count, 1)
         XCTAssertEqual(result.verification.signatures.first?.signerPrimaryFingerprint, signerIdentity.fingerprint)
         XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .ownKey)

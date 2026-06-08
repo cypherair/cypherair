@@ -134,7 +134,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: DeviceSecurityTestCase {
             verificationContext: verificationContext(for: prepared.identity),
             progress: nil
         )
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
         XCTAssertEqual(String(data: try Data(contentsOf: output), encoding: .utf8), plaintext)
         XCTAssertFalse(
             unwrapper.didUnwrap,

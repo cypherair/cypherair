@@ -492,14 +492,14 @@ final class DecryptScreenModelTests: XCTestCase {
 
         var parsedFingerprint: String?
         var decryptedPlaintext: Data?
-        var decryptedStatus: MessageSignatureStatus?
+        var decryptedSummaryState: SignatureVerification.VerificationState?
         var configuration = DecryptView.Configuration()
         configuration.onParsed = { result in
             parsedFingerprint = result.matchedKey?.fingerprint
         }
         configuration.onDecrypted = { plaintext, verification in
             decryptedPlaintext = plaintext
-            decryptedStatus = verification.legacyStatus
+            decryptedSummaryState = verification.summaryState
         }
 
         let model = makeModel(
@@ -531,10 +531,10 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedText, "decrypted-text")
-        XCTAssertEqual(model.textDecryptionResult?.verification.legacyStatus, .valid)
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.textDecryptionResult?.verification.summaryState, .verified)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
         XCTAssertEqual(decryptedPlaintext, Data("decrypted-text".utf8))
-        XCTAssertEqual(decryptedStatus, .valid)
+        XCTAssertEqual(decryptedSummaryState, .verified)
     }
 
     @MainActor
@@ -608,8 +608,8 @@ final class DecryptScreenModelTests: XCTestCase {
         }
 
         XCTAssertEqual(model.decryptedFileURL, outputURL)
-        XCTAssertEqual(model.fileDecryptionResult?.verification.legacyStatus, .unknownSigner)
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .unknownSigner)
+        XCTAssertEqual(model.fileDecryptionResult?.verification.summaryState, .signerCertificateUnavailable)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .signerCertificateUnavailable)
 
         model.exportDecryptedFile()
 
@@ -816,18 +816,18 @@ final class DecryptScreenModelTests: XCTestCase {
         model.decryptMode = .text
 
         XCTAssertEqual(model.decryptedText, "Text plaintext")
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
 
         model.decryptMode = .file
 
         XCTAssertEqual(model.decryptedFileURL, fileOutputURL)
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .invalid)
 
         model.setCiphertextInput("edited text")
 
         XCTAssertNil(model.textDecryptionResult)
-        XCTAssertEqual(model.fileDecryptionResult?.verification.legacyStatus, .bad)
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.fileDecryptionResult?.verification.summaryState, .invalid)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .invalid)
     }
 
     @MainActor
@@ -875,7 +875,7 @@ final class DecryptScreenModelTests: XCTestCase {
         model.decryptMode = .text
 
         XCTAssertEqual(model.decryptedText, "Text plaintext")
-        XCTAssertEqual(model.activeDetailedSignatureVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
     }
 
     @MainActor
@@ -1092,31 +1092,21 @@ final class DecryptScreenModelTests: XCTestCase {
         )
     }
 
-    private func makeSignature(
-        status: MessageSignatureStatus,
-        signerFingerprint: String? = nil
-    ) -> SignatureVerification {
-        SignatureVerification(
-            status: status,
-            signerFingerprint: signerFingerprint
-        )
-    }
-
     private func makeDetailedVerification(
         status: MessageSignatureStatus,
         signerFingerprint: String? = nil
     ) -> DetailedSignatureVerification {
-        DetailedSignatureVerification(
-            legacyStatus: status,
-            legacySignerFingerprint: signerFingerprint,
-            legacySignerIdentity: nil,
-            signatures: status == .notSigned ? [] : [
-                DetailedSignatureVerification.Entry(
-                    status: makeDetailedEntryStatus(from: status),
-                    signerPrimaryFingerprint: signerFingerprint,
-                    signerIdentity: nil
-                )
-            ]
+        let entries: [DetailedSignatureVerification.Entry] = status == .notSigned ? [] : [
+            DetailedSignatureVerification.Entry(
+                status: makeDetailedEntryStatus(from: status),
+                signerPrimaryFingerprint: signerFingerprint,
+                signerIdentity: nil
+            )
+        ]
+        return DetailedSignatureVerification(
+            summaryState: entries.first?.verificationState ?? .notSigned,
+            summaryEntryIndex: entries.isEmpty ? nil : 0,
+            signatures: entries
         )
     }
 

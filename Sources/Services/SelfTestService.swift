@@ -239,7 +239,7 @@ final class SelfTestService {
         guard decrypted.plaintext == plaintext else {
             throw CypherAirError.corruptData(reason: "Plaintext mismatch after round-trip")
         }
-        guard decrypted.verification.legacyStatus == .valid else {
+        guard decrypted.verification.summaryState == .verified else {
             throw CypherAirError.badSignature
         }
         return decrypted.verification
@@ -261,7 +261,7 @@ final class SelfTestService {
         guard verified.text == text else {
             throw CypherAirError.corruptData(reason: "Signed text mismatch after verification")
         }
-        guard verified.verification.legacyStatus == .valid else {
+        guard verified.verification.summaryState == .verified else {
             throw CypherAirError.badSignature
         }
         return verified.verification

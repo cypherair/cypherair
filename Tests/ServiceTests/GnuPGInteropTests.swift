@@ -104,8 +104,8 @@ final class GnuPGInteropTests: XCTestCase {
 
         let result = try engine.verifyCleartextDetailed(signedMessage: signedMessage, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG cleartext signature should be valid")
-        XCTAssertNotNil(result.legacySignerFingerprint, "Signer fingerprint should be present")
+        XCTAssertEqual(result.summaryState, .verified, "GnuPG cleartext signature should be valid")
+        XCTAssertNotNil(result.signatures.first?.signerPrimaryFingerprint, "Signer fingerprint should be present")
         XCTAssertNotNil(result.content, "Signed content should be extracted")
     }
 
@@ -124,7 +124,7 @@ final class GnuPGInteropTests: XCTestCase {
             progress: nil
         )
 
-        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG armored detached signature should be valid")
+        XCTAssertEqual(result.summaryState, .verified, "GnuPG armored detached signature should be valid")
     }
 
     func test_c3_5_verifyGnuPGDetachedSignature_binary_returnsValid() throws {
@@ -141,7 +141,7 @@ final class GnuPGInteropTests: XCTestCase {
             progress: nil
         )
 
-        XCTAssertEqual(result.legacyStatus, .valid, "GnuPG binary detached signature should be valid")
+        XCTAssertEqual(result.summaryState, .verified, "GnuPG binary detached signature should be valid")
     }
 
     // MARK: - C3.6 Tamper Detection
@@ -251,8 +251,8 @@ final class GnuPGInteropTests: XCTestCase {
 
         let result = try engine.verifyCleartextDetailed(signedMessage: signedMessage, verificationKeys: [pubKey])
 
-        XCTAssertEqual(result.legacyStatus, .valid,
+        XCTAssertEqual(result.summaryState, .verified,
                        "GnuPG signed+compressed message should have a valid signature")
-        XCTAssertNotNil(result.legacySignerFingerprint, "Signer fingerprint should be present")
+        XCTAssertNotNil(result.signatures.first?.signerPrimaryFingerprint, "Signer fingerprint should be present")
     }
 }

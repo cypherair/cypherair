@@ -339,7 +339,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 7. Verify plaintext and signature.
         XCTAssertEqual(result.plaintext, plaintext,
             "Decrypted plaintext must match original after SE round-trip")
-        XCTAssertEqual(result.legacyStatus, .valid,
+        XCTAssertEqual(result.summaryState, .verified,
             "Signature must verify after SE round-trip")
     }
 
@@ -411,7 +411,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // 7. Verify plaintext and signature.
         XCTAssertEqual(result.plaintext, plaintext,
             "Profile B decrypted plaintext must match original after SE round-trip")
-        XCTAssertEqual(result.legacyStatus, .valid,
+        XCTAssertEqual(result.summaryState, .verified,
             "Profile B signature must verify after SE round-trip")
     }
 

@@ -214,9 +214,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             return XCTFail("Expected decrypted outcome")
         }
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "secure enclave routed password message")
-        XCTAssertEqual(verification.legacyStatus, .valid)
         XCTAssertEqual(verification.summaryState, .verified)
-        XCTAssertEqual(verification.legacySignerFingerprint, fixture.identity.fingerprint)
+        XCTAssertEqual(verification.signatures.first?.signerPrimaryFingerprint, fixture.identity.fingerprint)
     }
 
     func test_missingHandleSurfacesUnavailableWithoutSoftwareFallback() async throws {

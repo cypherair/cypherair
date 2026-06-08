@@ -87,7 +87,7 @@ final class PasswordMessageServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "Service password message v1")
-        XCTAssertEqual(verification.legacyStatus, .notSigned)
+        XCTAssertEqual(verification.summaryState, .notSigned)
         XCTAssertTrue(verification.signatures.isEmpty)
     }
 
@@ -111,9 +111,8 @@ final class PasswordMessageServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(String(data: plaintext, encoding: .utf8), "Signed password service message")
-        XCTAssertEqual(verification.legacyStatus, .valid)
         XCTAssertEqual(verification.summaryState, .verified)
-        XCTAssertEqual(verification.legacySignerFingerprint, signer.fingerprint)
+        XCTAssertEqual(verification.signatures.first?.signerPrimaryFingerprint, signer.fingerprint)
         XCTAssertEqual(verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
@@ -149,7 +148,6 @@ final class PasswordMessageServiceTests: XCTestCase {
             String(data: plaintext, encoding: .utf8),
             "Password message from unknown signer"
         )
-        XCTAssertEqual(verification.legacyStatus, .unknownSigner)
         XCTAssertEqual(verification.summaryState, .contactsContextUnavailable)
         XCTAssertEqual(verification.contactsUnavailableReason, .locked)
         XCTAssertEqual(verification.signatures.first?.verificationState, .contactsContextUnavailable)

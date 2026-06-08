@@ -251,8 +251,8 @@ final class DecryptionServiceTests: XCTestCase {
 
         let result = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
-        XCTAssertEqual(result.verification.legacyStatus, .valid,
-                       "Signed message should verify with .valid status")
+        XCTAssertEqual(result.verification.summaryState, .verified,
+                       "Signed message should verify with .verified summary state")
     }
 
     func test_decrypt_phase2_triggersSeUnwrap() async throws {
@@ -448,7 +448,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
     func test_decryptViaService_profileB_fullFlow() async throws {
@@ -461,7 +461,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
     // MARK: - End-to-End via decryptMessageDetailed() (Phase 1 + Phase 2)
@@ -483,7 +483,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
     func test_decryptMessage_profileB_endToEnd() async throws {
@@ -502,7 +502,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
         XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.legacyStatus, .valid)
+        XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
     func test_parseRecipients_profileA_matchesCorrectKey() async throws {
@@ -611,7 +611,7 @@ final class DecryptionServiceTests: XCTestCase {
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
-        XCTAssertEqual(detailed.verification.legacyStatus, .notSigned)
+        XCTAssertEqual(detailed.verification.summaryState, .notSigned)
         XCTAssertTrue(detailed.verification.signatures.isEmpty)
     }
 
@@ -647,12 +647,8 @@ final class DecryptionServiceTests: XCTestCase {
 
         XCTAssertEqual(detailed.plaintext, expected.plaintext)
         XCTAssertEqual(
-            detailed.verification.legacyStatus,
-            messageStatus(from: expected.legacyStatus)
-        )
-        XCTAssertEqual(
-            detailed.verification.legacySignerFingerprint,
-            expected.legacySignerFingerprint
+            detailed.verification.summaryEntryIndex,
+            expected.summaryEntryIndex
         )
         assertDetailedEntriesMatchFFI(
             detailed.verification.signatures,
@@ -694,11 +690,8 @@ final class DecryptionServiceTests: XCTestCase {
         let detailed = try await stack.decryptionService.decryptDetailed(phase1: phase1)
 
         XCTAssertEqual(detailed.plaintext, plaintext)
-        XCTAssertEqual(detailed.verification.legacyStatus, .unknownSigner)
-        XCTAssertNil(detailed.verification.legacySignerFingerprint)
         XCTAssertEqual(detailed.verification.summaryState, .contactsContextUnavailable)
         XCTAssertEqual(detailed.verification.contactsUnavailableReason, .locked)
-        XCTAssertTrue(detailed.verification.legacyVerification.requiresContactsContext)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
         XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .contactsContextUnavailable)
@@ -886,7 +879,7 @@ final class DecryptionServiceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: expectedOutputURL) }
 
         XCTAssertEqual(try Data(contentsOf: detailed.artifact.fileURL), inMemory.plaintext)
-        XCTAssertEqual(detailed.verification.legacyStatus, inMemory.verification.legacyStatus)
+        XCTAssertEqual(detailed.verification.summaryState, inMemory.verification.summaryState)
         assertDetailedEntriesMatchFFI(
             detailed.verification.signatures,
             expected.signatures
@@ -1342,21 +1335,6 @@ final class DecryptionServiceTests: XCTestCase {
             return .unknownSigner
         case .bad:
             return .bad
-        case .expired:
-            return .expired
-        }
-    }
-
-    private func messageStatus(from status: SignatureStatus) -> MessageSignatureStatus {
-        switch status {
-        case .valid:
-            return .valid
-        case .unknownSigner:
-            return .unknownSigner
-        case .bad:
-            return .bad
-        case .notSigned:
-            return .notSigned
         case .expired:
             return .expired
         }

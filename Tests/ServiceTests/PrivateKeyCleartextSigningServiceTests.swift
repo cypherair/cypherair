@@ -63,7 +63,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             identity: identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_secureEnclaveRouteSignsWithoutUnwrappingSecretCertificate() async throws {
@@ -92,7 +92,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             identity: fixture.identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_secureEnclaveCleartextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
@@ -127,7 +127,7 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             identity: fixture.identity,
             messageAdapter: messageAdapter
         )
-        XCTAssertEqual(verification.legacyStatus, .valid)
+        XCTAssertEqual(verification.summaryState, .verified)
     }
 
     func test_blockedRouteThrowsUnavailableCategoryWithoutUnwrapping() async throws {

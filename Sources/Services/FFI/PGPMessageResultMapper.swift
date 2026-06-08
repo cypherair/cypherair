@@ -8,8 +8,6 @@ enum PGPMessageResultMapper {
         (
             plaintext: result.plaintext,
             verification: detailedVerification(
-                legacyStatus: result.legacyStatus,
-                legacySignerFingerprint: result.legacySignerFingerprint,
                 summaryState: result.summaryState,
                 summaryEntryIndex: result.summaryEntryIndex,
                 signatures: result.signatures,
@@ -25,8 +23,6 @@ enum PGPMessageResultMapper {
         context: PGPMessageVerificationContext
     ) -> DetailedSignatureVerification {
         detailedVerification(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
             summaryState: result.summaryState,
             summaryEntryIndex: result.summaryEntryIndex,
             signatures: result.signatures,
@@ -51,8 +47,6 @@ enum PGPMessageResultMapper {
             return .decrypted(
                 plaintext: plaintext,
                 verification: detailedVerification(
-                    legacyStatus: result.signatureStatus ?? .notSigned,
-                    legacySignerFingerprint: result.signerFingerprint,
                     summaryState: result.summaryState,
                     summaryEntryIndex: result.summaryEntryIndex,
                     signatures: result.signatures,
@@ -77,8 +71,6 @@ enum PGPMessageResultMapper {
         (
             text: result.content,
             verification: detailedVerification(
-                legacyStatus: result.legacyStatus,
-                legacySignerFingerprint: result.legacySignerFingerprint,
                 summaryState: result.summaryState,
                 summaryEntryIndex: result.summaryEntryIndex,
                 signatures: result.signatures,
@@ -94,8 +86,6 @@ enum PGPMessageResultMapper {
         context: PGPMessageVerificationContext
     ) -> DetailedSignatureVerification {
         detailedVerification(
-            legacyStatus: result.legacyStatus,
-            legacySignerFingerprint: result.legacySignerFingerprint,
             summaryState: result.summaryState,
             summaryEntryIndex: result.summaryEntryIndex,
             signatures: result.signatures,
@@ -106,8 +96,6 @@ enum PGPMessageResultMapper {
     }
 
     private static func detailedVerification(
-        legacyStatus: SignatureStatus,
-        legacySignerFingerprint: String?,
         summaryState: SignatureVerificationState,
         summaryEntryIndex: UInt64?,
         signatures: [DetailedSignatureEntry],
@@ -117,11 +105,6 @@ enum PGPMessageResultMapper {
     ) -> DetailedSignatureVerification {
         let contactKeysForVerification = contactsAvailability.allowsContactsVerification ? contactKeys : []
         let unavailableReason = contactsAvailability.allowsContactsVerification ? nil : contactsAvailability
-        let legacySignerIdentity = SignatureVerification.SignerIdentity.resolve(
-            fingerprint: legacySignerFingerprint,
-            contactKeys: contactKeysForVerification,
-            ownKeys: ownKeys
-        )
 
         let mappedEntries = signatures.map { entry in
             let appState = SignatureVerification.VerificationState(
@@ -148,31 +131,11 @@ enum PGPMessageResultMapper {
         )
 
         return DetailedSignatureVerification(
-            legacyStatus: MessageSignatureStatus(from: legacyStatus),
-            legacySignerFingerprint: legacySignerFingerprint,
-            legacySignerIdentity: legacySignerIdentity,
             summaryState: appSummaryState,
             summaryEntryIndex: summaryEntryIndex,
             contactsUnavailableReason: appSummaryState == .contactsContextUnavailable ? unavailableReason : nil,
             signatures: mappedEntries
         )
-    }
-}
-
-private extension MessageSignatureStatus {
-    init(from status: SignatureStatus) {
-        switch status {
-        case .valid:
-            self = .valid
-        case .unknownSigner:
-            self = .unknownSigner
-        case .bad:
-            self = .bad
-        case .notSigned:
-            self = .notSigned
-        case .expired:
-            self = .expired
-        }
     }
 }
 

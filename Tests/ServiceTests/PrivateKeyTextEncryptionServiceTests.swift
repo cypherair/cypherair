@@ -25,7 +25,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(unwrapper.unwrapRequests, [])
         let result = try decrypt(ciphertext, recipientSecret: recipient.certData, verificationKeys: [])
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "unsigned text")
-        XCTAssertEqual(result.legacyStatus, .notSigned)
+        XCTAssertEqual(result.summaryState, .notSigned)
     }
 
     func test_softwareRouteSignsWithUnwrappedSecretCertificate() async throws {
@@ -64,7 +64,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             verificationKeys: [identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "software signed text")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveRouteSignsWithoutUnwrappingSecretCertificate() async throws {
@@ -93,7 +93,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             verificationKeys: [fixture.identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave signed text")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveV6RouteSignsAndVerifies() async throws {
@@ -126,7 +126,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             verificationKeys: [fixture.identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave v6 signed text")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveTextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
@@ -180,7 +180,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             verificationKeys: [fixture.identity.publicKeyData]
         )
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave routed text")
-        XCTAssertEqual(result.legacyStatus, .valid)
+        XCTAssertEqual(result.summaryState, .verified)
     }
 
     func test_secureEnclaveTextSigningWithSelfKeyUsesRealRouterAndDoesNotUnwrap() async throws {
@@ -223,7 +223,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
                 verificationKeys: [fixture.identity.publicKeyData]
             )
             XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "secure enclave text with self key")
-            XCTAssertEqual(result.legacyStatus, .valid)
+            XCTAssertEqual(result.summaryState, .verified)
         }
     }
 

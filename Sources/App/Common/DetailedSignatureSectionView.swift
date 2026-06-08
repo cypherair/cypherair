@@ -9,7 +9,7 @@ struct DetailedSignatureSectionView: View {
         Section {
             VStack(alignment: .leading, spacing: 16) {
                 if signatureEntries.isEmpty {
-                    statusRow(for: verification.legacyVerification)
+                    statusRow(for: verification.summaryVerification)
                 } else {
                     ForEach(Array(signatureEntries.enumerated()), id: \.offset) { index, entryVerification in
                         statusRow(for: entryVerification)
@@ -47,9 +47,10 @@ struct DetailedSignatureSectionView: View {
 
     private var signerEntries: [SignatureVerification] {
         if signatureEntries.isEmpty {
-            return verification.legacyVerification.shouldShowSignerIdentity
-                ? [verification.legacyVerification]
-                : []
+            // No per-signature entries → no signer identity to show. Empty `signatures` carries no
+            // observed signer; the summary status row already conveys the not-signed/invalid/expired
+            // outcome.
+            return []
         }
 
         return signatureEntries.filter(\.shouldShowSignerIdentity)

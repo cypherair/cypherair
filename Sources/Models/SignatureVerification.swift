@@ -90,11 +90,11 @@ struct SignatureVerification {
         status: MessageSignatureStatus,
         signerFingerprint: String?,
         signerIdentity: SignerIdentity? = nil,
-        verificationState: VerificationState? = nil,
+        verificationState: VerificationState,
         contactsUnavailableReason: ContactsAvailability? = nil
     ) {
         self.status = status
-        self.verificationState = verificationState ?? VerificationState(legacyStatus: status)
+        self.verificationState = verificationState
         self.signerFingerprint = signerFingerprint
         self.contactsUnavailableReason = contactsUnavailableReason
         self.signerIdentity = signerIdentity ?? signerFingerprint.map {

@@ -70,7 +70,7 @@ final class VerifyScreenModelTests: XCTestCase {
 
         XCTAssertTrue(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.filePickerTarget)
-        XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.cleartextDetailedVerification?.summaryState, .verified)
         XCTAssertEqual(model.cleartextOriginalText, "Original signed message")
         let startingEpoch = model.textInputSectionEpoch
 
@@ -132,12 +132,12 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertEqual(model.signatureFileName, signatureURL.lastPathComponent)
 
         model.verifyMode = .detached
-        XCTAssertEqual(model.activeDetailedVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.activeDetailedVerification?.summaryState, .invalid)
 
         model.verifyMode = .cleartext
-        XCTAssertEqual(model.activeDetailedVerification?.legacyStatus, .valid)
+        XCTAssertEqual(model.activeDetailedVerification?.summaryState, .verified)
         XCTAssertEqual(model.cleartextOriginalText, "Cleartext content")
-        XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.detachedDetailedVerification?.summaryState, .invalid)
     }
 
     @MainActor
@@ -152,7 +152,7 @@ final class VerifyScreenModelTests: XCTestCase {
 
         XCTAssertNil(model.cleartextDetailedVerification)
         XCTAssertNil(model.cleartextOriginalText)
-        XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.detachedDetailedVerification?.summaryState, .invalid)
         XCTAssertEqual(model.textInputSectionEpoch, startingEpoch)
     }
 
@@ -198,8 +198,8 @@ final class VerifyScreenModelTests: XCTestCase {
         XCTAssertFalse(model.importedCleartext.hasImportedFile)
         XCTAssertNil(model.filePickerTarget)
         XCTAssertEqual(model.cleartextOriginalText, "Original")
-        XCTAssertEqual(model.cleartextDetailedVerification?.legacyStatus, .valid)
-        XCTAssertEqual(model.detachedDetailedVerification?.legacyStatus, .bad)
+        XCTAssertEqual(model.cleartextDetailedVerification?.summaryState, .verified)
+        XCTAssertEqual(model.detachedDetailedVerification?.summaryState, .invalid)
         XCTAssertEqual(model.originalFileName, "original")
         XCTAssertEqual(model.signatureFileName, "original.sig")
     }
@@ -350,17 +350,17 @@ final class VerifyScreenModelTests: XCTestCase {
         status: MessageSignatureStatus,
         signerFingerprint: String? = nil
     ) -> DetailedSignatureVerification {
-        DetailedSignatureVerification(
-            legacyStatus: status,
-            legacySignerFingerprint: signerFingerprint,
-            legacySignerIdentity: nil,
-            signatures: status == .notSigned ? [] : [
-                DetailedSignatureVerification.Entry(
-                    status: makeDetailedEntryStatus(from: status),
-                    signerPrimaryFingerprint: signerFingerprint,
-                    signerIdentity: nil
-                )
-            ]
+        let entries: [DetailedSignatureVerification.Entry] = status == .notSigned ? [] : [
+            DetailedSignatureVerification.Entry(
+                status: makeDetailedEntryStatus(from: status),
+                signerPrimaryFingerprint: signerFingerprint,
+                signerIdentity: nil
+            )
+        ]
+        return DetailedSignatureVerification(
+            summaryState: entries.first?.verificationState ?? .notSigned,
+            summaryEntryIndex: entries.isEmpty ? nil : 0,
+            signatures: entries
         )
     }
 
