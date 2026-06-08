@@ -319,7 +319,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                     let decodedSnapshot = try ContactsDomainSnapshotCodec.decodeSnapshot(plaintext)
                     candidates.append(
                         OpenedSnapshot(
-                            snapshot: decodedSnapshot.snapshot,
+                            snapshot: decodedSnapshot,
                             generationIdentifier: envelope.generationIdentifier
                         )
                     )

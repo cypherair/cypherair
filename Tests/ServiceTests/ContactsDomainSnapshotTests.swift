@@ -12,9 +12,8 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         XCTAssertEqual(String(data: encoded.prefix(6), encoding: .utf8), "bplist")
 
         let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(encoded)
-        XCTAssertEqual(decoded.snapshot, snapshot)
-        XCTAssertEqual(decoded.sourceSchemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
-        try decoded.snapshot.validateContract()
+        XCTAssertEqual(decoded, snapshot)
+        try decoded.validateContract()
     }
 
     func test_unsupportedSchemaVersion_isRejected() throws {
@@ -170,7 +169,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(
             try encoder.encode(legacySnapshot)
         )
-        let artifact = try XCTUnwrap(decoded.snapshot.certificationArtifacts.first)
+        let artifact = try XCTUnwrap(decoded.certificationArtifacts.first)
 
         XCTAssertEqual(artifact.validationStatus, .revalidationNeeded)
         XCTAssertEqual(artifact.source, .imported)

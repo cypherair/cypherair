@@ -14,14 +14,11 @@ enum ContactsDomainSnapshotCodec {
         return try encoder.encode(snapshot)
     }
 
-    static func decodeSnapshot(_ data: Data) throws -> (
-        snapshot: ContactsDomainSnapshot,
-        sourceSchemaVersion: Int
-    ) {
+    static func decodeSnapshot(_ data: Data) throws -> ContactsDomainSnapshot {
         let decoder = PropertyListDecoder()
-        let sourceSchemaVersion = try decoder.decode(SchemaProbe.self, from: data).schemaVersion
+        let schemaVersion = try decoder.decode(SchemaProbe.self, from: data).schemaVersion
         let snapshot: ContactsDomainSnapshot
-        switch sourceSchemaVersion {
+        switch schemaVersion {
         case ContactsDomainSnapshot.currentSchemaVersion:
             snapshot = try decoder.decode(ContactsDomainSnapshot.self, from: data)
         default:
@@ -32,7 +29,7 @@ enum ContactsDomainSnapshotCodec {
         try mapValidationError {
             try snapshot.validateContract()
         }
-        return (snapshot, sourceSchemaVersion)
+        return snapshot
     }
 
     private static func mapValidationError<T>(_ operation: () throws -> T) throws -> T {
