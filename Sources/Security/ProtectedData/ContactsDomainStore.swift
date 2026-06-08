@@ -13,7 +13,6 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
     private struct OpenedSnapshot {
         let snapshot: ContactsDomainSnapshot
         let generationIdentifier: Int
-        let sourceSchemaVersion: Int
     }
 
     private let storageRoot: ProtectedDataStorageRoot
@@ -131,23 +130,13 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         }
 
         do {
-            var (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+            let openedSnapshot: OpenedSnapshot
+            var unwrappedDomainMasterKey: Data
+            (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
                 wrappingRootKey: wrappingRootKey
             )
             defer {
                 unwrappedDomainMasterKey.protectedDataZeroize()
-            }
-            if openedSnapshot.sourceSchemaVersion < ContactsDomainSnapshot.currentSchemaVersion {
-                let migratedGenerationIdentifier = openedSnapshot.generationIdentifier + 1
-                try writeSnapshotGeneration(
-                    openedSnapshot.snapshot,
-                    generationIdentifier: migratedGenerationIdentifier,
-                    domainMasterKey: unwrappedDomainMasterKey
-                )
-                unwrappedDomainMasterKey.protectedDataZeroize()
-                (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
-                    wrappingRootKey: wrappingRootKey
-                )
             }
             let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
@@ -331,8 +320,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                     candidates.append(
                         OpenedSnapshot(
                             snapshot: decodedSnapshot.snapshot,
-                            generationIdentifier: envelope.generationIdentifier,
-                            sourceSchemaVersion: decodedSnapshot.sourceSchemaVersion
+                            generationIdentifier: envelope.generationIdentifier
                         )
                     )
                 } catch {

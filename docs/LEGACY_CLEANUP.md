@@ -46,13 +46,12 @@ hold the old source.
 | 2 | Key-metadata Keychain → ProtectedData | legacy `metadataAccount` + default-account `PGPKeyIdentity` rows → `key-metadata` domain (schema v2) | `KeyMetadataStore.swift:60,79,120`; `KeyMetadataDomainStore.swift:132,169,535,542,626`; `KeyManagementService.swift:184,198`; `KeyCatalogStore.swift:26,37` | All supported installs migrated; cleanup retries no longer needed | **High** — wrong cleanup can hide keys |
 | 3 | Private-key-control legacy defaults | legacy `UserDefaults` `authMode`/rewrap/modify-expiry → `private-key-control` domain | `PrivateKeyControlStore.swift:606,617,629` (reads), `:647-651` (`cleanupLegacyDefaults`), called at `:142,194,404`; keys in `AuthenticationEvaluable.swift:395-412` | Old-install migration support ends | **High** — auth-sensitive |
 | 4 | Protected-settings v1 → v2 + legacy ordinary settings | schema-v1 payload (`clipboardNotice` only) + legacy `com.cypherair.preference.*` `UserDefaults` → schema-v2 ordinary settings | `ProtectedSettingsStore.swift:14` (`PayloadV1`), `:25` (`requiresOrdinarySettingsMigration`), `:850-885,896`, `:1028-1041` (`legacyOrdinarySettingsSnapshot`/`removeLegacySettingsSources`); `ProtectedOrdinarySettingsPersistence.swift:17` (`LegacyOrdinarySettingsStore`) | Supported installs expected to hold schema v2 | **High** — can reset auth-adjacent settings / fail-open |
-| 5 | Contacts snapshot v1 → v2 | schema-v1 `ContactsDomainSnapshot` (`recipientLists`) → v2 (`recipientLists` dropped) | `ContactsDomainSnapshotCodec.swift:8` (`LegacySnapshotV1`), `:38-39,52-60` (`migrateLegacyV1Snapshot`); `ContactsDomainSnapshot.swift:4,27` | Supported installs expected to hold v2 contacts | Medium |
 | 6 | Local-data cleanup | removes legacy `Documents/self-test/` + orphan `com.cypherair.tutorial.<UUID>` defaults suites, and (gated on #1/#2) the legacy right-store + metadata-account reset hooks. **Keep:** the root-secret format-floor / device-binding / legacy-cleanup markers are current security — Reset-All must keep *deleting* them; they are not removable code | `AppTemporaryArtifactStore.swift:10,126` (`legacyTutorialDefaultsSuitePrefix`, `cleanupTutorialDefaultsSuites`); `AppStartupCoordinator.swift:131,134,143` (startup cleanup, `legacySelfTestReportDirectory`); `LocalDataResetService.swift:415,472` (reset enumeration + post-reset validation) | Those paths can no longer exist on supported installs | Medium — Reset-All correctness depends on exhaustive deletion |
 
 > **Row 3 caveat:** Only the **legacy-defaults import/cleanup** is removable. The
 > rewrap **recovery-journal** logic in the same file is current behavior — keep it.
 
-Authoritative migration-readiness for rows 2–5 lives in
+Authoritative migration-readiness for rows 2–4 lives in
 [PERSISTED_STATE_INVENTORY.md:45-57,61](PERSISTED_STATE_INVENTORY.md) — all marked
 `Implemented` (migration done; legacy source kept **only** as a verified cleanup source).
 
@@ -95,6 +94,7 @@ block reintroduction.
 - Simple Rust/UniFFI `decrypt` / `decrypt_file` / `verify_cleartext` / `verify_detached` / `verify_detached_file` (+ generated Swift) — only the `*_detailed` variants remain.
 - Raw first-match User-ID FFI (`generate_user_id_certification`, `generate_user_id_revocation`, `verify_user_id_binding_signature`, `find_user_id_first_match`) — only the `*_by_selector` variants remain.
 - Tracked `scripts/experiments/` — removed (`6c4356e`, `a2c00b2`).
+- Contacts snapshot v1→v2 migration (`LegacySnapshotV1`, `migrateLegacyV1Snapshot`, decode `case 1`, and the `ContactsDomainStore` upgrade-on-read writeback) — removed under the 2026-06-08 cutoff (PR-A1). A schema v1 payload now fails closed via the unsupported-version `default` (routes the Contacts domain to recovery, never a silent reset); the fail-closed `default` is **kept**.
 
 ## 4. Do NOT remove — permanent interop / security
 

@@ -261,7 +261,7 @@ The App offers two authentication modes, selectable in Settings:
 - Contacts are person-centered entries, not bare public-key files. A contact may have one preferred key, additional active keys, and historical keys retained for signer recognition and audit context.
 - Contact detail separates local manual fingerprint verification from OpenPGP certification. Manual verification is a local user assertion; saved certification artifacts are cryptographic evidence and may be exported explicitly as certification signatures.
 - Contacts support search and free-form tags. Encrypt can use a tag as a one-click batch selection entry that adds the tag's currently encryptable contacts to the explicit recipient selection; users may then add, remove, or clear selected recipients before sending.
-- Contacts schema v2 no longer stores recipient lists. Opening a legacy schema v1 Contacts payload deletes `recipientLists` during migration and writes back a verified v2 generation; list names are not converted into tags.
+- Contacts schema v2 no longer stores recipient lists. Legacy schema v1 Contacts payloads are unsupported as of the 2026-06-08 cutoff and fail closed (route to recovery) instead of migrating; list names are not converted into tags.
 - Contacts package exchange is not active. Any future complete Contacts backup or device migration must be designed as mandatory encrypted export/import, not as plaintext or optional-encryption social-graph export.
 
 ### 5.3 Encryption / Decryption

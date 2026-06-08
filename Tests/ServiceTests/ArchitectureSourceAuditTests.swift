@@ -1565,14 +1565,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #5 contacts snapshot v1→v2 migration; removed by PR-A1 under the 2026-06-08 cutoff.",
-                [
-                    "Sources/Security/ProtectedData/ContactsDomainSnapshotCodec.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupRootSecretRightStoreSymbols = ArchitectureSourceAuditRule(
