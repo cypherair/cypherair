@@ -393,6 +393,9 @@ struct CypherAirApp: App {
                             AppLockSurfaceView(appLockController: container.appLockController)
                         }
                     }
+                    #if os(macOS)
+                    .authenticationPresentationHost(container.macAuthenticationPresenter)
+                    #endif
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )

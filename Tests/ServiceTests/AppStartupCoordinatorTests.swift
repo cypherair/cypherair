@@ -362,6 +362,7 @@ final class AppStartupCoordinatorTests: XCTestCase {
             authLifecycleTraceStore: nil,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
+            macAuthenticationPresenter: PassthroughAuthenticationPresenter(),
             secureEnclave: mockSE,
             keychain: mockKC,
             authManager: authManager,

@@ -5,6 +5,7 @@ final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
     let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
+    let macAuthenticationPresenter: any AuthenticationPresenting
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
@@ -42,6 +43,7 @@ final class AppContainer: @unchecked Sendable {
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         appLockController: AppLockController,
         authPromptCoordinator: AuthenticationPromptCoordinator,
+        macAuthenticationPresenter: any AuthenticationPresenting,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
@@ -77,6 +79,7 @@ final class AppContainer: @unchecked Sendable {
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
+        self.macAuthenticationPresenter = macAuthenticationPresenter
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authManager = authManager
@@ -572,6 +575,11 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        let macAuthenticationPresenter: any AuthenticationPresenting = MacAuthenticationPresenter()
+        #else
+        let macAuthenticationPresenter: any AuthenticationPresenting = PassthroughAuthenticationPresenter()
+        #endif
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
@@ -861,6 +869,7 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
+            macAuthenticationPresenter: macAuthenticationPresenter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
@@ -919,6 +928,11 @@ final class AppContainer: @unchecked Sendable {
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        let macAuthenticationPresenter: any AuthenticationPresenting = MacAuthenticationPresenter()
+        #else
+        let macAuthenticationPresenter: any AuthenticationPresenting = PassthroughAuthenticationPresenter()
+        #endif
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
@@ -1186,6 +1200,7 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
+            macAuthenticationPresenter: macAuthenticationPresenter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
