@@ -122,7 +122,6 @@ $(SRCROOT)/Sources/App/Settings/LicenseListView.swift
 $(SRCROOT)/Sources/App/Settings/LocalDataResetRestartAction.swift
 $(SRCROOT)/Sources/App/Settings/LocalDataResetRestartCoordinator.swift
 $(SRCROOT)/Sources/App/Settings/LocalDataResetService.swift
-$(SRCROOT)/Sources/App/Settings/MacSettingsRootView.swift
 $(SRCROOT)/Sources/App/Settings/MainWindowSettingsRootView.swift
 $(SRCROOT)/Sources/App/Settings/OpenSourceNotice.swift
 $(SRCROOT)/Sources/App/Settings/OpenSourceNoticeStore.swift

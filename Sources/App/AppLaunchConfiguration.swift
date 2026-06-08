@@ -3,7 +3,6 @@ import Foundation
 struct AppLaunchConfiguration {
     enum Root: String {
         case main
-        case settings
         case tutorial
     }
 

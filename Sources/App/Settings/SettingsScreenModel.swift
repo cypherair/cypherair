@@ -135,7 +135,7 @@ final class SettingsScreenModel {
 
     var shouldShowClipboardNoticeRow: Bool {
         switch configuration.protectedSettingsHostMode {
-        case .mainWindowLive, .settingsSceneProxy, .tutorialSandbox:
+        case .mainWindowLive, .tutorialSandbox:
             true
         }
     }
@@ -415,10 +415,6 @@ final class SettingsScreenModel {
         localDataResetSucceeded = false
     }
 
-    func openProtectedSettingsInMainWindow() {
-        protectedSettingsHost?.openMainWindow()
-    }
-
     private var hasBackup: Bool {
         keyManagement.keys.contains(where: \.isBackedUp)
     }
@@ -436,8 +432,6 @@ final class SettingsScreenModel {
         switch configuration.protectedSettingsHostMode {
         case .mainWindowLive:
             .locked
-        case .settingsSceneProxy:
-            .settingsSceneProxy
         case .tutorialSandbox:
             .tutorialSandbox
         }

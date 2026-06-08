@@ -17,10 +17,8 @@ struct ContentView: View {
 struct MacAppShellView: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
 
-    let tutorialLaunchRelay: MacTutorialLaunchRelay
-    let tutorialHostAvailability: MacTutorialHostAvailability
-
-    @State private var navigationState = MacShellNavigationState()
+    let navigationState: MacShellNavigationState
+    let opensAuthModeConfirmation: Bool
 
     var body: some View {
         @Bindable var navigationState = navigationState
@@ -50,14 +48,10 @@ struct MacAppShellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .screenReady("main.ready")
-        .macPresentationHost(
-            $navigationState.activePresentation,
-            hostMode: .mainWindow,
-            tutorialLaunchRelay: tutorialLaunchRelay,
-            tutorialHostAvailability: tutorialHostAvailability
-        )
+        .macPresentationHost($navigationState.activePresentation)
         .task {
             presentOnboardingIfNeeded()
+            presentLaunchAuthModeConfirmationIfNeeded()
         }
         .onChange(of: protectedOrdinarySettings.state) { _, _ in
             presentOnboardingIfNeeded()
@@ -70,6 +64,19 @@ struct MacAppShellView: View {
             return
         }
         navigationState.activePresentation = .onboarding(initialPage: 0)
+    }
+
+    // UITest-only: auto-present the auth-mode confirmation in the main window when launched
+    // with UITEST_OPEN_AUTHMODE_CONFIRMATION (relocated from the removed MacSettingsRootView).
+    private func presentLaunchAuthModeConfirmationIfNeeded() {
+        guard opensAuthModeConfirmation,
+              navigationState.activePresentation == nil else {
+            return
+        }
+        navigationState.selectedTab = .settings
+        navigationState.activePresentation = .authModeConfirmation(
+            SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()
+        )
     }
 
     private func sidebarRow(_ tab: AppShellTab) -> some View {

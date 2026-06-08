@@ -120,25 +120,6 @@ struct SettingsProtectedClipboardNoticeRow: View {
                 )
             )
             .foregroundStyle(.secondary)
-        case .settingsSceneProxy:
-            VStack(alignment: .leading, spacing: 10) {
-                Text(
-                    String(
-                        localized: "protectedSettings.proxy.message",
-                        defaultValue: "Clipboard Safety Notice can only be viewed and changed from the main window."
-                    )
-                )
-                .foregroundStyle(.secondary)
-
-                Button(
-                    String(
-                        localized: "protectedSettings.proxy.openMainWindow",
-                        defaultValue: "Open Main Window"
-                    )
-                ) {
-                    model.openProtectedSettingsInMainWindow()
-                }
-            }
         case .tutorialSandbox:
             Text(
                 String(

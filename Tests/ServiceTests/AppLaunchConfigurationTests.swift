@@ -81,4 +81,17 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertFalse(configuration.shouldSkipOnboarding)
         XCTAssertNil(configuration.tutorialModule)
     }
+
+    func test_retiredSettingsRoot_fallsBackToMain() {
+        // The standalone macOS settings surface (UITEST_ROOT="settings") was removed in
+        // the single-window unification; the now-unknown value must fall back to .main.
+        let configuration = AppLaunchConfiguration(
+            environment: ["UITEST_ROOT": "settings"],
+            detectsXCTestHost: false,
+            allowsUITestLaunchOverrides: true
+        )
+
+        XCTAssertEqual(configuration.root, .main)
+        XCTAssertTrue(configuration.isUITestMode)
+    }
 }

@@ -181,7 +181,6 @@
 				App/Settings/LocalDataResetRestartAction.swift,
 				App/Settings/LocalDataResetRestartCoordinator.swift,
 				App/Settings/LocalDataResetService.swift,
-				App/Settings/MacSettingsRootView.swift,
 				App/Settings/MainWindowSettingsRootView.swift,
 				App/Settings/OpenSourceNotice.swift,
 				App/Settings/OpenSourceNoticeStore.swift,
