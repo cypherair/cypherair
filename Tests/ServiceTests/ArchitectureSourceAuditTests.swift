@@ -231,31 +231,31 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.protectedDataAuthorizationConcreteKeychainErrorClassification)
     }
 
-    func test_legacyCleanup_item2_keyMetadataMigration_staysBehindCutoffExceptions() throws {
+    func test_legacyCleanup_item2_keyMetadataMigration_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupKeyMetadataMigrationSymbols)
     }
 
-    func test_legacyCleanup_item3_privateKeyControlDefaults_staysBehindCutoffExceptions() throws {
+    func test_legacyCleanup_item3_privateKeyControlDefaults_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupPrivateKeyControlDefaultsSymbols)
     }
 
-    func test_legacyCleanup_item4_protectedSettingsMigration_staysBehindCutoffException() throws {
+    func test_legacyCleanup_item4_protectedSettingsMigration_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupProtectedSettingsMigrationSymbols)
     }
 
-    func test_legacyCleanup_item5_contactsSnapshotMigration_staysBehindCutoffException() throws {
+    func test_legacyCleanup_item5_contactsSnapshotMigration_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupContactsSnapshotMigrationSymbols)
     }
 
-    func test_legacyCleanup_item1A_rootSecretRightStore_staysBehindCutoffExceptions() throws {
+    func test_legacyCleanup_item1A_rootSecretRightStore_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRootSecretRightStoreSymbols)
     }
 
-    func test_legacyCleanup_item1B_rawRootSecret_staysBehindCutoffException() throws {
+    func test_legacyCleanup_item1B_rawRootSecret_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRawRootSecretSymbols)
     }
 
-    func test_legacyCleanup_item7_revocationBackfill_staysBehindCutoffExceptions() throws {
+    func test_legacyCleanup_item7_revocationBackfill_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRevocationBackfillSymbols)
     }
 
@@ -1463,16 +1463,16 @@ private enum ArchitectureSourceAuditRules {
 
     // MARK: - Legacy-cleanup reintroduction guardrails (2026-06-08 support cutoff)
     //
-    // Each rule forbids the Swift symbols a later legacy-cleanup PR removes (LEGACY_CLEANUP.md §2,
-    // maintainer-approved support cutoff dated 2026-06-08). Until that PR lands, the production file
-    // that still holds the symbol is listed as a temporary exception. The removal PR must delete the
-    // symbol AND its matching exception in lockstep: `assertRulePasses` fails if a symbol is gone but
-    // its exception remains, or if an exception is dropped while the symbol still exists. See
-    // docs/LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md §7.
+    // Each rule forbids Swift symbols that strict legacy-retirement cleanup removes
+    // (docs/LEGACY_CLEANUP.md, 2026-06-08 cutoff). Until that PR lands, the production file
+    // that still holds the symbol is listed as a temporary allowance. The removal PR must delete the
+    // symbol AND its matching allowance in lockstep: `assertRulePasses` fails if a symbol is gone but
+    // its allowance remains, or if an allowance is dropped while the symbol still exists. See
+    // docs/LEGACY_CLEANUP.md Guardrails.
     //
     // Item #9 (Swift) symbols — legacyStatus, legacySignerFingerprint, legacySignerIdentity,
-    // legacyVerification — are intentionally NOT covered here; they are added to this guardrail in
-    // PR-D4, after Track D removes them.
+    // legacyVerification — are added when Phase 6 retires the remaining Rust/UniFFI legacy signature
+    // surface and generated Swift fields.
 
     static let legacyCleanupKeyMetadataMigrationSymbols = ArchitectureSourceAuditRule(
         name: "Legacy cleanup #2 key-metadata migration symbols",
@@ -1544,7 +1544,7 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Item #4 protected-settings v1→v2 + legacy ordinary-settings migration bridge; removed by PR-C3 under the 2026-06-08 cutoff. LegacyOrdinarySettingsStore is a live backend and stays.",
+                "Item #4 protected-settings v1→v2 + legacy ordinary-settings migration bridge; removed under the strict retirement roadmap together with old ordinary-settings UserDefaults dependencies.",
                 [
                     "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
                 ]
@@ -1585,7 +1585,7 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Item #1A legacy LARight right-store migration; removed by PR-C4 under the 2026-06-08 cutoff. The modern v2 envelope + device-binding stay.",
+                "Item #1A legacy LARight right-store migration; removed under the strict retirement roadmap. Current root-secret envelope and device-binding coverage use current-model data.",
                 [
                     "Sources/App/AppContainer.swift",
                     "Sources/App/Settings/LocalDataResetService.swift",
@@ -1612,7 +1612,7 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Item #1B raw-v1 root-secret migration; removed by PR-C5 under the 2026-06-08 cutoff. The anti-downgrade throw and CAPDSEF2 format-floor stay.",
+                "Item #1B raw-v1 root-secret migration; removed under the strict retirement roadmap. Current root-secret format-floor coverage must not seed or name raw-v1 data.",
                 [
                     "Sources/Security/ProtectedData/ProtectedDataRightStoreClient.swift",
                 ]
