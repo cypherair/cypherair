@@ -14,10 +14,10 @@ case, or carry dedicated tests for its input data.
 App-owned old persisted models, old schemas, migration sources, fallback
 decoders, upgrade-on-read paths, cleanup-only legacy hooks, and legacy fixture
 dependencies are retirement targets. Production, tutorial, UI-test, and unit
-test callers that keep those targets alive must be rewritten to current models
+test callers that depend on those targets must be rewritten to current models
 or removed with the old surface.
 
-Cleanup is incomplete if old behavior survives through any of these forms:
+Cleanup is incomplete when old behavior survives through any of these forms:
 
 - renaming a type, method, field, stored key, or helper while carrying the same
   old behavior forward
@@ -30,31 +30,31 @@ Cleanup is incomplete if old behavior survives through any of these forms:
   removed
 
 If old data remains on disk after support ends, new software treats it like any
-other unknown or corrupted current-model input. The software must not keep code
-that identifies why the data is old, and it must not add tests for old data's
-post-cutoff failure behavior. Existing current-model validation, corruption,
-recovery, and error handling are sufficient.
+other unknown or corrupted current-model input. The software must not contain
+code that identifies why the data is old, and it must not add tests for old
+data's post-cutoff failure behavior. Existing current-model validation,
+corruption, recovery, and error handling are sufficient.
 
-This draft grants no approval to leave any listed legacy behavior in place. Any
-future request to preserve one must be raised separately and explicitly approved
-by the maintainer before implementation.
+This draft records retirement targets only. It does not create a mechanism for
+continuing app-owned old models inside new software. Changing that doctrine
+requires a separate policy revision outside this inventory.
 
 ## Test Policy
 
-Delete tests that only validate old migration success, old compatibility decode,
-old fallback behavior, old cleanup hooks, old fixture behavior, or old input
+Delete tests that validate old migration success, old compatibility decode, old
+fallback behavior, old cleanup hooks, old fixture behavior, or old input
 failure.
 
-Migrate a test only when it proves a current invariant that would otherwise lose
-coverage, such as current-schema validation, current protected-domain recovery,
-relock cleanup, mutation rollback, no silent reset of unreadable current data,
-current signature summary/detail behavior, or current tutorial sandbox cleanup.
+Rewrite coverage only when it proves a current invariant with
+current-model fixtures or ordinary malformed current data. Rewritten tests must
+not seed, decode, fixture, identify, or assert known old payloads, old keys, old
+defaults, old suites, old rows, or old artifact shapes.
 
 Do not add new tests for how old-model data should fail after support ends. Once
 cleanup is complete, the software should not know enough about the old model for
 that behavior to be a product contract. Old-input tests such as Contacts
-schema-v1 fail-closed checks and legacy artifact decode fixtures are retirement
-candidates, not future contracts.
+schema-v1 fail-closed checks and legacy artifact decode fixtures are deletion
+targets.
 
 ## Mandatory Retirement Inventory
 
@@ -69,8 +69,8 @@ candidates, not future contracts.
 - Required removal: delete the legacy right read, authorization, migration,
   deferral, tracing, and reset hooks. Old right-only installs must not migrate.
 - Test action: delete old right-store migration/deferred-authorization tests.
-  Migrate only current root-secret authorization, recovery, and relock
-  invariants.
+  Rewrite current root-secret authorization, recovery, and relock coverage using
+  current setup only.
 
 ### Raw V1 Root Secret Payload
 
@@ -82,11 +82,14 @@ candidates, not future contracts.
 - Current callers: `KeychainProtectedDataRootSecretStore.loadRootSecret`,
   `ProtectedDataRootSecretCoordinator`, and local-data reset validation.
 - Required removal: delete raw-v1 detection, migration, post-migration cleanup
-  marker handling, and cleanup-marker reset validation. Keep current
-  `ProtectedDataRootSecretFormatFloorStore` anti-downgrade behavior as current
-  security state.
-- Test action: delete raw-v1 migration and cleanup-marker tests. Migrate only
-  current v2 envelope, device-binding, and format-floor tests.
+  marker handling, cleanup-marker reset validation, and any raw-v1-specific
+  downgrade branch or trace label. The current v2 envelope, device-binding, and
+  `ProtectedDataRootSecretFormatFloorStore` enforcement remain current model
+  behavior; below-floor or malformed payloads fail through ordinary current
+  validation without identifying raw-v1.
+- Test action: delete raw-v1 migration, cleanup-marker, and raw-v1 failure
+  tests. Current envelope, device-binding, and format-floor tests must not seed
+  or name raw-v1 data.
 
 ### Private-Key-Control UserDefaults Import
 
@@ -99,8 +102,12 @@ candidates, not future contracts.
 - Required removal: create `private-key-control` from current defaults only;
   delete legacy defaults import, cleanup, invalid-old-mode error handling, and
   related strings.
-- Test action: delete tests that seed old auth-mode, rewrap, or modify-expiry
-  defaults. Keep current protected recovery journal tests.
+- Test action: delete tests that seed or assert behavior for old auth-mode,
+  rewrap, or modify-expiry `UserDefaults` keys, including old-input success and
+  failure coverage. Current protected recovery journal tests must create and
+  mutate journal state inside the current `private-key-control` ProtectedData
+  payload, with no old-defaults setup, import assertions, cleanup assertions, or
+  old-model diagnostics.
 
 ### Protected Settings And Ordinary Settings Migration
 
@@ -109,17 +116,19 @@ candidates, not future contracts.
 - Current residue: `ProtectedSettingsStore.PayloadV1`,
   `requiresOrdinarySettingsMigration`, `migrateOpenedSettingsSnapshotIfNeeded`,
   `legacyInitialPayload`, `legacyOrdinarySettingsSnapshot`,
-  `removeLegacySettingsSources`, `LegacyOrdinarySettingsStore`, and
-  `ProtectedOrdinarySettingsLegacyKeys`.
+  `removeLegacySettingsSources`, `LegacyOrdinarySettingsStore`,
+  `ProtectedOrdinarySettingsLegacyKeys`, and the legacy `clipboardNotice`
+  UserDefaults key.
 - Current callers: protected-settings create/open/upgrade/reset flows,
   `TutorialSandboxContainer`, authenticated-test-bypass composition, model
   tests, and settings screen tests.
 - Required removal: make schema v2 the only recognized protected-settings
   payload, remove the old UserDefaults backend, and replace tutorial/test bypass
   persistence with current-model test fixtures rather than a legacy store.
-- Test action: delete protected-settings v1 migration and old ordinary-settings
-  import tests. Migrate only current settings access, mutation, recovery, relock,
-  and tutorial sandbox behavior.
+- Test action: delete protected-settings v1 migration, old ordinary-settings
+  import, old `clipboardNotice`, and old UserDefaults fixture tests. Current
+  settings access, mutation, recovery, relock, and tutorial sandbox coverage
+  must not depend on old ordinary-settings or legacy settings keys.
 
 ### Protected-Settings UI And Access Plumbing
 
@@ -133,9 +142,10 @@ candidates, not future contracts.
   screen-model tests.
 - Required removal: remove migration authorization dependencies, branches,
   traces, host wiring, and tests with the store migration path.
-- Test action: delete tests that only prove old migration authorization order or
-  failure shape. Migrate only current protected-settings open, mutation,
-  recovery, and relock assertions.
+- Test action: delete every test that exercises the old migration authorization
+  path, including mixed-purpose tests that also assert current recovery, relock,
+  or error shape. Current protected-settings open, mutation, recovery, and relock
+  assertions must use current setup.
 
 ### Key Metadata Keychain Migration
 
@@ -158,6 +168,21 @@ candidates, not future contracts.
   metadata-account legacy row import, cleanup retry, partial migration, or
   warning behavior.
 
+### Local-Data Reset Legacy Metadata Rows
+
+- Surface: local-data reset cleanup and postcondition checks for legacy metadata
+  account rows.
+- Current residue: `LocalDataResetService` still enumerates and validates
+  metadata-account cleanup through `metadataService`, `metadataPrefix`, and
+  `metadataAccount`.
+- Current callers: reset-all flow, reset validation, and local-data reset tests.
+- Required removal: remove reset-time awareness of legacy metadata-account rows
+  once legacy metadata readers and import paths are removed. Reset validation
+  should not identify old metadata rows as a special app-owned model.
+- Test action: delete tests that seed legacy metadata-account rows to prove reset
+  cleanup or reset postconditions. Current reset coverage must use current
+  storage surfaces only.
+
 ### Key Metadata Protected Schema V1
 
 - Surface: in-domain key-metadata schema v1 upgrade-on-read.
@@ -170,9 +195,10 @@ candidates, not future contracts.
 - Required removal: delete the old payload type, source-schema tuple/state, v1
   decode branch, and writeback path that upgrades old payloads. Old schema
   payloads should not be recognized as a special case.
-- Test action: delete schema-v1 migration-success tests. Migrate only current
-  schema validation, current corruption recovery, and current no-silent-reset
-  invariants.
+- Test action: delete schema-v1 migration-success and schema-v1 failure tests.
+  Current schema validation, current corruption recovery, and current
+  no-silent-reset coverage must use current-model data or ordinary malformed
+  current payloads.
 
 ### PGP Key Identity Legacy Decode
 
@@ -184,8 +210,8 @@ candidates, not future contracts.
 - Required removal: require current metadata records to persist explicit
   `openPGPConfigurationIdentity` and `privateKeyCustodyKind`; remove the
   custom old-field defaulting.
-- Test action: delete legacy JSON decode tests. Keep current encode/decode tests
-  that include all current fields.
+- Test action: delete legacy JSON decode tests. Current encode/decode tests must
+  include all current fields and must not use missing-field old records.
 
 ### Revocation Backfill
 
@@ -196,12 +222,14 @@ candidates, not future contracts.
   force backfill.
 - Current callers: revocation export through `KeyManagementService` and key
   detail UI actions.
-- Required removal: missing revocation artifact should be treated as current
-  data missing required material, not as a signal to unwrap, regenerate, and
-  persist a legacy backfill.
-- Test action: delete lazy backfill success and metadata-update-failure tests.
-  Migrate only current revocation export success and missing-artifact failure
-  behavior.
+- Required removal: missing revocation material in current key metadata fails
+  closed as incomplete current data. The code must not infer that the key
+  predates revocation support, unwrap private material, regenerate, persist, or
+  emit old-model-specific diagnostics.
+- Test action: delete lazy backfill success, metadata-update-failure, and old
+  imported-key empty-`revocationCert` tests. Current revocation export success
+  and current-metadata missing-required-material failure coverage must seed no
+  pre-cutoff model and must assert no regeneration or persistence.
 
 ### Delete-Side Legacy Metadata Cleanup
 
@@ -212,8 +240,9 @@ candidates, not future contracts.
   `KeyMutationService`.
 - Required removal: remove delete-time awareness of legacy metadata rows when
   legacy metadata readers and import paths are removed.
-- Test action: delete tests that only prove legacy row deletion. Migrate only
-  current key deletion invariants.
+- Test action: delete tests that seed legacy rows to prove key deletion cleanup,
+  including mixed-purpose tests that also assert current deletion. Current key
+  deletion invariants must use current storage only.
 
 ### Contacts Certification Artifact Compatibility
 
@@ -226,11 +255,30 @@ candidates, not future contracts.
 - Current callers: Contacts protected-domain snapshot decode, certification
   artifact persistence, contact mutation, and legacy artifact fixtures.
 - Required removal: make current certification artifact fields required; remove
-  old-shape decode defaults, selector synthesis, and display-shadow backfill.
-  Delete `userId` if it is only shadow state; if it becomes a current explicit
-  field, it must be written directly rather than derived from compatibility.
-- Test action: delete legacy artifact decode/defaulting tests. Migrate only
-  current certification artifact validation, projection, and revalidation tests.
+  old-shape decode defaults, selector synthesis, display-shadow backfill, and
+  legacy-derived `userId` shadow state. A later product design that adds a
+  wholly current field belongs outside this compatibility path and outside this
+  draft's retirement inventory.
+- Test action: delete legacy artifact decode/defaulting tests, including
+  negative tests that use partial-v2 or old missing-field fixtures. Current
+  certification artifact validation, projection, and revalidation tests must use
+  current-shape artifacts.
+
+### Contacts Schema-V1 Old-Input Tests And Guardrails
+
+- Surface: post-cutoff Contacts schema-v1 old-input failure coverage and
+  source-audit vocabulary.
+- Current residue: `ContactsDomainSnapshotTests` still contains a
+  schema-v1 fail-closed fixture, and `ArchitectureSourceAuditTests` still tracks
+  related old Contacts symbols as guardrail vocabulary.
+- Current callers: Contacts codec tests and architecture source-audit tests.
+- Required removal: delete old Contacts schema-v1 input fixtures and any test
+  contract that asserts how new code should diagnose that old payload. Guardrails
+  should forbid reintroduction of old migration symbols without requiring old
+  input construction as product behavior.
+- Test action: current Contacts snapshot validation and protected-domain
+  recovery coverage must use current schema data or ordinary malformed current
+  data, not schema-v1 payloads.
 
 ### Contacts Unknown Display Sentinel
 
@@ -239,11 +287,11 @@ candidates, not future contracts.
   casing in identity display presentation, and contact mutation logic that
   treats persisted `"Unknown"` as replaceable old state.
 - Current callers: contact import/update display logic and model/UI tests.
-- Required removal: stop treating persisted `"Unknown"` as old model state.
-  Current localized unknown UI fallback can be reworked later without preserving
-  the old persisted sentinel semantics.
-- Test action: delete tests that assert persisted sentinel behavior. Migrate
-  only current display fallback tests that do not depend on old persisted values.
+- Required removal: stop treating persisted `"Unknown"` as old model state and
+  remove persisted sentinel semantics from mutation and presentation logic.
+- Test action: delete tests that assert persisted sentinel behavior. Current
+  display fallback tests must use current state and must not depend on old
+  persisted values.
 
 ### Cleanup-Only Old Artifacts
 
@@ -255,13 +303,15 @@ candidates, not future contracts.
   `legacyRequireAuthOnLaunchKey`.
 - Current callers: startup cleanup, local-data reset, temporary artifact store,
   app container wiring, and startup/reset/tutorial tests.
-- Required removal: remove cleanup-only old artifact discovery and validation
-  paths after cutoff. Keep current temporary/export cleanup and the current
-  fixed tutorial sandbox cleanup unless a later implementation replaces that
-  sandbox model too.
+- Required removal: remove cleanup-only discovery and validation for old
+  `Documents/self-test/`, orphan `com.cypherair.tutorial.<UUID>` suites, and old
+  `requireAuthOnLaunch` residue. Current temporary/export cleanup and fixed
+  `com.cypherair.tutorial.sandbox` cleanup must not depend on old suite
+  enumeration, old defaults keys, or old fixtures.
 - Test action: delete tests that create old `Documents/self-test/`, old
   `com.cypherair.tutorial.<UUID>` suites, or old `requireAuthOnLaunch` residue.
-  Migrate only current startup/reset cleanup coverage.
+  Current startup/reset cleanup coverage must use current temporary/export
+  artifacts and current fixed tutorial sandbox state only.
 
 ### Rust And UniFFI Legacy Signature Model
 
@@ -272,18 +322,19 @@ candidates, not future contracts.
   `PasswordDecryptResult.signature_status`,
   `PasswordDecryptResult.signer_fingerprint`, generated Swift `legacyStatus`,
   generated Swift `legacySignerFingerprint`, and stale `SignatureStatus`
-  exposure if no current surface still needs it.
+  exposure.
 - Current callers: Rust verify/decrypt/streaming/external decrypt/password
   paths, public engine result types, generated Swift bindings, FFI integration
   tests, password-message tests, detailed-signature tests, and broad Rust
   message/security tests.
 - Required removal: delete the legacy result surface outright and regenerate
-  Swift bindings. Tests must assert current `summary_state` / `summaryState`,
-  `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries.
-- Test action: delete tests that preserve old fold quirks, including expired
-  fingerprint preservation through bad/unknown later signatures. Migrate broad
-  message tests from legacy status assertions to current summary/detail
-  assertions.
+  Swift bindings. Current API surface must use `summary_state` / `summaryState`,
+  `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries
+  without legacy fold/status aliases, wrappers, or compatibility semantics.
+- Test action: delete tests that encode old fold quirks, including expired
+  fingerprint survival through bad/unknown later signatures. Rewrite broad
+  message tests only when the input is independently a current product scenario
+  and assertions target current summary/detail behavior.
 
 ## Stale Documentation And Planning Targets
 
@@ -295,7 +346,7 @@ candidates, not future contracts.
 - PRD legacy summary fallback wording: product text describing verify/decrypt
   routes as falling back to legacy summary fields should be removed or rewritten
   around the current signature model.
-- Official keep-list / rename-only wording: existing text that says
+- Official do-not-remove / rename-only wording: existing text that says
   `LegacyFoldMode`, `legacy_stopped`, `KeyMetadataStore`,
   `LegacyOrdinarySettingsStore`, or in-domain v1 migration should stay or be
   renamed is stale under this strict retirement doctrine.
@@ -307,16 +358,16 @@ candidates, not future contracts.
   suites, and cleanup-only keys need follow-up updates after implementation.
 - Architecture/Security current-state text: descriptions of legacy metadata
   rows, protected-settings v1 migration, raw/root-right migration, lazy
-  revocation backfill, and old Documents paths should be removed or recast when
-  those surfaces retire.
+  revocation backfill, local-data reset of metadata-account rows, and old
+  Documents paths should be removed or recast when those surfaces retire.
 
 ## Discovery Rule
 
 If implementation work uncovers another app-owned old model, old schema,
 migration path, fallback decoder, cleanup-only old hook, or legacy fixture
-dependency, add it to the retirement inventory before choosing PR order. Do not
-describe it as a supported long-term path unless the maintainer explicitly
-approves that separate request.
+dependency, add it to the retirement inventory before choosing PR order. This
+inventory does not classify any newly discovered old model as supported product
+behavior.
 
 ## Validation Notes
 
