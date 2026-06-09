@@ -1,148 +1,371 @@
 # Legacy Cleanup
 
-> Status: Active roadmap. Inventory current-state-verified against `main`.
-> Purpose: Single source for legacy upgrade/migration/compatibility code that is removable
->   later (gated), what is already removed, and what must never be removed.
-> Audience: Human developers, security reviewers, and AI coding tools.
-> Truth sources: current `main` source tree; [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md);
->   [ARCHITECTURE_REFACTOR_ROADMAP.md](ARCHITECTURE_REFACTOR_ROADMAP.md); [SECURITY.md](SECURITY.md).
-> Last reviewed: 2026-06-08.
-> Note: This doc replaces the former `LEGACY_COMPATIBILITY_AUDIT.md` (2026-05-13 snapshot) and
->   `LEGACY_CLEANUP_IMPLEMENTATION_REFERENCE.md` (Phases 1–7 roadmap), both removed when this
->   doc landed. It catalogs candidates and gates.
-> Companion execution plan: [LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md](LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md)
->   — ordered PR sequence for the approved 2026-06-08 cutoff.
+> Status: Active strict-retirement roadmap.
+> Purpose: Canonical plan for retiring app-owned legacy data models, persisted
+> formats, migration sources, fallback decoders, cleanup-only hooks, legacy
+> fixtures, and old-input tests after the 2026-06-08 support cutoff.
+> Audience: Human developers, security reviewers, QA, and AI coding agents.
+> Truth sources: current `main` source tree;
+> [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md);
+> [ARCHITECTURE.md](ARCHITECTURE.md); [SECURITY.md](SECURITY.md);
+> [TESTING.md](TESTING.md).
+> Last reviewed: 2026-06-09.
 
-This doc is an inventory, not an authorization to delete. Removal of any retained migration
-code is gated on a human-approved support cutoff (§1) and is performed in separate PRs (§5).
+This document replaces the earlier cleanup inventory and deleted execution
+roadmap. It is now the single source of truth for the strict legacy-retirement
+roadmap. Production cleanup happens in later PRs; this roadmap records what must
+be removed and how to validate those removals.
 
-## 1. Non-negotiable rule
+## Doctrine
 
-Retained old-install migration code is deleted **only after a human maintainer explicitly
-approves a support cutoff** named in the specific issue/PR. Never delete on telemetry, network,
-or the argument that "production already uses the new path" — the app is zero-network and
-offline, so installs that still hold a legacy source can surface at any time.
+After support ends for an app-owned old model, new CypherAir builds must not
+know it, recognize it, migrate it, fall back to it, clean it up as a special
+case, or carry dedicated tests for its input data.
 
-This rule is the same one stated in [ARCHITECTURE_REFACTOR_ROADMAP.md:26](ARCHITECTURE_REFACTOR_ROADMAP.md):
-*keep legacy migration support until a separate human-approved support cutoff exists.*
+App-owned old persisted models, old schemas, migration sources, fallback
+decoders, upgrade-on-read paths, cleanup-only legacy hooks, and legacy fixture
+dependencies are retirement targets. Production, tutorial, UI-test, and unit
+test callers that depend on those targets must be rewritten to current models
+or removed with the old surface.
 
-**Cutoff status (2026-06-08):** a maintainer has approved the support cutoff for **all §2 items**.
-The ordered PR sequence that consumes it lives in
-[LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md](LEGACY_CLEANUP_IMPLEMENTATION_PLAN.md); items move from §2
-to §3 here as each removal PR lands.
+Cleanup is incomplete when old behavior survives through any of these forms:
 
-## 2. Cleanup to do later (gated)
+- renaming a type, method, field, stored key, or helper while carrying the same
+  old behavior forward
+- moving old behavior to a new file, module, wrapper, adapter, helper, or
+  fixture
+- replacing an old fixture with a new fixture that still drives the old
+  compatibility path
+- adding special handling for old data after support has ended
+- adding success or failure tests for old input data after the old model is
+  removed
 
-### Class 1 — Retained old-install migration (cutoff-gated)
+If old data remains on disk after support ends, new software treats it like any
+other unknown or corrupted current-model input. The software must not contain
+code that identifies why the data is old, and it must not add tests for old
+data's post-cutoff failure behavior. Existing current-model validation,
+corruption, recovery, and error handling are sufficient.
 
-Each item reads a legacy source, migrates it into the current ProtectedData/Keychain home,
-then cleans the source up. All are **fail-closed**: the legacy source is kept until the
-destination is verified. Removable only after a support cutoff for installs that could still
-hold the old source.
+This roadmap records retirement targets only. It provides no continuation path
+for app-owned old models inside new software.
 
-| # | Domain | FROM → TO | Anchors | Removal gate | Risk |
-|---|--------|-----------|---------|--------------|------|
-| 1 | Root-secret v1/raw + legacy right-store | raw v1 root-secret / legacy `LARight` → v2 `CAPDSEV2` SE device-binding envelope | `ProtectedDataRootSecretCoordinator.swift:6` (`legacyMigrationDeferred`), `:88-118` (dispatch), `:273` (`migrateLegacySharedRightIfNeeded`); `ProtectedDataSessionCoordinator.swift:23,59-155`; `ProtectedDataPostUnlockCoordinator.swift:137` (`allowLegacyMigration:false`) | Formal cutoff for installs holding v1/raw or legacy right-store secrets | **Critical** — wrong deletion locks users out of protected data |
-| 2 | Key-metadata Keychain → ProtectedData | legacy `metadataAccount` + default-account `PGPKeyIdentity` rows → `key-metadata` domain (schema v2) | `KeyMetadataStore.swift:60,79,120`; `KeyMetadataDomainStore.swift:132,169,535,542,626`; `KeyManagementService.swift:184,198`; `KeyCatalogStore.swift:26,37` | All supported installs migrated; cleanup retries no longer needed | **High** — wrong cleanup can hide keys |
-| 3 | Private-key-control legacy defaults | legacy `UserDefaults` `authMode`/rewrap/modify-expiry → `private-key-control` domain | `PrivateKeyControlStore.swift:606,617,629` (reads), `:647-651` (`cleanupLegacyDefaults`), called at `:142,194,404`; keys in `AuthenticationEvaluable.swift:395-412` | Old-install migration support ends | **High** — auth-sensitive |
-| 4 | Protected-settings v1 → v2 + legacy ordinary settings | schema-v1 payload (`clipboardNotice` only) + legacy `com.cypherair.preference.*` `UserDefaults` → schema-v2 ordinary settings | `ProtectedSettingsStore.swift:14` (`PayloadV1`), `:25` (`requiresOrdinarySettingsMigration`), `:850-885,896`, `:1028-1041` (`legacyOrdinarySettingsSnapshot`/`removeLegacySettingsSources`); `ProtectedOrdinarySettingsPersistence.swift:17` (`LegacyOrdinarySettingsStore`) | Supported installs expected to hold schema v2 | **High** — can reset auth-adjacent settings / fail-open |
-| 6 | Local-data cleanup | removes legacy `Documents/self-test/` + orphan `com.cypherair.tutorial.<UUID>` defaults suites, and (gated on #1/#2) the legacy right-store + metadata-account reset hooks. **Keep:** the root-secret format-floor / device-binding / legacy-cleanup markers are current security — Reset-All must keep *deleting* them; they are not removable code | `AppTemporaryArtifactStore.swift:10,126` (`legacyTutorialDefaultsSuitePrefix`, `cleanupTutorialDefaultsSuites`); `AppStartupCoordinator.swift:131,134,143` (startup cleanup, `legacySelfTestReportDirectory`); `LocalDataResetService.swift:415,472` (reset enumeration + post-reset validation) | Those paths can no longer exist on supported installs | Medium — Reset-All correctness depends on exhaustive deletion |
+## Test Policy
 
-> **Row 3 caveat:** Only the **legacy-defaults import/cleanup** is removable. The
-> rewrap **recovery-journal** logic in the same file is current behavior — keep it.
+Delete tests that validate old migration success, old compatibility decode, old
+fallback behavior, old cleanup hooks, old fixture behavior, or old input
+failure.
 
-Authoritative migration-readiness for rows 2–4 lives in
-[PERSISTED_STATE_INVENTORY.md:45-57,61](PERSISTED_STATE_INVENTORY.md) — all marked
-`Implemented` (migration done; legacy source kept **only** as a verified cleanup source).
+Rewrite coverage only when it proves a current invariant with current-model
+fixtures or ordinary malformed current data. Rewritten tests must not seed,
+decode, fixture, identify, or assert known old payloads, old keys, old defaults,
+old suites, old rows, or old artifact shapes.
 
-### Class 2 — Removable later, newly surfaced
+Do not add new tests for how old-model data should fail after support ends. Once
+cleanup is complete, the software should not know enough about the old model for
+that behavior to be a product contract. Old-input tests such as Contacts
+schema-v1 fail-closed checks, legacy artifact decode fixtures, raw-v1 root
+secret fixtures, legacy metadata rows, legacy defaults seeds, and legacy
+signature fold fixtures are deletion targets.
 
-These are real legacy-compat paths with explicit "predate … support" / "retained for
-migration" comments. They were absent from the prior audit's inventory table and are folded in
-here.
+## Roadmap
 
-| # | Item | What it does | Anchors | Removal gate |
-|---|------|--------------|---------|--------------|
-| 7 | Imported-key revocation backfill | for imported keys whose stored `revocationCert` is empty (keys that predate revocation-construction support), generates + persists the binary revocation lazily at export time, then zeroizes the temporarily-unwrapped secret | `PGPKeyIdentity.swift:70-73` (comment *"backfilled on demand for imported keys that predate revocation-construction support"*), `:162`; `KeyExportService.swift:51-79` (`exportRevocationCertificate()` — zeroize via `defer`, generate, persist to catalog) | After all on-device keys are guaranteed to carry a revocation artifact — tie to the key-metadata cutoff (#2) |
-| 8 | `PGPKeyIdentity` legacy Codable decode | tolerant decode of metadata rows written before `openPGPConfigurationIdentity` / `privateKeyCustodyKind` existed — `decodeIfPresent(...) ?? <profile default>` fallbacks | `PGPKeyIdentity.swift:8` (comment *"legacy Keychain decoding retained for migration"*), `:147-154` | After all on-device metadata is re-encoded under `key-metadata` schema v2 — same cutoff as #2 |
+### Phase 0 — Documentation And Guardrail Reset
 
-### Class 3 — Active compatibility surface, removable after a Swift-side rework (not cutoff-gated)
+- Delete obsolete planning docs and make this file the canonical roadmap.
+- Align Swift source-audit comments and guardrail rationale with this roadmap.
+- Add or revise guardrails so every later production PR removes both code and
+  the corresponding temporary audit allowance.
+- Do not use Phase 0 to delete production behavior.
 
-| # | Item | Status | Anchors |
-|---|------|--------|---------|
-| 9 | Rust `legacy_status` / `legacy_signer_fingerprint` | **Swift consumers retired (PR-D1, 2026-06-08 cutoff).** The folded-summary fields still **remain inside the Rust detailed result + generated bindings**, now referenced only by FFI-result test fixtures; deleted in PR-D2+D3. | Rust: `signature_details.rs:38-85` (4 detailed-result structs + `LegacyFoldMode`; `SignatureCollector` `:89-212`), produced in `decrypt.rs:211-221`, `external_decryptor.rs:144-154`, `verify.rs`, `streaming.rs`, `password.rs`. Swift app-model consumers (now on `summaryState`/`signatures`): `PGPMessageResultMapper.swift`, `DetailedSignatureVerification`, `DetailedSignatureSectionView`, `SelfTestService`; generated `pgp_mobile.swift` legacy fields remain until PR-D2+D3. |
+### Phase 1 — Contacts Low-Blast-Radius Cleanup
 
-**Removal gate / progress:** The Swift-side migration is **done** under the 2026-06-08 cutoff —
-PR-D1 repointed every Swift consumer (`PGPMessageResultMapper`, the `DetailedSignatureVerification`
-app model, `DetailedSignatureSectionView`, and the test suite) to `summaryState` / `signatures`, and
-closed the former blocker at **`SelfTestService.swift`** (self-test pass/fail now gates on
-`summaryState == .verified`). `Sources/` carries zero references to the app-model legacy fields.
-**Remaining for full retirement:** delete the Rust `legacy_status`/`legacy_signer_fingerprint` fields
-(and the `PasswordDecryptResult` equivalents) and regenerate the bindings in **PR-D2+D3**, then make
-the §2→§3 inventory move in **PR-D4**. Until then the FFI fields remain present, referenced only by
-FFI-result test fixtures.
+Retire Contacts old-model residues that do not require cross-domain security
+plumbing.
 
-Scope note: only the `legacy_status`/`legacy_signer_fingerprint` fields (and the
-`PasswordDecryptResult.signature_status`/`signer_fingerprint` equivalents) are removed.
-`LegacyFoldMode`/`legacy_stopped` are **kept** — they also drive the modern
-`summaryState`/`summaryEntryIndex`.
+- Remove Contacts schema-v1 old-input tests in `ContactsDomainSnapshotTests`
+  and any product contract around diagnosing schema-v1 payloads.
+- Limit Contacts guardrails to reintroduction prevention, not to
+  constructing known old input.
+- Remove certification artifact partial-v2/defaulting behavior:
+  `ContactCertificationArtifactReference.init(from:)` defaults for missing
+  `canonicalSignatureData`, `source`, `targetSelector`, and `validationStatus`,
+  plus the matching default-argument values on the memberwise
+  `ContactCertificationArtifactReference.init(...)`;
+  `ContactCertificationArtifactReference.legacyTargetSelector`;
+  `ContactCertificationTargetSelector.legacyUserIdDisplayText`; legacy-derived
+  `ContactCertificationArtifactReference.userId`; and `ContactSnapshotMutator`
+  assignment of `userId` from selector display text.
+- Delete the legacy-decode test fixtures and tests that drive that path:
+  `LegacyCertificationArtifactSnapshot`, `LegacyCertificationArtifactReference`,
+  `test_v1Snapshot_failsClosedAsUnsupportedAfterCutoff`, and
+  `test_legacyCertificationArtifactDecodesWithRevalidationDefaults` in
+  `ContactsDomainSnapshotTests`.
+- Remove persisted `"Unknown"` sentinel semantics:
+  `IdentityPresentation.legacyUnknownDisplayName`, UI special casing, contact
+  mutation logic that treats persisted `"Unknown"` as old replaceable state, and
+  tests that assert persisted sentinel behavior.
+- Remove the write-side sentinel producer: the `ContactSnapshotMutator`
+  display-name fallback must stop persisting the literal `"Unknown"`. The
+  current model persists the empty or derived value, and the existing localized
+  render-time fallback in `IdentityDisplayPresentation` is the only display
+  substitution. No persisted magic display-name string remains, so read-side
+  removal cannot be defeated by new writes.
+- Rewrite any useful Contacts tests with current schema data and current-shape
+  certification artifacts only.
 
-**Surfaced follow-up (not #9 scope; recorded by PR-D1).** Retiring the Swift legacy layer left
-state-model debt worth a separate, non-cutoff cleanup:
-- `SignatureVerification` still carries both a graded `status` (`MessageSignatureStatus`) and a
-  `verificationState` that can disagree. The message-row display already derives solely from
-  `verificationState` (`SignatureVerification+Presentation.swift`), so `status` is near-vestigial in
-  the message path. A "collapse the signature state model" pass could remove or fold `status` into
-  `verificationState` (note: `status` is still read by the **separate** `CertificateSignatureVerification`
-  path, which is unaffected).
-- `verify.rs` / `streaming.rs` can return an **empty `signatures` array with a failure `summaryState`**
-  (`Invalid`/`Expired`) on verifier-setup failure, so "empty signatures" is **not** equivalent to "not
-  signed"; the no-entries UI row renders from `summaryState` (`DetailedSignatureVerification.summaryVerification`).
-- Broader direction: after this cleanup wave, sweep for other stale compatibility layers that left
-  similarly complex app state behind.
+### Phase 2 — Protected Settings And Ordinary Settings Cleanup
 
-## 3. Already done — do not re-chase
+Retire protected-settings schema v1 and the old ordinary-settings UserDefaults
+model across production, tutorial, and tests.
 
-Confirmed absent on current `main` (verified 2026-06-08); listed so this inventory is a
-complete map. Source-audit guardrails in [ARCHITECTURE_REFACTOR_ROADMAP.md](ARCHITECTURE_REFACTOR_ROADMAP.md)
-block reintroduction.
+- Remove `ProtectedSettingsStore.PayloadV1`,
+  `requiresOrdinarySettingsMigration`,
+  `migrateOpenedSettingsSnapshotIfNeeded`, decode `case 1`,
+  `legacyInitialPayload`, `legacyOrdinarySettingsSnapshot`,
+  `removeLegacySettingsSources`, and the legacy `clipboardNotice` UserDefaults
+  source.
+- Remove `LegacyOrdinarySettingsStore` and
+  `ProtectedOrdinarySettingsLegacyKeys`; rewrite callers such as
+  `TutorialSandboxContainer`, authenticated-test-bypass composition,
+  `AppContainer`, settings tests, model tests, and tutorial tests to use current
+  protected-settings or current in-memory fixtures.
+- Remove protected-settings migration UI/access plumbing:
+  `ProtectedSettingsAccessCoordinator.migrationAuthorizationRequirement`,
+  `ensureCommittedAndMigrateSettingsIfNeeded`, `settingsMigration` traces,
+  `ProtectedSettingsHost` migration wiring, and `CypherAirApp` migration
+  authorization paths.
+- Remove the legacy entries from `AppConfiguration.resetPersistentKeys`:
+  `clipboardNoticeLegacyKey` and `LegacyOrdinarySettingsStore.persistentKeys`
+  leave with this phase; the `AuthPreferences` migration keys and
+  `legacyRequireAuthOnLaunchKey` in the same list leave with Phase 4. The reset
+  key list is a cleanup-only legacy hook for those entries, and the shared file
+  spans both phases.
+- Delete protected-settings v1, old ordinary-settings, old `clipboardNotice`,
+  old UserDefaults fixture, and migration authorization tests. Current settings
+  tests must use current payloads and current access/relock/recovery behavior.
+- Delete the settings legacy test-support surface:
+  `ProtectedSettingsPayloadV1`, `setLegacyOrdinarySettings`,
+  `assertLegacyOrdinarySettingsRemoved`, and the
+  `ProtectedDataTestAppLegacyOrdinarySettingsStore` typealias in
+  `ProtectedDataFrameworkTestSupport`.
 
-- Flat `Contact`, `ContactRepository`, `ContactsLegacyMigrationSource`, `ContactsCompatibilityMapper` — **0 hits**. The current model is granular (`ContactIdentity`, `ContactKeyRecord`, …).
-- No-caller `ContactService` fingerprint-recipient helpers and overloads.
-- Simple Rust/UniFFI `decrypt` / `decrypt_file` / `verify_cleartext` / `verify_detached` / `verify_detached_file` (+ generated Swift) — only the `*_detailed` variants remain.
-- Raw first-match User-ID FFI (`generate_user_id_certification`, `generate_user_id_revocation`, `verify_user_id_binding_signature`, `find_user_id_first_match`) — only the `*_by_selector` variants remain.
-- Tracked `scripts/experiments/` — removed (`6c4356e`, `a2c00b2`).
-- Contacts snapshot v1→v2 migration (`LegacySnapshotV1`, `migrateLegacyV1Snapshot`, decode `case 1`, and the `ContactsDomainStore` upgrade-on-read writeback) — removed under the 2026-06-08 cutoff (PR-A1). A schema v1 payload now fails closed via the unsupported-version `default` (routes the Contacts domain to recovery, never a silent reset); the fail-closed `default` is **kept**.
+### Phase 3 — Key Metadata Cleanup
 
-## 4. Do NOT remove — permanent interop / security
+Retire legacy Keychain metadata rows, test-fixture dependence on the old helper,
+key-metadata schema v1, tolerant metadata decode, and revocation backfill.
 
-These read as "legacy" by keyword but are intentional interop or active security (see
-[SECURITY.md](SECURITY.md) §1). Removing them breaks interoperability or weakens security.
+- Remove the `KeyMetadataStore` fallback/CRUD fixture dependency and legacy
+  Keychain metadata row model, including default-account and `metadataAccount`
+  source reads and the `KeychainConstants.metadataService` /
+  `KeychainConstants.metadataPrefix` row addressing they depend on. Both
+  Keychain metadata locations are legacy: `defaultAccount` rows and dedicated
+  `metadataAccount` rows are migration/cleanup sources only, and production
+  persistence is the ProtectedData `key-metadata` domain.
+- Remove `KeyMetadataLegacyMigrationOutcome`,
+  `KeyMetadataMigrationSourceItem`, `KeyMetadataMigrationSourceSnapshot`,
+  `loadMigrationSourceSnapshot`, `cleanupMigrationSourceItems`,
+  `migrateLegacyMetadataIfNeeded`, `KeyCatalogStore` migration passthrough,
+  `KeyManagementService` warning/wiring, and `CypherAirApp` warning
+  presentation, including the orphaned
+  `app.loadWarning.legacyMetadataMigration` String Catalog entry.
+- Remove the `KeyMetadataDomainStore` migration-side members:
+  `legacyMetadataStore`, `migrationWarning`, `updateMigrationWarning`,
+  `migrationWarningMessage`, and `cleanupLegacyRowsMatchingOpenedPayload`.
+- Remove `AppSessionOrchestrator.borrowAuthenticatedContextForMetadataMigration`
+  and the `metadataMigration` authenticated-context trace purpose.
+- Remove the `AuthTraceMetadata` classification of legacy metadata Keychain
+  rows via `KeychainConstants.metadataPrefix`, which is dead once legacy rows
+  are gone.
+- Remove `LocalDataResetService` cleanup and postcondition awareness for
+  legacy metadata-account rows: the `metadataAccount` reset pass and the
+  matching remaining-rows postcondition exist only for old metadata rows.
+- Remove delete-side legacy metadata cleanup:
+  `KeyMutationService.cleanupLegacyMetadataRows`.
+- Remove `KeyMetadataDomainStore.PayloadV1`,
+  `DecodedPayload.sourceSchemaVersion`, `OpenedSnapshot.sourceSchemaVersion`,
+  decode `case 1`, and upgrade-on-read writeback when
+  `sourceSchemaVersion < Payload.currentSchemaVersion`.
+- Remove `PGPKeyIdentity.init(from:)` tolerant defaults for missing
+  `openPGPConfigurationIdentity` and `privateKeyCustodyKind`, and the matching
+  profile-derived default arguments on the memberwise initializer; current
+  metadata records must persist explicit fields.
+- Remove imported-key revocation backfill:
+  `KeyExportService` empty-`revocationCert` branch,
+  `KeyCatalogStore.updateRevocation`, old imported-key empty-`revocationCert`
+  tests, metadata-update-failure backfill tests, and old diagnostics.
+- Rewrite useful key-management tests against current protected metadata
+  storage, current missing-required-material behavior, and current revocation
+  artifact requirements.
 
-- **Interop read-compat:** reads v4 keys, SEIPDv1/MDC, SEIPDv2 (OCB/GCM), DEFLATE input (read-only), SHA-256 *legacy verification*; S2K auto-detect on import (Iterated+Salted vs Argon2id) — `pgp-mobile/src/keys/s2k.rs:24` (`parse_s2k_params`), `pgp-mobile/src/keys/secret_transfer.rs`. Removing breaks GnuPG / OpenPGP.js / GopenPGP / Bouncy Castle interop.
-- **Active anti-downgrade:** root-secret **format-floor** marker `CAPDSEF2` (`ProtectedDataDeviceBinding.swift:192`) and the SE device-binding envelope — current security, not cleanup debt.
-- **Profile / message-format selection:** v4 → SEIPDv1, mixed → SEIPDv1, v6 → SEIPDv2 (`pgp-mobile/src/encrypt.rs:229-231`); Standard-mode passcode-fallback language; current temp/export artifact cleanup; alternate app icons; QR import route/version.
+### Phase 4 — Private-Key-Control And Cleanup-Only Residue
 
-## 5. Removal procedure & validation matrix
+Retire legacy UserDefaults import/cleanup and old local artifact cleanup hooks.
 
-Every PR that actually deletes retained code (out of scope for the inventory itself) must:
+- Remove `PrivateKeyControlStore.legacyInitialPayload`,
+  `cleanupLegacyDefaults`, `invalidLegacyAuthMode` (including its localized
+  String Catalog entry), and `AuthPreferences` keys used only as old migration
+  sources, including their entries in `AppConfiguration.resetPersistentKeys`
+  together with `legacyRequireAuthOnLaunchKey`.
+- Current private-key recovery journal coverage must create and mutate journal
+  state inside the current `private-key-control` ProtectedData payload, with no
+  old-defaults setup, import assertions, cleanup assertions, or old-model
+  diagnostics.
+- Remove cleanup-only old artifact discovery and validation:
+  `legacySelfTestReportsDirectory`, `legacySelfTestReportDirectory`,
+  `legacyTutorialDefaultsSuitePrefix`, `legacyTutorialDefaultsSuiteNames`,
+  `cleanupTutorialDefaultsSuites`, and `legacyRequireAuthOnLaunchKey`.
+- Current temporary/export cleanup and fixed `com.cypherair.tutorial.sandbox`
+  cleanup must not depend on old suite enumeration, old defaults keys, or old
+  fixtures.
+- Delete tests that create old `Documents/self-test/`, old
+  `com.cypherair.tutorial.<UUID>` suites, old `requireAuthOnLaunch` residue, or
+  legacy private-key-control defaults.
+- Remove legacy-defaults seeding and teardown from test support, including
+  `KeyManagementServiceTestSupport`, `DeviceSecurityTestCase`, and
+  `DeviceAuthenticationManagerTests` handling of the old `AuthPreferences`
+  keys.
 
-1. Name the **human-approved support cutoff** in the issue/PR (§1).
-2. Prove old-install **fail-closed / recovery / reset** behavior for the removed migration.
-3. Run the matching validation below.
+### Phase 5 — Root-Secret Cleanup
 
-| Cleanup family | Minimum validation |
-|----------------|--------------------|
-| ProtectedData / Keychain / auth / root-secret / settings / key-metadata migration (Class 1 rows 1–6; Class 2 #7–#8) | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` (ProtectedData framework, settings, private-key-control, key-metadata, auth, local-reset, device-binding) |
-| Rust / UniFFI surface change (only if #9 is retired) | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, then refresh the XCFramework (per [TESTING.md](TESTING.md)) and re-run the macOS unit tests |
-| Public Swift / UniFFI surface removal | Confirm no remaining caller, then the relevant matrix row above |
+Retire legacy right-store and raw-v1 root-secret recognition/migration paths.
 
-## 6. Forward-looking — not current code
+- Remove root-secret legacy `LARight` migration and authorization deferral:
+  `legacyMigrationDeferred`, `legacyRightStoreClient`,
+  `migrateLegacySharedRightIfNeeded`, `allowLegacyMigration`, and
+  `ProtectedDataRightStoreClient` right-store migration/cleanup behavior.
+- Remove local-data reset awareness of legacy right-store rows, the
+  `legacyRight.remove.*` reset failure keys, and the
+  `protectedDataRootSecretLegacyCleanupService` row deletion in
+  `LocalDataResetService`.
+- Remove raw-v1 root-secret migration and cleanup-marker handling:
+  `legacyV1Raw`, `migrateLegacyRawRootSecret`,
+  `deleteLegacyCleanupMarkerIfPresent`, and
+  `protectedDataRootSecretLegacyCleanupService`.
+- Remove the raw-v1 recognition machinery around that path: the root-secret
+  load `storageFormat` distinction (`legacyV1Raw` / `envelopeV2`), `didMigrate`,
+  the length-based raw-v1 payload recognition, and the Keychain `format-floor`
+  marker write/read and downgrade check. Once v1 recognition is gone, a raw-v1
+  payload fails envelope decode as ordinary corrupt input, so the format floor
+  has no remaining purpose and the downgrade check is forbidden legacy-shape
+  recognition. Retiring the floor changes a documented SECURITY.md invariant
+  and requires the matching SECURITY.md update in Documentation Follow-Up.
+- Current root-secret tests must use the current envelope, device-binding, and
+  ordinary malformed current data. They must not seed or name raw-v1 data or old
+  right-only installs.
 
-The **unshipped** auth-lifecycle redesign ([SECURITY.md](SECURITY.md) §4) will, when it lands,
-**add two new one-time macOS migrations** to this inventory:
+### Phase 6 — Rust And UniFFI Signature Cleanup
 
-- force-re-wrap of macOS Standard keys, dropping `.devicePasscode`;
-- root-secret re-protection `[.userPresence] → [.biometryAny]`.
+Retire the full legacy signature fold surface from Rust, UniFFI, generated
+Swift, and tests.
 
-These are future *additions*, not present removable code.
+- Remove `legacy_status`, `legacy_signer_fingerprint`, `LegacyFoldMode`,
+  `legacy_stopped`, `state_from_legacy_status`,
+  `PasswordDecryptResult.signature_status`,
+  `PasswordDecryptResult.signer_fingerprint`, generated Swift `legacyStatus`,
+  generated Swift `legacySignerFingerprint`, and stale `SignatureStatus`
+  exposure.
+- No Swift production or test call sites consume the generated `legacyStatus`
+  or `legacySignerFingerprint`; `PGPMessageResultMapper` already reads only
+  `summaryState` / `summaryEntryIndex`. Phase 6 is Rust removal, UniFFI
+  regeneration, and Rust-test deletion, with no Swift call-site rewrites.
+- Regenerate UniFFI bindings after Rust result-shape changes.
+- Current API surface must use `summary_state` / `summaryState`,
+  `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries
+  without legacy fold/status aliases, wrappers, or compatibility semantics.
+- Delete tests that encode old fold quirks, including expired fingerprint
+  survival through bad/unknown later signatures. Rewrite broad message tests
+  only when the input is independently a current product scenario and
+  assertions target current summary/detail behavior.
+
+## Follow-Ups Outside This Roadmap
+
+- Signature state-model collapse: `SignatureVerification` carries a dual
+  `status` / `verificationState` representation, with `status` derived from
+  the current summary state so the two cannot disagree. Collapsing that
+  redundancy is deliberate post-retirement debt, not a Phase 6 target. The
+  Phase 6 implementation PR should also repoint the
+  `DetailedSignatureVerification` code comment that still cites a
+  "LEGACY_CLEANUP §9 follow-up" to this section.
+
+## Guardrails
+
+The existing Swift source-audit rules in
+`Tests/ServiceTests/ArchitectureSourceAuditTests.swift` are part of Phase 0.
+They should continue to fail when production `Sources/*.swift` reintroduce
+removed Swift legacy symbols, and each production cleanup PR must delete the
+matching temporary allowance when it removes the symbol.
+
+Current audit-rule coverage maps to this roadmap as follows: the audit file's
+`item1A`/`item1B` rules cover Phase 5 right-store and raw-v1 symbols, `item2`
+and `item7` cover Phase 3 metadata migration and revocation backfill, `item3`
+covers the Phase 2/Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
+`invalidLegacyAuthMode` family, and the remaining contacts-snapshot and
+protected-settings rules cover Phase 1 snapshot and Phase 2 migration symbols.
+
+No guardrail rule yet covers: Phase 1 certification-artifact and `"Unknown"`
+sentinel symbols; `PayloadV1`, `sourceSchemaVersion`, schema decode `case 1`,
+and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
+`KeyMetadataMigrationSourceItem`, `KeyMetadataMigrationSourceSnapshot`, and
+`cleanupLegacyMetadataRows`; the Phase 4 cleanup-only symbols; the Phase 5
+`storageFormat` / format-floor additions; and all Phase 6 symbols — there is
+no Rust guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so
+Phase 6 currently has zero guardrail coverage. `PayloadV1` is a token shared
+by `ProtectedSettingsStore` and `KeyMetadataDomainStore` across Phases 2 and
+3; a bare-token guardrail catches both, so use per-path temporary exceptions.
+
+Additional guardrails are needed as cleanup proceeds:
+
+- Swift guardrails should cover newly retired Contacts artifact/sentinel,
+  settings, key-metadata, private-key-control, cleanup-only, and root-secret
+  symbols.
+- Rust guardrails should read `pgp-mobile/src` via `CARGO_MANIFEST_DIR` and
+  forbid the Phase 6 legacy signature symbols after they are removed.
+- Guardrails must not require construction of old input data as product
+  behavior.
+
+## Validation Matrix
+
+| Change family | Minimum validation |
+|---------------|--------------------|
+| Phase 0 docs/source-audit wording only | `git diff --check`; source-audit targeted unit test |
+| Contacts model cleanup | targeted Contacts unit tests plus `ArchitectureSourceAuditTests` |
+| ProtectedData/settings/key-metadata/private-key-control/root-secret cleanup | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` |
+| Rust/UniFFI signature cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, then `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`, then macOS unit tests |
+| Any cleanup touching reset | targeted local-data reset tests plus the relevant broader unit lane |
+
+Two cross-cutting validation rules apply on top of the matrix:
+
+- Any phase that removes user-facing strings must delete the orphaned
+  `.xcstrings` entries; `LocalizationCatalogTests` in the unit lane fails on
+  stale entries.
+- Phases 2–5 touch `Sources/Security/` and `Sources/Security/ProtectedData/`,
+  and Phase 6 touches `pgp-mobile/src`, so the CLAUDE.md security-boundary
+  human-review requirement applies to those implementation PRs. Rewritten
+  security tests must stay current-model-only per the Test Policy: positive
+  and negative tests with current payloads, never reconstructed old input.
+
+Every cleanup PR should include the exact symbols removed, the current-model
+tests that replaced any still-useful invariant coverage, and confirmation that
+old-input success/failure tests were deleted rather than redefined as future
+contracts.
+
+## Documentation Follow-Up
+
+As implementation PRs land, update current-state docs that still describe old
+models as live behavior, especially:
+
+- `ARCHITECTURE.md` references to legacy metadata rows, protected-settings v1
+  migration, root-secret legacy migration, tutorial UUID-suite cleanup, and
+  old settings sources.
+- `SECURITY.md` references to lazy revocation backfill, legacy metadata rows,
+  protected-settings schema-v1 upgrade, old cleanup-only paths, and the
+  ProtectedData Device-Binding Note paragraph that requires the `format-floor`
+  marker to fail v1 raw payloads closed as downgrade/corruption (retired with
+  Phase 5; v1 payloads then fail closed as ordinary undecodable envelopes).
+- `TESTING.md` old migration/fail-closed coverage language for Contacts,
+  protected-settings, key-metadata, private-key-control, revocation backfill,
+  raw-v1 root secret, and cleanup-only artifacts.
+- `PERSISTED_STATE_INVENTORY.md` rows for legacy UserDefaults, legacy metadata
+  rows, self-test reports, tutorial UUID suites, Contacts old schema tests, and
+  cleanup-only keys.
+- `PRD.md` legacy summary fallback wording.
