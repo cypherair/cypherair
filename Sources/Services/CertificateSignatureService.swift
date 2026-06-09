@@ -147,7 +147,6 @@ final class CertificateSignatureService {
                 targetKey: targetKey,
                 targetCert: targetCert,
                 targetSelector: .directKey,
-                userId: nil,
                 verification: verification,
                 exportFilename: exportFilename
             )
@@ -187,7 +186,6 @@ final class CertificateSignatureService {
                     displayText: selectedUserId.displayText,
                     occurrenceIndex: selectedUserId.occurrenceIndex
                 ),
-                userId: selectedUserId.displayText,
                 verification: verification,
                 exportFilename: exportFilename
             )
@@ -215,7 +213,6 @@ final class CertificateSignatureService {
         targetKey: ContactKeySummary,
         targetCert: Data,
         targetSelector: ContactCertificationTargetSelector,
-        userId: String?,
         verification: CertificateSignatureVerification,
         exportFilename: String?
     ) -> VerifiedContactCertificationArtifact {
@@ -223,7 +220,6 @@ final class CertificateSignatureService {
         let reference = ContactCertificationArtifactReference(
             artifactId: "cert-artifact-\(UUID().uuidString)",
             keyId: targetKey.keyId,
-            userId: userId,
             createdAt: now,
             storageHint: "protected-contacts-domain",
             canonicalSignatureData: canonicalSignatureData,

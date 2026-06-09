@@ -608,7 +608,6 @@ struct ContactSnapshotMutator {
         var artifact = candidateArtifact
         artifact.targetKeyFingerprint = keyRecord.fingerprint
         artifact.targetCertificateDigest = currentTargetDigest
-        artifact.userId = artifact.userId ?? artifact.targetSelector.legacyUserIdDisplayText
         artifact.updatedAt = now
         artifact.lastValidatedAt = artifact.lastValidatedAt ?? now
         artifact.storageHint = "protected-contacts-domain"
@@ -625,7 +624,6 @@ struct ContactSnapshotMutator {
             let refreshedArtifact = ContactCertificationArtifactReference(
                 artifactId: existing.artifactId,
                 keyId: existing.keyId,
-                userId: artifact.userId,
                 createdAt: existing.createdAt,
                 storageHint: "protected-contacts-domain",
                 canonicalSignatureData: artifact.canonicalSignatureData,
@@ -822,8 +820,7 @@ struct ContactSnapshotMutator {
         }) else {
             return
         }
-        if snapshot.identities[identityIndex].displayName.isEmpty ||
-            snapshot.identities[identityIndex].displayName == IdentityPresentation.legacyUnknownDisplayName {
+        if snapshot.identities[identityIndex].displayName.isEmpty {
             snapshot.identities[identityIndex].displayName = keyRecord.displayName
         }
         if snapshot.identities[identityIndex].primaryEmail == nil {
@@ -833,8 +830,7 @@ struct ContactSnapshotMutator {
     }
 
     private static func domainDisplayName(from userId: String?) -> String {
-        IdentityPresentation.parsedDisplayName(from: userId)
-            ?? IdentityPresentation.legacyUnknownDisplayName
+        IdentityPresentation.parsedDisplayName(from: userId) ?? ""
     }
 
     private func pruneCertificationArtifacts(

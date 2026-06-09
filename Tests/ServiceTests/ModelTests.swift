@@ -278,11 +278,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(keyRecord.displayName, "Alice")
     }
 
-    func test_contactKeyRecord_displayName_nilUserId_returnsUnknown() {
-        let keyRecord = makeContactKeyRecord(userId: nil)
-        XCTAssertEqual(keyRecord.displayName, IdentityPresentation.legacyUnknownDisplayName)
-    }
-
     func test_contactKeyRecord_displayName_noAngleBrackets_returnsUserId() {
         let keyRecord = makeContactKeyRecord(userId: "just-a-name")
         XCTAssertEqual(keyRecord.displayName, "just-a-name")
@@ -364,23 +359,9 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(IdentityPresentation.parsedDisplayName(from: nil))
     }
 
-    func test_identityPresentation_displayFallback_isStableDomainValue() {
-        XCTAssertEqual(
-            IdentityPresentation.displayName(from: nil),
-            IdentityPresentation.legacyUnknownDisplayName
-        )
-    }
-
     func test_identityDisplayPresentation_nilUserId_returnsLocalizedFallback() {
         XCTAssertEqual(
             IdentityDisplayPresentation.displayName(from: nil),
-            String(localized: "contact.unknown", defaultValue: "Unknown")
-        )
-    }
-
-    func test_identityDisplayPresentation_legacyUnknownDisplayName_returnsLocalizedFallback() {
-        XCTAssertEqual(
-            IdentityDisplayPresentation.displayName(IdentityPresentation.legacyUnknownDisplayName),
             String(localized: "contact.unknown", defaultValue: "Unknown")
         )
     }
@@ -741,25 +722,6 @@ final class ModelTests: XCTestCase {
         }
     }
 
-    func test_contactCertificationArtifactReference_decodesLegacyCertificationKindRawValues() throws {
-        let decoder = JSONDecoder()
-
-        for kind in OpenPGPCertificationKind.allCases {
-            let json = Data("""
-            {
-              "artifactId": "artifact-\(kind.rawValue)",
-              "keyId": "contact-key",
-              "createdAt": 0,
-              "certificationKind": "\(kind.rawValue)"
-            }
-            """.utf8)
-
-            let artifact = try decoder.decode(ContactCertificationArtifactReference.self, from: json)
-
-            XCTAssertEqual(artifact.certificationKind, kind)
-        }
-    }
-
     // MARK: - SignatureVerification
 
     func test_signatureVerification_isWarning_forBad() {
@@ -1107,7 +1069,7 @@ final class ModelTests: XCTestCase {
             contactId: fingerprint,
             fingerprint: fingerprint,
             primaryUserId: userId,
-            displayName: IdentityPresentation.displayName(from: userId),
+            displayName: IdentityPresentation.parsedDisplayName(from: userId) ?? "",
             email: IdentityPresentation.email(from: userId),
             keyVersion: 4,
             profile: .universal,

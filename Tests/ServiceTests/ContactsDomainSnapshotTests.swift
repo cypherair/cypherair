@@ -59,12 +59,10 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
         var missingArtifactKey = try makeValidSnapshot()
         missingArtifactKey.certificationArtifacts = [
-            ContactCertificationArtifactReference(
+            makePersistedArtifact(
                 artifactId: "artifact-1",
                 keyId: "missing-key",
-                userId: nil,
-                createdAt: referenceDate,
-                storageHint: nil
+                signatureData: Data([0x01, 0x02, 0x03])
             )
         ]
         XCTAssertThrowsError(try missingArtifactKey.validateContract())
@@ -118,12 +116,9 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         ]
         snapshot.identities[0].tagIds = ["tag-1"]
         snapshot.certificationArtifacts = [
-            ContactCertificationArtifactReference(
+            makePersistedArtifact(
                 artifactId: "artifact-1",
-                keyId: "key-1",
-                userId: "Alice <alice@example.com>",
-                createdAt: referenceDate,
-                storageHint: "placeholder"
+                signatureData: Data([0x51, 0x52, 0x53])
             )
         ]
         snapshot.keyRecords[0].certificationArtifactIds = ["artifact-1"]
@@ -135,66 +130,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         )
 
         XCTAssertNoThrow(try snapshot.validateContract())
-    }
-
-    func test_legacyCertificationArtifactDecodesWithRevalidationDefaults() throws {
-        var snapshot = try makeValidSnapshot()
-        snapshot.keyRecords[0].certificationArtifactIds = ["artifact-legacy"]
-        snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
-            status: .revalidationNeeded,
-            artifactIds: ["artifact-legacy"],
-            lastValidatedAt: nil,
-            reconciliationMetadata: "legacy"
-        )
-        let legacySnapshot = LegacyCertificationArtifactSnapshot(
-            schemaVersion: snapshot.schemaVersion,
-            identities: snapshot.identities,
-            keyRecords: snapshot.keyRecords,
-            tags: snapshot.tags,
-            certificationArtifacts: [
-                LegacyCertificationArtifactReference(
-                    artifactId: "artifact-legacy",
-                    keyId: "key-1",
-                    userId: "Alice <alice@example.com>",
-                    createdAt: referenceDate,
-                    storageHint: "legacy-placeholder"
-                )
-            ],
-            createdAt: snapshot.createdAt,
-            updatedAt: snapshot.updatedAt
-        )
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-
-        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(
-            try encoder.encode(legacySnapshot)
-        )
-        let artifact = try XCTUnwrap(decoded.certificationArtifacts.first)
-
-        XCTAssertEqual(artifact.validationStatus, .revalidationNeeded)
-        XCTAssertEqual(artifact.source, .imported)
-        XCTAssertTrue(artifact.canonicalSignatureData.isEmpty)
-        XCTAssertEqual(artifact.targetSelector.kind, .userId)
-        XCTAssertEqual(artifact.targetSelector.occurrenceIndex, 0)
-        XCTAssertEqual(artifact.targetSelector.userIdDisplayText, "Alice <alice@example.com>")
-    }
-
-    func test_v1Snapshot_failsClosedAsUnsupportedAfterCutoff() throws {
-        // The contacts schema v1→v2 migration was removed under the 2026-06-08 support cutoff.
-        // A v1 payload (the same fields as v2, but schemaVersion 1) must now fail closed via the
-        // unsupported-version `default` branch — routing the domain to recovery instead of migrating.
-        var v1ShapedSnapshot = try makeValidSnapshot()
-        v1ShapedSnapshot.schemaVersion = 1
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        let v1Payload = try encoder.encode(v1ShapedSnapshot)
-
-        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.decodeSnapshot(v1Payload)) { error in
-            XCTAssertEqual(
-                error as? ProtectedDataError,
-                .invalidEnvelope("Contacts payload has an unsupported schema version.")
-            )
-        }
     }
 
     func test_certificationArtifactDigestMismatch_isRejected() throws {
@@ -230,12 +165,11 @@ final class ContactsDomainSnapshotTests: XCTestCase {
     func test_keyRecordCertificationArtifactsMustBelongToSameKey() throws {
         var snapshot = try makeValidSnapshotWithTwoKeys()
         snapshot.certificationArtifacts = [
-            ContactCertificationArtifactReference(
+            makePersistedArtifact(
                 artifactId: "artifact-for-key-2",
                 keyId: "key-2",
-                userId: "Alice <alice@example.com>",
-                createdAt: referenceDate,
-                storageHint: "placeholder"
+                targetKeyFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                signatureData: Data([0x61, 0x62, 0x63])
             )
         ]
         snapshot.keyRecords[0].certificationArtifactIds = ["artifact-for-key-2"]
@@ -246,12 +180,11 @@ final class ContactsDomainSnapshotTests: XCTestCase {
     func test_keyRecordCertificationProjectionArtifactsMustBelongToSameKey() throws {
         var snapshot = try makeValidSnapshotWithTwoKeys()
         snapshot.certificationArtifacts = [
-            ContactCertificationArtifactReference(
+            makePersistedArtifact(
                 artifactId: "artifact-for-key-2",
                 keyId: "key-2",
-                userId: "Alice <alice@example.com>",
-                createdAt: referenceDate,
-                storageHint: "placeholder"
+                targetKeyFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                signatureData: Data([0x61, 0x62, 0x63])
             )
         ]
         snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
@@ -338,13 +271,14 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
     private func makePersistedArtifact(
         artifactId: String,
+        keyId: String = "key-1",
+        targetKeyFingerprint: String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         signatureData: Data,
         signatureDigest: String? = nil
     ) -> ContactCertificationArtifactReference {
         ContactCertificationArtifactReference(
             artifactId: artifactId,
-            keyId: "key-1",
-            userId: nil,
+            keyId: keyId,
             createdAt: referenceDate,
             storageHint: "test",
             canonicalSignatureData: signatureData,
@@ -352,7 +286,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
                 for: signatureData
             ),
             source: .imported,
-            targetKeyFingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            targetKeyFingerprint: targetKeyFingerprint,
             targetSelector: .directKey,
             signerPrimaryFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             signingKeyFingerprint: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -366,22 +300,4 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             exportFilename: "artifact.asc"
         )
     }
-}
-
-private struct LegacyCertificationArtifactSnapshot: Encodable {
-    let schemaVersion: Int
-    let identities: [ContactIdentity]
-    let keyRecords: [ContactKeyRecord]
-    let tags: [ContactTag]
-    let certificationArtifacts: [LegacyCertificationArtifactReference]
-    let createdAt: Date
-    let updatedAt: Date
-}
-
-private struct LegacyCertificationArtifactReference: Encodable {
-    let artifactId: String
-    let keyId: String
-    let userId: String?
-    let createdAt: Date
-    let storageHint: String?
 }

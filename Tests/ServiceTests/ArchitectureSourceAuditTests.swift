@@ -247,6 +247,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupContactsSnapshotMigrationSymbols)
     }
 
+    func test_legacyCleanup_phase1_contactsArtifactSentinel_isTrackedForStrictRetirement() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupContactsArtifactSentinelSymbols)
+    }
+
     func test_legacyCleanup_item1A_rootSecretRightStore_isTrackedForStrictRetirement() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRootSecretRightStoreSymbols)
     }
@@ -1558,6 +1562,23 @@ private enum ArchitectureSourceAuditRules {
         pattern: wordPattern(for: [
             "LegacySnapshotV1",
             "migrateLegacyV1Snapshot",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let legacyCleanupContactsArtifactSentinelSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup Phase 1 contacts certification-artifact and sentinel symbols",
+        failureSummary: "Phase 1 contacts certification-artifact defaulting and \"Unknown\" sentinel symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        pattern: wordPattern(for: [
+            "legacyTargetSelector",
+            "legacyUserIdDisplayText",
+            "legacyUnknownDisplayName",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")

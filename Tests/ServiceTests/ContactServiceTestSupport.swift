@@ -108,12 +108,20 @@ class ContactServiceTestCase: XCTestCase {
             snapshot.keyRecords.firstIndex { $0.fingerprint == fingerprint }
         )
         let keyId = snapshot.keyRecords[keyIndex].keyId
+        let signatureData = Data("test-signature-\(artifactId)".utf8)
         let artifact = ContactCertificationArtifactReference(
             artifactId: artifactId,
             keyId: keyId,
-            userId: snapshot.keyRecords[keyIndex].primaryUserId,
             createdAt: Date(),
-            storageHint: "test-\(artifactId)"
+            storageHint: "test-\(artifactId)",
+            canonicalSignatureData: signatureData,
+            signatureDigest: ContactCertificationArtifactReference.sha256Hex(
+                for: signatureData
+            ),
+            source: .imported,
+            targetKeyFingerprint: snapshot.keyRecords[keyIndex].fingerprint,
+            targetSelector: .directKey,
+            validationStatus: .revalidationNeeded
         )
         snapshot.certificationArtifacts.append(artifact)
         snapshot.keyRecords[keyIndex].certificationArtifactIds.append(artifactId)
@@ -205,7 +213,6 @@ class ContactServiceTestCase: XCTestCase {
         var artifact = ContactCertificationArtifactReference(
             artifactId: artifactId,
             keyId: keyRecord.keyId,
-            userId: userId,
             createdAt: Date(),
             storageHint: "test",
             canonicalSignatureData: signatureData,
