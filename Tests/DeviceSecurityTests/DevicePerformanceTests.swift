@@ -135,14 +135,14 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         // Generate SE key and extract its dataRepresentation for reconstruction.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let keyData = handle.dataRepresentation
 
         let options = XCTMeasureOptions()
         options.iterationCount = 20
 
         measure(metrics: [XCTClockMetric()], options: options) {
-            _ = try! secureEnclave.reconstructKey(from: keyData)
+            _ = try! secureEnclave.reconstructKey(from: keyData, authenticationContext: nil)
         }
     }
 
@@ -159,7 +159,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
         options.iterationCount = 10
 
         measure(metrics: [XCTClockMetric()], options: options) {
-            let handle = try! secureEnclave.generateWrappingKey(accessControl: nil)
+            let handle = try! secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try! secureEnclave.wrap(
                 privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint
             )

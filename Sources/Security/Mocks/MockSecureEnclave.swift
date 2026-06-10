@@ -28,6 +28,13 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     private(set) var wrapCallCount = 0
     private(set) var unwrapCallCount = 0
     private(set) var deleteCallCount = 0
+    private(set) var reconstructCallCount = 0
+
+    /// The `authenticationContext` passed to the most recent `reconstructKey` /
+    /// `generateWrappingKey` call, for asserting that the macOS in-window route
+    /// threads (or withholds) a context. The mock never evaluates it.
+    private(set) var lastReconstructAuthenticationContext: LAContext?
+    private(set) var lastGenerateAuthenticationContext: LAContext?
 
     /// If set, the next operation will throw this error.
     var nextError: Error?
@@ -52,6 +59,7 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
             throw error
         }
         generateCallCount += 1
+        lastGenerateAuthenticationContext = authenticationContext
 
         #if canImport(CryptoKit)
         // Use software P-256 key (same algorithm, no hardware binding)
@@ -164,6 +172,8 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
             nextError = nil
             throw error
         }
+        reconstructCallCount += 1
+        lastReconstructAuthenticationContext = authenticationContext
         // Simulate auth mode enforcement.
         if let mode = simulatedAuthMode, mode == .highSecurity, !biometricsAvailable {
             throw MockSEError.authenticationFailed
@@ -183,6 +193,9 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         wrapCallCount = 0
         unwrapCallCount = 0
         deleteCallCount = 0
+        reconstructCallCount = 0
+        lastReconstructAuthenticationContext = nil
+        lastGenerateAuthenticationContext = nil
         nextError = nil
         simulatedAuthMode = nil
         biometricsAvailable = true

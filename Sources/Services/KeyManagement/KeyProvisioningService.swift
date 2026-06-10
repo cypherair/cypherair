@@ -65,7 +65,7 @@ final class KeyProvisioningService {
 
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: generated.certData,
             using: seHandle,
@@ -134,7 +134,7 @@ final class KeyProvisioningService {
 
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: imported.secretKeyData,
             using: seHandle,

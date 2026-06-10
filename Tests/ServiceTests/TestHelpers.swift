@@ -188,7 +188,7 @@ enum TestHelpers {
         let armoredPublicKey = try engine.armorPublicKey(certData: secretCertData)
         let publicKeyData = try engine.dearmor(armored: armoredPublicKey)
 
-        let handle = try mockSE.generateWrappingKey(accessControl: nil)
+        let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try mockSE.wrap(
             privateKey: secretCertData,
             using: handle,
