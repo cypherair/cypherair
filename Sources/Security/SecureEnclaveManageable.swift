@@ -28,7 +28,7 @@ protocol SEKeyHandle {
 /// Test: Software P-256 + AES-GCM (same algorithm, no hardware binding).
 ///
 /// SECURITY-CRITICAL: Changes to this protocol require human review.
-/// See SECURITY.md Section 7.
+/// See SECURITY.md Section 10.
 ///
 /// `Sendable` so an instance can be handed to the off-main reconstruct/unwrap in
 /// `PrivateKeyAccessService` (the synchronous SE biometric must not block the main

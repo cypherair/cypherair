@@ -42,7 +42,7 @@ final class HardwareSEKey: SEKeyHandle {
 /// 4. AES.GCM.seal(privateKeyBytes) -> sealed box.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 3 and Section 7.
+/// See SECURITY.md Section 3 and Section 10.
 struct HardwareSecureEnclave: SecureEnclaveManageable {
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -135,7 +135,7 @@ struct HardwareSecureEnclave: SecureEnclaveManageable {
             // Note: SymmetricKey is an opaque CryptoKit type that manages its own secure
             // memory lifecycle internally. There is no public zeroize() API — the key
             // material is cleared by the framework when the value goes out of scope.
-            // This satisfies SECURITY.md §3.2 step 6 ("zeroize symmetric key") via
+            // This satisfies SECURITY.md Section 3 wrapping step 6 ("zeroize symmetric key") via
             // framework guarantees rather than explicit application-level zeroing.
             let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
             let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
