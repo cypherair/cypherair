@@ -104,7 +104,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 
 The guided tutorial is a host-driven sandbox that teaches the real app workflow without touching real workspace state. `TutorialView` owns the hub, sandbox acknowledgement, workspace, completion, and leave-confirmation surfaces. `TutorialSessionStore` owns the current tutorial session, seven-module progress, replay unlock rules, navigation state, active tutorial modal, output interception policy, and completion-version persistence.
 
-`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, while startup/reset cleanup also removes legacy orphaned `com.cypherair.tutorial.<UUID>` defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
+`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, and startup/reset cleanup removes the fixed suite plist and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
 The tutorial's mock security primitives are temporary SR-FIX-18 debt, not production security primitives — the naming and containment rules live in the Security Layer table below and [SECURITY.md](SECURITY.md) Section 6. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
 
@@ -228,13 +228,13 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
-- `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
+- `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; opens through post-unlock orchestration
 - `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores schema v2 `PGPKeyIdentity` metadata including explicit OpenPGP configuration identity and private-key custody kind, and participates in relock/recovery. It does not store Apple handle locators, access-control policy, or private material.
 
 ProtectedData component ownership:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
-- `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
+- `PrivateKeyControlStore` is the private-key control source of truth; the payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key bundle rows
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
 - `ProtectedSettingsOrdinarySettingsPersistence` adapts `ProtectedSettingsStore` to the ordinary-settings persistence protocol inside the ProtectedData boundary
@@ -538,7 +538,6 @@ Keychain (kSecClassKey, Secure Enclave token):
 App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Legacy flat Contacts files; unsupported — not read, migrated, quarantined, or reset-cleaned (see PERSISTED_STATE_INVENTORY)
-│   └── self-test/               → Legacy self-test reports cleanup source only; new reports are in-memory export-only
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist
@@ -549,14 +548,8 @@ App Sandbox:
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)
-│       ├── com.cypherair.preference.authMode              → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
-│       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
-│       └── com.cypherair.tutorial.<UUID>.plist             → Legacy tutorial sandbox defaults orphan; startup/reset fallback cleanup
+│       └── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
 └── tmp/
     ├── decrypted/op-<UUID>/     → Per-operation decrypted file previews with verified complete protection
     ├── streaming/op-<UUID>/     → Per-operation streaming outputs with verified complete protection

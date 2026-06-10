@@ -205,6 +205,8 @@ key-metadata schema v1, tolerant metadata decode, and revocation backfill.
 
 ### Phase 4 — Private-Key-Control And Cleanup-Only Residue
 
+> Status: Completed (2026-06-10).
+
 Retire legacy UserDefaults import/cleanup and old local artifact cleanup hooks.
 
 - Remove `PrivateKeyControlStore.legacyInitialPayload`,
@@ -307,9 +309,12 @@ and `item7` cover the retired Phase 3 metadata migration/legacy-row symbols
 (including `PayloadV1` via the `item4` bare token, `sourceSchemaVersion`, the
 migration source/outcome types, `cleanupLegacyMetadataRows`, and the
 `metadataAccount` / `metadataPrefix` row addressing) and revocation backfill,
-`item3` covers the Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
-`invalidLegacyAuthMode` family (its Phase 2 `ProtectedSettingsStore`
-occurrence is retired), the `item4` protected-settings rule covers the
+`item3` covers the retired Phase 4 `legacyInitialPayload` /
+`cleanupLegacyDefaults` / `invalidLegacyAuthMode` family plus the
+cleanup-only artifact symbols (`legacyRequireAuthOnLaunchKey`,
+`legacySelfTestReportsDirectory`, `legacySelfTestReportDirectory`,
+`legacyTutorialDefaultsSuitePrefix`, `legacyTutorialDefaultsSuiteNames`,
+`cleanupTutorialDefaultsSuites`), the `item4` protected-settings rule covers the
 retired Phase 2 settings symbols including `PayloadV1` and the old
 ordinary-settings store surface, the remaining contacts-snapshot rule covers
 Phase 1 snapshot symbols, and the Phase 1 contacts
@@ -317,10 +322,10 @@ certification-artifact/sentinel rule covers the retired
 `legacyTargetSelector`, `legacyUserIdDisplayText`, and
 `legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers: the Phase 4 cleanup-only symbols; the Phase 5
-`storageFormat` / format-floor additions; and all Phase 6 symbols — there is
-no Rust guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so
-Phase 6 currently has zero guardrail coverage.
+No guardrail rule yet covers: the Phase 5 `storageFormat` / format-floor
+additions; and all Phase 6 symbols — there is no Rust guardrail yet, and the
+Swift rules exclude `Sources/PgpMobile/`, so Phase 6 currently has zero
+guardrail coverage.
 
 Additional guardrails are needed as cleanup proceeds:
 

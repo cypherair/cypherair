@@ -463,13 +463,6 @@ class KeyManagementServiceTestCase: XCTestCase {
     }
 
     override func tearDown() {
-        // Clean up crash recovery flags that tests may have set
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.authModeKey)
-
         service = nil
         mockSE = nil
         mockKC = nil
@@ -705,7 +698,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
 
         let privateKeyControlStore = PrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager

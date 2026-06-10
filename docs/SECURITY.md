@@ -337,7 +337,7 @@ Security invariants for protected app data:
 - Contacts does not provide multi-contact package exchange or social-graph export. Any future complete Contacts backup or device migration must be mandatory encrypted.
 - Self-test, decrypted, streaming, export handoff, and tutorial artifacts keep the inventory's ephemeral-with-cleanup behavior; files exported to user-selected destinations are outside app custody after handoff.
 
-UserDefaults is allowed only for documented boot, test, tutorial, and legacy cleanup exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
+UserDefaults is allowed only for documented boot, test, and tutorial exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
 
 Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
 
@@ -361,7 +361,7 @@ The guided tutorial is allowed to run real app services and real OpenPGP operati
 
 Tutorial isolation boundaries:
 
-- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory. Startup and Reset All Local Data also remove legacy orphaned `com.cypherair.tutorial.<UUID>` suites.
+- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory, and startup and Reset All Local Data also remove the fixed suite plist.
 - Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
 - Tutorial private-key protection currently uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows. This is temporary SR-FIX-18 debt: tutorial/UI-test mocks must remain visibly named `Mock*`, stay under `Sources/Security/Mocks`, and keep mock-owned errors instead of impersonating production `KeychainError`.
 - `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.

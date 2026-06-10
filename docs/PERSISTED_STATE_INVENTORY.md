@@ -43,19 +43,18 @@ Allowed target classes:
 | Item | Current location | Target class | Domain / exception | Current status | Migration readiness |
 |------|------------------|--------------|--------------------------|----------------|---------------------|
 | `appSessionAuthenticationPolicy` | `UserDefaults` | `early-readable boot exception` | Boot exception | Exception retained | n/a in v1 |
-| `authMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
+| `authMode` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | `gracePeriod` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `colorTheme` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `legacy cleanup-only` | Legacy cleanup | Cleanup-only | cleanup only |
 | `encryptToSelf` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `clipboardNotice` | `ProtectedData/protected-settings` | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | Test-only exception | Exception retained | n/a |
-| `rewrapInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
-| `rewrapTargetMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
-| `modifyExpiryInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
-| `modifyExpiryFingerprint` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
+| `rewrapInProgress` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
+| `rewrapTargetMode` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
+| `modifyExpiryInProgress` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
+| `modifyExpiryFingerprint` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | Permanent SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
 | Pending SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
 | Secure Enclave custody private-operation key rows | Keychain `kSecClassKey` rows tagged `com.cypherair.v1.secure-enclave-custody.<random-id>.<role>`; two distinct P-256 Secure Enclave private keys for signing and key agreement. Tags are Security-private local locators and are not stored in `key-metadata`, logs, UI, Rust, or exports. Reset All Local Data inventories and deletes app-owned custody rows, including malformed app-owned tags, and validates no remaining custody handles using sanitized counts/categories only. Guarded device tests validate real hardware creation/load/delete, biometric private-operation access, handle-state failure, and cleanup behavior. | `private-key-material exception` | Secure Enclave custody handle store (hidden/test boundary) | Implemented hidden boundary with local reset cleanup and guarded device evidence; not user-reachable | n/a — implemented as a hidden/test boundary; production exposure deferred |
@@ -71,12 +70,12 @@ Allowed target classes:
 | Contacts runtime-only search/filter/selection state | In memory only: `ContactsSearchIndex`, screen search/filter values, tag filters, recipient selection, and pending route state | `ephemeral-with-cleanup` | Contacts runtime exception | Implemented; cleared with relock, content clear, or screen lifecycle as applicable | n/a, not persisted |
 | Unsupported legacy contacts public-key files | `Documents/contacts/*.gpg` and historical `Documents/contacts.quarantine/*.gpg` | `unsupported legacy` | Contacts support cutoff | Not read, migrated, quarantined, reset-cleaned, or proactively deleted; existing files may remain on disk but are no longer treated as CypherAir app state | unsupported |
 | Unsupported legacy contacts metadata | `Documents/contacts/contact-metadata.json` and historical quarantine copy | `unsupported legacy` | Contacts support cutoff | Not read, migrated, quarantined, reset-cleaned, or proactively deleted; existing files may remain on disk but are no longer treated as CypherAir app state | unsupported |
-| Self-test reports / legacy `Documents/self-test/` | In-memory export-only report data; legacy app sandbox `Documents/self-test/` cleanup source only | `ephemeral-with-cleanup` / `legacy cleanup-only` | Self-test export-only exception | Implemented | implemented |
+| Self-test reports | In-memory export-only report data | `ephemeral-with-cleanup` | Self-test export-only exception | Implemented | implemented |
 | `tmp/decrypted/` | App temporary directory `tmp/decrypted/op-<UUID>/<sanitized output filename>` | `ephemeral-with-cleanup` | Temporary decrypted artifact cleanup | Implemented | implemented |
 | `tmp/streaming/` | App temporary directory `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg` | `ephemeral-with-cleanup` | Temporary streaming artifact cleanup | Implemented | implemented |
 | `tmp/export-*` | App temporary directory `tmp/export-<UUID>-<sanitized filename>`, including explicit certification-signature export handoff files before user-selected export/share leaves app custody | `ephemeral-with-cleanup` | Temporary export handoff / certification-signature explicit export boundary | Implemented | implemented |
 | `tmp/CypherAirGuidedTutorial-*` | App temporary directory `tmp/CypherAirGuidedTutorial-<UUID>/` | `ephemeral-with-cleanup` | Tutorial sandbox artifact cleanup | Implemented | implemented |
-| Tutorial `UserDefaults` suite | App Preferences plist/domain `com.cypherair.tutorial.sandbox`, plus legacy orphan cleanup for `com.cypherair.tutorial.<UUID>.plist` | `ephemeral-with-cleanup` | Tutorial defaults cleanup | Implemented | implemented |
+| Tutorial `UserDefaults` suite | App Preferences plist/domain `com.cypherair.tutorial.sandbox` | `ephemeral-with-cleanup` | Tutorial defaults cleanup | Implemented | implemented |
 | Files exported to user-selected locations | Outside app-controlled sandbox after export | `out-of-app-custody` | Out-of-app-custody exception | Exception retained | n/a |
 
 ## 4. Migration Rules

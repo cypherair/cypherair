@@ -66,7 +66,6 @@ final class AppConfiguration {
     // MARK: - UserDefaults Keys
 
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
-    private static let legacyRequireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
 
     // MARK: - Initialization
 
@@ -101,12 +100,6 @@ final class AppConfiguration {
     private static var resetPersistentKeys: [String] {
         [
             appSessionAuthenticationPolicyKey,
-            legacyRequireAuthOnLaunchKey,
-            AuthPreferences.authModeKey,
-            AuthPreferences.rewrapInProgressKey,
-            AuthPreferences.rewrapTargetModeKey,
-            AuthPreferences.modifyExpiryInProgressKey,
-            AuthPreferences.modifyExpiryFingerprintKey,
             "com.cypherair.preference.uiTestBypassAuthentication"
         ]
     }

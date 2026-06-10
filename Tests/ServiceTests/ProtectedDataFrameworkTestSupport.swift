@@ -621,7 +621,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         let privateKeyControlStore = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager

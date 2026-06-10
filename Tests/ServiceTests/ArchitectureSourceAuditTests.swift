@@ -1511,12 +1511,18 @@ private enum ArchitectureSourceAuditRules {
     )
 
     static let legacyCleanupPrivateKeyControlDefaultsSymbols = ArchitectureSourceAuditRule(
-        name: "Legacy cleanup #3 private-key-control defaults symbols",
-        failureSummary: "Legacy private-key-control defaults symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        name: "Legacy cleanup #3 private-key-control defaults and cleanup-only symbols",
+        failureSummary: "Legacy private-key-control defaults and cleanup-only artifact symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
         pattern: wordPattern(for: [
             "legacyInitialPayload",
             "cleanupLegacyDefaults",
             "invalidLegacyAuthMode",
+            "legacyRequireAuthOnLaunchKey",
+            "legacySelfTestReportsDirectory",
+            "legacySelfTestReportDirectory",
+            "legacyTutorialDefaultsSuitePrefix",
+            "legacyTutorialDefaultsSuiteNames",
+            "cleanupTutorialDefaultsSuites",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1524,15 +1530,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #3 private-key-control legacy UserDefaults import/cleanup; removed by LEGACY_CLEANUP Phase 4 under the 2026-06-08 cutoff.",
-                [
-                    "Sources/Security/ProtectedData/PrivateKeyControlStore.swift",
-                    "Sources/Security/AuthenticationEvaluable.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupProtectedSettingsMigrationSymbols = ArchitectureSourceAuditRule(

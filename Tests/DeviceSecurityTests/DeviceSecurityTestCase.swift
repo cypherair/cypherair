@@ -46,11 +46,6 @@ class DeviceSecurityTestCase: XCTestCase {
             try? keychain.delete(service: entry.service, account: entry.account)
         }
         // Clean up UserDefaults flags
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.authModeKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
 
         createdFingerprints = []
         createdKeychainServices = []

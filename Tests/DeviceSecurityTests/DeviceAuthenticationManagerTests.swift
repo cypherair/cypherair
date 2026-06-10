@@ -264,10 +264,8 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
-        // No flag set, but pending items exist (should be left alone).
+        // No journal entry set, but pending items exist (should be left alone).
         try keychain.save(Data("stale".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-
-        UserDefaults.standard.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
 
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,

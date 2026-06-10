@@ -14,13 +14,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedRightIdentifier: "com.cypherair.tests.private-key-control.no-handoff"
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let defaultsSuiteName = "com.cypherair.tests.private-key-control.no-handoff.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
-        defaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
         let store = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
@@ -33,11 +27,10 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
         XCTAssertFalse(created)
         XCTAssertNil(try registryStore.loadRegistry().committedMembership[ProtectedDataTestAppPrivateKeyControlStore.domainID])
-        XCTAssertEqual(defaults.string(forKey: AuthPreferences.authModeKey), AuthenticationMode.highSecurity.rawValue)
         XCTAssertEqual(store.privateKeyControlState, .locked)
     }
 
-    func test_privateKeyControl_emptyRegistryCreatesFirstDomainAndMigratesLegacyJournal() async throws {
+    func test_privateKeyControl_emptyRegistryCreatesFirstDomainWithStandardDefaults() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("PrivateKeyControlFirstDomain"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
@@ -46,17 +39,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         )
         _ = try registryStore.performSynchronousBootstrap()
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let defaultsSuiteName = "com.cypherair.tests.private-key-control.first.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
-        defaults.set(AuthenticationMode.highSecurity.rawValue, forKey: AuthPreferences.authModeKey)
-        defaults.set(true, forKey: AuthPreferences.rewrapInProgressKey)
-        defaults.set(AuthenticationMode.standard.rawValue, forKey: AuthPreferences.rewrapTargetModeKey)
-        defaults.set(true, forKey: AuthPreferences.modifyExpiryInProgressKey)
-        defaults.set("abc123", forKey: AuthPreferences.modifyExpiryFingerprintKey)
         let store = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager
@@ -72,11 +55,6 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
         XCTAssertTrue(created)
         XCTAssertEqual(try registryStore.loadRegistry().committedMembership[ProtectedDataTestAppPrivateKeyControlStore.domainID], .active)
-        XCTAssertNil(defaults.string(forKey: AuthPreferences.authModeKey))
-        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.rewrapInProgressKey))
-        XCTAssertNil(defaults.string(forKey: AuthPreferences.rewrapTargetModeKey))
-        XCTAssertFalse(defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey))
-        XCTAssertNil(defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey))
 
         var rootSecret = await persistedSecretBox.data()
         XCTAssertFalse(rootSecret.isEmpty)
@@ -84,10 +62,9 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         rootSecret.protectedDataZeroize()
         let payload = try await store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
 
-        XCTAssertEqual(payload.settings.authMode, .highSecurity)
-        XCTAssertEqual(payload.recoveryJournal.rewrapTargetMode, .standard)
-        XCTAssertEqual(payload.recoveryJournal.modifyExpiry?.fingerprint, "abc123")
-        XCTAssertEqual(try store.requireUnlockedAuthMode(), .highSecurity)
+        XCTAssertEqual(payload.settings.authMode, .standard)
+        XCTAssertEqual(payload.recoveryJournal, .empty)
+        XCTAssertEqual(try store.requireUnlockedAuthMode(), .standard)
     }
 
     func test_realComponents_privateKeyControlFirstLeavesSettingsCreationNeedingAuthorizedSessionAfterRestart() async throws {
@@ -137,7 +114,6 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
         let privateKeyControlStore = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager
@@ -214,7 +190,6 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
         let store = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)

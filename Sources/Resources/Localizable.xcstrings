@@ -5157,22 +5157,6 @@
         }
       }
     },
-    "error.privateKeyControl.invalidLegacyAuthMode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection settings need recovery."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护设置需要恢复。"
-          }
-        }
-      }
-    },
     "error.privateKeyControl.locked" : {
       "localizations" : {
         "en" : {

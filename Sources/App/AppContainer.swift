@@ -34,7 +34,6 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
-    let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
 
@@ -71,7 +70,6 @@ final class AppContainer: @unchecked Sendable {
         selfTestService: SelfTestService,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
         localDataResetService: LocalDataResetService,
-        legacySelfTestReportsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
         self.authLifecycleTraceStore = authLifecycleTraceStore
@@ -106,7 +104,6 @@ final class AppContainer: @unchecked Sendable {
         self.selfTestService = selfTestService
         self.temporaryArtifactStore = temporaryArtifactStore
         self.localDataResetService = localDataResetService
-        self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
         self.defaultsSuiteName = defaultsSuiteName
         uiTestContactsBootstrap = nil
     }
@@ -600,7 +597,6 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -649,9 +645,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
-        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let legacySelfTestReportsDirectory = documentDirectory
-            .appendingPathComponent("self-test", isDirectory: true)
         let contactsDomainStore = ContactsDomainStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -840,7 +833,6 @@ final class AppContainer: @unchecked Sendable {
             appSessionOrchestrator: appSessionOrchestrator,
             appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -880,8 +872,7 @@ final class AppContainer: @unchecked Sendable {
             qrService: pgpServices.qrService,
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            localDataResetService: localDataResetService,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
+            localDataResetService: localDataResetService
         )
     }
 
@@ -918,8 +909,6 @@ final class AppContainer: @unchecked Sendable {
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
-        let legacySelfTestReportsDirectory = documentDirectory
-            .appendingPathComponent("self-test", isDirectory: true)
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
@@ -961,7 +950,6 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -1162,7 +1150,6 @@ final class AppContainer: @unchecked Sendable {
             appSessionOrchestrator: appSessionOrchestrator,
             appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -1201,7 +1188,6 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
         if !requiresManualAuthentication {
