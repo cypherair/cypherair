@@ -192,7 +192,9 @@ func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
         revocationCert: Data("revocation-\(fingerprint)".utf8),
         primaryAlgo: "Ed448",
         subkeyAlgo: "X448",
-        expiryDate: nil
+        expiryDate: nil,
+        openPGPConfigurationIdentity: .modernSoftwareV6,
+        privateKeyCustodyKind: .softwareSecretCertificate
     )
 }
 

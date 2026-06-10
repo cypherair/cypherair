@@ -232,7 +232,7 @@ $(SRCROOT)/Sources/Security/AuthenticationManager.swift
 $(SRCROOT)/Sources/Security/AuthenticationPromptCoordinator.swift
 $(SRCROOT)/Sources/Security/KeyBundleStore.swift
 $(SRCROOT)/Sources/Security/KeychainFailure.swift
-$(SRCROOT)/Sources/Security/KeyMetadataStore.swift
+$(SRCROOT)/Sources/Security/KeyMetadataPersistence.swift
 $(SRCROOT)/Sources/Security/KeyMigrationCoordinator.swift
 $(SRCROOT)/Sources/Security/KeychainManageable.swift
 $(SRCROOT)/Sources/Security/KeychainManager.swift

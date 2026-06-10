@@ -447,7 +447,7 @@ final class SettingsScreenModelTests: XCTestCase {
         guard let keychain = resetContainer.keychain as? MockKeychain else {
             return XCTFail("Expected UI-test container to use MockKeychain")
         }
-        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7SUCCESS")
+        let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7SUCCESS"
         do {
             try keychain.save(
                 Data([0x07]),
@@ -495,7 +495,7 @@ final class SettingsScreenModelTests: XCTestCase {
         guard let keychain = resetContainer.keychain as? MockKeychain else {
             return XCTFail("Expected UI-test container to use MockKeychain")
         }
-        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7UNAVAILABLE")
+        let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7UNAVAILABLE"
         do {
             try keychain.save(
                 Data([0x07]),
@@ -548,7 +548,7 @@ final class SettingsScreenModelTests: XCTestCase {
         guard let keychain = resetContainer.keychain as? MockKeychain else {
             return XCTFail("Expected UI-test container to use MockKeychain")
         }
-        let markerService = KeychainConstants.metadataService(fingerprint: "SRFIX7FAILED")
+        let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7FAILED"
         do {
             try keychain.save(
                 Data([0x07]),

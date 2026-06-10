@@ -52,30 +52,11 @@ final class KeyExportService {
         guard let identity = catalogStore.identity(for: fingerprint) else {
             throw CypherAirError.noMatchingKey
         }
-
-        if !identity.revocationCert.isEmpty {
-            return try await certificateAdapter.armorSignature(identity.revocationCert)
-        }
-        guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
+        guard !identity.revocationCert.isEmpty else {
             throw CypherAirError.keyOperationUnavailable(category: .revocationArtifactUnavailable)
         }
 
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
-        defer {
-            secretKey.resetBytes(in: 0..<secretKey.count)
-        }
-
-        let generatedRevocation = try await certificateAdapter.generateKeyRevocation(
-            secretCert: secretKey
-        )
-        let armoredRevocation = try await certificateAdapter.armorSignature(generatedRevocation)
-
-        catalogStore.updateRevocation(
-            fingerprint: fingerprint,
-            revocationCert: generatedRevocation
-        )
-
-        return armoredRevocation
+        return try await certificateAdapter.armorSignature(identity.revocationCert)
     }
 
     func exportPublicKey(fingerprint: String) throws -> Data {

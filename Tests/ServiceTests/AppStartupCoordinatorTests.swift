@@ -98,6 +98,7 @@ final class AppStartupCoordinatorTests: XCTestCase {
         )
         let setupPrivateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         setupAuthManager.configurePrivateKeyControlStore(setupPrivateKeyControlStore)
+        let sharedMetadataPersistence = InMemoryKeyMetadataStore()
         let setupKeyManagement = KeyManagementService(
             keyAdapter: PGPKeyOperationAdapter(engine: engine),
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
@@ -105,7 +106,8 @@ final class AppStartupCoordinatorTests: XCTestCase {
             keychain: mockKC,
             authenticator: setupAuthManager,
             defaults: defaults,
-            privateKeyControlStore: setupPrivateKeyControlStore
+            privateKeyControlStore: setupPrivateKeyControlStore,
+            metadataPersistence: sharedMetadataPersistence
         )
 
         let identity = try await setupKeyManagement.generateKey(
@@ -171,7 +173,8 @@ final class AppStartupCoordinatorTests: XCTestCase {
             authenticator: authManager,
             defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator,
-            privateKeyControlStore: keyManagementPrivateKeyControlStore
+            privateKeyControlStore: keyManagementPrivateKeyControlStore,
+            metadataPersistence: sharedMetadataPersistence
         )
         let config = AppConfiguration(defaults: defaults)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(

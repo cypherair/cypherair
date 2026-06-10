@@ -7,8 +7,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
 
     func test_productionPolicyBlocksSecureEnclaveSelectiveRevocationBeforeHandleLookup() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -46,8 +46,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             let fixture = try await makeSecureEnclaveRouteFixture(
                 configurationIdentity: configurationIdentity
             )
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)
@@ -95,8 +95,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
 
     func test_secureEnclaveSelectorMismatchFailsBeforeHandleLookupOrUnwrap() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -147,8 +147,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
 
         for (loadError, expectedCategory) in cases {
             let fixture = try await makeSecureEnclaveRouteFixture()
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             if let loadError {
@@ -199,8 +199,8 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
 
         for (signingError, expectedError) in cases {
             let fixture = try await makeSecureEnclaveRouteFixture()
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)

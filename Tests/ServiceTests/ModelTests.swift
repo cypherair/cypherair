@@ -434,7 +434,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(universal.compatibilityTarget, .gnupgOriented)
         XCTAssertEqual(universal.messageFormatPreference, .seipdV1)
         XCTAssertEqual(universal.softwareExportProtection, .iteratedSaltedS2K)
-        XCTAssertEqual(PGPKeyProfile.universal.defaultCustodyKind, .softwareSecretCertificate)
 
         let advanced = PGPKeyProfile.advanced.openPGPConfiguration
         XCTAssertEqual(advanced.identity, .modernSoftwareV6)
@@ -443,7 +442,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(advanced.compatibilityTarget, .rfc9580Oriented)
         XCTAssertEqual(advanced.messageFormatPreference, .seipdV2Aead)
         XCTAssertEqual(advanced.softwareExportProtection, .argon2idS2K)
-        XCTAssertEqual(PGPKeyProfile.advanced.defaultCustodyKind, .softwareSecretCertificate)
     }
 
     func test_pgpKeyIdentity_persistsSuccessorVocabulary() throws {
@@ -481,39 +479,6 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(object["openPGPConfiguration"])
     }
 
-    func test_pgpKeyIdentity_decodesLegacyJSONWithSoftwareCustodyDefaults() throws {
-        let fixtures: [(String, UInt8, String, String, PGPKeyConfiguration.Identity, PGPKeyConfiguration)] = [
-            ("abababababababababababababababababababab", 4, "universal", "Ed25519", .compatibleSoftwareV4, .compatibleSoftwareV4),
-            ("babababababababababababababababababababa", 6, "advanced", "Ed448", .modernSoftwareV6, .modernSoftwareV6)
-        ]
-
-        for (fingerprint, keyVersion, profile, primaryAlgo, expectedIdentity, expectedConfiguration) in fixtures {
-            let legacyJSON = Data("""
-            {
-              "fingerprint": "\(fingerprint)",
-              "keyVersion": \(keyVersion),
-              "profile": "\(profile)",
-              "userId": "Legacy",
-              "hasEncryptionSubkey": true,
-              "isRevoked": false,
-              "isExpired": false,
-              "isDefault": false,
-              "isBackedUp": false,
-              "publicKeyData": "",
-              "revocationCert": "",
-              "primaryAlgo": "\(primaryAlgo)",
-              "subkeyAlgo": "X"
-            }
-            """.utf8)
-
-            let identity = try JSONDecoder().decode(PGPKeyIdentity.self, from: legacyJSON)
-
-            XCTAssertEqual(identity.openPGPConfigurationIdentity, expectedIdentity)
-            XCTAssertEqual(identity.openPGPConfiguration, expectedConfiguration)
-            XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
-        }
-    }
-
     func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {
         let compatibleP256 = PGPKeyConfiguration.compatibleP256V4
         XCTAssertEqual(compatibleP256.identity, .compatibleP256V4)
@@ -532,7 +497,6 @@ final class ModelTests: XCTestCase {
         for profile in PGPKeyProfile.allCases {
             XCTAssertNotEqual(profile.openPGPConfiguration, .compatibleP256V4)
             XCTAssertNotEqual(profile.openPGPConfiguration, .modernP256V6)
-            XCTAssertNotEqual(profile.defaultCustodyKind, .appleSecureEnclavePrivateOperations)
         }
 
         XCTAssertEqual(
@@ -1105,7 +1069,9 @@ final class ModelTests: XCTestCase {
             revocationCert: Data(),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 

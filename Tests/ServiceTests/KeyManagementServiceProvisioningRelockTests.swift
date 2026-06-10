@@ -658,8 +658,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
         await relockTask.value
 
         let reopenedPayload = try await target.keyMetadataStore.openDomainIfNeeded(
-            wrappingRootKey: target.wrappingRootKey,
-            authenticationContext: nil
+            wrappingRootKey: target.wrappingRootKey
         )
         XCTAssertEqual(reopenedPayload.identities, [])
         XCTAssertEqual(

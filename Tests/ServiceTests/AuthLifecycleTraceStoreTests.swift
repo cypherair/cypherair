@@ -270,7 +270,8 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
     func test_systemKeychain_recordsPassiveTraceWithoutChangingResults() throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let keychain = SystemKeychain(traceStore: store)
-        let service = "\(KeychainConstants.metadataPrefix)trace-\(UUID().uuidString)"
+        let tracePrefix = "\(KeychainConstants.prefix).trace-test."
+        let service = "\(tracePrefix)\(UUID().uuidString)"
         let account = "com.cypherair.tests.trace"
 
         try? keychain.delete(service: service, account: account)
@@ -286,7 +287,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
 
         XCTAssertEqual(try keychain.load(service: service, account: account), Data([0xCA, 0xFE]))
         XCTAssertTrue(keychain.exists(service: service, account: account))
-        XCTAssertTrue(try keychain.listItems(servicePrefix: KeychainConstants.metadataPrefix, account: account).contains(service))
+        XCTAssertTrue(try keychain.listItems(servicePrefix: tracePrefix, account: account).contains(service))
         try keychain.delete(service: service, account: account)
         XCTAssertFalse(keychain.exists(service: service, account: account))
 

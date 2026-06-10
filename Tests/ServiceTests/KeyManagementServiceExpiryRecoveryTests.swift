@@ -104,16 +104,18 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     func test_modifyExpiry_clearJournalFailureKeepsUpdatedMetadataAndJournal() async throws {
         let failingStore = FailingModifyExpiryPrivateKeyControlStore()
         failingStore.failNextClearModifyExpiry = true
+        let localMetadataPersistence = RecordingKeyMetadataPersistence()
         let stack = TestHelpers.makeKeyManagement(
             engine: engine,
-            privateKeyControlStore: failingStore
+            privateKeyControlStore: failingStore,
+            metadataPersistence: localMetadataPersistence
         )
         let localService = stack.service
         let localKeychain = stack.mockKC
         let identity = try await TestHelpers.generateProfileAKey(service: localService, name: "Clear Journal Failure")
         let originalStoredIdentity = try loadStoredIdentity(
             fingerprint: identity.fingerprint,
-            keychain: localKeychain
+            persistence: localMetadataPersistence
         )
 
         do {
@@ -130,7 +132,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
 
         let updatedStoredIdentity = try loadStoredIdentity(
             fingerprint: identity.fingerprint,
-            keychain: localKeychain
+            persistence: localMetadataPersistence
         )
         XCTAssertNotEqual(updatedStoredIdentity.expiryDate, originalStoredIdentity.expiryDate)
         XCTAssertEqual(localService.keys.first?.expiryDate, updatedStoredIdentity.expiryDate)

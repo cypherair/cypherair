@@ -634,6 +634,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             mockSE: stack.mockSE,
             mockKC: stack.mockKC,
+            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
         let phase1 = try makePhase1(matchedKey: identity, ciphertext: ciphertext)
@@ -847,6 +848,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             mockSE: stack.mockSE,
             mockKC: stack.mockKC,
+            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
 
@@ -953,6 +955,7 @@ final class DecryptionServiceTests: XCTestCase {
             service: stack.keyManagement,
             mockSE: stack.mockSE,
             mockKC: stack.mockKC,
+            metadataPersistence: stack.metadataPersistence,
             isDefault: true
         )
 

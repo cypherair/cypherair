@@ -111,11 +111,6 @@ final class LocalDataResetService {
             authenticationContext: authenticationContext,
             failures: &failures
         )
-        deletedKeychainItemCount += resetKeychainItems(
-            account: KeychainConstants.metadataAccount,
-            authenticationContext: authenticationContext,
-            failures: &failures
-        )
 
         deletedKeychainItemCount += deleteExactKeychainItem(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -388,11 +383,6 @@ final class LocalDataResetService {
                 authenticationContext: authenticationContext,
                 failures: &failures
             )
-            let remainingMetadataAccountServices = remainingKeychainServices(
-                account: KeychainConstants.metadataAccount,
-                authenticationContext: authenticationContext,
-                failures: &failures
-            )
             let remainingSecureEnclaveCustodyHandleCount = remainingSecureEnclaveCustodyHandleCount(
                 failures: &failures
             )
@@ -405,7 +395,6 @@ final class LocalDataResetService {
                 || hasLegacyCleanup
                 || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
-                || !remainingMetadataAccountServices.isEmpty
                 || remainingSecureEnclaveCustodyHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
                 || !keyManagement.keys.isEmpty
@@ -423,7 +412,6 @@ final class LocalDataResetService {
                     "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
                     "legacySelfTestReportsDirectoryExists": legacySelfTestReportsDirectoryExists ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
-                    "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
                     "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
                     "keyCount": String(keyManagement.keys.count),
@@ -450,9 +438,6 @@ final class LocalDataResetService {
             }
             if !remainingDefaultAccountServices.isEmpty {
                 failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")
-            }
-            if !remainingMetadataAccountServices.isEmpty {
-                failures.append("keychain.metadata.remaining.\(remainingMetadataAccountServices.count)")
             }
             if remainingSecureEnclaveCustodyHandleCount > 0 {
                 failures.append("keychain.secureEnclaveCustodyHandle.remaining.\(remainingSecureEnclaveCustodyHandleCount)")

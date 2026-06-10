@@ -136,8 +136,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
 
     func test_productionPolicyBlocksSecureEnclavePasswordSigningWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let unwrapper = RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
@@ -171,8 +171,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
 
     func test_secureEnclavePasswordSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.insert(fixture.route.signingHandle)
@@ -220,8 +220,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
 
     func test_missingHandleSurfacesUnavailableWithoutSoftwareFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let unwrapper = RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
@@ -404,7 +404,9 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             revocationCert: generated.revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
-            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            openPGPConfigurationIdentity: .modernSoftwareV6,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 

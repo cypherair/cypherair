@@ -42,7 +42,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         let stack = await TestHelpers.makeServiceStack(engine: engine)
         defer { stack.cleanup() }
         let fixture = try await makeSecureEnclaveRouteFixture()
-        try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+        try stack.metadataPersistence.save(fixture.identity)
         try stack.keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -83,7 +83,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             let fixture = try await makeSecureEnclaveRouteFixture(
                 configurationIdentity: configurationIdentity
             )
-            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.metadataPersistence.save(fixture.identity)
             try stack.keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)
@@ -141,7 +141,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         let stack = await TestHelpers.makeServiceStack(engine: engine)
         defer { stack.cleanup() }
         let fixture = try await makeSecureEnclaveRouteFixture()
-        try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+        try stack.metadataPersistence.save(fixture.identity)
         try stack.keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -195,7 +195,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             let stack = await TestHelpers.makeServiceStack(engine: engine)
             defer { stack.cleanup() }
             let fixture = try await makeSecureEnclaveRouteFixture()
-            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.metadataPersistence.save(fixture.identity)
             try stack.keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             if let loadError {
@@ -249,7 +249,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             let stack = await TestHelpers.makeServiceStack(engine: engine)
             defer { stack.cleanup() }
             let fixture = try await makeSecureEnclaveRouteFixture()
-            try KeyMetadataStore(keychain: stack.mockKC).save(fixture.identity)
+            try stack.metadataPersistence.save(fixture.identity)
             try stack.keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)

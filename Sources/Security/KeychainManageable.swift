@@ -38,10 +38,10 @@ protocol KeychainManageable {
     func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool
 
     /// List all service names matching a given prefix.
-    /// Used by legacy metadata migration and reset cleanup.
+    /// Used by reset cleanup.
     ///
     /// - Parameters:
-    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.metadata.").
+    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.").
     ///   - account: The Keychain account identifier.
     /// - Returns: Array of full service names matching the prefix.
     func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String]
@@ -101,15 +101,6 @@ enum KeychainConstants {
         "\(prefix).pending-sealed-key.\(fingerprint)"
     }
 
-    /// Legacy key identity metadata (Codable JSON, no sensitive data).
-    /// Retained as a migration source for the protected key-metadata domain.
-    static func metadataService(fingerprint: String) -> String {
-        "\(prefix).metadata.\(fingerprint)"
-    }
-
-    /// Service prefix for metadata items (used for enumeration).
-    static let metadataPrefix = "\(prefix).metadata."
-
     /// ProtectedData Secure Enclave device-binding key representation.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
 
@@ -121,7 +112,4 @@ enum KeychainConstants {
 
     /// Default Keychain account identifier.
     static let defaultAccount = "com.cypherair"
-
-    /// Dedicated account for non-sensitive metadata cold-launch enumeration.
-    static let metadataAccount = "\(defaultAccount).metadata"
 }

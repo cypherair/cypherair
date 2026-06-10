@@ -27,7 +27,9 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
             revocationCert: generated.revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
-            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
         let router = StaticPrivateKeyOperationRouter(
             route: .softwareSecretCertificate(
@@ -97,8 +99,8 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
 
     func test_secureEnclaveCleartextSigningUsesRealCatalogRouterAndSharedHandleStore() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
 
         let keyStore = MockSecureEnclaveCustodyKeyStore()

@@ -156,7 +156,9 @@ enum KeyManagementPrivateKeyControlTestError: Error {
 
 enum RecordingKeyMetadataPersistenceError: Error {
     case duplicateIdentity
+    case loadFailed
     case saveFailed
+    case updateFailed
     case deleteFailed
 }
 
@@ -254,7 +256,9 @@ final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
     private(set) var saveCallCount = 0
     private(set) var updateCallCount = 0
     private(set) var deleteCallCount = 0
+    var failNextLoadAll = false
     var failNextSave = false
+    var failNextUpdate = false
     var failNextDelete = false
     var throwOnDuplicate = true
     var deleteCheckpoint: (() -> Void)?
@@ -265,6 +269,10 @@ final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
 
     func loadAll() throws -> [PGPKeyIdentity] {
         loadAllCallCount += 1
+        if failNextLoadAll {
+            failNextLoadAll = false
+            throw RecordingKeyMetadataPersistenceError.loadFailed
+        }
         return identities.sorted { $0.fingerprint < $1.fingerprint }
     }
 
@@ -283,6 +291,10 @@ final class RecordingKeyMetadataPersistence: KeyMetadataPersistence {
 
     func update(_ identity: PGPKeyIdentity) throws {
         updateCallCount += 1
+        if failNextUpdate {
+            failNextUpdate = false
+            throw RecordingKeyMetadataPersistenceError.updateFailed
+        }
         if let index = identities.firstIndex(where: { $0.fingerprint == identity.fingerprint }) {
             identities[index] = identity
         } else {
@@ -422,6 +434,7 @@ class KeyManagementServiceTestCase: XCTestCase {
     var mockKC: MockKeychain!
     var mockAuth: MockAuthenticator!
     var privateKeyControlStore: InMemoryPrivateKeyControlStore!
+    var metadataPersistence: RecordingKeyMetadataPersistence!
 
     struct ProtectedKeyMetadataProvisioningTarget {
         let baseDirectory: URL
@@ -437,9 +450,11 @@ class KeyManagementServiceTestCase: XCTestCase {
         super.setUp()
         engine = PgpEngine()
         privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
+        metadataPersistence = RecordingKeyMetadataPersistence()
         let result = TestHelpers.makeKeyManagement(
             engine: engine,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
         service = result.service
         mockSE = result.mockSE
@@ -460,6 +475,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         mockKC = nil
         mockAuth = nil
         privateKeyControlStore = nil
+        metadataPersistence = nil
         engine = nil
         super.tearDown()
     }
@@ -506,7 +522,8 @@ class KeyManagementServiceTestCase: XCTestCase {
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
     }
 
@@ -710,19 +727,16 @@ class KeyManagementServiceTestCase: XCTestCase {
 
         let keychain = MockKeychain()
         let keyMetadataStore = KeyMetadataDomainStore(
-            legacyMetadataStore: KeyMetadataStore(keychain: keychain),
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
         try await keyMetadataStore.ensureCommittedIfNeeded(
-            wrappingRootKey: wrappingRootKey,
-            authenticationContext: nil
+            wrappingRootKey: wrappingRootKey
         )
         _ = try await keyMetadataStore.openDomainIfNeeded(
-            wrappingRootKey: wrappingRootKey,
-            authenticationContext: nil
+            wrappingRootKey: wrappingRootKey
         )
         _ = try await privateKeyControlStore.openDomainIfNeeded(
             wrappingRootKey: wrappingRootKey
@@ -768,13 +782,8 @@ class KeyManagementServiceTestCase: XCTestCase {
             servicePrefix: KeychainConstants.prefix,
             account: KeychainConstants.defaultAccount
         )
-        let metadataServices = try keychain.listItems(
-            servicePrefix: KeychainConstants.metadataPrefix,
-            account: KeychainConstants.metadataAccount
-        )
 
         XCTAssertTrue(privateKeyServices.isEmpty, file: file, line: line)
-        XCTAssertTrue(metadataServices.isEmpty, file: file, line: line)
         XCTAssertTrue(metadataPersistence.identities.isEmpty, file: file, line: line)
         XCTAssertEqual(metadataPersistence.saveCallCount, 0, file: file, line: line)
     }
@@ -813,43 +822,27 @@ class KeyManagementServiceTestCase: XCTestCase {
     }
 
     func loadStoredIdentity(fingerprint: String) throws -> PGPKeyIdentity {
-        try loadStoredIdentity(fingerprint: fingerprint, keychain: mockKC)
+        try loadStoredIdentity(fingerprint: fingerprint, persistence: metadataPersistence)
     }
 
     func loadStoredIdentity(
         fingerprint: String,
-        keychain: MockKeychain
+        persistence: RecordingKeyMetadataPersistence
     ) throws -> PGPKeyIdentity {
-        let metadata = try keychain.load(
-            service: KeychainConstants.metadataService(fingerprint: fingerprint),
-            account: KeychainConstants.metadataAccount
-        )
-        return try JSONDecoder().decode(PGPKeyIdentity.self, from: metadata)
+        guard let identity = persistence.identities.first(
+            where: { $0.fingerprint == fingerprint }
+        ) else {
+            throw CypherAirError.noMatchingKey
+        }
+        return identity
     }
 
     func overwriteStoredIdentity(_ identity: PGPKeyIdentity) throws {
-        let serviceName = KeychainConstants.metadataService(fingerprint: identity.fingerprint)
-        try mockKC.delete(
-            service: serviceName,
-            account: KeychainConstants.metadataAccount
-        )
-        let data = try JSONEncoder().encode(identity)
-        try mockKC.save(
-            data,
-            service: serviceName,
-            account: KeychainConstants.metadataAccount,
-            accessControl: nil
-        )
+        try metadataPersistence.update(identity)
     }
 
     func storeIdentity(_ identity: PGPKeyIdentity) throws {
-        let data = try JSONEncoder().encode(identity)
-        try mockKC.save(
-            data,
-            service: KeychainConstants.metadataService(fingerprint: identity.fingerprint),
-            account: KeychainConstants.metadataAccount,
-            accessControl: nil
-        )
+        try metadataPersistence.save(identity)
     }
 
     static func hiddenGenerationMaterial(
@@ -1061,7 +1054,9 @@ class KeyManagementServiceTestCase: XCTestCase {
             revocationCert: Data(),
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate
+            expiryDate: metadata.expiryDate,
+            openPGPConfigurationIdentity: metadata.profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
         try storeIdentity(identity)
         return identity

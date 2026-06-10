@@ -629,12 +629,7 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
-        let legacyKeyMetadataStore = KeyMetadataStore(
-            keychain: keychain,
-            traceStore: authLifecycleTraceStore
-        )
         let keyMetadataDomainStore = KeyMetadataDomainStore(
-            legacyMetadataStore: legacyKeyMetadataStore,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -702,28 +697,25 @@ final class AppContainer: @unchecked Sendable {
                 ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: KeyMetadataDomainStore.domainID,
-                    ensureCommittedWithContext: { context in
+                    ensureCommittedIfNeeded: { wrappingRootKey in
                         keyManagement.beginKeyMetadataLoad()
                         do {
                             try await keyMetadataDomainStore.ensureCommittedIfNeeded(
-                                wrappingRootKey: context.wrappingRootKey,
-                                authenticationContext: context.authenticationContext
+                                wrappingRootKey: wrappingRootKey
                             )
                         } catch {
                             keyManagement.markKeyMetadataRecoveryNeeded()
                             throw error
                         }
                     },
-                    openWithContext: { context in
+                    open: { wrappingRootKey in
                         keyManagement.beginKeyMetadataLoad()
                         do {
                             _ = try await keyMetadataDomainStore.openDomainIfNeeded(
-                                wrappingRootKey: context.wrappingRootKey,
-                                authenticationContext: context.authenticationContext
+                                wrappingRootKey: wrappingRootKey
                             )
                             try keyManagement.completeKeyMetadataLoad(
-                                migrationWarning: keyMetadataDomainStore.migrationWarning,
-                                source: context.authenticationContext == nil ? "postUnlockNoContext" : "postUnlock"
+                                source: "postUnlock"
                             )
                         } catch {
                             keyManagement.markKeyMetadataRecoveryNeeded()
@@ -1054,7 +1046,8 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
-            authLifecycleTraceStore: authLifecycleTraceStore
+            authLifecycleTraceStore: authLifecycleTraceStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? keyManagement.loadKeys()
         let contactService = ContactService(
@@ -1103,10 +1096,6 @@ final class AppContainer: @unchecked Sendable {
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 }
-                await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
-                    authenticationContext: authenticationContext,
-                    source: source
-                )
                 let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
                     authenticationContext: authenticationContext,
                     localizedReason: String(

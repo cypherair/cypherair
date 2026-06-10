@@ -20,17 +20,11 @@ final class LocalDataResetServiceTests: XCTestCase {
             }
         }
 
-        let metadataService = KeychainConstants.metadataService(fingerprint: "ABCDEF")
+        let markerService = "\(KeychainConstants.prefix).test-reset-marker.ABCDEF"
         try container.keychain.save(
             Data([0x01]),
-            service: metadataService,
+            service: markerService,
             account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try container.keychain.save(
-            Data([0x05]),
-            service: metadataService,
-            account: KeychainConstants.metadataAccount,
             accessControl: nil
         )
         try container.keychain.save(
@@ -79,9 +73,8 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 6)
-        XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.defaultAccount))
-        XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.metadataAccount))
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 5)
+        XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             account: KeychainConstants.defaultAccount
@@ -212,33 +205,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         keyStore.insertMalformedApplicationTag(
             "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).reset-malformed"
         )
-        let hiddenIdentity = PGPKeyIdentity(
-            fingerprint: "hidden-reset",
-            keyVersion: 4,
-            profile: .universal,
-            userId: "Hidden Reset <hidden-reset@example.test>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: true,
-            isBackedUp: false,
-            publicKeyData: Data("hidden-reset-public".utf8),
-            revocationCert: Data("hidden-reset-revocation".utf8),
-            primaryAlgo: "ECDSA P-256",
-            subkeyAlgo: "ECDH P-256",
-            expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-        )
-        let hiddenMetadataService = KeychainConstants.metadataService(
-            fingerprint: hiddenIdentity.fingerprint
-        )
-        try container.keychain.save(
-            try JSONEncoder().encode(hiddenIdentity),
-            service: hiddenMetadataService,
-            account: KeychainConstants.metadataAccount,
-            accessControl: nil
-        )
         let resetService = makeResetService(
             from: container,
             secureEnclaveCustodyHandleStore: handleStore
@@ -246,14 +212,7 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await resetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertFalse(
-            container.keychain.exists(
-                service: hiddenMetadataService,
-                account: KeychainConstants.metadataAccount
-            )
-        )
         let cleanupEntry = try XCTUnwrap(
             container.authLifecycleTraceStore?.recentEntries.last {
                 $0.name == "localDataReset.secureEnclaveCustody.cleanup.finish"

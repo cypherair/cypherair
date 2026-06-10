@@ -12,12 +12,20 @@ enum TestHelpers {
     static func makeKeyManagement(
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil,
-        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil
-    ) -> (service: KeyManagementService, mockSE: MockSecureEnclave, mockKC: MockKeychain, mockAuth: MockAuthenticator) {
+        privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
+        metadataPersistence: (any KeyMetadataPersistence)? = nil
+    ) -> (
+        service: KeyManagementService,
+        mockSE: MockSecureEnclave,
+        mockKC: MockKeychain,
+        mockAuth: MockAuthenticator,
+        metadataPersistence: any KeyMetadataPersistence
+    ) {
         let mockSE = MockSecureEnclave()
         let mockKC = MockKeychain()
         let mockAuth = MockAuthenticator()
         let privateKeyControlStore = privateKeyControlStore ?? InMemoryPrivateKeyControlStore(mode: .standard)
+        let metadataPersistence = metadataPersistence ?? InMemoryKeyMetadataStore()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
 
@@ -28,18 +36,20 @@ enum TestHelpers {
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
                 defaults: .standard,
-                privateKeyControlStore: privateKeyControlStore
+                privateKeyControlStore: privateKeyControlStore,
+                metadataPersistence: metadataPersistence
             )
         } else {
             service = KeyManagementService(
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
-                privateKeyControlStore: privateKeyControlStore
+                privateKeyControlStore: privateKeyControlStore,
+                metadataPersistence: metadataPersistence
             )
         }
 
-        return (service, mockSE, mockKC, mockAuth)
+        return (service, mockSE, mockKC, mockAuth, metadataPersistence)
     }
 
     // MARK: - ContactService Factory
@@ -170,6 +180,7 @@ enum TestHelpers {
         service: KeyManagementService,
         mockSE: MockSecureEnclave,
         mockKC: MockKeychain,
+        metadataPersistence: any KeyMetadataPersistence,
         isDefault: Bool = false
     ) throws -> PGPKeyIdentity {
         let info = try engine.parseKeyInfo(keyData: secretCertData)
@@ -201,11 +212,12 @@ enum TestHelpers {
             revocationCert: Data(),
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate
+            expiryDate: metadata.expiryDate,
+            openPGPConfigurationIdentity: metadata.profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
 
-        let metadataStore = KeyMetadataStore(keychain: mockKC)
-        try metadataStore.save(identity)
+        try metadataPersistence.save(identity)
         try service.loadKeys()
 
         return identity
@@ -220,7 +232,7 @@ enum TestHelpers {
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil
     ) async -> ServiceStack {
-        let (keyMgmt, mockSE, mockKC, mockAuth) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
+        let (keyMgmt, mockSE, mockKC, mockAuth, metadataPersistence) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = await makeContactService(engine: engine)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
@@ -314,6 +326,7 @@ enum TestHelpers {
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
+            metadataPersistence: metadataPersistence,
             contactService: contactSvc,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
@@ -340,6 +353,7 @@ enum TestHelpers {
         let engine: PgpEngine
         let messageAdapter: PGPMessageOperationAdapter
         let keyManagement: KeyManagementService
+        let metadataPersistence: any KeyMetadataPersistence
         let contactService: ContactService
         let textEncryptor: any TextMessageEncrypting
         let fileEncryptor: any StreamingFileEncrypting

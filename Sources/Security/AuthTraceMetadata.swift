@@ -13,9 +13,6 @@ enum AuthTraceMetadata {
             }
             return "secureEnclaveCustodyHandle"
         }
-        if service.hasPrefix(KeychainConstants.metadataPrefix) {
-            return "metadata"
-        }
         if service == KeychainConstants.protectedDataDeviceBindingKeyService {
             return "protectedDataDeviceBindingKey"
         }
@@ -54,9 +51,6 @@ enum AuthTraceMetadata {
             || servicePrefix.hasPrefix("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).") {
             return "secureEnclaveCustodyHandle"
         }
-        if servicePrefix == KeychainConstants.metadataPrefix {
-            return "metadata"
-        }
         if servicePrefix.hasPrefix(KeychainConstants.prefix) {
             return "cypherair"
         }
@@ -67,8 +61,6 @@ enum AuthTraceMetadata {
         switch account {
         case KeychainConstants.defaultAccount:
             "default"
-        case KeychainConstants.metadataAccount:
-            "metadata"
         default:
             "unknown"
         }

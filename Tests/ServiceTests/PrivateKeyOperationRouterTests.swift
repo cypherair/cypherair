@@ -480,7 +480,9 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             revocationCert: Data([0x12]),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 

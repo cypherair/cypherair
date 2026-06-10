@@ -64,23 +64,11 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
 
     static let domainID: ProtectedDataDomainID = "key-metadata"
 
-    private struct PayloadV1: Codable {
-        let schemaVersion: Int
-        let identities: [PGPKeyIdentity]
-    }
-
-    private struct DecodedPayload {
-        let payload: Payload
-        let sourceSchemaVersion: Int
-    }
-
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
-        let sourceSchemaVersion: Int
     }
 
-    private let legacyMetadataStore: KeyMetadataStore
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
@@ -89,19 +77,16 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
 
     private(set) var payload: Payload?
     private(set) var domainState: KeyMetadataLoadState = .locked
-    private(set) var migrationWarning: String?
 
     private var unlockedGenerationIdentifier: Int?
 
     init(
-        legacyMetadataStore: KeyMetadataStore,
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
         bootstrapStore: ProtectedDomainBootstrapStore? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
-        self.legacyMetadataStore = legacyMetadataStore
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
@@ -110,8 +95,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     }
 
     func ensureCommittedIfNeeded(
-        wrappingRootKey: Data,
-        authenticationContext: LAContext?
+        wrappingRootKey: Data
     ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
@@ -129,12 +113,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             return
         }
 
-        let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
-            authenticationContext: authenticationContext
-        )
-        let initialPayload = Payload.initial(
-            identities: Self.mergedIdentities(from: sourceSnapshot.items)
-        )
+        let initialPayload = Payload.initial(identities: [])
         let wrappingRootKeyBox = SensitiveBytesBox(data: wrappingRootKey)
         defer {
             wrappingRootKeyBox.zeroize()
@@ -166,24 +145,13 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             }
         )
 
-        let cleanupOutcome = legacyMetadataStore.cleanupMigrationSourceItems(
-            sourceSnapshot.items.filter { item in
-                initialPayload.identities.contains { $0.fingerprint == item.identity.fingerprint }
-            },
-            authenticationContext: authenticationContext
-        )
-        updateMigrationWarning(
-            failedLoadCount: sourceSnapshot.failedItemCount,
-            failedDeleteCount: cleanupOutcome.failedItemCount
-        )
         clearUnlockedState()
         domainState = .locked
     }
 
     @discardableResult
     func openDomainIfNeeded(
-        wrappingRootKey: Data,
-        authenticationContext: LAContext?
+        wrappingRootKey: Data
     ) async throws -> Payload {
         if let payload, domainState == .loaded {
             return payload
@@ -205,23 +173,13 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         do {
-            var (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
+            let readResult = try readAuthoritativeSnapshot(
                 wrappingRootKey: wrappingRootKey
             )
+            let openedSnapshot = readResult.0
+            var unwrappedDomainMasterKey = readResult.1
             defer {
                 unwrappedDomainMasterKey.protectedDataZeroize()
-            }
-            if openedSnapshot.sourceSchemaVersion < Payload.currentSchemaVersion {
-                let migratedGenerationIdentifier = openedSnapshot.generationIdentifier + 1
-                try writePayloadGeneration(
-                    openedSnapshot.payload,
-                    generationIdentifier: migratedGenerationIdentifier,
-                    domainMasterKey: unwrappedDomainMasterKey
-                )
-                unwrappedDomainMasterKey.protectedDataZeroize()
-                (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
-                    wrappingRootKey: wrappingRootKey
-                )
             }
             let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
@@ -236,7 +194,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 )
             }
 
-            cleanupLegacyRowsMatchingOpenedPayload(authenticationContext: authenticationContext)
             return openedSnapshot.payload
         } catch {
             clearUnlockedState()
@@ -455,9 +412,8 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             schemaVersion: envelope.schemaVersion
         )
         let snapshot = OpenedSnapshot(
-            payload: decodedPayload.payload,
-            generationIdentifier: envelope.generationIdentifier,
-            sourceSchemaVersion: decodedPayload.sourceSchemaVersion
+            payload: decodedPayload,
+            generationIdentifier: envelope.generationIdentifier
         )
 
         shouldReturnDomainMasterKey = true
@@ -479,23 +435,13 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private func decodePayload(
         plaintext: Data,
         schemaVersion: Int
-    ) throws -> DecodedPayload {
+    ) throws -> Payload {
         let decoder = PropertyListDecoder()
         switch schemaVersion {
         case Payload.currentSchemaVersion:
             let payload = try decoder.decode(Payload.self, from: plaintext)
             try payload.validateContract()
-            return DecodedPayload(payload: payload, sourceSchemaVersion: schemaVersion)
-        case 1:
-            let legacyPayload = try decoder.decode(PayloadV1.self, from: plaintext)
-            guard legacyPayload.schemaVersion == 1 else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata v1 migration received an unexpected schema version."
-                )
-            }
-            let payload = Payload.initial(identities: legacyPayload.identities)
-            try payload.validateContract()
-            return DecodedPayload(payload: payload, sourceSchemaVersion: schemaVersion)
+            return payload
         default:
             throw ProtectedDataError.invalidEnvelope(
                 "Key metadata payload has unsupported schema version \(schemaVersion)."
@@ -527,31 +473,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         )
     }
 
-    private func cleanupLegacyRowsMatchingOpenedPayload(authenticationContext: LAContext?) {
-        guard let payload else {
-            return
-        }
-        do {
-            let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
-                authenticationContext: authenticationContext
-            )
-            let migratedFingerprints = Set(payload.identities.map(\.fingerprint))
-            let matchingSourceItems = sourceSnapshot.items.filter { item in
-                migratedFingerprints.contains(item.identity.fingerprint)
-            }
-            let cleanupOutcome = legacyMetadataStore.cleanupMigrationSourceItems(
-                matchingSourceItems,
-                authenticationContext: authenticationContext
-            )
-            updateMigrationWarning(
-                failedLoadCount: sourceSnapshot.failedItemCount,
-                failedDeleteCount: cleanupOutcome.failedItemCount
-            )
-        } catch {
-            migrationWarning = Self.migrationWarningMessage()
-        }
-    }
-
     private func deleteDomainArtifacts() throws {
         try storageRoot.removeItemIfPresent(
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
@@ -576,32 +497,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         payload = nil
         unlockedGenerationIdentifier = nil
     }
-
-    private func updateMigrationWarning(
-        failedLoadCount: Int,
-        failedDeleteCount: Int
-    ) {
-        migrationWarning = failedLoadCount == 0 && failedDeleteCount == 0
-            ? nil
-            : Self.migrationWarningMessage()
-    }
-
-    static func migrationWarningMessage() -> String {
-        String(
-            localized: "app.loadWarning.keyMetadataMigration",
-            defaultValue: "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir X and unlock again to retry."
-        )
-    }
-
-    private static func mergedIdentities(
-        from sourceItems: [KeyMetadataMigrationSourceItem]
-    ) -> [PGPKeyIdentity] {
-        var byFingerprint: [String: PGPKeyIdentity] = [:]
-        for item in sourceItems {
-            byFingerprint[item.identity.fingerprint] = item.identity
-        }
-        return byFingerprint.values.sorted { $0.fingerprint < $1.fingerprint }
-    }
 }
 
 extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
@@ -623,15 +518,7 @@ extension KeyMetadataDomainStore: ProtectedDomainRecoveryHandler {
         let stagedPayload: Payload?
         switch phase {
         case .journaled, .sharedResourceProvisioned:
-            let sourceSnapshot = try legacyMetadataStore.loadMigrationSourceSnapshot(
-                authenticationContext: authenticationContext
-            )
-            guard authenticationContext != nil || sourceSnapshot.failedItemCount == 0 else {
-                throw ProtectedDataError.authorizingUnavailable
-            }
-            stagedPayload = Payload.initial(
-                identities: Self.mergedIdentities(from: sourceSnapshot.items)
-            )
+            stagedPayload = Payload.initial(identities: [])
         case .artifactsStaged, .validated:
             stagedPayload = nil
         case .membershipCommitted:

@@ -105,8 +105,8 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
     func test_secureEnclaveFileDecryptUsesRealCatalogRouterAndSharedHandleStore() async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
 
         let keyStore = MockSecureEnclaveCustodyKeyStore()
@@ -145,8 +145,8 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
     func test_productionPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
 
         let keyStore = MockSecureEnclaveCustodyKeyStore()
@@ -694,7 +694,9 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             revocationCert: generated.revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
-            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 

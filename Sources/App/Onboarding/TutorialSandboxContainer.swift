@@ -104,7 +104,8 @@ final class TutorialSandboxContainer {
             authenticator: authManager,
             defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? self.keyManagement.loadKeys()
         let contactsWrappingRootKey = Data(repeating: 0x54, count: 32)

@@ -24,7 +24,6 @@ typealias ProtectedDataTestAppProtectedDataPostUnlockOutcome = CypherAir.Protect
 typealias ProtectedDataTestAppProtectedDataFrameworkSentinelStore = CypherAir.ProtectedDataFrameworkSentinelStore
 typealias ProtectedDataTestAppPrivateKeyControlStore = CypherAir.PrivateKeyControlStore
 typealias ProtectedDataTestAppKeyMetadataDomainStore = CypherAir.KeyMetadataDomainStore
-typealias ProtectedDataTestAppKeyMetadataStore = CypherAir.KeyMetadataStore
 typealias ProtectedDataTestAppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 typealias ProtectedDataTestAppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 typealias ProtectedDataTestAppProtectedDomainRecoveryHandler = CypherAir.ProtectedDomainRecoveryHandler
@@ -363,45 +362,6 @@ actor ThrowingRootSecretFloorRecorder {
 
 @MainActor
 class ProtectedDataFrameworkTestCase: XCTestCase {
-    struct KeyMetadataPayloadV1: Encodable {
-        var schemaVersion: Int
-        var identities: [KeyMetadataIdentityV1]
-    }
-
-    struct KeyMetadataIdentityV1: Encodable {
-        let fingerprint: String
-        let keyVersion: UInt8
-        let profile: PGPKeyProfile
-        let userId: String?
-        let hasEncryptionSubkey: Bool
-        let isRevoked: Bool
-        let isExpired: Bool
-        let isDefault: Bool
-        let isBackedUp: Bool
-        let publicKeyData: Data
-        let revocationCert: Data
-        let primaryAlgo: String
-        let subkeyAlgo: String?
-        let expiryDate: Date?
-
-        init(_ identity: PGPKeyIdentity) {
-            fingerprint = identity.fingerprint
-            keyVersion = identity.keyVersion
-            profile = identity.profile
-            userId = identity.userId
-            hasEncryptionSubkey = identity.hasEncryptionSubkey
-            isRevoked = identity.isRevoked
-            isExpired = identity.isExpired
-            isDefault = identity.isDefault
-            isBackedUp = identity.isBackedUp
-            publicKeyData = identity.publicKeyData
-            revocationCert = identity.revocationCert
-            primaryAlgo = identity.primaryAlgo
-            subkeyAlgo = identity.subkeyAlgo
-            expiryDate = identity.expiryDate
-        }
-    }
-
     let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
 
     func makeTemporaryDirectory(_ prefix: String) -> URL {
@@ -432,7 +392,9 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             revocationCert: Data([0x52, publicKeySeed]),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 
@@ -637,15 +599,12 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     }
 
     func makeKeyMetadataDomainHarness(
-        _ prefix: String,
-        keychain providedKeychain: MockKeychain? = nil
+        _ prefix: String
     ) async throws -> (
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
         wrappingRootKey: Data,
-        keychain: MockKeychain,
-        legacyStore: ProtectedDataTestAppKeyMetadataStore,
         store: ProtectedDataTestAppKeyMetadataDomainStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
@@ -682,10 +641,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
 
-        let keychain = providedKeychain ?? MockKeychain()
-        let legacyStore = ProtectedDataTestAppKeyMetadataStore(keychain: keychain)
         let store = ProtectedDataTestAppKeyMetadataDomainStore(
-            legacyMetadataStore: legacyStore,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -697,8 +653,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
             wrappingRootKey: wrappingRootKey,
-            keychain: keychain,
-            legacyStore: legacyStore,
             store: store
         )
     }

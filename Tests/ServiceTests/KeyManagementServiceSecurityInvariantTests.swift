@@ -114,7 +114,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         // Create a separate service with low memory (500 MB)
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 500_000_000
-        let (lowMemService, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+        let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
 
         // Profile B uses Argon2id with 512 MB; 512 MB > 75% of 500 MB (375 MB) → rejected
         do {
@@ -142,7 +142,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         // Create a service with low memory
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 500_000_000
-        let (lowMemService, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
+        let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
 
         // Profile A uses Iterated+Salted S2K (no Argon2id) — guard is no-op
         let imported = try await lowMemService.importKey(

@@ -25,8 +25,4 @@ enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
             .modernSoftwareV6
         }
     }
-
-    var defaultCustodyKind: PGPPrivateKeyCustodyKind {
-        .softwareSecretCertificate
-    }
 }

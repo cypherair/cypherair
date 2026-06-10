@@ -451,12 +451,6 @@ struct CypherAirApp: App {
         .onChange(of: loadWarningPresentationState) { _, _ in
             presentPendingLoadWarningIfPossible(source: "presentationStateChange")
         }
-        .onChange(of: container.keyManagement.legacyMetadataMigrationLoadWarning) { _, warning in
-            guard let warning else { return }
-            loadWarningCoordinator.enqueue(warning)
-            container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
-            presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
-        }
         .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
             guard let warning else { return }
             loadWarningCoordinator.enqueue(warning)

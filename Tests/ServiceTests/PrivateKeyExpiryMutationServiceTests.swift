@@ -8,11 +8,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     func test_productionPolicyBlocksSecureEnclaveModifyExpiryWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -49,11 +49,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         ] {
             let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: configurationIdentity)
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
                 engine: engine,
                 privateKeyControlStore: privateKeyControlStore
             )
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)
@@ -110,11 +110,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     func test_secureEnclaveModifyExpiryCanRemoveExpiryWithoutSoftwareFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.insert(fixture.route.signingHandle)
@@ -144,11 +144,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     func test_secureEnclaveModifyExpiryRefreshesTransportSubkeyBindingPastOriginalExpiry() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(expirySeconds: 2)
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.insert(fixture.route.signingHandle)
@@ -192,11 +192,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
                 expirySeconds: 1
             )
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
                 engine: engine,
                 privateKeyControlStore: privateKeyControlStore
             )
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)
@@ -239,11 +239,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     func test_secureEnclaveModifyExpiryMergesCurrentCatalogFlagsAfterAsyncSigning() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let gate = ExpiryMutationSuspensionGate()
         keyManagement.configurePrivateKeyExpiryMutationService(
@@ -271,7 +271,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         XCTAssertTrue(updated.isBackedUp)
         XCTAssertTrue(keyManagement.keys.first?.isDefault == true)
         XCTAssertTrue(keyManagement.keys.first?.isBackedUp == true)
-        let reloaded = try KeyMetadataStore(keychain: mockKeychain).loadAll()
+        let reloaded = try metadataPersistence.loadAll()
         XCTAssertEqual(reloaded.count, 1)
         XCTAssertTrue(reloaded[0].isDefault)
         XCTAssertTrue(reloaded[0].isBackedUp)
@@ -280,11 +280,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     func test_secureEnclaveModifyExpiryDoesNotResurrectDeletedCatalogIdentity() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let gate = ExpiryMutationSuspensionGate()
         keyManagement.configurePrivateKeyExpiryMutationService(
@@ -315,17 +315,17 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             XCTFail("Expected noMatchingKey, got \(error)")
         }
         XCTAssertTrue(keyManagement.keys.isEmpty)
-        XCTAssertTrue(try KeyMetadataStore(keychain: mockKeychain).loadAll().isEmpty)
+        XCTAssertTrue(try metadataPersistence.loadAll().isEmpty)
     }
 
     func test_secureEnclaveModifyExpiryMissingHandleSurfacesUnavailableWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
             engine: engine,
             privateKeyControlStore: privateKeyControlStore
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         keyManagement.configurePrivateKeyExpiryMutationService(
             TestHelpers.makeExpiryMutator(
@@ -364,11 +364,11 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         for (signingError, expectedError) in cases {
             let fixture = try await makeSecureEnclaveRouteFixture()
             let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
-            let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(
+            let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
                 engine: engine,
                 privateKeyControlStore: privateKeyControlStore
             )
-            try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+            try metadataPersistence.save(fixture.identity)
             try keyManagement.loadKeys()
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             keyStore.insert(fixture.route.signingHandle)

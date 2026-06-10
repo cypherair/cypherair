@@ -1256,6 +1256,12 @@ private enum ArchitectureSourceAuditRules {
                 ]
             ),
             (
+                "Provisioning persists explicit configuration identity and custody kind on every new software-custody record.",
+                [
+                    "Sources/Services/KeyManagement/KeyProvisioningService.swift",
+                ]
+            ),
+            (
                 "Phase 5G/5H keep narrow compatibility fallbacks for unconfigured tests; app and tutorial composition roots inject router-backed helpers.",
                 [
                     "Sources/Services/KeyManagement/KeyMutationService.swift",
@@ -1485,6 +1491,15 @@ private enum ArchitectureSourceAuditRules {
             "migrateLegacyMetadataIfNeeded",
             "loadMigrationSourceSnapshot",
             "cleanupMigrationSourceItems",
+            "KeyMetadataLegacyMigrationOutcome",
+            "KeyMetadataMigrationSourceItem",
+            "KeyMetadataMigrationSourceSnapshot",
+            "cleanupLegacyMetadataRows",
+            "cleanupLegacyRowsMatchingOpenedPayload",
+            "borrowAuthenticatedContextForMetadataMigration",
+            "sourceSchemaVersion",
+            "metadataAccount",
+            "metadataPrefix",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1492,17 +1507,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #2 key-metadata Keychain→ProtectedData migration; removed by PR-A2 (dead 2A chain) then PR-C2 (live 2B source) under the 2026-06-08 cutoff.",
-                [
-                    "Sources/Security/KeyMetadataStore.swift",
-                    "Sources/Security/ProtectedData/KeyMetadataDomainStore.swift",
-                    "Sources/Services/KeyManagement/KeyCatalogStore.swift",
-                    "Sources/Services/KeyManagementService.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupPrivateKeyControlDefaultsSymbols = ArchitectureSourceAuditRule(
@@ -1551,14 +1556,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "PayloadV1 is a token shared with the key-metadata domain; the KeyMetadataDomainStore occurrence is removed by LEGACY_CLEANUP Phase 3 under the 2026-06-08 cutoff.",
-                [
-                    "Sources/Security/ProtectedData/KeyMetadataDomainStore.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupContactsSnapshotMigrationSymbols = ArchitectureSourceAuditRule(
@@ -1658,15 +1656,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #7 imported-key revocation backfill (KeyCatalogStore.updateRevocation + its only caller KeyExportService); removed by PR-B2 under the 2026-06-08 cutoff.",
-                [
-                    "Sources/Services/KeyManagement/KeyCatalogStore.swift",
-                    "Sources/Services/KeyManagement/KeyExportService.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     private static let keyRouteViewPaths: Set<String> = [
