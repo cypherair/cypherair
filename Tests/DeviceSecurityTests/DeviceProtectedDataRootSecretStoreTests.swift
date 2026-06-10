@@ -3,7 +3,6 @@ import CryptoKit
 import XCTest
 @testable import CypherAir
 
-#if os(iOS)
 final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
     private var rootSecretStore: KeychainProtectedDataRootSecretStore!
     private var trackedIdentifiers: [String] = []
@@ -194,4 +193,3 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         try await Task.sleep(for: .seconds(2))
     }
 }
-#endif
