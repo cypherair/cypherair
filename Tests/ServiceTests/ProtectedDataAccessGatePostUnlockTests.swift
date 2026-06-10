@@ -592,12 +592,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: sharedRightIdentifier
         )
-        let defaultsSuiteName = "com.cypherair.tests.protected-data.post-unlock.sentinel.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -613,7 +608,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
                 try sessionCoordinator.wrappingRootKeyData()
             }
         )
-        try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+        try await protectedSettingsStore.ensureCommittedIfNeeded(
             persistSharedRight: { secret in
                 try rootSecretStore.saveRootSecret(
                     secret,

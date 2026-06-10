@@ -213,7 +213,7 @@ final class AppContainer: @unchecked Sendable {
         ProtectedDataPostUnlockDomainOpener(
             domainID: ProtectedSettingsStore.domainID,
             ensureCommittedIfNeeded: { wrappingRootKey in
-                try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                try await protectedSettingsStore.ensureCommittedIfNeeded(
                     persistSharedRight: { secret in
                         try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },
@@ -609,7 +609,6 @@ final class AppContainer: @unchecked Sendable {
             }
         )
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -981,7 +980,6 @@ final class AppContainer: @unchecked Sendable {
         privateKeyControlStore.seedUnlockedForTesting(.standard)
         config.privateKeyControlState = .unlocked(.standard)
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -998,7 +996,7 @@ final class AppContainer: @unchecked Sendable {
             )
         } else {
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-                persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+                persistence: InMemoryOrdinarySettingsStore()
             )
             protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         }

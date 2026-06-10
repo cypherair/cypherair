@@ -117,6 +117,8 @@ plumbing.
 
 ### Phase 2 — Protected Settings And Ordinary Settings Cleanup
 
+> Status: Completed (2026-06-10).
+
 Retire protected-settings schema v1 and the old ordinary-settings UserDefaults
 model across production, tutorial, and tests.
 
@@ -300,22 +302,26 @@ matching temporary allowance when it removes the symbol.
 Current audit-rule coverage maps to this roadmap as follows: the audit file's
 `item1A`/`item1B` rules cover Phase 5 right-store and raw-v1 symbols, `item2`
 and `item7` cover Phase 3 metadata migration and revocation backfill, `item3`
-covers the Phase 2/Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
-`invalidLegacyAuthMode` family, the remaining contacts-snapshot and
-protected-settings rules cover Phase 1 snapshot and Phase 2 migration symbols,
-and the Phase 1 contacts certification-artifact/sentinel rule covers the
-retired `legacyTargetSelector`, `legacyUserIdDisplayText`, and
+covers the Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
+`invalidLegacyAuthMode` family (its Phase 2 `ProtectedSettingsStore`
+occurrence is retired), the `item4` protected-settings rule covers the
+retired Phase 2 settings symbols including `PayloadV1` and the old
+ordinary-settings store surface, the remaining contacts-snapshot rule covers
+Phase 1 snapshot symbols, and the Phase 1 contacts
+certification-artifact/sentinel rule covers the retired
+`legacyTargetSelector`, `legacyUserIdDisplayText`, and
 `legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers: `PayloadV1`, `sourceSchemaVersion`, schema
-decode `case 1`, and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
+No guardrail rule yet covers: `sourceSchemaVersion`, schema decode `case 1`,
+and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
 `KeyMetadataMigrationSourceItem`, `KeyMetadataMigrationSourceSnapshot`, and
 `cleanupLegacyMetadataRows`; the Phase 4 cleanup-only symbols; the Phase 5
 `storageFormat` / format-floor additions; and all Phase 6 symbols — there is
 no Rust guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so
 Phase 6 currently has zero guardrail coverage. `PayloadV1` is a token shared
 by `ProtectedSettingsStore` and `KeyMetadataDomainStore` across Phases 2 and
-3; a bare-token guardrail catches both, so use per-path temporary exceptions.
+3; the Phase 2 rule guards the bare token with a per-path temporary exception
+for `KeyMetadataDomainStore` until Phase 3 removes that occurrence.
 
 Additional guardrails are needed as cleanup proceeds:
 
@@ -332,7 +338,7 @@ Additional guardrails are needed as cleanup proceeds:
 |---------------|--------------------|
 | Phase 0 docs/source-audit wording only | `git diff --check`; source-audit targeted unit test |
 | Contacts model cleanup | targeted Contacts unit tests plus `ArchitectureSourceAuditTests` |
-| ProtectedData/settings/key-metadata/private-key-control/root-secret cleanup | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` |
+| ProtectedData/settings/key-metadata/private-key-control/root-secret cleanup | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS,arch=arm64e'` |
 | Rust/UniFFI signature cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, then `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`, then macOS unit tests |
 | Any cleanup touching reset | targeted local-data reset tests plus the relevant broader unit lane |
 

@@ -1521,10 +1521,9 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Item #3 private-key-control legacy UserDefaults import/cleanup; removed by PR-C1 under the 2026-06-08 cutoff. The ProtectedSettingsStore legacyInitialPayload occurrence is cleared by PR-C3.",
+                "Item #3 private-key-control legacy UserDefaults import/cleanup; removed by LEGACY_CLEANUP Phase 4 under the 2026-06-08 cutoff.",
                 [
                     "Sources/Security/ProtectedData/PrivateKeyControlStore.swift",
-                    "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
                     "Sources/Security/AuthenticationEvaluable.swift",
                 ]
             ),
@@ -1539,6 +1538,12 @@ private enum ArchitectureSourceAuditRules {
             "migrateOpenedSettingsSnapshotIfNeeded",
             "legacyOrdinarySettingsSnapshot",
             "removeLegacySettingsSources",
+            "ensureCommittedAndMigrateSettingsIfNeeded",
+            "migrationAuthorizationRequirement",
+            "LegacyOrdinarySettingsStore",
+            "ProtectedOrdinarySettingsLegacyKeys",
+            "clipboardNoticeLegacyKey",
+            "PayloadV1",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1548,9 +1553,9 @@ private enum ArchitectureSourceAuditRules {
         stripsCommentsAndStrings: true,
         temporaryExceptions: temporaryExceptions([
             (
-                "Item #4 protected-settings v1→v2 + legacy ordinary-settings migration bridge; removed under the strict retirement roadmap together with old ordinary-settings UserDefaults dependencies.",
+                "PayloadV1 is a token shared with the key-metadata domain; the KeyMetadataDomainStore occurrence is removed by LEGACY_CLEANUP Phase 3 under the 2026-06-08 cutoff.",
                 [
-                    "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+                    "Sources/Security/ProtectedData/KeyMetadataDomainStore.swift",
                 ]
             ),
         ])

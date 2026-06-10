@@ -178,13 +178,8 @@ struct CypherAirApp: App {
             currentClipboardNotice: {
                 container.protectedSettingsStore.clipboardNotice
             },
-            migrationAuthorizationRequirement: {
-                Self.protectedSettingsMutationRequirement(
-                    container.protectedSettingsStore.migrationAuthorizationRequirement()
-                )
-            },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
-                try await container.protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+            ensureCommittedSettingsIfNeeded: {
+                try await container.protectedSettingsStore.ensureCommittedIfNeeded(
                     persistSharedRight: { secret in
                         try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },

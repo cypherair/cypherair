@@ -44,13 +44,13 @@ Allowed target classes:
 |------|------------------|--------------|--------------------------|----------------|---------------------|
 | `appSessionAuthenticationPolicy` | `UserDefaults` | `early-readable boot exception` | Boot exception | Exception retained | n/a in v1 |
 | `authMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
-| `gracePeriod` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `colorTheme` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `gracePeriod` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `colorTheme` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `requireAuthOnLaunch` | Retired legacy `UserDefaults` key | `legacy cleanup-only` | Legacy cleanup | Cleanup-only | cleanup only |
-| `encryptToSelf` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `clipboardNotice` | `ProtectedData/protected-settings`; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2; legacy `UserDefaults` only as verified migration cleanup source | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `encryptToSelf` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `clipboardNotice` | `ProtectedData/protected-settings` | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | Test-only exception | Exception retained | n/a |
 | `rewrapInProgress` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | `rewrapTargetMode` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |

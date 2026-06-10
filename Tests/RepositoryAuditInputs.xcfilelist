@@ -196,6 +196,7 @@ $(SRCROOT)/Sources/Models/DetailedSignatureVerification.swift
 $(SRCROOT)/Sources/Models/ExportableFile.swift
 $(SRCROOT)/Sources/Models/FileDecryptionPhase1Result.swift
 $(SRCROOT)/Sources/Models/IdentityPresentation.swift
+$(SRCROOT)/Sources/Models/InMemoryOrdinarySettingsStore.swift
 $(SRCROOT)/Sources/Models/MessageSignatureStatus.swift
 $(SRCROOT)/Sources/Models/OpenPGPCertificationKind.swift
 $(SRCROOT)/Sources/Models/PasswordMessageDetailedDecryptOutcome.swift

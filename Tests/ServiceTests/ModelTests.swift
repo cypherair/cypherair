@@ -892,18 +892,17 @@ final class ModelTests: XCTestCase {
     // MARK: - Protected Ordinary Settings
 
     func test_protectedOrdinarySettings_gracePeriod_validValuePersists() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
 
         coordinator.setGracePeriod(60)
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.snapshot?.gracePeriod, 60)
     }
 
     func test_protectedOrdinarySettings_gracePeriod_invalidValueClampsToDefault() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
 
         coordinator.setGracePeriod(42)
 
@@ -1030,28 +1029,29 @@ final class ModelTests: XCTestCase {
     }
 
     func test_protectedOrdinarySettings_guidedTutorial_defaultsToNeverCompleted() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
 
         XCTAssertEqual(coordinator.snapshot?.guidedTutorialCompletedVersion, 0)
         XCTAssertEqual(coordinator.guidedTutorialCompletionState, .neverCompleted)
     }
 
     func test_protectedOrdinarySettings_guidedTutorial_currentVersionPersists() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
         coordinator.markGuidedTutorialCompletedCurrentVersion()
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.snapshot?.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
         XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
     }
 
-    func test_protectedOrdinarySettings_guidedTutorial_oldVersionIsRecognized() {
-        let defaults = makeIsolatedDefaults()
-        defaults.set(GuidedTutorialVersion.current - 1, forKey: "com.cypherair.preference.guidedTutorialCompletedVersion")
+    func test_protectedOrdinarySettings_guidedTutorial_previousVersionIsRecognized() {
+        var snapshot = ProtectedOrdinarySettingsSnapshot.firstRunDefaults
+        snapshot.guidedTutorialCompletedVersion = GuidedTutorialVersion.current - 1
 
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings(
+            store: InMemoryOrdinarySettingsStore(snapshot: snapshot)
+        )
         XCTAssertEqual(coordinator.guidedTutorialCompletionState, .completedPreviousVersion)
     }
 
@@ -1117,10 +1117,10 @@ final class ModelTests: XCTestCase {
     }
 
     private func makeLoadedProtectedOrdinarySettings(
-        defaults: UserDefaults
+        store: InMemoryOrdinarySettingsStore = InMemoryOrdinarySettingsStore()
     ) -> ProtectedOrdinarySettingsCoordinator {
         let coordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: store
         )
         coordinator.loadForAuthenticatedTestBypass()
         return coordinator
@@ -1216,18 +1216,17 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(ColorTheme.graphite.isMultiColor)
     }
 
-    func test_protectedOrdinarySettings_colorTheme_persistsToUserDefaults() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+    func test_protectedOrdinarySettings_colorTheme_persistsAcrossReload() {
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
         coordinator.setColorTheme(.purple)
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.colorTheme, .purple)
     }
 
     func test_protectedOrdinarySettings_colorTheme_defaultsToSystemDefault() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
         XCTAssertEqual(coordinator.colorTheme, .systemDefault)
     }
 

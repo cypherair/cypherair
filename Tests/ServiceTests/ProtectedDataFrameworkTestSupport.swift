@@ -33,7 +33,6 @@ typealias ProtectedDataTestAppMockProtectedDataRootSecretStore = CypherAir.MockP
 typealias ProtectedDataTestAppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 typealias ProtectedDataTestAppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
 typealias ProtectedDataTestAppProtectedOrdinarySettingsCoordinator = CypherAir.ProtectedOrdinarySettingsCoordinator
-typealias ProtectedDataTestAppLegacyOrdinarySettingsStore = CypherAir.LegacyOrdinarySettingsStore
 
 final class ProtectedDataTestMutableDateProvider: @unchecked Sendable {
     var value: Date
@@ -364,10 +363,6 @@ actor ThrowingRootSecretFloorRecorder {
 
 @MainActor
 class ProtectedDataFrameworkTestCase: XCTestCase {
-    struct ProtectedSettingsPayloadV1: Codable {
-        var clipboardNotice: Bool
-    }
-
     struct KeyMetadataPayloadV1: Encodable {
         var schemaVersion: Int
         var identities: [KeyMetadataIdentityV1]
@@ -447,8 +442,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
-        defaults: UserDefaults,
-        defaultsSuiteName: String,
         store: ProtectedSettingsStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
@@ -459,11 +452,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         )
         _ = try registryStore.performSynchronousBootstrap()
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let defaultsSuiteName = "com.cypherair.tests.protected-settings.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
         let store = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager
@@ -472,8 +461,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             storageRoot,
             registryStore,
             domainKeyManager,
-            defaults,
-            defaultsSuiteName,
             store
         )
     }
@@ -483,7 +470,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager
     ) async throws -> Data {
         let capturedSharedSecret = AsyncDataBox()
-        try await store.ensureCommittedAndMigrateSettingsIfNeeded(
+        try await store.ensureCommittedIfNeeded(
             persistSharedRight: { secret in
                 await capturedSharedSecret.set(secret)
             }
@@ -492,34 +479,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
         return wrappingRootKey
-    }
-
-    func setLegacyOrdinarySettings(
-        _ snapshot: ProtectedOrdinarySettingsSnapshot,
-        defaults: UserDefaults
-    ) {
-        defaults.set(snapshot.gracePeriod, forKey: ProtectedOrdinarySettingsLegacyKeys.gracePeriod)
-        defaults.set(snapshot.encryptToSelf, forKey: ProtectedOrdinarySettingsLegacyKeys.encryptToSelf)
-        defaults.set(
-            snapshot.hasCompletedOnboarding,
-            forKey: ProtectedOrdinarySettingsLegacyKeys.onboardingComplete
-        )
-        defaults.set(
-            snapshot.guidedTutorialCompletedVersion,
-            forKey: ProtectedOrdinarySettingsLegacyKeys.guidedTutorialCompletedVersion
-        )
-        defaults.set(snapshot.colorTheme.rawValue, forKey: ProtectedOrdinarySettingsLegacyKeys.colorTheme)
-    }
-
-    func assertLegacyOrdinarySettingsRemoved(
-        defaults: UserDefaults,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertNil(defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey), file: file, line: line)
-        for key in LegacyOrdinarySettingsStore.persistentKeys {
-            XCTAssertNil(defaults.object(forKey: key), "Expected \(key) to be removed.", file: file, line: line)
-        }
     }
 
     func writeProtectedSettingsEnvelope<P: Encodable>(

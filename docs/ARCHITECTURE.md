@@ -57,7 +57,7 @@ Key files:
 - `LocalDataResetService.swift` — destructive reset workflow for CypherAir-owned Keychain items, ProtectedData files, contacts, defaults, temporary files, and in-memory session state
 - `LocalDataResetRestartAction.swift` — platform restart/termination action after local-data reset
 - `AppSceneIncomingURLRouter.swift` — scene-level URL handoff into the incoming contact-import coordinator
-- `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, migration, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
+- `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, domain creation, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
 - `ProtectedSettingsHost.swift` — SwiftUI-facing protected-settings host, section-state projection, environment injection, and presentation trace metadata
 - `ContentView.swift` — root navigation
 - `OnboardingView.swift` — first-run flow and guided tutorial decision page
@@ -498,7 +498,7 @@ sequenceDiagram
     Domain->>Domain: unwrap domain DMK and read encrypted payload generation
 ```
 
-Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, open protected payloads, or read ordinary-setting legacy sources. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. The protected-settings opener first ensures the domain is committed and upgrades schema v1 payloads to schema v2 when needed. After that handoff, App composition reduces the protected-settings domain state to app-level ordinary-settings availability; `ProtectedOrdinarySettingsCoordinator` loads the ordinary-settings snapshot only when that availability is `.available`. Locked, recovery, pending mutation, or framework-unavailable states fail closed to ordinary-settings recovery. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
+Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, or open protected payloads. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. The protected-settings opener first ensures the domain is committed. After that handoff, App composition reduces the protected-settings domain state to app-level ordinary-settings availability; `ProtectedOrdinarySettingsCoordinator` loads the ordinary-settings snapshot only when that availability is `.available`. Locked, recovery, pending mutation, or framework-unavailable states fail closed to ordinary-settings recovery. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
 
 ## 4. Tightly Coupled Modules
 
@@ -553,12 +553,6 @@ App Sandbox:
 │   └── (UserDefaults)
 │       ├── com.cypherair.preference.authMode              → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
-│       ├── com.cypherair.preference.gracePeriod            → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.encryptToSelf          → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.clipboardNotice        → Legacy cleanup-only after protected-settings migration
-│       ├── com.cypherair.preference.onboardingComplete     → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.colorTheme             → Legacy cleanup-only after protected-settings schema v2 migration
 │       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration

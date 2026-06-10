@@ -65,7 +65,6 @@ final class AppConfiguration {
 
     // MARK: - UserDefaults Keys
 
-    static let clipboardNoticeLegacyKey = "com.cypherair.preference.clipboardNotice"
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
     private static let legacyRequireAuthOnLaunchKey = "com.cypherair.preference.requireAuthOnLaunch"
 
@@ -101,7 +100,6 @@ final class AppConfiguration {
 
     private static var resetPersistentKeys: [String] {
         [
-            clipboardNoticeLegacyKey,
             appSessionAuthenticationPolicyKey,
             legacyRequireAuthOnLaunchKey,
             AuthPreferences.authModeKey,
@@ -110,6 +108,6 @@ final class AppConfiguration {
             AuthPreferences.modifyExpiryInProgressKey,
             AuthPreferences.modifyExpiryFingerprintKey,
             "com.cypherair.preference.uiTestBypassAuthentication"
-        ] + LegacyOrdinarySettingsStore.persistentKeys
+        ]
     }
 }

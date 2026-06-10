@@ -88,7 +88,7 @@ final class TutorialSandboxContainer {
         self.config = AppConfiguration(defaults: defaults)
         self.config.privateKeyControlState = .unlocked(.standard)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator

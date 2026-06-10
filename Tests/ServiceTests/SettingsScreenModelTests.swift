@@ -25,7 +25,7 @@ final class SettingsScreenModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         config = AppConfiguration(defaults: defaults)
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         protectedOrdinarySettings.loadForAuthenticatedTestBypass()
         config.privateKeyControlState = .unlocked(.standard)
@@ -605,7 +605,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
@@ -633,7 +633,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
             },
@@ -666,7 +666,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? false : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -702,7 +702,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
             },
@@ -732,7 +732,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 XCTFail("Refresh should not open protected settings when no domain is present")
             },
@@ -748,9 +748,9 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_noProtectedDomainPresent_unlockMigratesAndOpens() async {
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_unlockCreatesSettingsDomainAndOpens() async {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
-        var migrateCallCount = 0
+        var ensureCommittedCallCount = 0
         var authorizeCallCount = 0
         var openDomainCallCount = 0
         let host = CypherAir.ProtectedSettingsHost(
@@ -764,8 +764,8 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? false : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
-                migrateCallCount += 1
+            ensureCommittedSettingsIfNeeded: {
+                ensureCommittedCallCount += 1
                 domainState = .locked
             },
             openDomainIfNeeded: { _ in
@@ -779,14 +779,14 @@ final class SettingsScreenModelTests: XCTestCase {
 
         await host.unlockForSettings()
 
-        XCTAssertEqual(migrateCallCount, 1)
+        XCTAssertEqual(ensureCommittedCallCount, 1)
         XCTAssertEqual(authorizeCallCount, 1)
         XCTAssertEqual(openDomainCallCount, 1)
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_noProtectedDomainPresent_authorizesBeforeSecondDomainMigration() async {
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_createsDomainBeforeAuthorization() async {
         var domainState: CypherAir.ProtectedSettingsHost.DomainState = .locked
         var events: [String] = []
         let host = CypherAir.ProtectedSettingsHost(
@@ -803,9 +803,8 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? true : nil },
-            migrationAuthorizationRequirement: { .wrappingRootKeyRequired },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
-                events.append("migrate")
+            ensureCommittedSettingsIfNeeded: {
+                events.append("ensureCommitted")
                 domainState = .locked
             },
             openDomainIfNeeded: { _ in
@@ -821,7 +820,7 @@ final class SettingsScreenModelTests: XCTestCase {
 
         XCTAssertEqual(
             events,
-            ["authorize", "wrappingRootKey", "migrate", "wrappingRootKey", "open"]
+            ["ensureCommitted", "authorize", "wrappingRootKey", "open"]
         )
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
     }
@@ -846,10 +845,9 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? false : nil },
-            migrationAuthorizationRequirement: { .wrappingRootKeyRequired },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
+            ensureCommittedSettingsIfNeeded: {
                 XCTAssertTrue(didAuthorize)
-                events.append("migrate")
+                events.append("ensureCommitted")
                 domainState = .locked
             },
             openDomainIfNeeded: { _ in
@@ -863,27 +861,27 @@ final class SettingsScreenModelTests: XCTestCase {
 
         await host.unlockForSettings()
 
-        XCTAssertEqual(events, ["authorize", "migrate", "wrappingRootKey", "open"])
+        XCTAssertEqual(events, ["authorize", "ensureCommitted", "wrappingRootKey", "open"])
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: false))
     }
 
     @MainActor
-    func test_liveProtectedSettingsHost_noProtectedDomainPresent_migrationFailureDoesNotReturnLocked() async {
+    func test_liveProtectedSettingsHost_noProtectedDomainPresent_ensureCommittedFailureDoesNotReturnLocked() async {
         let host = CypherAir.ProtectedSettingsHost(
             evaluateAccessGate: { _ in .noProtectedDomainPresent },
             authorizeSharedRight: { _, _ in
-                XCTFail("Migration failure should happen before authorization")
+                XCTFail("Domain-creation failure should happen before authorization")
                 return .authorized
             },
             currentWrappingRootKey: { Data(repeating: 0xAA, count: 32) },
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
+            ensureCommittedSettingsIfNeeded: {
                 throw ProtectedDataError.invalidRegistry("test")
             },
             openDomainIfNeeded: { _ in
-                XCTFail("Migration failure should not open protected settings")
+                XCTFail("Domain-creation failure should not open protected settings")
             },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
@@ -910,7 +908,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -935,7 +933,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 XCTFail("Protected settings should not open after cancelled authorization")
             },
@@ -962,7 +960,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .recoveryNeeded },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 XCTFail("Protected settings should not open while recovery is required")
             },
@@ -993,7 +991,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -1023,7 +1021,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .locked },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 XCTFail("Clipboard preference reads should not unlock protected settings when locked")
             },
@@ -1053,7 +1051,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .unlocked },
             currentClipboardNotice: { false },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
             },
@@ -1086,7 +1084,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -1121,7 +1119,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .pendingRetryRequired },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 XCTFail("Warm-up should not open protected settings while pending recovery is required")
             },
@@ -1154,7 +1152,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
@@ -1190,7 +1188,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .pendingResetRequired },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
@@ -1226,7 +1224,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },
@@ -1263,7 +1261,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .pendingRetryRequired },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             pendingRecoveryAuthorizationRequirement: {
@@ -1302,7 +1300,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { .pendingRetryRequired },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in },
             updateClipboardNotice: { _, _ in },
             pendingRecoveryAuthorizationRequirement: {
@@ -1344,7 +1342,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -1383,7 +1381,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -1422,7 +1420,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked
@@ -1463,7 +1461,7 @@ final class SettingsScreenModelTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { domainState == .unlocked ? clipboardNotice : nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in
                 openDomainCallCount += 1
                 domainState = .unlocked

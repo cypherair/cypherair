@@ -175,7 +175,7 @@ final class AppStartupCoordinatorTests: XCTestCase {
         )
         let config = AppConfiguration(defaults: defaults)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         let contactDirectory = FileManager.default.temporaryDirectory
@@ -204,7 +204,6 @@ final class AppStartupCoordinatorTests: XCTestCase {
             authenticationPromptCoordinator: authPromptCoordinator
         )
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,

@@ -90,7 +90,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         XCTAssertEqual(try store.requireUnlockedAuthMode(), .highSecurity)
     }
 
-    func test_realComponents_privateKeyControlFirstLeavesSettingsMigrationNeedingAuthorizedSessionAfterRestart() async throws {
+    func test_realComponents_privateKeyControlFirstLeavesSettingsCreationNeedingAuthorizedSessionAfterRestart() async throws {
         guard SecureEnclave.isAvailable else {
             throw XCTSkip("Secure Enclave is required for the real ProtectedData root-secret store.")
         }
@@ -170,7 +170,6 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedRightIdentifier: sharedRightIdentifier
         )
         let settingsStore = CypherAir.ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -179,14 +178,13 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             }
         )
 
-        XCTAssertEqual(settingsStore.migrationAuthorizationRequirement(), .wrappingRootKeyRequired)
         do {
-            try await settingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+            try await settingsStore.ensureCommittedIfNeeded(
                 persistSharedRight: { _ in
                     XCTFail("A second ProtectedData domain must reuse the existing shared root.")
                 }
             )
-            XCTFail("Expected migration to require an authorized wrapping root key after restart.")
+            XCTFail("Expected settings domain creation to require an authorized wrapping root key after restart.")
         } catch ProtectedDataError.missingWrappingRootKey {
         } catch {
             XCTFail("Unexpected error: \(error)")
@@ -587,7 +585,6 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
