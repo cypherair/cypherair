@@ -385,6 +385,38 @@
         }
       }
     },
+    "auth.inWindow.cancel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "auth.privateKey.operation.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate with Touch ID to use your private key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Touch ID 验证以使用您的私钥。"
+          }
+        }
+      }
+    },
     "auth.switchMode.reason" : {
       "localizations" : {
         "en" : {

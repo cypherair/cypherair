@@ -388,6 +388,11 @@ struct CypherAirApp: App {
                             AppLockSurfaceView(appLockController: container.appLockController)
                         }
                     }
+                    #if os(macOS)
+                    // P3 in-window authentication host: mounted after the lock
+                    // overlay so a prompt renders above the lock surface too.
+                    .authenticationPresentationHost(container.authenticationPresenter)
+                    #endif
                     .appLifecycleObserver(
                         appLockController: container.appLockController
                     )

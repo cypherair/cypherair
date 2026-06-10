@@ -5,6 +5,7 @@ final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
     let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
+    let authenticationPresenter: any AuthenticationPresenting
     let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
@@ -41,6 +42,7 @@ final class AppContainer: @unchecked Sendable {
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         appLockController: AppLockController,
         authPromptCoordinator: AuthenticationPromptCoordinator,
+        authenticationPresenter: any AuthenticationPresenting = PassthroughAuthenticationPresenter(),
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
@@ -75,6 +77,7 @@ final class AppContainer: @unchecked Sendable {
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
+        self.authenticationPresenter = authenticationPresenter
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authManager = authManager
@@ -142,6 +145,18 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             authPromptCoordinator: authPromptCoordinator
         )
+    }
+
+    /// The platform authentication-presentation seam (P3): macOS renders prompts
+    /// in-window via `MacAuthenticationPresenter`; every other platform passes
+    /// through to the system prompt unchanged.
+    @MainActor
+    private static func makeAuthenticationPresenter() -> any AuthenticationPresenting {
+        #if os(macOS)
+        MacAuthenticationPresenter()
+        #else
+        PassthroughAuthenticationPresenter()
+        #endif
     }
 
     private static func makeProtectedDataSessionCoordinator(
@@ -555,6 +570,7 @@ final class AppContainer: @unchecked Sendable {
         let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
         let authLifecycleTraceStore = authentication.authLifecycleTraceStore
         let authPromptCoordinator = authentication.authPromptCoordinator
+        let authenticationPresenter = makeAuthenticationPresenter()
         let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
         let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
         let authManager = AuthenticationManager(
@@ -654,6 +670,7 @@ final class AppContainer: @unchecked Sendable {
             authenticator: authManager,
             defaults: .standard,
             authenticationPromptCoordinator: authPromptCoordinator,
+            authenticationPresenter: authenticationPresenter,
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
@@ -834,6 +851,7 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
+            authenticationPresenter: authenticationPresenter,
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
@@ -1146,6 +1164,11 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
+            // The host mounts (dormant) in UI tests too, but the per-operation
+            // private-key route is NOT wired here: UI tests run on the mock
+            // Secure Enclave under the authentication bypass and must not drive
+            // real LocalAuthentication evaluations.
+            authenticationPresenter: makeAuthenticationPresenter(),
             secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,

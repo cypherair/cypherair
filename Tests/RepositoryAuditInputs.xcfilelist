@@ -7,6 +7,7 @@ $(SRCROOT)/Sources/App/AppStartupCoordinator.swift
 $(SRCROOT)/Sources/App/Common/AuthLifecycleTraceEnvironment.swift
 $(SRCROOT)/Sources/App/Common/AppLifecycleObserver.swift
 $(SRCROOT)/Sources/App/Common/AppLockSurfaceView.swift
+$(SRCROOT)/Sources/App/Common/AuthenticationPresentationHost.swift
 $(SRCROOT)/Sources/App/Common/CosmeticPrivacyCover.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifact.swift
 $(SRCROOT)/Sources/App/Common/AppTemporaryArtifactError.swift
@@ -229,6 +230,7 @@ $(SRCROOT)/Sources/Security/AuthLifecycleTraceStore.swift
 $(SRCROOT)/Sources/Security/AuthTraceMetadata.swift
 $(SRCROOT)/Sources/Security/AuthenticationEvaluable.swift
 $(SRCROOT)/Sources/Security/AuthenticationManager.swift
+$(SRCROOT)/Sources/Security/AuthenticationPresenting.swift
 $(SRCROOT)/Sources/Security/AuthenticationPromptCoordinator.swift
 $(SRCROOT)/Sources/Security/KeyBundleStore.swift
 $(SRCROOT)/Sources/Security/KeychainFailure.swift
@@ -236,8 +238,10 @@ $(SRCROOT)/Sources/Security/KeyMetadataPersistence.swift
 $(SRCROOT)/Sources/Security/KeyMigrationCoordinator.swift
 $(SRCROOT)/Sources/Security/KeychainManageable.swift
 $(SRCROOT)/Sources/Security/KeychainManager.swift
+$(SRCROOT)/Sources/Security/MacAuthenticationPresenter.swift
 $(SRCROOT)/Sources/Security/MemoryInfoProvidable.swift
 $(SRCROOT)/Sources/Security/MemoryZeroingUtility.swift
+$(SRCROOT)/Sources/Security/PassthroughAuthenticationPresenter.swift
 $(SRCROOT)/Sources/Security/PrivateKeyModeSwitchAuthenticator.swift
 $(SRCROOT)/Sources/Security/PrivateKeyRewrapRecoveryCoordinator.swift
 $(SRCROOT)/Sources/Security/PrivateKeyRewrapWorkflow.swift
