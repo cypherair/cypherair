@@ -4,7 +4,8 @@
 > **Version:** v4.4
 > **Companion to:** [PRD](PRD.md) v4.4
 > **Audience:** Developers, Security Auditors
-> **Last reviewed:** 2026-06-04.
+> **Update triggers:** Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
+> **Last reviewed:** 2026-06-10.
 
 ## 1. OpenPGP Library: Sequoia PGP
 
@@ -237,9 +238,9 @@ See also [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 for extended type mapping 
 ### 2.5 Build Pipeline
 
 1. `cargo +stable build --release --target aarch64-apple-ios` / `aarch64-apple-ios-sim` / `aarch64-apple-darwin` / `aarch64-apple-visionos` / `aarch64-apple-visionos-sim` refreshes ordinary stable `arm64` archives when you only need target-specific Rust outputs
-2. `./build-xcframework.sh --release` is the packaging entrypoint; for local app-side validation, run it as `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` so it refreshes stable `arm64` and patched `arm64e` release archives from the pinned attested stage1, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
+2. `./build-xcframework.sh --release` is the packaging entrypoint; for local app-side validation, run it with the pinned force-download environment from [CLAUDE.md](../CLAUDE.md) Build Commands so it refreshes stable `arm64` and patched `arm64e` release archives from the pinned attested stage1, generates UniFFI Swift bindings and headers from an `arm64e-apple-darwin` host dylib, validates host-dylib cleanup, produces the packaged `PgpMobile.xcframework` output, and writes `PgpMobile.arm64e-build-manifest.json`
 3. The current Xcode project links `PgpMobile.xcframework` and imports the generated headers through `bindings/module.modulemap`
-4. Local Swift / FFI validation runs through `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`
+4. Local Swift / FFI validation runs through the `CypherAir-UnitTests` plan ([TESTING.md](TESTING.md) Section 2.4)
 
 The current `openssl-src` override for the Apple `arm64e` build chain must
 remain explicit: use the checked-in CypherAir `openssl-src-rs` git branch plus
@@ -268,18 +269,12 @@ Bitwarden (UniFFI), Firefox iOS (UniFFI XCFramework), Signal (cbindgen), Delta C
 - **Parse/setup failure stays distinct from cryptographic invalidity.** Parse, type, and precondition failures return `Err(PgpError)`. Successful parsing followed by crypto failure should stay in family-specific result or graded-status types.
 - **`PgpError` remains the cross-family fatal boundary.** UniFFI-visible error changes must preserve the Rust/Swift 1:1 mapping and should be reserved for fatal semantics that cannot be modeled as a family-local result.
 - **Signer fingerprint meaning must stay explicit.** Detailed verify/decrypt summaries expose the signer certificate primary fingerprint, not the signing subkey fingerprint. New APIs must either preserve that meaning or add a separate explicit subkey field.
-- **Any UniFFI-visible surface change is a multi-layer change.** Regenerate bindings, update Swift service call sites, refresh `PgpMobile.xcframework`, and rerun Rust plus Swift / FFI validation together.
-- **Plaintext-bearing results still inherit Swift-side zeroization expectations.** When FFI results carry plaintext or signed content, the service and app layers must continue to zeroize temporary `Data` buffers after use.
+- **Any UniFFI-visible surface change is a multi-layer change.** Follow the sync-and-validate workflow in [TESTING.md](TESTING.md) Section 2.4.
+- **Plaintext-bearing results still inherit Swift-side zeroization expectations** (CLAUDE.md hard constraint 5).
 
 ### 2.9 Current FFI Capability Families
 
-| Family | Rust / FFI role | Swift service owner | Current app owner | Current state |
-|--------|------------------|---------------------|-------------------|---------------|
-| Certificate Merge / Update | Same-fingerprint public-certificate update absorption | `ContactService` | `ContactImportWorkflow`, `AddContactView`, `IncomingURLImportCoordinator`, URL import flow in `CypherAirApp` | Shipped |
-| Revocation Construction | Key-level and selective revocation construction | `KeyManagementService` | `KeyDetailView`, `SelectiveRevocationView`, `SelectiveRevocationScreenModel` | Shipped; selective revocation remains export-on-demand and does not extend persisted key-level revocation state |
-| Password / SKESK Symmetric Messages | Additive password encrypt/decrypt methods and result types | `PasswordMessageService` | None | Service-only; no shipped app route or screen-model owner |
-| Certification And Binding Verification | Direct-key verify, User ID binding verify, and User ID certification generation | `CertificateSignatureService` | `ContactDetailView`, `ContactCertificateSignaturesView`, `ContactCertificateSignaturesScreenModel` | Shipped; workflow is crypto-only and does not mutate trust state automatically |
-| Richer Signature Results | Detailed verify/decrypt APIs | `SigningService` and `DecryptionService` | `VerifyView`, `VerifyScreenModel`, `DecryptView`, `DecryptScreenModel`, shared `DetailedSignatureSectionView` | Shipped; detailed results are the primary service/app surface, with `SignatureVerification` retained only as an internal presentation helper |
+The capability-family inventory — Rust/FFI role, Swift service owner, current app owner, and shipped state per family — is maintained in [ARCHITECTURE.md](ARCHITECTURE.md) Section 2 ("Current Rust / FFI Capability Ownership").
 
 All current app-surface workflows continue to call Swift service owners rather than `PgpEngine` directly.
 
@@ -293,23 +288,11 @@ SE supports P-256 only. Ed25519/X25519/Ed448/X448 keys all require indirect wrap
 
 ### 3.2 Wrapping Flow
 
-1. Generate `SecureEnclave.P256.KeyAgreement.PrivateKey()` with access control flags.
-2. Self-ECDH (SE private key × own public key, computed inside SE hardware).
-3. HKDF: `deriveKey(inputKeyMaterial: sharedSecret, salt: randomSalt, info: "CypherAir-SE-Wrap-v1:" + hexFingerprint, outputByteCount: 32)`.
-4. `AES.GCM.seal(privateKeyBytes)`.
-5. Store: SE key `dataRepresentation` + salt + sealed box in Keychain. **Confirm success.**
-6. Zeroize raw key bytes + symmetric key **after storage confirmed.**
+Self-ECDH inside the SE (the P-256 key agreement against its own public key) feeds HKDF-SHA256 with a random salt and the info string `"CypherAir-SE-Wrap-v1:" + hexFingerprint` to derive an AES-256 key, which seals the raw private key bytes via AES-GCM. The SE key `dataRepresentation`, salt, and sealed box are stored as three Keychain items; the raw key bytes and symmetric key are zeroized only after all three writes are confirmed. Authoritative step-by-step flow, info-string warning, and ordering rationale: [SECURITY.md](SECURITY.md) Section 3.
 
 ### 3.3 Unwrapping Flow
 
-1. Retrieve SE key blob, salt, and sealed box from Keychain.
-2. Reconstruct SE key from `dataRepresentation` (triggers device authentication — Face ID / Touch ID, with or without passcode fallback depending on auth mode).
-3. Re-derive symmetric key (self-ECDH inside SE + HKDF with stored salt and same info string).
-4. `AES.GCM.open()` → Ed25519/X25519/Ed448/X448 private key in application memory.
-5. Perform PGP operation.
-6. Zeroize private key bytes and symmetric key immediately.
-
-See also [SECURITY.md](SECURITY.md) Section 3 for the full unwrapping security analysis.
+Reconstructing the SE key from its `dataRepresentation` triggers device authentication (per auth mode); the symmetric key is re-derived (self-ECDH inside the SE plus HKDF with the stored salt and same info string), and the sealed box opens to raw private key bytes that are zeroized immediately after the PGP operation completes. Full flow and security analysis: [SECURITY.md](SECURITY.md) Section 3.
 
 ### 3.4 Access Control (Dual Mode)
 
@@ -318,15 +301,7 @@ See also [SECURITY.md](SECURITY.md) Section 3 for the full unwrapping security a
 | Standard (default) | `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]` | Face ID / Touch ID with passcode fallback. Equivalent to `deviceOwnerAuthentication`. |
 | High Security | `[.privateKeyUsage, .biometryAny]` | Face ID / Touch ID only. No passcode fallback. If biometrics unavailable, private key is inaccessible. |
 
-**Mode switching:** When the user changes authentication mode in Settings, the App must re-wrap all SE-protected private keys with the new access control flags:
-
-1. Unwrap each private key using the current SE key (requires current auth).
-2. Delete the current SE wrapping key from Keychain.
-3. Generate a new SE wrapping key with the new access control flags.
-4. Re-wrap each private key with the new SE key.
-5. Store the new wrapped blobs in Keychain.
-
-*This operation requires the user to authenticate once (under the current mode) and is atomic: if any step fails, the original keys remain intact.* Crash recovery uses the post-unlock `private-key-control.recoveryJournal`. See [SECURITY.md](SECURITY.md) Section 4.
+**Mode switching:** Changing the authentication mode re-wraps all SE-protected private keys with the new access control flags under a single authentication, atomically — original keys stay intact until the complete new bundle is verified, and crash recovery uses the post-unlock `private-key-control.recoveryJournal`. Authoritative procedure, atomicity ordering, and recovery rules: [SECURITY.md](SECURITY.md) Section 4.
 
 ### 3.5 Keychain Layout
 
@@ -354,10 +329,7 @@ It is not part of the private-key bundle model and must fail closed if missing.
 
 ### 3.6 Security Properties
 
-- Keychain extraction without SE hardware → encrypted blob useless.
-- SE `dataRepresentation` bound to SoC UID (fused at manufacturing).
-- Ed25519/X25519/Ed448/X448 key exists in app memory briefly during use (inherent tradeoff).
-- SE ECDH adds ~2–5ms. Imperceptible.
+See [SECURITY.md](SECURITY.md) Section 3 ("Security Properties"): Keychain extraction without the SE hardware yields a useless encrypted blob, and the raw private key exists in application memory only briefly during use — an inherent tradeoff of the P-256-only SE constraint.
 
 ### 3.7 Key Loss & Recovery
 
@@ -373,7 +345,7 @@ SE keys destroyed by: device erase, iCloud restore, backup restore. App detects 
 | Parallelism | 4 | p = 4 | 128 MB per lane |
 | Time | Fixed at 3 passes (~3s target on contemporary hardware) | t = 3 | Stable, explicit export profile |
 
-**Not used by Profile A.** Profile A uses Iterated+Salted S2K (mode 3) for key export, which is universally supported by GnuPG.
+**Not used by Profile A.** Profile A uses Iterated+Salted S2K (mode 3) for key export, which is universally supported by GnuPG. Canonical parameter set, scope, and refusal message: [SECURITY.md](SECURITY.md) Section 7.
 
 ### iOS Memory Safety Guard
 
@@ -437,7 +409,7 @@ Migration and exception rules:
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - Unsupported legacy flat Contacts files must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
-- Documentation updates for storage or migration changes belong in `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed.
+- Documentation updates for storage or migration changes follow the update triggers in [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md) Section 6, with [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md) as the row-level inventory.
 
 ---
 
@@ -449,37 +421,8 @@ SwiftUI (iOS 26.5+). UIKit: UIActivityViewController, UIDocumentPickerViewContro
 
 ## 8. Memory Integrity Enforcement (MIE)
 
-### 8.1 Overview
+Memory Integrity Enforcement is Apple's hardware-level memory safety system (Enhanced Memory Tagging Extension, secure typed allocators, Tag Confidentiality Enforcement). It matters for CypherAir because vendored OpenSSL is C code — memory corruption is the primary attack vector against C cryptographic libraries — and Apple explicitly recommends MIE for apps that are "likely entry points for attackers — such as social networks, messaging apps, or any other app where a specific user can be targeted." Protection is always on with no user-visible performance cost on supported hardware, and the capability is additive: unsupported devices simply run without hardware tagging.
 
-Memory Integrity Enforcement is Apple's hardware-level memory safety system, built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It combines Enhanced Memory Tagging Extension (EMTE), secure typed memory allocators, and Tag Confidentiality Enforcement to detect and block memory corruption (buffer overflows, use-after-free) in real time.
+Enablement: in Xcode 26.5, add the Enhanced Security capability and enable Hardware Memory Tagging. Xcode manages this via `ENABLE_ENHANCED_SECURITY = YES` and writes the required entitlement keys into `CypherAir.entitlements`; those keys must stay committed to source control. No code changes are required.
 
-### 8.2 Why MIE Matters for CypherAir
-
-- **Vendored OpenSSL is C code:** Memory corruption vulnerabilities are the primary attack vector against C cryptographic libraries. MIE provides hardware-level defense against exploitation of any undiscovered OpenSSL bugs.
-- **Security-sensitive app:** Apple explicitly recommends MIE for apps that are "likely entry points for attackers — such as social networks, messaging apps, or any other app where a specific user can be targeted." CypherAir fits this description.
-- **Zero performance cost:** Apple has optimized MIE to maintain device performance. The protection is always on and invisible to users on supported hardware.
-
-### 8.3 Enablement
-
-In Xcode 26:
-
-1. Open Signing & Capabilities for the app target.
-2. Add Capability → Enhanced Security.
-3. Enable Hardware Memory Tagging.
-
-Xcode manages Enhanced Security via the `ENABLE_ENHANCED_SECURITY = YES` build setting and writes the required entitlement keys (Hardened Process, Hardware Memory Tagging, etc.) into `CypherAir.entitlements`. These entitlement keys must be committed to source control — Xcode reads them to determine which protections are enabled. No code changes are required.
-
-### 8.4 Compatibility
-
-- **Supported A19/A19 Pro-or-newer devices, including current iPhone 17 and iPhone Air models:** Full MIE protection active.
-- **Older unsupported devices:** App runs normally. Enhanced Security capability is ignored. No hardware memory tagging.
-
-The Enhanced Security capability is additive and does not affect compatibility with older devices.
-
-### 8.5 Testing
-
-- Run the App on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enabled. Perform full workflow (both profiles: key gen, encrypt/decrypt, sign/verify).
-- Verify no tag mismatch terminations occur (check Console.app and Xcode crash logs).
-- Test under Xcode Instruments "Memory Tag Violations" instrument if available.
-
-See also [SECURITY.md](SECURITY.md) Section 8 for additional MIE security analysis.
+Canonical entitlement-key list, supported-device examples, and the MIE testing workflow: [SECURITY.md](SECURITY.md) Section 8.
