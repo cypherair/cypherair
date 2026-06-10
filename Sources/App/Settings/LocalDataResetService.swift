@@ -20,7 +20,6 @@ struct LocalDataResetError: LocalizedError, Equatable {
 
 final class LocalDataResetService {
     private let keychain: any KeychainManageable
-    private let legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?
     private let protectedDataStorageRoot: ProtectedDataStorageRoot
     private let defaults: UserDefaults
     private let defaultsDomainName: String?
@@ -41,7 +40,6 @@ final class LocalDataResetService {
 
     init(
         keychain: any KeychainManageable,
-        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)? = nil,
         protectedDataStorageRoot: ProtectedDataStorageRoot,
         defaults: UserDefaults,
         defaultsDomainName: String?,
@@ -61,7 +59,6 @@ final class LocalDataResetService {
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.keychain = keychain
-        self.legacyRightStoreClient = legacyRightStoreClient
         self.protectedDataStorageRoot = protectedDataStorageRoot
         self.defaults = defaults
         self.defaultsDomainName = defaultsDomainName
@@ -121,32 +118,10 @@ final class LocalDataResetService {
             failureKey: "keychain.protectedDataDeviceBindingKey",
             failures: &failures
         )
-        deletedKeychainItemCount += deleteExactKeychainItem(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount,
-            authenticationContext: authenticationContext,
-            failureKey: "keychain.protectedDataRootSecretFormatFloor",
-            failures: &failures
-        )
-        deletedKeychainItemCount += deleteExactKeychainItem(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: KeychainConstants.defaultAccount,
-            authenticationContext: authenticationContext,
-            failureKey: "keychain.protectedDataRootSecretLegacyCleanup",
-            failures: &failures
-        )
         cleanupSecureEnclaveCustodyHandles(
             deletedKeychainItemCount: &deletedKeychainItemCount,
             failures: &failures
         )
-
-        do {
-            try await legacyRightStoreClient?.removeRight(
-                forIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
-            )
-        } catch {
-            failures.append("legacyRight.remove.\(String(describing: type(of: error)))")
-        }
 
         for directory in resetDirectories {
             removedDirectoryCount += removeDirectoryIfPresent(
@@ -359,16 +334,6 @@ final class LocalDataResetService {
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: nil
             )
-            let hasFormatFloor = keychain.exists(
-                service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-                account: KeychainConstants.defaultAccount,
-                authenticationContext: nil
-            )
-            let hasLegacyCleanup = keychain.exists(
-                service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-                account: KeychainConstants.defaultAccount,
-                authenticationContext: nil
-            )
             let remainingDefaultAccountServices = remainingKeychainServices(
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: authenticationContext,
@@ -382,8 +347,6 @@ final class LocalDataResetService {
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || hasDeviceBindingKey
-                || hasFormatFloor
-                || hasLegacyCleanup
                 || !remainingDefaultAccountServices.isEmpty
                 || remainingSecureEnclaveCustodyHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
@@ -398,8 +361,6 @@ final class LocalDataResetService {
                     "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
                     "hasProtectedDataRootSecret": hasRootSecret ? "true" : "false",
                     "hasDeviceBindingKey": hasDeviceBindingKey ? "true" : "false",
-                    "hasFormatFloor": hasFormatFloor ? "true" : "false",
-                    "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
                     "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
@@ -415,12 +376,6 @@ final class LocalDataResetService {
             }
             if hasDeviceBindingKey {
                 failures.append("keychain.protectedDataDeviceBindingKey.remaining")
-            }
-            if hasFormatFloor {
-                failures.append("keychain.protectedDataRootSecretFormatFloor.remaining")
-            }
-            if hasLegacyCleanup {
-                failures.append("keychain.protectedDataRootSecretLegacyCleanup.remaining")
             }
             if !remainingDefaultAccountServices.isEmpty {
                 failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")

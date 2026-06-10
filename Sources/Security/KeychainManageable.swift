@@ -104,12 +104,6 @@ enum KeychainConstants {
     /// ProtectedData Secure Enclave device-binding key representation.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
 
-    /// ProtectedData root-secret envelope format floor marker.
-    static let protectedDataRootSecretFormatFloorService = "\(prefix).protected-data.root-secret-format-floor"
-
-    /// Legacy root-secret cleanup staging row. This is never used for authorization fallback.
-    static let protectedDataRootSecretLegacyCleanupService = "\(prefix).protected-data.root-secret-legacy-cleanup"
-
     /// Default Keychain account identifier.
     static let defaultAccount = "com.cypherair"
 }

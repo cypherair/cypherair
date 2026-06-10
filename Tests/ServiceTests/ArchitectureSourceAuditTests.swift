@@ -1605,26 +1605,23 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #1A legacy LARight right-store migration; removed under the strict retirement roadmap. Current root-secret envelope and device-binding coverage use current-model data.",
-                [
-                    "Sources/App/AppContainer.swift",
-                    "Sources/App/Settings/LocalDataResetService.swift",
-                    "Sources/Security/ProtectedData/ProtectedDataRootSecretCoordinator.swift",
-                    "Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift",
-                    "Sources/Security/ProtectedData/ProtectedDataPostUnlockCoordinator.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupRawRootSecretSymbols = ArchitectureSourceAuditRule(
-        name: "Legacy cleanup #1B raw-v1 root-secret symbols",
-        failureSummary: "Legacy raw-v1 root-secret migration symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
+        name: "Legacy cleanup #1B raw-v1 root-secret and format-floor symbols",
+        failureSummary: "Legacy raw-v1 root-secret migration and format-floor symbols are removed under the 2026-06-08 cutoff and must not be reintroduced.",
         pattern: wordPattern(for: [
             "migrateLegacyRawRootSecret",
             "legacyV1Raw",
+            "deleteLegacyCleanupMarkerIfPresent",
+            "protectedDataRootSecretLegacyCleanupService",
+            "protectedDataRootSecretFormatFloorService",
+            "ProtectedDataRootSecretFormatFloorStore",
+            "ProtectedDataRootSecretFormatFloorMarker",
+            "ProtectedDataRootSecretStorageFormat",
+            "rootSecretEnvelopeMinimumVersion",
+            "recordRootSecretEnvelopeMinimumVersion",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1632,14 +1629,7 @@ private enum ArchitectureSourceAuditRules {
                 && path.hasSuffix(".swift")
         },
         stripsCommentsAndStrings: true,
-        temporaryExceptions: temporaryExceptions([
-            (
-                "Item #1B raw-v1 root-secret migration; removed under the strict retirement roadmap. Current root-secret format-floor coverage must not seed or name raw-v1 data.",
-                [
-                    "Sources/Security/ProtectedData/ProtectedDataRightStoreClient.swift",
-                ]
-            ),
-        ])
+        temporaryExceptions: temporaryExceptions([])
     )
 
     static let legacyCleanupRevocationBackfillSymbols = ArchitectureSourceAuditRule(

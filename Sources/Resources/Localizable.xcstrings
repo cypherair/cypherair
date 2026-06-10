@@ -5237,22 +5237,6 @@
         }
       }
     },
-    "error.protectedData.rootSecretMigrationVerification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The protected app data root secret could not be verified after migration."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "迁移后无法验证受保护应用数据根密钥。"
-          }
-        }
-      }
-    },
     "error.protectedData.rootSecretVerification" : {
       "localizations" : {
         "en" : {

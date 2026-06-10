@@ -11,10 +11,8 @@ typealias ProtectedDataTestAppAppStartupCoordinator = CypherAir.AppStartupCoordi
 typealias ProtectedDataTestAppProtectedDataBootstrapState = CypherAir.ProtectedDataBootstrapState
 typealias ProtectedDataTestAppProtectedDataAccessGateClassifier = CypherAir.ProtectedDataAccessGateClassifier
 typealias ProtectedDataTestAppProtectedDataFrameworkState = CypherAir.ProtectedDataFrameworkState
-typealias ProtectedDataTestAppProtectedDataPersistedRightHandle = CypherAir.ProtectedDataPersistedRightHandle
 typealias ProtectedDataTestAppProtectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore
 typealias ProtectedDataTestAppProtectedDataRelockParticipant = CypherAir.ProtectedDataRelockParticipant
-typealias ProtectedDataTestAppProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
 typealias ProtectedDataTestAppProtectedDataRightIdentifiers = CypherAir.ProtectedDataRightIdentifiers
 typealias ProtectedDataTestAppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 typealias ProtectedDataTestAppProtectedDataSessionRelockCoordinator = CypherAir.ProtectedDataSessionRelockCoordinator
@@ -45,86 +43,19 @@ final class ProtectedDataTestMutableDateProvider: @unchecked Sendable {
     }
 }
 
-final class MockProtectedDataPersistedRightHandle: ProtectedDataTestAppProtectedDataPersistedRightHandle {
-    let identifier: String
-    let secretData: Data
-    var authorizeError: Error?
-    var rawSecretError: Error?
+final class RecordingProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
+    private var storage: [String: Data] = [:]
 
-    private(set) var authorizeCallCount = 0
-    private(set) var deauthorizeCallCount = 0
-
-    init(identifier: String, secretData: Data) {
-        self.identifier = identifier
-        self.secretData = secretData
-    }
-
-    func authorize(localizedReason: String) async throws {
-        authorizeCallCount += 1
-        if let authorizeError {
-            throw authorizeError
-        }
-    }
-
-    func deauthorize() async {
-        deauthorizeCallCount += 1
-    }
-
-    func rawSecretData() async throws -> Data {
-        if let rawSecretError {
-            throw rawSecretError
-        }
-        return secretData
-    }
-
-    func rootSecretData() throws -> Data {
-        if let rawSecretError {
-            throw rawSecretError
-        }
-        return secretData
-    }
-}
-
-final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedDataRightStoreClientProtocol, ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
-    var persistedRightHandle: MockProtectedDataPersistedRightHandle?
-
-    private(set) var rightLookupCallCount = 0
-    private(set) var saveWithoutSecretCallCount = 0
-    private(set) var saveWithSecretCallCount = 0
+    private(set) var saveCallCount = 0
+    private(set) var loadCallCount = 0
     private(set) var removeCallCount = 0
     private(set) var lastRemovedIdentifier: String?
     private(set) var lastAuthenticationContext: LAContext?
 
-    func right(forIdentifier identifier: String) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        rightLookupCallCount += 1
-        guard let persistedRightHandle else {
-            throw CypherAir.ProtectedDataError.missingPersistedRight(identifier)
-        }
-        return persistedRightHandle
-    }
+    var loadError: Error?
 
-    func saveRight(_ right: LARight, identifier: String) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        saveWithoutSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: Data(repeating: 0x11, count: 32))
-        persistedRightHandle = handle
-        return handle
-    }
-
-    func saveRight(
-        _ right: LARight,
-        identifier: String,
-        secret: Data
-    ) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        saveWithSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: secret)
-        persistedRightHandle = handle
-        return handle
-    }
-
-    func removeRight(forIdentifier identifier: String) async throws {
-        removeCallCount += 1
-        lastRemovedIdentifier = identifier
-        persistedRightHandle = nil
+    func seedRootSecret(_ secretData: Data, identifier: String) {
+        storage[identifier] = secretData
     }
 
     func saveRootSecret(
@@ -133,43 +64,35 @@ final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedData
         policy: AppSessionAuthenticationPolicy
     ) throws {
         _ = policy
-        saveWithSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: secretData)
-        persistedRightHandle = handle
+        saveCallCount += 1
+        storage[identifier] = secretData
     }
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext,
-        minimumEnvelopeVersion: Int?
-    ) throws -> ProtectedDataRootSecretLoadResult {
-        _ = minimumEnvelopeVersion
+        authenticationContext: LAContext
+    ) throws -> Data {
         lastAuthenticationContext = authenticationContext
-        rightLookupCallCount += 1
-        guard let persistedRightHandle else {
+        loadCallCount += 1
+        if let loadError {
+            throw loadError
+        }
+        guard let secretData = storage[identifier] else {
             throw MockKeychainError.itemNotFound
         }
-        if let authorizeError = persistedRightHandle.authorizeError {
-            throw authorizeError
-        }
-        return ProtectedDataRootSecretLoadResult(
-            secretData: try persistedRightHandle.rootSecretData(),
-            storageFormat: .envelopeV2,
-            didMigrate: false
-        )
+        return secretData
     }
 
     func deleteRootSecret(identifier: String) throws {
         removeCallCount += 1
         lastRemovedIdentifier = identifier
-        guard persistedRightHandle != nil else {
+        guard storage.removeValue(forKey: identifier) != nil else {
             throw MockKeychainError.itemNotFound
         }
-        persistedRightHandle = nil
     }
 
     func rootSecretExists(identifier: String) -> Bool {
-        persistedRightHandle != nil
+        storage[identifier] != nil
     }
 
     func reprotectRootSecret(
@@ -178,11 +101,10 @@ final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedData
         to newPolicy: AppSessionAuthenticationPolicy,
         authenticationContext: LAContext
     ) throws {
-        _ = identifier
         _ = currentPolicy
         _ = newPolicy
         lastAuthenticationContext = authenticationContext
-        guard persistedRightHandle != nil else {
+        guard storage[identifier] != nil else {
             throw MockKeychainError.itemNotFound
         }
     }
@@ -342,21 +264,6 @@ final class MockProtectedDomainRecoveryHandler: ProtectedDataTestAppProtectedDom
 
     func deleteDomainArtifactsForRecovery() throws {
         deleteArtifactsCallCount += 1
-    }
-}
-
-actor ThrowingRootSecretFloorRecorder {
-    private(set) var callCount = 0
-    private(set) var lastVersion: Int?
-
-    func record(_ version: Int) throws {
-        callCount += 1
-        lastVersion = version
-        throw ProtectedDataError.internalFailure("Injected root-secret envelope floor write failure.")
-    }
-
-    func snapshot() -> (callCount: Int, lastVersion: Int?) {
-        (callCount, lastVersion)
     }
 }
 
@@ -832,7 +739,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         )
     }
 
-    func insertLegacyRootSecret(
+    func insertRootSecretPayload(
         _ payload: Data,
         identifier: String,
         account: String
@@ -842,34 +749,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         query[kSecValueData as String] = payload
         query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         try handleKeychainStatus(SecItemAdd(query as CFDictionary, nil))
-    }
-
-    func replaceRootSecretPayload(
-        _ payload: Data,
-        identifier: String,
-        account: String
-    ) throws {
-        try handleKeychainStatus(
-            SecItemUpdate(
-                rootSecretQuery(identifier: identifier, account: account) as CFDictionary,
-                [kSecValueData as String: payload] as CFDictionary
-            )
-        )
-    }
-
-    func loadRootSecretPayload(
-        identifier: String,
-        account: String
-    ) throws -> Data {
-        var query = rootSecretQuery(identifier: identifier, account: account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: AnyObject?
-        try handleKeychainStatus(SecItemCopyMatching(query as CFDictionary, &result))
-        guard let data = result as? Data else {
-            throw KeychainError.unhandledError(errSecInternalError)
-        }
-        return data
     }
 
     func deleteRootSecretPayload(identifier: String, account: String) {

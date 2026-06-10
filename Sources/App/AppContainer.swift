@@ -146,22 +146,16 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeProtectedDataSessionCoordinator(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
-        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?,
         domainKeyManager: ProtectedDomainKeyManager,
-        registryStore: ProtectedDataRegistryStore,
         config: AppConfiguration,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         traceStore: AuthLifecycleTraceStore?
     ) -> ProtectedDataSessionCoordinator {
         ProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
-            legacyRightStoreClient: legacyRightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            recordRootSecretEnvelopeMinimumVersion: { version in
-                try await registryStore.recordRootSecretEnvelopeMinimumVersion(version)
-            },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: traceStore
         )
@@ -581,12 +575,9 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
-        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: KeychainProtectedDataRootSecretStore(traceStore: authLifecycleTraceStore),
-            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            registryStore: protectedDataRegistryStore,
             config: config,
             authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
@@ -819,7 +810,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
-            legacyRightStoreClient: protectedDataRightStoreClient,
             protectedDataStorageRoot: protectedDataStorageRoot,
             defaults: defaults,
             defaultsDomainName: Bundle.main.bundleIdentifier,
@@ -934,12 +924,9 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
-        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: MockProtectedDataRootSecretStore(),
-            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            registryStore: protectedDataRegistryStore,
             config: config,
             authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
@@ -1136,7 +1123,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
-            legacyRightStoreClient: nil,
             protectedDataStorageRoot: protectedDataStorageRoot,
             defaults: defaults,
             defaultsDomainName: suiteName,

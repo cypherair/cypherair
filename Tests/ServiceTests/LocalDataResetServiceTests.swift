@@ -36,18 +36,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
-        try container.keychain.save(
-            Data([0x07]),
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try container.keychain.save(
-            Data([0x08]),
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
 
         try container.protectedDataStorageRoot.ensureRootDirectoryExists()
         let protectedMarker = container.protectedDataStorageRoot.rootURL
@@ -62,7 +50,7 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 5)
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
         XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -70,14 +58,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         ))
         XCTAssertFalse(container.keychain.exists(
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: KeychainConstants.defaultAccount
-        ))
-        XCTAssertFalse(container.keychain.exists(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount
-        ))
-        XCTAssertFalse(container.keychain.exists(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
@@ -270,22 +250,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
             metadataKey: "hasDeviceBindingKey",
             expectedFailure: "keychain.protectedDataDeviceBindingKey.remaining"
-        )
-    }
-
-    func test_resetAllLocalData_reportsRemainingDataWhenFormatFloorRowRemains() async throws {
-        try await assertResetValidationReportsRemainingProtectedRow(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            metadataKey: "hasFormatFloor",
-            expectedFailure: "keychain.protectedDataRootSecretFormatFloor.remaining"
-        )
-    }
-
-    func test_resetAllLocalData_reportsRemainingDataWhenLegacyCleanupRowRemains() async throws {
-        try await assertResetValidationReportsRemainingProtectedRow(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            metadataKey: "hasLegacyCleanup",
-            expectedFailure: "keychain.protectedDataRootSecretLegacyCleanup.remaining"
         )
     }
 

@@ -200,10 +200,10 @@ The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
 software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE
 public key; it must not reuse the existing private-key self-ECDH wrapping
 scheme as its security design. Its HKDF sharedInfo and AES-GCM AAD bind the
-AAD version plus hashes of both persistent SE and ephemeral public keys. After
-v2 migration succeeds, registry state plus
-a ThisDeviceOnly Keychain `format-floor` marker must make later v1 raw
-root-secret payloads fail closed as downgrade/corruption.
+AAD version plus hashes of both persistent SE and ephemeral public keys. The
+envelope is the only supported root-secret payload: any payload that does not
+decode as a current `CAPDSEV2` envelope fails closed as ordinary undecodable
+input.
 
 ProtectedData domain payloads must open only after the app privacy gate has
 produced an authenticated `LAContext` or an already-authorized ProtectedData
@@ -310,7 +310,6 @@ When the user changes mode in Settings:
 - Recovery diagnostics are surfaced through the app's existing post-unlock warning path and must remain generic — never include fingerprints or other key identifiers.
 - Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
 - This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
-
 
 ### LAPolicy Selection
 

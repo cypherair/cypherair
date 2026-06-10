@@ -4,8 +4,6 @@ import Security
 import XCTest
 @testable import CypherAir
 
-private typealias TraceProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
-private typealias TraceProtectedDataPersistedRightHandle = CypherAir.ProtectedDataPersistedRightHandle
 private typealias TraceProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 private typealias TraceProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias TraceProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
@@ -95,42 +93,6 @@ private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable, @u
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         try base.reconstructKey(from: data, authenticationContext: authenticationContext)
     }
-}
-
-private final class TraceTestPersistedRightHandle: TraceProtectedDataPersistedRightHandle {
-    let identifier: String
-
-    init(identifier: String) {
-        self.identifier = identifier
-    }
-
-    func authorize(localizedReason: String) async throws {}
-
-    func deauthorize() async {}
-
-    func rawSecretData() async throws -> Data {
-        Data(repeating: 0xAB, count: 32)
-    }
-}
-
-private final class TraceTestRightStoreClient: TraceProtectedDataRightStoreClientProtocol {
-    func right(forIdentifier identifier: String) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func saveRight(_ right: LARight, identifier: String) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func saveRight(
-        _ right: LARight,
-        identifier: String,
-        secret: Data
-    ) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func removeRight(forIdentifier identifier: String) async throws {}
 }
 
 @MainActor

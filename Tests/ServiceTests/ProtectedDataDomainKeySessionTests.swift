@@ -79,11 +79,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.session",
-            secretData: Data(repeating: 0xAB, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xAB, count: 32), identifier: "com.cypherair.tests.protected-data.session")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -109,7 +106,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(coordinator.frameworkState, .sessionAuthorized)
         XCTAssertTrue(coordinator.hasActiveWrappingRootKey)
         XCTAssertTrue(keyManager.hasUnlockedDomainMasterKeys)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 1)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 1)
 
         await coordinator.relockCurrentSession()
 
@@ -143,11 +140,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let identifier = "com.cypherair.tests.protected-data.session-remove-shared-right"
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: identifier,
-            secretData: Data(repeating: 0xA1, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xA1, count: 32), identifier: identifier)
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -187,11 +181,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let identifier = "com.cypherair.tests.protected-data.session-reauthorization"
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: identifier,
-            secretData: Data(repeating: 0xA2, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xA2, count: 32), identifier: identifier)
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -209,10 +200,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
             localizedReason: "ProtectedData unit test first authorization"
         )
         keyManager.cacheUnlockedDomainMasterKey(Data(repeating: 0xC2, count: 32), for: "contacts")
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: identifier,
-            secretData: Data(repeating: 0xA3, count: 32)
-        )
+        rightStoreClient.seedRootSecret(Data(repeating: 0xA3, count: 32), identifier: identifier)
 
         let secondAuthorizationResult = await coordinator.beginProtectedDataAuthorization(
             registry: registry,
@@ -224,48 +212,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(coordinator.frameworkState, .sessionAuthorized)
         XCTAssertTrue(coordinator.hasActiveWrappingRootKey)
         XCTAssertFalse(keyManager.hasUnlockedDomainMasterKeys)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 2)
-    }
-
-    func test_sessionCoordinator_authorizationFloorRecordFailureReturnsRecoveryWithoutSessionKey() async throws {
-        let baseDirectory = makeTemporaryDirectory("ProtectedDataSessionFloorFailure")
-        defer { try? FileManager.default.removeItem(at: baseDirectory) }
-
-        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.session-floor-failure",
-            secretData: Data(repeating: 0xA7, count: 32)
-        )
-        let floorRecorder = ThrowingRootSecretFloorRecorder()
-        let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
-            rootSecretStore: rightStoreClient,
-            domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-floor-failure",
-            recordRootSecretEnvelopeMinimumVersion: { version in
-                try await floorRecorder.record(version)
-            }
-        )
-        let registry = ProtectedDataRegistry(
-            formatVersion: ProtectedDataRegistry.currentFormatVersion,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-floor-failure",
-            sharedResourceLifecycleState: .ready,
-            committedMembership: ["contacts": .active],
-            pendingMutation: nil
-        )
-
-        let authorizationResult = await coordinator.beginProtectedDataAuthorization(
-            registry: registry,
-            localizedReason: "ProtectedData unit test floor failure"
-        )
-        let floorSnapshot = await floorRecorder.snapshot()
-
-        XCTAssertEqual(authorizationResult, .frameworkRecoveryNeeded)
-        XCTAssertEqual(coordinator.frameworkState, .frameworkRecoveryNeeded)
-        XCTAssertFalse(coordinator.hasActiveWrappingRootKey)
-        XCTAssertEqual(floorSnapshot.callCount, 1)
-        XCTAssertEqual(floorSnapshot.lastVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 2)
     }
 
     func test_sessionCoordinator_authorizationUsesProvidedAppSessionContext() async throws {
@@ -274,11 +221,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rootSecretStore = MockProtectedDataRightStoreClient()
-        rootSecretStore.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.session-handoff",
-            secretData: Data(repeating: 0xBC, count: 32)
-        )
+        let rootSecretStore = RecordingProtectedDataRootSecretStore()
+        rootSecretStore.seedRootSecret(Data(repeating: 0xBC, count: 32), identifier: "com.cypherair.tests.protected-data.session-handoff")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: keyManager,
@@ -303,7 +247,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(authorizationResult, .authorized)
         XCTAssertTrue(rootSecretStore.lastAuthenticationContext === context)
         XCTAssertTrue(context.interactionNotAllowed)
-        XCTAssertEqual(rootSecretStore.rightLookupCallCount, 1)
+        XCTAssertEqual(rootSecretStore.loadCallCount, 1)
     }
 
     func test_sessionCoordinator_reprotectRootSecretDisallowsSecondInteraction() throws {
@@ -312,11 +256,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rootSecretStore = MockProtectedDataRightStoreClient()
-        rootSecretStore.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.reprotect",
-            secretData: Data(repeating: 0xB7, count: 32)
-        )
+        let rootSecretStore = RecordingProtectedDataRootSecretStore()
+        rootSecretStore.seedRootSecret(Data(repeating: 0xB7, count: 32), identifier: "com.cypherair.tests.protected-data.reprotect")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: keyManager,
@@ -342,11 +283,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.restart",
-            secretData: Data(repeating: 0xAC, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xAC, count: 32), identifier: "com.cypherair.tests.protected-data.restart")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,

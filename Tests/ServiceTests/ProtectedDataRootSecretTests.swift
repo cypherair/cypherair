@@ -129,126 +129,27 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         )
     }
 
-    func test_rootSecretStore_migratesLegacyRawPayloadAndWritesFormatFloor() throws {
+    func test_rootSecretStore_undecodablePayloadFailsClosed() throws {
         let account = "ProtectedDataRootSecretTests.\(#function).\(UUID().uuidString)"
-        let identifier = "\(envelopeTestSharedRight).migration.\(UUID().uuidString)"
-        let legacySecret = Data(repeating: 0x61, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
-        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
-        defer {
-            deleteRootSecretPayload(identifier: identifier, account: account)
-        }
-
-        let floorKeychain = MockKeychain()
-        try floorKeychain.save(
-            Data([0x91]),
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: account,
-            accessControl: nil
-        )
-        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
-        let store = KeychainProtectedDataRootSecretStore(
-            account: account,
-            supportKeychain: floorKeychain,
-            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
-            formatFloorStore: floorStore
-        )
-
-        var result = try store.loadRootSecret(
+        let identifier = "\(envelopeTestSharedRight).undecodable.\(UUID().uuidString)"
+        try insertRootSecretPayload(
+            Data("not-a-root-secret-envelope".utf8),
             identifier: identifier,
-            authenticationContext: LAContext(),
-            minimumEnvelopeVersion: nil
-        )
-        defer {
-            result.secretData.protectedDataZeroize()
-        }
-
-        XCTAssertEqual(result.secretData, legacySecret)
-        XCTAssertEqual(result.storageFormat, .envelopeV2)
-        XCTAssertTrue(result.didMigrate)
-        XCTAssertEqual(
-            try floorStore.readMinimumEnvelopeVersion(sharedRightIdentifier: identifier),
-            ProtectedDataRootSecretEnvelope.currentFormatVersion
-        )
-        XCTAssertFalse(floorKeychain.exists(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
             account: account
-        ))
-
-        let migratedPayload = try loadRootSecretPayload(identifier: identifier, account: account)
-        XCTAssertNotEqual(migratedPayload.count, ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
-        XCTAssertNoThrow(try ProtectedDataRootSecretEnvelopeCodec.decode(
-            migratedPayload,
-            expectedSharedRightIdentifier: identifier
-        ))
-    }
-
-    func test_rootSecretStore_legacyMigrationFloorWriteFailureThrowsAfterMigratingPayload() throws {
-        let account = "ProtectedDataRootSecretTests.\(#function).\(UUID().uuidString)"
-        let identifier = "\(envelopeTestSharedRight).migration-floor-failure.\(UUID().uuidString)"
-        let legacySecret = Data(repeating: 0x63, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
-        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
+        )
         defer {
             deleteRootSecretPayload(identifier: identifier, account: account)
         }
 
-        let floorKeychain = MockKeychain()
-        try floorKeychain.save(
-            Data([0x91]),
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: account,
-            accessControl: nil
-        )
-        floorKeychain.failOnSaveNumber = 2
-        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
         let store = KeychainProtectedDataRootSecretStore(
             account: account,
-            supportKeychain: floorKeychain,
-            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
-            formatFloorStore: floorStore
+            deviceBindingProvider: MockProtectedDataDeviceBindingProvider()
         )
-
-        XCTAssertThrowsError(try store.loadRootSecret(
-            identifier: identifier,
-            authenticationContext: LAContext(),
-            minimumEnvelopeVersion: nil
-        ))
-        XCTAssertNil(try floorStore.readMinimumEnvelopeVersion(sharedRightIdentifier: identifier))
-        let migratedPayload = try loadRootSecretPayload(identifier: identifier, account: account)
-        XCTAssertNotEqual(migratedPayload.count, ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
-    }
-
-    func test_rootSecretStore_rejectsLegacyDowngradeAfterFormatFloor() throws {
-        let account = "ProtectedDataRootSecretTests.\(#function).\(UUID().uuidString)"
-        let identifier = "\(envelopeTestSharedRight).downgrade.\(UUID().uuidString)"
-        let legacySecret = Data(repeating: 0x72, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
-        try insertLegacyRootSecret(legacySecret, identifier: identifier, account: account)
-        defer {
-            deleteRootSecretPayload(identifier: identifier, account: account)
-        }
-
-        let floorKeychain = MockKeychain()
-        let floorStore = ProtectedDataRootSecretFormatFloorStore(keychain: floorKeychain, account: account)
-        let store = KeychainProtectedDataRootSecretStore(
-            account: account,
-            supportKeychain: floorKeychain,
-            deviceBindingProvider: MockProtectedDataDeviceBindingProvider(),
-            formatFloorStore: floorStore
-        )
-
-        var migratedResult = try store.loadRootSecret(
-            identifier: identifier,
-            authenticationContext: LAContext(),
-            minimumEnvelopeVersion: nil
-        )
-        migratedResult.secretData.protectedDataZeroize()
-
-        try replaceRootSecretPayload(legacySecret, identifier: identifier, account: account)
 
         XCTAssertThrowsError(
             try store.loadRootSecret(
                 identifier: identifier,
-                authenticationContext: LAContext(),
-                minimumEnvelopeVersion: nil
+                authenticationContext: LAContext()
             )
         )
     }

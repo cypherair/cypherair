@@ -110,8 +110,7 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
             let authorizationResult = await protectedDataSessionCoordinator.beginProtectedDataAuthorization(
                 registry: registry,
                 localizedReason: localizedReason,
-                authenticationContext: authenticationContext,
-                allowLegacyMigration: false
+                authenticationContext: authenticationContext
             )
             switch authorizationResult {
             case .authorized:

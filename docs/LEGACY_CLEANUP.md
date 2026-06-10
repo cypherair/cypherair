@@ -235,6 +235,8 @@ Retire legacy UserDefaults import/cleanup and old local artifact cleanup hooks.
 
 ### Phase 5 — Root-Secret Cleanup
 
+> Status: Completed (2026-06-10).
+
 Retire legacy right-store and raw-v1 root-secret recognition/migration paths.
 
 - Remove root-secret legacy `LARight` migration and authorization deferral:
@@ -304,7 +306,9 @@ removed Swift legacy symbols, and each production cleanup PR must delete the
 matching temporary allowance when it removes the symbol.
 
 Current audit-rule coverage maps to this roadmap as follows: the audit file's
-`item1A`/`item1B` rules cover Phase 5 right-store and raw-v1 symbols, `item2`
+`item1A`/`item1B` rules cover the retired Phase 5 right-store, raw-v1, and
+format-floor symbols (including `ProtectedDataRootSecretStorageFormat`, the
+format-floor marker/store, and the registry envelope-floor recorder), `item2`
 and `item7` cover the retired Phase 3 metadata migration/legacy-row symbols
 (including `PayloadV1` via the `item4` bare token, `sourceSchemaVersion`, the
 migration source/outcome types, `cleanupLegacyMetadataRows`, and the
@@ -322,10 +326,9 @@ certification-artifact/sentinel rule covers the retired
 `legacyTargetSelector`, `legacyUserIdDisplayText`, and
 `legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers: the Phase 5 `storageFormat` / format-floor
-additions; and all Phase 6 symbols — there is no Rust guardrail yet, and the
-Swift rules exclude `Sources/PgpMobile/`, so Phase 6 currently has zero
-guardrail coverage.
+No guardrail rule yet covers the Phase 6 symbols — there is no Rust
+guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so Phase 6
+currently has zero guardrail coverage.
 
 Additional guardrails are needed as cleanup proceeds:
 

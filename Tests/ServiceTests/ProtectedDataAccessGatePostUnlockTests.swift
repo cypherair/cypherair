@@ -122,7 +122,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
     func test_accessGate_emptySteadyState_returnsNoProtectedDomainPresent() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessEmpty"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -142,13 +142,13 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
 
         XCTAssertEqual(decision, .noProtectedDomainPresent)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 0)
     }
 
     func test_accessGate_continuePendingMutation_returnsPendingMutationRecoveryRequired() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessPending"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -172,13 +172,13 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
 
         XCTAssertEqual(decision, .pendingMutationRecoveryRequired)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 0)
     }
 
     func test_accessGate_readyRegistryWithoutAuthorization_requiresAuthorization() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessAuth"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -210,11 +210,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
     func test_accessGate_readyRegistryWithAuthorizedSession_returnsAlreadyAuthorized() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessAlreadyAuthorized"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.gate.reuse",
-            secretData: Data(repeating: 0xAD, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xAD, count: 32), identifier: "com.cypherair.tests.protected-data.gate.reuse")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -252,7 +249,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
     func test_accessGate_readyRegistryWithLatchedFrameworkRecovery_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessFrameworkRecovery"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -289,11 +286,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
     func test_accessGate_readyRegistryWithRestartRequired_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessRestartRequired"))
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.gate.restart-required",
-            secretData: Data(repeating: 0xB0, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xB0, count: 32), identifier: "com.cypherair.tests.protected-data.gate.restart-required")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -336,11 +330,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
-        rightStoreClient.persistedRightHandle = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.post-unlock.open",
-            secretData: Data(repeating: 0xCA, count: 32)
-        )
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
+        rightStoreClient.seedRootSecret(Data(repeating: 0xCA, count: 32), identifier: "com.cypherair.tests.protected-data.post-unlock.open")
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
@@ -388,7 +379,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockNoContext"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
@@ -415,7 +406,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
 
         XCTAssertEqual(outcome, .noAuthenticatedContext)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 0)
         XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
     }
 
@@ -423,7 +414,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockPending"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
@@ -462,62 +453,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         XCTAssertEqual(outcome, .pendingMutationRecoveryRequired)
         let didOpen = await openCalled.currentValue()
         XCTAssertFalse(didOpen)
-        XCTAssertEqual(rightStoreClient.rightLookupCallCount, 0)
-        XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
-    }
-
-    func test_postUnlockCoordinator_defersLegacyMigrationWithoutSecondPrompt() async throws {
-        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockLegacy"))
-        defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
-
-        let legacyRightStoreClient = MockProtectedDataRightStoreClient()
-        let legacyRight = MockProtectedDataPersistedRightHandle(
-            identifier: "com.cypherair.tests.protected-data.post-unlock.legacy",
-            secretData: Data(repeating: 0xC9, count: 32)
-        )
-        legacyRightStoreClient.persistedRightHandle = legacyRight
-        let rootSecretStore = ProtectedDataTestAppMockProtectedDataRootSecretStore()
-        let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
-            rootSecretStore: rootSecretStore,
-            legacyRightStoreClient: legacyRightStoreClient,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.legacy"
-        )
-        let registry = ProtectedDataRegistry(
-            formatVersion: ProtectedDataRegistry.currentFormatVersion,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.legacy",
-            sharedResourceLifecycleState: .ready,
-            committedMembership: [CypherAir.ProtectedSettingsStore.domainID: .active],
-            pendingMutation: nil
-        )
-        let openCalled = AsyncBooleanFlag()
-        let coordinator = ProtectedDataTestAppProtectedDataPostUnlockCoordinator(
-            currentRegistryProvider: { registry },
-            protectedDataSessionCoordinator: sessionCoordinator,
-            domainOpeners: [
-                ProtectedDataTestAppProtectedDataPostUnlockDomainOpener(
-                    domainID: CypherAir.ProtectedSettingsStore.domainID,
-                    open: { _ in await openCalled.setTrue() }
-                )
-            ]
-        )
-        let handoffContext = LAContext()
-        defer { handoffContext.invalidate() }
-
-        let outcome = await coordinator.openRegisteredDomains(
-            authenticationContext: handoffContext,
-            localizedReason: "Open protected domains",
-            source: "unitTest"
-        )
-
-        XCTAssertEqual(outcome, .authorizationDenied)
-        XCTAssertEqual(rootSecretStore.loadCallCount, 1)
-        XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
-        XCTAssertTrue(handoffContext.interactionNotAllowed)
-        XCTAssertEqual(legacyRightStoreClient.rightLookupCallCount, 0)
-        XCTAssertEqual(legacyRight.authorizeCallCount, 0)
-        let didOpen = await openCalled.currentValue()
-        XCTAssertFalse(didOpen)
+        XCTAssertEqual(rightStoreClient.loadCallCount, 0)
         XCTAssertEqual(sessionCoordinator.frameworkState, .sessionLocked)
     }
 
@@ -586,7 +522,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         )
         _ = try registryStore.performSynchronousBootstrap()
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rootSecretStore = MockProtectedDataRightStoreClient()
+        let rootSecretStore = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
@@ -666,7 +602,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         XCTAssertEqual(registry.committedMembership[ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID], .active)
         XCTAssertEqual(registry.pendingMutation, nil)
         XCTAssertEqual(sentinelStore.payload, .current)
-        XCTAssertEqual(rootSecretStore.rightLookupCallCount, 1)
+        XCTAssertEqual(rootSecretStore.loadCallCount, 1)
         XCTAssertTrue(rootSecretStore.lastAuthenticationContext === handoffContext)
         XCTAssertTrue(handoffContext.interactionNotAllowed)
     }
