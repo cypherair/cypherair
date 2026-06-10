@@ -12,25 +12,16 @@ final class LocalDataResetServiceTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
             )
-            if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
-                try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-            }
             if let defaultsSuiteName = container.defaultsSuiteName {
                 UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
             }
         }
 
-        let metadataService = KeychainConstants.metadataService(fingerprint: "ABCDEF")
+        let markerService = "\(KeychainConstants.prefix).test-reset-marker.ABCDEF"
         try container.keychain.save(
             Data([0x01]),
-            service: metadataService,
+            service: markerService,
             account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try container.keychain.save(
-            Data([0x05]),
-            service: metadataService,
-            account: KeychainConstants.metadataAccount,
             accessControl: nil
         )
         try container.keychain.save(
@@ -45,32 +36,12 @@ final class LocalDataResetServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
-        try container.keychain.save(
-            Data([0x07]),
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try container.keychain.save(
-            Data([0x08]),
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
 
         try container.protectedDataStorageRoot.ensureRootDirectoryExists()
         let protectedMarker = container.protectedDataStorageRoot.rootURL
             .appendingPathComponent("reset-marker.txt")
         try Data([0x03]).write(to: protectedMarker)
 
-        let legacySelfTestReportsDirectory = try XCTUnwrap(container.legacySelfTestReportsDirectory)
-        try FileManager.default.createDirectory(
-            at: legacySelfTestReportsDirectory,
-            withIntermediateDirectories: true
-        )
-        try Data("legacy self-test report".utf8).write(
-            to: legacySelfTestReportsDirectory.appendingPathComponent("self-test-legacy.txt")
-        )
         await container.selfTestService.runAllTests()
         XCTAssertNotNil(container.selfTestService.latestReport)
 
@@ -79,9 +50,8 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 6)
-        XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.defaultAccount))
-        XCTAssertFalse(container.keychain.exists(service: metadataService, account: KeychainConstants.metadataAccount))
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
+        XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             account: KeychainConstants.defaultAccount
@@ -90,16 +60,7 @@ final class LocalDataResetServiceTests: XCTestCase {
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
             account: KeychainConstants.defaultAccount
         ))
-        XCTAssertFalse(container.keychain.exists(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount
-        ))
-        XCTAssertFalse(container.keychain.exists(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: KeychainConstants.defaultAccount
-        ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacySelfTestReportsDirectory.path))
         XCTAssertNil(container.protectedOrdinarySettingsCoordinator.snapshot)
         XCTAssertEqual(container.protectedOrdinarySettingsCoordinator.state, .locked)
         XCTAssertNil(container.selfTestService.latestReport)
@@ -122,9 +83,6 @@ final class LocalDataResetServiceTests: XCTestCase {
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
             )
             try? FileManager.default.removeItem(at: temporaryDirectory)
-            if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
-                try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-            }
             if let defaultsSuiteName = container.defaultsSuiteName {
                 UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
             }
@@ -158,15 +116,11 @@ final class LocalDataResetServiceTests: XCTestCase {
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
         let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
         let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
-        let legacyTutorialSuiteName = "com.cypherair.tutorial.\(UUID().uuidString)"
-        let similarTutorialSuiteName = "com.cypherair.tutorial.not-a-uuid-\(UUID().uuidString)"
         let unrelatedSuiteName = "com.cypherair.tests.tutorial.\(UUID().uuidString)"
         defer {
             cleanup(container)
             try? FileManager.default.removeItem(at: temporaryDirectory)
             UserDefaults(suiteName: fixedTutorialSuiteName)?.removePersistentDomain(forName: fixedTutorialSuiteName)
-            UserDefaults(suiteName: legacyTutorialSuiteName)?.removePersistentDomain(forName: legacyTutorialSuiteName)
-            UserDefaults(suiteName: similarTutorialSuiteName)?.removePersistentDomain(forName: similarTutorialSuiteName)
             UserDefaults(suiteName: unrelatedSuiteName)?.removePersistentDomain(forName: unrelatedSuiteName)
         }
 
@@ -174,12 +128,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         let fixedTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: fixedTutorialSuiteName))
         fixedTutorialDefaults.set("fixed", forKey: "marker")
         _ = fixedTutorialDefaults.synchronize()
-        let legacyTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: legacyTutorialSuiteName))
-        legacyTutorialDefaults.set("orphan", forKey: "marker")
-        _ = legacyTutorialDefaults.synchronize()
-        let similarTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: similarTutorialSuiteName))
-        similarTutorialDefaults.set("keep", forKey: "marker")
-        _ = similarTutorialDefaults.synchronize()
         let unrelatedDefaults = try XCTUnwrap(UserDefaults(suiteName: unrelatedSuiteName))
         unrelatedDefaults.set("keep", forKey: "marker")
         _ = unrelatedDefaults.synchronize()
@@ -192,9 +140,8 @@ final class LocalDataResetServiceTests: XCTestCase {
         _ = try await resetService.resetAllLocalData()
 
         XCTAssertTrue(store.remainingTemporaryArtifacts().isEmpty)
+        XCTAssertTrue(store.remainingTutorialSandboxDefaultsSuites().isEmpty)
         XCTAssertNil(UserDefaults(suiteName: fixedTutorialSuiteName)?.string(forKey: "marker"))
-        XCTAssertNil(UserDefaults(suiteName: legacyTutorialSuiteName)?.string(forKey: "marker"))
-        XCTAssertEqual(UserDefaults(suiteName: similarTutorialSuiteName)?.string(forKey: "marker"), "keep")
         XCTAssertEqual(UserDefaults(suiteName: unrelatedSuiteName)?.string(forKey: "marker"), "keep")
     }
 
@@ -212,33 +159,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         keyStore.insertMalformedApplicationTag(
             "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).reset-malformed"
         )
-        let hiddenIdentity = PGPKeyIdentity(
-            fingerprint: "hidden-reset",
-            keyVersion: 4,
-            profile: .universal,
-            userId: "Hidden Reset <hidden-reset@example.test>",
-            hasEncryptionSubkey: true,
-            isRevoked: false,
-            isExpired: false,
-            isDefault: true,
-            isBackedUp: false,
-            publicKeyData: Data("hidden-reset-public".utf8),
-            revocationCert: Data("hidden-reset-revocation".utf8),
-            primaryAlgo: "ECDSA P-256",
-            subkeyAlgo: "ECDH P-256",
-            expiryDate: nil,
-            openPGPConfigurationIdentity: .compatibleP256V4,
-            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
-        )
-        let hiddenMetadataService = KeychainConstants.metadataService(
-            fingerprint: hiddenIdentity.fingerprint
-        )
-        try container.keychain.save(
-            try JSONEncoder().encode(hiddenIdentity),
-            service: hiddenMetadataService,
-            account: KeychainConstants.metadataAccount,
-            accessControl: nil
-        )
         let resetService = makeResetService(
             from: container,
             secureEnclaveCustodyHandleStore: handleStore
@@ -246,14 +166,7 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await resetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertFalse(
-            container.keychain.exists(
-                service: hiddenMetadataService,
-                account: KeychainConstants.metadataAccount
-            )
-        )
         let cleanupEntry = try XCTUnwrap(
             container.authLifecycleTraceStore?.recentEntries.last {
                 $0.name == "localDataReset.secureEnclaveCustody.cleanup.finish"
@@ -337,22 +250,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
             metadataKey: "hasDeviceBindingKey",
             expectedFailure: "keychain.protectedDataDeviceBindingKey.remaining"
-        )
-    }
-
-    func test_resetAllLocalData_reportsRemainingDataWhenFormatFloorRowRemains() async throws {
-        try await assertResetValidationReportsRemainingProtectedRow(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            metadataKey: "hasFormatFloor",
-            expectedFailure: "keychain.protectedDataRootSecretFormatFloor.remaining"
-        )
-    }
-
-    func test_resetAllLocalData_reportsRemainingDataWhenLegacyCleanupRowRemains() async throws {
-        try await assertResetValidationReportsRemainingProtectedRow(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            metadataKey: "hasLegacyCleanup",
-            expectedFailure: "keychain.protectedDataRootSecretLegacyCleanup.remaining"
         )
     }
 
@@ -484,9 +381,6 @@ final class LocalDataResetServiceTests: XCTestCase {
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
         )
-        if let legacySelfTestReportsDirectory = container.legacySelfTestReportsDirectory {
-            try? FileManager.default.removeItem(at: legacySelfTestReportsDirectory.deletingLastPathComponent())
-        }
         if let defaultsSuiteName = container.defaultsSuiteName {
             UserDefaults(suiteName: defaultsSuiteName)?.removePersistentDomain(forName: defaultsSuiteName)
         }
@@ -516,7 +410,6 @@ final class LocalDataResetServiceTests: XCTestCase {
             appSessionOrchestrator: container.appSessionOrchestrator,
             appLockController: container.appLockController,
             temporaryArtifactStore: temporaryArtifactStore,
-            legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             traceStore: container.authLifecycleTraceStore

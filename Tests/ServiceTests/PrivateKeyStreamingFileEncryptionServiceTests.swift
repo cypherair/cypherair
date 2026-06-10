@@ -155,7 +155,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
 
     func test_secureEnclaveFileSigningUsesRealCatalogRouterSharedHandleStoreAndDefaultSelfKey() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, mockSE, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         var selfSecret = try engine.generateKey(
             name: "Default Self",
             email: "default-self@example.invalid",
@@ -169,9 +169,10 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             service: keyManagement,
             mockSE: mockSE,
             mockKC: mockKeychain,
+            metadataPersistence: metadataPersistence,
             isDefault: true
         )
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.insert(fixture.route.signingHandle)
@@ -277,8 +278,8 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
 
     func test_productionPolicyBlocksSecureEnclaveFileSigningWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let service = TestHelpers.makeFileEncryptor(
             engine: engine,
@@ -310,8 +311,8 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
 
     func test_missingHandleSurfacesUnavailableWithoutSoftwareFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let service = TestHelpers.makeFileEncryptor(
             engine: engine,
@@ -494,8 +495,8 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             unwrapper: RecordingStreamingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
             digestSigner: ThrowingStreamingDigestSigner(error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing))
         )
-        let (keyManagement, _, mockKeychain, _) = TestHelpers.makeKeyManagement(engine: engine)
-        try KeyMetadataStore(keychain: mockKeychain).save(fixture.identity)
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
+        try metadataPersistence.save(fixture.identity)
         try keyManagement.loadKeys()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let textEncryptor = TestHelpers.makeTextEncryptor(
@@ -592,7 +593,9 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             revocationCert: generated.revocationCert,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
-            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            openPGPConfigurationIdentity: keyInfo.keyVersion == 6 ? .modernSoftwareV6 : .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 

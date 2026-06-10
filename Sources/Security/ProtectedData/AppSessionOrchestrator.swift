@@ -137,18 +137,6 @@ final class AppSessionOrchestrator {
         return context
     }
 
-    func borrowAuthenticatedContextForMetadataMigration() -> LAContext? {
-        traceStore?.record(
-            category: .session,
-            name: "session.borrowAuthenticatedContext",
-            metadata: [
-                "purpose": "metadataMigration",
-                "hasContext": pendingAuthenticatedContext == nil ? "false" : "true"
-            ]
-        )
-        return pendingAuthenticatedContext
-    }
-
     // MARK: - Protected App-Data access gate
 
     func evaluateProtectedDataAccessGate(

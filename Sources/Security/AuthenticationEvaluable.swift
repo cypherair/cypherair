@@ -202,7 +202,6 @@ enum PrivateKeyControlError: Error, LocalizedError, Equatable {
     case locked
     case recoveryNeeded
     case missingStore
-    case invalidLegacyAuthMode(String)
 
     var errorDescription: String? {
         switch self {
@@ -220,11 +219,6 @@ enum PrivateKeyControlError: Error, LocalizedError, Equatable {
             String(
                 localized: "error.privateKeyControl.unavailable",
                 defaultValue: "Private key protection settings are unavailable."
-            )
-        case .invalidLegacyAuthMode:
-            String(
-                localized: "error.privateKeyControl.invalidLegacyAuthMode",
-                defaultValue: "Saved private key protection settings are invalid and need recovery."
             )
         }
     }
@@ -389,28 +383,8 @@ protocol AuthenticationEvaluable {
     var lastEvaluatedContext: LAContext? { get }
 }
 
-/// UserDefaults keys for authentication preferences.
+/// Authentication preference constants.
 enum AuthPreferences {
-    /// Current authentication mode ("standard" or "highSecurity").
-    static let authModeKey = "com.cypherair.preference.authMode"
-
-    /// Grace period in seconds (0, 60, 180, 300).
-    static let gracePeriodKey = "com.cypherair.preference.gracePeriod"
-
-    /// Flag indicating an interrupted mode switch (crash recovery).
-    static let rewrapInProgressKey = "com.cypherair.internal.rewrapInProgress"
-
-    /// The target mode of an in-progress mode switch (crash recovery).
-    /// Stored alongside `rewrapInProgressKey` so crash recovery can create
-    /// correct access control flags and update the mode preference.
-    static let rewrapTargetModeKey = "com.cypherair.internal.rewrapTargetMode"
-
-    /// Flag indicating an interrupted modifyExpiry operation (crash recovery).
-    static let modifyExpiryInProgressKey = "com.cypherair.internal.modifyExpiryInProgress"
-
-    /// The fingerprint of the key being modified during an interrupted modifyExpiry.
-    static let modifyExpiryFingerprintKey = "com.cypherair.internal.modifyExpiryFingerprint"
-
     /// Default grace period: 3 minutes (180 seconds).
     static let defaultGracePeriod = 180
 }

@@ -88,7 +88,7 @@ final class TutorialSandboxContainer {
         self.config = AppConfiguration(defaults: defaults)
         self.config.privateKeyControlState = .unlocked(.standard)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
@@ -104,7 +104,8 @@ final class TutorialSandboxContainer {
             authenticator: authManager,
             defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? self.keyManagement.loadKeys()
         let contactsWrappingRootKey = Data(repeating: 0x54, count: 32)

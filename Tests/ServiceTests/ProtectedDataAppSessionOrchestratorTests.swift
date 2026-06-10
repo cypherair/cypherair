@@ -18,7 +18,7 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
             baseDirectory: makeTemporaryDirectory("OrchestratorCustody")
         )
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let rightStoreClient = MockProtectedDataRightStoreClient()
+        let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
@@ -50,16 +50,6 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         XCTAssertTrue(orchestrator.consumeAuthenticatedContextForProtectedData() === context)
         XCTAssertFalse(orchestrator.hasProtectedDataAuthorizationHandoffContext)
         XCTAssertNil(orchestrator.consumeAuthenticatedContextForProtectedData())
-    }
-
-    func test_borrowAuthenticatedContext_doesNotConsume() {
-        let orchestrator = makeOrchestrator()
-        let context = LAContext()
-        orchestrator.recordSuccessfulAppSessionAuthentication(context: context)
-
-        XCTAssertTrue(orchestrator.borrowAuthenticatedContextForMetadataMigration() === context)
-        XCTAssertTrue(orchestrator.hasProtectedDataAuthorizationHandoffContext, "Borrow must not consume the context.")
-        XCTAssertTrue(orchestrator.consumeAuthenticatedContextForProtectedData() === context)
     }
 
     func test_requestContentClear_discardsContextAndBumpsGeneration() {

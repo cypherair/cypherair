@@ -385,38 +385,6 @@
         }
       }
     },
-    "app.loadWarning.keyMetadataMigration" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated or cleaned up. Your private keys remain protected; restart CypherAir X and unlock again to retry."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移或清理。你的私钥仍然受到保护；请重启 CypherAir X 并再次解锁以重试。"
-          }
-        }
-      }
-    },
-    "app.loadWarning.legacyMetadataMigration" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir X and unlock again to retry."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分已保存的密钥元数据无法迁移。你的私钥仍然受到保护；请重启 CypherAir X 并再次解锁以重试。"
-          }
-        }
-      }
-    },
     "auth.switchMode.reason" : {
       "localizations" : {
         "en" : {
@@ -5189,22 +5157,6 @@
         }
       }
     },
-    "error.privateKeyControl.invalidLegacyAuthMode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Private key protection settings need recovery."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私钥保护设置需要恢复。"
-          }
-        }
-      }
-    },
     "error.privateKeyControl.locked" : {
       "localizations" : {
         "en" : {
@@ -5281,22 +5233,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "准备受保护应用数据时，安全随机数操作失败。"
-          }
-        }
-      }
-    },
-    "error.protectedData.rootSecretMigrationVerification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The protected app data root secret could not be verified after migration."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "迁移后无法验证受保护应用数据根密钥。"
           }
         }
       }

@@ -34,7 +34,6 @@ final class AppContainer: @unchecked Sendable {
     let selfTestService: SelfTestService
     let temporaryArtifactStore: AppTemporaryArtifactStore
     let localDataResetService: LocalDataResetService
-    let legacySelfTestReportsDirectory: URL?
     let defaultsSuiteName: String?
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
 
@@ -71,7 +70,6 @@ final class AppContainer: @unchecked Sendable {
         selfTestService: SelfTestService,
         temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore(),
         localDataResetService: LocalDataResetService,
-        legacySelfTestReportsDirectory: URL? = nil,
         defaultsSuiteName: String? = nil
     ) {
         self.authLifecycleTraceStore = authLifecycleTraceStore
@@ -106,7 +104,6 @@ final class AppContainer: @unchecked Sendable {
         self.selfTestService = selfTestService
         self.temporaryArtifactStore = temporaryArtifactStore
         self.localDataResetService = localDataResetService
-        self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
         self.defaultsSuiteName = defaultsSuiteName
         uiTestContactsBootstrap = nil
     }
@@ -149,22 +146,16 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeProtectedDataSessionCoordinator(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
-        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?,
         domainKeyManager: ProtectedDomainKeyManager,
-        registryStore: ProtectedDataRegistryStore,
         config: AppConfiguration,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         traceStore: AuthLifecycleTraceStore?
     ) -> ProtectedDataSessionCoordinator {
         ProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
-            legacyRightStoreClient: legacyRightStoreClient,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            recordRootSecretEnvelopeMinimumVersion: { version in
-                try await registryStore.recordRootSecretEnvelopeMinimumVersion(version)
-            },
             authenticationPromptCoordinator: authPromptCoordinator,
             traceStore: traceStore
         )
@@ -213,7 +204,7 @@ final class AppContainer: @unchecked Sendable {
         ProtectedDataPostUnlockDomainOpener(
             domainID: ProtectedSettingsStore.domainID,
             ensureCommittedIfNeeded: { wrappingRootKey in
-                try await protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+                try await protectedSettingsStore.ensureCommittedIfNeeded(
                     persistSharedRight: { secret in
                         try await protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },
@@ -584,12 +575,9 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
-        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: KeychainProtectedDataRootSecretStore(traceStore: authLifecycleTraceStore),
-            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            registryStore: protectedDataRegistryStore,
             config: config,
             authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
@@ -600,7 +588,6 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -609,7 +596,6 @@ final class AppContainer: @unchecked Sendable {
             }
         )
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -630,12 +616,7 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
-        let legacyKeyMetadataStore = KeyMetadataStore(
-            keychain: keychain,
-            traceStore: authLifecycleTraceStore
-        )
         let keyMetadataDomainStore = KeyMetadataDomainStore(
-            legacyMetadataStore: legacyKeyMetadataStore,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -655,9 +636,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
-        let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let legacySelfTestReportsDirectory = documentDirectory
-            .appendingPathComponent("self-test", isDirectory: true)
         let contactsDomainStore = ContactsDomainStore(
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
@@ -703,28 +681,25 @@ final class AppContainer: @unchecked Sendable {
                 ),
                 ProtectedDataPostUnlockDomainOpener(
                     domainID: KeyMetadataDomainStore.domainID,
-                    ensureCommittedWithContext: { context in
+                    ensureCommittedIfNeeded: { wrappingRootKey in
                         keyManagement.beginKeyMetadataLoad()
                         do {
                             try await keyMetadataDomainStore.ensureCommittedIfNeeded(
-                                wrappingRootKey: context.wrappingRootKey,
-                                authenticationContext: context.authenticationContext
+                                wrappingRootKey: wrappingRootKey
                             )
                         } catch {
                             keyManagement.markKeyMetadataRecoveryNeeded()
                             throw error
                         }
                     },
-                    openWithContext: { context in
+                    open: { wrappingRootKey in
                         keyManagement.beginKeyMetadataLoad()
                         do {
                             _ = try await keyMetadataDomainStore.openDomainIfNeeded(
-                                wrappingRootKey: context.wrappingRootKey,
-                                authenticationContext: context.authenticationContext
+                                wrappingRootKey: wrappingRootKey
                             )
                             try keyManagement.completeKeyMetadataLoad(
-                                migrationWarning: keyMetadataDomainStore.migrationWarning,
-                                source: context.authenticationContext == nil ? "postUnlockNoContext" : "postUnlock"
+                                source: "postUnlock"
                             )
                         } catch {
                             keyManagement.markKeyMetadataRecoveryNeeded()
@@ -835,7 +810,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
-            legacyRightStoreClient: protectedDataRightStoreClient,
             protectedDataStorageRoot: protectedDataStorageRoot,
             defaults: defaults,
             defaultsDomainName: Bundle.main.bundleIdentifier,
@@ -849,7 +823,6 @@ final class AppContainer: @unchecked Sendable {
             appSessionOrchestrator: appSessionOrchestrator,
             appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -889,8 +862,7 @@ final class AppContainer: @unchecked Sendable {
             qrService: pgpServices.qrService,
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            localDataResetService: localDataResetService,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory
+            localDataResetService: localDataResetService
         )
     }
 
@@ -927,8 +899,6 @@ final class AppContainer: @unchecked Sendable {
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirUITestDocuments-\(UUID().uuidString)", isDirectory: true)
-        let legacySelfTestReportsDirectory = documentDirectory
-            .appendingPathComponent("self-test", isDirectory: true)
         let applicationSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let protectedDataBaseDirectory = applicationSupportDirectory
             .appendingPathComponent("CypherAirUITestProtectedData-\(UUID().uuidString)", isDirectory: true)
@@ -954,12 +924,9 @@ final class AppContainer: @unchecked Sendable {
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
-        let protectedDataRightStoreClient = ProtectedDataRightStoreClient(traceStore: authLifecycleTraceStore)
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
             rootSecretStore: MockProtectedDataRootSecretStore(),
-            legacyRightStoreClient: protectedDataRightStoreClient,
             domainKeyManager: protectedDomainKeyManager,
-            registryStore: protectedDataRegistryStore,
             config: config,
             authPromptCoordinator: authPromptCoordinator,
             traceStore: authLifecycleTraceStore
@@ -970,7 +937,6 @@ final class AppContainer: @unchecked Sendable {
             traceStore: authLifecycleTraceStore
         )
         let privateKeyControlStore = PrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -981,7 +947,6 @@ final class AppContainer: @unchecked Sendable {
         privateKeyControlStore.seedUnlockedForTesting(.standard)
         config.privateKeyControlState = .unlocked(.standard)
         let protectedSettingsStore = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: protectedDataStorageRoot,
             registryStore: protectedDataRegistryStore,
             domainKeyManager: protectedDomainKeyManager,
@@ -998,7 +963,7 @@ final class AppContainer: @unchecked Sendable {
             )
         } else {
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
-                persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+                persistence: InMemoryOrdinarySettingsStore()
             )
             protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
         }
@@ -1056,7 +1021,8 @@ final class AppContainer: @unchecked Sendable {
             defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
-            authLifecycleTraceStore: authLifecycleTraceStore
+            authLifecycleTraceStore: authLifecycleTraceStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? keyManagement.loadKeys()
         let contactService = ContactService(
@@ -1105,10 +1071,6 @@ final class AppContainer: @unchecked Sendable {
                 } catch {
                     config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
                 }
-                await keyManagement.migrateLegacyMetadataAfterAppAuthentication(
-                    authenticationContext: authenticationContext,
-                    source: source
-                )
                 let postUnlockOutcome = await protectedDataPostUnlockCoordinator.openRegisteredDomains(
                     authenticationContext: authenticationContext,
                     localizedReason: String(
@@ -1161,7 +1123,6 @@ final class AppContainer: @unchecked Sendable {
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
-            legacyRightStoreClient: nil,
             protectedDataStorageRoot: protectedDataStorageRoot,
             defaults: defaults,
             defaultsDomainName: suiteName,
@@ -1175,7 +1136,6 @@ final class AppContainer: @unchecked Sendable {
             appSessionOrchestrator: appSessionOrchestrator,
             appLockController: appLockController,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
@@ -1214,7 +1174,6 @@ final class AppContainer: @unchecked Sendable {
             selfTestService: pgpServices.selfTestService,
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             localDataResetService: localDataResetService,
-            legacySelfTestReportsDirectory: legacySelfTestReportsDirectory,
             defaultsSuiteName: suiteName
         )
         if !requiresManualAuthentication {

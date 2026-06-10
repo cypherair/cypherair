@@ -4,11 +4,11 @@
 
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;
-use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use pgp_mobile::verify;
 use tempfile::NamedTempFile;
@@ -88,9 +88,13 @@ fn test_sign_verify_text_profile_a() {
     let result = verify::verify_cleartext_detailed(&signed, &[key.public_key_data.clone()])
         .expect("Verification should succeed");
 
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
     assert_eq!(
-        result.legacy_signer_fingerprint,
+        summary_entry.signer_primary_fingerprint,
         Some(key.fingerprint.clone())
     );
 }
@@ -144,9 +148,13 @@ fn test_encrypt_decrypt_signed_profile_a() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
     assert_eq!(
-        result.legacy_signer_fingerprint,
+        summary_entry.signer_primary_fingerprint,
         Some(sender.fingerprint.clone())
     );
 }
@@ -300,7 +308,7 @@ fn test_detached_signature_profile_a() {
     )
     .expect("Verification should succeed");
 
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 /// Armor round-trip: public key → armor → dearmor → identical.

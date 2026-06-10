@@ -178,13 +178,8 @@ struct CypherAirApp: App {
             currentClipboardNotice: {
                 container.protectedSettingsStore.clipboardNotice
             },
-            migrationAuthorizationRequirement: {
-                Self.protectedSettingsMutationRequirement(
-                    container.protectedSettingsStore.migrationAuthorizationRequirement()
-                )
-            },
-            ensureCommittedAndMigrateSettingsIfNeeded: {
-                try await container.protectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded(
+            ensureCommittedSettingsIfNeeded: {
+                try await container.protectedSettingsStore.ensureCommittedIfNeeded(
                     persistSharedRight: { secret in
                         try await container.protectedDataSessionCoordinator.persistSharedRight(secretData: secret)
                     },
@@ -455,12 +450,6 @@ struct CypherAirApp: App {
         }
         .onChange(of: loadWarningPresentationState) { _, _ in
             presentPendingLoadWarningIfPossible(source: "presentationStateChange")
-        }
-        .onChange(of: container.keyManagement.legacyMetadataMigrationLoadWarning) { _, warning in
-            guard let warning else { return }
-            loadWarningCoordinator.enqueue(warning)
-            container.keyManagement.clearLegacyMetadataMigrationLoadWarning()
-            presentPendingLoadWarningIfPossible(source: "legacyMetadataMigration")
         }
         .onChange(of: container.config.postUnlockRecoveryLoadWarning) { _, warning in
             guard let warning else { return }

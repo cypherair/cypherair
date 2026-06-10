@@ -14,7 +14,7 @@ fn test_external_signer_cleartext_signatures_verify_for_v4_and_v6() {
 
         let result = verify::verify_cleartext_detailed(&signed, &[material.public_cert])
             .expect("external cleartext signature should verify");
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -33,7 +33,7 @@ fn test_external_signer_runtime_cleartext_api_verifies_for_v4_and_v6() {
 
         let result = verify::verify_cleartext_detailed(&signed, &[material.public_cert])
             .expect("runtime external cleartext signature should verify");
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 

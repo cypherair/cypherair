@@ -7,7 +7,6 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::Serialize;
 use openpgp::types::{Curve, HashAlgorithm};
-use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalP256SigningError, ExternalP256SigningFailureCategory,

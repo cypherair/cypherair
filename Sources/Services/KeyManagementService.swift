@@ -10,7 +10,6 @@ final class KeyManagementService: @unchecked Sendable {
 
     /// All key identities stored on this device.
     private(set) var keys: [PGPKeyIdentity] = []
-    private(set) var legacyMetadataMigrationLoadWarning: String?
     private(set) var metadataLoadState: KeyMetadataLoadState = .locked
 
     private let certificateAdapter: PGPCertificateOperationAdapter
@@ -30,7 +29,6 @@ final class KeyManagementService: @unchecked Sendable {
     private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let traceStore: AuthLifecycleTraceStore?
-    private var legacyMetadataMigrationCompletedInProcess = false
     private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
     init(
@@ -44,7 +42,7 @@ final class KeyManagementService: @unchecked Sendable {
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil,
+        metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -60,11 +58,9 @@ final class KeyManagementService: @unchecked Sendable {
         ) -> SecureEnclaveCustodyGenerationService)? = nil,
         secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil
     ) {
-        let metadataStore = KeyMetadataStore(keychain: keychain, traceStore: authLifecycleTraceStore)
-        let keyMetadataPersistence = metadataPersistence ?? metadataStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
-        let catalogStore = KeyCatalogStore(metadataStore: keyMetadataPersistence)
+        let catalogStore = KeyCatalogStore(metadataStore: metadataPersistence)
         let privateKeyAccessService = PrivateKeyAccessService(
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
@@ -165,65 +161,17 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     func completeKeyMetadataLoad(
-        migrationWarning: String?,
         source: String
     ) throws {
         try loadKeys()
-        legacyMetadataMigrationLoadWarning = migrationWarning
         traceStore?.record(
             category: .operation,
             name: "keyMetadata.protectedDomain.sessionUpdate",
             metadata: [
                 "source": source,
-                "keyCount": String(keys.count),
-                "hasMigrationWarning": migrationWarning == nil ? "false" : "true"
+                "keyCount": String(keys.count)
             ]
         )
-    }
-
-    func migrateLegacyMetadataAfterAppAuthentication(
-        authenticationContext: LAContext?,
-        source: String
-    ) async {
-        guard !legacyMetadataMigrationCompletedInProcess else {
-            traceStore?.record(
-                category: .operation,
-                name: "keyMetadata.legacyMigration.skip",
-                metadata: ["reason": "alreadyCompletedInProcess", "source": source]
-            )
-            return
-        }
-
-        do {
-            let outcome = try catalogStore.migrateLegacyMetadataIfNeeded(
-                authenticationContext: authenticationContext
-            )
-            syncKeysAndSecureEnclaveRecoveryReport()
-            legacyMetadataMigrationCompletedInProcess = outcome.failedItemCount == 0
-            legacyMetadataMigrationLoadWarning = outcome.failedItemCount == 0 ? nil : Self.legacyMetadataMigrationWarningMessage()
-            traceStore?.record(
-                category: .operation,
-                name: "keyMetadata.legacyMigration.sessionUpdate",
-                metadata: [
-                    "source": source,
-                    "keyCount": String(keys.count),
-                    "legacyServiceCount": String(outcome.legacyServiceCount),
-                    "migratedCount": String(outcome.migratedCount),
-                    "failedItemCount": String(outcome.failedItemCount)
-                ]
-            )
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "keyMetadata.legacyMigration.error",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["source": source])
-            )
-            legacyMetadataMigrationLoadWarning = Self.legacyMetadataMigrationWarningMessage()
-        }
-    }
-
-    func clearLegacyMetadataMigrationLoadWarning() {
-        legacyMetadataMigrationLoadWarning = nil
     }
 
     func resetInMemoryStateAfterLocalDataReset() {
@@ -231,16 +179,7 @@ final class KeyManagementService: @unchecked Sendable {
         catalogStore.clearInMemoryIdentities()
         keys = []
         secureEnclaveCustodyRecoveryReport = .empty
-        legacyMetadataMigrationCompletedInProcess = false
-        legacyMetadataMigrationLoadWarning = nil
         metadataLoadState = .locked
-    }
-
-    private static func legacyMetadataMigrationWarningMessage() -> String {
-        String(
-            localized: "app.loadWarning.legacyMetadataMigration",
-            defaultValue: "Some saved key metadata could not be migrated. Your private keys remain protected; restart CypherAir X and unlock again to retry."
-        )
     }
 
     // MARK: - Key Generation
@@ -405,8 +344,8 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     /// Export the key's revocation signature as an ASCII-armored signature.
-    /// If the key predates revocation-construction support, this lazily backfills
-    /// the binary revocation signature, persists it, and then exports the armored form.
+    /// Fails closed with `revocationArtifactUnavailable` when no revocation artifact is
+    /// stored for the key; no secret-key access or persistence side effect occurs.
     func exportRevocationCertificate(fingerprint: String) async throws -> Data {
         let armoredRevocation = try await exportService.exportRevocationCertificate(
             fingerprint: fingerprint

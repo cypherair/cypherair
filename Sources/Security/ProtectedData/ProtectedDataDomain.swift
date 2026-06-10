@@ -104,7 +104,6 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
     case fileProtectionUnsupported
     case fileProtectionVerificationFailed
     case protectedFileWriteFailed
-    case missingPersistedRight(String)
     case missingWrappingRootKey
     case missingWrappedDomainMasterKey(ProtectedDataDomainID)
     case internalFailure(String)
@@ -135,8 +134,6 @@ enum ProtectedDataError: Error, LocalizedError, Equatable {
             "ProtectedData storage could not verify the required file protection settings."
         case .protectedFileWriteFailed:
             "ProtectedData storage could not create a protected file."
-        case .missingPersistedRight(let identifier):
-            "ProtectedData shared right is missing for identifier \(identifier)."
         case .missingWrappingRootKey:
             "ProtectedData wrapping root key is not available in the current session."
         case .missingWrappedDomainMasterKey(let domainID):

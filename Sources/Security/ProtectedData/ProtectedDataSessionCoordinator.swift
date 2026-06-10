@@ -20,11 +20,9 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
 
     init(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol = KeychainProtectedDataRootSecretStore(),
-        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)? = nil,
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
         appSessionPolicyProvider: @escaping () -> AppSessionAuthenticationPolicy = { .userPresence },
-        recordRootSecretEnvelopeMinimumVersion: @escaping @Sendable (Int) async throws -> Void = { _ in },
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
@@ -33,10 +31,8 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
         self.traceStore = traceStore
         self.rootSecretCoordinator = ProtectedDataRootSecretCoordinator(
             rootSecretStore: rootSecretStore,
-            legacyRightStoreClient: legacyRightStoreClient,
             rootSecretIdentifier: sharedRightIdentifier,
             appSessionPolicyProvider: appSessionPolicyProvider,
-            recordRootSecretEnvelopeMinimumVersion: recordRootSecretEnvelopeMinimumVersion,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             traceStore: traceStore
         )
@@ -55,36 +51,30 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     func beginProtectedDataAuthorization(
         registry: ProtectedDataRegistry,
         localizedReason: String,
-        authenticationContext: LAContext? = nil,
-        allowLegacyMigration: Bool = true
+        authenticationContext: LAContext? = nil
     ) async -> ProtectedDataAuthorizationResult {
         let context = authenticationContext ?? makeRootSecretAuthenticationContext(
             localizedReason: localizedReason
         )
         return await authorizeProtectedDataSession(
             registry: registry,
-            localizedReason: localizedReason,
             context: context,
-            usesHandoffContext: authenticationContext != nil,
-            allowLegacyMigration: allowLegacyMigration
+            usesHandoffContext: authenticationContext != nil
         )
     }
 
     func beginProtectedDataAuthorizationReturningContext(
         registry: ProtectedDataRegistry,
         localizedReason: String,
-        authenticationContext: LAContext? = nil,
-        allowLegacyMigration: Bool = true
+        authenticationContext: LAContext? = nil
     ) async -> ProtectedDataAuthorizationContextResult {
         let context = authenticationContext ?? makeRootSecretAuthenticationContext(
             localizedReason: localizedReason
         )
         let result = await authorizeProtectedDataSession(
             registry: registry,
-            localizedReason: localizedReason,
             context: context,
-            usesHandoffContext: authenticationContext != nil,
-            allowLegacyMigration: allowLegacyMigration
+            usesHandoffContext: authenticationContext != nil
         )
         return ProtectedDataAuthorizationContextResult(
             result: result,
@@ -94,10 +84,8 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
 
     private func authorizeProtectedDataSession(
         registry: ProtectedDataRegistry,
-        localizedReason: String,
         context: LAContext,
-        usesHandoffContext: Bool,
-        allowLegacyMigration: Bool
+        usesHandoffContext: Bool
     ) async -> ProtectedDataAuthorizationResult {
         traceStore?.record(
             category: .operation,
@@ -139,29 +127,17 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
         )
 
         do {
-            let rootSecretOutcome = try await rootSecretCoordinator.loadRootSecretForAuthorization(
+            var rootSecret = try await rootSecretCoordinator.loadRootSecretForAuthorization(
                 registry: registry,
-                localizedReason: localizedReason,
                 authenticationContext: context,
-                usesHandoffContext: usesHandoffContext,
-                allowLegacyMigration: allowLegacyMigration
+                usesHandoffContext: usesHandoffContext
             )
-
-            guard case .loaded(var rootSecretResult) = rootSecretOutcome else {
-                clearSessionSecrets()
-                traceStore?.record(
-                    category: .operation,
-                    name: "protectedSettings.authorization.finish",
-                    metadata: ["result": "cancelledOrDenied", "reason": "legacyMigrationDeferred"]
-                )
-                return .cancelledOrDenied
-            }
             defer {
-                rootSecretResult.secretData.protectedDataZeroize()
+                rootSecret.protectedDataZeroize()
             }
 
             let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(
-                from: &rootSecretResult.secretData
+                from: &rootSecret
             )
 
             clearSessionSecrets()

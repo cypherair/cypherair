@@ -2605,8 +2605,6 @@ public func FfiConverterTypeCertificateSignatureResult_lower(_ value: Certificat
  * zeroize this data after use.
  */
 public struct DecryptDetailedResult: Equatable, Hashable {
-    public var legacyStatus: SignatureStatus
-    public var legacySignerFingerprint: String?
     public var summaryState: SignatureVerificationState
     public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
@@ -2614,9 +2612,7 @@ public struct DecryptDetailedResult: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], plaintext: Data) {
-        self.legacyStatus = legacyStatus
-        self.legacySignerFingerprint = legacySignerFingerprint
+    public init(summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], plaintext: Data) {
         self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
@@ -2639,8 +2635,6 @@ public struct FfiConverterTypeDecryptDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DecryptDetailedResult {
         return
             try DecryptDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
                 summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
                 summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf),
@@ -2649,8 +2643,6 @@ public struct FfiConverterTypeDecryptDetailedResult: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: DecryptDetailedResult, into buf: inout [UInt8]) {
-        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
-        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
         FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
@@ -3089,17 +3081,13 @@ public func FfiConverterTypeExternalP256KeyAgreementRequest_lower(_ value: Exter
  * Detailed result for file decrypt APIs.
  */
 public struct FileDecryptDetailedResult: Equatable, Hashable {
-    public var legacyStatus: SignatureStatus
-    public var legacySignerFingerprint: String?
     public var summaryState: SignatureVerificationState
     public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
-        self.legacyStatus = legacyStatus
-        self.legacySignerFingerprint = legacySignerFingerprint
+    public init(summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
@@ -3121,8 +3109,6 @@ public struct FfiConverterTypeFileDecryptDetailedResult: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileDecryptDetailedResult {
         return
             try FileDecryptDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
                 summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
                 summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
@@ -3130,8 +3116,6 @@ public struct FfiConverterTypeFileDecryptDetailedResult: FfiConverterRustBuffer 
     }
 
     public static func write(_ value: FileDecryptDetailedResult, into buf: inout [UInt8]) {
-        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
-        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
         FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
@@ -3158,17 +3142,13 @@ public func FfiConverterTypeFileDecryptDetailedResult_lower(_ value: FileDecrypt
  * Detailed result for file verification APIs.
  */
 public struct FileVerifyDetailedResult: Equatable, Hashable {
-    public var legacyStatus: SignatureStatus
-    public var legacySignerFingerprint: String?
     public var summaryState: SignatureVerificationState
     public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
-        self.legacyStatus = legacyStatus
-        self.legacySignerFingerprint = legacySignerFingerprint
+    public init(summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
@@ -3190,8 +3170,6 @@ public struct FfiConverterTypeFileVerifyDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileVerifyDetailedResult {
         return
             try FileVerifyDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
                 summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
                 summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
@@ -3199,8 +3177,6 @@ public struct FfiConverterTypeFileVerifyDetailedResult: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: FileVerifyDetailedResult, into buf: inout [UInt8]) {
-        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
-        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
         FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
@@ -3783,19 +3759,15 @@ public func FfiConverterTypeP256RawSharedSecret_lower(_ value: P256RawSharedSecr
 public struct PasswordDecryptResult: Equatable, Hashable {
     public var status: PasswordDecryptStatus
     public var plaintext: Data?
-    public var signatureStatus: SignatureStatus?
-    public var signerFingerprint: String?
     public var summaryState: SignatureVerificationState
     public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: PasswordDecryptStatus, plaintext: Data?, signatureStatus: SignatureStatus?, signerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
+    public init(status: PasswordDecryptStatus, plaintext: Data?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry]) {
         self.status = status
         self.plaintext = plaintext
-        self.signatureStatus = signatureStatus
-        self.signerFingerprint = signerFingerprint
         self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
@@ -3819,8 +3791,6 @@ public struct FfiConverterTypePasswordDecryptResult: FfiConverterRustBuffer {
             try PasswordDecryptResult(
                 status: FfiConverterTypePasswordDecryptStatus.read(from: &buf),
                 plaintext: FfiConverterOptionData.read(from: &buf),
-                signatureStatus: FfiConverterOptionTypeSignatureStatus.read(from: &buf),
-                signerFingerprint: FfiConverterOptionString.read(from: &buf),
                 summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
                 summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf)
@@ -3830,8 +3800,6 @@ public struct FfiConverterTypePasswordDecryptResult: FfiConverterRustBuffer {
     public static func write(_ value: PasswordDecryptResult, into buf: inout [UInt8]) {
         FfiConverterTypePasswordDecryptStatus.write(value.status, into: &buf)
         FfiConverterOptionData.write(value.plaintext, into: &buf)
-        FfiConverterOptionTypeSignatureStatus.write(value.signatureStatus, into: &buf)
-        FfiConverterOptionString.write(value.signerFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
         FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
@@ -4423,8 +4391,6 @@ public func FfiConverterTypeUserIdSelectorInput_lower(_ value: UserIdSelectorInp
  * Detailed result for in-memory verification APIs.
  */
 public struct VerifyDetailedResult: Equatable, Hashable {
-    public var legacyStatus: SignatureStatus
-    public var legacySignerFingerprint: String?
     public var summaryState: SignatureVerificationState
     public var summaryEntryIndex: UInt64?
     public var signatures: [DetailedSignatureEntry]
@@ -4432,9 +4398,7 @@ public struct VerifyDetailedResult: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(legacyStatus: SignatureStatus, legacySignerFingerprint: String?, summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], content: Data?) {
-        self.legacyStatus = legacyStatus
-        self.legacySignerFingerprint = legacySignerFingerprint
+    public init(summaryState: SignatureVerificationState, summaryEntryIndex: UInt64?, signatures: [DetailedSignatureEntry], content: Data?) {
         self.summaryState = summaryState
         self.summaryEntryIndex = summaryEntryIndex
         self.signatures = signatures
@@ -4457,8 +4421,6 @@ public struct FfiConverterTypeVerifyDetailedResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VerifyDetailedResult {
         return
             try VerifyDetailedResult(
-                legacyStatus: FfiConverterTypeSignatureStatus.read(from: &buf),
-                legacySignerFingerprint: FfiConverterOptionString.read(from: &buf),
                 summaryState: FfiConverterTypeSignatureVerificationState.read(from: &buf),
                 summaryEntryIndex: FfiConverterOptionUInt64.read(from: &buf),
                 signatures: FfiConverterSequenceTypeDetailedSignatureEntry.read(from: &buf),
@@ -4467,8 +4429,6 @@ public struct FfiConverterTypeVerifyDetailedResult: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: VerifyDetailedResult, into buf: inout [UInt8]) {
-        FfiConverterTypeSignatureStatus.write(value.legacyStatus, into: &buf)
-        FfiConverterOptionString.write(value.legacySignerFingerprint, into: &buf)
         FfiConverterTypeSignatureVerificationState.write(value.summaryState, into: &buf)
         FfiConverterOptionUInt64.write(value.summaryEntryIndex, into: &buf)
         FfiConverterSequenceTypeDetailedSignatureEntry.write(value.signatures, into: &buf)
@@ -4826,7 +4786,7 @@ public func FfiConverterTypeCertificationKind_lower(_ value: CertificationKind) 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Per-signature status preserved by the additive detailed APIs.
+ * Per-signature status preserved by the detailed APIs.
  */
 
 public enum DetailedSignatureStatus: Equatable, Hashable {
@@ -6033,113 +5993,6 @@ public func FfiConverterTypeSecureEnclaveCertificateVersion_lower(_ value: Secur
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Signature verification status for decrypted messages.
- */
-
-public enum SignatureStatus: Equatable, Hashable {
-
-    /**
-     * Signature is valid and the signer key is known.
-     */
-    case valid
-    /**
-     * Signature is valid but the signer key is not in the provided set.
-     */
-    case unknownSigner
-    /**
-     * Signature verification failed — content may have been modified.
-     */
-    case bad
-    /**
-     * Message was not signed.
-     */
-    case notSigned
-    /**
-     * Signer key has expired. Signature may have been valid when created.
-     * PRD: "Ask sender to update."
-     */
-    case expired
-
-
-
-
-
-}
-
-#if compiler(>=6)
-extension SignatureStatus: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeSignatureStatus: FfiConverterRustBuffer {
-    typealias SwiftType = SignatureStatus
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SignatureStatus {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-
-        case 1: return .valid
-
-        case 2: return .unknownSigner
-
-        case 3: return .bad
-
-        case 4: return .notSigned
-
-        case 5: return .expired
-
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: SignatureStatus, into buf: inout [UInt8]) {
-        switch value {
-
-
-        case .valid:
-            writeInt(&buf, Int32(1))
-
-
-        case .unknownSigner:
-            writeInt(&buf, Int32(2))
-
-
-        case .bad:
-            writeInt(&buf, Int32(3))
-
-
-        case .notSigned:
-            writeInt(&buf, Int32(4))
-
-
-        case .expired:
-            writeInt(&buf, Int32(5))
-
-        }
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSignatureStatus_lift(_ buf: RustBuffer) throws -> SignatureStatus {
-    return try FfiConverterTypeSignatureStatus.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeSignatureStatus_lower(_ value: SignatureStatus) -> RustBuffer {
-    return FfiConverterTypeSignatureStatus.lower(value)
-}
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-/**
  * Certificate-backed verification state for a signature entry or summary.
  */
 
@@ -6343,30 +6196,6 @@ fileprivate struct FfiConverterOptionTypeCertificationKind: FfiConverterRustBuff
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeCertificationKind.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionTypeSignatureStatus: FfiConverterRustBuffer {
-    typealias SwiftType = SignatureStatus?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeSignatureStatus.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeSignatureStatus.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

@@ -9,10 +9,10 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
         var clipboardNotice: Bool
         var ordinarySettings: ProtectedOrdinarySettingsSnapshot
-    }
 
-    private struct PayloadV1: Codable, Equatable, Sendable {
-        var clipboardNotice: Bool
+        static var initial: Payload {
+            Payload(clipboardNotice: true, ordinarySettings: .firstRunDefaults)
+        }
     }
 
     static let domainID: ProtectedDataDomainID = "protected-settings"
@@ -20,31 +20,12 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private struct OpenedSnapshot {
         let payload: Payload
         let generationIdentifier: Int
-        let schemaVersion: Int
-
-        var requiresOrdinarySettingsMigration: Bool {
-            schemaVersion < Payload.currentSchemaVersion
-        }
-    }
-
-    private enum CommittedSettingsUpgradeFailure: Error {
-        case retryable(underlying: Error, state: ProtectedSettingsDomainState)
-        case recoveryRequired(underlying: Error)
-
-        var underlyingError: Error {
-            switch self {
-            case .retryable(let underlying, _),
-                 .recoveryRequired(let underlying):
-                underlying
-            }
-        }
     }
 
     private struct ProtectedSettingsStorageReadFailure: Error {
         let underlying: Error
     }
 
-    private let defaults: UserDefaults
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
@@ -58,14 +39,12 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private var unlockedGenerationIdentifier: Int?
 
     init(
-        defaults: UserDefaults,
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
         bootstrapStore: ProtectedDomainBootstrapStore? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
-        self.defaults = defaults
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
@@ -134,30 +113,8 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     }
 
     func resetOrdinarySettingsRuntimeStateAfterLocalDataReset() {
-        removeLegacySettingsSources()
         clearUnlockedState()
         domainState = .locked
-    }
-
-    func migrationAuthorizationRequirement() -> ProtectedDataMutationAuthorizationRequirement {
-        do {
-            let registry = try registryStore.loadRegistry()
-            if registry.committedMembership[Self.domainID] != nil {
-                return .notRequired
-            }
-            guard registry.classifyRecoveryDisposition() == .resumeSteadyState else {
-                return .frameworkRecoveryNeeded
-            }
-            guard !registry.committedMembership.isEmpty else {
-                return registry.sharedResourceLifecycleState == .absent ? .notRequired : .frameworkRecoveryNeeded
-            }
-            guard registry.sharedResourceLifecycleState == .ready else {
-                return .frameworkRecoveryNeeded
-            }
-            return .wrappingRootKeyRequired
-        } catch {
-            return .frameworkRecoveryNeeded
-        }
     }
 
     func syncPreAuthorizationState() {
@@ -183,39 +140,17 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         }
     }
 
-    func ensureCommittedAndMigrateSettingsIfNeeded(
+    func ensureCommittedIfNeeded(
         persistSharedRight: @escaping @Sendable (Data) async throws -> Void,
         firstDomainSharedRightCleaner: ProtectedDataFirstDomainSharedRightCleaner? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) async throws {
         let registry = try registryStore.loadRegistry()
         if registry.committedMembership[Self.domainID] != nil {
-            do {
-                try upgradeCommittedSettingsPayloadIfNeeded(
-                    currentWrappingRootKey: currentWrappingRootKey
-                )
-            } catch {
-                let failure = committedSettingsUpgradeFailure(for: error)
-                clearUnlockedState()
-                switch failure {
-                case .retryable(let underlying, let state):
-                    domainState = state
-                    throw underlying
-                case .recoveryRequired(let underlying):
-                    domainState = .recoveryNeeded
-                    if registry.committedMembership[Self.domainID] != .recoveryNeeded {
-                        _ = try? await registryStore.updateCommittedDomainState(
-                            domainID: Self.domainID,
-                            to: .recoveryNeeded
-                        )
-                    }
-                    throw underlying
-                }
-            }
             return
         }
 
-        let initialPayload = legacyInitialPayload()
+        let initialPayload = Payload.initial
 
         if !registry.committedMembership.isEmpty {
             if let pendingDomainState = pendingDomainState(for: registry) {
@@ -264,7 +199,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 }
             )
 
-            removeLegacySettingsSources()
             clearUnlockedState()
             domainState = .locked
             return
@@ -325,7 +259,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             }
         )
 
-        removeLegacySettingsSources()
         clearUnlockedState()
         domainState = .locked
     }
@@ -353,16 +286,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             let readResult = try readAuthoritativeSnapshot(
                 wrappingRootKey: wrappingRootKey
             )
-            var openedSnapshot = readResult.0
+            let openedSnapshot = readResult.0
             var unwrappedDomainMasterKey = readResult.1
             defer {
                 unwrappedDomainMasterKey.protectedDataZeroize()
             }
-            openedSnapshot = try migrateOpenedSettingsSnapshotIfNeeded(
-                openedSnapshot,
-                domainMasterKey: &unwrappedDomainMasterKey,
-                wrappingRootKey: wrappingRootKey
-            )
             let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
             domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
             payload = openedSnapshot.payload
@@ -467,7 +395,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
 
         clearUnlockedState()
         domainState = .locked
-        try await ensureCommittedAndMigrateSettingsIfNeeded(
+        try await ensureCommittedIfNeeded(
             persistSharedRight: persistSharedRight,
             firstDomainSharedRightCleaner: firstDomainSharedRightCleaner,
             currentWrappingRootKey: currentWrappingRootKey
@@ -699,191 +627,11 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         return try activeDomainMasterKey(wrappingRootKey: wrappingRootKey)
     }
 
-    private func upgradeCommittedSettingsPayloadIfNeeded(
-        currentWrappingRootKey: (() throws -> Data)? = nil
-    ) throws {
-        let registry = try registryStore.loadRegistry()
-        if let pendingDomainState = pendingDomainState(for: registry) {
-            domainState = pendingDomainState
-            throw CommittedSettingsUpgradeFailure.retryable(
-                underlying: ProtectedDataError.invalidRegistry(
-                    "Protected settings cannot be upgraded while protected-data recovery is pending."
-                ),
-                state: pendingDomainState
-            )
-        }
-        guard registry.committedMembership[Self.domainID] != nil else {
-            return
-        }
-        guard registry.sharedResourceLifecycleState == .ready else {
-            throw CommittedSettingsUpgradeFailure.retryable(
-                underlying: ProtectedDataError.invalidRegistry(
-                    "Protected settings cannot be upgraded while the shared resource is not ready."
-                ),
-                state: .frameworkUnavailable
-            )
-        }
-
-        let wrappingRootKeyProvider = currentWrappingRootKey ?? self.currentWrappingRootKey
-        guard let wrappingRootKeyProvider else {
-            throw CommittedSettingsUpgradeFailure.retryable(
-                underlying: ProtectedDataError.authorizingUnavailable,
-                state: .locked
-            )
-        }
-        var wrappingRootKey = try wrappingRootKeyProvider()
-        defer {
-            wrappingRootKey.protectedDataZeroize()
-        }
-
-        let readResult = try readAuthoritativeSnapshot(wrappingRootKey: wrappingRootKey)
-        var openedSnapshot = readResult.0
-        var domainMasterKey = readResult.1
-        defer {
-            domainMasterKey.protectedDataZeroize()
-        }
-        openedSnapshot = try migrateOpenedSettingsSnapshotIfNeeded(
-            openedSnapshot,
-            domainMasterKey: &domainMasterKey,
-            wrappingRootKey: wrappingRootKey
-        )
-        payload = nil
-        unlockedGenerationIdentifier = nil
-        if openedSnapshot.requiresOrdinarySettingsMigration {
-            domainState = .recoveryNeeded
-        } else {
-            domainState = .locked
-        }
-    }
-
-    private func committedSettingsUpgradeFailure(
-        for error: Error
-    ) -> CommittedSettingsUpgradeFailure {
-        if let failure = error as? CommittedSettingsUpgradeFailure {
-            return failure
-        }
-        if let storageReadFailure = error as? ProtectedSettingsStorageReadFailure {
-            return .retryable(underlying: storageReadFailure.underlying, state: .frameworkUnavailable)
-        }
-        if let protectedDataError = error as? ProtectedDataError {
-            switch protectedDataError {
-            case .missingWrappingRootKey, .authorizingUnavailable:
-                return .retryable(underlying: error, state: .locked)
-            case .storageRootOutsideApplicationSupport,
-                 .fileProtectionUnsupported,
-                 .fileProtectionVerificationFailed,
-                 .protectedFileWriteFailed,
-                 .registryMissingWithArtifacts,
-                 .missingPersistedRight,
-                 .restartRequired,
-                 .internalFailure:
-                return .retryable(underlying: error, state: .frameworkUnavailable)
-            case .invalidRegistry(let reason):
-                if reason.hasPrefix("Unsupported WrappedDomainMasterKeyRecord") {
-                    return .recoveryRequired(underlying: error)
-                }
-                return .retryable(underlying: error, state: .frameworkUnavailable)
-            case .missingWrappedDomainMasterKey(let domainID):
-                if domainID == Self.domainID {
-                    return .recoveryRequired(underlying: error)
-                }
-                return .retryable(underlying: error, state: .frameworkUnavailable)
-            case .invalidDomainMasterKeyLength,
-                 .invalidNonceLength,
-                 .invalidAuthenticationTagLength,
-                 .invalidCiphertextLength,
-                 .invalidEnvelope:
-                return .recoveryRequired(underlying: error)
-            }
-        }
-        if isFoundationFileIOError(error) {
-            return .retryable(underlying: error, state: .frameworkUnavailable)
-        }
-        return .recoveryRequired(underlying: error)
-    }
-
     private func externallyVisibleProtectedSettingsError(_ error: Error) -> Error {
-        if let failure = error as? CommittedSettingsUpgradeFailure {
-            return failure.underlyingError
-        }
         if let storageReadFailure = error as? ProtectedSettingsStorageReadFailure {
             return storageReadFailure.underlying
         }
         return error
-    }
-
-    private func isFoundationFileIOError(_ error: Error) -> Bool {
-        let nsError = error as NSError
-        if nsError.domain == NSPOSIXErrorDomain {
-            return true
-        }
-        guard nsError.domain == NSCocoaErrorDomain else {
-            return false
-        }
-        switch CocoaError.Code(rawValue: nsError.code) {
-        case .fileNoSuchFile,
-             .fileLocking,
-             .fileReadUnknown,
-             .fileReadNoPermission,
-             .fileReadInvalidFileName,
-             .fileReadNoSuchFile,
-             .fileReadTooLarge,
-             .fileWriteUnknown,
-             .fileWriteNoPermission,
-             .fileWriteInvalidFileName,
-             .fileWriteFileExists,
-             .fileWriteInapplicableStringEncoding,
-             .fileWriteUnsupportedScheme,
-             .fileWriteOutOfSpace,
-             .fileWriteVolumeReadOnly:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func migrateOpenedSettingsSnapshotIfNeeded(
-        _ openedSnapshot: OpenedSnapshot,
-        domainMasterKey: inout Data,
-        wrappingRootKey: Data
-    ) throws -> OpenedSnapshot {
-        guard openedSnapshot.requiresOrdinarySettingsMigration else {
-            removeLegacySettingsSources()
-            return openedSnapshot
-        }
-
-        var upgradedPayload = Payload(
-            clipboardNotice: openedSnapshot.payload.clipboardNotice,
-            ordinarySettings: legacyOrdinarySettingsSnapshot()
-        )
-        upgradedPayload.ordinarySettings.normalize()
-        try validateOrdinarySettingsSnapshot(upgradedPayload.ordinarySettings)
-
-        let nextGenerationIdentifier = max(openedSnapshot.generationIdentifier, 0) + 1
-        try writePayloadGeneration(
-            upgradedPayload,
-            generationIdentifier: nextGenerationIdentifier,
-            domainMasterKey: domainMasterKey
-        )
-
-        let verificationResult = try readAuthoritativeSnapshot(
-            wrappingRootKey: wrappingRootKey
-        )
-        let verifiedSnapshot = verificationResult.0
-        var verifiedDomainMasterKey = verificationResult.1
-        defer {
-            verifiedDomainMasterKey.protectedDataZeroize()
-        }
-        guard verifiedSnapshot.schemaVersion == Payload.currentSchemaVersion,
-              verifiedSnapshot.generationIdentifier == nextGenerationIdentifier,
-              verifiedSnapshot.payload == upgradedPayload else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Protected settings migration verification did not reopen the expected schema v2 payload."
-            )
-        }
-
-        removeLegacySettingsSources()
-        return verifiedSnapshot
     }
 
     private func decodeOpenedSnapshot(
@@ -892,23 +640,12 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     ) throws -> OpenedSnapshot {
         let decoder = PropertyListDecoder()
         switch envelope.schemaVersion {
-        case 1:
-            let v1Payload = try decoder.decode(PayloadV1.self, from: plaintext)
-            return OpenedSnapshot(
-                payload: Payload(
-                    clipboardNotice: v1Payload.clipboardNotice,
-                    ordinarySettings: .firstRunDefaults
-                ),
-                generationIdentifier: envelope.generationIdentifier,
-                schemaVersion: envelope.schemaVersion
-            )
         case Payload.currentSchemaVersion:
             let payload = try decoder.decode(Payload.self, from: plaintext)
             try validateOrdinarySettingsSnapshot(payload.ordinarySettings)
             return OpenedSnapshot(
                 payload: payload,
-                generationIdentifier: envelope.generationIdentifier,
-                schemaVersion: envelope.schemaVersion
+                generationIdentifier: envelope.generationIdentifier
             )
         default:
             throw ProtectedDataError.invalidEnvelope(
@@ -972,7 +709,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         guard let currentWrappingRootKey else {
             throw ProtectedDataError.authorizingUnavailable
         }
-        let initialPayload = legacyInitialPayload()
+        let initialPayload = Payload.initial
         let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
         defer {
             wrappingRootKey.zeroize()
@@ -1017,27 +754,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
-    }
-
-    private func legacyInitialPayload() -> Payload {
-        let clipboardNotice = defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey) == nil
-            ? true
-            : defaults.bool(forKey: AppConfiguration.clipboardNoticeLegacyKey)
-        return Payload(
-            clipboardNotice: clipboardNotice,
-            ordinarySettings: legacyOrdinarySettingsSnapshot()
-        )
-    }
-
-    private func legacyOrdinarySettingsSnapshot() -> ProtectedOrdinarySettingsSnapshot {
-        LegacyOrdinarySettingsStore(defaults: defaults).loadSnapshot()
-    }
-
-    private func removeLegacySettingsSources() {
-        defaults.removeObject(forKey: AppConfiguration.clipboardNoticeLegacyKey)
-        for key in LegacyOrdinarySettingsStore.persistentKeys {
-            defaults.removeObject(forKey: key)
-        }
     }
 
     private func validateOrdinarySettingsSnapshot(

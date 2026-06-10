@@ -38,8 +38,7 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try rootSecretStore.loadRootSecret(
                 identifier: identifier,
-                authenticationContext: lockedContext,
-                minimumEnvelopeVersion: nil
+                authenticationContext: lockedContext
             )
         ) { error in
             guard let keychainError = error as? KeychainError else {
@@ -65,17 +64,14 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
         let loadResult = try rootSecretStore.loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticatedContext,
-            minimumEnvelopeVersion: nil
+            authenticationContext: authenticatedContext
         )
-        var loadedSecret = loadResult.secretData
+        var loadedSecret = loadResult
         defer {
             loadedSecret.protectedDataZeroize()
             authenticatedContext.invalidate()
         }
 
-        XCTAssertEqual(loadResult.storageFormat, .envelopeV2)
-        XCTAssertFalse(loadResult.didMigrate)
         XCTAssertEqual(loadedSecret, secret)
     }
 
@@ -100,17 +96,14 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
         let loadResult = try rootSecretStore.loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticatedContext,
-            minimumEnvelopeVersion: nil
+            authenticationContext: authenticatedContext
         )
-        var loadedSecret = loadResult.secretData
+        var loadedSecret = loadResult
         defer {
             loadedSecret.protectedDataZeroize()
             authenticatedContext.invalidate()
         }
 
-        XCTAssertEqual(loadResult.storageFormat, .envelopeV2)
-        XCTAssertFalse(loadResult.didMigrate)
         XCTAssertEqual(loadedSecret, secret)
     }
 
@@ -130,9 +123,8 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
         var initialSecret = try rootSecretStore.loadRootSecret(
             identifier: identifier,
-            authenticationContext: authenticatedContext,
-            minimumEnvelopeVersion: nil
-        ).secretData
+            authenticationContext: authenticatedContext
+        )
         initialSecret.protectedDataZeroize()
 
         cleanupSupportKeychainItems()
@@ -140,8 +132,7 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try rootSecretStore.loadRootSecret(
                 identifier: identifier,
-                authenticationContext: authenticatedContext,
-                minimumEnvelopeVersion: nil
+                authenticationContext: authenticatedContext
             )
         )
     }
@@ -189,9 +180,7 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
     private func cleanupSupportKeychainItems() {
         let keychain = SystemKeychain()
         for service in [
-            KeychainConstants.protectedDataDeviceBindingKeyService,
-            KeychainConstants.protectedDataRootSecretFormatFloorService,
-            KeychainConstants.protectedDataRootSecretLegacyCleanupService
+            KeychainConstants.protectedDataDeviceBindingKeyService
         ] {
             try? keychain.delete(
                 service: service,

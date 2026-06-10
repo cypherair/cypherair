@@ -399,7 +399,9 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             revocationCert: Data([0x03]),
             primaryAlgo: profile == .universal ? "Ed25519" : "Ed448",
             subkeyAlgo: profile == .universal ? "X25519" : "X448",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 }

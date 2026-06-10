@@ -424,7 +424,8 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             keychain: keychain,
             authenticator: authManager,
             defaults: defaults,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         _ = try await keyManagement.generateKey(
             name: "Post Unlock",
@@ -472,7 +473,8 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             keychain: keychain,
             authenticator: authManager,
             defaults: defaults,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: InMemoryKeyMetadataStore()
         )
         _ = try await keyManagement.generateKey(
             name: "Post Unlock Warning",

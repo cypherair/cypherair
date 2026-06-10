@@ -89,7 +89,9 @@ final class KeyProvisioningService {
             revocationCert: generated.revocationCert,
             primaryAlgo: generated.metadata.primaryAlgo,
             subkeyAlgo: generated.metadata.subkeyAlgo,
-            expiryDate: generated.metadata.expiryDate
+            expiryDate: generated.metadata.expiryDate,
+            openPGPConfigurationIdentity: profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)
@@ -156,7 +158,9 @@ final class KeyProvisioningService {
             revocationCert: imported.revocationCert,
             primaryAlgo: imported.metadata.primaryAlgo,
             subkeyAlgo: imported.metadata.subkeyAlgo,
-            expiryDate: imported.metadata.expiryDate
+            expiryDate: imported.metadata.expiryDate,
+            openPGPConfigurationIdentity: imported.metadata.profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
 
         try await commitIdentity(identity, bundle: bundle, token: token)

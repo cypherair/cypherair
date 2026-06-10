@@ -55,7 +55,7 @@ published release assets unless the audit passes.
 ### Layer 2: Swift Unit Tests
 
 **Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, key operation failure-category vocabulary, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, ordinary-settings coordinator gating plus protected-settings schema v2 migration, self-test legacy cleanup, temporary/export/tutorial artifact cleanup, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain schema v2 creation/v1 migration/recovery, key custody capability resolver matrix and failure-category resolution coverage, Secure Enclave custody routing through mocks and software P-256 keys — resolver gating, router routing/blocking/failure-mapping and signing/key-agreement handle lookup, hidden/test generation and public-binding/recovery classification, the signer-route and key-agreement message/file decrypt consumers, software custody unchanged, production-policy blocks, no software fallback, sanitized failure mapping, and source-audit containment, protected-settings handoff-only auto-open behavior, private-key-control migration/recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, v1-to-v2 migration, registry + Keychain `format-floor` downgrade rejection, `legacy-cleanup` deletion after the next successful v2 open, and Reset deleting the SE binding key.
+**What they cover:** Services layer logic, model validation, key operation failure-category vocabulary, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, ordinary-settings coordinator gating plus protected-settings schema v2 coverage, temporary/export/tutorial artifact cleanup, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain schema v2 creation/recovery, key custody capability resolver matrix and failure-category resolution coverage, Secure Enclave custody routing through mocks and software P-256 keys — resolver gating, router routing/blocking/failure-mapping and signing/key-agreement handle lookup, hidden/test generation and public-binding/recovery classification, the signer-route and key-agreement message/file decrypt consumers, software custody unchanged, production-policy blocks, no software fallback, sanitized failure mapping, and source-audit containment, protected-settings handoff-only auto-open behavior, private-key-control recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v2 `CAPDSEV2` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, ciphertext/tag/nonce/salt/public-key tampering, undecodable-payload fail-closed behavior, and Reset deleting the SE binding key.
 
 The Secure Enclave custody decrypt consumers (`PrivateKeyMessageDecryptionService`, `PrivateKeyStreamingFileDecryptionService`) prove software/Secure Enclave dispatch, v4/v6 round-trip, signed-message folding, mixed-recipient and repeated decrypt, and recipient-mismatch/tamper fail-closed-without-partial-plaintext through mocks and software P-256 keys; the existing `DecryptionServiceTests` software round-trip, tamper, and Phase 1/Phase 2 boundary coverage stays green through the router delegation.
 
@@ -81,7 +81,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 ### Layer 4: Device-Only Tests
 
 **Run on:** Physical device only. Cannot run in simulator.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain/Data Protection behavior through authenticated `LAContext` handoff on real hardware. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second biometric prompt. Envelope format and migration state-machine coverage should remain in the macOS unit lane through mocks.
+**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain/Data Protection behavior through authenticated `LAContext` handoff on real hardware. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second biometric prompt. Envelope format coverage should remain in the macOS unit lane through mocks.
 
 For Secure Enclave custody, most coverage stays in the macOS unit lane (mocks plus software P-256 keys); the device lane carries only the real-hardware evidence that cannot be mocked: handle creation/load/delete, biometric signing and ECDH private operations, hidden generation with a real signing handle, and end-to-end key-agreement decrypt. `DeviceSecureEnclaveCustodyDecryptTests` creates and deletes a single test-owned handle pair, decrypts v4/v6 messages and a mixed-recipient file through a real `.keyAgreement` P-256 handle, and confirms a tampered payload hard-fails with no output under one authenticated `LAContext`. The destructive Reset All Local Data cleanup proof is isolated in `CypherAir-DangerousDeviceTests` because it deletes every app-owned Secure Enclave custody handle for the current app bundle, not only handles created by the test. Secure Enclave custody device tests require Secure Enclave plus enrolled biometrics — available on Apple Silicon / T2 Macs and SE-capable iPhones/iPads — and skip elsewhere; only the `DeviceMIETests` subset additionally requires A19/A19 Pro Hardware Memory Tagging.
 
@@ -141,7 +141,7 @@ ProtectedData device-test isolation rules:
 
 Current ProtectedData unit-test expectations for the implemented AppData and Contacts protected-domain security surface:
 
-- verify that pre-auth bootstrap never touches the root-secret store or legacy right-store adapter
+- verify that pre-auth bootstrap never touches the root-secret store
 - verify that pre-auth bootstrap does not load key metadata or enumerate private-key Keychain rows
 - verify that bootstrap can return framework recovery without a trusted registry object
 - verify that `.continuePendingMutation` is preserved as an explicit bootstrap outcome
@@ -149,14 +149,13 @@ Current ProtectedData unit-test expectations for the implemented AppData and Con
 - verify that generic pending-mutation recovery dispatches by domain handler and refuses target mismatches as framework recovery
 - verify that abandoning a first-domain create cleans a provisioned shared resource based on post-removal membership and fails closed if cleanup fails
 - verify that post-unlock orchestration opens only committed registered domains with an authenticated `LAContext`, skips pending mutation recovery, and never authorizes without a context
-- verify that `private-key-control` migrates `authMode` and private-key recovery journals after app unlock, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
-- verify that `key-metadata` pending-create recovery reuses the authenticated `LAContext` for legacy default-account metadata or remains retryable without committing a partial payload, and that legacy cleanup retry deletes already-migrated source rows by fingerprint membership
+- verify that `private-key-control` creates its first domain with standard defaults and an empty recovery journal, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
 - verify that key metadata loading starts as locked/loading before app unlock, completes from `key-metadata` after post-unlock orchestration, and does not regress to pre-auth metadata reads or visible empty-key-list flashes
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
-- verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, migrate schema v1 plus legacy ordinary values only after verified readback, treat existing schema v2 as authoritative over legacy keys, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
+- verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
 - verify that onboarding, root tint/theme, guided tutorial entry/completion, Settings controls, and encrypt-to-self behavior consume `ProtectedOrdinarySettingsCoordinator` state rather than `AppConfiguration` or `ProtectedSettingsHost`
 - verify that Contacts creates an empty protected `contacts` domain after authorized unlock, treats corrupt or missing protected Contacts state as recovery, persists protected mutations across reopen, fails closed on unsupported Contacts schema versions by routing the domain to recovery, and clears Contacts runtime state on relock or framework reset
-- verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items plus app-owned Secure Enclave custody `kSecClassKey` rows, treats missing items as success, clears in-memory state, validates no remaining custody handles, and exposes only sanitized cleanup categories/counts on failure
+- verify that Reset All Local Data deletes default-account CypherAir Keychain items plus app-owned Secure Enclave custody `kSecClassKey` rows, treats missing items as success, clears in-memory state, validates no remaining custody handles, and exposes only sanitized cleanup categories/counts on failure
 
 Current ProtectedData file-protection expectations:
 
@@ -169,8 +168,8 @@ Current ProtectedData file-protection expectations:
 
 Current non-Contacts ProtectedData validation expectations:
 
-- Self-test coverage proves export-only report state and legacy `Documents/self-test/` cleanup.
-- Temporary/export/tutorial coverage proves per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
+- Self-test coverage proves export-only report state.
+- Temporary/export/tutorial coverage proves per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, and fixed tutorial defaults cleanup.
 
 Current Contacts validation expectations:
 
@@ -444,11 +443,10 @@ When changing revocation-construction behavior, validation must cover:
 - duplicate same-bytes User ID discovery preserving per-occurrence `primary` / `revoked` state
 - public-only / unusable-secret rejection returning `InvalidKeyData`
 - imported-key availability parity: import immediately stores a key-level revocation signature
-- lazy backfill for legacy imported keys with empty `revocationCert`
-- revocation export still succeeds when legacy backfill metadata persistence fails, while a fresh service still observes the old persisted state
+- missing revocation artifacts fail closed without private-key unwrap or metadata rewrite
 - export of existing revocation without Secure Enclave unwrap
 - ASCII-armored revocation export matching the stored binary signature after `dearmor`
-- Secure Enclave custody revocation export using only the stored revocation artifact; missing artifacts fail closed without private-key unwrap or lazy backfill
+- Secure Enclave custody revocation export using only the stored revocation artifact
 - selective revocation remaining export-on-demand: subkey and User ID revocation export must not mutate `PGPKeyIdentity.revocationCert` or assume a new persisted selective-revocation store
 
 ## 2.6 Password / SKESK Coverage

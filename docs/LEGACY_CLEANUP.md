@@ -1,6 +1,6 @@
 # Legacy Cleanup
 
-> Status: Active strict-retirement roadmap.
+> Status: Completed strict-retirement roadmap — all phases (0–6) implemented; see per-phase status lines. Retained as the record of what was removed and why, and for the reintroduction guardrails it defines.
 > Purpose: Canonical plan for retiring app-owned legacy data models, persisted
 > formats, migration sources, fallback decoders, cleanup-only hooks, legacy
 > fixtures, and old-input tests after the 2026-06-08 support cutoff.
@@ -9,7 +9,7 @@
 > [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md);
 > [ARCHITECTURE.md](ARCHITECTURE.md); [SECURITY.md](SECURITY.md);
 > [TESTING.md](TESTING.md).
-> Last reviewed: 2026-06-09.
+> Last reviewed: 2026-06-10.
 
 This document replaces the earlier cleanup inventory and deleted execution
 roadmap. It is now the single source of truth for the strict legacy-retirement
@@ -117,6 +117,8 @@ plumbing.
 
 ### Phase 2 — Protected Settings And Ordinary Settings Cleanup
 
+> Status: Completed (2026-06-10).
+
 Retire protected-settings schema v1 and the old ordinary-settings UserDefaults
 model across production, tutorial, and tests.
 
@@ -152,6 +154,8 @@ model across production, tutorial, and tests.
   `ProtectedDataFrameworkTestSupport`.
 
 ### Phase 3 — Key Metadata Cleanup
+
+> Status: Completed (2026-06-10).
 
 Retire legacy Keychain metadata rows, test-fixture dependence on the old helper,
 key-metadata schema v1, tolerant metadata decode, and revocation backfill.
@@ -201,6 +205,8 @@ key-metadata schema v1, tolerant metadata decode, and revocation backfill.
 
 ### Phase 4 — Private-Key-Control And Cleanup-Only Residue
 
+> Status: Completed (2026-06-10).
+
 Retire legacy UserDefaults import/cleanup and old local artifact cleanup hooks.
 
 - Remove `PrivateKeyControlStore.legacyInitialPayload`,
@@ -228,6 +234,8 @@ Retire legacy UserDefaults import/cleanup and old local artifact cleanup hooks.
   keys.
 
 ### Phase 5 — Root-Secret Cleanup
+
+> Status: Completed (2026-06-10).
 
 Retire legacy right-store and raw-v1 root-secret recognition/migration paths.
 
@@ -257,6 +265,8 @@ Retire legacy right-store and raw-v1 root-secret recognition/migration paths.
 
 ### Phase 6 — Rust And UniFFI Signature Cleanup
 
+> Status: Completed (2026-06-10).
+
 Retire the full legacy signature fold surface from Rust, UniFFI, generated
 Swift, and tests.
 
@@ -270,6 +280,13 @@ Swift, and tests.
   or `legacySignerFingerprint`; `PGPMessageResultMapper` already reads only
   `summaryState` / `summaryEntryIndex`. Phase 6 is Rust removal, UniFFI
   regeneration, and Rust-test deletion, with no Swift call-site rewrites.
+  (As-executed correction: that expectation was wrong — two Swift test files
+  consumed the generated `PasswordDecryptResult.signatureStatus` /
+  `signerFingerprint` fields, and one test constructed
+  `FileVerifyDetailedResult` via the legacy initializer labels, so the
+  lead-in claim above missed test-side consumers; all three were moved onto
+  `summaryState` / `summaryEntryIndex` / entry-fingerprint assertions under
+  the Test Policy.)
 - Regenerate UniFFI bindings after Rust result-shape changes.
 - Current API surface must use `summary_state` / `summaryState`,
   `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries
@@ -285,8 +302,8 @@ Swift, and tests.
   `status` / `verificationState` representation, with `status` derived from
   the current summary state so the two cannot disagree. Collapsing that
   redundancy is deliberate post-retirement debt, not a Phase 6 target. The
-  Phase 6 implementation PR should also repoint the
-  `DetailedSignatureVerification` code comment that still cites a
+  Phase 6 implementation commit (633fa5e) repointed the
+  `DetailedSignatureVerification` code comment that previously cited a
   "LEGACY_CLEANUP §9 follow-up" to this section.
 
 ## Guardrails
@@ -298,33 +315,63 @@ removed Swift legacy symbols, and each production cleanup PR must delete the
 matching temporary allowance when it removes the symbol.
 
 Current audit-rule coverage maps to this roadmap as follows: the audit file's
-`item1A`/`item1B` rules cover Phase 5 right-store and raw-v1 symbols, `item2`
-and `item7` cover Phase 3 metadata migration and revocation backfill, `item3`
-covers the Phase 2/Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
-`invalidLegacyAuthMode` family, the remaining contacts-snapshot and
-protected-settings rules cover Phase 1 snapshot and Phase 2 migration symbols,
-and the Phase 1 contacts certification-artifact/sentinel rule covers the
-retired `legacyTargetSelector`, `legacyUserIdDisplayText`, and
+`item1A`/`item1B` rules cover the retired Phase 5 right-store, raw-v1, and
+format-floor symbols (including `ProtectedDataRootSecretStorageFormat`, the
+format-floor marker/store, the registry envelope-floor recorder, and the
+retired right-store client/handle type names `ProtectedDataRightStoreClient`
+/ `ProtectedDataRightStoreClientProtocol` / `ProtectedDataPersistedRightHandle`
+/ `LocalAuthenticationPersistedRightHandle` — banned even though the
+`ProtectedDataRightStoreClient.swift` filename survives for the current
+root-secret store surface), `item2`
+and `item7` cover the retired Phase 3 metadata migration/legacy-row symbols
+(including `PayloadV1` via the `item4` bare token, `sourceSchemaVersion`, the
+migration source/outcome types, `cleanupLegacyMetadataRows`,
+`migrateLegacyMetadataAfterAppAuthentication`, and the
+`metadataAccount` / `metadataPrefix` / `metadataService` row addressing) and
+revocation backfill,
+`item3` covers the retired Phase 4 `legacyInitialPayload` /
+`cleanupLegacyDefaults` / `invalidLegacyAuthMode` family plus the
+cleanup-only artifact symbols (`legacyRequireAuthOnLaunchKey`,
+`legacySelfTestReportsDirectory`, `legacySelfTestReportDirectory`,
+`legacyTutorialDefaultsSuitePrefix`, `legacyTutorialDefaultsSuiteNames`,
+`cleanupTutorialDefaultsSuites`) and the six retired `AuthPreferences` key
+constants (`authModeKey`, `gracePeriodKey`, `rewrapInProgressKey`,
+`rewrapTargetModeKey`, `modifyExpiryInProgressKey`,
+`modifyExpiryFingerprintKey`), the `item4` protected-settings rule covers the
+retired Phase 2 settings symbols including `PayloadV1`, the old
+ordinary-settings store surface, and the committed-payload upgrade machinery
+(`upgradeCommittedSettingsPayloadIfNeeded`, `CommittedSettingsUpgradeFailure`,
+`committedSettingsUpgradeFailure`, `isFoundationFileIOError`), the remaining
+contacts-snapshot rule covers
+Phase 1 snapshot symbols, and the Phase 1 contacts
+certification-artifact/sentinel rule covers the retired
+`legacyTargetSelector`, `legacyUserIdDisplayText`, and
 `legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers: `PayloadV1`, `sourceSchemaVersion`, schema
-decode `case 1`, and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
-`KeyMetadataMigrationSourceItem`, `KeyMetadataMigrationSourceSnapshot`, and
-`cleanupLegacyMetadataRows`; the Phase 4 cleanup-only symbols; the Phase 5
-`storageFormat` / format-floor additions; and all Phase 6 symbols — there is
-no Rust guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so
-Phase 6 currently has zero guardrail coverage. `PayloadV1` is a token shared
-by `ProtectedSettingsStore` and `KeyMetadataDomainStore` across Phases 2 and
-3; a bare-token guardrail catches both, so use per-path temporary exceptions.
+The Phase 6 symbols are covered on both sides of the FFI boundary:
+`pgp-mobile/tests/legacy_symbol_guardrail_tests.rs` reads `pgp-mobile/src`
+via `CARGO_MANIFEST_DIR` and forbids the retired Rust legacy signature
+symbols (`legacy_status`, `legacy_signer_fingerprint`, `LegacyFoldMode`,
+`legacy_stopped`, `state_from_legacy_status`, the bare `SignatureStatus`
+enum name, and the retired `PasswordDecryptResult` field names), and the
+audit file's Phase 6 rule forbids the item #9 Swift tokens (`legacyStatus`,
+`legacySignerFingerprint`, `legacySignerIdentity`, `legacyVerification`) in
+hand-written `Sources/*.swift`. Generated `Sources/PgpMobile/` stays excluded
+from the Swift rules; the Rust guardrail prevents the legacy fields from
+re-entering the generated bindings at their source.
 
-Additional guardrails are needed as cleanup proceeds:
+Known residual gaps, accepted deliberately: the rules strip string
+literals, so raw persisted-key strings (Keychain account/service strings,
+UserDefaults key strings) cannot be banned as tokens; the Swift rules
+exclude generated `Sources/PgpMobile/`, so a hand edit to the generated
+bindings would not trip them (generated files are declared not-hand-edited,
+and the Rust guardrail protects them at their source); the Rust guardrail
+scans `pgp-mobile/src` only; and the whole-word matchers deliberately exempt
+longer identifiers that merely embed retired names (for example, test
+function names under `pgp-mobile/src` that embed `signature_status`).
 
-- Swift guardrails should cover newly retired settings, key-metadata,
-  private-key-control, cleanup-only, and root-secret symbols.
-- Rust guardrails should read `pgp-mobile/src` via `CARGO_MANIFEST_DIR` and
-  forbid the Phase 6 legacy signature symbols after they are removed.
-- Guardrails must not require construction of old input data as product
-  behavior.
+Guardrails must not require construction of old input data as product
+behavior.
 
 ## Validation Matrix
 
@@ -332,7 +379,7 @@ Additional guardrails are needed as cleanup proceeds:
 |---------------|--------------------|
 | Phase 0 docs/source-audit wording only | `git diff --check`; source-audit targeted unit test |
 | Contacts model cleanup | targeted Contacts unit tests plus `ArchitectureSourceAuditTests` |
-| ProtectedData/settings/key-metadata/private-key-control/root-secret cleanup | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` |
+| ProtectedData/settings/key-metadata/private-key-control/root-secret cleanup | `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS,arch=arm64e'` |
 | Rust/UniFFI signature cleanup | `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, then `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`, then macOS unit tests |
 | Any cleanup touching reset | targeted local-data reset tests plus the relevant broader unit lane |
 

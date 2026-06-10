@@ -9,9 +9,10 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
     func test_generateKey_profileA_storesKeychainItems() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
 
-        // Should store 4 Keychain items: SE key, salt, sealed box, metadata
-        XCTAssertEqual(mockKC.saveCallCount, 4,
-                       "Profile A key gen should store 4 Keychain items")
+        // Should store 3 Keychain items: SE key, salt, sealed box. Metadata
+        // persists through the injected metadata persistence, not the Keychain.
+        XCTAssertEqual(mockKC.saveCallCount, 3,
+                       "Profile A key gen should store 3 Keychain items")
 
         // Verify items exist
         let fp = identity.fingerprint
@@ -24,9 +25,7 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
         XCTAssertTrue(mockKC.exists(
             service: KeychainConstants.sealedKeyService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
-        XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.metadataService(fingerprint: fp),
-            account: KeychainConstants.metadataAccount))
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [fp])
     }
 
     func test_generateKey_profileA_returnsCorrectIdentity() async throws {
@@ -46,7 +45,7 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
     func test_generateKey_profileB_storesKeychainItems() async throws {
         let identity = try await TestHelpers.generateProfileBKey(service: service)
 
-        XCTAssertEqual(mockKC.saveCallCount, 4)
+        XCTAssertEqual(mockKC.saveCallCount, 3)
 
         let fp = identity.fingerprint
         XCTAssertTrue(mockKC.exists(

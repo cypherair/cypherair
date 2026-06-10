@@ -137,8 +137,7 @@ detached system-sheet path is eliminated decisively; the coupling is only a macO
   `.highSecurity` and app-session `.biometricsOnly`.
 
   **Two independent, user-initiated, in-window migration actions** are owned by a dedicated
-  `MacAuthMigrationCoordinator` (a detect→run→record migration coordinator, modeled on
-  `KeyMetadataDomainStore` / `ProtectedSettingsStore.ensureCommittedAndMigrateSettingsIfNeeded`) — **not** the
+  `MacAuthMigrationCoordinator` (a detect→run→record migration coordinator) — **not** the
   crash-recovery hook `recoverPrivateKeyControlJournalsAfterPostUnlock`, which is a no-op unless an interrupted
   re-wrap journal already exists and only *finishes* an interruption. They are surfaced as **two Settings
   entries**, each with **its own in-window authentication and its own completion**, runnable in any order, each

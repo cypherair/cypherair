@@ -13,17 +13,8 @@ enum AuthTraceMetadata {
             }
             return "secureEnclaveCustodyHandle"
         }
-        if service.hasPrefix(KeychainConstants.metadataPrefix) {
-            return "metadata"
-        }
         if service == KeychainConstants.protectedDataDeviceBindingKeyService {
             return "protectedDataDeviceBindingKey"
-        }
-        if service == KeychainConstants.protectedDataRootSecretFormatFloorService {
-            return "protectedDataRootSecretFormatFloor"
-        }
-        if service == KeychainConstants.protectedDataRootSecretLegacyCleanupService {
-            return "protectedDataRootSecretLegacyCleanup"
         }
         if service.hasPrefix("\(KeychainConstants.prefix).pending-se-key.") {
             return "pendingSeKey"
@@ -54,9 +45,6 @@ enum AuthTraceMetadata {
             || servicePrefix.hasPrefix("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).") {
             return "secureEnclaveCustodyHandle"
         }
-        if servicePrefix == KeychainConstants.metadataPrefix {
-            return "metadata"
-        }
         if servicePrefix.hasPrefix(KeychainConstants.prefix) {
             return "cypherair"
         }
@@ -67,8 +55,6 @@ enum AuthTraceMetadata {
         switch account {
         case KeychainConstants.defaultAccount:
             "default"
-        case KeychainConstants.metadataAccount:
-            "metadata"
         default:
             "unknown"
         }

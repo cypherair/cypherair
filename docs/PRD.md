@@ -179,7 +179,7 @@ The App decrypts both SEIPDv1 and SEIPDv2 messages regardless of the user's own 
 
 Text: cleartext sig. File: detached .sig. Auto-verify during decryption. Graded results.
 
-The shipped verify and decrypt routes prefer detailed per-signature results when available, with legacy summary data retained as fallback and compatibility context.
+The shipped verify and decrypt routes consume detailed per-signature results, with the overall verdict taken from the summary state and summary entry index derived from those entries.
 
 Contact detail includes a contact-scoped certificate-signature workflow for direct-key verification, User ID binding verification, and User ID certification generation.
 
@@ -277,7 +277,7 @@ The App offers two authentication modes, selectable in Settings:
 
 Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 
-- Verify and decrypt screens prefer detailed per-signature entries when available and fall back to legacy summary status only when detailed entries are absent.
+- Verify and decrypt screens render detailed per-signature entries, with the overall verdict taken from the summary state and summary entry index derived from those entries.
 - Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
 - Password / SKESK message workflows are not currently exposed in the shipped app UI.
 

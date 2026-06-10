@@ -18,9 +18,10 @@ use openpgp::serialize::stream::{Armorer, Encryptor, LiteralWriter, Message, Sig
 use openpgp::serialize::Serialize;
 use openpgp::types::SignatureType;
 use pgp_mobile::armor::{self, ArmorKind};
-use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::keys::{self, KeyProfile};
-use pgp_mobile::signature_details::{DetailedSignatureStatus, FileVerifyDetailedResult};
+use pgp_mobile::signature_details::{
+    DetailedSignatureStatus, FileVerifyDetailedResult, SignatureVerificationState,
+};
 use pgp_mobile::streaming;
 use sequoia_openpgp as openpgp;
 use tempfile::NamedTempFile;
@@ -271,8 +272,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[expired_signer.public_key_data.clone()],
     )?;
     assert_eq!(
-        expired_unknown_verify.legacy_status,
-        SignatureStatus::Expired
+        expired_unknown_verify.summary_state,
+        SignatureVerificationState::Expired
     );
     assert_eq!(expired_unknown_verify.signatures.len(), 2);
     assert_eq!(
@@ -292,7 +293,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             bad_signer.public_key_data.clone(),
         ],
     )?;
-    assert_eq!(expired_bad_verify.legacy_status, SignatureStatus::Expired);
+    assert_eq!(
+        expired_bad_verify.summary_state,
+        SignatureVerificationState::Expired
+    );
     assert_eq!(expired_bad_verify.signatures.len(), 2);
     assert_eq!(
         expired_bad_verify.signatures[0].status,

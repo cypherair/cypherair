@@ -132,7 +132,7 @@ The FFI adapter / mapper boundary contains generated UniFFI interaction. It owns
 - generated progress-protocol bridging, cancellation propagation, and result cleanup
 - conversion of generated signature, key-info, certificate-selector, decrypt, verify, merge, revocation, and password-message results into app-owned values
 
-Generated types such as `PgpEngine`, `PgpError`, `KeyInfo`, `SignatureStatus`, `SignatureVerificationState`, `UserIdSelectorInput`, `DiscoveredCertificateSelectors`, and generated operation result records should remain inside this boundary or in narrowly scoped migration code while the refactor is underway.
+Generated types such as `PgpEngine`, `PgpError`, `KeyInfo`, `SignatureVerificationState`, `UserIdSelectorInput`, `DiscoveredCertificateSelectors`, and generated operation result records should remain inside this boundary or in narrowly scoped migration code while the refactor is underway.
 
 ### Security
 

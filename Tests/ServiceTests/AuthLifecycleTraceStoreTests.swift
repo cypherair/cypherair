@@ -4,8 +4,6 @@ import Security
 import XCTest
 @testable import CypherAir
 
-private typealias TraceProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
-private typealias TraceProtectedDataPersistedRightHandle = CypherAir.ProtectedDataPersistedRightHandle
 private typealias TraceProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 private typealias TraceProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias TraceProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
@@ -95,42 +93,6 @@ private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable, @u
     func reconstructKey(from data: Data, authenticationContext: LAContext?) throws -> any SEKeyHandle {
         try base.reconstructKey(from: data, authenticationContext: authenticationContext)
     }
-}
-
-private final class TraceTestPersistedRightHandle: TraceProtectedDataPersistedRightHandle {
-    let identifier: String
-
-    init(identifier: String) {
-        self.identifier = identifier
-    }
-
-    func authorize(localizedReason: String) async throws {}
-
-    func deauthorize() async {}
-
-    func rawSecretData() async throws -> Data {
-        Data(repeating: 0xAB, count: 32)
-    }
-}
-
-private final class TraceTestRightStoreClient: TraceProtectedDataRightStoreClientProtocol {
-    func right(forIdentifier identifier: String) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func saveRight(_ right: LARight, identifier: String) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func saveRight(
-        _ right: LARight,
-        identifier: String,
-        secret: Data
-    ) async throws -> any TraceProtectedDataPersistedRightHandle {
-        TraceTestPersistedRightHandle(identifier: identifier)
-    }
-
-    func removeRight(forIdentifier identifier: String) async throws {}
 }
 
 @MainActor
@@ -270,7 +232,8 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
     func test_systemKeychain_recordsPassiveTraceWithoutChangingResults() throws {
         let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         let keychain = SystemKeychain(traceStore: store)
-        let service = "\(KeychainConstants.metadataPrefix)trace-\(UUID().uuidString)"
+        let tracePrefix = "\(KeychainConstants.prefix).trace-test."
+        let service = "\(tracePrefix)\(UUID().uuidString)"
         let account = "com.cypherair.tests.trace"
 
         try? keychain.delete(service: service, account: account)
@@ -286,7 +249,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
 
         XCTAssertEqual(try keychain.load(service: service, account: account), Data([0xCA, 0xFE]))
         XCTAssertTrue(keychain.exists(service: service, account: account))
-        XCTAssertTrue(try keychain.listItems(servicePrefix: KeychainConstants.metadataPrefix, account: account).contains(service))
+        XCTAssertTrue(try keychain.listItems(servicePrefix: tracePrefix, account: account).contains(service))
         try keychain.delete(service: service, account: account)
         XCTAssertFalse(keychain.exists(service: service, account: account))
 
@@ -1258,7 +1221,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
             syncPreAuthorizationState: {},
             currentDomainState: { domainState },
             currentClipboardNotice: { nil },
-            ensureCommittedAndMigrateSettingsIfNeeded: {},
+            ensureCommittedSettingsIfNeeded: {},
             openDomainIfNeeded: { _ in domainState = .unlocked },
             updateClipboardNotice: { _, _ in },
             recoverPendingMutation: { .retryablePending },

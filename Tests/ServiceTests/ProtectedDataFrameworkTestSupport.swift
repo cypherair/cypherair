@@ -11,10 +11,8 @@ typealias ProtectedDataTestAppAppStartupCoordinator = CypherAir.AppStartupCoordi
 typealias ProtectedDataTestAppProtectedDataBootstrapState = CypherAir.ProtectedDataBootstrapState
 typealias ProtectedDataTestAppProtectedDataAccessGateClassifier = CypherAir.ProtectedDataAccessGateClassifier
 typealias ProtectedDataTestAppProtectedDataFrameworkState = CypherAir.ProtectedDataFrameworkState
-typealias ProtectedDataTestAppProtectedDataPersistedRightHandle = CypherAir.ProtectedDataPersistedRightHandle
 typealias ProtectedDataTestAppProtectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore
 typealias ProtectedDataTestAppProtectedDataRelockParticipant = CypherAir.ProtectedDataRelockParticipant
-typealias ProtectedDataTestAppProtectedDataRightStoreClientProtocol = CypherAir.ProtectedDataRightStoreClientProtocol
 typealias ProtectedDataTestAppProtectedDataRightIdentifiers = CypherAir.ProtectedDataRightIdentifiers
 typealias ProtectedDataTestAppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 typealias ProtectedDataTestAppProtectedDataSessionRelockCoordinator = CypherAir.ProtectedDataSessionRelockCoordinator
@@ -24,7 +22,6 @@ typealias ProtectedDataTestAppProtectedDataPostUnlockOutcome = CypherAir.Protect
 typealias ProtectedDataTestAppProtectedDataFrameworkSentinelStore = CypherAir.ProtectedDataFrameworkSentinelStore
 typealias ProtectedDataTestAppPrivateKeyControlStore = CypherAir.PrivateKeyControlStore
 typealias ProtectedDataTestAppKeyMetadataDomainStore = CypherAir.KeyMetadataDomainStore
-typealias ProtectedDataTestAppKeyMetadataStore = CypherAir.KeyMetadataStore
 typealias ProtectedDataTestAppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 typealias ProtectedDataTestAppProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
 typealias ProtectedDataTestAppProtectedDomainRecoveryHandler = CypherAir.ProtectedDomainRecoveryHandler
@@ -33,7 +30,6 @@ typealias ProtectedDataTestAppMockProtectedDataRootSecretStore = CypherAir.MockP
 typealias ProtectedDataTestAppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 typealias ProtectedDataTestAppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
 typealias ProtectedDataTestAppProtectedOrdinarySettingsCoordinator = CypherAir.ProtectedOrdinarySettingsCoordinator
-typealias ProtectedDataTestAppLegacyOrdinarySettingsStore = CypherAir.LegacyOrdinarySettingsStore
 
 final class ProtectedDataTestMutableDateProvider: @unchecked Sendable {
     var value: Date
@@ -47,86 +43,19 @@ final class ProtectedDataTestMutableDateProvider: @unchecked Sendable {
     }
 }
 
-final class MockProtectedDataPersistedRightHandle: ProtectedDataTestAppProtectedDataPersistedRightHandle {
-    let identifier: String
-    let secretData: Data
-    var authorizeError: Error?
-    var rawSecretError: Error?
+final class RecordingProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
+    private var storage: [String: Data] = [:]
 
-    private(set) var authorizeCallCount = 0
-    private(set) var deauthorizeCallCount = 0
-
-    init(identifier: String, secretData: Data) {
-        self.identifier = identifier
-        self.secretData = secretData
-    }
-
-    func authorize(localizedReason: String) async throws {
-        authorizeCallCount += 1
-        if let authorizeError {
-            throw authorizeError
-        }
-    }
-
-    func deauthorize() async {
-        deauthorizeCallCount += 1
-    }
-
-    func rawSecretData() async throws -> Data {
-        if let rawSecretError {
-            throw rawSecretError
-        }
-        return secretData
-    }
-
-    func rootSecretData() throws -> Data {
-        if let rawSecretError {
-            throw rawSecretError
-        }
-        return secretData
-    }
-}
-
-final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedDataRightStoreClientProtocol, ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
-    var persistedRightHandle: MockProtectedDataPersistedRightHandle?
-
-    private(set) var rightLookupCallCount = 0
-    private(set) var saveWithoutSecretCallCount = 0
-    private(set) var saveWithSecretCallCount = 0
+    private(set) var saveCallCount = 0
+    private(set) var loadCallCount = 0
     private(set) var removeCallCount = 0
     private(set) var lastRemovedIdentifier: String?
     private(set) var lastAuthenticationContext: LAContext?
 
-    func right(forIdentifier identifier: String) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        rightLookupCallCount += 1
-        guard let persistedRightHandle else {
-            throw CypherAir.ProtectedDataError.missingPersistedRight(identifier)
-        }
-        return persistedRightHandle
-    }
+    var loadError: Error?
 
-    func saveRight(_ right: LARight, identifier: String) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        saveWithoutSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: Data(repeating: 0x11, count: 32))
-        persistedRightHandle = handle
-        return handle
-    }
-
-    func saveRight(
-        _ right: LARight,
-        identifier: String,
-        secret: Data
-    ) async throws -> any ProtectedDataTestAppProtectedDataPersistedRightHandle {
-        saveWithSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: secret)
-        persistedRightHandle = handle
-        return handle
-    }
-
-    func removeRight(forIdentifier identifier: String) async throws {
-        removeCallCount += 1
-        lastRemovedIdentifier = identifier
-        persistedRightHandle = nil
+    func seedRootSecret(_ secretData: Data, identifier: String) {
+        storage[identifier] = secretData
     }
 
     func saveRootSecret(
@@ -135,43 +64,35 @@ final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedData
         policy: AppSessionAuthenticationPolicy
     ) throws {
         _ = policy
-        saveWithSecretCallCount += 1
-        let handle = MockProtectedDataPersistedRightHandle(identifier: identifier, secretData: secretData)
-        persistedRightHandle = handle
+        saveCallCount += 1
+        storage[identifier] = secretData
     }
 
     func loadRootSecret(
         identifier: String,
-        authenticationContext: LAContext,
-        minimumEnvelopeVersion: Int?
-    ) throws -> ProtectedDataRootSecretLoadResult {
-        _ = minimumEnvelopeVersion
+        authenticationContext: LAContext
+    ) throws -> Data {
         lastAuthenticationContext = authenticationContext
-        rightLookupCallCount += 1
-        guard let persistedRightHandle else {
+        loadCallCount += 1
+        if let loadError {
+            throw loadError
+        }
+        guard let secretData = storage[identifier] else {
             throw MockKeychainError.itemNotFound
         }
-        if let authorizeError = persistedRightHandle.authorizeError {
-            throw authorizeError
-        }
-        return ProtectedDataRootSecretLoadResult(
-            secretData: try persistedRightHandle.rootSecretData(),
-            storageFormat: .envelopeV2,
-            didMigrate: false
-        )
+        return secretData
     }
 
     func deleteRootSecret(identifier: String) throws {
         removeCallCount += 1
         lastRemovedIdentifier = identifier
-        guard persistedRightHandle != nil else {
+        guard storage.removeValue(forKey: identifier) != nil else {
             throw MockKeychainError.itemNotFound
         }
-        persistedRightHandle = nil
     }
 
     func rootSecretExists(identifier: String) -> Bool {
-        persistedRightHandle != nil
+        storage[identifier] != nil
     }
 
     func reprotectRootSecret(
@@ -180,11 +101,10 @@ final class MockProtectedDataRightStoreClient: ProtectedDataTestAppProtectedData
         to newPolicy: AppSessionAuthenticationPolicy,
         authenticationContext: LAContext
     ) throws {
-        _ = identifier
         _ = currentPolicy
         _ = newPolicy
         lastAuthenticationContext = authenticationContext
-        guard persistedRightHandle != nil else {
+        guard storage[identifier] != nil else {
             throw MockKeychainError.itemNotFound
         }
     }
@@ -347,66 +267,8 @@ final class MockProtectedDomainRecoveryHandler: ProtectedDataTestAppProtectedDom
     }
 }
 
-actor ThrowingRootSecretFloorRecorder {
-    private(set) var callCount = 0
-    private(set) var lastVersion: Int?
-
-    func record(_ version: Int) throws {
-        callCount += 1
-        lastVersion = version
-        throw ProtectedDataError.internalFailure("Injected root-secret envelope floor write failure.")
-    }
-
-    func snapshot() -> (callCount: Int, lastVersion: Int?) {
-        (callCount, lastVersion)
-    }
-}
-
 @MainActor
 class ProtectedDataFrameworkTestCase: XCTestCase {
-    struct ProtectedSettingsPayloadV1: Codable {
-        var clipboardNotice: Bool
-    }
-
-    struct KeyMetadataPayloadV1: Encodable {
-        var schemaVersion: Int
-        var identities: [KeyMetadataIdentityV1]
-    }
-
-    struct KeyMetadataIdentityV1: Encodable {
-        let fingerprint: String
-        let keyVersion: UInt8
-        let profile: PGPKeyProfile
-        let userId: String?
-        let hasEncryptionSubkey: Bool
-        let isRevoked: Bool
-        let isExpired: Bool
-        let isDefault: Bool
-        let isBackedUp: Bool
-        let publicKeyData: Data
-        let revocationCert: Data
-        let primaryAlgo: String
-        let subkeyAlgo: String?
-        let expiryDate: Date?
-
-        init(_ identity: PGPKeyIdentity) {
-            fingerprint = identity.fingerprint
-            keyVersion = identity.keyVersion
-            profile = identity.profile
-            userId = identity.userId
-            hasEncryptionSubkey = identity.hasEncryptionSubkey
-            isRevoked = identity.isRevoked
-            isExpired = identity.isExpired
-            isDefault = identity.isDefault
-            isBackedUp = identity.isBackedUp
-            publicKeyData = identity.publicKeyData
-            revocationCert = identity.revocationCert
-            primaryAlgo = identity.primaryAlgo
-            subkeyAlgo = identity.subkeyAlgo
-            expiryDate = identity.expiryDate
-        }
-    }
-
     let envelopeTestSharedRight = "com.cypherair.tests.protected-data.envelope"
 
     func makeTemporaryDirectory(_ prefix: String) -> URL {
@@ -437,7 +299,9 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             revocationCert: Data([0x52, publicKeySeed]),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 
@@ -447,8 +311,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
-        defaults: UserDefaults,
-        defaultsSuiteName: String,
         store: ProtectedSettingsStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
@@ -459,11 +321,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         )
         _ = try registryStore.performSynchronousBootstrap()
         let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
-        let defaultsSuiteName = "com.cypherair.tests.protected-settings.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
         let store = ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager
@@ -472,8 +330,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             storageRoot,
             registryStore,
             domainKeyManager,
-            defaults,
-            defaultsSuiteName,
             store
         )
     }
@@ -483,7 +339,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager
     ) async throws -> Data {
         let capturedSharedSecret = AsyncDataBox()
-        try await store.ensureCommittedAndMigrateSettingsIfNeeded(
+        try await store.ensureCommittedIfNeeded(
             persistSharedRight: { secret in
                 await capturedSharedSecret.set(secret)
             }
@@ -492,34 +348,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
         return wrappingRootKey
-    }
-
-    func setLegacyOrdinarySettings(
-        _ snapshot: ProtectedOrdinarySettingsSnapshot,
-        defaults: UserDefaults
-    ) {
-        defaults.set(snapshot.gracePeriod, forKey: ProtectedOrdinarySettingsLegacyKeys.gracePeriod)
-        defaults.set(snapshot.encryptToSelf, forKey: ProtectedOrdinarySettingsLegacyKeys.encryptToSelf)
-        defaults.set(
-            snapshot.hasCompletedOnboarding,
-            forKey: ProtectedOrdinarySettingsLegacyKeys.onboardingComplete
-        )
-        defaults.set(
-            snapshot.guidedTutorialCompletedVersion,
-            forKey: ProtectedOrdinarySettingsLegacyKeys.guidedTutorialCompletedVersion
-        )
-        defaults.set(snapshot.colorTheme.rawValue, forKey: ProtectedOrdinarySettingsLegacyKeys.colorTheme)
-    }
-
-    func assertLegacyOrdinarySettingsRemoved(
-        defaults: UserDefaults,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertNil(defaults.object(forKey: AppConfiguration.clipboardNoticeLegacyKey), file: file, line: line)
-        for key in LegacyOrdinarySettingsStore.persistentKeys {
-            XCTAssertNil(defaults.object(forKey: key), "Expected \(key) to be removed.", file: file, line: line)
-        }
     }
 
     func writeProtectedSettingsEnvelope<P: Encodable>(
@@ -678,15 +506,12 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
     }
 
     func makeKeyMetadataDomainHarness(
-        _ prefix: String,
-        keychain providedKeychain: MockKeychain? = nil
+        _ prefix: String
     ) async throws -> (
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
         wrappingRootKey: Data,
-        keychain: MockKeychain,
-        legacyStore: ProtectedDataTestAppKeyMetadataStore,
         store: ProtectedDataTestAppKeyMetadataDomainStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
@@ -703,7 +528,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         let privateKeyControlStore = ProtectedDataTestAppPrivateKeyControlStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager
@@ -723,10 +547,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         let wrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rootSecret)
         rootSecret.protectedDataZeroize()
 
-        let keychain = providedKeychain ?? MockKeychain()
-        let legacyStore = ProtectedDataTestAppKeyMetadataStore(keychain: keychain)
         let store = ProtectedDataTestAppKeyMetadataDomainStore(
-            legacyMetadataStore: legacyStore,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
@@ -738,8 +559,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
             wrappingRootKey: wrappingRootKey,
-            keychain: keychain,
-            legacyStore: legacyStore,
             store: store
         )
     }
@@ -920,7 +739,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         )
     }
 
-    func insertLegacyRootSecret(
+    func insertRootSecretPayload(
         _ payload: Data,
         identifier: String,
         account: String
@@ -930,34 +749,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         query[kSecValueData as String] = payload
         query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         try handleKeychainStatus(SecItemAdd(query as CFDictionary, nil))
-    }
-
-    func replaceRootSecretPayload(
-        _ payload: Data,
-        identifier: String,
-        account: String
-    ) throws {
-        try handleKeychainStatus(
-            SecItemUpdate(
-                rootSecretQuery(identifier: identifier, account: account) as CFDictionary,
-                [kSecValueData as String: payload] as CFDictionary
-            )
-        )
-    }
-
-    func loadRootSecretPayload(
-        identifier: String,
-        account: String
-    ) throws -> Data {
-        var query = rootSecretQuery(identifier: identifier, account: account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: AnyObject?
-        try handleKeychainStatus(SecItemCopyMatching(query as CFDictionary, &result))
-        guard let data = result as? Data else {
-            throw KeychainError.unhandledError(errSecInternalError)
-        }
-        return data
     }
 
     func deleteRootSecretPayload(identifier: String, account: String) {

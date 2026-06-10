@@ -434,7 +434,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(universal.compatibilityTarget, .gnupgOriented)
         XCTAssertEqual(universal.messageFormatPreference, .seipdV1)
         XCTAssertEqual(universal.softwareExportProtection, .iteratedSaltedS2K)
-        XCTAssertEqual(PGPKeyProfile.universal.defaultCustodyKind, .softwareSecretCertificate)
 
         let advanced = PGPKeyProfile.advanced.openPGPConfiguration
         XCTAssertEqual(advanced.identity, .modernSoftwareV6)
@@ -443,7 +442,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(advanced.compatibilityTarget, .rfc9580Oriented)
         XCTAssertEqual(advanced.messageFormatPreference, .seipdV2Aead)
         XCTAssertEqual(advanced.softwareExportProtection, .argon2idS2K)
-        XCTAssertEqual(PGPKeyProfile.advanced.defaultCustodyKind, .softwareSecretCertificate)
     }
 
     func test_pgpKeyIdentity_persistsSuccessorVocabulary() throws {
@@ -481,39 +479,6 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(object["openPGPConfiguration"])
     }
 
-    func test_pgpKeyIdentity_decodesLegacyJSONWithSoftwareCustodyDefaults() throws {
-        let fixtures: [(String, UInt8, String, String, PGPKeyConfiguration.Identity, PGPKeyConfiguration)] = [
-            ("abababababababababababababababababababab", 4, "universal", "Ed25519", .compatibleSoftwareV4, .compatibleSoftwareV4),
-            ("babababababababababababababababababababa", 6, "advanced", "Ed448", .modernSoftwareV6, .modernSoftwareV6)
-        ]
-
-        for (fingerprint, keyVersion, profile, primaryAlgo, expectedIdentity, expectedConfiguration) in fixtures {
-            let legacyJSON = Data("""
-            {
-              "fingerprint": "\(fingerprint)",
-              "keyVersion": \(keyVersion),
-              "profile": "\(profile)",
-              "userId": "Legacy",
-              "hasEncryptionSubkey": true,
-              "isRevoked": false,
-              "isExpired": false,
-              "isDefault": false,
-              "isBackedUp": false,
-              "publicKeyData": "",
-              "revocationCert": "",
-              "primaryAlgo": "\(primaryAlgo)",
-              "subkeyAlgo": "X"
-            }
-            """.utf8)
-
-            let identity = try JSONDecoder().decode(PGPKeyIdentity.self, from: legacyJSON)
-
-            XCTAssertEqual(identity.openPGPConfigurationIdentity, expectedIdentity)
-            XCTAssertEqual(identity.openPGPConfiguration, expectedConfiguration)
-            XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
-        }
-    }
-
     func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {
         let compatibleP256 = PGPKeyConfiguration.compatibleP256V4
         XCTAssertEqual(compatibleP256.identity, .compatibleP256V4)
@@ -532,7 +497,6 @@ final class ModelTests: XCTestCase {
         for profile in PGPKeyProfile.allCases {
             XCTAssertNotEqual(profile.openPGPConfiguration, .compatibleP256V4)
             XCTAssertNotEqual(profile.openPGPConfiguration, .modernP256V6)
-            XCTAssertNotEqual(profile.defaultCustodyKind, .appleSecureEnclavePrivateOperations)
         }
 
         XCTAssertEqual(
@@ -762,8 +726,6 @@ final class ModelTests: XCTestCase {
 
         let detailed = PGPMessageResultMapper.fileVerifyDetailedResult(
             FileVerifyDetailedResult(
-                legacyStatus: .unknownSigner,
-                legacySignerFingerprint: nil,
                 summaryState: .signerCertificateUnavailable,
                 summaryEntryIndex: 0,
                 signatures: [entry]
@@ -892,18 +854,17 @@ final class ModelTests: XCTestCase {
     // MARK: - Protected Ordinary Settings
 
     func test_protectedOrdinarySettings_gracePeriod_validValuePersists() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
 
         coordinator.setGracePeriod(60)
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.snapshot?.gracePeriod, 60)
     }
 
     func test_protectedOrdinarySettings_gracePeriod_invalidValueClampsToDefault() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
 
         coordinator.setGracePeriod(42)
 
@@ -1019,39 +980,30 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
     }
 
-    func test_appConfiguration_resetRemovesLegacyRequireAuthOnLaunchKey() {
-        let defaults = makeIsolatedDefaults()
-        defaults.set(false, forKey: "com.cypherair.preference.requireAuthOnLaunch")
-        let config = AppConfiguration(defaults: defaults)
-
-        config.resetToFirstRunDefaults()
-
-        XCTAssertNil(defaults.object(forKey: "com.cypherair.preference.requireAuthOnLaunch"))
-    }
-
     func test_protectedOrdinarySettings_guidedTutorial_defaultsToNeverCompleted() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
 
         XCTAssertEqual(coordinator.snapshot?.guidedTutorialCompletedVersion, 0)
         XCTAssertEqual(coordinator.guidedTutorialCompletionState, .neverCompleted)
     }
 
     func test_protectedOrdinarySettings_guidedTutorial_currentVersionPersists() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
         coordinator.markGuidedTutorialCompletedCurrentVersion()
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.snapshot?.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
         XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
     }
 
-    func test_protectedOrdinarySettings_guidedTutorial_oldVersionIsRecognized() {
-        let defaults = makeIsolatedDefaults()
-        defaults.set(GuidedTutorialVersion.current - 1, forKey: "com.cypherair.preference.guidedTutorialCompletedVersion")
+    func test_protectedOrdinarySettings_guidedTutorial_previousVersionIsRecognized() {
+        var snapshot = ProtectedOrdinarySettingsSnapshot.firstRunDefaults
+        snapshot.guidedTutorialCompletedVersion = GuidedTutorialVersion.current - 1
 
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings(
+            store: InMemoryOrdinarySettingsStore(snapshot: snapshot)
+        )
         XCTAssertEqual(coordinator.guidedTutorialCompletionState, .completedPreviousVersion)
     }
 
@@ -1105,7 +1057,9 @@ final class ModelTests: XCTestCase {
             revocationCert: Data(),
             primaryAlgo: "Ed25519",
             subkeyAlgo: "X25519",
-            expiryDate: nil
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .compatibleSoftwareV4,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
     }
 
@@ -1117,10 +1071,10 @@ final class ModelTests: XCTestCase {
     }
 
     private func makeLoadedProtectedOrdinarySettings(
-        defaults: UserDefaults
+        store: InMemoryOrdinarySettingsStore = InMemoryOrdinarySettingsStore()
     ) -> ProtectedOrdinarySettingsCoordinator {
         let coordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: store
         )
         coordinator.loadForAuthenticatedTestBypass()
         return coordinator
@@ -1216,18 +1170,17 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(ColorTheme.graphite.isMultiColor)
     }
 
-    func test_protectedOrdinarySettings_colorTheme_persistsToUserDefaults() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+    func test_protectedOrdinarySettings_colorTheme_persistsAcrossReload() {
+        let store = InMemoryOrdinarySettingsStore()
+        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
         coordinator.setColorTheme(.purple)
 
-        let reloaded = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
         XCTAssertEqual(reloaded.colorTheme, .purple)
     }
 
     func test_protectedOrdinarySettings_colorTheme_defaultsToSystemDefault() {
-        let defaults = makeIsolatedDefaults()
-        let coordinator = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let coordinator = makeLoadedProtectedOrdinarySettings()
         XCTAssertEqual(coordinator.colorTheme, .systemDefault)
     }
 

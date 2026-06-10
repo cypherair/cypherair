@@ -20,7 +20,6 @@ struct LocalDataResetError: LocalizedError, Equatable {
 
 final class LocalDataResetService {
     private let keychain: any KeychainManageable
-    private let legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)?
     private let protectedDataStorageRoot: ProtectedDataStorageRoot
     private let defaults: UserDefaults
     private let defaultsDomainName: String?
@@ -34,7 +33,6 @@ final class LocalDataResetService {
     private let appSessionOrchestrator: AppSessionOrchestrator
     private let appLockController: AppLockController
     private let fileManager: FileManager
-    private let legacySelfTestReportsDirectory: URL
     private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let protectedDataRootSecretExists: () -> Bool
     private let secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore?
@@ -42,7 +40,6 @@ final class LocalDataResetService {
 
     init(
         keychain: any KeychainManageable,
-        legacyRightStoreClient: (any ProtectedDataRightStoreClientProtocol)? = nil,
         protectedDataStorageRoot: ProtectedDataStorageRoot,
         defaults: UserDefaults,
         defaultsDomainName: String?,
@@ -57,13 +54,11 @@ final class LocalDataResetService {
         appLockController: AppLockController,
         temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
         fileManager: FileManager = .default,
-        legacySelfTestReportsDirectory: URL? = nil,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.keychain = keychain
-        self.legacyRightStoreClient = legacyRightStoreClient
         self.protectedDataStorageRoot = protectedDataStorageRoot
         self.defaults = defaults
         self.defaultsDomainName = defaultsDomainName
@@ -78,9 +73,6 @@ final class LocalDataResetService {
         self.appLockController = appLockController
         self.fileManager = fileManager
         self.temporaryArtifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
-        self.legacySelfTestReportsDirectory = legacySelfTestReportsDirectory
-            ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("self-test", isDirectory: true)
         self.protectedDataRootSecretExists = protectedDataRootSecretExists ?? {
             keychain.exists(
                 service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -111,11 +103,6 @@ final class LocalDataResetService {
             authenticationContext: authenticationContext,
             failures: &failures
         )
-        deletedKeychainItemCount += resetKeychainItems(
-            account: KeychainConstants.metadataAccount,
-            authenticationContext: authenticationContext,
-            failures: &failures
-        )
 
         deletedKeychainItemCount += deleteExactKeychainItem(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -131,32 +118,10 @@ final class LocalDataResetService {
             failureKey: "keychain.protectedDataDeviceBindingKey",
             failures: &failures
         )
-        deletedKeychainItemCount += deleteExactKeychainItem(
-            service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-            account: KeychainConstants.defaultAccount,
-            authenticationContext: authenticationContext,
-            failureKey: "keychain.protectedDataRootSecretFormatFloor",
-            failures: &failures
-        )
-        deletedKeychainItemCount += deleteExactKeychainItem(
-            service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-            account: KeychainConstants.defaultAccount,
-            authenticationContext: authenticationContext,
-            failureKey: "keychain.protectedDataRootSecretLegacyCleanup",
-            failures: &failures
-        )
         cleanupSecureEnclaveCustodyHandles(
             deletedKeychainItemCount: &deletedKeychainItemCount,
             failures: &failures
         )
-
-        do {
-            try await legacyRightStoreClient?.removeRight(
-                forIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier
-            )
-        } catch {
-            failures.append("legacyRight.remove.\(String(describing: type(of: error)))")
-        }
 
         for directory in resetDirectories {
             removedDirectoryCount += removeDirectoryIfPresent(
@@ -220,8 +185,7 @@ final class LocalDataResetService {
 
     private var resetDirectories: [URL] {
         [
-            protectedDataStorageRoot.rootURL,
-            legacySelfTestReportsDirectory
+            protectedDataStorageRoot.rootURL
         ]
     }
 
@@ -364,32 +328,14 @@ final class LocalDataResetService {
         do {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
-            let legacySelfTestReportsDirectoryExists = fileManager.fileExists(
-                atPath: legacySelfTestReportsDirectory.path
-            )
             let hasRootSecret = protectedDataRootSecretExists()
             let hasDeviceBindingKey = keychain.exists(
                 service: KeychainConstants.protectedDataDeviceBindingKeyService,
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: nil
             )
-            let hasFormatFloor = keychain.exists(
-                service: KeychainConstants.protectedDataRootSecretFormatFloorService,
-                account: KeychainConstants.defaultAccount,
-                authenticationContext: nil
-            )
-            let hasLegacyCleanup = keychain.exists(
-                service: KeychainConstants.protectedDataRootSecretLegacyCleanupService,
-                account: KeychainConstants.defaultAccount,
-                authenticationContext: nil
-            )
             let remainingDefaultAccountServices = remainingKeychainServices(
                 account: KeychainConstants.defaultAccount,
-                authenticationContext: authenticationContext,
-                failures: &failures
-            )
-            let remainingMetadataAccountServices = remainingKeychainServices(
-                account: KeychainConstants.metadataAccount,
                 authenticationContext: authenticationContext,
                 failures: &failures
             )
@@ -401,11 +347,7 @@ final class LocalDataResetService {
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || hasDeviceBindingKey
-                || hasFormatFloor
-                || hasLegacyCleanup
-                || legacySelfTestReportsDirectoryExists
                 || !remainingDefaultAccountServices.isEmpty
-                || !remainingMetadataAccountServices.isEmpty
                 || remainingSecureEnclaveCustodyHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
                 || !keyManagement.keys.isEmpty
@@ -419,11 +361,7 @@ final class LocalDataResetService {
                     "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
                     "hasProtectedDataRootSecret": hasRootSecret ? "true" : "false",
                     "hasDeviceBindingKey": hasDeviceBindingKey ? "true" : "false",
-                    "hasFormatFloor": hasFormatFloor ? "true" : "false",
-                    "hasLegacyCleanup": hasLegacyCleanup ? "true" : "false",
-                    "legacySelfTestReportsDirectoryExists": legacySelfTestReportsDirectoryExists ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
-                    "remainingMetadataKeychainItemCount": String(remainingMetadataAccountServices.count),
                     "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
                     "keyCount": String(keyManagement.keys.count),
@@ -439,20 +377,8 @@ final class LocalDataResetService {
             if hasDeviceBindingKey {
                 failures.append("keychain.protectedDataDeviceBindingKey.remaining")
             }
-            if hasFormatFloor {
-                failures.append("keychain.protectedDataRootSecretFormatFloor.remaining")
-            }
-            if hasLegacyCleanup {
-                failures.append("keychain.protectedDataRootSecretLegacyCleanup.remaining")
-            }
-            if legacySelfTestReportsDirectoryExists {
-                failures.append("directory.\(legacySelfTestReportsDirectory.lastPathComponent).remaining")
-            }
             if !remainingDefaultAccountServices.isEmpty {
                 failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")
-            }
-            if !remainingMetadataAccountServices.isEmpty {
-                failures.append("keychain.metadata.remaining.\(remainingMetadataAccountServices.count)")
             }
             if remainingSecureEnclaveCustodyHandleCount > 0 {
                 failures.append("keychain.secureEnclaveCustodyHandle.remaining.\(remainingSecureEnclaveCustodyHandleCount)")
@@ -550,14 +476,14 @@ final class LocalDataResetService {
         removedDirectoryCount += temporaryCleanup.removedItemCount
         failures.append(contentsOf: temporaryCleanup.failures.map { "temporary.\($0)" })
 
-        let tutorialDefaultsCleanup = temporaryArtifactStore.cleanupTutorialDefaultsSuites()
+        let tutorialDefaultsCleanup = temporaryArtifactStore.cleanupTutorialSandboxDefaultsSuite()
         removedDirectoryCount += tutorialDefaultsCleanup.removedItemCount
         failures.append(contentsOf: tutorialDefaultsCleanup.failures.map { "tutorialDefaults.\($0)" })
     }
 
     private func temporaryResetTargetsRemaining() -> [String] {
         temporaryArtifactStore.remainingTemporaryArtifacts()
-            + temporaryArtifactStore.remainingTutorialDefaultsSuites()
+            + temporaryArtifactStore.remainingTutorialSandboxDefaultsSuites()
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {

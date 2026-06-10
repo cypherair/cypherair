@@ -94,8 +94,7 @@ struct AppStartupCoordinator {
 
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.start")
         cleanupTemporaryFiles(
-            temporaryArtifactStore: container.temporaryArtifactStore,
-            legacySelfTestReportsDirectory: container.legacySelfTestReportsDirectory
+            temporaryArtifactStore: container.temporaryArtifactStore
         )
         traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.finish")
 
@@ -122,31 +121,11 @@ struct AppStartupCoordinator {
 
     func cleanupTemporaryFiles(
         fileManager: FileManager = .default,
-        temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
-        documentDirectory: URL? = nil,
-        legacySelfTestReportsDirectory: URL? = nil
+        temporaryArtifactStore: AppTemporaryArtifactStore? = nil
     ) {
         let artifactStore = temporaryArtifactStore ?? AppTemporaryArtifactStore(fileManager: fileManager)
         _ = artifactStore.cleanupTemporaryArtifacts()
-        _ = artifactStore.cleanupTutorialDefaultsSuites()
-
-        let selfTestDir = legacySelfTestReportsDirectory
-            ?? legacySelfTestReportDirectory(
-                fileManager: fileManager,
-                documentDirectory: documentDirectory
-            )
-        if fileManager.fileExists(atPath: selfTestDir.path) {
-            try? fileManager.removeItem(at: selfTestDir)
-        }
-    }
-
-    func legacySelfTestReportDirectory(
-        fileManager: FileManager = .default,
-        documentDirectory: URL? = nil
-    ) -> URL {
-        let documents = documentDirectory
-            ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documents.appendingPathComponent("self-test", isDirectory: true)
+        _ = artifactStore.cleanupTutorialSandboxDefaultsSuite()
     }
 
     func mergedStartupMessages(

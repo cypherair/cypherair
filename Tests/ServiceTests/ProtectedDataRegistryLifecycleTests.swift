@@ -314,7 +314,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         )
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
         let settingsStore = CypherAir.ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: keyManager
@@ -415,7 +414,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-cleanup-failure"
         )
         let settingsStore = CypherAir.ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
@@ -500,7 +498,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-pre-membership-cleanup-failure"
         )
         let settingsStore = CypherAir.ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
@@ -604,7 +601,6 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         )
         let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
         let settingsStore = CypherAir.ProtectedSettingsStore(
-            defaults: defaults,
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: keyManager

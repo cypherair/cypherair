@@ -25,7 +25,7 @@ use openssl::nid::Nid;
 use openssl::pkey::PKey;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{decrypt_with_helper, SignatureStatus};
+use crate::decrypt::decrypt_with_helper;
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::external_signer::{ExternalP256Signature, ExternalP256Signer, ExternalP256SignerError};
@@ -33,7 +33,7 @@ use crate::keys::{
     self, ExternalP256KeyAgreementError, ExternalP256KeyAgreementFailureCategory,
     ExternalP256KeyAgreementProvider, P256RawSharedSecret,
 };
-use crate::signature_details::{LegacyFoldMode, SignatureCollector};
+use crate::signature_details::{SignatureCollector, SignatureVerificationState, SummaryFoldMode};
 use crate::PgpEngine;
 
 #[derive(Clone, Copy, Debug)]
@@ -476,7 +476,7 @@ where
         recipient_certs: vec![recipient_cert],
         verifier_certs: verification_certs.to_vec(),
         key_agreement_operation,
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
         telemetry,
     };
 
@@ -678,8 +678,8 @@ fn test_external_decryptor_decrypts_v4_and_v6_messages() {
         let (decrypted, helper) = decrypt_with_external_oracle(&ciphertext, &material, &[])
             .expect("external decryptor should recover plaintext");
         assert_eq!(decrypted, plaintext);
-        let (legacy_status, _, _, _, _) = helper.collector.into_parts();
-        assert_eq!(legacy_status, SignatureStatus::NotSigned);
+        let (summary_state, _, _) = helper.collector.into_parts();
+        assert_eq!(summary_state, SignatureVerificationState::NotSigned);
     }
 }
 
@@ -699,8 +699,8 @@ fn test_external_decryptor_signed_messages_preserve_signature_status() {
             decrypt_with_external_oracle(&ciphertext, &material, &[verifier_cert])
                 .expect("external decryptor should recover signed plaintext");
         assert_eq!(decrypted, plaintext);
-        let (legacy_status, _, _, _, _) = helper.collector.into_parts();
-        assert_eq!(legacy_status, SignatureStatus::Valid);
+        let (summary_state, _, _) = helper.collector.into_parts();
+        assert_eq!(summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -728,7 +728,7 @@ fn test_runtime_external_key_agreement_api_decrypts_v4_and_v6_messages() {
             .expect("runtime external key agreement should decrypt");
 
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
         assert!(provider.request_count() > 0);
         let requests = provider.captured_requests();
         assert!(!requests.is_empty());
@@ -768,7 +768,7 @@ fn test_runtime_external_key_agreement_api_preserves_signature_status() {
             .expect("runtime external key agreement should decrypt signed message");
 
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -939,7 +939,7 @@ fn test_runtime_external_key_agreement_api_hard_aborts_invalid_response_before_l
                 "unexpected recipient public key",
             ))
         },
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
         telemetry: ExternalDecryptTelemetry::default(),
     };
 
@@ -988,7 +988,7 @@ fn test_runtime_external_key_agreement_api_decrypts_hidden_recipient_message_ski
         .expect("non-ECDH wildcard PKESK must be skipped and the P-256 PKESK decrypted");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+    assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
     // The external operation runs only for the ECDH PKESK; the RSA PKESK is
     // rejected by prepare_request before the callback.
     assert!(provider.request_count() > 0);
@@ -1172,7 +1172,7 @@ fn test_external_decryptor_failure_does_not_fallback_to_secret_certificate_decry
         recipient_certs: vec![recipient_cert],
         verifier_certs: Vec::new(),
         key_agreement_operation: |_request| Err(external_operation_failed()),
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
         telemetry: ExternalDecryptTelemetry::default(),
     };
 
@@ -1522,7 +1522,7 @@ fn test_runtime_external_key_agreement_file_api_decrypts_v4_and_v6_files() {
             )
             .expect("runtime external key agreement should decrypt file");
 
-        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
         assert!(provider.request_count() > 0);
         let decrypted = std::fs::read(&output).expect("output file should exist on success");
         assert_eq!(decrypted, plaintext);
@@ -1563,7 +1563,7 @@ fn test_runtime_external_key_agreement_file_api_preserves_signature_status() {
             )
             .expect("runtime external key agreement should decrypt signed file");
 
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
         let decrypted = std::fs::read(&output).expect("output file should exist on success");
         assert_eq!(decrypted, plaintext);
     }
@@ -1905,7 +1905,7 @@ fn test_runtime_external_key_agreement_file_api_decrypts_mixed_recipient_file() 
             )
             .expect("mixed-recipient file should decrypt via the key-agreement subkey");
 
-        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
         assert!(provider.request_count() > 0);
         let decrypted = std::fs::read(&output).expect("output file should exist on success");
         assert_eq!(decrypted, plaintext);
@@ -1944,7 +1944,7 @@ fn test_runtime_external_key_agreement_api_repeated_message_decrypts_are_consist
             )
             .unwrap_or_else(|e| panic!("repeated decrypt {iteration} should succeed: {e:?}"));
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
         let request_count = provider.request_count();
         assert!(
             request_count > previous_request_count,
@@ -1983,7 +1983,7 @@ fn test_runtime_external_key_agreement_file_api_repeated_decrypts_leave_no_resid
                 None,
             )
             .unwrap_or_else(|e| panic!("repeated file decrypt {iteration} should succeed: {e:?}"));
-        assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+        assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
         let decrypted = std::fs::read(&output).expect("output file should exist on success");
         assert_eq!(decrypted, plaintext);
         assert_eq!(

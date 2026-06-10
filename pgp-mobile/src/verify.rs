@@ -3,17 +3,15 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{is_expired_error, parse_verification_certs, SignatureStatus};
+use crate::decrypt::{is_expired_error, parse_verification_certs};
 use crate::error::PgpError;
 use crate::signature_details::{
-    state_from_legacy_status, LegacyFoldMode, SignatureCollector, VerifyDetailedResult,
+    SignatureCollector, SignatureVerificationState, SummaryFoldMode, VerifyDetailedResult,
 };
 
-fn empty_detailed_result(status: SignatureStatus) -> VerifyDetailedResult {
+fn empty_detailed_result(summary_state: SignatureVerificationState) -> VerifyDetailedResult {
     VerifyDetailedResult {
-        legacy_status: status.clone(),
-        legacy_signer_fingerprint: None,
-        summary_state: state_from_legacy_status(&status),
+        summary_state,
         summary_entry_index: None,
         signatures: Vec::new(),
         content: None,
@@ -36,16 +34,16 @@ pub fn verify_cleartext_detailed(
         .with_policy(&policy, None, helper);
 
     // Match the current early-setup grading: no observed per-signature results means
-    // an empty detailed array and a legacy Bad/Expired status with no content.
+    // an empty detailed array and an Expired/Invalid summary with no content.
     let mut verifier = match verifier_result {
         Ok(v) => v,
         Err(e) => {
-            let status = if is_expired_error(&e) {
-                SignatureStatus::Expired
+            let summary_state = if is_expired_error(&e) {
+                SignatureVerificationState::Expired
             } else {
-                SignatureStatus::Bad
+                SignatureVerificationState::Invalid
             };
-            return Ok(empty_detailed_result(status));
+            return Ok(empty_detailed_result(summary_state));
         }
     };
 
@@ -55,12 +53,9 @@ pub fn verify_cleartext_detailed(
     })?;
 
     let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(VerifyDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,
@@ -79,7 +74,7 @@ impl<'a> VerifyHelper<'a> {
     pub(crate) fn new(certs: &'a [openpgp::Cert]) -> Self {
         Self {
             certs,
-            collector: SignatureCollector::new(LegacyFoldMode::VerifyLike),
+            collector: SignatureCollector::new(SummaryFoldMode::VerifyLike),
         }
     }
 }

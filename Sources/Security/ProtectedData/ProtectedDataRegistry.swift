@@ -80,7 +80,6 @@ struct ProtectedDataRegistry: Codable, Equatable, Sendable {
     var sharedResourceLifecycleState: SharedResourceLifecycleState
     var committedMembership: [ProtectedDataDomainID: ProtectedDataCommittedDomainState]
     var pendingMutation: PendingMutation?
-    var rootSecretEnvelopeMinimumVersion: Int? = nil
 
     static func emptySteadyState(sharedRightIdentifier: String) -> ProtectedDataRegistry {
         ProtectedDataRegistry(
@@ -88,19 +87,13 @@ struct ProtectedDataRegistry: Codable, Equatable, Sendable {
             sharedRightIdentifier: sharedRightIdentifier,
             sharedResourceLifecycleState: .absent,
             committedMembership: [:],
-            pendingMutation: nil,
-            rootSecretEnvelopeMinimumVersion: nil
+            pendingMutation: nil
         )
     }
 
     func validateConsistency() -> String? {
         if formatVersion != Self.currentFormatVersion {
             return "Unsupported registry format version \(formatVersion)."
-        }
-
-        if let rootSecretEnvelopeMinimumVersion,
-           rootSecretEnvelopeMinimumVersion < ProtectedDataRootSecretEnvelope.currentFormatVersion {
-            return "Root-secret envelope minimum version cannot be lower than \(ProtectedDataRootSecretEnvelope.currentFormatVersion)."
         }
 
         if committedMembership.isEmpty {

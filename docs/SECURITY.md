@@ -81,9 +81,9 @@ Deletion:
     → Key permanently inaccessible
 ```
 
-**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data, but it now lives in the ProtectedData `key-metadata` domain so key-list loading happens only after app-session authentication opens protected app data. Legacy metadata rows may still exist in the dedicated metadata Keychain account (`KeychainConstants.metadataAccount`) or older default-account locations; those rows are migration/cleanup sources only and are read after app-session authentication, using the authenticated `LAContext` handoff when the default account requires it. Private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
+**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data, but it lives in the ProtectedData `key-metadata` domain so key-list loading happens only after app-session authentication opens protected app data. Private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
 
-**Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Imported keys now receive key-level revocation export capability as part of import. Older imported keys that predate this support lazily backfill the binary revocation at export time, then immediately zeroize the temporarily unwrapped secret certificate bytes after use.
+**Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Keys receive key-level revocation material at generation or import; export uses only the stored revocation artifact and fails closed when it is missing.
 
 **Selective revocation note:** Subkey and User ID selective revocations are generated and exported on demand. They do not write back into `PGPKeyIdentity.revocationCert`, and they do not introduce an implicit persisted selective-revocation history alongside the key-level revocation slot.
 
@@ -200,10 +200,10 @@ The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
 software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE
 public key; it must not reuse the existing private-key self-ECDH wrapping
 scheme as its security design. Its HKDF sharedInfo and AES-GCM AAD bind the
-AAD version plus hashes of both persistent SE and ephemeral public keys. After
-v2 migration succeeds, registry state plus
-a ThisDeviceOnly Keychain `format-floor` marker must make later v1 raw
-root-secret payloads fail closed as downgrade/corruption.
+AAD version plus hashes of both persistent SE and ephemeral public keys. The
+envelope is the only supported root-secret payload: any payload that does not
+decode as a current `CAPDSEV2` envelope fails closed as ordinary undecodable
+input.
 
 ProtectedData domain payloads must open only after the app privacy gate has
 produced an authenticated `LAContext` or an already-authorized ProtectedData
@@ -311,8 +311,6 @@ When the user changes mode in Settings:
 - Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
 - This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
 
-Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and `com.cypherair.preference.authMode` are migration sources only. Verified migration moves them into `private-key-control` and removes the legacy keys.
-
 ### LAPolicy Selection
 
 | Mode | LAPolicy | Fallback Button |
@@ -337,13 +335,13 @@ Security invariants for protected app data:
 - Contacts does not provide multi-contact package exchange or social-graph export. Any future complete Contacts backup or device migration must be mandatory encrypted.
 - Self-test, decrypted, streaming, export handoff, and tutorial artifacts keep the inventory's ephemeral-with-cleanup behavior; files exported to user-selected destinations are outside app custody after handoff.
 
-UserDefaults is allowed only for documented boot, test, tutorial, and legacy cleanup exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
+UserDefaults is allowed only for documented boot, test, and tutorial exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
 
 Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
 
-`ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability. It loads grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion from `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff. Existing schema v1 payloads are upgraded through an explicit compatibility path using legacy ordinary settings as a migration source; schema v2 payloads are strict, so missing or corrupt ordinary settings enter protected-settings recovery instead of resetting to defaults. If the setting snapshot is unavailable, the resume grace window fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption does not silently use the app-default encrypt-to-self value for real work.
+`ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability. It loads grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion from `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff. Schema v2 payloads are strict: missing or corrupt ordinary settings enter protected-settings recovery instead of resetting to defaults. If the setting snapshot is unavailable, the resume grace window fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption does not silently use the app-default encrypt-to-self value for real work.
 
-`KeyMetadataDomainStore` owns key metadata availability. It stores `key-metadata` schema v2 payloads with `PGPKeyIdentity` records that explicitly include app-owned OpenPGP configuration identity and private-key custody kind; existing schema v1 payloads are upgraded after app privacy authentication by deriving current Profile A/B records as software-custody keys. The domain remains metadata-only: it must not store Apple Secure Enclave handle locators, access-control policy, salts, sealed boxes, secret certificate bytes, or any other private material. Corrupt, missing, or bootstrap-mismatched current committed metadata enters recovery instead of rebuilding from legacy Keychain rows.
+`KeyMetadataDomainStore` owns key metadata availability. It stores `key-metadata` schema v2 payloads with `PGPKeyIdentity` records that explicitly include app-owned OpenPGP configuration identity and private-key custody kind. The domain remains metadata-only: it must not store Apple Secure Enclave handle locators, access-control policy, salts, sealed boxes, secret certificate bytes, or any other private material. Corrupt, missing, or bootstrap-mismatched current committed metadata enters recovery.
 
 Key operation failure categories are app-owned sanitized classifications for resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping boundaries. Local-authentication categories are explicitly separate from payload-authentication failure. They must not contain plaintext, private-key material, shared secrets, session keys, KEKs, Keychain locators, stable fingerprints, temporary capability paths, or other secret-bearing values. They do not persist Secure Enclave handle state and do not replace payload-authentication hard-fail behavior.
 
@@ -361,7 +359,7 @@ The guided tutorial is allowed to run real app services and real OpenPGP operati
 
 Tutorial isolation boundaries:
 
-- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory. Startup and Reset All Local Data also remove legacy orphaned `com.cypherair.tutorial.<UUID>` suites.
+- `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory, and startup and Reset All Local Data also remove the fixed suite plist.
 - Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
 - Tutorial private-key protection currently uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows. This is temporary SR-FIX-18 debt: tutorial/UI-test mocks must remain visibly named `Mock*`, stay under `Sources/Security/Mocks`, and keep mock-owned errors instead of impersonating production `KeychainError`.
 - `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.

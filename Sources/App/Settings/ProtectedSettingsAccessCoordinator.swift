@@ -25,8 +25,7 @@ final class ProtectedSettingsAccessCoordinator {
         let syncPreAuthorizationState: @MainActor () -> Void
         let currentDomainState: @MainActor () -> DomainState
         let currentClipboardNotice: @MainActor () -> Bool?
-        let migrationAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
-        let ensureCommittedAndMigrateSettingsIfNeeded: @MainActor () async throws -> Void
+        let ensureCommittedSettingsIfNeeded: @MainActor () async throws -> Void
         let openDomainIfNeeded: @MainActor (_ wrappingRootKey: Data) async throws -> Void
         let updateClipboardNotice: @MainActor (_ enabled: Bool, _ wrappingRootKey: Data) async throws -> Void
         let pendingRecoveryAuthorizationRequirement: @MainActor () -> MutationAuthorizationRequirement
@@ -325,21 +324,21 @@ final class ProtectedSettingsAccessCoordinator {
         }
     }
 
-    private func ensureCommittedAndMigrateSettingsIfNeeded(
+    private func ensureCommittedSettingsIfNeeded(
         gateDecision: AccessGateDecision,
         preauthorized: Bool
     ) async throws {
         traceCoordinatorEvent(
-            "protectedSettings.settingsMigration.start",
+            "protectedSettings.ensureCommitted.start",
             metadata: [
                 "gateDecision": accessGateTraceValue(gateDecision),
                 "preauthorized": preauthorized ? "true" : "false"
             ]
         )
         do {
-            try await dependencies.ensureCommittedAndMigrateSettingsIfNeeded()
+            try await dependencies.ensureCommittedSettingsIfNeeded()
             traceCoordinatorEvent(
-                "protectedSettings.settingsMigration.finish",
+                "protectedSettings.ensureCommitted.finish",
                 metadata: [
                     "result": "success",
                     "gateDecision": accessGateTraceValue(gateDecision),
@@ -348,7 +347,7 @@ final class ProtectedSettingsAccessCoordinator {
             )
         } catch {
             traceCoordinatorEvent(
-                "protectedSettings.settingsMigration.finish",
+                "protectedSettings.ensureCommitted.finish",
                 metadata: traceErrorMetadata(
                     error,
                     extra: [
@@ -421,76 +420,40 @@ final class ProtectedSettingsAccessCoordinator {
                 )
                 return false
             }
-            let migrationRequirement = dependencies.migrationAuthorizationRequirement()
-            let didPreauthorizeMigration: Bool
-            switch migrationRequirement {
-            case .notRequired:
-                didPreauthorizeMigration = false
-            case .wrappingRootKeyRequired:
-                let migrationAuthorization = try await authorizeMutationIfNeeded(
-                    requirement: migrationRequirement,
-                    localizedReason: localizedReason,
-                    operation: "settingsMigration"
-                )
-                guard migrationAuthorization.isAuthorized else {
-                    traceCoordinatorEvent(
-                        "protectedSettings.ensureAccess.finish",
-                        metadata: stateMetadata()
-                            .merging(["result": "migrationAuthorizationBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                    )
-                    return false
-                }
-                if let authenticationContext = migrationAuthorization.authenticationContext {
+            try await ensureCommittedSettingsIfNeeded(
+                gateDecision: decision,
+                preauthorized: false
+            )
+            traceCoordinatorEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
+            let authorizationResult = await dependencies.authorizeSharedRight(
+                localizedReason,
+                .allowInteraction
+            )
+            traceCoordinatorEvent(
+                "protectedSettings.authorization.result",
+                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
+            )
+            switch authorizationResult {
+            case .authorized, .authorizedWithContext:
+                if let authenticationContext = authorizationResult.authenticationContext {
                     operationAuthenticationContexts.append(authenticationContext)
                 }
-                didPreauthorizeMigration = true
+            case .cancelledOrDenied:
+                stateAdapter.setSectionState(.locked)
+                traceCoordinatorEvent(
+                    "protectedSettings.ensureAccess.finish",
+                    metadata: stateMetadata()
+                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                )
+                return false
             case .frameworkRecoveryNeeded:
-                dependencies.syncPreAuthorizationState()
                 stateAdapter.setSectionState(.frameworkUnavailable)
                 traceCoordinatorEvent(
                     "protectedSettings.ensureAccess.finish",
                     metadata: stateMetadata()
-                        .merging(["result": "migrationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
+                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
                 )
                 return false
-            }
-            try await ensureCommittedAndMigrateSettingsIfNeeded(
-                gateDecision: decision,
-                preauthorized: didPreauthorizeMigration
-            )
-            if !didPreauthorizeMigration {
-                traceCoordinatorEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
-                let authorizationResult = await dependencies.authorizeSharedRight(
-                    localizedReason,
-                    .allowInteraction
-                )
-                traceCoordinatorEvent(
-                    "protectedSettings.authorization.result",
-                    metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
-                )
-                switch authorizationResult {
-                case .authorized, .authorizedWithContext:
-                    if let authenticationContext = authorizationResult.authenticationContext {
-                        operationAuthenticationContexts.append(authenticationContext)
-                    }
-                    break
-                case .cancelledOrDenied:
-                    stateAdapter.setSectionState(.locked)
-                    traceCoordinatorEvent(
-                        "protectedSettings.ensureAccess.finish",
-                        metadata: stateMetadata()
-                            .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                    )
-                    return false
-                case .frameworkRecoveryNeeded:
-                    stateAdapter.setSectionState(.frameworkUnavailable)
-                    traceCoordinatorEvent(
-                        "protectedSettings.ensureAccess.finish",
-                        metadata: stateMetadata()
-                            .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                    )
-                    return false
-                }
             }
         case .authorizationRequired:
             guard authorizationMode == .authorizeIfNeeded || authorizationMode == .handoffOnly else {
@@ -547,7 +510,7 @@ final class ProtectedSettingsAccessCoordinator {
                 if let authenticationContext = authorizationResult.authenticationContext {
                     operationAuthenticationContexts.append(authenticationContext)
                 }
-                try await ensureCommittedAndMigrateSettingsIfNeeded(
+                try await ensureCommittedSettingsIfNeeded(
                     gateDecision: decision,
                     preauthorized: true
                 )
@@ -569,7 +532,7 @@ final class ProtectedSettingsAccessCoordinator {
                 return false
             }
         case .alreadyAuthorized:
-            try await ensureCommittedAndMigrateSettingsIfNeeded(
+            try await ensureCommittedSettingsIfNeeded(
                 gateDecision: decision,
                 preauthorized: true
             )

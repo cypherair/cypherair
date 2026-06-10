@@ -125,7 +125,9 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             revocationCert: Data(),
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
-            expiryDate: metadata.expiryDate
+            expiryDate: metadata.expiryDate,
+            openPGPConfigurationIdentity: metadata.profile.openPGPConfiguration.identity,
+            privateKeyCustodyKind: .softwareSecretCertificate
         )
         try storeIdentity(identity)
 
@@ -238,93 +240,31 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         XCTAssertEqual(binary, imported.revocationCert)
     }
 
-    func test_exportRevocationCertificate_legacyMissingRevocation_backfillsAndSecondExportSkipsUnwrap() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Legacy Revocation")
-        let passphrase = "legacy-revocation-pass"
-        let exportedBackup = try await service.exportKey(
-            fingerprint: identity.fingerprint,
-            passphrase: passphrase
-        )
-        try service.deleteKey(fingerprint: identity.fingerprint)
+    func test_exportRevocationCertificate_missingArtifact_failsClosedWithoutUnwrap() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Missing Revocation Artifact")
+        var stored = try loadStoredIdentity(fingerprint: identity.fingerprint)
+        stored.revocationCert = Data()
+        try overwriteStoredIdentity(stored)
 
-        let imported = try await service.importKey(
-            armoredData: exportedBackup,
-            passphrase: passphrase
-        )
+        let strictService = makeFreshService()
+        try strictService.loadKeys()
+        XCTAssertTrue(try XCTUnwrap(strictService.keys.first).revocationCert.isEmpty)
 
-        var legacyIdentity = try loadStoredIdentity(fingerprint: imported.fingerprint)
-        legacyIdentity.revocationCert = Data()
-        try overwriteStoredIdentity(legacyIdentity)
+        let unwrapCountBefore = mockSE.unwrapCallCount
+        let updateCountBefore = metadataPersistence.updateCallCount
 
-        let legacyService = makeFreshService()
-        try legacyService.loadKeys()
-        XCTAssertTrue(try XCTUnwrap(legacyService.keys.first).revocationCert.isEmpty)
+        do {
+            _ = try await strictService.exportRevocationCertificate(fingerprint: identity.fingerprint)
+            XCTFail("Expected missing revocation artifact to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .revocationArtifactUnavailable)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
 
-        let unwrapCountBeforeFirstExport = mockSE.unwrapCallCount
-        let firstArmored = try await legacyService.exportRevocationCertificate(fingerprint: imported.fingerprint)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBeforeFirstExport + 1, "Legacy backfill should unwrap once")
-
-        let firstBinary = try engine.dearmor(armored: firstArmored)
-        let persisted = try loadStoredIdentity(fingerprint: imported.fingerprint)
-        XCTAssertEqual(firstBinary, persisted.revocationCert, "Backfilled revocation should persist to metadata")
-        XCTAssertFalse(persisted.revocationCert.isEmpty)
-
-        let unwrapCountBeforeSecondExport = mockSE.unwrapCallCount
-        let secondArmored = try await legacyService.exportRevocationCertificate(fingerprint: imported.fingerprint)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBeforeSecondExport, "Persisted revocation should skip unwrap on later exports")
-        XCTAssertEqual(secondArmored, firstArmored)
-    }
-
-    func test_exportRevocationCertificate_legacyMissingRevocation_metadataUpdateFailure_stillExportsAndKeepsSessionBackfilled() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Legacy Revocation Save Failure")
-        let passphrase = "legacy-revocation-save-failure-pass"
-        let exportedBackup = try await service.exportKey(
-            fingerprint: identity.fingerprint,
-            passphrase: passphrase
-        )
-        try service.deleteKey(fingerprint: identity.fingerprint)
-
-        let imported = try await service.importKey(
-            armoredData: exportedBackup,
-            passphrase: passphrase
-        )
-
-        var legacyIdentity = try loadStoredIdentity(fingerprint: imported.fingerprint)
-        legacyIdentity.revocationCert = Data()
-        try overwriteStoredIdentity(legacyIdentity)
-
-        let legacyService = makeFreshService()
-        try legacyService.loadKeys()
-        XCTAssertTrue(try XCTUnwrap(legacyService.keys.first).revocationCert.isEmpty)
-
-        mockKC.saveError = MockKeychainError.saveFailed
-
-        let unwrapCountBeforeFirstExport = mockSE.unwrapCallCount
-        let firstArmored = try await legacyService.exportRevocationCertificate(fingerprint: imported.fingerprint)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBeforeFirstExport + 1, "Legacy backfill should unwrap once even when metadata persistence fails")
-
-        let firstBinary = try engine.dearmor(armored: firstArmored)
-        XCTAssertEqual(try XCTUnwrap(legacyService.keys.first).revocationCert, firstBinary, "Current session should keep the generated revocation even if metadata persistence fails")
-
-        let persisted = try loadStoredIdentity(fingerprint: imported.fingerprint)
-        XCTAssertTrue(persisted.revocationCert.isEmpty, "Failed metadata update should restore the previous persisted metadata")
-
-        let unwrapCountBeforeSecondExport = mockSE.unwrapCallCount
-        let secondArmored = try await legacyService.exportRevocationCertificate(fingerprint: imported.fingerprint)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBeforeSecondExport, "Current session should not re-unwrap after an in-memory backfill")
-        XCTAssertEqual(secondArmored, firstArmored)
-
-        let freshService = makeFreshService()
-        try freshService.loadKeys()
-        XCTAssertTrue(try XCTUnwrap(freshService.keys.first).revocationCert.isEmpty, "Fresh service should still observe the legacy persisted state")
-
-        let unwrapCountBeforeFreshExport = mockSE.unwrapCallCount
-        let freshArmored = try await freshService.exportRevocationCertificate(fingerprint: imported.fingerprint)
-        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBeforeFreshExport + 1, "Fresh service should backfill again because persisted metadata was unchanged")
-
-        let freshBinary = try engine.dearmor(armored: freshArmored)
-        let freshSessionIdentity = try XCTUnwrap(freshService.keys.first)
-        XCTAssertEqual(freshSessionIdentity.revocationCert, freshBinary)
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore, "Missing artifact must not trigger private-key unwrap")
+        XCTAssertEqual(metadataPersistence.updateCallCount, updateCountBefore, "Missing artifact must not rewrite metadata")
+        XCTAssertTrue(try loadStoredIdentity(fingerprint: identity.fingerprint).revocationCert.isEmpty)
     }
 
     func test_generateKey_profileA_revocationCertIsValidOpenPGP() async throws {

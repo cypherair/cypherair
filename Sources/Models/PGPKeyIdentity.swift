@@ -5,27 +5,9 @@ import Foundation
 /// holds only metadata and the public key data.
 ///
 /// Conforms to `Codable` for serialization into the protected key-metadata
-/// domain, with legacy Keychain decoding retained for migration.
+/// domain. All fields are strict: records must persist explicit
+/// configuration identity and custody kind.
 struct PGPKeyIdentity: Identifiable, Hashable, Codable {
-    private enum CodingKeys: String, CodingKey {
-        case fingerprint
-        case keyVersion
-        case profile
-        case openPGPConfigurationIdentity
-        case privateKeyCustodyKind
-        case userId
-        case hasEncryptionSubkey
-        case isRevoked
-        case isExpired
-        case isDefault
-        case isBackedUp
-        case publicKeyData
-        case revocationCert
-        case primaryAlgo
-        case subkeyAlgo
-        case expiryDate
-    }
-
     /// Unique identifier — the full fingerprint in lowercase hex.
     var id: String { fingerprint }
 
@@ -68,8 +50,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     var publicKeyData: Data
 
     /// Binary revocation signature data used for export.
-    /// Generated at key creation for local keys and backfilled on demand for
-    /// imported keys that predate revocation-construction support.
     var revocationCert: Data
 
     /// Primary algorithm description (e.g., "Ed25519", "Ed448").
@@ -116,14 +96,14 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         primaryAlgo: String,
         subkeyAlgo: String?,
         expiryDate: Date?,
-        openPGPConfigurationIdentity: PGPKeyConfiguration.Identity? = nil,
-        privateKeyCustodyKind: PGPPrivateKeyCustodyKind? = nil
+        openPGPConfigurationIdentity: PGPKeyConfiguration.Identity,
+        privateKeyCustodyKind: PGPPrivateKeyCustodyKind
     ) {
         self.fingerprint = fingerprint
         self.keyVersion = keyVersion
         self.profile = profile
-        self.openPGPConfigurationIdentity = openPGPConfigurationIdentity ?? profile.openPGPConfiguration.identity
-        self.privateKeyCustodyKind = privateKeyCustodyKind ?? profile.defaultCustodyKind
+        self.openPGPConfigurationIdentity = openPGPConfigurationIdentity
+        self.privateKeyCustodyKind = privateKeyCustodyKind
         self.userId = userId
         self.hasEncryptionSubkey = hasEncryptionSubkey
         self.isRevoked = isRevoked
@@ -135,33 +115,5 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         self.primaryAlgo = primaryAlgo
         self.subkeyAlgo = subkeyAlgo
         self.expiryDate = expiryDate
-    }
-
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let profile = try container.decode(PGPKeyProfile.self, forKey: .profile)
-
-        fingerprint = try container.decode(String.self, forKey: .fingerprint)
-        keyVersion = try container.decode(UInt8.self, forKey: .keyVersion)
-        self.profile = profile
-        openPGPConfigurationIdentity = try container.decodeIfPresent(
-            PGPKeyConfiguration.Identity.self,
-            forKey: .openPGPConfigurationIdentity
-        ) ?? profile.openPGPConfiguration.identity
-        privateKeyCustodyKind = try container.decodeIfPresent(
-            PGPPrivateKeyCustodyKind.self,
-            forKey: .privateKeyCustodyKind
-        ) ?? profile.defaultCustodyKind
-        userId = try container.decodeIfPresent(String.self, forKey: .userId)
-        hasEncryptionSubkey = try container.decode(Bool.self, forKey: .hasEncryptionSubkey)
-        isRevoked = try container.decode(Bool.self, forKey: .isRevoked)
-        isExpired = try container.decode(Bool.self, forKey: .isExpired)
-        isDefault = try container.decode(Bool.self, forKey: .isDefault)
-        isBackedUp = try container.decode(Bool.self, forKey: .isBackedUp)
-        publicKeyData = try container.decode(Data.self, forKey: .publicKeyData)
-        revocationCert = try container.decode(Data.self, forKey: .revocationCert)
-        primaryAlgo = try container.decode(String.self, forKey: .primaryAlgo)
-        subkeyAlgo = try container.decodeIfPresent(String.self, forKey: .subkeyAlgo)
-        expiryDate = try container.decodeIfPresent(Date.self, forKey: .expiryDate)
     }
 }

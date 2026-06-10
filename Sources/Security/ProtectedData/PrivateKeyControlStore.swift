@@ -29,7 +29,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         let generationIdentifier: Int
     }
 
-    private let defaults: UserDefaults
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
@@ -45,14 +44,12 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     private var memoryOnlySeededForTesting = false
 
     init(
-        defaults: UserDefaults,
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
         bootstrapStore: ProtectedDomainBootstrapStore? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
-        self.defaults = defaults
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
@@ -86,7 +83,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             privateKeyControlState = .locked
             return false
         }
-        let initialPayload = try legacyInitialPayload()
+        let initialPayload = Payload.initial(authMode: .standard)
         let provisionedSecret = SensitiveBytesBox(
             data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
         )
@@ -139,7 +136,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             }
         )
 
-        cleanupLegacyDefaults()
         clearUnlockedState()
         privateKeyControlState = .locked
         return true
@@ -159,7 +155,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             throw PrivateKeyControlError.recoveryNeeded
         }
 
-        let initialPayload = try legacyInitialPayload()
+        let initialPayload = Payload.initial(authMode: .standard)
         let wrappingRootKeyBox = SensitiveBytesBox(data: wrappingRootKey)
         defer {
             wrappingRootKeyBox.zeroize()
@@ -191,7 +187,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             }
         )
 
-        cleanupLegacyDefaults()
         clearUnlockedState()
         privateKeyControlState = .locked
     }
@@ -379,7 +374,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         guard let currentWrappingRootKey else {
             throw ProtectedDataError.authorizingUnavailable
         }
-        let initialPayload = try legacyInitialPayload()
+        let initialPayload = Payload.initial(authMode: .standard)
         let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
         defer {
             wrappingRootKey.zeroize()
@@ -401,7 +396,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
                 }
             }
         )
-        cleanupLegacyDefaults()
     }
 
     func deleteDomainArtifactsForRecovery() throws {
@@ -599,57 +593,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             from: wrappedRecord,
             wrappingRootKey: wrappingRootKey.dataCopy()
         )
-    }
-
-    private func legacyInitialPayload() throws -> Payload {
-        let authMode: AuthenticationMode
-        if let rawMode = defaults.string(forKey: AuthPreferences.authModeKey) {
-            guard let parsedMode = AuthenticationMode(rawValue: rawMode) else {
-                privateKeyControlState = .recoveryNeeded
-                throw PrivateKeyControlError.invalidLegacyAuthMode(rawMode)
-            }
-            authMode = parsedMode
-        } else {
-            authMode = .standard
-        }
-
-        let rewrapTargetMode: AuthenticationMode?
-        if defaults.bool(forKey: AuthPreferences.rewrapInProgressKey) {
-            if let rawTarget = defaults.string(forKey: AuthPreferences.rewrapTargetModeKey),
-               let parsedTarget = AuthenticationMode(rawValue: rawTarget) {
-                rewrapTargetMode = parsedTarget
-            } else {
-                rewrapTargetMode = authMode
-            }
-        } else {
-            rewrapTargetMode = nil
-        }
-
-        let modifyExpiryEntry: ModifyExpiryRecoveryEntry?
-        if defaults.bool(forKey: AuthPreferences.modifyExpiryInProgressKey) {
-            modifyExpiryEntry = ModifyExpiryRecoveryEntry(
-                fingerprint: defaults.string(forKey: AuthPreferences.modifyExpiryFingerprintKey)
-            )
-        } else {
-            modifyExpiryEntry = nil
-        }
-
-        return Payload(
-            settings: Payload.Settings(authMode: authMode),
-            recoveryJournal: PrivateKeyControlRecoveryJournal(
-                rewrapTargetMode: rewrapTargetMode,
-                rewrapPhase: rewrapTargetMode == nil ? nil : .preparing,
-                modifyExpiry: modifyExpiryEntry
-            )
-        )
-    }
-
-    private func cleanupLegacyDefaults() {
-        defaults.removeObject(forKey: AuthPreferences.authModeKey)
-        defaults.removeObject(forKey: AuthPreferences.rewrapInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.rewrapTargetModeKey)
-        defaults.removeObject(forKey: AuthPreferences.modifyExpiryInProgressKey)
-        defaults.removeObject(forKey: AuthPreferences.modifyExpiryFingerprintKey)
     }
 
     private func deleteDomainArtifacts() throws {

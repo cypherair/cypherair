@@ -373,8 +373,7 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_markFinishedTutorial_isTheOnlyPointThatPersistsCompletion() {
-        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings()
         let store = TutorialSessionStore()
         store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
 
@@ -408,8 +407,7 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_prepareForPresentation_afterFinishedReplay_resetsSession() {
-        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings()
         let store = TutorialSessionStore()
         store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
         for module in TutorialModuleID.allCases {
@@ -425,8 +423,7 @@ final class TutorialSessionStoreTests: XCTestCase {
     }
 
     func test_canOpen_unlocksSequentiallyBeforeReplayAndEverythingAfterReplay() {
-        let defaults = UserDefaults(suiteName: "com.cypherair.tests.tutorial.\(UUID().uuidString)")!
-        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings(defaults: defaults)
+        let protectedOrdinarySettings = makeLoadedProtectedOrdinarySettings()
         let store = TutorialSessionStore()
         store.configurePersistence(protectedOrdinarySettings: protectedOrdinarySettings)
 
@@ -445,11 +442,9 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertTrue(store.canOpen(.enableHighSecurity))
     }
 
-    private func makeLoadedProtectedOrdinarySettings(
-        defaults: UserDefaults
-    ) -> ProtectedOrdinarySettingsCoordinator {
+    private func makeLoadedProtectedOrdinarySettings() -> ProtectedOrdinarySettingsCoordinator {
         let coordinator = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         coordinator.loadForAuthenticatedTestBypass()
         return coordinator

@@ -8,7 +8,7 @@ use openpgp::types::{AEADAlgorithm, SymmetricAlgorithm};
 use sequoia_openpgp as openpgp;
 
 use crate::armor;
-use crate::decrypt::{self, SignatureStatus};
+use crate::decrypt;
 use crate::encrypt;
 use crate::error::PgpError;
 use crate::keys::ExternalP256SigningProvider;
@@ -37,8 +37,6 @@ pub enum PasswordDecryptStatus {
 pub struct PasswordDecryptResult {
     pub status: PasswordDecryptStatus,
     pub plaintext: Option<Vec<u8>>,
-    pub signature_status: Option<SignatureStatus>,
-    pub signer_fingerprint: Option<String>,
     pub summary_state: SignatureVerificationState,
     pub summary_entry_index: Option<u64>,
     pub signatures: Vec<DetailedSignatureEntry>,
@@ -116,8 +114,6 @@ pub fn decrypt(
         return Ok(PasswordDecryptResult {
             status: PasswordDecryptStatus::NoSkesk,
             plaintext: None,
-            signature_status: None,
-            signer_fingerprint: None,
             summary_state: SignatureVerificationState::NotSigned,
             summary_entry_index: None,
             signatures: Vec::new(),
@@ -152,8 +148,6 @@ pub fn decrypt(
                 return Ok(PasswordDecryptResult {
                     status: PasswordDecryptStatus::Decrypted,
                     plaintext: Some(result.plaintext),
-                    signature_status: Some(result.legacy_status),
-                    signer_fingerprint: result.legacy_signer_fingerprint,
                     summary_state: result.summary_state,
                     summary_entry_index: result.summary_entry_index,
                     signatures: result.signatures,
@@ -178,8 +172,6 @@ pub fn decrypt(
     Ok(PasswordDecryptResult {
         status: PasswordDecryptStatus::PasswordRejected,
         plaintext: None,
-        signature_status: None,
-        signer_fingerprint: None,
         summary_state: SignatureVerificationState::NotSigned,
         summary_entry_index: None,
         signatures: Vec::new(),

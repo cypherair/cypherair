@@ -57,7 +57,7 @@ Key files:
 - `LocalDataResetService.swift` — destructive reset workflow for CypherAir-owned Keychain items, ProtectedData files, contacts, defaults, temporary files, and in-memory session state
 - `LocalDataResetRestartAction.swift` — platform restart/termination action after local-data reset
 - `AppSceneIncomingURLRouter.swift` — scene-level URL handoff into the incoming contact-import coordinator
-- `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, migration, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
+- `ProtectedSettingsAccessCoordinator.swift` — protected-settings access, domain creation, open-domain, reset, retry, and clipboard-notice mutation authorization workflow policy
 - `ProtectedSettingsHost.swift` — SwiftUI-facing protected-settings host, section-state projection, environment injection, and presentation trace metadata
 - `ContentView.swift` — root navigation
 - `OnboardingView.swift` — first-run flow and guided tutorial decision page
@@ -104,7 +104,7 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 
 The guided tutorial is a host-driven sandbox that teaches the real app workflow without touching real workspace state. `TutorialView` owns the hub, sandbox acknowledgement, workspace, completion, and leave-confirmation surfaces. `TutorialSessionStore` owns the current tutorial session, seven-module progress, replay unlock rules, navigation state, active tutorial modal, output interception policy, and completion-version persistence.
 
-`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, while startup/reset cleanup also removes legacy orphaned `com.cypherair.tutorial.<UUID>` defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
+`TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, and startup/reset cleanup removes the fixed suite plist and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
 The tutorial's mock security primitives are temporary SR-FIX-18 debt, not production security primitives — the naming and containment rules live in the Security Layer table below and [SECURITY.md](SECURITY.md) Section 6. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
 
@@ -210,8 +210,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
-| `KeyMetadataDomainStore` | ProtectedData `key-metadata` schema v2 domain for `PGPKeyIdentity` payloads opened after app privacy authentication; legacy Keychain metadata rows are migration sources only |
-| `KeyMetadataStore` | Legacy Keychain metadata helper retained for migration from the dedicated metadata account and older default-account rows |
+| `KeyMetadataDomainStore` | ProtectedData `key-metadata` schema v2 domain for `PGPKeyIdentity` payloads opened after app privacy authentication |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
 | `MemoryZeroingUtility` | Extensions on `Data` and `Array<UInt8>` for secure clearing |
@@ -220,22 +219,21 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 - `ProtectedDataStorageRoot.swift` — resolves the protected app-data storage root, applies file protection, and owns registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
-- `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration, legacy right-store migration handoff, envelope-floor recording, and root-secret operation tracing
-- `KeychainProtectedDataRootSecretStore` (`ProtectedDataRightStoreClient.swift`) — Keychain storage for the shared app-data root-secret v2 envelope, legacy raw-secret migration, and anti-downgrade enforcement
-- `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider and format-floor marker store
+- `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration and root-secret operation tracing
+- `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider
 - `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
-- `ProtectedDataRightStoreClient.swift` — legacy right-store migration/cleanup adapter, not the current authorization path
+- `ProtectedDataRightStoreClient.swift` — Keychain-backed root-secret store for the `CAPDSEV2` envelope
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
 - `ProtectedDataFrameworkSentinelStore.swift` — framework-owned second production domain (`protected-framework-sentinel`) with a minimal schema/purpose payload used to prove multi-domain lifecycle, recovery, and relock behavior before later product-domain migrations
-- `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; migrates legacy UserDefaults sources after app authentication and opens through post-unlock orchestration
-- `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores schema v2 `PGPKeyIdentity` metadata including explicit OpenPGP configuration identity and private-key custody kind, migrates schema v1 / legacy Keychain metadata rows after unlock, and participates in relock/recovery. It does not store Apple handle locators, access-control policy, or private material.
+- `PrivateKeyControlStore.swift` — protected domain `private-key-control` for `settings.authMode` plus `recoveryJournal`; opens through post-unlock orchestration
+- `KeyMetadataDomainStore.swift` — protected domain `key-metadata`; stores schema v2 `PGPKeyIdentity` metadata including explicit OpenPGP configuration identity and private-key custody kind, and participates in relock/recovery. It does not store Apple handle locators, access-control policy, or private material.
 
 ProtectedData component ownership:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
-- `PrivateKeyControlStore` is the private-key control source of truth; current migrated payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
+- `PrivateKeyControlStore` is the private-key control source of truth; the payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key bundle rows
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
 - `ProtectedSettingsOrdinarySettingsPersistence` adapts `ProtectedSettingsStore` to the ordinary-settings persistence protocol inside the ProtectedData boundary
@@ -248,8 +246,7 @@ ProtectedData component ownership:
 - `ContactsDomainSnapshotCodec` owns Contacts protected-domain schema serialization, binary-plist payload decoding, current-schema validation, unsupported-schema fail-closed errors, and decode scratch-buffer clearing.
 - `AppContainer` assembles the Contacts store, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
 - root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
-- legacy 32-byte raw root-secret payloads are migrated on first authenticated load only while no v2 floor exists
-- after successful v2 save/migration, registry state plus a ThisDeviceOnly Keychain `format-floor` marker prevents accepting downgraded v1 root-secret payloads
+- root-secret payloads that do not decode as a current `CAPDSEV2` envelope fail closed as ordinary undecodable input
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
 - ProtectedData current-state coverage includes ordinary-settings, self-test export-only state, temporary/export/tutorial artifact hardening, and Contacts protected-domain state; Contacts uses the protected `contacts` domain for person-centered Contacts data and no longer reads legacy flat Contacts files
@@ -498,7 +495,7 @@ sequenceDiagram
     Domain->>Domain: unwrap domain DMK and read encrypted payload generation
 ```
 
-Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, open protected payloads, or read ordinary-setting legacy sources. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. The protected-settings opener first ensures the domain is committed and upgrades schema v1 payloads to schema v2 when needed. After that handoff, App composition reduces the protected-settings domain state to app-level ordinary-settings availability; `ProtectedOrdinarySettingsCoordinator` loads the ordinary-settings snapshot only when that availability is `.available`. Locked, recovery, pending mutation, or framework-unavailable states fail closed to ordinary-settings recovery. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
+Pre-auth startup may classify `ProtectedDataRegistry` and bootstrap metadata only. It must not read the root secret, unwrap a domain master key, or open protected payloads. Post-unlock orchestration currently opens `private-key-control`, `key-metadata`, `protected-settings`, and the framework sentinel when their registry state allows it. The protected-settings opener first ensures the domain is committed. After that handoff, App composition reduces the protected-settings domain state to app-level ordinary-settings availability; `ProtectedOrdinarySettingsCoordinator` loads the ordinary-settings snapshot only when that availability is `.available`. Locked, recovery, pending mutation, or framework-unavailable states fail closed to ordinary-settings recovery. If the registry reports pending mutation or framework recovery, domain open is blocked until recovery completes.
 
 ## 4. Tightly Coupled Modules
 
@@ -518,7 +515,7 @@ These pairs must be updated together. A change to one without the other will cau
 
 ```
 Keychain (kSecClassGenericPassword, data-protection Keychain):
-├── Default account (`com.cypherair`):
+└── Default account (`com.cypherair`):
 │   ├── com.cypherair.v1.se-key.<fingerprint>         → SE key dataRepresentation
 │   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt
 │   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
@@ -527,10 +524,7 @@ Keychain (kSecClassGenericPassword, data-protection Keychain):
 │   ├── com.cypherair.v1.pending-sealed-key.<fingerprint>
 │   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret v2 envelope
 │   ├── com.cypherair.v1.protected-data.device-binding-key → ProtectedData SE device-binding key representation
-│   ├── com.cypherair.v1.protected-data.root-secret-format-floor → ThisDeviceOnly anti-downgrade marker
-│   └── com.cypherair.v1.protected-data.root-secret-legacy-cleanup → Optional cleanup-only staging row, never fallback
-├── Metadata account (`com.cypherair.metadata`):
-│   └── com.cypherair.v1.metadata.<fingerprint>       → Legacy PGPKeyIdentity JSON migration source
+│   └── (no other CypherAir support rows)
 
 Keychain (kSecClassKey, Secure Enclave token):
 └── com.cypherair.v1.secure-enclave-custody.<random-id>.<role>
@@ -540,7 +534,6 @@ Keychain (kSecClassKey, Secure Enclave token):
 App Sandbox:
 ├── Documents/
 │   ├── contacts/                → Legacy flat Contacts files; unsupported — not read, migrated, quarantined, or reset-cleaned (see PERSISTED_STATE_INVENTORY)
-│   └── self-test/               → Legacy self-test reports cleanup source only; new reports are in-memory export-only
 ├── Application Support/
 │   └── ProtectedData/
 │       ├── ProtectedDataRegistry.plist
@@ -551,20 +544,8 @@ App Sandbox:
 │       └── protected-framework-sentinel/    → Framework sentinel envelopes; schema/purpose marker only
 ├── Library/Preferences/
 │   └── (UserDefaults)
-│       ├── com.cypherair.preference.authMode              → Legacy source removed after private-key-control migration
 │       ├── com.cypherair.preference.appSessionAuthenticationPolicy → App-session boot auth profile
-│       ├── com.cypherair.preference.gracePeriod            → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.encryptToSelf          → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.clipboardNotice        → Legacy cleanup-only after protected-settings migration
-│       ├── com.cypherair.preference.onboardingComplete     → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.guidedTutorialCompletedVersion → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.preference.colorTheme             → Legacy cleanup-only after protected-settings schema v2 migration
-│       ├── com.cypherair.internal.rewrapInProgress         → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.rewrapTargetMode         → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.modifyExpiryInProgress   → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.internal.modifyExpiryFingerprint  → Legacy source removed after private-key-control migration
-│       ├── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
-│       └── com.cypherair.tutorial.<UUID>.plist             → Legacy tutorial sandbox defaults orphan; startup/reset fallback cleanup
+│       └── com.cypherair.tutorial.sandbox.plist            → Fixed tutorial sandbox defaults; startup/reset direct cleanup
 └── tmp/
     ├── decrypted/op-<UUID>/     → Per-operation decrypted file previews with verified complete protection
     ├── streaming/op-<UUID>/     → Per-operation streaming outputs with verified complete protection
@@ -575,12 +556,10 @@ App Sandbox:
 **Keychain key naming conventions:**
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
-- Legacy metadata items use `metadata.` prefix under the dedicated metadata account, with older rows possible in the default account. They store `PGPKeyIdentity` as JSON only for migration/cleanup; new production metadata writes go to ProtectedData domain `key-metadata`.
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
 - Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Hidden generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
 - The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a normal software-ephemeral P-256 ECDH envelope, not the private-key self-ECDH wrapping pattern.
-- The v2 root-secret envelope is guarded against downgrade by registry state plus the ThisDeviceOnly `format-floor` marker. If either marker says v2 and the root-secret row later looks like v1 raw bytes, ProtectedData fails closed.
-- The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, legacy-cleanup, or out-of-app-custody exception.
+- The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, or out-of-app-custody exception.
 - Post-unlock orchestration opens required domains such as `private-key-control`, `key-metadata`, protected settings, and the framework sentinel by reusing the app privacy authentication context without extra Face ID prompts.
 
 ## 6. Memory Integrity Enforcement

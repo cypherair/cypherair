@@ -49,7 +49,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
     func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
-        mockKC.deleteError = MockKeychainError.deleteFailed
+        metadataPersistence.failNextUpdate = true
 
         _ = try await service.exportKey(
             fingerprint: identity.fingerprint,

@@ -310,7 +310,6 @@ Per identity (fingerprint = lowercase hex, no spaces):
 com.cypherair.v1.se-key.<fingerprint>
 com.cypherair.v1.salt.<fingerprint>
 com.cypherair.v1.sealed-key.<fingerprint>
-com.cypherair.v1.metadata.<fingerprint>
 ```
 
 **Keychain item configuration:**
@@ -320,7 +319,6 @@ com.cypherair.v1.metadata.<fingerprint>
 | SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
-| Legacy key metadata migration rows (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); migration/cleanup source before verified ProtectedData `key-metadata` domain creation |
 | ProtectedData SE device-binding key | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
 
 ProtectedData uses this device-binding key only to open the app-data
@@ -370,7 +368,7 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 
 Detailed storage locations, target classes, current status, and migration readiness live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This TDD owns the technical contracts for ProtectedData behavior, migration safety, relock, and recovery; it does not duplicate the full persisted-state inventory.
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Permanent exceptions remain limited to documented boot-authentication, private-key material, framework bootstrap, test-only, cleanup-only, temporary, and out-of-app-custody export surfaces as classified in the inventory.
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Permanent exceptions remain limited to documented boot-authentication, private-key material, framework bootstrap, test-only, temporary, and out-of-app-custody export surfaces as classified in the inventory.
 
 ### 6.1 ProtectedData Current Contract
 
@@ -378,7 +376,7 @@ ProtectedData is the current shared framework for app-owned local state that ope
 
 Current framework contracts:
 
-- `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, root-secret envelope minimum version, and a single pending create/delete mutation.
+- `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, and a single pending create/delete mutation.
 - Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the shared app-data root secret, unwrap any domain master key, or open protected payload generations.
 - The shared app-data root secret is stored in the Keychain as a v2 `CAPDSEV2` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key silently unwraps that envelope under the same app-session gate.
 - `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from wrapped-DMK records.
@@ -399,10 +397,10 @@ Tags normalize display text for case-insensitive uniqueness. In Encrypt, applyin
 
 Migration and exception rules:
 
-- Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
-- Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
+- `private-key-control` settings and recovery-journal state are created and mutated only inside the protected payload.
+- Key metadata persists only in the protected `key-metadata` domain.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
-- Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
+- Self-test reports are in-memory export-only data.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
 - Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.
 - Contacts payloads with an unsupported schema version fail closed and route the Contacts domain to recovery.

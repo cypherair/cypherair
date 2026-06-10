@@ -6,7 +6,7 @@ import XCTest
 
 final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
 
-    func test_deleteKey_removesKeychainItems() async throws {
+    func test_deleteKey_removesKeychainItemsAndMetadata() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
         let fp = identity.fingerprint
 
@@ -15,9 +15,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         XCTAssertFalse(mockKC.exists(
             service: KeychainConstants.seKeyService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
-        XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.metadataService(fingerprint: fp),
-            account: KeychainConstants.metadataAccount))
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
     }
 
     func test_deleteKey_removesFromKeysArray() async throws {
@@ -149,7 +147,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             keychain: mockKC,
             authenticator: mockAuth,
             authenticationPromptCoordinator: coordinator,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
         let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
 
@@ -182,7 +181,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             keychain: mockKC,
             authenticator: mockAuth,
             authenticationPromptCoordinator: coordinator,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
         let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
 
@@ -242,12 +242,12 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
         let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
 
-        mockKC.saveError = MockKeychainError.saveFailed
+        metadataPersistence.failNextUpdate = true
 
         XCTAssertThrowsError(try service.setDefaultKey(fingerprint: second.fingerprint)) { error in
-            guard let keychainError = error as? MockKeychainError,
-                  case .saveFailed = keychainError else {
-                return XCTFail("Expected MockKeychainError.saveFailed, got \(error)")
+            guard let persistenceError = error as? RecordingKeyMetadataPersistenceError,
+                  case .updateFailed = persistenceError else {
+                return XCTFail("Expected RecordingKeyMetadataPersistenceError.updateFailed, got \(error)")
             }
         }
 
@@ -279,7 +279,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
         try freshService.loadKeys()
 
@@ -310,7 +311,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             secureEnclave: mockSE,
             keychain: mockKC,
             authenticator: mockAuth,
-            privateKeyControlStore: privateKeyControlStore
+            privateKeyControlStore: privateKeyControlStore,
+            metadataPersistence: metadataPersistence
         )
         try freshService.loadKeys()
 

@@ -62,7 +62,7 @@ final class EncryptScreenModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         config = AppConfiguration(defaults: defaults)
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
-            persistence: LegacyOrdinarySettingsStore(defaults: defaults)
+            persistence: InMemoryOrdinarySettingsStore()
         )
         protectedOrdinarySettings.loadForAuthenticatedTestBypass()
     }

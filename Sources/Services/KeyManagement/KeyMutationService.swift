@@ -235,7 +235,6 @@ final class KeyMutationService {
         } catch {
             deletionErrors.append(error)
         }
-        cleanupLegacyMetadataRows(for: fingerprint, deletionErrors: &deletionErrors)
         clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
 
         if let firstError = deletionErrors.first {
@@ -284,23 +283,6 @@ final class KeyMutationService {
         }
 
         return deletionErrors
-    }
-
-    private func cleanupLegacyMetadataRows(
-        for fingerprint: String,
-        deletionErrors: inout [Error]
-    ) {
-        let service = KeychainConstants.metadataService(fingerprint: fingerprint)
-        for account in [KeychainConstants.defaultAccount, KeychainConstants.metadataAccount] {
-            do {
-                try keychain.delete(service: service, account: account)
-            } catch {
-                guard !Self.isItemNotFound(error) else {
-                    continue
-                }
-                deletionErrors.append(error)
-            }
-        }
     }
 
     private func allPrivateKeychainServices(for fingerprint: String) -> [String] {
