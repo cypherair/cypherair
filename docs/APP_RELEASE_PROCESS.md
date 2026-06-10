@@ -7,6 +7,7 @@
 > Last reviewed: 2026-06-10.
 > Update triggers: stable tag rules, stable asset names, arm64e stage1 pin changes, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
+> Agent choreography: `.claude/skills/release-stable` sequences this flow for agent sessions; this document stays canonical for every rule it cites.
 
 ## 1. Release Modes
 
@@ -43,8 +44,9 @@ CypherAir's formal stable app-build release uses a unified GitHub release page.
 - The stable workflow includes an independent `rust-dependency-audit` job that selects the official stable Rust toolchain and runs `cargo audit --file pgp-mobile/Cargo.lock --deny warnings` against the same checked-out ref. This job does not block stable asset generation, but the formal tag-push-only `publish-stable-release` job depends on it and will not create the immutable GitHub Release unless the audit passes.
 - The stable workflow uses the pinned arm64e Rust stage1 prerelease recorded in
   `docs/ARM64E_STATUS.md`. If the intended release requires a newer Rust fork
-  stage1, update the workflow env, script default, status docs, and workflow
-  hardening tests in a normal PR before creating the stable tag.
+  stage1, complete the re-pin per the `docs/ARM64E_STATUS.md` re-pin rule
+  (agent checklist: `.claude/skills/repin-arm64e`) in a normal PR before
+  creating the stable tag.
 - Release owners choose and set the Xcode release metadata in the project. The
   release scripts read those values; they do not invent, increment, reset, or
   formula-generate `CURRENT_PROJECT_VERSION`.
