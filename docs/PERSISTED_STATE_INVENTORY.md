@@ -34,7 +34,6 @@ Allowed target classes:
 - `framework-bootstrap`
 - `ephemeral-with-cleanup`
 - `out-of-app-custody`
-- `legacy cleanup-only`
 - `unsupported legacy` (outside supported app state: not read, migrated, quarantined, reset-cleaned, or proactively deleted)
 - `test-only exception`
 

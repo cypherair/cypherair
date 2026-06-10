@@ -311,7 +311,6 @@ When the user changes mode in Settings:
 - Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
 - This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
 
-Legacy `UserDefaults` keys such as `com.cypherair.internal.rewrapInProgress` and `com.cypherair.preference.authMode` are migration sources only. Verified migration moves them into `private-key-control` and removes the legacy keys.
 
 ### LAPolicy Selection
 

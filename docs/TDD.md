@@ -370,7 +370,7 @@ Generate: `CIQRCodeGenerator`. Decode from photo: PHPicker + CoreImage `CIDetect
 
 Detailed storage locations, target classes, current status, and migration readiness live in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). This TDD owns the technical contracts for ProtectedData behavior, migration safety, relock, and recovery; it does not duplicate the full persisted-state inventory.
 
-Protected app-data planning covers all CypherAir-owned local data, not only preferences. Permanent exceptions remain limited to documented boot-authentication, private-key material, framework bootstrap, test-only, cleanup-only, temporary, and out-of-app-custody export surfaces as classified in the inventory.
+Protected app-data planning covers all CypherAir-owned local data, not only preferences. Permanent exceptions remain limited to documented boot-authentication, private-key material, framework bootstrap, test-only, temporary, and out-of-app-custody export surfaces as classified in the inventory.
 
 ### 6.1 ProtectedData Current Contract
 
@@ -399,10 +399,10 @@ Tags normalize display text for case-insensitive uniqueness. In Encrypt, applyin
 
 Migration and exception rules:
 
-- Legacy `authMode`, rewrap, and modify-expiry `UserDefaults` keys are migration sources only after verified `private-key-control` creation/open.
-- Legacy key metadata rows in the dedicated metadata account and older default-account rows are migration/cleanup sources only after verified `key-metadata` readability.
+- `private-key-control` settings and recovery-journal state are created and mutated only inside the protected payload.
+- Key metadata persists only in the protected `key-metadata` domain.
 - Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
-- Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
+- Self-test reports are in-memory export-only data.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
 - Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.
 - Contacts payloads with an unsupported schema version fail closed and route the Contacts domain to recovery.

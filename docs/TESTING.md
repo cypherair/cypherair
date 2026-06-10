@@ -149,13 +149,13 @@ Current ProtectedData unit-test expectations for the implemented AppData and Con
 - verify that generic pending-mutation recovery dispatches by domain handler and refuses target mismatches as framework recovery
 - verify that abandoning a first-domain create cleans a provisioned shared resource based on post-removal membership and fails closed if cleanup fails
 - verify that post-unlock orchestration opens only committed registered domains with an authenticated `LAContext`, skips pending mutation recovery, and never authorizes without a context
-- verify that `private-key-control` migrates `authMode` and private-key recovery journals after app unlock, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
+- verify that `private-key-control` creates its first domain with standard defaults and an empty recovery journal, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
 - verify that key metadata loading starts as locked/loading before app unlock, completes from `key-metadata` after post-unlock orchestration, and does not regress to pre-auth metadata reads or visible empty-key-list flashes
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
 - verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
 - verify that onboarding, root tint/theme, guided tutorial entry/completion, Settings controls, and encrypt-to-self behavior consume `ProtectedOrdinarySettingsCoordinator` state rather than `AppConfiguration` or `ProtectedSettingsHost`
 - verify that Contacts creates an empty protected `contacts` domain after authorized unlock, treats corrupt or missing protected Contacts state as recovery, persists protected mutations across reopen, fails closed on unsupported Contacts schema versions by routing the domain to recovery, and clears Contacts runtime state on relock or framework reset
-- verify that Reset All Local Data deletes default-account and metadata-account CypherAir Keychain items plus app-owned Secure Enclave custody `kSecClassKey` rows, treats missing items as success, clears in-memory state, validates no remaining custody handles, and exposes only sanitized cleanup categories/counts on failure
+- verify that Reset All Local Data deletes default-account CypherAir Keychain items plus app-owned Secure Enclave custody `kSecClassKey` rows, treats missing items as success, clears in-memory state, validates no remaining custody handles, and exposes only sanitized cleanup categories/counts on failure
 
 Current ProtectedData file-protection expectations:
 
@@ -168,8 +168,8 @@ Current ProtectedData file-protection expectations:
 
 Current non-Contacts ProtectedData validation expectations:
 
-- Self-test coverage proves export-only report state and legacy `Documents/self-test/` cleanup.
-- Temporary/export/tutorial coverage proves per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, fixed tutorial defaults cleanup, and legacy tutorial defaults UUID cleanup.
+- Self-test coverage proves export-only report state.
+- Temporary/export/tutorial coverage proves per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, and fixed tutorial defaults cleanup.
 
 Current Contacts validation expectations:
 

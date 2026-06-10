@@ -45,7 +45,6 @@ class DeviceSecurityTestCase: XCTestCase {
         for entry in createdKeychainServices {
             try? keychain.delete(service: entry.service, account: entry.account)
         }
-        // Clean up UserDefaults flags
 
         createdFingerprints = []
         createdKeychainServices = []
