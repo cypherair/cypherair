@@ -68,6 +68,10 @@ xcodebuild build -scheme CypherAir \
 
 Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. The pinned `ARM64E_STAGE1_RELEASE_TAG` value is owned by docs/ARM64E_STATUS.md and rotates with each stage1 re-pin.
 
+## Xcode MCP
+
+Xcode's MCP server (`xcrun mcpbridge`, Xcode 26.3+) provides Apple Developer Documentation search plus build/diagnostic tools, and the repository's `.mcp.json` configures it as the `xcode` server. When it is available in the current agent session, use `DocumentationSearch` to query Apple documentation rather than relying on memory for Apple API behavior. Setup: README.md "Xcode MCP".
+
 ## Hard Constraints — NEVER Violate
 
 1. **Zero network access.** No HTTP(S), no networked SDKs, no telemetry. Code audit must confirm zero network code paths. No network URL loading (http/https). No NWConnection. No URLSession.
