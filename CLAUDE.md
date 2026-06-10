@@ -38,9 +38,8 @@ Detailed module breakdown: docs/ARCHITECTURE.md
 ## Build Commands
 
 ```bash
-# Full Rust + UniFFI + packaged-artifact sync. Required after Rust changes that
-# can affect Swift-visible behavior; matches the GitHub Actions pinned stage1 path.
-# First build compiles vendored OpenSSL from source (~3-5 min); later builds are cached.
+# Full Rust + UniFFI + packaged-artifact sync; matches the GitHub Actions
+# pinned stage1 path. When it is required: .claude/skills/rust-sync.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
@@ -112,7 +111,7 @@ Profiles are selected at key generation and immutable per key; multiple keys of 
 ## Testing
 
 - Every functional PR must include tests. Security changes require both positive and negative tests. Crypto tests run for **both profiles**.
-- Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links. If a Rust change can affect Swift-visible behavior, run the full sync command above before `xcodebuild test`.
+- Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - Docs-only PRs may use the documentation consistency path in docs/TESTING.md Section 2 instead of Rust/Xcode runs.
 - Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review checklist: docs/CODE_REVIEW.md.

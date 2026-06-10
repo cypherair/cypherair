@@ -97,7 +97,7 @@
     default, the workflow hardening tests, this file (the pin lines above and
     the local packaging command), `CLAUDE.md` (Build Commands), and
     `docs/TESTING.md` Section 2.4 workflow C; `latest` is not allowed in the
-    CI/default download path
+    CI/default download path (agent checklist: `.claude/skills/repin-arm64e`)
   - latest hosted LLVM-workaround-shrink validation force-downloaded the
     prerelease above and recorded the same source and checked-out commit in
     `PgpMobile.arm64e-build-manifest.json`
