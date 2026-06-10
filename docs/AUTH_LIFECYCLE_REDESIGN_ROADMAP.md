@@ -1,9 +1,12 @@
 # Authentication / Privacy / Lifecycle Redesign — Migration Roadmap
 
-> Status: Draft / active roadmap. This document describes **proposed migration work** and does **not**
-> describe current shipped behavior. Shipped behavior remains as documented in [SECURITY.md](SECURITY.md)
-> and [PRD.md](PRD.md) until these phases land.
-> Date: 2026-06-07.
+> Status: Active roadmap, partially landed. P0 (validation PoC; frozen #469), P1 (lock foundation +
+> obsolete-cluster removal; PR #472), and P2 (macOS single-window unification; PR #475) are implemented
+> on `main`. P3 (macOS in-window authentication cutover) is **in progress**; P4–P5 remain proposed.
+> Phases that have not landed do **not** describe current shipped behavior — shipped behavior remains as
+> documented in [SECURITY.md](SECURITY.md) and [PRD.md](PRD.md), and the current-state docs flip at P5.
+> On macOS, P1–P3 are one coupled release (§3): macOS is not shipped to users until P3 lands.
+> Date: 2026-06-10 (originally 2026-06-07).
 > Purpose: The decisive migration from the current entangled privacy/lock/shield machinery to the target
 > in [Target Design](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md): phasing, the validated P0 results, the
 > in-window authentication seam inventory, the current→target component map, tests, and decisions.
@@ -84,7 +87,7 @@ detached system-sheet path is eliminated decisively; the coupling is only a macO
 
 - **P0 — Validation PoC (DONE; frozen #469).** Results inlined in §1. No code merges to `main`.
 
-- **P1 — Lock foundation + decisive removal of the obsolete lifecycle/shield cluster.**
+- **P1 — Lock foundation + decisive removal of the obsolete lifecycle/shield cluster (DONE; PR #472).**
   Introduce `AppLockController` (the explicit lock state machine) and the decoupled cosmetic cover; adopt the
   per-platform away-event rule (iOS = `ScenePhase.background`; macOS = resign ∪ screen-lock ∪ "Lock Now").
   **Delete, in this same phase**, the cluster that exists only to disambiguate the system-sheet
@@ -105,7 +108,7 @@ detached system-sheet path is eliminated decisively; the coupling is only a macO
   within-release order: the shield occludes in-window auth, so it is torn down exactly as the in-window view is
   mounted. The cluster is never an authentication path. The independent `LocalDataResetRestartGate` is untouched here.
 
-- **P2 — macOS single-window unification.**
+- **P2 — macOS single-window unification (DONE; PR #475).**
   Remove the standalone macOS `Settings { }` scene; route settings into the main window; preserve Cmd-, via a
   `CommandGroup(replacing: .appSettings)` command. Update the macOS presentation hosts
   (`MacSettingsRootView`, `ProtectedSettingsHost`) to drop the settings-scene presentation mode; retire the
@@ -114,7 +117,7 @@ detached system-sheet path is eliminated decisively; the coupling is only a macO
   **`LocalDataResetRestartGate` settings-scene mount is removed with the scene** — only its main-window mount
   remains.
 
-- **P3 — macOS in-window authentication cutover (shipped surfaces; one decisive move, zero exceptions).**
+- **P3 — macOS in-window authentication cutover (IN PROGRESS; shipped surfaces; one decisive move, zero exceptions).**
   Introduce the `AuthenticationPresenting` seam + the macOS `LAAuthenticationView` implementation so the
   **authentication prompt** renders in-window (not merely the lock surface; iOS / visionOS pass through to the
   system prompt). Route **all** shipped macOS authentication in-window:
@@ -260,5 +263,5 @@ milestones: on macOS the P1 removals and the P3 in-window cutover ship as one co
 
 ---
 
-*This is a migration proposal. It does not change shipped behavior until these phases are implemented and
-reviewed; the current-state docs are updated at P5.*
+*Phases land individually (P0–P2 are on `main`; P3 is in progress). Un-landed phases remain proposals and
+do not change shipped behavior until implemented and reviewed; the current-state docs are updated at P5.*

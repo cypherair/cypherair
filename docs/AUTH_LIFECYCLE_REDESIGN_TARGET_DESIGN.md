@@ -1,9 +1,12 @@
 # Authentication / Privacy / Lifecycle Redesign — Target Design
 
-> Status: Draft target design. This document describes a **proposed end state** and does **not**
-> describe current shipped behavior. Shipped behavior remains as documented in
-> [SECURITY.md](SECURITY.md) §4–§5 and [PRD.md](PRD.md) §4.9 until the redesign lands.
-> Date: 2026-06-07.
+> Status: Target design, partially landed. The lock foundation (P1; PR #472) and the macOS single-window
+> unification (P2; PR #475) are implemented on `main`; the macOS in-window authentication cutover (P3) is
+> **in progress** (see the [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md) §3 for phase status).
+> Until the remaining phases land, this document still describes a **proposed end state**, not current
+> shipped behavior — shipped behavior remains as documented in [SECURITY.md](SECURITY.md) §4–§5 and
+> [PRD.md](PRD.md) §4.9, and the current-state docs flip at P5.
+> Date: 2026-06-10 (originally 2026-06-07).
 > Purpose: Define the **target** architecture and user experience for CypherAir's app-lock,
 > privacy-cover, and authentication-presentation flow across iOS, iPadOS, macOS, and visionOS.
 > This document is intentionally narrow: it states *what the end state is*, not how to migrate to
@@ -153,5 +156,6 @@ their macOS authentication presentation moving in-window and their surface follo
 
 ---
 
-*This is a target-design proposal. It does not change shipped behavior until the phases in the companion
-[Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md) are implemented and reviewed.*
+*This target design is partially landed (P1–P2 on `main`; P3 in progress). Un-landed portions do not change
+shipped behavior until the phases in the companion [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md)
+are implemented and reviewed.*
