@@ -1,6 +1,10 @@
 # CypherAir Apple arm64e Status
 
-Snapshot date: 2026-05-30
+> Status: Canonical current-state — source of truth for Apple arm64e support.
+> Purpose: Current arm64e toolchain chain, packaging posture, automation contract, and pinned stage1 consumption policy.
+> Audience: Human developers, release owners, and AI coding tools.
+> Update triggers: See "Update Rules" at the end of this file.
+> Last reviewed: 2026-06-10.
 
 ## Repo Identity
 
@@ -34,11 +38,9 @@ Snapshot date: 2026-05-30
 - Pre-merge release validation passed through edge drill run `24897042096` and
   stable dry-run `24897042109`. Post-merge main validation passed through edge
   run `24916588574` and stable dry-run `24916629353`.
-- Latest verified main edge release: run `25656213585` attempt 3, release
-  `pgpmobile-edge-20260512T075747Z-04f5ad6-r25656213585-a3`, commit
-  `04f5ad607e80`.
-- Latest verified stable build release: release `cypherair-v1.4.0-build14004`,
-  commit `4390ff91a8fa`.
+- Current edge prereleases (`pgpmobile-edge-*`) and stable build releases
+  (`cypherair-v*-build*`) are published on the repository's GitHub Releases
+  page; consult it for the latest verified runs rather than this file.
 
 ## Current Verified Chain
 
@@ -90,10 +92,12 @@ Snapshot date: 2026-05-30
     `stableBaseCommit: "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96"`,
     `requiresBuildStd: false`, includes host `std`/`proc_macro`, and includes
     Apple arm64e std targets for Darwin, iOS, tvOS, and visionOS
-  - when publishing a new official stage1 prerelease, update this pinned tag,
-    the GitHub Actions workflow env values, the script default, and the workflow
-    hardening tests in the same PR; `latest` is not allowed in the CI/default
-    download path
+  - when publishing a new official stage1 prerelease, update every pinned-tag
+    location in the same PR: the GitHub Actions workflow env values, the script
+    default, the workflow hardening tests, this file (the pin lines above and
+    the local packaging command), `CLAUDE.md` (Build Commands), and
+    `docs/TESTING.md` Section 2.4 workflow C; `latest` is not allowed in the
+    CI/default download path
   - latest hosted LLVM-workaround-shrink validation force-downloaded the
     prerelease above and recorded the same source and checked-out commit in
     `PgpMobile.arm64e-build-manifest.json`
@@ -147,12 +151,10 @@ Snapshot date: 2026-05-30
     intended `main` commit before the immutable GitHub release is published
   - App Store candidate validation requires the stable release to include a
     valid arm64e manifest before archiving is allowed
-  - hosted macOS Swift unit-test preview runs after a hosted macOS/Xcode/macOS
-    SDK readiness preflight that requires an `arm64e` macOS destination; the
-    preview runs `CypherAir-UnitTests` on `platform=macOS,arch=arm64e`, hosted
-    runner environment mismatches warn and skip the preview, while signing
-    profile, build, link, and test failures after readiness remain regular
-    failure signals
+  - the hosted macOS Swift unit-test preview requires an `arm64e` macOS
+    destination and runs `CypherAir-UnitTests` on `platform=macOS,arch=arm64e`;
+    readiness preflight and warn-skip semantics live in `docs/TESTING.md`
+    Section 2.2
 - `cypherair/openssl-src-rs`:
   - `arm64e-carry-chain.yml` checks that the OpenSSL submodule URL, branch, and
     pointer stay aligned with `cypherair/openssl:carry/apple-arm64e-targets`,
@@ -188,7 +190,11 @@ Snapshot date: 2026-05-30
   level of app-side functionality without implying the OpenSSL carry chain is
   upstreamed.
 
-## Latest LLVM Workaround-Shrink Validation
+## Historical: LLVM Workaround-Shrink Validation (2026-05-03)
+
+This dated record predates the current stable196 stage1 pin and consumed the
+deprecated `carry/cypherair-arm64e-toolchain` line; it is retained as evidence
+only.
 
 - Date: 2026-05-03.
 - Local app validation: `cypherair/cypherair` branch `main`, commit

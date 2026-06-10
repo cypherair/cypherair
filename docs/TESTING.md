@@ -4,7 +4,7 @@
 > Purpose: Test strategy, how to run and write tests, and expectations for AI-assisted development.
 > Audience: Human developers and AI coding tools.
 > Source of truth: validation commands, Rust artifact refresh, and UniFFI/bindings sync for the current workspace.
-> Last reviewed: 2026-06-04.
+> Last reviewed: 2026-06-10.
 
 ## 1. Test Layers
 
@@ -62,7 +62,7 @@ The Secure Enclave custody decrypt consumers (`PrivateKeyMessageDecryptionServic
 ```bash
 # Practical local path used in this repository
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
+    -destination 'platform=macOS,arch=arm64e'
 
 # Simulator path (also valid when the host/runtime supports it)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
@@ -389,40 +389,32 @@ xcodebuild build -scheme CypherAir \
 
 Treat this as build/linkage and platform-availability validation, not as a substitute for the existing Rust, macOS-local, and iOS-device test matrix.
 
-Recommended flows:
+Recommended flow — run the numbered steps that apply to your change type:
 
 ```bash
-# Cargo.lock dependency update
+# 1. Dependency audit (when pgp-mobile/Cargo.lock changed)
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
-    ./build-xcframework.sh --release
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
 
-# Rust-backed behavior change
+# 2. Rust tests
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
-    ./build-xcframework.sh --release
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
-xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS' \
-    CODE_SIGNING_ALLOWED=NO
 
-# UniFFI surface / bindings / packaged artifact change
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
-    ./build-xcframework.sh --release
+# 3. Full XCFramework sync — the pinned force-download command in C above
+
+# 4. Swift / FFI validation
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
+    -destination 'platform=macOS,arch=arm64e'
+
+# 5. visionOS build probe
 xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS' \
     CODE_SIGNING_ALLOWED=NO
 ```
+
+| Change type | Steps |
+|------------|-------|
+| `Cargo.lock` dependency update | 1, 2, 3, 4 |
+| Rust-backed behavior change | 2, 3, 4, 5 |
+| UniFFI surface / bindings / packaged artifact change | 2, 3, 4, 5 |
 
 Typical stale-artifact symptoms:
 
@@ -705,7 +697,7 @@ func test_decrypt_highSecurityMode_biometricsUnavailable_throwsAuthError() async
 }
 ```
 
-## 7. Recovery-Specific Tests
+### Recovery-Specific Tests
 
 Crash-recovery logic now distinguishes safe cleanup, successful promotion, retryable failure, and unrecoverable states. Tests should cover:
 
@@ -790,13 +782,13 @@ Run on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enab
 
 ### Functional PRs Must Include
 
-- Tests for all new or changed functionality. No exceptions. **Both profiles unless explicitly scoped to one.**
+- Tests for all new or changed functionality, covering **both profiles unless explicitly scoped to one**.
 - For security changes: both positive and negative tests (see Section 6).
 - For new PgpError variants: test that the error is thrown and maps correctly to Swift.
 - For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
-- For screen ownership, launch, routing, or tutorial-host refactors: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests -destination 'platform=macOS'` or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
+- For screen ownership, launch, routing, or tutorial-host refactors: run the `CypherAir-MacUITests` plan (Section 2) or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
 - For SR-FIX-18 mock-boundary or UI-test launch-gating changes: run the full `CypherAir-MacUITests` plan plus Release and `AppStore Candidate Release` macOS build probes to prove `UITEST_*` app-container paths are ignored outside Debug.
-- For guided tutorial product, sandbox, output-interception, or completion-state changes: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS' -only-testing:CypherAirTests/TutorialSessionStoreTests`, then add the Mac UI plan above when the change affects tutorial launch, routing, or visible tutorial surfaces.
+- For guided tutorial product, sandbox, output-interception, or completion-state changes: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS,arch=arm64e' -only-testing:CypherAirTests/TutorialSessionStoreTests`, then add the Mac UI plan above when the change affects tutorial launch, routing, or visible tutorial surfaces.
 
 Documentation-only PRs that do not touch code, generated files, project files, entitlements, release metadata, or build settings may use the documentation-only validation path in Section 2 instead of Rust/Xcode test runs.
 
@@ -817,7 +809,7 @@ Documentation-only PRs that do not touch code, generated files, project files, e
 
 ## 10. POC Test Case Reference
 
-The POC Test Plan defines test cases that validated the technical stack. These map to the test layers above:
+The archived POC test plan ([archive/POC.md](archive/POC.md)) defines test cases that validated the technical stack. These map to the test layers above:
 
 | POC Category | Layer | Notes |
 |-------------|-------|-------|

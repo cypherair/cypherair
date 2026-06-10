@@ -100,6 +100,30 @@ The current app structure keeps maintainability and safety work behind stable us
 - macOS (Apple Silicon) with Xcode 26.5
 - Rust stable (latest) with targets: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin aarch64-apple-visionos aarch64-apple-visionos-sim`
 
+### Xcode MCP
+
+Xcode's MCP server can provide Apple Developer Documentation search and
+build/diagnostic tools to agent sessions. This repository ships a project-level
+`.mcp.json` that configures an `xcode` server running `/usr/bin/xcrun mcpbridge`;
+Claude Code picks it up automatically. To use it, open this project in Xcode
+(26.3 or newer), enable Xcode Settings → Intelligence → Xcode Tools under Model
+Context Protocol, and keep Xcode running. For other MCP-capable agents,
+configure the equivalent server:
+
+```json
+{
+  "mcpServers": {
+    "xcode": {
+      "command": "/usr/bin/xcrun",
+      "args": ["mcpbridge"]
+    }
+  }
+}
+```
+
+Restart the agent session after changing MCP configuration and confirm that
+`DocumentationSearch` is available.
+
 ### Commands
 
 ```bash

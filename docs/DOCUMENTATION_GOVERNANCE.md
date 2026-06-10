@@ -4,7 +4,7 @@
 > Purpose: Define the documentation classes, metadata rules, archive rules, naming/path rules, language expectations, and update triggers for the CypherAir repository.
 > Audience: Human developers, reviewers, product authors, and AI coding tools.
 > Source of truth: This document, together with the active canonical docs it governs.
-> Last reviewed: 2026-04-18.
+> Last reviewed: 2026-06-10.
 > Update triggers: Any documentation-class change, archive move, metadata convention change, or repeated cross-document drift that suggests the governance rules are incomplete.
 
 ## 1. Documentation Classes
@@ -103,10 +103,10 @@ Archived docs should include:
 Update the relevant docs in the same change when one of these surfaces changes:
 
 - **Build or linkage model changes**
-  - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/PRD.md`, `docs/TDD.md`, and `docs/TESTING.md`
+  - Update `README.md`, `CLAUDE.md`, `docs/PRD.md`, `docs/TDD.md`, and `docs/TESTING.md`
 
 - **Test-plan or workflow changes**
-  - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, and `docs/TESTING.md`
+  - Update `README.md`, `CLAUDE.md`, and `docs/TESTING.md`
 
 - **Release / compliance surface changes**
   - Update `README.md`, `CLAUDE.md`, `docs/APP_RELEASE_PROCESS.md`, and `docs/XCFRAMEWORK_RELEASES.md`

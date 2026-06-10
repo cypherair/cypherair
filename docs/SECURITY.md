@@ -4,7 +4,10 @@
 > Purpose: Complete description of the encryption scheme, key lifecycle, authentication flows,
 > security invariants, and AI coding boundaries for CypherAir.
 > Audience: Human developers, security auditors, and AI coding tools.
-> Last reviewed: 2026-06-04.
+> Update triggers: Changes to crypto/profile behavior, key lifecycle, Secure Enclave wrapping,
+> authentication modes, the ProtectedData model, tutorial isolation, MIE posture, or the
+> Section 10 red lines.
+> Last reviewed: 2026-06-10.
 
 ## 1. Encryption Scheme
 
@@ -240,34 +243,14 @@ second interactive prompt.
 
 ## 4. Authentication Modes
 
-> **Planned change (auth-lifecycle redesign — unshipped).** When this redesign ships, macOS authentication is
-> presented **in-window** (the authentication prompt itself, via `LAAuthenticationView`) using **local
-> biometric authentication** (Touch ID). Apple Watch / companion authentication is **not** part of this target
-> (not validated in P0; different security semantics). Two **separate** macOS subsystems change, via two
-> **independent** one-time migrations (each its own in-window authentication; not one shared context, not the
-> crash-recovery path); keep them distinct (see
-> [AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) /
-> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md)):
->
-> - **Private-key authentication (`AuthenticationMode`, this section).** macOS removes
->   `AuthenticationMode.standard` (and its Standard/High mode-switch UI); macOS private-key operations are
->   biometric-only — authorized by the SE key access-control flags `[.privateKeyUsage, .biometryAny]` plus an
->   in-window-authenticated `LAContext`, not a passcode fallback. Existing macOS Standard keys are
->   **force-re-wrapped** once (a dedicated, user-initiated migration action that **itself authenticates
->   in-window biometric**, not under the old Standard system-sheet path), **dropping the `.devicePasscode`
->   flag** — an access-control model change (these flags are security-critical; human review required), not a
->   presentation-only change. The migration **applies the existing backup gate unchanged** — the same requirement
->   that already gates Standard→High Security (this section's Mode-Switching step 1 and the `switchMode`
->   `backupRequired` safety net), which blocks only when no private-key backup exists at all; the migration does not
->   bypass or change it.
-> - **App-session authentication (`AppSessionAuthenticationPolicy`, §5).** macOS removes the `.userPresence`
->   passcode-fallback path; macOS app unlock (and Local Data Reset's confirmation auth) become local-biometric-
->   only (`.biometricsOnly`). The persisted root-secret Keychain item is **re-protected** once (a separate
->   user-initiated migration action; `SecItemUpdate` on its access control, `[.userPresence]` → `[.biometryAny]`;
->   payload unchanged). This is the **separate** app-session subsystem and is **not** "Standard Mode removal."
->
-> iOS / iPadOS / visionOS are unaffected. **Current shipped behavior (this section and §5) is unchanged until
-> this change lands.**
+> **Planned change (auth-lifecycle redesign — unshipped, currently paused).** A redesign moves macOS
+> authentication to in-window local biometric prompts (`LAAuthenticationView`) and removes the macOS
+> passcode-fallback paths from two separate subsystems — private-key `AuthenticationMode` (removing
+> Standard Mode on macOS via a one-time force-re-wrap) and app-session `AppSessionAuthenticationPolicy`
+> (§5) — through two independent, user-initiated migrations. Design and staging live in
+> [AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) and
+> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md). iOS / iPadOS / visionOS
+> are unaffected, and current shipped behavior (this section and §5) is unchanged until it lands.
 
 ### Standard Mode (default)
 
@@ -479,7 +462,7 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 ## 10. AI Coding Red Lines
 
-The following files and functions are security-critical. Claude Code must **stop and describe proposed changes** before editing them. Do not make autonomous modifications.
+The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, must include the testing requirements at the end of this section, and requires human review before merge (see [CODE_REVIEW.md](CODE_REVIEW.md)). Never merge such a change autonomously.
 
 ### Absolute Coding Invariants
 

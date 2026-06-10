@@ -3,7 +3,8 @@
 > Status: Canonical current-state.
 > Purpose: Module breakdown, dependency relationships, and data flow for CypherAir.
 > Audience: Human developers and AI coding tools.
-> Last reviewed: 2026-06-04.
+> Update triggers: Module ownership, FFI capability families, data flows, tightly-coupled pairs, or storage layout change.
+> Last reviewed: 2026-06-10.
 
 ## 1. Layer Overview
 
@@ -105,7 +106,7 @@ The guided tutorial is a host-driven sandbox that teaches the real app workflow 
 
 `TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, while startup/reset cleanup also removes legacy orphaned `com.cypherair.tutorial.<UUID>` defaults suites and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
-The mock security primitives used by the tutorial are a temporary SR-FIX-18 debt, not a production security primitive. They must remain visibly named `Mock*` and confined to `Sources/Security/Mocks` while this interim state exists. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
+The tutorial's mock security primitives are temporary SR-FIX-18 debt, not production security primitives — the naming and containment rules live in the Security Layer table below and [SECURITY.md](SECURITY.md) Section 6. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
 
 Safety is enforced by narrow host boundaries:
 
@@ -277,6 +278,7 @@ pgp-mobile/
 │   ├── keys.rs       # Key module root: UniFFI records, shared helpers, internal re-exports
 │   ├── keys/
 │   │   ├── generation.rs          # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
+│   │   ├── secure_enclave_generation/ # Hidden/test SE custody public-only generation (mod.rs, tests.rs)
 │   │   ├── key_info.rs            # KeyInfo parsing and display metadata
 │   │   ├── selector_discovery.rs  # Subkey/User ID selector discovery
 │   │   ├── public_certificates.rs # Public certificate validation and merge/update
@@ -291,6 +293,10 @@ pgp-mobile/
 │   ├── qr_url.rs     # QR URL scheme encode/decode validation
 │   ├── sign.rs       # Cleartext signing and shared signer helpers
 │   ├── verify.rs     # Cleartext verification helpers with graded results
+│   ├── cert_signature.rs      # Certificate-signature verification + User ID certification generation
+│   ├── signature_details.rs   # Detailed signature-result records for verify/decrypt APIs
+│   ├── external_signer.rs     # External P-256 signer seam (external_signer/: core, error, provider, tests)
+│   ├── external_decryptor.rs  # External P-256 key-agreement decrypt seam (external_decryptor/: core, tests)
 │   ├── streaming.rs  # File-path-based streaming I/O with progress reporting and cancellation
 │   ├── armor.rs      # ASCII armor encode/decode
 │   └── error.rs      # PgpError enum (maps 1:1 to Swift throwing functions)
@@ -533,8 +539,7 @@ Keychain (kSecClassKey, Secure Enclave token):
 
 App Sandbox:
 ├── Documents/
-│   ├── contacts/                → Public key files (.gpg binary)
-│   │   └── contact-metadata.json → Verification-state manifest for stored contacts
+│   ├── contacts/                → Legacy flat Contacts files; unsupported — not read, migrated, quarantined, or reset-cleaned (see PERSISTED_STATE_INVENTORY)
 │   └── self-test/               → Legacy self-test reports cleanup source only; new reports are in-memory export-only
 ├── Application Support/
 │   └── ProtectedData/
@@ -580,8 +585,4 @@ App Sandbox:
 
 ## 6. Memory Integrity Enforcement
 
-MIE is built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It is enabled via the Enhanced Security capability in Xcode, adding hardware memory tagging (EMTE) that protects all C/C++ code — including vendored OpenSSL — against buffer overflows and use-after-free.
-
-The capability is configured in Xcode 26 via Signing & Capabilities → Add Capability → Enhanced Security. Xcode manages this through the `ENABLE_ENHANCED_SECURITY = YES` build setting and writes the required entitlement keys (Hardened Process, Hardened Heap, Enhanced Security version, Platform Restrictions, Read-Only Platform Memory, Hardware Memory Tagging, etc.) into `CypherAir.entitlements`. These entitlement keys must be committed to source control — Xcode reads them to determine which protections are enabled. See [SECURITY.md](SECURITY.md) Section 8.
-
-On older unsupported devices without hardware memory tagging, the app runs normally — the capability is additive and never breaks compatibility with older devices. See [SECURITY.md](SECURITY.md) Section 8 for the full testing workflow.
+MIE adds hardware memory tagging (EMTE) that protects all C/C++ code — including vendored OpenSSL — against buffer overflows and use-after-free on supported hardware. It is enabled through the Enhanced Security capability in Xcode 26.5 (`ENABLE_ENHANCED_SECURITY = YES`), which writes the required entitlement keys into `CypherAir.entitlements`; those keys must stay committed to source control. The capability is additive — unsupported devices run normally without hardware tagging. Canonical entitlement-key list, device support, and testing workflow: [SECURITY.md](SECURITY.md) Section 8.

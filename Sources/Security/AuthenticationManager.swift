@@ -79,7 +79,7 @@ enum AuthenticationError: Error, LocalizedError {
 /// - Recover from interrupted mode switches (crash recovery) on app launch.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 4 and Section 7.
+/// See SECURITY.md Section 4 and Section 10.
 @Observable
 final class AuthenticationManager: AuthenticationEvaluable {
     private enum UITestPreferences {

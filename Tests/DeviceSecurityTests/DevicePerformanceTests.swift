@@ -130,7 +130,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
     }
 
     /// C10.6: SE key reconstruction from dataRepresentation.
-    /// Threshold: < 10ms. ARCHITECTURE.md documents 2–5ms.
+    /// Threshold: < 10ms. SECURITY.md Section 3 documents ~2–5ms.
     func test_perf_seKeyReconstruction_latencyUnder10ms() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 

@@ -4,7 +4,7 @@
 > Purpose: Maintain the row-level classification and migration status for CypherAir-owned persisted and local state.
 > Audience: Human developers, security reviewers, QA, and AI coding tools.
 > Source of truth: Current code, with `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, and `TESTING.md` as companion current-state documents. This file owns the exhaustive row-level inventory.
-> Last reviewed: 2026-06-08.
+> Last reviewed: 2026-06-10.
 > Update triggers: Any ProtectedData domain migration, storage/defaults/temp-path change, persistent-state classification change, Contacts protected-domain gate change, or storage/relock/recovery behavior change.
 
 ## 1. Scope
@@ -35,6 +35,7 @@ Allowed target classes:
 - `ephemeral-with-cleanup`
 - `out-of-app-custody`
 - `legacy cleanup-only`
+- `unsupported legacy` (outside supported app state: not read, migrated, quarantined, reset-cleaned, or proactively deleted)
 - `test-only exception`
 
 ## 3. Inventory
@@ -57,14 +58,14 @@ Allowed target classes:
 | `modifyExpiryFingerprint` | `ProtectedData/private-key-control`; legacy `UserDefaults` only as migration source | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | Permanent SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
 | Pending SE-wrapped private-key bundle rows | Keychain default account | `private-key-material exception` | Private-key-material exception | Exception retained | n/a |
-| Secure Enclave custody private-operation key rows | Keychain `kSecClassKey` rows tagged `com.cypherair.v1.secure-enclave-custody.<random-id>.<role>`; two distinct P-256 Secure Enclave private keys for signing and key agreement. Tags are Security-private local locators and are not stored in `key-metadata`, logs, UI, Rust, or exports. Reset All Local Data inventories and deletes app-owned custody rows, including malformed app-owned tags, and validates no remaining custody handles using sanitized counts/categories only. Guarded device tests validate real hardware creation/load/delete, biometric private-operation access, handle-state failure, and cleanup behavior. | `private-key-material exception` | Future Secure Enclave custody handle store | Implemented hidden boundary with local reset cleanup and guarded device evidence; not user-reachable | phase 3A/3B/3C |
+| Secure Enclave custody private-operation key rows | Keychain `kSecClassKey` rows tagged `com.cypherair.v1.secure-enclave-custody.<random-id>.<role>`; two distinct P-256 Secure Enclave private keys for signing and key agreement. Tags are Security-private local locators and are not stored in `key-metadata`, logs, UI, Rust, or exports. Reset All Local Data inventories and deletes app-owned custody rows, including malformed app-owned tags, and validates no remaining custody handles using sanitized counts/categories only. Guarded device tests validate real hardware creation/load/delete, biometric private-operation access, handle-state failure, and cleanup behavior. | `private-key-material exception` | Secure Enclave custody handle store (hidden/test boundary) | Implemented hidden boundary with local reset cleanup and guarded device evidence; not user-reachable | n/a — implemented as a hidden/test boundary; production exposure deferred |
 | `PGPKeyIdentity` metadata rows | `ProtectedData/key-metadata` schema v2 records with explicit OpenPGP configuration identity and private-key custody kind; legacy metadata-account and default-account rows only as migration sources | `key-metadata-domain target` | `key-metadata` | Implemented | implemented |
 | Shared app-data root secret | Keychain default account | `framework-bootstrap` | Shared app-data bootstrap | Implemented with SE device binding | implemented |
 | `ProtectedDataRegistry` | `Application Support/ProtectedData/ProtectedDataRegistry.plist` | `framework-bootstrap` | Framework registry bootstrap | Implemented | framework prerequisite |
 | Per-domain bootstrap metadata | `Application Support/ProtectedData/<domain>/bootstrap.plist` | `framework-bootstrap` | Per-domain bootstrap | Implemented for existing domains | domain-specific |
 | Protected settings payload | `Application Support/ProtectedData/protected-settings/` | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | Private-key control payload | `Application Support/ProtectedData/private-key-control/` | `private-key-control target` | `private-key-control` | Implemented | implemented |
-| Key metadata payload | `Application Support/ProtectedData/key-metadata/`; protected schema v2 `PGPKeyIdentity` metadata only. It records configuration/custody vocabulary, including hidden/test P-256 Secure Enclave custody identities, and stores public certificate bytes plus the key-level revocation artifact for export. It does not store Apple handle locators, handle-set ids, access-control policy, salts, sealed boxes, secret certificate bytes, response-file bridge state, digests, signatures beyond the public revocation artifact, recovery reports, or other private material. Phase 4B derives expected Secure Enclave handles from stored public certificate bindings at load time and keeps the recovery classification in memory only. | `key-metadata-domain target` | `key-metadata` | Implemented | implemented |
+| Key metadata payload | `Application Support/ProtectedData/key-metadata/`; protected schema v2 `PGPKeyIdentity` metadata only. It records configuration/custody vocabulary, including hidden/test P-256 Secure Enclave custody identities, and stores public certificate bytes plus the key-level revocation artifact for export. It does not store Apple handle locators, handle-set ids, access-control policy, salts, sealed boxes, secret certificate bytes, response-file bridge state, digests, signatures beyond the public revocation artifact, recovery reports, or other private material. Recovery derives expected Secure Enclave handles from stored public certificate bindings at load time and keeps the classification in memory only. | `key-metadata-domain target` | `key-metadata` | Implemented | implemented |
 | Framework sentinel payload | `Application Support/ProtectedData/protected-framework-sentinel/` | `framework-bootstrap` | `protected-framework-sentinel` | Implemented | implemented |
 | Contacts payload | `Application Support/ProtectedData/contacts/`; protected schema v2 `ContactsDomainSnapshot` with `ContactIdentity` records (display name, primary email, tag membership, notes, timestamps), `ContactKeyRecord` records (public certificate bytes, fingerprint/User ID/profile/algorithm metadata, manual verification, usage state, certification projection and artifact references), `ContactTag` records (display and normalized tag names), and `ContactCertificationArtifactReference` records (canonical signature bytes, digest, source, selector, signer metadata, validation status, target certificate digest, export filename). Payloads with any other schema version fail closed (route to recovery). | `protected-after-unlock` | Contacts protected domain | Implemented | implemented |
 | Contacts runtime-only search/filter/selection state | In memory only: `ContactsSearchIndex`, screen search/filter values, tag filters, recipient selection, and pending route state | `ephemeral-with-cleanup` | Contacts runtime exception | Implemented; cleared with relock, content clear, or screen lifecycle as applicable | n/a, not persisted |
@@ -88,8 +89,7 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - never silently reset unreadable converted state to empty data
 - make corrupted committed protected state a recovery surface
 - document cleanup or quarantine behavior explicitly
-- update this inventory, [ARCHITECTURE](ARCHITECTURE.md), [SECURITY](SECURITY.md), [TDD](TDD.md), [TESTING](TESTING.md), and [CODE_REVIEW](CODE_REVIEW.md) as needed in the same change
-- for Contacts protected-domain behavior, storage, or mutation changes, update the long-term docs above and this inventory
+- update this inventory and the companion canonical docs per [DOCUMENTATION_GOVERNANCE](DOCUMENTATION_GOVERNANCE.md) Section 6 in the same change
 
 For protected ordinary settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
 

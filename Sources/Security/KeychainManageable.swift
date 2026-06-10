@@ -7,7 +7,7 @@ import Security
 /// Test: In-memory dictionary.
 ///
 /// SECURITY-CRITICAL: Changes to this protocol require human review.
-/// See SECURITY.md Section 7.
+/// See SECURITY.md Section 10.
 protocol KeychainManageable {
     /// Save data to the Keychain.
     ///

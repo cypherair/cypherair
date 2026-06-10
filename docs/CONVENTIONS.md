@@ -1,7 +1,10 @@
 # Coding Conventions
 
+> Status: Canonical current-state.
 > Purpose: Swift coding standards, SwiftUI patterns, and project-wide conventions for CypherAir.
 > Audience: Human developers and AI coding tools.
+> Update triggers: Swift style, SwiftUI patterns, concurrency model, file organization, localization, accessibility, or git conventions change.
+> Last reviewed: 2026-06-10.
 
 ## 0. Engineering Principle
 
@@ -13,8 +16,14 @@ maintainable design.
 
 This governs the *depth* of a change, not its *scope*. It is not license to expand into unrelated
 cleanup: keep the work focused on delivering the requested task (see the scoping rules in
-`CLAUDE.md` and `AGENTS.md`), and let the intended architecture — not a smaller diff — determine
-the shape of the change.
+`CLAUDE.md`), and let the intended architecture — not a smaller diff — determine the shape of the
+change.
+
+Keep source layout, ownership boundaries, and project wiring aligned with that intended
+architecture: do not hide new behavior in unrelated places to make a diff look smaller or to avoid
+configuration work. Shared components live in dedicated files in the right feature or shared area,
+with Xcode file-system sync, target membership, and test-target exclusions reflecting that
+structure.
 
 ## 1. Swift Style
 
@@ -151,98 +160,31 @@ File name matches the type name: `EncryptionService.swift`, `CypherAirError.swif
 
 ### Group by Feature, Not by Layer
 
+Top-level structure and grouping rules — illustrative, not exhaustive; the authoritative module breakdown and component ownership live in [ARCHITECTURE.md](ARCHITECTURE.md):
+
 ```
 Sources/
-├── App/
-│   ├── AppContainer.swift
-│   ├── AppStartupCoordinator.swift
-│   ├── CypherAirApp.swift
-│   ├── AppRoute.swift
-│   ├── ContentView.swift
-│   ├── HomeView.swift
-│   ├── Common/
-│   │   ├── FileExportController.swift
-│   │   ├── OperationController.swift
-│   │   ├── PrivacyScreenModifier.swift
-│   │   └── SecurityScopedFileAccess.swift
-│   ├── Onboarding/
-│   │   ├── OnboardingView.swift
-│   │   └── TutorialView.swift
-│   ├── Encrypt/
-│   │   └── EncryptView.swift
-│   ├── Decrypt/
-│   │   └── DecryptView.swift
-│   ├── Sign/
-│   │   ├── SignView.swift
-│   │   └── VerifyView.swift
-│   ├── Keys/
-│   │   ├── MyKeysView.swift
-│   │   ├── KeyGenerationView.swift
-│   │   ├── KeyDetailView.swift
-│   │   ├── BackupKeyView.swift
-│   │   ├── ImportKeyView.swift
-│   │   └── PostGenerationPromptView.swift
-│   ├── Contacts/
-│   │   ├── ContactsView.swift
-│   │   ├── ContactDetailView.swift
-│   │   ├── AddContactView.swift
-│   │   ├── QRDisplayView.swift
-│   │   └── ImportConfirmView.swift
-│   └── Settings/
-│       ├── SettingsView.swift
-│       ├── SelfTestView.swift
-│       ├── AboutView.swift
-│       └── AppIconPickerView.swift
-├── PgpMobile/
-│   └── pgp_mobile.swift          # UniFFI-generated (do not edit)
-├── Services/
-│   ├── EncryptionService.swift
-│   ├── DecryptionService.swift
-│   ├── SigningService.swift
-│   ├── KeyManagementService.swift
-│   ├── ContactService.swift
-│   ├── ContactSnapshotMutator.swift
-│   ├── QRService.swift
-│   ├── SelfTestService.swift
-│   ├── FileProgressReporter.swift
-│   └── DiskSpaceChecker.swift
-├── Security/
-│   ├── SecureEnclaveManager.swift
-│   ├── SecureEnclaveManageable.swift
-│   ├── KeychainManager.swift
-│   ├── KeychainManageable.swift
-│   ├── AuthenticationManager.swift
-│   ├── KeyBundleStore.swift
-│   ├── KeyMetadataStore.swift
-│   ├── KeyMigrationCoordinator.swift
-│   ├── AuthenticationEvaluable.swift
-│   ├── MemoryZeroingUtility.swift
-│   ├── Argon2idMemoryGuard.swift
-│   ├── MemoryInfoProvidable.swift
-│   ├── ProtectedData/
-│   │   └── ContactsDomainSnapshotCodec.swift
-│   └── Mocks/
-│       ├── MockAuthenticator.swift
-│       ├── MockKeychain.swift
-│       └── MockSecureEnclave.swift
-├── Models/
-│   ├── CypherAirError.swift
-│   ├── ExportableFile.swift
-│   ├── IdentityPresentation.swift
-│   ├── PGPKeyIdentity.swift
-│   ├── PGPKeyProfile.swift
-│   ├── OpenPGPCertificationKind.swift
-│   ├── Contact.swift
-│   ├── SignatureVerification.swift
-│   └── AppConfiguration.swift
-├── Extensions/
-│   └── Data+Zeroing.swift
-└── Resources/
-    ├── Assets.xcassets
-    └── Localizable.xcstrings
+├── App/              # One subdirectory per feature surface:
+│   ├── Common/       #   shared presentation infrastructure (OperationController, FileExportController, …)
+│   ├── Onboarding/   #   onboarding + guided tutorial host
+│   ├── Encrypt/ … Decrypt/ … Sign/ … Keys/ … Contacts/ … Settings/
+│   │                 #   feature areas: route views + their ScreenModels (e.g. SignView + SignScreenModel)
+│   └── (top level)   #   app entry, routing, shell composition
+├── PgpMobile/        # Generated UniFFI bindings (pgp_mobile.swift — do not edit)
+├── Services/         # One service per workflow (EncryptionService, QRService, …) + FFI/ adapter boundary
+├── Security/         # SE wrapping, Keychain, auth modes, ProtectedData/; mocks only under Mocks/
+├── Models/           # App-owned data types and error vocabulary
+├── Extensions/       # Small Foundation/Swift helpers (e.g. Data+Zeroing.swift)
+└── Resources/        # Assets.xcassets, Localizable.xcstrings
 
-CypherAir-Info.plist              # Root-level app Info.plist source
+CypherAir-Info.plist  # Root-level app Info.plist source
 ```
+
+Placement rules:
+
+- New feature views and their ScreenModels go in the matching `App/<Feature>/` directory; shared presentation infrastructure goes in `App/Common/`.
+- Workflow logic belongs in `Services/`; generated-API access stays behind the `Services/FFI/` adapters.
+- Security primitives stay under `Security/`; test/tutorial mocks are confined to `Security/Mocks/` with visible `Mock*` names.
 
 When multiple screens share the same lifecycle/platform behavior, prefer extracting common infrastructure (`OperationController`, `SecurityScopedFileAccess`, `FileExportController`) instead of re-implementing per-view task/progress/export state machines.
 
@@ -250,6 +192,7 @@ When multiple screens share the same lifecycle/platform behavior, prefer extract
 
 - All user-facing strings go in the String Catalog (`Localizable.xcstrings`). Use `String(localized:)` in code.
 - Never hardcode user-visible strings in Swift files.
+- If `Localizable.xcstrings` marks a key with `extractionState: stale`, verify whether the key is still referenced by Swift source: remove the entry if it is unused, or fix the extraction path if it is still used. Never make tests pass by merely deleting the `stale` marker.
 - Supported languages: English (`en`) and Simplified Chinese (`zh-Hans`).
 - Error messages per PRD Section 4.7 are defined as localized strings mapped from `CypherAirError` cases.
 - VoiceOver labels: always localized. Fingerprints use segment-by-segment readout (4-character groups).
@@ -284,4 +227,4 @@ ForEach(fingerprintSegments, id: \.self) { segment in
 - **Branch names:** `feature/<description>`, `fix/<description>`, `refactor/<description>`. Automated-contributor branches may instead use an authoring prefix (`claude-<topic>` / `codex-<topic>`) or the staged `<topic>-pr<NN>-<description>` series shape used by long-running integration work; the prefix should reflect the actual author rather than being copied from a prior series.
 - **Commit messages:** Conventional format — `feat: add encrypt-to-self toggle`, `fix: AEAD hard-fail not triggered on empty ciphertext`, `test: add tamper detection round-trip`, `docs: update SE wrapping diagram`.
 - **PR scope:** One logical change per PR. Do not bundle unrelated changes.
-- **Never commit to `main` directly.** Always use feature branches and PRs.
+- **Do not commit directly to `main` unless the user explicitly asks for it.** Default to topic branches and PRs. Merge PRs with a regular merge commit; do not squash-merge or rebase-merge unless explicitly requested.

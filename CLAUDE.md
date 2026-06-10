@@ -2,6 +2,8 @@
 
 Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
+This file is the single agent-facing source of truth; `AGENTS.md` defers here. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/DOCUMENTATION_GOVERNANCE.md; archived docs under `docs/archive/` are historical context only.
+
 ## Tech Stack
 
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
@@ -36,23 +38,9 @@ Detailed module breakdown: docs/ARCHITECTURE.md
 ## Build Commands
 
 ```bash
-# Rust: cross-compile for iOS device
-# Note: First build compiles vendored OpenSSL from source (~3-5 min). Subsequent builds are cached.
-cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
-
-# Rust: cross-compile for Apple Silicon simulator
-cargo +stable build --release --target aarch64-apple-ios-sim --manifest-path pgp-mobile/Cargo.toml
-
-# Rust: cross-compile for macOS Apple Silicon
-cargo +stable build --release --target aarch64-apple-darwin --manifest-path pgp-mobile/Cargo.toml
-
-# Rust: cross-compile for visionOS device
-cargo +stable build --release --target aarch64-apple-visionos --manifest-path pgp-mobile/Cargo.toml
-
-# Rust: cross-compile for visionOS simulator
-cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-path pgp-mobile/Cargo.toml
-
-# Full Rust + UniFFI + packaged-artifact sync
+# Full Rust + UniFFI + packaged-artifact sync. Required after Rust changes that
+# can affect Swift-visible behavior; matches the GitHub Actions pinned stage1 path.
+# First build compiles vendored OpenSSL from source (~3-5 min); later builds are cached.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
     ./build-xcframework.sh --release
@@ -62,9 +50,9 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # Run Swift unit + FFI tests locally (source of truth for Swift validation)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
+    -destination 'platform=macOS,arch=arm64e'
 
-# Run device-only tests (SE, biometrics, MIE — uses CypherAir-DeviceTests test plan)
+# Run device-only tests (SE, biometrics, MIE)
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
 
@@ -72,15 +60,17 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
 xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
     -destination 'platform=macOS'
 
-# Run the native visionOS build probe
+# Run the native visionOS build probe (there is no dedicated visionOS test plan)
 xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS' \
     CODE_SIGNING_ALLOWED=NO
 ```
 
-There is currently no dedicated visionOS XCTest test plan. Native visionOS validation uses the build probe above together with the existing Rust, macOS-local, and iOS-device validation paths.
+Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. The pinned `ARM64E_STAGE1_RELEASE_TAG` value is owned by docs/ARM64E_STATUS.md and rotates with each stage1 re-pin.
 
-For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation workflow, see docs/TESTING.md.
+## Xcode MCP
+
+Xcode's MCP server (`xcrun mcpbridge`, Xcode 26.3+) provides Apple Developer Documentation search plus build/diagnostic tools, and the repository's `.mcp.json` configures it as the `xcode` server. When it is available in the current agent session, use `DocumentationSearch` to query Apple documentation rather than relying on memory for Apple API behavior. Setup: README.md "Xcode MCP".
 
 ## Hard Constraints — NEVER Violate
 
@@ -90,67 +80,54 @@ For the full Rust artifact refresh, UniFFI/bindings sync, and Xcode validation w
 4. **No plaintext or private keys in logs.** Never `print()`, `os_log()`, or `NSLog()` any key material, passphrase, or decrypted content.
 5. **Memory zeroing.** All sensitive data (`Data` buffers containing keys, passphrases, plaintext) must be overwritten with zeros when no longer needed. Rust side: `zeroize` crate. Swift side: `resetBytes(in:)` on `Data`.
 6. **Secure random only.** Swift side: `SecRandomCopyBytes` or CryptoKit (which uses it internally). Rust side: `getrandom` crate.
-7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See @docs/SECURITY.md Section 8.
+7. **MIE enabled.** Enhanced Security capability with Hardware Memory Tagging must remain enabled. Never remove the entitlements. See docs/SECURITY.md Section 8.
 8. **Profile-correct message format.** Format is chosen automatically by recipient key version; never send SEIPDv2 to a v4 key holder. See docs/TDD.md Section 1.4.
 
-## Security Boundaries — Ask Before Modifying
+## Security-Sensitive Code — Edit, Then Explain
 
-STOP and describe proposed changes before editing any file in these areas:
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, must include both positive and negative tests, and receives human review before merge (docs/CODE_REVIEW.md). Security-critical areas:
 
-- `Sources/Security/` — SE wrapping, Keychain access, auth mode logic
-- `Sources/Security/SecureEnclaveManager.swift` — wrapping/unwrapping flow
-- `Sources/Security/KeychainManager.swift` — access control flags
-- `Sources/Security/AuthenticationManager.swift` — Standard/High Security mode switching
-- `Sources/Security/ProtectedData/` — app-data root-secret authorization, registry/recovery, wrapped-DMK lifecycle, relock semantics
+- `Sources/Security/` — SE wrapping, Keychain access control, auth modes, ProtectedData, custody boundaries
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
-- `Sources/Services/QRService.swift` — external URL input parsing (untrusted data)
-- `pgp-mobile/src/` — any Rust cryptographic code
-- `CypherAir.xcodeproj/project.pbxproj` and other Xcode project files
-- `CypherAir.entitlements`
-- `CypherAirMacOS.entitlements`
-- `CypherAir-Info.plist`
+- `Sources/Services/QRService.swift` — parses untrusted `cypherair://` input
+- `Sources/Extensions/Data+Zeroing.swift` and `Sources/Security/MemoryZeroingUtility.swift` — memory-zeroing barriers
+- `Sources/Services/DiskSpaceChecker.swift` — disk-space threshold guarding file operations
+- `pgp-mobile/src/` — all Rust cryptographic code
+- `CypherAir.entitlements`, `CypherAirMacOS.entitlements`, `CypherAir-Info.plist`, and Xcode project files
 
-Full security model and red lines: @docs/SECURITY.md
+The authoritative per-file rationale, function-level review list, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
 
-## Encryption Profiles
+## Encryption Profiles & Authentication Modes
 
-Two profiles, selected at key generation and immutable; multiple keys of different profiles are allowed. For profile behavior, algorithm suites, and interoperability, see docs/PRD.md Section 3 and @docs/SECURITY.md Section 1.
-
-## Authentication Modes
-
-Standard Mode (default) and High Security Mode, selectable in Settings; switching modes re-wraps all SE-protected keys. For access-control flags and mode-switching details, see @docs/SECURITY.md Section 4.
+Profiles are selected at key generation and immutable per key; multiple keys of different profiles are allowed, and message format is auto-selected by recipient key version (docs/TDD.md Section 1.4). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all SE-protected keys. Details: docs/PRD.md Section 3 and docs/SECURITY.md Sections 1 and 4.
 
 ## Code Style (Summary)
 
 - Swift API Design Guidelines. `guard let` over force-unwrap. `async/await` over Combine.
 - `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
-- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions. See docs/CONVENTIONS.md.
+- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions.
 - One type per file. Group by feature. All user strings in String Catalog.
 - Full conventions: docs/CONVENTIONS.md
 
-## Testing Requirements
+## Testing
 
-- Every functional PR must include tests. Security changes require both positive and negative tests. Docs-only PRs may use the documentation consistency path instead of Rust/Xcode runs (see docs/TESTING.md and docs/CODE_REVIEW.md).
-- Crypto tests: run for **both profiles**. Round-trip tests (encrypt→decrypt, sign→verify), tamper tests (1-bit flip → failure).
+- Every functional PR must include tests. Security changes require both positive and negative tests. Crypto tests run for **both profiles**.
+- Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links. If a Rust change can affect Swift-visible behavior, run the full sync command above before `xcodebuild test`.
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
-- MIE: test on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging diagnostics enabled; current device examples live in `docs/SECURITY.md`.
-- Test plans: `CypherAir-UnitTests.xctestplan` (local macOS validation / simulator / CI), `CypherAir-DeviceTests.xctestplan` (physical device), `CypherAir-MacUITests.xctestplan` (targeted macOS UI smoke coverage for route, launch, settings, and tutorial flows), `CypherAir-DangerousDeviceTests.xctestplan` (manual destructive physical-device lane for the Secure Enclave custody Reset All Local Data cleanup proof).
-- Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode uses for Swift/FFI tests.
-- If a Rust change can affect Swift-visible behavior, run `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` before running `xcodebuild test`. This matches GitHub Actions by consuming the pinned `cypherair/rust` stage1 prerelease; use a local `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, or rustup-linked `stage1-arm64e-patch` only when deliberately testing a local Rust fork build.
-- See `docs/TESTING.md` for the full Rust↔Xcode validation workflow and stale-artifact troubleshooting.
-- **GitHub Actions caveat:** the hosted `macos-26` runner image may still lag the project's current 26.5 deployment target or expose Xcode before all matching platform runtimes are usable. When that happens, hosted Swift tests or app probes can be warning-skipped by preflight even though local validation passes.
-- Full testing guide: docs/TESTING.md
-- Code review checklist: docs/CODE_REVIEW.md
+- Docs-only PRs may use the documentation consistency path in docs/TESTING.md Section 2 instead of Rust/Xcode runs.
+- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review checklist: docs/CODE_REVIEW.md.
 
-## Workflow Reminders
+## Releases & Versioning
 
-- Read and understand relevant source files before proposing edits.
-- Do not add unrequested features or expand into unrelated changes. Within the requested scope, prefer the architecturally-correct solution over a minimal patch (next bullet).
-- **Architecturally-correct over the smallest patch.** When the existing structure forces awkward or fragile fixes, a larger refactor — or a substantial rewrite of the affected area — is acceptable and encouraged when it yields a cleaner, more maintainable design. This sets the *depth* of the change, not its *scope*; keep it focused on the requested task and balance it against small, reviewable diffs. See docs/CONVENTIONS.md "Engineering Principle".
-- Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
-- Commit messages: conventional format — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`.
+- Stable releases are tag-first per docs/APP_RELEASE_PROCESS.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Ask before publishing any release or tag.
+- Xcode release metadata (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`) is user-owned: read it from the project, and never invent, increment, or reset it. If the user changed it, treat that change as in-scope work, not something to revert.
+
+## Git & Workflow
+
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
-- **Before text replacement, verify match count.** Before executing any string replacement, check how many matches exist in the file. If multiple matches exist, handle each one individually to avoid unintended changes to other locations.
-- **After reverting changes, verify with `git diff`.** Never rely on memory to confirm a revert is complete. Always run `git diff` (or `git diff origin/main`) to confirm the file matches the expected state.
-- **After code changes, run tests — not just build.** A successful build does not guarantee correctness. Always run the relevant test suite to verify no regressions were introduced.
-- **Never run destructive git operations (checkout, reset, restore) on project files (*.pbxproj, *.entitlements, *.xctestplan, *.xcscheme) without explicit user approval.** These files are difficult to manually reconstruct if changes are lost.
+- Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/CONVENTIONS.md "Engineering Principle".
+- Prefer small, reviewable diffs. Maintain existing user-visible behavior unless the task explicitly changes it.
+- Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
+- Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.
+- Commits are signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the signing key is unavailable, ask the user to unlock it; never create an unsigned commit.
+- Never run destructive git operations (checkout, reset, restore) on project files (`*.pbxproj`, `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user approval — they are difficult to reconstruct if lost.

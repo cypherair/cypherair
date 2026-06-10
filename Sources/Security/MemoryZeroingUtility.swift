@@ -4,7 +4,7 @@ import Foundation
 /// Calls `resetBytes(in:)` on deinit to prevent key material from lingering in memory.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
-/// See SECURITY.md Section 7.
+/// See SECURITY.md Section 10.
 ///
 /// Usage:
 /// ```swift

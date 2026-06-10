@@ -280,7 +280,7 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
 }
 
 /// Verify that encrypting to v4 recipient produces SEIPDv1.
-/// This directly validates PRD Section 3.4 format auto-selection rule.
+/// This directly validates the PRD Section 3.3 / TDD Section 1.4 format auto-selection rule.
 #[test]
 fn test_format_selection_v4_recipient_produces_seipd_v1() {
     let recipient_a =
