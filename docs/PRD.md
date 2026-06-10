@@ -1,9 +1,14 @@
 # Product Requirements Document (PRD)
 
+> **Status:** Canonical current-state.<br>
+> **Purpose:** Product requirements, workflows, feature scope, and acceptance criteria for CypherAir.<br>
+> **Audience:** Human developers, product reviewers, and AI coding tools.<br>
 > **Version:** v4.4<br>
 > **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+<br>
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
-> **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)
+> **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)<br>
+> **Update triggers:** Product scope, user workflows, profile behavior, acceptance criteria, or roadmap change.<br>
+> **Last reviewed:** 2026-06-10.
 
 ## 1. Product Overview
 
@@ -78,7 +83,7 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 - **Key generation:** User chooses profile before generating a key. Default: Profile A.
   - "Universal Compatible" — "Works with all PGP tools including GnuPG."
   - "Advanced Security" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG."
-- **Encryption:** Message format is determined automatically by the recipient's key version. If recipient has a v4 key → SEIPDv1. If v6 key → SEIPDv2 (AEAD). The user does not choose this manually.
+- **Encryption:** Message format is determined automatically by the recipient's key version. If recipient has a v4 key → SEIPDv1. If v6 key → SEIPDv2 (AEAD). Mixed v4+v6 recipients → SEIPDv1 (lowest common denominator). The user does not choose this manually. See [TDD](TDD.md) Section 1.4.
 - **Decryption:** The App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
 - **Multiple keys:** A user may have keys of different profiles (e.g., a Profile A key for GnuPG contacts and a Profile B key for security-conscious contacts).
 
@@ -109,10 +114,8 @@ with historical POC evidence archived under
 
 ### 3.5 Security Hard Rules
 
-- AEAD auth failure → hard-fail; no plaintext fragments shown.
-- All failures produce user-understandable error messages.
-- Random numbers: SecRandomCopyBytes (Swift) / getrandom crate (Rust).
-- No plaintext or private keys in logs. Sensitive data zeroed from memory.
+- All failures produce user-understandable error messages (Section 4.7).
+- The remaining app-wide hard rules — AEAD hard-fail with no plaintext fragments, secure randomness, no secret logging, memory zeroing — are canonically stated in CLAUDE.md "Hard Constraints — NEVER Violate" and [SECURITY.md](SECURITY.md) Section 10.
 
 ---
 
@@ -160,7 +163,7 @@ Home → Encrypt → plaintext → recipients → encrypt-to-self (ON) → signa
 
 - **Encrypt-to-self:** Default ON, configurable in Settings.
 - **Signing:** Default ON per message, no global off.
-- **Message format:** Automatically determined by recipient key version. v4 recipient → SEIPDv1. v6 recipient → SEIPDv2 (AEAD OCB). Mixed recipients (v4 + v6) → SEIPDv1 (lowest common denominator).
+- **Message format:** Auto-selected by recipient key version (Section 3.3 / [TDD](TDD.md) Section 1.4).
 
 ### 4.4 Decryption
 
@@ -228,7 +231,7 @@ Blur overlay when App enters background. Prevents multitasking switcher leakage.
 
 After app privacy authentication succeeds, the app can open protected app-data domains through the same authenticated session. Protected app data is separate from private-key material: it protects app-owned local state after unlock, while private keys remain under the Secure Enclave / Keychain private-key domain.
 
-Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, and tags over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete. Contacts package exchange is not an active product feature; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
+Protected app-data scope and per-surface classification are maintained in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At product level, current coverage includes ordinary protected settings, private-key control state, key metadata, and the protected Contacts domain. Contacts now supports person-centered entries, multiple keys per contact, manual verification and OpenPGP certification state, search, and tags over protected app data. Self-test reports remain short-lived export-only data rather than a protected diagnostics domain, and temporary/export/tutorial cleanup hardening is complete.
 
 **Authentication Mode**
 
@@ -267,7 +270,7 @@ The App offers two authentication modes, selectable in Settings:
 ### 5.3 Encryption / Decryption
 
 - Text + file. Multi-recipient. Encrypt-to-self. Two-phase decryption. Cancellable. Runtime disk space validation.
-- Message format auto-selected by recipient key version. Mixed v4+v6 recipients → SEIPDv1.
+- Message format auto-selected by recipient key version (Section 3.3).
 - Device auth: Standard or High Security mode.
 
 ### 5.4 Signing / Verification
@@ -284,7 +287,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.6 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active; any future complete Contacts backup or device migration must be a separate mandatory encrypted design.
+Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active (Section 5.2).
 
 ---
 
@@ -312,53 +315,55 @@ Key gen, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode. Ru
 
 ## 8. Security Acceptance Criteria
 
+Each criterion below must hold in every release.
+
 ### 8.1 Encryption
 
-- [ ] AEAD hard-fail. Sig failure communicated. SecRandomCopyBytes. No logs. SE-wrapped Keychain. Memory zeroing. Tmp cleanup.
+- AEAD hard-fail. Sig failure communicated. SecRandomCopyBytes. No logs. SE-wrapped Keychain. Memory zeroing. Tmp cleanup.
 
 ### 8.2 Profile Compliance
 
-- [ ] Profile A keys generate v4 format with Ed25519+X25519. Messages use SEIPDv1.
-- [ ] Profile B keys generate v6 format with Ed448+X448. Messages use SEIPDv2 (OCB).
-- [ ] Encrypting to v4 recipient always produces SEIPDv1 regardless of sender's profile.
-- [ ] Encrypting to v6 recipient produces SEIPDv2.
-- [ ] Mixed v4+v6 recipients → SEIPDv1.
-- [ ] App decrypts both SEIPDv1 and SEIPDv2 regardless of user's profile.
-- [ ] Profile A export uses Iterated+Salted S2K. Profile B export uses Argon2id.
+- Profile A keys generate v4 format with Ed25519+X25519. Messages use SEIPDv1.
+- Profile B keys generate v6 format with Ed448+X448. Messages use SEIPDv2 (OCB).
+- Encrypting to v4 recipient always produces SEIPDv1 regardless of sender's profile.
+- Encrypting to v6 recipient produces SEIPDv2.
+- Mixed v4+v6 recipients → SEIPDv1.
+- App decrypts both SEIPDv1 and SEIPDv2 regardless of user's profile.
+- Profile A export uses Iterated+Salted S2K. Profile B export uses Argon2id.
 
 ### 8.3 App Protection
 
-- [ ] Privacy screen active on background.
-- [ ] Re-auth after grace period functions correctly.
-- [ ] Both Standard and High Security authentication modes function correctly.
-- [ ] High Security Mode blocks all private-key operations when biometrics unavailable.
-- [ ] Protected app data opens only after app privacy authentication or an active protected-data session.
-- [ ] Protected app-data unlock does not add a redundant prompt when the app can reuse the authenticated launch/resume context.
-- [ ] URL scheme import (`cypherair://`) requires user confirmation before adding key.
-- [ ] Encrypt-to-self correct.
+- Privacy screen active on background.
+- Re-auth after grace period functions correctly.
+- Both Standard and High Security authentication modes function correctly.
+- High Security Mode blocks all private-key operations when biometrics unavailable.
+- Protected app data opens only after app privacy authentication or an active protected-data session.
+- Protected app-data unlock does not add a redundant prompt when the app can reuse the authenticated launch/resume context.
+- URL scheme import (`cypherair://`) requires user confirmation before adding key.
+- Encrypt-to-self correct.
 
 ### 8.4 Interoperability
 
-- [ ] Profile A: App ↔ GnuPG encrypt/decrypt/sign/verify all succeed.
-- [ ] Profile B: App ↔ Sequoia/OpenPGP.js encrypt/decrypt/sign/verify all succeed.
-- [ ] Profile B output rejected by GnuPG with clear error (not silent corruption).
-- [ ] Tamper → failure in all cases.
+- Profile A: App ↔ GnuPG encrypt/decrypt/sign/verify all succeed.
+- Profile B: App ↔ Sequoia/OpenPGP.js encrypt/decrypt/sign/verify all succeed.
+- Profile B output rejected by GnuPG with clear error (not silent corruption).
+- Tamper → failure in all cases.
 
 ### 8.5 Offline & Permission
 
-- [ ] Airplane Mode works. No prompts. Only `NSFaceIDUsageDescription` in `CypherAir-Info.plist` (no other usage descriptions). No network/camera/photo APIs.
+- Airplane Mode works. No prompts. Only `NSFaceIDUsageDescription` in `CypherAir-Info.plist` (no other usage descriptions). No network/camera/photo APIs.
 
 ### 8.6 Accessibility
 
-- [ ] VoiceOver. Fingerprint readout. Text equivalents. Dynamic Type.
+- VoiceOver. Fingerprint readout. Text equivalents. Dynamic Type.
 
 ### 8.7 Memory Safety
 
-- [ ] Xcode Enhanced Security capability enabled with Hardware Memory Tagging.
-- [ ] App tested under MIE (Memory Integrity Enforcement) on supported A19/A19 Pro-or-newer hardware with no crashes or tag mismatches.
-- [ ] OpenSSL (vendored C code) operates correctly under hardware memory tagging in both debug and release builds.
+- Xcode Enhanced Security capability enabled with Hardware Memory Tagging.
+- App tested under MIE (Memory Integrity Enforcement) on supported A19/A19 Pro-or-newer hardware with no crashes or tag mismatches.
+- OpenSSL (vendored C code) operates correctly under hardware memory tagging in both debug and release builds.
 
-*Note: MIE is built into supported Apple hardware and software, including current A19/A19 Pro devices such as iPhone 17 and iPhone Air. It provides hardware-level protection against buffer overflows and use-after-free vulnerabilities in C/C++ code (including vendored OpenSSL). On unsupported older devices, the App still runs normally but without hardware memory tagging protection.*
+*Note: MIE provides hardware-level protection against buffer overflows and use-after-free in C/C++ code (including vendored OpenSSL) on supported hardware; unsupported older devices run normally without it. Device examples and details: [SECURITY.md](SECURITY.md) Section 8.*
 
 ---
 
@@ -378,33 +383,14 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ## 10. MVP Scope & Roadmap
 
-### 10.1 MVP (v1.0)
+### 10.1 Shipped (v1.0 – v1.3)
 
-- [x] Dual profile key generation (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6). Multi-key with default designation. Expiry modification. Revocation cert auto-generated.
-- [x] Profile-aware encryption (auto format selection by recipient key version).
-- [x] Key exchange: QR + Share Sheet + paste + photo QR. Public key update.
-- [x] Text + file encrypt/decrypt (streaming I/O, cancel, runtime disk space validation). Encrypt-to-self. Two-phase decrypt.
-- [x] Signing/verification. Contact management. Backup & restore (Iterated+Salted / Argon2id).
-- [x] Device auth (Standard + High Security). SE wrapping.
-- [x] Compatibility check. Self-test (both profiles). File/URL registration. Clipboard notice.
-- [x] Privacy screen + re-auth + content lifecycle. Onboarding + guided tutorial. Backup indicator.
-- [x] English + Chinese. Zero permissions. Background tasks. Accessibility. MIE.
+- **v1.0 (MVP):** Dual-profile key generation, multi-key with default designation, expiry modification, auto-generated revocation certs; profile-aware encryption with auto format selection; key exchange via QR / Share Sheet / paste / photo QR with public-key update; text + file encrypt/decrypt with streaming I/O, cancel, disk-space validation, encrypt-to-self, and two-phase decrypt; signing/verification; contact management; backup & restore (Iterated+Salted / Argon2id); Standard + High Security auth with SE wrapping; compatibility check; dual-profile self-test; file/URL registration; clipboard notice; privacy screen + re-auth + content lifecycle; onboarding + guided tutorial; backup indicator; English + Chinese; zero permissions; background tasks; accessibility; MIE.
+- **v1.1:** File-path-based streaming I/O with constant memory (64 KB buffers); fixed 100 MB limit replaced by runtime disk-space validation; progress reporting and cancellation for all file operations.
+- **v1.2:** macOS 26.5+ support (same codebase) with separate entitlements and platform-conditional APIs; `aarch64-apple-darwin` slice in the Rust packaging workflow.
+- **v1.3:** Native visionOS 26.5+ support (same codebase) with native device/simulator Rust release archives and the visionOS build probe.
 
-### 10.2 v1.1 — Completed
-
-- [x] Streaming file processing: file-path-based streaming I/O with constant memory usage (64 KB buffers), replacing in-memory processing for file operations.
-- [x] File size increase: removed fixed 100 MB limit, replaced with runtime disk space validation.
-- [x] Progress reporting and cancellation for all file operations (encrypt, decrypt, sign, verify).
-
-### 10.3 v1.2 — Completed
-
-- [x] macOS 26.5+ support (same codebase). Separate entitlements for macOS sandbox and file access. Conditional compilation for platform-specific APIs (clipboard, background tasks, biometric icons). The Rust build/packaging workflow includes the `aarch64-apple-darwin` release archive and packaged output slice.
-
-### 10.4 v1.3 — Completed
-
-- [x] Native visionOS 26.5+ support (same codebase). The project ships native `visionOS` and `visionOS Simulator` Rust release archives, links them directly in Xcode, and validates the native app path with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
-
-### 10.5 v2.0
+### 10.2 v2.0 (Future)
 
 Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
 
