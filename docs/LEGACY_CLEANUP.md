@@ -279,12 +279,14 @@ Swift, and tests.
 - No Swift production or test call sites consume the generated `legacyStatus`
   or `legacySignerFingerprint`; `PGPMessageResultMapper` already reads only
   `summaryState` / `summaryEntryIndex`. Phase 6 is Rust removal, UniFFI
-  regeneration, and Rust-test deletion, with no Swift production call-site
-  rewrites. (As executed: two Swift test files consumed the generated
-  `PasswordDecryptResult.signatureStatus` / `signerFingerprint` fields and
-  one constructed `FileVerifyDetailedResult` with the legacy initializer
-  labels; all three moved onto `summaryState` / `summaryEntryIndex` /
-  entry-fingerprint assertions under the Test Policy.)
+  regeneration, and Rust-test deletion, with no Swift call-site rewrites.
+  (As-executed correction: that expectation was wrong — two Swift test files
+  consumed the generated `PasswordDecryptResult.signatureStatus` /
+  `signerFingerprint` fields, and one test constructed
+  `FileVerifyDetailedResult` via the legacy initializer labels, so the
+  lead-in claim above missed test-side consumers; all three were moved onto
+  `summaryState` / `summaryEntryIndex` / entry-fingerprint assertions under
+  the Test Policy.)
 - Regenerate UniFFI bindings after Rust result-shape changes.
 - Current API surface must use `summary_state` / `summaryState`,
   `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries
@@ -300,8 +302,8 @@ Swift, and tests.
   `status` / `verificationState` representation, with `status` derived from
   the current summary state so the two cannot disagree. Collapsing that
   redundancy is deliberate post-retirement debt, not a Phase 6 target. The
-  Phase 6 implementation PR should also repoint the
-  `DetailedSignatureVerification` code comment that still cites a
+  Phase 6 implementation commit (633fa5e) repointed the
+  `DetailedSignatureVerification` code comment that previously cited a
   "LEGACY_CLEANUP §9 follow-up" to this section.
 
 ## Guardrails
@@ -315,19 +317,32 @@ matching temporary allowance when it removes the symbol.
 Current audit-rule coverage maps to this roadmap as follows: the audit file's
 `item1A`/`item1B` rules cover the retired Phase 5 right-store, raw-v1, and
 format-floor symbols (including `ProtectedDataRootSecretStorageFormat`, the
-format-floor marker/store, and the registry envelope-floor recorder), `item2`
+format-floor marker/store, the registry envelope-floor recorder, and the
+retired right-store client/handle type names `ProtectedDataRightStoreClient`
+/ `ProtectedDataRightStoreClientProtocol` / `ProtectedDataPersistedRightHandle`
+/ `LocalAuthenticationPersistedRightHandle` — banned even though the
+`ProtectedDataRightStoreClient.swift` filename survives for the current
+root-secret store surface), `item2`
 and `item7` cover the retired Phase 3 metadata migration/legacy-row symbols
 (including `PayloadV1` via the `item4` bare token, `sourceSchemaVersion`, the
-migration source/outcome types, `cleanupLegacyMetadataRows`, and the
-`metadataAccount` / `metadataPrefix` row addressing) and revocation backfill,
+migration source/outcome types, `cleanupLegacyMetadataRows`,
+`migrateLegacyMetadataAfterAppAuthentication`, and the
+`metadataAccount` / `metadataPrefix` / `metadataService` row addressing) and
+revocation backfill,
 `item3` covers the retired Phase 4 `legacyInitialPayload` /
 `cleanupLegacyDefaults` / `invalidLegacyAuthMode` family plus the
 cleanup-only artifact symbols (`legacyRequireAuthOnLaunchKey`,
 `legacySelfTestReportsDirectory`, `legacySelfTestReportDirectory`,
 `legacyTutorialDefaultsSuitePrefix`, `legacyTutorialDefaultsSuiteNames`,
-`cleanupTutorialDefaultsSuites`), the `item4` protected-settings rule covers the
-retired Phase 2 settings symbols including `PayloadV1` and the old
-ordinary-settings store surface, the remaining contacts-snapshot rule covers
+`cleanupTutorialDefaultsSuites`) and the six retired `AuthPreferences` key
+constants (`authModeKey`, `gracePeriodKey`, `rewrapInProgressKey`,
+`rewrapTargetModeKey`, `modifyExpiryInProgressKey`,
+`modifyExpiryFingerprintKey`), the `item4` protected-settings rule covers the
+retired Phase 2 settings symbols including `PayloadV1`, the old
+ordinary-settings store surface, and the committed-payload upgrade machinery
+(`upgradeCommittedSettingsPayloadIfNeeded`, `CommittedSettingsUpgradeFailure`,
+`committedSettingsUpgradeFailure`, `isFoundationFileIOError`), the remaining
+contacts-snapshot rule covers
 Phase 1 snapshot symbols, and the Phase 1 contacts
 certification-artifact/sentinel rule covers the retired
 `legacyTargetSelector`, `legacyUserIdDisplayText`, and
@@ -344,6 +359,16 @@ audit file's Phase 6 rule forbids the item #9 Swift tokens (`legacyStatus`,
 hand-written `Sources/*.swift`. Generated `Sources/PgpMobile/` stays excluded
 from the Swift rules; the Rust guardrail prevents the legacy fields from
 re-entering the generated bindings at their source.
+
+Known residual gaps, accepted deliberately: the rules strip string
+literals, so raw persisted-key strings (Keychain account/service strings,
+UserDefaults key strings) cannot be banned as tokens; the Swift rules
+exclude generated `Sources/PgpMobile/`, so a hand edit to the generated
+bindings would not trip them (generated files are declared not-hand-edited,
+and the Rust guardrail protects them at their source); the Rust guardrail
+scans `pgp-mobile/src` only; and the whole-word matchers deliberately exempt
+longer identifiers that merely embed retired names (for example, test
+function names under `pgp-mobile/src` that embed `signature_status`).
 
 Guardrails must not require construction of old input data as product
 behavior.

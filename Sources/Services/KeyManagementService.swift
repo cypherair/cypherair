@@ -344,8 +344,8 @@ final class KeyManagementService: @unchecked Sendable {
     }
 
     /// Export the key's revocation signature as an ASCII-armored signature.
-    /// If the key predates revocation-construction support, this lazily backfills
-    /// the binary revocation signature, persists it, and then exports the armored form.
+    /// Fails closed with `revocationArtifactUnavailable` when no revocation artifact is
+    /// stored for the key; no secret-key access or persistence side effect occurs.
     func exportRevocationCertificate(fingerprint: String) async throws -> Data {
         let armoredRevocation = try await exportService.exportRevocationCertificate(
             fingerprint: fingerprint

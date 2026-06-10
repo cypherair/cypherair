@@ -187,4 +187,3 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
         return key
     }
 }
-

@@ -310,7 +310,6 @@ Per identity (fingerprint = lowercase hex, no spaces):
 com.cypherair.v1.se-key.<fingerprint>
 com.cypherair.v1.salt.<fingerprint>
 com.cypherair.v1.sealed-key.<fingerprint>
-com.cypherair.v1.metadata.<fingerprint>
 ```
 
 **Keychain item configuration:**
@@ -320,7 +319,6 @@ com.cypherair.v1.metadata.<fingerprint>
 | SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
-| Legacy key metadata migration rows (PGPKeyIdentity JSON) | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None (no SE auth); migration/cleanup source before verified ProtectedData `key-metadata` domain creation |
 | ProtectedData SE device-binding key | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
 
 ProtectedData uses this device-binding key only to open the app-data

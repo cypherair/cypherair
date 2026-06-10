@@ -1502,9 +1502,11 @@ private enum ArchitectureSourceAuditRules {
             "cleanupLegacyMetadataRows",
             "cleanupLegacyRowsMatchingOpenedPayload",
             "borrowAuthenticatedContextForMetadataMigration",
+            "migrateLegacyMetadataAfterAppAuthentication",
             "sourceSchemaVersion",
             "metadataAccount",
             "metadataPrefix",
+            "metadataService",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1528,6 +1530,12 @@ private enum ArchitectureSourceAuditRules {
             "legacyTutorialDefaultsSuitePrefix",
             "legacyTutorialDefaultsSuiteNames",
             "cleanupTutorialDefaultsSuites",
+            "authModeKey",
+            "gracePeriodKey",
+            "rewrapInProgressKey",
+            "rewrapTargetModeKey",
+            "modifyExpiryInProgressKey",
+            "modifyExpiryFingerprintKey",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1552,6 +1560,10 @@ private enum ArchitectureSourceAuditRules {
             "ProtectedOrdinarySettingsLegacyKeys",
             "clipboardNoticeLegacyKey",
             "PayloadV1",
+            "upgradeCommittedSettingsPayloadIfNeeded",
+            "CommittedSettingsUpgradeFailure",
+            "committedSettingsUpgradeFailure",
+            "isFoundationFileIOError",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")
@@ -1603,6 +1615,10 @@ private enum ArchitectureSourceAuditRules {
             "migrateLegacySharedRightIfNeeded",
             "legacyMigrationDeferred",
             "allowLegacyMigration",
+            "ProtectedDataRightStoreClient",
+            "ProtectedDataRightStoreClientProtocol",
+            "ProtectedDataPersistedRightHandle",
+            "LocalAuthenticationPersistedRightHandle",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")

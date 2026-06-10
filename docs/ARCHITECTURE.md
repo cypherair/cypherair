@@ -515,7 +515,7 @@ These pairs must be updated together. A change to one without the other will cau
 
 ```
 Keychain (kSecClassGenericPassword, data-protection Keychain):
-├── Default account (`com.cypherair`):
+└── Default account (`com.cypherair`):
 │   ├── com.cypherair.v1.se-key.<fingerprint>         → SE key dataRepresentation
 │   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt
 │   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
@@ -525,7 +525,6 @@ Keychain (kSecClassGenericPassword, data-protection Keychain):
 │   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret v2 envelope
 │   ├── com.cypherair.v1.protected-data.device-binding-key → ProtectedData SE device-binding key representation
 │   └── (no other CypherAir support rows)
-├── Metadata account (`com.cypherair.metadata`):
 
 Keychain (kSecClassKey, Secure Enclave token):
 └── com.cypherair.v1.secure-enclave-custody.<random-id>.<role>
