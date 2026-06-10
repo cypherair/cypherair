@@ -79,6 +79,8 @@ signature fold fixtures are deletion targets.
 
 ### Phase 1 — Contacts Low-Blast-Radius Cleanup
 
+> Status: Completed (2026-06-09).
+
 Retire Contacts old-model residues that do not require cross-domain security
 plumbing.
 
@@ -299,12 +301,14 @@ Current audit-rule coverage maps to this roadmap as follows: the audit file's
 `item1A`/`item1B` rules cover Phase 5 right-store and raw-v1 symbols, `item2`
 and `item7` cover Phase 3 metadata migration and revocation backfill, `item3`
 covers the Phase 2/Phase 4 `legacyInitialPayload` / `cleanupLegacyDefaults` /
-`invalidLegacyAuthMode` family, and the remaining contacts-snapshot and
-protected-settings rules cover Phase 1 snapshot and Phase 2 migration symbols.
+`invalidLegacyAuthMode` family, the remaining contacts-snapshot and
+protected-settings rules cover Phase 1 snapshot and Phase 2 migration symbols,
+and the Phase 1 contacts certification-artifact/sentinel rule covers the
+retired `legacyTargetSelector`, `legacyUserIdDisplayText`, and
+`legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers: Phase 1 certification-artifact and `"Unknown"`
-sentinel symbols; `PayloadV1`, `sourceSchemaVersion`, schema decode `case 1`,
-and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
+No guardrail rule yet covers: `PayloadV1`, `sourceSchemaVersion`, schema
+decode `case 1`, and upgrade-on-read writeback; `KeyMetadataLegacyMigrationOutcome`,
 `KeyMetadataMigrationSourceItem`, `KeyMetadataMigrationSourceSnapshot`, and
 `cleanupLegacyMetadataRows`; the Phase 4 cleanup-only symbols; the Phase 5
 `storageFormat` / format-floor additions; and all Phase 6 symbols — there is
@@ -315,9 +319,8 @@ by `ProtectedSettingsStore` and `KeyMetadataDomainStore` across Phases 2 and
 
 Additional guardrails are needed as cleanup proceeds:
 
-- Swift guardrails should cover newly retired Contacts artifact/sentinel,
-  settings, key-metadata, private-key-control, cleanup-only, and root-secret
-  symbols.
+- Swift guardrails should cover newly retired settings, key-metadata,
+  private-key-control, cleanup-only, and root-secret symbols.
 - Rust guardrails should read `pgp-mobile/src` via `CARGO_MANIFEST_DIR` and
   forbid the Phase 6 legacy signature symbols after they are removed.
 - Guardrails must not require construction of old input data as product

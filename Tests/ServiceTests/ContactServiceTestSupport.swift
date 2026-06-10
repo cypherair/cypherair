@@ -107,14 +107,17 @@ class ContactServiceTestCase: XCTestCase {
         let keyIndex = try XCTUnwrap(
             snapshot.keyRecords.firstIndex { $0.fingerprint == fingerprint }
         )
-        let keyId = snapshot.keyRecords[keyIndex].keyId
-        let artifact = ContactCertificationArtifactReference(
+        let artifact = makeValidCertificationArtifact(
             artifactId: artifactId,
-            keyId: keyId,
-            userId: snapshot.keyRecords[keyIndex].primaryUserId,
-            createdAt: Date(),
-            storageHint: "test-\(artifactId)"
-        )
+            keyRecord: snapshot.keyRecords[keyIndex],
+            signatureData: Data("test-signature-\(artifactId)".utf8)
+        ) { artifact in
+            artifact.storageHint = "test-\(artifactId)"
+            artifact.source = .imported
+            artifact.targetSelector = .directKey
+            artifact.validationStatus = .revalidationNeeded
+            artifact.lastValidatedAt = nil
+        }
         snapshot.certificationArtifacts.append(artifact)
         snapshot.keyRecords[keyIndex].certificationArtifactIds.append(artifactId)
         snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
@@ -205,7 +208,6 @@ class ContactServiceTestCase: XCTestCase {
         var artifact = ContactCertificationArtifactReference(
             artifactId: artifactId,
             keyId: keyRecord.keyId,
-            userId: userId,
             createdAt: Date(),
             storageHint: "test",
             canonicalSignatureData: signatureData,

@@ -433,7 +433,7 @@ Migration and exception rules:
 - Self-test reports are in-memory export-only data, and legacy `Documents/self-test/` is cleanup-only on startup and local-data reset.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
 - Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.
-- Contacts schema v1 payloads are no longer supported (migration removed under the 2026-06-08 cutoff). Opening a v1 payload fails closed and routes the Contacts domain to recovery instead of migrating; the former v1 `recipientLists` field is not represented in schema v2.
+- Contacts payloads with an unsupported schema version fail closed and route the Contacts domain to recovery.
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - Unsupported legacy flat Contacts files must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.

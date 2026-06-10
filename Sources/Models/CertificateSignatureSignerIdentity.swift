@@ -27,7 +27,7 @@ struct CertificateSignatureSignerIdentity: Equatable {
         }
 
         if let ownKey = ownKeys.first(where: { $0.fingerprint == fingerprint }) {
-            let displayName = ownKey.userId.map(IdentityPresentation.displayName(from:))
+            let displayName = IdentityPresentation.parsedDisplayName(from: ownKey.userId)
                 ?? ownKey.shortKeyId
             return CertificateSignatureSignerIdentity(
                 source: .ownKey,

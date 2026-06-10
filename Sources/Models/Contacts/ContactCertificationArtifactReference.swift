@@ -45,13 +45,6 @@ struct ContactCertificationTargetSelector: Codable, Equatable, Hashable, Sendabl
         )
     }
 
-    var legacyUserIdDisplayText: String? {
-        guard kind == .userId else {
-            return nil
-        }
-        return userIdDisplayText
-    }
-
     var deduplicationKey: String {
         switch kind {
         case .directKey:
@@ -85,7 +78,6 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
 
     let artifactId: String
     let keyId: String
-    var userId: String?
     var createdAt: Date
     var storageHint: String?
     var canonicalSignatureData: Data
@@ -101,46 +93,6 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
     var lastValidatedAt: Date?
     var updatedAt: Date?
     var exportFilename: String?
-
-    init(
-        artifactId: String,
-        keyId: String,
-        userId: String?,
-        createdAt: Date,
-        storageHint: String?,
-        canonicalSignatureData: Data = Data(),
-        signatureDigest: String? = nil,
-        source: ContactCertificationArtifactSource = .imported,
-        targetKeyFingerprint: String? = nil,
-        targetSelector: ContactCertificationTargetSelector? = nil,
-        signerPrimaryFingerprint: String? = nil,
-        signingKeyFingerprint: String? = nil,
-        certificationKind: OpenPGPCertificationKind? = nil,
-        validationStatus: ContactCertificationValidationStatus = .revalidationNeeded,
-        targetCertificateDigest: String? = nil,
-        lastValidatedAt: Date? = nil,
-        updatedAt: Date? = nil,
-        exportFilename: String? = nil
-    ) {
-        self.artifactId = artifactId
-        self.keyId = keyId
-        self.userId = userId
-        self.createdAt = createdAt
-        self.storageHint = storageHint
-        self.canonicalSignatureData = canonicalSignatureData
-        self.signatureDigest = signatureDigest
-        self.source = source
-        self.targetKeyFingerprint = targetKeyFingerprint
-        self.targetSelector = targetSelector ?? Self.legacyTargetSelector(userId: userId)
-        self.signerPrimaryFingerprint = signerPrimaryFingerprint
-        self.signingKeyFingerprint = signingKeyFingerprint
-        self.certificationKind = certificationKind
-        self.validationStatus = validationStatus
-        self.targetCertificateDigest = targetCertificateDigest
-        self.lastValidatedAt = lastValidatedAt
-        self.updatedAt = updatedAt
-        self.exportFilename = exportFilename
-    }
 
     var effectiveSignatureDigest: String? {
         if let signatureDigest, !signatureDigest.isEmpty {
@@ -218,66 +170,5 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
         SHA256.hash(data: data).map {
             String(format: "%02x", $0)
         }.joined()
-    }
-
-    private static func legacyTargetSelector(userId: String?) -> ContactCertificationTargetSelector {
-        guard let userId, !userId.isEmpty else {
-            return .directKey
-        }
-        return .userId(
-            data: Data(userId.utf8),
-            displayText: userId,
-            occurrenceIndex: 0
-        )
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case artifactId
-        case keyId
-        case userId
-        case createdAt
-        case storageHint
-        case canonicalSignatureData
-        case signatureDigest
-        case source
-        case targetKeyFingerprint
-        case targetSelector
-        case signerPrimaryFingerprint
-        case signingKeyFingerprint
-        case certificationKind
-        case validationStatus
-        case targetCertificateDigest
-        case lastValidatedAt
-        case updatedAt
-        case exportFilename
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        artifactId = try container.decode(String.self, forKey: .artifactId)
-        keyId = try container.decode(String.self, forKey: .keyId)
-        userId = try container.decodeIfPresent(String.self, forKey: .userId)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        storageHint = try container.decodeIfPresent(String.self, forKey: .storageHint)
-        canonicalSignatureData = try container.decodeIfPresent(Data.self, forKey: .canonicalSignatureData) ?? Data()
-        signatureDigest = try container.decodeIfPresent(String.self, forKey: .signatureDigest)
-        source = try container.decodeIfPresent(ContactCertificationArtifactSource.self, forKey: .source)
-            ?? .imported
-        targetKeyFingerprint = try container.decodeIfPresent(String.self, forKey: .targetKeyFingerprint)
-        targetSelector = try container.decodeIfPresent(
-            ContactCertificationTargetSelector.self,
-            forKey: .targetSelector
-        ) ?? Self.legacyTargetSelector(userId: userId)
-        signerPrimaryFingerprint = try container.decodeIfPresent(String.self, forKey: .signerPrimaryFingerprint)
-        signingKeyFingerprint = try container.decodeIfPresent(String.self, forKey: .signingKeyFingerprint)
-        certificationKind = try container.decodeIfPresent(OpenPGPCertificationKind.self, forKey: .certificationKind)
-        validationStatus = try container.decodeIfPresent(
-            ContactCertificationValidationStatus.self,
-            forKey: .validationStatus
-        ) ?? .revalidationNeeded
-        targetCertificateDigest = try container.decodeIfPresent(String.self, forKey: .targetCertificateDigest)
-        lastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .lastValidatedAt)
-        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
-        exportFilename = try container.decodeIfPresent(String.self, forKey: .exportFilename)
     }
 }

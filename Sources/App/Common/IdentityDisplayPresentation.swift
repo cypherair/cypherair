@@ -7,8 +7,7 @@ enum IdentityDisplayPresentation {
     }
 
     static func displayName(_ displayName: String) -> String {
-        guard !displayName.isEmpty,
-              displayName != IdentityPresentation.legacyUnknownDisplayName else {
+        guard !displayName.isEmpty else {
             return String(localized: "contact.unknown", defaultValue: "Unknown")
         }
         return displayName
