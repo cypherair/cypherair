@@ -726,8 +726,6 @@ final class ModelTests: XCTestCase {
 
         let detailed = PGPMessageResultMapper.fileVerifyDetailedResult(
             FileVerifyDetailedResult(
-                legacyStatus: .unknownSigner,
-                legacySignerFingerprint: nil,
                 summaryState: .signerCertificateUnavailable,
                 summaryEntryIndex: 0,
                 signatures: [entry]

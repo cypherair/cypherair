@@ -16,7 +16,7 @@ use crate::keys::{
     ExternalP256KeyAgreementRequest,
 };
 use crate::signature_details::{
-    DecryptDetailedResult, FileDecryptDetailedResult, LegacyFoldMode, SignatureCollector,
+    DecryptDetailedResult, FileDecryptDetailedResult, SignatureCollector, SummaryFoldMode,
 };
 
 pub(crate) use core::{
@@ -138,15 +138,12 @@ pub(crate) fn decrypt_detailed_with_external_p256_key_agreement(
         verifier_certs,
         expected_key_agreement_fingerprint: key_agreement_subkey_fingerprint.to_string(),
         key_agreement_provider,
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
     };
     let (plaintext, helper) = decrypt_with_helper(ciphertext, &policy, helper)?;
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(DecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,
@@ -192,7 +189,7 @@ pub(crate) fn decrypt_file_detailed_with_external_p256_key_agreement(
         verifier_certs,
         expected_key_agreement_fingerprint: key_agreement_subkey_fingerprint.to_string(),
         key_agreement_provider,
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
     };
     let helper = crate::streaming::decrypt_file_with_helper(
         input_path,
@@ -201,12 +198,9 @@ pub(crate) fn decrypt_file_detailed_with_external_p256_key_agreement(
         helper,
         progress,
     )?;
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(FileDecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,

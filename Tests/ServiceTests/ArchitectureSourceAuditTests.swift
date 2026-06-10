@@ -263,6 +263,10 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupRevocationBackfillSymbols)
     }
 
+    func test_legacyCleanup_phase6_signatureFold_isTrackedForStrictRetirement() throws {
+        try assertRulePasses(ArchitectureSourceAuditRules.legacyCleanupSignatureFoldSymbols)
+    }
+
     func test_sourceAuditRules_detectViolationsAndAllowFileExceptions() throws {
         try assertRuleBehavior(
             ArchitectureSourceAuditRules.generatedFFITypes.withTemporaryExceptions([
@@ -1481,8 +1485,9 @@ private enum ArchitectureSourceAuditRules {
     // docs/LEGACY_CLEANUP.md Guardrails.
     //
     // Item #9 (Swift) symbols — legacyStatus, legacySignerFingerprint, legacySignerIdentity,
-    // legacyVerification — are added when Phase 6 retires the remaining Rust/UniFFI legacy signature
-    // surface and generated Swift fields.
+    // legacyVerification — are covered by the Phase 6 rule below now that the Rust/UniFFI legacy
+    // signature surface and generated Swift fields are retired. The Rust-side companion guardrail
+    // is pgp-mobile/tests/legacy_symbol_guardrail_tests.rs.
 
     static let legacyCleanupKeyMetadataMigrationSymbols = ArchitectureSourceAuditRule(
         name: "Legacy cleanup #2 key-metadata migration symbols",
@@ -1637,6 +1642,24 @@ private enum ArchitectureSourceAuditRules {
         failureSummary: "Legacy imported-key revocation backfill symbol is removed under the 2026-06-08 cutoff and must not be reintroduced.",
         pattern: wordPattern(for: [
             "updateRevocation",
+        ]),
+        scope: { path in
+            path.hasPrefix("Sources/")
+                && !path.hasPrefix("Sources/PgpMobile/")
+                && path.hasSuffix(".swift")
+        },
+        stripsCommentsAndStrings: true,
+        temporaryExceptions: temporaryExceptions([])
+    )
+
+    static let legacyCleanupSignatureFoldSymbols = ArchitectureSourceAuditRule(
+        name: "Legacy cleanup #9 / Phase 6 signature fold symbols",
+        failureSummary: "Legacy signature fold/status symbols are removed under the 2026-06-08 cutoff and must not be reintroduced; the current surface is summaryState/summaryEntryIndex plus detailed entries.",
+        pattern: wordPattern(for: [
+            "legacyStatus",
+            "legacySignerFingerprint",
+            "legacySignerIdentity",
+            "legacyVerification",
         ]),
         scope: { path in
             path.hasPrefix("Sources/")

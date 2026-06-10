@@ -24,7 +24,7 @@ fn test_external_signer_runtime_detached_file_api_verifies_for_v4_and_v6() {
             None,
         )
         .expect("runtime external detached signature should verify");
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 

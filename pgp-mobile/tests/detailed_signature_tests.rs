@@ -6,7 +6,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::serialize::stream::{Armorer, Encryptor, LiteralWriter, Message, Signer};
 use openpgp::types::SignatureType;
-use pgp_mobile::decrypt::{self, SignatureStatus};
+use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, GeneratedKey, KeyProfile};
@@ -165,7 +165,6 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
     )
     .expect("detailed verification should succeed");
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.summary_entry_index, Some(0));
     assert_eq!(
@@ -193,10 +192,6 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
         .collect();
     assert!(observed_fingerprints.contains(&signer_a.fingerprint));
     assert!(observed_fingerprints.contains(&signer_b.fingerprint));
-    assert_eq!(
-        detailed.signatures[0].signer_primary_fingerprint,
-        detailed.legacy_signer_fingerprint
-    );
 }
 
 #[test]
@@ -208,9 +203,15 @@ fn test_verify_cleartext_detailed_expired_signer_preserves_entries() {
     let detailed = verify::verify_cleartext_detailed(&signed, &[signer.public_key_data.clone()])
         .expect("expired detailed verification should still grade");
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Expired);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Expired);
-    assert_eq!(detailed.legacy_signer_fingerprint, Some(signer.fingerprint));
+    let summary_entry = &detailed.signatures[detailed
+        .summary_entry_index
+        .expect("expired summary should reference an entry")
+        as usize];
+    assert_eq!(
+        summary_entry.signer_primary_fingerprint,
+        Some(signer.fingerprint)
+    );
     assert!(!detailed.signatures.is_empty());
     assert!(detailed
         .signatures
@@ -226,7 +227,6 @@ fn test_verify_detached_file_detailed_repeated_signer_preserves_repeated_entries
 
     let detailed = verify_detached_file_for_test(data, &signature, &[signer.public_key_data]);
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.signatures.len(), 2);
     assert_eq!(
@@ -256,7 +256,6 @@ fn test_verify_detached_file_detailed_known_plus_unknown_preserves_unknown_nil_f
 
     let detailed = verify_detached_file_for_test(data, &signature, &[signer_a.public_key_data]);
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.signatures.len(), 2);
     assert!(detailed
@@ -282,9 +281,7 @@ fn test_verify_detached_file_detailed_tampered_runtime_data_reports_bad() {
     let detailed =
         verify_detached_file_for_test(&tampered, &signature, &[signer.public_key_data.clone()]);
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Bad);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Invalid);
-    assert_eq!(detailed.legacy_signer_fingerprint, None);
 }
 
 #[test]
@@ -297,7 +294,6 @@ fn test_verify_detached_file_detailed_preserves_unknown_entry() {
     let file_detailed =
         verify_detached_file_for_test(data, &signature, &[signer_a.public_key_data.clone()]);
 
-    assert_eq!(file_detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(
         file_detailed.summary_state,
         SignatureVerificationState::Verified
@@ -314,10 +310,6 @@ fn test_verify_detached_file_detailed_preserves_unknown_entry() {
     assert_eq!(
         summary_entry.signer_primary_fingerprint,
         Some(signer_a.fingerprint.clone())
-    );
-    assert_eq!(
-        file_detailed.legacy_signer_fingerprint,
-        Some(signer_a.fingerprint)
     );
     assert_eq!(file_detailed.signatures.len(), 2);
     assert!(file_detailed.signatures.iter().any(|entry| {
@@ -338,12 +330,10 @@ fn test_verify_detached_file_detailed_tampered_fixture_data_reports_bad() {
     let file_detailed =
         verify_detached_file_for_test(&tampered, &signature, &[signer.public_key_data.clone()]);
 
-    assert_eq!(file_detailed.legacy_status, SignatureStatus::Bad);
     assert_eq!(
         file_detailed.summary_state,
         SignatureVerificationState::Invalid
     );
-    assert_eq!(file_detailed.legacy_signer_fingerprint, None);
 }
 
 #[test]
@@ -368,7 +358,6 @@ fn test_decrypt_detailed_multi_signature_preserves_entries() {
     )
     .expect("detailed decrypt should succeed");
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::Valid);
     assert_eq!(detailed.summary_state, SignatureVerificationState::Verified);
     assert_eq!(detailed.plaintext, plaintext);
     assert_eq!(detailed.signatures.len(), 2);
@@ -393,10 +382,13 @@ fn test_decrypt_detailed_multi_signature_preserves_entries() {
     assert!(observed_fingerprints.contains(&signer_a.fingerprint));
     assert!(observed_fingerprints.contains(&signer_b.fingerprint));
     assert!(observed_fingerprints.contains(
-        detailed
-            .legacy_signer_fingerprint
+        detailed.signatures[detailed
+            .summary_entry_index
+            .expect("valid decrypt summary should reference an entry")
+            as usize]
+            .signer_primary_fingerprint
             .as_ref()
-            .expect("valid decrypt summary should have signer fp")
+            .expect("valid summary entry should have signer fp")
     ));
 }
 
@@ -414,7 +406,6 @@ fn test_decrypt_detailed_unsigned_returns_empty_signatures_and_not_signed() {
     let detailed = decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data], &[])
         .expect("unsigned detailed decrypt should succeed");
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::NotSigned);
     assert_eq!(
         detailed.summary_state,
         SignatureVerificationState::NotSigned
@@ -453,7 +444,6 @@ fn test_decrypt_file_detailed_unsigned_returns_empty_signatures_and_not_signed()
     )
     .expect("file detailed decrypt should succeed");
 
-    assert_eq!(detailed.legacy_status, SignatureStatus::NotSigned);
     assert_eq!(
         detailed.summary_state,
         SignatureVerificationState::NotSigned

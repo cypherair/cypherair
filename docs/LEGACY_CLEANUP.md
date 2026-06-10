@@ -1,6 +1,6 @@
 # Legacy Cleanup
 
-> Status: Active strict-retirement roadmap.
+> Status: Completed strict-retirement roadmap — all phases (0–6) implemented; see per-phase status lines. Retained as the record of what was removed and why, and for the reintroduction guardrails it defines.
 > Purpose: Canonical plan for retiring app-owned legacy data models, persisted
 > formats, migration sources, fallback decoders, cleanup-only hooks, legacy
 > fixtures, and old-input tests after the 2026-06-08 support cutoff.
@@ -9,7 +9,7 @@
 > [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md);
 > [ARCHITECTURE.md](ARCHITECTURE.md); [SECURITY.md](SECURITY.md);
 > [TESTING.md](TESTING.md).
-> Last reviewed: 2026-06-09.
+> Last reviewed: 2026-06-10.
 
 This document replaces the earlier cleanup inventory and deleted execution
 roadmap. It is now the single source of truth for the strict legacy-retirement
@@ -265,6 +265,8 @@ Retire legacy right-store and raw-v1 root-secret recognition/migration paths.
 
 ### Phase 6 — Rust And UniFFI Signature Cleanup
 
+> Status: Completed (2026-06-10).
+
 Retire the full legacy signature fold surface from Rust, UniFFI, generated
 Swift, and tests.
 
@@ -277,7 +279,12 @@ Swift, and tests.
 - No Swift production or test call sites consume the generated `legacyStatus`
   or `legacySignerFingerprint`; `PGPMessageResultMapper` already reads only
   `summaryState` / `summaryEntryIndex`. Phase 6 is Rust removal, UniFFI
-  regeneration, and Rust-test deletion, with no Swift call-site rewrites.
+  regeneration, and Rust-test deletion, with no Swift production call-site
+  rewrites. (As executed: two Swift test files consumed the generated
+  `PasswordDecryptResult.signatureStatus` / `signerFingerprint` fields and
+  one constructed `FileVerifyDetailedResult` with the legacy initializer
+  labels; all three moved onto `summaryState` / `summaryEntryIndex` /
+  entry-fingerprint assertions under the Test Policy.)
 - Regenerate UniFFI bindings after Rust result-shape changes.
 - Current API surface must use `summary_state` / `summaryState`,
   `summary_entry_index` / `summaryEntryIndex`, and detailed signature entries
@@ -326,18 +333,20 @@ certification-artifact/sentinel rule covers the retired
 `legacyTargetSelector`, `legacyUserIdDisplayText`, and
 `legacyUnknownDisplayName` symbols.
 
-No guardrail rule yet covers the Phase 6 symbols — there is no Rust
-guardrail yet, and the Swift rules exclude `Sources/PgpMobile/`, so Phase 6
-currently has zero guardrail coverage.
+The Phase 6 symbols are covered on both sides of the FFI boundary:
+`pgp-mobile/tests/legacy_symbol_guardrail_tests.rs` reads `pgp-mobile/src`
+via `CARGO_MANIFEST_DIR` and forbids the retired Rust legacy signature
+symbols (`legacy_status`, `legacy_signer_fingerprint`, `LegacyFoldMode`,
+`legacy_stopped`, `state_from_legacy_status`, the bare `SignatureStatus`
+enum name, and the retired `PasswordDecryptResult` field names), and the
+audit file's Phase 6 rule forbids the item #9 Swift tokens (`legacyStatus`,
+`legacySignerFingerprint`, `legacySignerIdentity`, `legacyVerification`) in
+hand-written `Sources/*.swift`. Generated `Sources/PgpMobile/` stays excluded
+from the Swift rules; the Rust guardrail prevents the legacy fields from
+re-entering the generated bindings at their source.
 
-Additional guardrails are needed as cleanup proceeds:
-
-- Swift guardrails should cover newly retired settings, key-metadata,
-  private-key-control, cleanup-only, and root-secret symbols.
-- Rust guardrails should read `pgp-mobile/src` via `CARGO_MANIFEST_DIR` and
-  forbid the Phase 6 legacy signature symbols after they are removed.
-- Guardrails must not require construction of old input data as product
-  behavior.
+Guardrails must not require construction of old input data as product
+behavior.
 
 ## Validation Matrix
 

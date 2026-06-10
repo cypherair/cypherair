@@ -27,7 +27,6 @@ use zeroize::Zeroizing;
 
 use crate::decrypt::{
     classify_decrypt_error, is_expired_error, parse_verification_certs, DecryptHelper,
-    SignatureStatus,
 };
 use crate::encrypt;
 use crate::error::PgpError;
@@ -35,7 +34,7 @@ use crate::external_signer::{map_external_signing_error, signer_for_provider};
 use crate::keys::ExternalP256SigningProvider;
 use crate::sign;
 use crate::signature_details::{
-    state_from_legacy_status, FileDecryptDetailedResult, FileVerifyDetailedResult,
+    FileDecryptDetailedResult, FileVerifyDetailedResult, SignatureVerificationState,
 };
 use crate::verify::VerifyHelper;
 
@@ -464,18 +463,15 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
         secret_certs: &certs,
         verifier_certs: &verifier_certs,
         collector: crate::signature_details::SignatureCollector::new(
-            crate::signature_details::LegacyFoldMode::DecryptLike,
+            crate::signature_details::SummaryFoldMode::DecryptLike,
         ),
     };
 
     let helper = decrypt_file_with_helper(input_path, output_path, &policy, helper, progress)?;
 
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(FileDecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,
@@ -708,19 +704,17 @@ pub fn verify_detached_file_detailed(
         .with_policy(&policy, None, helper);
 
     // Match the current early-setup grading: no observed per-signature results means
-    // an empty detailed array and a legacy Bad/Expired status.
+    // an empty detailed array and an Expired/Invalid summary.
     let mut verifier = match verifier_result {
         Ok(v) => v,
         Err(e) => {
-            let status = if is_expired_error(&e) {
-                SignatureStatus::Expired
+            let summary_state = if is_expired_error(&e) {
+                SignatureVerificationState::Expired
             } else {
-                SignatureStatus::Bad
+                SignatureVerificationState::Invalid
             };
             return Ok(FileVerifyDetailedResult {
-                legacy_status: status.clone(),
-                legacy_signer_fingerprint: None,
-                summary_state: state_from_legacy_status(&status),
+                summary_state,
                 summary_entry_index: None,
                 signatures: Vec::new(),
             });
@@ -740,8 +734,6 @@ pub fn verify_detached_file_detailed(
 
         let helper = verifier.into_helper();
         return Ok(FileVerifyDetailedResult {
-            legacy_status: SignatureStatus::Bad,
-            legacy_signer_fingerprint: helper.collector.legacy_signer_fingerprint(),
             summary_state: helper.collector.summary_state(),
             summary_entry_index: helper.collector.summary_entry_index(),
             signatures: helper.collector.signatures(),
@@ -749,12 +741,9 @@ pub fn verify_detached_file_detailed(
     }
 
     let helper = verifier.into_helper();
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(FileVerifyDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,

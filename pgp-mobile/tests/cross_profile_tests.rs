@@ -6,10 +6,10 @@ mod common;
 use common::detect_message_format;
 
 use pgp_mobile::decrypt;
-use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::verify;
 
 /// C2X.1: Profile A encrypts to Profile B recipient (v6 key).
@@ -43,7 +43,7 @@ fn test_profile_a_encrypts_to_profile_b() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 /// C2X.2: Profile B encrypts to Profile A recipient (v4 key).
@@ -77,7 +77,7 @@ fn test_profile_b_encrypts_to_profile_a() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 /// C2X.3: Profile B encrypts to mixed recipients (v4 + v6).
@@ -177,7 +177,10 @@ fn test_cross_profile_signature_verification() {
     let verify_a_by_b =
         verify::verify_cleartext_detailed(&signed_a, &[key_a.public_key_data.clone()])
             .expect("Profile B should verify Profile A signature");
-    assert_eq!(verify_a_by_b.legacy_status, SignatureStatus::Valid);
+    assert_eq!(
+        verify_a_by_b.summary_state,
+        SignatureVerificationState::Verified
+    );
 
     // Profile B signs, Profile A verifies
     let signed_b =
@@ -185,7 +188,10 @@ fn test_cross_profile_signature_verification() {
     let verify_b_by_a =
         verify::verify_cleartext_detailed(&signed_b, &[key_b.public_key_data.clone()])
             .expect("Profile A should verify Profile B signature");
-    assert_eq!(verify_b_by_a.legacy_status, SignatureStatus::Valid);
+    assert_eq!(
+        verify_b_by_a.summary_state,
+        SignatureVerificationState::Verified
+    );
 }
 
 /// Extended: Profile A sender signs encrypted message for Profile B recipient.
@@ -220,9 +226,13 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
     assert_eq!(
-        result.legacy_signer_fingerprint,
+        summary_entry.signer_primary_fingerprint,
         Some(sender_a.fingerprint.clone())
     );
 }
@@ -261,9 +271,13 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
     .expect("Decryption should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
     assert_eq!(
-        result.legacy_signer_fingerprint,
+        summary_entry.signer_primary_fingerprint,
         Some(sender_b.fingerprint.clone())
     );
 
@@ -276,7 +290,10 @@ fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
     .expect("Sender should decrypt via encrypt-to-self");
 
     assert_eq!(result_self.plaintext, plaintext);
-    assert_eq!(result_self.legacy_status, SignatureStatus::Valid);
+    assert_eq!(
+        result_self.summary_state,
+        SignatureVerificationState::Verified
+    );
 }
 
 /// Verify that encrypting to v4 recipient produces SEIPDv1.

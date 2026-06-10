@@ -4,9 +4,9 @@
 
 mod common;
 
-use pgp_mobile::decrypt::SignatureStatus;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
+use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use std::fs;
 
@@ -66,8 +66,8 @@ fn test_encrypt_decrypt_file_profile_a_roundtrip() {
 
     // No signing key was used, so signature should be NotSigned
     assert_eq!(
-        result.legacy_status,
-        SignatureStatus::NotSigned,
+        result.summary_state,
+        SignatureVerificationState::NotSigned,
         "Unsigned message should report NotSigned"
     );
 }
@@ -104,7 +104,7 @@ fn test_encrypt_decrypt_file_profile_b_roundtrip() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::NotSigned);
+    assert_eq!(result.summary_state, SignatureVerificationState::NotSigned);
 }
 
 // ── Signed Encrypt/Decrypt Tests ───────────────────────────────────────
@@ -144,17 +144,17 @@ fn test_encrypt_decrypt_file_with_signature_profile_a() {
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
     assert_eq!(
-        result.legacy_status,
-        SignatureStatus::Valid,
+        result.summary_state,
+        SignatureVerificationState::Verified,
         "Signature should be valid"
     );
-    assert!(
-        result.legacy_signer_fingerprint.is_some(),
-        "Signer fingerprint should be present"
-    );
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
     assert_eq!(
-        result.legacy_signer_fingerprint.unwrap(),
-        key.fingerprint,
+        summary_entry.signer_primary_fingerprint,
+        Some(key.fingerprint.clone()),
         "Signer fingerprint should match"
     );
 }
@@ -191,8 +191,15 @@ fn test_encrypt_decrypt_file_with_signature_profile_b() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
+    assert_eq!(
+        summary_entry.signer_primary_fingerprint,
+        Some(key.fingerprint.clone())
+    );
 }
 
 // ── Sign/Verify Detached File Tests ────────────────────────────────────
@@ -222,8 +229,15 @@ fn test_sign_verify_detached_file_profile_a() {
     )
     .expect("Verification should succeed");
 
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
+    assert_eq!(
+        summary_entry.signer_primary_fingerprint,
+        Some(key.fingerprint.clone())
+    );
 }
 
 #[test]
@@ -247,8 +261,15 @@ fn test_sign_verify_detached_file_profile_b() {
     )
     .expect("Verification should succeed");
 
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
-    assert_eq!(result.legacy_signer_fingerprint.unwrap(), key.fingerprint);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
+    let summary_entry = &result.signatures[result
+        .summary_entry_index
+        .expect("summary should reference an entry")
+        as usize];
+    assert_eq!(
+        summary_entry.signer_primary_fingerprint,
+        Some(key.fingerprint.clone())
+    );
 }
 
 // ── Match Recipients From File Test ────────────────────────────────────
@@ -339,5 +360,5 @@ fn test_encrypt_file_cross_profile() {
 
     let decrypted = fs::read(&decrypted_path).unwrap();
     assert_eq!(decrypted, plaintext);
-    assert_eq!(result.legacy_status, SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }

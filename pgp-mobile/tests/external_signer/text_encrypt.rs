@@ -33,7 +33,7 @@ fn test_external_signer_runtime_encrypt_api_decrypts_and_verifies_for_v4_and_v6(
             decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data], &[material.public_cert])
                 .expect("recipient should decrypt signed message");
         assert_eq!(result.plaintext, plaintext.as_bytes());
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -76,7 +76,7 @@ fn test_external_signer_runtime_encrypt_mixed_recipients_downgrades_to_seipdv1()
             decrypt::decrypt_detailed(&ciphertext, &[secret], &[material.public_cert.clone()])
                 .expect("recipient should decrypt mixed-recipient message");
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -116,7 +116,7 @@ fn test_external_signer_runtime_encrypt_to_self_downgrades_and_self_decrypts() {
             decrypt::decrypt_detailed(&ciphertext, &[secret], &[material.public_cert.clone()])
                 .expect("recipient or self key should decrypt encrypt-to-self message");
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 

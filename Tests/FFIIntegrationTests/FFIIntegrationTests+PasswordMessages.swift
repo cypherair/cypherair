@@ -58,7 +58,7 @@ extension FFIIntegrationTests {
 
         XCTAssertEqual(result.status, .decrypted)
         XCTAssertEqual(result.plaintext, plaintext)
-        XCTAssertEqual(result.signatureStatus, .notSigned)
+        XCTAssertEqual(result.summaryState, .notSigned)
     }
 
     func test_passwordRoundTrip_seipdv2_signed_preservesSignatureAcrossFFI() throws {
@@ -85,8 +85,9 @@ extension FFIIntegrationTests {
 
         XCTAssertEqual(result.status, .decrypted)
         XCTAssertEqual(result.plaintext, plaintext)
-        XCTAssertEqual(result.signatureStatus, .valid)
-        XCTAssertEqual(result.signerFingerprint, signer.fingerprint)
+        XCTAssertEqual(result.summaryState, .verified)
+        XCTAssertEqual(result.summaryEntryIndex, 0)
+        XCTAssertEqual(result.signatures.first?.signerPrimaryFingerprint, signer.fingerprint)
     }
 
     func test_passwordDecrypt_noSkesk_returnsStatus() throws {

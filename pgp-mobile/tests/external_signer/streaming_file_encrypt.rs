@@ -36,7 +36,7 @@ fn test_external_signer_runtime_streaming_file_encrypt_decrypts_and_verifies_for
             decrypt::decrypt_detailed(&ciphertext, &[recipient.cert_data], &[verifier_cert])
                 .expect("recipient should decrypt signed file message");
         assert_eq!(result.plaintext, plaintext.as_bytes());
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -78,7 +78,7 @@ fn test_external_signer_runtime_streaming_file_encrypt_mixed_recipients_downgrad
         let result = decrypt::decrypt_detailed(&ciphertext, &[secret], &[verifier_cert.clone()])
             .expect("recipient should decrypt mixed-recipient file message");
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 
@@ -117,7 +117,7 @@ fn test_external_signer_runtime_streaming_file_encrypt_to_self_downgrades_and_se
         let result = decrypt::decrypt_detailed(&ciphertext, &[secret], &[verifier_cert.clone()])
             .expect("recipient or self key should decrypt file message");
         assert_eq!(result.plaintext, plaintext);
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 

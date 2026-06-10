@@ -15,6 +15,7 @@ use pgp_mobile::encrypt;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
+use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::streaming;
 use pgp_mobile::verify;
 use tempfile::NamedTempFile;
@@ -130,7 +131,7 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     .expect("Should decrypt with GnuPG secret key");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 // ── C3.3: App (Profile A) sign → gpg --verify "Good signature" ────────────
@@ -152,7 +153,7 @@ fn test_c3_3_app_sign_profile_a() {
     let result = verify::verify_cleartext_detailed(&signed, &[sender.public_key_data])
         .expect("Verification should succeed");
 
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     assert!(result.content.is_some());
     // The content from cleartext verification should match the original plaintext
     let content = result.content.unwrap();
@@ -210,7 +211,7 @@ fn test_c3_5_verify_gpg_cleartext_signature() {
     let result = verify::verify_cleartext_detailed(&signed, &[pubkey])
         .expect("Should verify GnuPG cleartext signature");
 
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 
     // Verify content matches
     let content = result.content.expect("Should have content");
@@ -235,7 +236,7 @@ fn test_c3_5_verify_gpg_detached_signature_armored() {
     )
     .expect("Should verify GnuPG detached signature");
 
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 /// C3.5 (detached, binary): Verify a GnuPG detached signature in binary format.
@@ -254,7 +255,7 @@ fn test_c3_5_verify_gpg_detached_signature_binary() {
     )
     .expect("Should verify binary GnuPG detached signature");
 
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 // ── C3.6: Tamper 1 bit → gpg fails ────────────────────────────────────────
@@ -373,7 +374,7 @@ fn test_c3_7_full_roundtrip_signed() {
     .expect("Decrypt+verify should succeed");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 // ── C3.8: Profile B pubkey → gpg (GnuPG 2.4.x) ───────────────────────────
@@ -643,7 +644,7 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     .expect("GnuPG recipient should decrypt SEIPDv1 message");
 
     assert_eq!(result.plaintext, plaintext);
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
 // ── Signed+compressed fixture test ──────────────────────────────────────
@@ -662,7 +663,7 @@ fn test_verify_gpg_signed_compressed() {
     let result = verify::verify_cleartext_detailed(&signed, &[pubkey])
         .expect("Should verify signed+compressed message");
 
-    assert_eq!(result.legacy_status, decrypt::SignatureStatus::Valid);
+    assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     let content = result.content.expect("Should have content");
     let content_str = String::from_utf8_lossy(&content);
     let expected_str = String::from_utf8_lossy(&expected);

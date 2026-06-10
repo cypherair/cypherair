@@ -3,7 +3,7 @@ use openpgp::parse::stream::{
 };
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{is_expired_error, SignatureStatus};
+use crate::decrypt::is_expired_error;
 
 /// Certificate-backed verification state for a signature entry or summary.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
@@ -15,7 +15,7 @@ pub enum SignatureVerificationState {
     SignerCertificateUnavailable,
 }
 
-/// Per-signature status preserved by the additive detailed APIs.
+/// Per-signature status preserved by the detailed APIs.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum DetailedSignatureStatus {
     Valid,
@@ -36,8 +36,6 @@ pub struct DetailedSignatureEntry {
 /// Detailed result for in-memory verification APIs.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct VerifyDetailedResult {
-    pub legacy_status: SignatureStatus,
-    pub legacy_signer_fingerprint: Option<String>,
     pub summary_state: SignatureVerificationState,
     pub summary_entry_index: Option<u64>,
     pub signatures: Vec<DetailedSignatureEntry>,
@@ -50,8 +48,6 @@ pub struct VerifyDetailedResult {
 /// zeroize this data after use.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DecryptDetailedResult {
-    pub legacy_status: SignatureStatus,
-    pub legacy_signer_fingerprint: Option<String>,
     pub summary_state: SignatureVerificationState,
     pub summary_entry_index: Option<u64>,
     pub signatures: Vec<DetailedSignatureEntry>,
@@ -61,8 +57,6 @@ pub struct DecryptDetailedResult {
 /// Detailed result for file verification APIs.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct FileVerifyDetailedResult {
-    pub legacy_status: SignatureStatus,
-    pub legacy_signer_fingerprint: Option<String>,
     pub summary_state: SignatureVerificationState,
     pub summary_entry_index: Option<u64>,
     pub signatures: Vec<DetailedSignatureEntry>,
@@ -71,48 +65,48 @@ pub struct FileVerifyDetailedResult {
 /// Detailed result for file decrypt APIs.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct FileDecryptDetailedResult {
-    pub legacy_status: SignatureStatus,
-    pub legacy_signer_fingerprint: Option<String>,
     pub summary_state: SignatureVerificationState,
     pub summary_entry_index: Option<u64>,
     pub signatures: Vec<DetailedSignatureEntry>,
 }
 
+/// Summary selection mode.
+///
+/// Verify-like routes freeze the summary on the first conclusive result
+/// (valid, or any hard failure); decrypt-like routes keep following later
+/// results until a valid signature wins.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LegacyFoldMode {
+pub(crate) enum SummaryFoldMode {
     VerifyLike,
     DecryptLike,
 }
 
-/// Collects detailed per-signature entries while independently reproducing legacy fold behavior.
+/// Collects detailed per-signature entries and selects the summary signature.
 #[derive(Debug, Clone)]
 pub(crate) struct SignatureCollector {
-    mode: LegacyFoldMode,
-    legacy_status: Option<SignatureStatus>,
-    legacy_signer_fingerprint: Option<String>,
+    mode: SummaryFoldMode,
     summary_state: Option<SignatureVerificationState>,
     summary_entry_index: Option<u64>,
-    legacy_stopped: bool,
+    summary_stopped: bool,
     signatures: Vec<DetailedSignatureEntry>,
 }
 
 impl SignatureCollector {
-    pub(crate) fn new(mode: LegacyFoldMode) -> Self {
+    pub(crate) fn new(mode: SummaryFoldMode) -> Self {
         Self {
             mode,
-            legacy_status: None,
-            legacy_signer_fingerprint: None,
             summary_state: None,
             summary_entry_index: None,
-            legacy_stopped: false,
+            summary_stopped: false,
             signatures: Vec::new(),
         }
     }
 
     /// Record every observed signature result in global parser order.
     ///
-    /// Legacy fold stop conditions only affect `legacy_*` fields. Detailed entry collection
-    /// must continue for every observed result, even after the legacy winner is known.
+    /// Summary stop conditions only affect the summary selection. Detailed entry
+    /// collection must continue for every observed result, even after the summary
+    /// winner is known.
     pub(crate) fn observe_structure(&mut self, structure: MessageStructure) {
         for layer in structure {
             if let MessageLayer::SignatureGroup { results } = layer {
@@ -121,10 +115,6 @@ impl SignatureCollector {
                 }
             }
         }
-    }
-
-    pub(crate) fn legacy_signer_fingerprint(&self) -> Option<String> {
-        self.legacy_signer_fingerprint.clone()
     }
 
     pub(crate) fn summary_state(&self) -> SignatureVerificationState {
@@ -144,15 +134,11 @@ impl SignatureCollector {
     pub(crate) fn into_parts(
         self,
     ) -> (
-        SignatureStatus,
-        Option<String>,
         SignatureVerificationState,
         Option<u64>,
         Vec<DetailedSignatureEntry>,
     ) {
         (
-            self.legacy_status.unwrap_or(SignatureStatus::NotSigned),
-            self.legacy_signer_fingerprint,
             self.summary_state
                 .unwrap_or(SignatureVerificationState::NotSigned),
             self.summary_entry_index,
@@ -165,46 +151,37 @@ impl SignatureCollector {
         let entry_index = self.signatures.len() as u64;
         self.signatures.push(entry.clone());
 
-        if self.legacy_stopped {
+        if self.summary_stopped {
             return;
         }
 
         match result {
-            Ok(GoodChecksum { ka, .. }) => {
-                self.legacy_status = Some(SignatureStatus::Valid);
-                self.legacy_signer_fingerprint =
-                    Some(ka.cert().fingerprint().to_hex().to_lowercase());
+            Ok(GoodChecksum { .. }) => {
                 self.summary_state = Some(entry.state);
                 self.summary_entry_index = Some(entry_index);
-                self.legacy_stopped = true;
+                self.summary_stopped = true;
             }
             Err(VerificationError::MissingKey { .. }) => {
-                self.legacy_status = Some(SignatureStatus::UnknownSigner);
                 self.summary_state = Some(entry.state);
                 self.summary_entry_index = Some(entry_index);
             }
-            Err(VerificationError::BadKey { ka, error, .. }) => {
+            Err(VerificationError::BadKey { error, .. }) => {
                 if is_expired_error(&error) {
-                    self.legacy_status = Some(SignatureStatus::Expired);
-                    self.legacy_signer_fingerprint =
-                        Some(ka.cert().fingerprint().to_hex().to_lowercase());
                     self.summary_state = Some(SignatureVerificationState::Expired);
                 } else {
-                    self.legacy_status = Some(SignatureStatus::Bad);
                     self.summary_state = Some(SignatureVerificationState::Invalid);
                 }
                 self.summary_entry_index = Some(entry_index);
 
-                if matches!(self.mode, LegacyFoldMode::VerifyLike) {
-                    self.legacy_stopped = true;
+                if matches!(self.mode, SummaryFoldMode::VerifyLike) {
+                    self.summary_stopped = true;
                 }
             }
             Err(_) => {
-                self.legacy_status = Some(SignatureStatus::Bad);
                 self.summary_state = Some(SignatureVerificationState::Invalid);
                 self.summary_entry_index = Some(entry_index);
-                if matches!(self.mode, LegacyFoldMode::VerifyLike) {
-                    self.legacy_stopped = true;
+                if matches!(self.mode, SummaryFoldMode::VerifyLike) {
+                    self.summary_stopped = true;
                 }
             }
         }
@@ -275,16 +252,6 @@ fn entry_from_result(result: &VerificationResult) -> DetailedSignatureEntry {
     }
 }
 
-pub(crate) fn state_from_legacy_status(status: &SignatureStatus) -> SignatureVerificationState {
-    match status {
-        SignatureStatus::Valid => SignatureVerificationState::Verified,
-        SignatureStatus::UnknownSigner => SignatureVerificationState::SignerCertificateUnavailable,
-        SignatureStatus::Bad => SignatureVerificationState::Invalid,
-        SignatureStatus::NotSigned => SignatureVerificationState::NotSigned,
-        SignatureStatus::Expired => SignatureVerificationState::Expired,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,38 +273,32 @@ mod tests {
             });
             let entry_index = (self.signatures.len() - 1) as u64;
 
-            if self.legacy_stopped {
+            if self.summary_stopped {
                 return;
             }
 
             match status {
                 DetailedSignatureStatus::Valid => {
-                    self.legacy_status = Some(SignatureStatus::Valid);
-                    self.legacy_signer_fingerprint = signer_primary_fingerprint;
                     self.summary_state = Some(SignatureVerificationState::Verified);
                     self.summary_entry_index = Some(entry_index);
-                    self.legacy_stopped = true;
+                    self.summary_stopped = true;
                 }
                 DetailedSignatureStatus::UnknownSigner => {
-                    self.legacy_status = Some(SignatureStatus::UnknownSigner);
                     self.summary_state = Some(state);
                     self.summary_entry_index = Some(entry_index);
                 }
                 DetailedSignatureStatus::Bad => {
-                    self.legacy_status = Some(SignatureStatus::Bad);
                     self.summary_state = Some(SignatureVerificationState::Invalid);
                     self.summary_entry_index = Some(entry_index);
-                    if matches!(self.mode, LegacyFoldMode::VerifyLike) {
-                        self.legacy_stopped = true;
+                    if matches!(self.mode, SummaryFoldMode::VerifyLike) {
+                        self.summary_stopped = true;
                     }
                 }
                 DetailedSignatureStatus::Expired => {
-                    self.legacy_status = Some(SignatureStatus::Expired);
-                    self.legacy_signer_fingerprint = signer_primary_fingerprint;
                     self.summary_state = Some(SignatureVerificationState::Expired);
                     self.summary_entry_index = Some(entry_index);
-                    if matches!(self.mode, LegacyFoldMode::VerifyLike) {
-                        self.legacy_stopped = true;
+                    if matches!(self.mode, SummaryFoldMode::VerifyLike) {
+                        self.summary_stopped = true;
                     }
                 }
             }
@@ -345,28 +306,17 @@ mod tests {
     }
 
     #[test]
-    fn verify_like_stop_only_affects_legacy_fold() {
-        let mut collector = SignatureCollector::new(LegacyFoldMode::VerifyLike);
+    fn verify_like_summary_freezes_on_first_valid_while_entries_continue() {
+        let mut collector = SignatureCollector::new(SummaryFoldMode::VerifyLike);
         collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("signer-a"));
         collector.observe_synthetic(DetailedSignatureStatus::UnknownSigner, None);
         collector.observe_synthetic(DetailedSignatureStatus::Bad, Some("signer-b"));
 
         assert_eq!(
-            collector
-                .legacy_status
-                .clone()
-                .unwrap_or(SignatureStatus::NotSigned),
-            SignatureStatus::Valid
-        );
-        assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::Verified
         );
         assert_eq!(collector.summary_entry_index(), Some(0));
-        assert_eq!(
-            collector.legacy_signer_fingerprint(),
-            Some("signer-a".to_string())
-        );
         assert_eq!(collector.signatures.len(), 3);
         assert_eq!(
             collector.signatures[0].state,
@@ -383,58 +333,41 @@ mod tests {
     }
 
     #[test]
-    fn decrypt_like_expired_then_bad_preserves_expired_fingerprint() {
-        let mut collector = SignatureCollector::new(LegacyFoldMode::DecryptLike);
-        collector.observe_synthetic(DetailedSignatureStatus::Expired, Some("expired-fp"));
+    fn decrypt_like_summary_follows_later_results_until_valid() {
+        let mut collector = SignatureCollector::new(SummaryFoldMode::DecryptLike);
         collector.observe_synthetic(DetailedSignatureStatus::Bad, Some("bad-fp"));
+        collector.observe_synthetic(DetailedSignatureStatus::UnknownSigner, None);
+        collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("good-fp"));
 
         assert_eq!(
-            collector
-                .legacy_status
-                .clone()
-                .unwrap_or(SignatureStatus::NotSigned),
-            SignatureStatus::Bad
+            collector.summary_state(),
+            SignatureVerificationState::Verified
         );
+        assert_eq!(collector.summary_entry_index(), Some(2));
+        assert_eq!(collector.signatures.len(), 3);
+        assert_eq!(
+            collector.signatures[2].signer_primary_fingerprint,
+            Some("good-fp".to_string())
+        );
+    }
+
+    #[test]
+    fn verify_like_summary_freezes_on_hard_failure() {
+        let mut collector = SignatureCollector::new(SummaryFoldMode::VerifyLike);
+        collector.observe_synthetic(DetailedSignatureStatus::Bad, Some("bad-fp"));
+        collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("good-fp"));
+
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::Invalid
         );
-        assert_eq!(collector.summary_entry_index(), Some(1));
-        assert_eq!(
-            collector.legacy_signer_fingerprint(),
-            Some("expired-fp".to_string())
-        );
-        assert_eq!(collector.signatures.len(), 2);
-    }
-
-    #[test]
-    fn decrypt_like_expired_then_unknown_signer_preserves_expired_fingerprint() {
-        let mut collector = SignatureCollector::new(LegacyFoldMode::DecryptLike);
-        collector.observe_synthetic(DetailedSignatureStatus::Expired, Some("expired-fp"));
-        collector.observe_synthetic(DetailedSignatureStatus::UnknownSigner, None);
-
-        assert_eq!(
-            collector
-                .legacy_status
-                .clone()
-                .unwrap_or(SignatureStatus::NotSigned),
-            SignatureStatus::UnknownSigner
-        );
-        assert_eq!(
-            collector.summary_state(),
-            SignatureVerificationState::SignerCertificateUnavailable
-        );
-        assert_eq!(collector.summary_entry_index(), Some(1));
-        assert_eq!(
-            collector.legacy_signer_fingerprint(),
-            Some("expired-fp".to_string())
-        );
+        assert_eq!(collector.summary_entry_index(), Some(0));
         assert_eq!(collector.signatures.len(), 2);
     }
 
     #[test]
     fn repeated_signers_are_not_collapsed() {
-        let mut collector = SignatureCollector::new(LegacyFoldMode::VerifyLike);
+        let mut collector = SignatureCollector::new(SummaryFoldMode::VerifyLike);
         collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("same-fp"));
         collector.observe_synthetic(DetailedSignatureStatus::Valid, Some("same-fp"));
 
@@ -451,20 +384,12 @@ mod tests {
 
     #[test]
     fn no_observed_signatures_defaults_to_not_signed() {
-        let collector = SignatureCollector::new(LegacyFoldMode::DecryptLike);
-        assert_eq!(
-            collector
-                .legacy_status
-                .clone()
-                .unwrap_or(SignatureStatus::NotSigned),
-            SignatureStatus::NotSigned
-        );
+        let collector = SignatureCollector::new(SummaryFoldMode::DecryptLike);
         assert_eq!(
             collector.summary_state(),
             SignatureVerificationState::NotSigned
         );
         assert_eq!(collector.summary_entry_index(), None);
-        assert_eq!(collector.legacy_signer_fingerprint(), None);
         assert!(collector.signatures.is_empty());
     }
 

@@ -6,9 +6,9 @@ use openpgp::serialize::Serialize;
 use openpgp::types::{Curve, Features, HashAlgorithm, KeyFlags, SignatureType};
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::SignatureStatus;
 use crate::error::PgpError;
 use crate::keys::ExternalP256SigningFailureCategory;
+use crate::signature_details::SignatureVerificationState;
 use crate::{sign, streaming};
 use tempfile::NamedTempFile;
 
@@ -157,7 +157,7 @@ fn test_external_signer_detached_signatures_verify_for_v4_and_v6() {
             None,
         )
         .expect("external detached signature should verify");
-        assert_eq!(result.legacy_status, SignatureStatus::Valid);
+        assert_eq!(result.summary_state, SignatureVerificationState::Verified);
     }
 }
 

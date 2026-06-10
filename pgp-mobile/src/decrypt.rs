@@ -10,23 +10,7 @@ use zeroize::Zeroize;
 
 use crate::error::PgpError;
 use crate::external_decryptor::ExternalP256DecryptorError;
-use crate::signature_details::{DecryptDetailedResult, LegacyFoldMode, SignatureCollector};
-
-/// Signature verification status for decrypted messages.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum SignatureStatus {
-    /// Signature is valid and the signer key is known.
-    Valid,
-    /// Signature is valid but the signer key is not in the provided set.
-    UnknownSigner,
-    /// Signature verification failed — content may have been modified.
-    Bad,
-    /// Message was not signed.
-    NotSigned,
-    /// Signer key has expired. Signature may have been valid when created.
-    /// PRD: "Ask sender to update."
-    Expired,
-}
+use crate::signature_details::{DecryptDetailedResult, SignatureCollector, SummaryFoldMode};
 
 pub(crate) fn parse_verification_certs(
     verification_keys: &[Vec<u8>],
@@ -204,16 +188,13 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
         policy: &policy,
         secret_certs: &certs,
         verifier_certs: &verifier_certs,
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
     };
 
     let (plaintext, helper) = decrypt_with_helper(ciphertext, &policy, helper)?;
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(DecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,
@@ -257,18 +238,15 @@ pub(crate) fn decrypt_with_fixed_session_key_detailed(
     let policy = StandardPolicy::new();
     let helper = FixedSessionKeyDecryptHelper {
         verifier_certs,
-        collector: SignatureCollector::new(LegacyFoldMode::DecryptLike),
+        collector: SignatureCollector::new(SummaryFoldMode::DecryptLike),
         session_key,
         session_key_algo,
     };
 
     let (plaintext, helper) = decrypt_with_helper(ciphertext, &policy, helper)?;
-    let (legacy_status, legacy_signer_fingerprint, summary_state, summary_entry_index, signatures) =
-        helper.collector.into_parts();
+    let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();
 
     Ok(DecryptDetailedResult {
-        legacy_status,
-        legacy_signer_fingerprint,
         summary_state,
         summary_entry_index,
         signatures,

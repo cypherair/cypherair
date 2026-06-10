@@ -47,7 +47,6 @@ fn test_external_signer_runtime_password_encrypt_decrypts_and_verifies_for_v4_an
                         .expect("password message should decrypt and verify");
                 assert_eq!(result.status, password::PasswordDecryptStatus::Decrypted);
                 assert_eq!(result.plaintext.as_deref(), Some(plaintext.as_bytes()));
-                assert_eq!(result.signature_status, Some(SignatureStatus::Valid));
                 assert_eq!(result.summary_state, SignatureVerificationState::Verified);
             }
         }
