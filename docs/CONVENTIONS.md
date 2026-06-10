@@ -13,8 +13,14 @@ maintainable design.
 
 This governs the *depth* of a change, not its *scope*. It is not license to expand into unrelated
 cleanup: keep the work focused on delivering the requested task (see the scoping rules in
-`CLAUDE.md` and `AGENTS.md`), and let the intended architecture — not a smaller diff — determine
-the shape of the change.
+`CLAUDE.md`), and let the intended architecture — not a smaller diff — determine the shape of the
+change.
+
+Keep source layout, ownership boundaries, and project wiring aligned with that intended
+architecture: do not hide new behavior in unrelated places to make a diff look smaller or to avoid
+configuration work. Shared components live in dedicated files in the right feature or shared area,
+with Xcode file-system sync, target membership, and test-target exclusions reflecting that
+structure.
 
 ## 1. Swift Style
 
@@ -250,6 +256,7 @@ When multiple screens share the same lifecycle/platform behavior, prefer extract
 
 - All user-facing strings go in the String Catalog (`Localizable.xcstrings`). Use `String(localized:)` in code.
 - Never hardcode user-visible strings in Swift files.
+- If `Localizable.xcstrings` marks a key with `extractionState: stale`, verify whether the key is still referenced by Swift source: remove the entry if it is unused, or fix the extraction path if it is still used. Never make tests pass by merely deleting the `stale` marker.
 - Supported languages: English (`en`) and Simplified Chinese (`zh-Hans`).
 - Error messages per PRD Section 4.7 are defined as localized strings mapped from `CypherAirError` cases.
 - VoiceOver labels: always localized. Fingerprints use segment-by-segment readout (4-character groups).
