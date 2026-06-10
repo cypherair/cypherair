@@ -31,6 +31,12 @@ CypherAir uses five durable documentation classes:
    - Historical context only
    - Archived documents must never outrank current code or active canonical docs
 
+Agent skill files under `.claude/skills/` are workflow-choreography
+instructions for AI coding tools, not documentation: they must defer to the
+canonical documents they cite and must never become the sole home of a
+contract, rule, or fact. Skill-file changes follow the same review checklist
+as documentation changes (Section 7).
+
 ## 2. Required Metadata
 
 ### 2.1 Canonical Current-State Documents
