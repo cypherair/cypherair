@@ -1,20 +1,22 @@
 # Code Review Checklist
 
+> Status: Canonical current-state.
 > Purpose: Review criteria for PRs, organized by change type.
 > Audience: Human reviewers and AI coding tools.
+> Update triggers: Validation commands, review gates, or security checklist items change.
+> Last reviewed: 2026-06-10.
 
 ## Review Cautions
 
-- [ ] When a review concern intersects with an established pattern, reviewers should examine the broader context around that pattern, including relevant call chains, active documentation, comparable implementations, and other relevant evidence. Established patterns are context to evaluate, not proof that the behavior is correct; feedback should address the pattern itself when the evidence shows the design or its application is risky.
-- [ ] Review findings should match the evidence. When the evidence supports a possible risk, describe the risk and the checks behind it; avoid presenting it as a confirmed defect unless the evidence supports that conclusion.
+- [ ] Findings match the evidence: established patterns are context to evaluate, not proof of correctness, and a possible risk is reported as a risk — not a confirmed defect — unless the evidence supports the stronger claim.
 - [ ] Evaluate whether a change is implemented at the right altitude. Prefer solutions that are architecturally correct for long-term maintainability over minimal patches; when the existing structure forces awkward or fragile fixes, a deeper refactor of the affected area can be the better outcome. See [CONVENTIONS.md](CONVENTIONS.md) "Engineering Principle".
 
 ## All Code PRs
 
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
-- [ ] For Rust / UniFFI-visible behavior changes, `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release` has been run before any Xcode validation
-- [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, local `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'`, and the native visionOS build probe pass
-- [ ] If `swift-unit-tests-hosted-preview` is warning-skipped by hosted environment preflight, rely on local macOS validation for Swift test signal
+- [ ] For Rust / UniFFI-visible behavior changes, the pinned full-sync command (CLAUDE.md Build Commands / [TESTING.md](TESTING.md) Section 2.4) has been run before any Xcode validation
+- [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, the local `CypherAir-UnitTests` plan on `platform=macOS,arch=arm64e`, and the native visionOS build probe pass
+- [ ] If `swift-unit-tests-hosted-preview` is warning-skipped by hosted preflight ([TESTING.md](TESTING.md) Section 2.2), rely on local macOS validation for Swift test signal
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)
 - [ ] No force-unwrap (`!`) in production code
@@ -49,7 +51,7 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] Secure Enclave custody public/revocation export uses only stored public artifacts; private-key backup/export is unsupported, and missing revocation artifacts are not lazily regenerated from private material
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
-- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, `TESTING.md`, and `CODE_REVIEW.md` as needed
+- [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md` and the companion docs per [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md) Section 6
 - [ ] Contacts changes preserve protected-domain-only production state, no legacy flat-file reads or fallback, runtime-only search/filter/tag-applied recipient selection state, per-key manual verification and certification state, relock cleanup, unsupported-schema fail-closed behavior, and the no-package-exchange / mandatory-encrypted-future-backup boundary
 
 ## Rust API Changes

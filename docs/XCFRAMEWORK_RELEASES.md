@@ -4,7 +4,7 @@
 > Purpose: Describe the current edge, drill, and stable `PgpMobile.xcframework` release channels, including discovery, verification, and the stable channel's relationship to the unified app-build release page.
 > Audience: Human developers and automation that consume prebuilt `PgpMobile.xcframework` assets.
 > Source of truth: `.github/workflows/xcframework-edge-release.yml`, `.github/workflows/stable-build-release.yml`, and published GitHub releases.
-> Last reviewed: 2026-05-12.
+> Last reviewed: 2026-06-10.
 > Update triggers: channel naming/routing, asset names, verification commands, stable asset contract, or relink-kit semantics.
 
 ## 1. Release Channels
@@ -20,7 +20,7 @@ CypherAir publishes a unique edge prerelease XCFramework from the current `main`
 - It is intended for CI, integration, and manual validation of the current `main` tip.
 - It is not treated as a stable SDK release.
 
-The legacy rolling `pgpmobile-edge` tag/release is deprecated and removed during the migration to unique edge prereleases. Consumers must not use the fixed `pgpmobile-edge` tag.
+The legacy rolling `pgpmobile-edge` tag/release was removed when unique edge prereleases were introduced. Consumers must not use the fixed `pgpmobile-edge` tag.
 
 ### Drill Channel
 
@@ -61,22 +61,15 @@ This is intentional: a single app marketing version can have multiple Xcode buil
 
 CypherAir publishes stable XCFramework assets through the same unified stable GitHub release page used by formal app builds.
 
-- Stable release tags use the app-build format defined in
-  [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md):
-  `cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>`.
-- The stable release page is the exact source and compliance landing page for both the tagged App build and the stable `PgpMobile.xcframework` assets.
-- Stable releases publish these assets together:
-  `CypherAir-source-bundle.tar.zst`,
-  `CypherAir-compliance-manifest.json`,
-  `PgpMobile.xcframework.zip`,
-  `PgpMobile.xcframework.sha256`,
-  `PgpMobile.arm64e-build-manifest.json`,
-  and `PgpMobile-relink-kit.tar.zst`.
+- The stable tag format, six-asset contract, binding rules, and immutability
+  rules are defined in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md)
+  Section 2. The stable release page is the exact source and compliance landing
+  page for both the tagged App build and the stable `PgpMobile.xcframework`
+  assets.
 - `PgpMobile.arm64e-build-manifest.json` records the Rust stage1 prerelease
   provenance, the resolved `openssl-src-rs` carry commit, the OpenSSL submodule
   commit, and the verified XCFramework slice layout.
 - `PgpMobile-relink-kit.tar.zst` is a technical supplement for SDK consumers and relink-focused compliance review. It does not replace the shared source bundle and is not an in-app asset.
-- Stable assets are immutable once published. If a stable asset set is wrong, publish a new build number under a new stable tag instead of replacing assets in place.
 - Edge and drill prereleases remain separate from the stable channel.
 
 ### CI Cache Policy
@@ -159,7 +152,7 @@ Drill releases are verified using the exact ref-pinned command rendered in that 
 Stable releases are retrieved by their exact app-build tag:
 
 ```bash
-TAG="cypherair-v1.3.6-build13601" # replace with the exact stable tag
+TAG="cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>" # replace with the exact stable tag, e.g. cypherair-v1.3.6-build13601
 
 gh release download "$TAG" \
     --repo cypherair/cypherair \

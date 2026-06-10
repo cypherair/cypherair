@@ -1,5 +1,10 @@
 # Prompting Claude Fable 5
 
+> Status: Vendored external reference — snapshot of Anthropic's "Prompting Claude Fable 5" guidance.
+> Purpose: Rationale basis for the agent-documentation style used in `CLAUDE.md` and the canonical docs.
+> Note: Not CypherAir documentation. Do not edit except to re-vendor a newer upstream snapshot.
+> Vendored snapshot reviewed: 2026-06-10.
+
 Behavioral differences and prompting patterns for Claude Fable 5 and Claude Mythos 5, covering effort, instruction following, long runs, memory, and scaffolding changes.
 
 ---

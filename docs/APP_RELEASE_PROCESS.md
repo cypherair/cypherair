@@ -4,7 +4,7 @@
 > Purpose: Document the current release flows for CypherAir app builds and the stable build contract that backs formal App Store candidate archives.
 > Audience: Human developers, release owners, and AI coding tools.
 > Source of truth: `CypherAir` and `CypherAir AppStore Candidate` scheme behavior, `SourceComplianceInfo.json` build integration, and `.github/workflows/stable-build-release.yml`.
-> Last reviewed: 2026-06-01.
+> Last reviewed: 2026-06-10.
 > Update triggers: stable tag rules, stable asset names, arm64e stage1 pin changes, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 
@@ -89,7 +89,7 @@ Stable tag signing requirements:
   values:
 
   ```bash
-  TAG="cypherair-v1.3.6-build13601"
+  TAG="cypherair-v<MARKETING_VERSION>-build<CURRENT_PROJECT_VERSION>"  # e.g. cypherair-v1.3.6-build13601
   MAIN_COMMIT="$(git rev-parse main)"
   git -c gpg.format=ssh tag -s -m "$TAG" "$TAG" "$MAIN_COMMIT"
   ```
@@ -202,13 +202,7 @@ Before uploading the App Store candidate to TestFlight, confirm:
 - the stable workflow's Rust dependency audit passed without warnings
 - the release notes identify the same workflow run whose `rust-dependency-audit`
   job gated the published GitHub Release
-- the release page includes the expected stable assets:
-  `CypherAir-source-bundle.tar.zst`,
-  `CypherAir-compliance-manifest.json`,
-  `PgpMobile.xcframework.zip`,
-  `PgpMobile.xcframework.sha256`,
-  `PgpMobile.arm64e-build-manifest.json`,
-  and `PgpMobile-relink-kit.tar.zst`
+- the release page includes all six stable assets listed in Section 2
 - `HEAD` matches the remote stable tag commit
 - the archive was built from `CypherAir AppStore Candidate`
 
