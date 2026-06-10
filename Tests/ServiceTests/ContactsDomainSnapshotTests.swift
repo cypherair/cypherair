@@ -31,6 +31,21 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         }
     }
 
+    func test_decodeSnapshot_rejectsUnsupportedSchemaVersion() throws {
+        var snapshot = try makeValidSnapshot()
+        snapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let payload = try encoder.encode(snapshot)
+
+        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.decodeSnapshot(payload)) { error in
+            XCTAssertEqual(
+                error as? ProtectedDataError,
+                .invalidEnvelope("Contacts payload has an unsupported schema version.")
+            )
+        }
+    }
+
     func test_duplicateIdentifiersAndFingerprints_areRejected() throws {
         var duplicateContactID = try makeValidSnapshot()
         duplicateContactID.identities.append(duplicateContactID.identities[0])
