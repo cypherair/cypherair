@@ -13,11 +13,22 @@ import XCTest
 /// Legacy: with no authenticator wired (other platforms, default), both SE
 /// operations receive a nil context — byte-for-byte the prior behavior.
 final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
+    /// Counts invalidations so tests can pin "exactly one invalidate after the
+    /// action completes" (TARGET §6: the per-action context is confined and
+    /// invalidated).
+    private final class TrackingLAContext: LAContext {
+        private(set) var invalidateCount = 0
+        override func invalidate() {
+            invalidateCount += 1
+            super.invalidate()
+        }
+    }
+
     private final class StubExpiryAuthenticator {
         private(set) var calls = 0
         private(set) var reasons: [String] = []
         var errorToThrow: Error?
-        let context = LAContext()
+        let context = TrackingLAContext()
 
         func authenticate(_: SecAccessControl, _ reason: String) async throws -> LAContext {
             calls += 1
@@ -60,6 +71,11 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             "The new wrapping key must be generated with the SAME context (covers the wrap's first self-ECDH)."
         )
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The per-action context is invalidated exactly once when the action completes."
+        )
     }
 
     func test_modifyExpiry_declinedAuthentication_abortsBeforeAnySEOperationOrJournal() async throws {
@@ -106,6 +122,11 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         )
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
         XCTAssertEqual(stub.calls, 2)
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "Only the successful attempt's completion invalidates the context (the declined attempt never received it)."
+        )
     }
 
     func test_modifyExpiry_withoutAuthenticator_keepsImplicitNilContexts() async throws {
