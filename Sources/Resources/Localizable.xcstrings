@@ -5045,6 +5045,22 @@
         }
       }
     },
+    "error.keyMetadataUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key information is locked or unavailable. Unlock the app and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥信息已锁定或不可用。请解锁应用后重试。"
+          }
+        }
+      }
+    },
     "error.keyOperationUnavailable" : {
       "localizations" : {
         "en" : {
@@ -8433,6 +8449,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "到期时间"
+          }
+        }
+      }
+    },
+    "keydetail.expiry.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to change the key's expiry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证以更改密钥的有效期。"
           }
         }
       }

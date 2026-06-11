@@ -1,7 +1,19 @@
 import Foundation
+import LocalAuthentication
+import Security
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
+    /// macOS single-prompt pre-authentication for modify-expiry (TARGET §4):
+    /// evaluates the persisted mode's access control once (system sheet) and
+    /// returns the authenticated context, which the flow then threads into BOTH
+    /// Secure Enclave operations (unwrap of the old wrapping key; generation of
+    /// the new one, whose first self-ECDH inside `wrap` would otherwise prompt a
+    /// second time). `nil` (the default, and the only value on other platforms /
+    /// in unit tests) keeps the legacy two-prompt behavior; production macOS
+    /// wiring passes `systemSheetExpiryAuthenticator`.
+    typealias ExpiryAuthenticator = (SecAccessControl, String) async throws -> LAContext
+
     private let keyAdapter: PGPKeyOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
@@ -11,6 +23,8 @@ final class KeyMutationService {
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    private let expiryAuthenticator: ExpiryAuthenticator?
     private var expiryMutationService: (any PrivateKeyExpiryMutationRouting)?
 
     init(
@@ -22,7 +36,9 @@ final class KeyMutationService {
         migrationCoordinator: KeyMigrationCoordinator,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService,
-        privateKeyControlStore: any PrivateKeyControlStoreProtocol
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
+        expiryAuthenticator: ExpiryAuthenticator? = nil
     ) {
         self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
@@ -33,7 +49,48 @@ final class KeyMutationService {
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = privateKeyControlStore
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.expiryAuthenticator = expiryAuthenticator
     }
+
+    #if os(macOS)
+    /// The production macOS `ExpiryAuthenticator`: one system-sheet
+    /// `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's
+    /// access control (a biometric satisfies both the Standard OR-gate and the
+    /// High Security flag set). Biometric reuse is disabled: this is exactly one
+    /// fresh authentication for exactly one user action.
+    static var systemSheetExpiryAuthenticator: ExpiryAuthenticator {
+        { accessControl, reason in
+            let context = LAContext()
+            context.touchIDAuthenticationAllowableReuseDuration = 0
+            do {
+                let success = try await context.evaluateAccessControl(
+                    accessControl,
+                    operation: .useKeyKeyExchange,
+                    localizedReason: reason
+                )
+                guard success else {
+                    throw AuthenticationError.failed
+                }
+                return context
+            } catch {
+                // Every failure path invalidates the never-returned context
+                // exactly once; only a returned (authenticated) context is the
+                // caller's to invalidate.
+                context.invalidate()
+                if let laError = error as? LAError,
+                   [.userCancel, .appCancel, .systemCancel].contains(laError.code) {
+                    // The user dismissed their own prompt: abort the action
+                    // silently (the modify-expiry screen swallows
+                    // operationCancelled by design) instead of surfacing a
+                    // misleading storage/authentication alert.
+                    throw CypherAirError.operationCancelled
+                }
+                throw error
+            }
+        }
+    }
+    #endif
 
     func configureExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
         expiryMutationService = service
@@ -102,8 +159,55 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
+        // The WHOLE action — pre-authentication included — runs inside ONE
+        // operation-prompt session, so the lock controller's `.authenticating`
+        // rule attributes every authentication-sheet resign to this action and
+        // defers the away decision to the session's end. (#495's failure: the
+        // pre-auth prompt ran outside any session, and its own sheet resign
+        // locked the app mid-action at grace=Immediately.) The inner
+        // `privateKey.unwrap` session nests on the coordinator's stack; the
+        // lifecycle hooks fire only on the outermost open/close.
+        try await authenticationPromptCoordinator.withOperationPrompt(source: "modifyExpiry") {
+            try await performModifySoftwareExpiry(
+                route: route,
+                newExpirySeconds: newExpirySeconds,
+                authMode: authMode
+            )
+        }
+    }
+
+    private func performModifySoftwareExpiry(
+        route: SoftwareSecretCertificateRoute,
+        newExpirySeconds: UInt64?,
+        authMode: AuthenticationMode
+    ) async throws -> PGPKeyIdentity {
         let fingerprint = route.identity.fingerprint
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+        let accessControl = try authMode.createAccessControl()
+
+        // Single prompt per user action (TARGET §4): when the authenticator is
+        // wired (production macOS), authenticate once BEFORE touching anything —
+        // a declined prompt aborts here, before any unwrap, pending bundle, or
+        // journal entry exists — and consume the same context in both Secure
+        // Enclave operations below. When nil (other platforms, unit tests), the
+        // SE authenticates implicitly as before.
+        var authenticationContext: LAContext?
+        if let expiryAuthenticator {
+            authenticationContext = try await expiryAuthenticator(
+                accessControl,
+                String(
+                    localized: "keydetail.expiry.auth.reason",
+                    defaultValue: "Authenticate to change the key's expiry."
+                )
+            )
+        }
+        defer {
+            authenticationContext?.invalidate()
+        }
+
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(
+            fingerprint: fingerprint,
+            authenticationContext: authenticationContext
+        )
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
@@ -117,11 +221,17 @@ final class KeyMutationService {
         }
 
         guard catalogStore.containsKey(fingerprint: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            // Not a decrypt-recipient mismatch: the key vanished from the catalog
+            // mid-action (typically the key-metadata domain relocked underneath
+            // the flow). Surface that honestly instead of `noMatchingKey`'s
+            // decrypt-flavored message.
+            throw CypherAirError.keyMetadataUnavailable
         }
 
-        let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
+        let seHandle = try secureEnclave.generateWrappingKey(
+            accessControl: accessControl,
+            authenticationContext: authenticationContext
+        )
         let bundle = try secureEnclave.wrap(
             privateKey: result.certData,
             using: seHandle,

@@ -54,6 +54,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.authCancelled", defaultValue: "Authentication was cancelled.")
         case .keychainError:
             String(localized: "error.keychain", defaultValue: "Failed to access secure storage.")
+        case .keyMetadataUnavailable:
+            String(localized: "error.keyMetadataUnavailable", defaultValue: "Key information is locked or unavailable. Unlock the app and try again.")
         case .invalidQRCode:
             String(localized: "error.invalidQR", defaultValue: "Not a valid CypherAir X public key.")
         case .unsupportedQRVersion:
