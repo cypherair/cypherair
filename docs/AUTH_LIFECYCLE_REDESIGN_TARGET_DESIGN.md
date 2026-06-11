@@ -94,9 +94,12 @@ An app-driven authentication window is **explicit state, never lifecycle inferen
   private-key operation prompt is in flight (the operation-prompt depth owned by
   `AuthenticationPromptCoordinator`), a macOS app-resign attributable to the authentication presentation is
   **not** an away event.
-- Genuine away events **still win during authentication**: a real app switch, screen-lock, or "Lock Now"
-  while a prompt is open supersedes the in-flight authentication and the lock model fails closed (the
-  in-flight unlock result is discarded; protected data relocks).
+- Genuine away events **still win during authentication**: screen-lock and "Lock Now" supersede an
+  in-flight authentication immediately and fail closed (the in-flight unlock result is discarded;
+  protected data relocks). A plain app-resign during a **private-key operation prompt** is ambiguous
+  (the prompt's own resign vs. a real app switch), so it is **decided at the prompts' end**: still not
+  foreground-active → the away is processed then (normal grace semantics, fail-closed relock); returned →
+  it was the prompt's own resign and is discarded.
 - This rule is a designed, documented, tested property of the state machine — the successor of the P1-interim
   resign-suppression guard, not a heuristic settle window. It makes the lock model correct **independent of
   how the system presents authentication or how long the user takes**, on every macOS version.

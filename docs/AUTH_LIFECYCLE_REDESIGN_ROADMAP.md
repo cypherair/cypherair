@@ -136,7 +136,8 @@ machine.** The app never infers lock state from lifecycle noise around authentic
     resign-suppression guard in `AppLockController` with the designed rule (TARGET §3): an app-resign
     attributable to an in-flight app-driven authentication (app-session unlock in `.authenticating`, or a
     private-key operation prompt in flight per the `AuthenticationPromptCoordinator` depth) is not an
-    away event; genuine away events during authentication still win and fail closed. Pure-state-machine
+    away event; the operation-prompt case is decided at the prompts' end (deferred, fail-closed if
+    still away); screen-lock and "Lock Now" always win immediately. Pure-state-machine
     unit tests for every interleaving; a trace-enabled validation session on macOS 27.
   - **Stage 2 — Single-prompt key-expiry modification 🔴.** `KeyMutationService.modifySoftwareExpiry`
     currently prompts twice in one user action (unwrap with the old wrapping key; first use of the new

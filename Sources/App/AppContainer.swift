@@ -795,8 +795,22 @@ final class AppContainer: @unchecked Sendable {
                 appSessionOrchestrator.requestContentClear()
             },
             shouldBypassAuthentication: { false },
+            isOperationPromptActive: { authPromptCoordinator.isOperationPromptInProgress },
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        // The `.authenticating` rule (TARGET §3): a resign deferred during a
+        // private-key operation prompt is decided when the prompts end. The hook
+        // fires on the ending thread and hops to the main actor; either ordering
+        // against a concurrent didBecomeActive is safe (the decision reads
+        // `isForegroundActive` on the main actor: user back → discard, still away →
+        // lock — both fail-closed). Assigned once, before any prompt can begin.
+        authPromptCoordinator.onOperationPromptsEnded = { [weak appLockController] in
+            Task { @MainActor in
+                appLockController?.handleOperationPromptsEnded()
+            }
+        }
+        #endif
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyAdapter: keyAdapter,
@@ -1106,8 +1120,16 @@ final class AppContainer: @unchecked Sendable {
                 appSessionOrchestrator.requestContentClear()
             },
             shouldBypassAuthentication: { !requiresManualAuthentication },
+            isOperationPromptActive: { authPromptCoordinator.isOperationPromptInProgress },
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        authPromptCoordinator.onOperationPromptsEnded = { [weak appLockController] in
+            Task { @MainActor in
+                appLockController?.handleOperationPromptsEnded()
+            }
+        }
+        #endif
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyAdapter: keyAdapter,

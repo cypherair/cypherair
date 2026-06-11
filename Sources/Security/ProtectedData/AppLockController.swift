@@ -67,17 +67,23 @@ final class AppLockController {
     private let contentClearHandler: () -> Void
     /// UI-test bypass (the orchestrator's old `shouldBypassPrivacyAuthentication`).
     private let shouldBypassAuthentication: () -> Bool
+    /// Whether a private-key operation prompt is currently in flight (wired to
+    /// `AuthenticationPromptCoordinator.isOperationPromptInProgress`). Half of the
+    /// `.authenticating` rule (TARGET §3): a macOS resign during such a prompt is
+    /// deferred, not treated as an away event.
+    private let isOperationPromptActive: () -> Bool
     private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var lockState: LockState = .locked
 
-    /// True while this controller is driving an app-session authentication it is
-    /// awaiting. The macOS detached system auth sheet resigns the app; this guard
-    /// makes `handleAwayEvent` ignore that self-induced resign (P1 interim, until
-    /// P3 moves macOS auth in-window — see ROADMAP §6 "macOS delivery coupling").
-    /// This is an explicit flag keyed off the controller's own in-flight unlock —
-    /// NOT the deleted prompt-coordinator/settle disambiguation.
-    private var isDrivingAppSessionAuth = false
+    #if os(macOS)
+    /// A macOS app-resign arrived while a private-key operation prompt was in
+    /// flight (the `.authenticating` rule, TARGET §3). The away decision is
+    /// deferred to the prompts' end: `handleOperationPromptsEnded()` processes it
+    /// if the app is still not foreground-active, and discards it if the user
+    /// returned. Holds the original away source for tracing.
+    private var pendingOperationPromptAway: String?
+    #endif
 
     /// Monotonic token bumped on every genuine away event. The unlock flow captures
     /// it before the auth `await` and bails if it changed — i.e. the app genuinely
@@ -122,6 +128,7 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
+        isOperationPromptActive: @escaping () -> Bool = { false },
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.gracePeriodProvider = gracePeriodProvider
@@ -133,6 +140,7 @@ final class AppLockController {
         self.postAuthenticationHandler = postAuthenticationHandler
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
+        self.isOperationPromptActive = isOperationPromptActive
         self.traceStore = traceStore
     }
 
@@ -184,15 +192,42 @@ final class AppLockController {
     /// (A biometric prompt's `.inactive` is NOT routed here — see the observer.)
     func handleAwayEvent(source: String = "awayEvent") {
         #if os(macOS)
-        // The macOS detached system auth sheet resigns the app while THIS
-        // controller is driving an app-session unlock. Ignore that self-induced
-        // resign so the unlock can complete. (Per-operation private-key prompts are
-        // not driven here and therefore regress in the P1 interim — accepted; macOS
-        // is not shipped until P3 moves auth in-window.)
-        if isDrivingAppSessionAuth {
+        // The `.authenticating` rule (TARGET §3): an app-resign during an
+        // app-driven authentication is explicit state, never an away event.
+        //
+        // (a) An app-session unlock is in flight (`.authenticating` spans the
+        //     evaluation AND the post-auth fan-out): the system auth sheet's own
+        //     resign must not invalidate the unlock it belongs to. Every exit from
+        //     the unlock flow settles an explicit lock state, and the genuine lock
+        //     signals — screen-lock and "Lock Now" — flow through `lockNow`, which
+        //     is not routed here and therefore still wins (it bumps
+        //     `awayGeneration`, so the in-flight result is discarded).
+        if isAuthenticating {
             traceStore?.record(
                 category: .lifecycle,
-                name: "lock.inFlightGuard.suppressedAway",
+                name: "lock.authenticatingRule.resignDuringUnlock",
+                metadata: ["source": source]
+            )
+            return
+        }
+        // (b) A private-key operation prompt is in flight: the resign is ambiguous
+        //     (the prompt's own resign vs. a genuine app switch), so the away
+        //     decision is DEFERRED to the prompts' end rather than suppressed
+        //     outright. `handleOperationPromptsEnded()` processes the away if the
+        //     app is still not foreground-active then, and discards it if the user
+        //     returned. This replaces the accepted P1-interim regression (a per-op
+        //     prompt at grace=0 used to lock the app mid-operation).
+        if isOperationPromptActive() {
+            // First resign wins: later resigns during the same prompt session carry
+            // no additional information (the decision at the prompts' end depends
+            // only on `isForegroundActive`), and keeping the earliest source makes
+            // the trace reflect when the deferral began.
+            if pendingOperationPromptAway == nil {
+                pendingOperationPromptAway = source
+            }
+            traceStore?.record(
+                category: .lifecycle,
+                name: "lock.authenticatingRule.deferredOperationAway",
                 metadata: ["source": source]
             )
             return
@@ -228,6 +263,34 @@ final class AppLockController {
             return
         }
         Task { await enterLocked(source: "away:\(source)") }
+    }
+
+    /// The last in-flight private-key operation prompt ended (wired from
+    /// `AuthenticationPromptCoordinator` on macOS). Decides a deferred away
+    /// (the `.authenticating` rule, TARGET §3): if a resign arrived during the
+    /// prompts and the app is still not foreground-active, the away is processed
+    /// now (normal grace semantics); if the user returned, it is discarded.
+    func handleOperationPromptsEnded() {
+        #if os(macOS)
+        guard let source = pendingOperationPromptAway else {
+            return
+        }
+        pendingOperationPromptAway = nil
+        guard !isForegroundActive else {
+            traceStore?.record(
+                category: .lifecycle,
+                name: "lock.authenticatingRule.deferredAwayDiscarded",
+                metadata: ["source": source]
+            )
+            return
+        }
+        traceStore?.record(
+            category: .lifecycle,
+            name: "lock.authenticatingRule.deferredAwayProcessed",
+            metadata: ["source": source]
+        )
+        handleAwayEvent(source: "deferredOperationAway:\(source)")
+        #endif
     }
 
     /// The app returned to the foreground. Idempotent: safe to call from both the
@@ -321,7 +384,9 @@ final class AppLockController {
     /// `resetAfterLocalDataReset`). The orchestrator clears its own auth record.
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         awayGeneration &+= 1
-        isDrivingAppSessionAuth = false
+        #if os(macOS)
+        pendingOperationPromptAway = nil
+        #endif
         discardHandoffContext("localDataReset")
         if preserveAuthentication {
             // Stay unlocked and mark this epoch handled so a post-reset spurious
@@ -338,8 +403,9 @@ final class AppLockController {
     private func runUnlockFlow(source: String) async {
         // Mark the attempt in flight synchronously, BEFORE the first `await`, so a
         // second resume observes `.authenticating` at the `handleForegroundActive`
-        // guard and cannot start a duplicate prompt.
-        isDrivingAppSessionAuth = true
+        // guard and cannot start a duplicate prompt. `.authenticating` is also what
+        // the macOS `.authenticating` rule keys off in `handleAwayEvent` — it spans
+        // the whole flow (set below, and every exit path settles a different state).
         let attemptAwayGeneration = awayGeneration
         // Mark this away epoch as being handled by a foreground response. Setting it
         // here (not only on success) means a failed/cancelled attempt also marks the
@@ -348,7 +414,6 @@ final class AppLockController {
         // so the next foreground correctly re-authenticates.
         handledAwayGeneration = attemptAwayGeneration
         setLockState(.authenticating, source: "unlock.begin:\(source)")
-        defer { isDrivingAppSessionAuth = false }
 
         // Fail-closed: clear content and relock Protected App-Data before prompting.
         contentClearHandler()
@@ -374,8 +439,9 @@ final class AppLockController {
 
             // The app genuinely left the foreground during authentication: discard
             // the result and stay locked ("real background wins"). On macOS the
-            // self-induced resign is suppressed above, so this only fires for a real
-            // iOS `.background`.
+            // sheet's own resign never bumps the generation (the `.authenticating`
+            // rule), so this fires only for a real iOS `.background` or a macOS
+            // `lockNow` (screen-lock / "Lock Now") during the prompt.
             guard attemptAwayGeneration == awayGeneration else {
                 // The freshly produced context was never handed to the orchestrator
                 // (recordSuccessfulAuthentication is skipped on this path), so invalidate
@@ -432,6 +498,12 @@ final class AppLockController {
     }
 
     private func enterLocked(source: String) async {
+        #if os(macOS)
+        // An explicit lock supersedes a pending deferred away (the `.authenticating`
+        // rule): the app is locking right now, so the prompts'-end decision is moot —
+        // clearing it avoids a redundant second relock cycle at the prompts' end.
+        pendingOperationPromptAway = nil
+        #endif
         awayGeneration &+= 1
         discardHandoffContext("enterLocked:\(source)")
         contentClearHandler()

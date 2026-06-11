@@ -59,6 +59,12 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private let lock = NSLock()
+    /// Invoked (outside the lock) whenever the operation-prompt stack becomes
+    /// empty — i.e. the last in-flight operation prompt ended. macOS wires this to
+    /// `AppLockController.handleOperationPromptsEnded()` so a resign deferred by
+    /// the `.authenticating` rule (TARGET §3) is decided at that moment.
+    /// Assign once during container construction, before any prompt begins.
+    var onOperationPromptsEnded: (@Sendable () -> Void)?
     private let traceStore: AuthLifecycleTraceStore?
     private let now: @Sendable () -> Date
     private var privacyPromptDepth = 0
@@ -213,9 +219,11 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             operationDepth: Int,
             operationGeneration: UInt64,
             operationSessionGeneration: UInt64,
-            context: PromptTraceContext
+            context: PromptTraceContext,
+            operationPromptsEnded: Bool
         ) in
             let resolvedContext: PromptTraceContext
+            var operationPromptsEnded = false
             switch kind {
             case .privacy:
                 if delta > 0 {
@@ -249,6 +257,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                     )
                     if wasOperationPromptInProgress, operationPromptStack.isEmpty {
                         lastOperationPromptEndedAt = timestamp
+                        operationPromptsEnded = true
                     }
                 }
                 operationPromptDepth = operationPromptStack.count
@@ -258,7 +267,8 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 operationPromptDepth,
                 operationPromptAttemptGenerationValue,
                 operationPromptSessionGenerationValue,
-                resolvedContext
+                resolvedContext,
+                operationPromptsEnded
             )
         }
 
@@ -276,6 +286,9 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
+        if snapshot.operationPromptsEnded {
+            onOperationPromptsEnded?()
+        }
         return snapshot.context
     }
 
