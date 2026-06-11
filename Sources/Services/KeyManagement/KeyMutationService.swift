@@ -1,7 +1,19 @@
 import Foundation
+import LocalAuthentication
+import Security
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
+    /// macOS single-prompt pre-authentication for modify-expiry (TARGET §4):
+    /// evaluates the persisted mode's access control once (system sheet) and
+    /// returns the authenticated context, which the flow then threads into BOTH
+    /// Secure Enclave operations (unwrap of the old wrapping key; generation of
+    /// the new one, whose first self-ECDH inside `wrap` would otherwise prompt a
+    /// second time). `nil` (the default, and the only value on other platforms /
+    /// in unit tests) keeps the legacy two-prompt behavior; production macOS
+    /// wiring passes `systemSheetExpiryAuthenticator`.
+    typealias ExpiryAuthenticator = (SecAccessControl, String) async throws -> LAContext
+
     private let keyAdapter: PGPKeyOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
@@ -11,6 +23,7 @@ final class KeyMutationService {
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
+    private let expiryAuthenticator: ExpiryAuthenticator?
     private var expiryMutationService: (any PrivateKeyExpiryMutationRouting)?
 
     init(
@@ -22,7 +35,8 @@ final class KeyMutationService {
         migrationCoordinator: KeyMigrationCoordinator,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService,
-        privateKeyControlStore: any PrivateKeyControlStoreProtocol
+        privateKeyControlStore: any PrivateKeyControlStoreProtocol,
+        expiryAuthenticator: ExpiryAuthenticator? = nil
     ) {
         self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
@@ -33,7 +47,32 @@ final class KeyMutationService {
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = privateKeyControlStore
+        self.expiryAuthenticator = expiryAuthenticator
     }
+
+    #if os(macOS)
+    /// The production macOS `ExpiryAuthenticator`: one system-sheet
+    /// `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's
+    /// access control (a biometric satisfies both the Standard OR-gate and the
+    /// High Security flag set). Biometric reuse is disabled: this is exactly one
+    /// fresh authentication for exactly one user action.
+    static var systemSheetExpiryAuthenticator: ExpiryAuthenticator {
+        { accessControl, reason in
+            let context = LAContext()
+            context.touchIDAuthenticationAllowableReuseDuration = 0
+            let success = try await context.evaluateAccessControl(
+                accessControl,
+                operation: .useKeyKeyExchange,
+                localizedReason: reason
+            )
+            guard success else {
+                context.invalidate()
+                throw AuthenticationError.failed
+            }
+            return context
+        }
+    }
+    #endif
 
     func configureExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
         expiryMutationService = service
@@ -103,7 +142,32 @@ final class KeyMutationService {
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
         let fingerprint = route.identity.fingerprint
-        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
+        let accessControl = try authMode.createAccessControl()
+
+        // Single prompt per user action (TARGET §4): when the authenticator is
+        // wired (production macOS), authenticate once BEFORE touching anything —
+        // a declined prompt aborts here, before any unwrap, pending bundle, or
+        // journal entry exists — and consume the same context in both Secure
+        // Enclave operations below. When nil (other platforms, unit tests), the
+        // SE authenticates implicitly as before.
+        var authenticationContext: LAContext?
+        if let expiryAuthenticator {
+            authenticationContext = try await expiryAuthenticator(
+                accessControl,
+                String(
+                    localized: "keydetail.expiry.auth.reason",
+                    defaultValue: "Authenticate to change the key's expiry."
+                )
+            )
+        }
+        defer {
+            authenticationContext?.invalidate()
+        }
+
+        var secretKey = try await privateKeyAccessService.unwrapPrivateKey(
+            fingerprint: fingerprint,
+            authenticationContext: authenticationContext
+        )
         defer {
             secretKey.resetBytes(in: 0..<secretKey.count)
         }
@@ -120,8 +184,10 @@ final class KeyMutationService {
             throw CypherAirError.noMatchingKey
         }
 
-        let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
+        let seHandle = try secureEnclave.generateWrappingKey(
+            accessControl: accessControl,
+            authenticationContext: authenticationContext
+        )
         let bundle = try secureEnclave.wrap(
             privateKey: result.certData,
             using: seHandle,

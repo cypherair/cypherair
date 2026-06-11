@@ -41,6 +41,7 @@ final class KeyManagementService: @unchecked Sendable {
         defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
+        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -119,7 +120,8 @@ final class KeyManagementService: @unchecked Sendable {
             migrationCoordinator: migrationCoordinator,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService,
-            privateKeyControlStore: effectivePrivateKeyControlStore
+            privateKeyControlStore: effectivePrivateKeyControlStore,
+            expiryAuthenticator: expiryAuthenticator
         )
         self.traceStore = authLifecycleTraceStore
     }

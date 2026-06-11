@@ -13,7 +13,8 @@ enum TestHelpers {
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil
+        metadataPersistence: (any KeyMetadataPersistence)? = nil,
+        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil
     ) -> (
         service: KeyManagementService,
         mockSE: MockSecureEnclave,
@@ -37,6 +38,7 @@ enum TestHelpers {
                 memoryInfo: memInfo,
                 defaults: .standard,
                 privateKeyControlStore: privateKeyControlStore,
+                expiryAuthenticator: expiryAuthenticator,
                 metadataPersistence: metadataPersistence
             )
         } else {
@@ -45,6 +47,7 @@ enum TestHelpers {
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
                 privateKeyControlStore: privateKeyControlStore,
+                expiryAuthenticator: expiryAuthenticator,
                 metadataPersistence: metadataPersistence
             )
         }

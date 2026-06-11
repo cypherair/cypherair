@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Owns Secure Enclave reconstruction and secret-certificate-material unwrap for callers.
 final class PrivateKeyAccessService {
@@ -21,7 +22,18 @@ final class PrivateKeyAccessService {
 
     /// Triggers device authentication and returns the unwrapped secret certificate material.
     /// Callers must zeroize the returned data after use.
-    func unwrapPrivateKey(fingerprint: String) async throws -> Data {
+    ///
+    /// `authenticationContext`: a pre-authenticated subsystem-B `LAContext` to
+    /// consume for the Secure Enclave reconstruction instead of the implicit
+    /// system prompt (the single-prompt-per-action contract, TARGET §4 — e.g.
+    /// the macOS modify-expiry flow authenticates once and threads the same
+    /// context into both its SE operations). `nil` (the default, and the only
+    /// value used on iOS/iPadOS/visionOS) keeps today's implicit prompt.
+    /// The caller retains ownership and invalidates the context after its action.
+    func unwrapPrivateKey(
+        fingerprint: String,
+        authenticationContext: LAContext? = nil
+    ) async throws -> Data {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.start")
         do {
             let unwrapped = try await authenticationPromptCoordinator.withOperationPrompt(source: "privateKey.unwrap") {
@@ -60,6 +72,7 @@ final class PrivateKeyAccessService {
                     secureEnclave: secureEnclave,
                     bundle: bundle,
                     fingerprint: fingerprint,
+                    authenticationContext: AuthenticationContextCarrier(context: authenticationContext),
                     traceStore: traceStore
                 )
                 traceStore?.record(
@@ -81,6 +94,16 @@ final class PrivateKeyAccessService {
         }
     }
 
+    /// Moves an optional caller-authenticated `LAContext` into the off-main
+    /// Secure Enclave reconstruction. `LAContext` is intentionally non-Sendable;
+    /// this carrier crosses the actor boundary without copying, the context is
+    /// consumed by exactly one SE operation here, and the caller invalidates it
+    /// after its action completes (the same pattern `AuthenticationManager` uses
+    /// for its `LAContext` reply callbacks).
+    private struct AuthenticationContextCarrier: @unchecked Sendable {
+        let context: LAContext?
+    }
+
     /// Performs the Secure Enclave reconstruct + unwrap off the main actor.
     ///
     /// `@concurrent` hops this work to the cooperative pool so the synchronous,
@@ -94,12 +117,16 @@ final class PrivateKeyAccessService {
         secureEnclave: any SecureEnclaveManageable,
         bundle: WrappedKeyBundle,
         fingerprint: String,
+        authenticationContext: AuthenticationContextCarrier,
         traceStore: AuthLifecycleTraceStore?
     ) async throws -> Data {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
         let handle: any SEKeyHandle
         do {
-            handle = try secureEnclave.reconstructKey(from: bundle.seKeyData, authenticationContext: nil)
+            handle = try secureEnclave.reconstructKey(
+                from: bundle.seKeyData,
+                authenticationContext: authenticationContext.context
+            )
             traceStore?.record(
                 category: .operation,
                 name: "privateKey.unwrap.reconstruct.finish",

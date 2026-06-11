@@ -8437,6 +8437,22 @@
         }
       }
     },
+    "keydetail.expiry.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to change the key's expiry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证以更改密钥的有效期。"
+          }
+        }
+      }
+    },
     "keydetail.expiry.cancel" : {
       "localizations" : {
         "en" : {
