@@ -243,14 +243,21 @@ second interactive prompt.
 
 ## 4. Authentication Modes
 
-> **Planned change (auth-lifecycle redesign — unshipped, currently paused).** A redesign moves macOS
-> authentication to in-window local biometric prompts (`LAAuthenticationView`) and removes the macOS
-> passcode-fallback paths from two separate subsystems — private-key `AuthenticationMode` (removing
-> Standard Mode on macOS via a one-time force-re-wrap) and app-session `AppSessionAuthenticationPolicy`
-> (§5) — through two independent, user-initiated migrations. Design and staging live in
+> **Auth-lifecycle redesign (landed).** Authentication presentation is the **system authentication
+> sheet** for both subsystems on every platform, and both private-key modes (this section) and both
+> app-session policies (§5) are permanent, user-selectable product features everywhere. App lock is
+> an explicit state machine (`AppLockController`: `.locked` / `.authenticating` / `.unlocked`) with
+> per-platform away events, and **every user action that can present an authentication sheet while
+> unlocked runs inside one operation-prompt session for its full duration** — private-key
+> operations, key generation/import, key-expiry modification, the mode-switch re-wrap, the App
+> Access Protection policy change, and Local Data Reset — so an authentication sheet's own
+> transient resign is never treated as the user leaving (the `.authenticating` rule). Key-expiry
+> modification authenticates **once** per action with a subsystem-B `LAContext` confined to that
+> action. The previously planned in-window (`LAAuthenticationView`) cutover and the macOS
+> passcode-fallback removals were **retired**: macOS 27 denies embedded LocalAuthentication UI to
+> non-Apple-signed processes (LA -1007). Design and migration history:
 > [AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) and
-> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md). iOS / iPadOS / visionOS
-> are unaffected, and current shipped behavior (this section and §5) is unchanged until it lands.
+> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md).
 
 ### Standard Mode (default)
 
@@ -337,7 +344,7 @@ Security invariants for protected app data:
 
 UserDefaults is allowed only for documented boot, test, and tutorial exceptions. Personal or sensitive app data must not be newly introduced there; post-auth settings use `protected-settings` unless they are explicit boot-authentication exceptions.
 
-Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppSessionOrchestrator` owns launch/resume privacy authentication and the grace window. When app authentication succeeds, it can hand the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
+Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppLockController` owns the explicit lock state and the away/grace lifecycle; `AppSessionOrchestrator` owns the authentication record and the authorization-handoff custody. When app authentication succeeds, the controller hands the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the shared app-data root secret through Keychain with `kSecUseAuthenticationContext`. That same authenticated handoff is reused by post-unlock domain openers so committed registered domains can open without a second Face ID / Touch ID prompt.
 
 `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability. It loads grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion from `protected-settings` schema v2 only after app privacy authentication and an unlocked protected-settings handoff. Schema v2 payloads are strict: missing or corrupt ordinary settings enter protected-settings recovery instead of resetting to defaults. If the setting snapshot is unavailable, the resume grace window fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption does not silently use the app-default encrypt-to-self value for real work.
 

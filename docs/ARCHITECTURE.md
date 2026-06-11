@@ -72,10 +72,9 @@ Shared presentation-layer infrastructure used across multiple views.
 | `OperationController` | Shared task lifecycle, cancellation, progress state, error presentation, and clipboard notice handling for encrypt/decrypt/sign/verify flows |
 | `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
 | `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
-| `PrivacyScreenModifier` | Background blur + re-authentication gating as a thin UI adapter over `AppSessionOrchestrator` |
-| `AuthenticationShieldCoordinator` | Authentication shield prompt depth, pending-dismissal timing, lifecycle observations, and trace state transitions |
-| `AuthenticationShieldHost` | SwiftUI environment key, host modifier, and platform lifecycle adapter for the authentication shield |
-| `AuthenticationShieldOverlayView` | Authentication shield overlay/card rendering and animation |
+| `CosmeticPrivacyCover` | Pure content-obscuring overlay shown whenever the app is not foreground-active; zero coupling to authentication (cover ≠ lock) |
+| `AppLockSurfaceView` | Opaque lock surface (app name + locked-state caption; all platforms) driven by `AppLockController.lockState`; auto-invokes system authentication on appear and hosts retry / biometrics-locked-out messaging |
+| `AppLifecycleObserver` | Routes platform lifecycle signals (ScenePhase / app-resign / screen-lock) into `AppLockController` foreground-active and away events |
 
 ### Services Layer (`Sources/Services/`)
 

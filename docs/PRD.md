@@ -215,17 +215,34 @@ First-copy notice. Dismissible. Also in Settings.
 
 ### 4.9 App Protection
 
-**Privacy Screen**
+**Privacy Cover and App Lock**
 
-Blur overlay when App enters background. Prevents multitasking switcher leakage.
+Two separate layers protect on-screen content (cover ≠ lock):
+
+- **Cosmetic privacy cover:** a content-obscuring material overlay shown whenever the app is not
+  foreground-active. It keeps sensitive content out of the multitasking-switcher snapshot and away
+  from shoulder-surfing, and has no coupling to authentication.
+- **App lock:** an explicit lock state. Leaving the foreground *covers* content immediately; the app
+  *locks* — clears decrypted content and requires re-authentication — only after the grace period
+  elapses following a genuine away event (iOS / iPadOS / visionOS: the app entering the background;
+  macOS: app resign ∪ screen lock ∪ explicit "Lock Now"), or on the away event itself at
+  grace = Immediately. A biometric prompt's own transient deactivation is never an away event.
+  While locked, the app shows an opaque lock surface (app name + locked-state caption) on every platform
+  that auto-invokes system authentication on appear and hosts the retry and
+  biometrics-locked-out messaging.
 
 **Re-Authentication on Resume**
 
-- **Within grace period:** Resume normally. Decrypted content retained.
-- **Grace period exceeded:** Device auth required. Content cleared.
+- **Within grace period:** Resume normally. Decrypted content retained (the cover hides it while away).
+- **Grace period exceeded:** Device auth required via the lock surface. Content cleared; protected
+  app data relocked.
 - **Grace period options:** Immediately (0s) / 1 min (60s) / 3 min (180s, default) / 5 min (300s).
 
-*App-level auth is independent of per-operation Keychain auth.*
+*App-level auth is independent of per-operation Keychain auth. Any user action that can present an
+authentication sheet while the app is unlocked (private-key operations, key generation/import,
+key-expiry change, protection-mode and App Access Protection changes, Local Data Reset) runs as one
+operation-prompt session for its full duration, so the sheet's own lifecycle noise never locks the
+app mid-action.*
 
 **Protected App Data**
 
@@ -287,7 +304,7 @@ Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biomet
 
 ### 5.6 App Protection
 
-Privacy screen. Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active (Section 5.2).
+Cosmetic privacy cover + explicit app lock (Section 4.9). Re-auth with grace period. Two auth modes. Protected app-data unlock after app authentication. Current protected app-data coverage includes protected settings, private-key control state, key metadata, protected Contacts data, self-test export-only behavior, and temporary/export/tutorial cleanup; row-level classification lives in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). Contacts package exchange is not active (Section 5.2).
 
 ---
 
@@ -333,7 +350,7 @@ Each criterion below must hold in every release.
 
 ### 8.3 App Protection
 
-- Privacy screen active on background.
+- Privacy cover active whenever the app is not foreground-active; lock surface shown when locked.
 - Re-auth after grace period functions correctly.
 - Both Standard and High Security authentication modes function correctly.
 - High Security Mode blocks all private-key operations when biometrics unavailable.

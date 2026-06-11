@@ -1,21 +1,22 @@
 # Authentication / Privacy / Lifecycle Redesign — Target Design
 
-> Status: Active target design, **re-scoped 2026-06-10**. The lock foundation (P1; PR #472) and the
-> macOS single-window unification (P2; PR #475) are implemented on `main`. The original P3 — the
-> macOS in-window authentication cutover — is **retired** (PR #491 closed unmerged): macOS 27 denies
-> embedded LocalAuthentication UI to non-Apple-signed processes, and the post-authentication stalls
-> that motivated in-window presentation no longer reproduce under the P1 lock model on macOS 27
+> Status: **Implemented — describes current shipped behavior** (P5 doc cutover, 2026-06-11). All
+> phases are on `main`: P1 (lock foundation; PR #472), P2 (macOS single-window unification;
+> PR #475), P3′ (auth-lifecycle completion on the system sheet — explicit `.authenticating` rule,
+> single-prompt key expiry, and the uniform operation-prompt-session enrollment), P4 (the
+> opaque lock surface, shared by every platform), and P5 (this cutover; [SECURITY.md](SECURITY.md)
+> §4–§5 and [PRD.md](PRD.md) §4.9 now state the same model). The original P3 — the macOS in-window
+> authentication cutover — was **retired** (PR #491 closed unmerged): macOS 27 denies embedded
+> LocalAuthentication UI to non-Apple-signed processes, and the post-authentication stalls that
+> motivated in-window presentation no longer reproduce under the P1 lock model on macOS 27
 > (see the [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md) §1 addendum). The redesign's goal
 > changed **from a fix to an architecture improvement**: authentication presentation stays with the
-> system, and the target is the explicit, simple, maintainable lock-state model described here.
-> Until the remaining phases land, portions marked as P3′/P4/P5 describe a **proposed end state**,
-> not current shipped behavior — shipped behavior remains as documented in [SECURITY.md](SECURITY.md)
-> §4–§5 and [PRD.md](PRD.md) §4.9, and the current-state docs flip at P5.
-> Date: 2026-06-10 (originally 2026-06-07).
-> Purpose: Define the **target** architecture and user experience for CypherAir's app-lock,
+> system, and the shipped result is the explicit, simple, maintainable lock-state model described here.
+> Date: 2026-06-11 (re-scoped 2026-06-10; originally 2026-06-07).
+> Purpose: Define the architecture and user experience for CypherAir's app-lock,
 > privacy-cover, and authentication flow across iOS, iPadOS, macOS, and visionOS.
-> This document is intentionally narrow: it states *what the end state is*, not how to migrate to
-> it. Migration phasing, sequencing, and per-component technical detail live in the companion roadmap.
+> This document is intentionally narrow: it states *what the end state is*, not how it was migrated
+> to. Migration phasing, sequencing, and per-component technical detail live in the companion roadmap.
 > Audience: Swift implementers, security reviewers, architecture reviewers, product, test owners, AI coding tools.
 > Companion: [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md) (phases, PoC results and their
 > macOS 27 invalidation, tests).
@@ -56,16 +57,16 @@ retired. There is **no access-control model change** anywhere in this redesign.
 
 The target separates three concerns that were entangled before P1, with no shared overloaded state between them:
 
-- **A. Cosmetic privacy cover.** A pure, opaque overlay shown whenever the app is not foreground-active. It
-  exists only to keep sensitive content out of the app-switcher snapshot and away from shoulder-surfing. It has
-  **zero** coupling to authentication: it never schedules a resume, clears content, inspects prompts, or reads a
-  lock interval. (Shipped in P1.)
+- **A. Cosmetic privacy cover.** A pure, content-obscuring overlay shown whenever the app is not
+  foreground-active. It exists only to keep sensitive content out of the app-switcher snapshot and away from
+  shoulder-surfing. It has **zero** coupling to authentication: it never schedules a resume, clears content,
+  inspects prompts, or reads a lock interval. (Shipped in P1.)
 - **B. `AppLockController` — the lock state machine.** An `@Observable @MainActor` state machine and the
   **single source of truth** for lock. `lockState` is explicit — `.locked`, `.authenticating`
   ("unlocking"), `.unlocked` — never inferred from a blur flag. It owns the auto-lock interval, the
   away/idle bookkeeping, the fail-closed Protected App-Data relock on entering the locked state, and the
   authenticated-`LAContext` handoff to Protected App-Data on unlock. (Shipped in P1; the `.authenticating`
-  away-event rule below is completed in P3′.)
+  away-event rule below shipped in P3′.)
 - **C. Authentication presentation.** The authentication prompt is the **system authentication sheet** —
   LocalAuthentication's standard presentation — on every platform. The app does not host the prompt
   inside its own window. (In-window presentation via `LAAuthenticationView` /
@@ -90,16 +91,25 @@ in each platform's unambiguous signal:
 
 An app-driven authentication window is **explicit state, never lifecycle inference**:
 
-- While `AppLockController.lockState == .authenticating` (an app-session unlock is in flight), and while a
-  private-key operation prompt is in flight (the operation-prompt depth owned by
+- While `AppLockController.lockState == .authenticating` (an app-session unlock is in flight), and while an
+  **operation-prompt session** is open (the session counter mirrored from
   `AuthenticationPromptCoordinator`), a macOS app-resign attributable to the authentication presentation is
   **not** an away event.
+- **The uniform enrollment rule:** every user action that can present an authentication sheet while the app
+  is unlocked runs inside **one operation-prompt session for its full duration** — private-key operations
+  (through the shared unwrap seam), key generation and import, key-expiry modification, the mode-switch
+  re-wrap, the App Access Protection policy change, and Local Data Reset. Enrollment is the wrapped action,
+  never the prompt mechanism: privacy prompts (`withPrivacyPrompt`, the subsystem-A evaluation bracket)
+  deliberately do **not** count toward the lock controller's mirror — a flow whose prompt is a privacy
+  evaluation enrolls by wrapping its whole action in an operation-prompt session.
 - Genuine away events **still win during authentication**: screen-lock and "Lock Now" supersede an
   in-flight authentication immediately and fail closed (the in-flight unlock result is discarded;
-  protected data relocks). A plain app-resign during a **private-key operation prompt** is ambiguous
-  (the prompt's own resign vs. a real app switch), so it is **decided at the prompts' end**: still not
+  protected data relocks). A plain app-resign during an **operation-prompt session** is ambiguous
+  (the prompt's own resign vs. a real app switch), so it is **decided at the session's end**: still not
   foreground-active → the away is processed then (normal grace semantics, fail-closed relock); returned →
-  it was the prompt's own resign and is discarded.
+  it was the prompt's own resign and is discarded. A long-running enrolled action (e.g. key generation)
+  extends that deferral window by design — a user who leaves and stays away is locked at the action's
+  end, not mid-action, and the cosmetic cover hides content for the whole absence.
 - This rule is a designed, documented, tested property of the state machine — the successor of the P1-interim
   resign-suppression guard, not a heuristic settle window. It makes the lock model correct **independent of
   how the system presents authentication or how long the user takes**, on every macOS version.
@@ -129,11 +139,13 @@ app-hosted prompt:
   Secure Enclave evaluates the key's flags when the key is used, presenting the system prompt. The
   per-operation posture is intentional (one prompt per user-initiated crypto action); private-key
   authorization is outside the grace/session model.
-- **Single prompt per user action is the contract.** A flow that would otherwise prompt twice within one
-  user action — key-expiry modification unwraps with the old wrapping key and first-uses a new one — must
-  authenticate **once** and thread that authenticated `LAContext` into both Secure Enclave operations (the
-  shipped mode-switch re-wrap pattern: `PrivateKeyRewrapWorkflow`). Explicit pre-authentication is **not**
-  generalized to already-single-prompt operations; that would be a separate, unscheduled change.
+- **Single prompt per user action is the contract.** Key-expiry modification — which unwraps with the old
+  wrapping key and first-uses a new one — authenticates **once** via a system-sheet
+  `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's access control and threads that
+  authenticated `LAContext` into both Secure Enclave operations (the mode-switch re-wrap pattern:
+  `PrivateKeyRewrapWorkflow`); the context is confined to the one action and invalidated after (P3′
+  stage 2′, shipped). Explicit pre-authentication is **not** generalized to already-single-prompt
+  operations; that would be a separate, unscheduled change.
 - **No mode pinning, no migrations.** Both App Access Protection options and both Private Key Protection
   modes remain selectable on macOS exactly as on iOS (§1).
 
@@ -141,10 +153,11 @@ app-hosted prompt:
 
 The existing platform authentication model is **preserved, unchanged**. The biometric prompt is the system
 prompt; lock keys off `.background`, so the prompt's transient `.inactive` is never an away event. The lock
-surface is a custom opaque screen with the biometric auto-invoked when it appears, preserving the retry and
-biometrics-locked-out messaging (completed in P4). visionOS follows the iOS direction by decision; with no
-hardware available its behavior is an iOS-equivalent assumption tracked as **unvalidated**, not a separate
-design.
+surface is a custom opaque screen with a text-only header (app name + locked-state caption) —
+**one shared surface on every platform, macOS included** — with
+the biometric auto-invoked when it appears, preserving the retry and biometrics-locked-out messaging (P4,
+shipped). visionOS follows the iOS direction by decision; with no hardware available its behavior is an
+iOS-equivalent assumption tracked as **unvalidated**, not a separate design.
 
 ## 6. Security model preservation
 
@@ -186,6 +199,5 @@ sheet like every other surface.
 
 ---
 
-*This target design is partially landed (P1–P2 on `main`; P3′ in progress). Un-landed portions do not change
-shipped behavior until the phases in the companion [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md)
-are implemented and reviewed.*
+*This design is fully implemented (P1–P5 on `main`) and describes current shipped behavior. The migration
+record lives in the companion [Migration Roadmap](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md).*
