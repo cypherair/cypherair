@@ -1020,7 +1020,7 @@ class KeyManagementServiceTestCase: XCTestCase {
     func provisionFixtureBackedIdentity(secretCertData: Data) throws -> PGPKeyIdentity {
         let info = try engine.parseKeyInfo(keyData: secretCertData)
         let metadata = PGPKeyMetadataAdapter.metadata(from: info)
-        let handle = try mockSE.generateWrappingKey(accessControl: nil)
+        let handle = try mockSE.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try mockSE.wrap(
             privateKey: secretCertData,
             using: handle,

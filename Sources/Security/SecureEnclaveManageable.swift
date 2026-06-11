@@ -83,19 +83,12 @@ protocol SecureEnclaveManageable: Sendable {
     static var isAvailable: Bool { get }
 }
 
-extension SecureEnclaveManageable {
-    /// Convenience: generate wrapping key without an explicit authentication context.
-    /// First use of the key will trigger Face ID / Touch ID if access control requires it.
-    func generateWrappingKey(accessControl: SecAccessControl?) throws -> any SEKeyHandle {
-        try generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
-    }
-
-    /// Convenience: reconstruct without an explicit authentication context.
-    /// Uses implicit SE authentication (triggers Face ID / Touch ID prompt).
-    func reconstructKey(from data: Data) throws -> any SEKeyHandle {
-        try reconstructKey(from: data, authenticationContext: nil)
-    }
-}
+// The former nil-context convenience overloads of `generateWrappingKey` /
+// `reconstructKey` were removed in P3' stage 0: every call site states its
+// `authenticationContext:` explicitly, so a reviewer can see at each Secure
+// Enclave operation whether an authenticated context is threaded (e.g. the
+// mode-switch re-wrap, the stage-2 single-prompt key expiry) or implicit
+// system authentication is intended (`nil`).
 
 /// HKDF info string constant.
 /// CRITICAL: This exact string must be used in both wrapping and unwrapping.

@@ -121,7 +121,7 @@ final class KeyMutationService {
         }
 
         let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: result.certData,
             using: seHandle,

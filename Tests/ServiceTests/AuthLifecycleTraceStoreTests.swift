@@ -133,7 +133,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         fingerprint: String = String(repeating: "a", count: 40),
         privateKey: Data = Data([0x11, 0x22, 0x33, 0x44])
     ) throws -> (fingerprint: String, privateKey: Data) {
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: privateKey,
             using: handle,
@@ -1098,7 +1098,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         )
         manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
         let fingerprint = String(repeating: "a", count: 40)
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: Data(repeating: 0x42, count: 32),
             using: handle,

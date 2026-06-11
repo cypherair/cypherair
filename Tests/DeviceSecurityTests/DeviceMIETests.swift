@@ -24,7 +24,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
         XCTAssertEqual(status, errSecSuccess)
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint)
         let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
 
@@ -44,7 +44,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             }
             XCTAssertEqual(status, errSecSuccess, "Iteration \(i): SecRandom failed")
 
-            let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+            let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try secureEnclave.wrap(privateKey: keyData, using: handle, fingerprint: fingerprint)
             let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
 

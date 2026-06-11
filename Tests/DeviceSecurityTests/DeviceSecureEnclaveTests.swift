@@ -11,7 +11,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
     func test_seGenerateKey_noAccessControl_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         XCTAssertFalse(handle.dataRepresentation.isEmpty, "SE key dataRepresentation must not be empty")
     }
 
@@ -27,7 +27,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         )
         XCTAssertNotNil(accessControl, "Failed to create Standard access control")
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
         XCTAssertFalse(handle.dataRepresentation.isEmpty)
     }
 
@@ -43,7 +43,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         )
         XCTAssertNotNil(accessControl, "Failed to create High Security access control")
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
         XCTAssertFalse(handle.dataRepresentation.isEmpty)
     }
 
@@ -56,7 +56,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // Ed25519 private key is 32 bytes
         let fakePrivateKey = Data(repeating: 0xAB, count: 32)
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
         XCTAssertFalse(bundle.seKeyData.isEmpty)
@@ -75,7 +75,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         // Ed448 private key is 57 bytes
         let fakePrivateKey = Data(repeating: 0xCD, count: 57)
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
         let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
@@ -89,7 +89,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fingerprintB = uniqueFingerprint()
         let fakePrivateKey = Data(repeating: 0xEF, count: 32)
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprintA)
 
         // Unwrap with a different fingerprint → HKDF derives a different key → AES-GCM open fails.
@@ -106,11 +106,11 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0x11, count: 32)
 
         // Generate and wrap.
-        let originalHandle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let originalHandle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: originalHandle, fingerprint: fingerprint)
 
         // Reconstruct SE key from dataRepresentation (simulates app restart).
-        let reconstructedHandle = try secureEnclave.reconstructKey(from: originalHandle.dataRepresentation)
+        let reconstructedHandle = try secureEnclave.reconstructKey(from: originalHandle.dataRepresentation, authenticationContext: nil)
 
         // Unwrap using reconstructed handle.
         let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: reconstructedHandle, fingerprint: fingerprint)
@@ -125,8 +125,8 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let key1 = Data(repeating: 0xAA, count: 32)
         let key2 = Data(repeating: 0xBB, count: 57)
 
-        let handle1 = try secureEnclave.generateWrappingKey(accessControl: nil)
-        let handle2 = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle1 = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
+        let handle2 = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
 
         let bundle1 = try secureEnclave.wrap(privateKey: key1, using: handle1, fingerprint: fp1)
         let bundle2 = try secureEnclave.wrap(privateKey: key2, using: handle2, fingerprint: fp2)
@@ -150,7 +150,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         }
         XCTAssertEqual(status, errSecSuccess, "SecRandomCopyBytes must succeed")
 
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: randomKey, using: handle, fingerprint: fingerprint)
         let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
 
@@ -247,7 +247,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0x42, count: 32)
 
         // 1. Generate SE key and wrap.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
         // 2. Store all 3 items in real Keychain.
@@ -261,7 +261,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
 
         // 4. Reconstruct SE key and unwrap.
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey)
+        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
         let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 
@@ -294,7 +294,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         )
 
         // 3. SE wrap the certData (full cert with private key).
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: generated.certData,
             using: handle,
@@ -323,7 +323,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
             account: account)
 
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey)
+        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(
             seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
         let recoveredCertData = try secureEnclave.unwrap(
@@ -366,7 +366,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         )
 
         // 3. SE wrap the certData.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: generated.certData,
             using: handle,
@@ -395,7 +395,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
             account: account)
 
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey)
+        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
         let loadedBundle = WrappedKeyBundle(
             seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
         let recoveredCertData = try secureEnclave.unwrap(
@@ -427,7 +427,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0xDE, count: 32)
 
         // 1. Generate SE key, wrap, store in Keychain.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
@@ -491,7 +491,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let fakePrivateKey = Data(repeating: 0xEF, count: 57)
 
         // 1. Generate SE key, wrap, store in Keychain.
-        let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
@@ -547,7 +547,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             let fakeKey = Data(repeating: UInt8(i + 1), count: keySize)
 
             // Generate SE key and wrap
-            let handle = try secureEnclave.generateWrappingKey(accessControl: nil)
+            let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try secureEnclave.wrap(privateKey: fakeKey, using: handle, fingerprint: fingerprint)
 
             // Store 3 items
@@ -560,7 +560,7 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             let loadedSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
             let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
 
-            let reconstructed = try secureEnclave.reconstructKey(from: loadedSE)
+            let reconstructed = try secureEnclave.reconstructKey(from: loadedSE, authenticationContext: nil)
             let loadedBundle = WrappedKeyBundle(seKeyData: loadedSE, salt: loadedSalt, sealedBox: loadedSealed)
             let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 

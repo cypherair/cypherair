@@ -99,7 +99,7 @@ final class PrivateKeyAccessService {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
         let handle: any SEKeyHandle
         do {
-            handle = try secureEnclave.reconstructKey(from: bundle.seKeyData)
+            handle = try secureEnclave.reconstructKey(from: bundle.seKeyData, authenticationContext: nil)
             traceStore?.record(
                 category: .operation,
                 name: "privateKey.unwrap.reconstruct.finish",
