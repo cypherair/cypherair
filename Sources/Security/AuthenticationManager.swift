@@ -104,6 +104,14 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let rewrapRecoveryCoordinator: PrivateKeyRewrapRecoveryCoordinator
     private let rewrapWorkflow: PrivateKeyRewrapWorkflow
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
+    /// The app-wide prompt coordinator, exposed so user-action owners (e.g. the
+    /// settings model's Local Data Reset) can enroll their WHOLE action in one
+    /// operation-prompt session (the uniform rule, TARGET §3): any user action
+    /// that can present an authentication sheet while unlocked runs inside one
+    /// session for its full duration.
+    var promptCoordinator: AuthenticationPromptCoordinator {
+        authenticationPromptCoordinator
+    }
     private let traceStore: AuthLifecycleTraceStore?
     private let localAuthenticationPolicyEvaluator: (
         LAContext,
@@ -725,6 +733,30 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///   - authenticator: The authentication evaluator to use for verifying user identity.
     ///     In production, pass `self` (the AuthenticationManager). In tests, pass a mock.
     func switchMode(
+        to newMode: AuthenticationMode,
+        fingerprints: [String],
+        hasBackup: Bool,
+        authenticator: any AuthenticationEvaluable
+    ) async throws {
+        // The WHOLE switch — pre-authentication and both re-wrap phases — runs
+        // inside ONE operation-prompt session (the uniform rule, TARGET §3):
+        // the pre-auth sheet's own resign is attributed to this action and the
+        // away decision is deferred to the session's end, never a mid-action
+        // lock. The nested `evaluate(mode:)` privacy prompt rides the
+        // coordinator's separate privacy stack by design.
+        try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "privateKeyProtection.switch"
+        ) {
+            try await performSwitchMode(
+                to: newMode,
+                fingerprints: fingerprints,
+                hasBackup: hasBackup,
+                authenticator: authenticator
+            )
+        }
+    }
+
+    private func performSwitchMode(
         to newMode: AuthenticationMode,
         fingerprints: [String],
         hasBackup: Bool,

@@ -173,6 +173,7 @@
 				App/Onboarding/TutorialTaskHostView.swift,
 				App/Onboarding/TutorialView.swift,
 				App/Settings/AboutView.swift,
+				App/Settings/AppAccessPolicySwitchWorkflow.swift,
 				App/Settings/AppIconPickerView.swift,
 				App/Settings/AuthMode/AuthModeChangeConfirmation.swift,
 				App/Settings/AuthMode/SettingsAuthModeRequestBuilder.swift,

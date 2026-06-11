@@ -185,6 +185,47 @@ final class AppContainer: @unchecked Sendable {
         #endif
     }
 
+    /// Builds the App Access Protection policy-switch workflow over the
+    /// container's live dependencies. The workflow encloses the whole switch in
+    /// one operation-prompt session (the uniform rule, TARGET §3).
+    @MainActor
+    func makeAppAccessPolicySwitchWorkflow() -> AppAccessPolicySwitchWorkflow {
+        let config = config
+        let protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        let authManager = authManager
+        let appSessionOrchestrator = appSessionOrchestrator
+        return AppAccessPolicySwitchWorkflow(
+            currentPolicy: {
+                config.appSessionAuthenticationPolicy
+            },
+            hasPersistedRootSecret: {
+                protectedDataSessionCoordinator.hasPersistedRootSecret()
+            },
+            canEvaluate: { policy in
+                authManager.canEvaluate(appSessionPolicy: policy)
+            },
+            evaluateAppSession: { policy, reason, source in
+                try await authManager.evaluateAppSession(
+                    policy: policy,
+                    reason: reason,
+                    source: source
+                )
+            },
+            reprotectPersistedRootSecret: { from, to, context in
+                try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                    from: from,
+                    to: to,
+                    authenticationContext: context
+                )
+            },
+            discardHandoffContextForPolicyChange: {
+                appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
+            },
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
+        )
+    }
+
     private static func makeProtectedDataSessionCoordinator(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
         domainKeyManager: ProtectedDomainKeyManager,

@@ -89,6 +89,7 @@ final class KeyManagementService: @unchecked Sendable {
             catalogStore: catalogStore,
             invalidationGate: provisioningInvalidationGate,
             commitCoordinator: provisioningCommitCoordinator,
+            authenticationPromptCoordinator: authenticationPromptCoordinator,
             beforePermanentStorageCheckpoint: provisioningCheckpoint,
             afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
             afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,

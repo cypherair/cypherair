@@ -15,7 +15,8 @@ enum TestHelpers {
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
-        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil
+        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
         service: KeyManagementService,
         mockSE: MockSecureEnclave,
@@ -42,7 +43,8 @@ enum TestHelpers {
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,
-                metadataPersistence: metadataPersistence
+                metadataPersistence: metadataPersistence,
+                provisioningCheckpoint: provisioningCheckpoint
             )
         } else {
             service = KeyManagementService(
@@ -52,7 +54,8 @@ enum TestHelpers {
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,
-                metadataPersistence: metadataPersistence
+                metadataPersistence: metadataPersistence,
+                provisioningCheckpoint: provisioningCheckpoint
             )
         }
 

@@ -488,6 +488,119 @@ final class SettingsScreenModelTests: XCTestCase {
         XCTAssertTrue(keychain.listItemsCalls.contains { $0.hasAuthenticationContext })
     }
 
+    #if os(macOS)
+    /// Minimal main-actor gate for suspending the confirmation-auth stub
+    /// mid-action.
+    @MainActor
+    private final class LocalDataResetAsyncGate {
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var isOpen = false
+        private(set) var isSuspended = false
+
+        func wait() async {
+            if isOpen { return }
+            isSuspended = true
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                continuation = cont
+            }
+        }
+
+        func open() {
+            isOpen = true
+            let cont = continuation
+            continuation = nil
+            cont?.resume()
+        }
+    }
+
+    @MainActor
+    func test_localDataReset_runsInsideOperationPromptSession_resignDeferredAndDecidedAtEnd() async {
+        // Uniform enrollment rule: the WHOLE reset action — confirmation
+        // authentication + the reset + restart-gate marking — runs inside one
+        // operation-prompt session, so the confirmation sheet's own resign is
+        // deferred and decided at the session's end.
+        let resetContainer = AppContainer.makeUITest()
+        defer { cleanup(resetContainer) }
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        await harness.unlockForTest()
+        let relocksBefore = harness.relockCount
+        let restartCoordinator = LocalDataResetRestartCoordinator()
+        let gate = LocalDataResetAsyncGate()
+        var observedInSession: Bool?
+        let model = makeModel(
+            appConfigurationOverride: resetContainer.config,
+            protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
+            authManagerOverride: resetContainer.authManager,
+            keyManagementOverride: resetContainer.keyManagement,
+            localDataResetService: resetContainer.localDataResetService,
+            localDataResetRestartCoordinator: restartCoordinator,
+            localDataResetAuthenticationAction: { _, _ in
+                observedInSession = harness.coordinator.isOperationPromptInProgress
+                await gate.wait()
+                return .authenticated(context: LAContext())
+            },
+            operationPromptCoordinator: harness.coordinator
+        )
+
+        model.requestLocalDataReset()
+        model.continueLocalDataReset()
+        model.localDataResetConfirmationPhrase = "RESET"
+        model.confirmLocalDataReset()
+        await waitUntil("confirmation auth suspended", timeout: 10) { gate.isSuspended }
+        await harness.settle() // the session-began hop must land before the resign
+
+        XCTAssertEqual(
+            observedInSession,
+            true,
+            "The Local Data Reset confirmation prompt must run inside an operation-prompt session (the uniform rule)."
+        )
+
+        harness.deliverResign()
+        await harness.settle()
+        XCTAssertEqual(harness.lockState, .unlocked, "Deferred, never a mid-action lock.")
+        XCTAssertEqual(harness.relockCount, relocksBefore)
+
+        gate.open()
+        await waitUntil("reset restart gate", timeout: 10) {
+            restartCoordinator.restartRequiredAfterLocalDataReset
+        }
+        await harness.settle()
+        XCTAssertEqual(
+            harness.lockState,
+            .locked,
+            "Still away at the prompts' end -> the deferred away is processed fail-closed."
+        )
+        XCTAssertGreaterThan(harness.relockCount, relocksBefore)
+    }
+
+    @MainActor
+    func test_localDataReset_controllerResetMidSession_keepsCounterBalanced() async {
+        // resetAfterLocalDataReset deliberately does not touch the session
+        // counter: the hooks are its sole mutators. Pin that a reset inside an
+        // open session leaves the mirror balanced — the session still closes
+        // normally and a subsequent resign is processed as a genuine away.
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        await harness.unlockForTest()
+
+        let prompt = harness.coordinator.beginOperationPrompt(source: "localDataReset")
+        await harness.settle() // began-hop lands: mirror opens
+
+        harness.controller.resetAfterLocalDataReset(preserveAuthentication: true)
+        XCTAssertEqual(harness.lockState, .unlocked)
+
+        harness.coordinator.endOperationPrompt(prompt)
+        await harness.settle() // ended-hop lands: mirror closes cleanly (no underflow trap)
+
+        harness.deliverResign()
+        await harness.settle()
+        XCTAssertEqual(
+            harness.lockState,
+            .locked,
+            "After the balanced session close, a genuine resign locks normally — the reset did not corrupt the mirror."
+        )
+    }
+    #endif
+
     @MainActor
     func test_localDataReset_authUnavailableDoesNotReset() async {
         let resetContainer = AppContainer.makeUITest()
@@ -1501,7 +1614,8 @@ final class SettingsScreenModelTests: XCTestCase {
         localDataResetRestartCoordinator: LocalDataResetRestartCoordinator? = nil,
         authModeSwitchAction: SettingsScreenModel.AuthModeSwitchAction? = nil,
         appAccessPolicySwitchAction: SettingsScreenModel.AppAccessPolicySwitchAction? = nil,
-        localDataResetAuthenticationAction: SettingsScreenModel.LocalDataResetAuthenticationAction? = nil
+        localDataResetAuthenticationAction: SettingsScreenModel.LocalDataResetAuthenticationAction? = nil,
+        operationPromptCoordinator: AuthenticationPromptCoordinator? = nil
     ) -> SettingsScreenModel {
         SettingsScreenModel(
             config: appConfigurationOverride ?? config,
@@ -1515,7 +1629,8 @@ final class SettingsScreenModelTests: XCTestCase {
             localDataResetRestartCoordinator: localDataResetRestartCoordinator,
             authModeSwitchAction: authModeSwitchAction,
             appAccessPolicySwitchAction: appAccessPolicySwitchAction,
-            localDataResetAuthenticationAction: localDataResetAuthenticationAction
+            localDataResetAuthenticationAction: localDataResetAuthenticationAction,
+            operationPromptCoordinator: operationPromptCoordinator
         )
     }
 
