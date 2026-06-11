@@ -144,6 +144,35 @@ final class AppContainer: @unchecked Sendable {
         )
     }
 
+    #if os(macOS)
+    /// Wire the operation-prompt lifecycle hooks to the lock controller's
+    /// main-actor mirror (the `.authenticating` rule, TARGET §3). The hooks fire
+    /// on the thread that adjusted the prompt depth and hop to the main actor;
+    /// the controller's session counter is what `handleAwayEvent` consults, so a
+    /// resign delivered between a prompt ending off-main and the ended-hop
+    /// landing is still deferred and decided — never misread as a genuine away.
+    /// Either hop ordering against a concurrent didBecomeActive is safe (the
+    /// decision reads `isForegroundActive` on the main actor: user back →
+    /// discard, still away → lock — both fail-closed). The coordinator's hooks
+    /// are write-once; every `AppLockController` construction site must call this.
+    @MainActor
+    private static func wireOperationPromptLifecycle(
+        from coordinator: AuthenticationPromptCoordinator,
+        to appLockController: AppLockController
+    ) {
+        coordinator.onOperationPromptSessionBegan = { [weak appLockController] in
+            Task { @MainActor in
+                appLockController?.handleOperationPromptSessionBegan()
+            }
+        }
+        coordinator.onOperationPromptsEnded = { [weak appLockController] in
+            Task { @MainActor in
+                appLockController?.handleOperationPromptsEnded()
+            }
+        }
+    }
+    #endif
+
     private static func makeProtectedDataSessionCoordinator(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
@@ -797,6 +826,9 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { false },
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
+        #endif
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyAdapter: keyAdapter,
@@ -1108,6 +1140,9 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { !requiresManualAuthentication },
             traceStore: authLifecycleTraceStore
         )
+        #if os(macOS)
+        wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
+        #endif
         let pgpServices = makePgpServiceGraph(
             engine: engine,
             keyAdapter: keyAdapter,
