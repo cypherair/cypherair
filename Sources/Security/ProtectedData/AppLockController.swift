@@ -67,11 +67,6 @@ final class AppLockController {
     private let contentClearHandler: () -> Void
     /// UI-test bypass (the orchestrator's old `shouldBypassPrivacyAuthentication`).
     private let shouldBypassAuthentication: () -> Bool
-    /// Whether a private-key operation prompt is currently in flight (wired to
-    /// `AuthenticationPromptCoordinator.isOperationPromptInProgress`). Half of the
-    /// `.authenticating` rule (TARGET §3): a macOS resign during such a prompt is
-    /// deferred, not treated as an away event.
-    private let isOperationPromptActive: () -> Bool
     private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var lockState: LockState = .locked
@@ -83,6 +78,19 @@ final class AppLockController {
     /// if the app is still not foreground-active, and discards it if the user
     /// returned. Holds the original away source for tracing.
     private var pendingOperationPromptAway: String?
+
+    /// Main-actor mirror of "an operation-prompt session is open", maintained by
+    /// `handleOperationPromptSessionBegan()` / `handleOperationPromptsEnded()`
+    /// (wired from `AuthenticationPromptCoordinator`'s lifecycle hooks). The away
+    /// rule consults THIS, not the coordinator's live depth: the mirror stays
+    /// open until the ended-hop lands on the main actor, so a resign delivered in
+    /// the gap between the prompt ending off-main and that hop is still deferred
+    /// (and then decided) instead of locking the app at the tail of an operation.
+    /// A counter, not a Bool: if a new session's began-hop lands before the
+    /// previous session's ended-hop, the count stays positive — correct under any
+    /// hop interleaving. (A resign racing ahead of the very first began-hop is
+    /// processed as a genuine away — fail-closed, the right direction.)
+    private var openOperationPromptSessions = 0
     #endif
 
     /// Monotonic token bumped on every genuine away event. The unlock flow captures
@@ -128,7 +136,6 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
-        isOperationPromptActive: @escaping () -> Bool = { false },
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.gracePeriodProvider = gracePeriodProvider
@@ -140,7 +147,6 @@ final class AppLockController {
         self.postAuthenticationHandler = postAuthenticationHandler
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
-        self.isOperationPromptActive = isOperationPromptActive
         self.traceStore = traceStore
     }
 
@@ -217,7 +223,7 @@ final class AppLockController {
         //     app is still not foreground-active then, and discards it if the user
         //     returned. This replaces the accepted P1-interim regression (a per-op
         //     prompt at grace=0 used to lock the app mid-operation).
-        if isOperationPromptActive() {
+        if openOperationPromptSessions > 0 {
             // First resign wins: later resigns during the same prompt session carry
             // no additional information (the decision at the prompts' end depends
             // only on `isForegroundActive`), and keeping the earliest source makes
@@ -265,17 +271,41 @@ final class AppLockController {
         Task { await enterLocked(source: "away:\(source)") }
     }
 
+    /// An operation-prompt session began (the coordinator's stack went 0 → 1;
+    /// wired from `AuthenticationPromptCoordinator` on macOS). Opens the
+    /// main-actor mirror the away rule consults.
+    func handleOperationPromptSessionBegan() {
+        #if os(macOS)
+        openOperationPromptSessions += 1
+        #endif
+    }
+
     /// The last in-flight private-key operation prompt ended (wired from
-    /// `AuthenticationPromptCoordinator` on macOS). Decides a deferred away
-    /// (the `.authenticating` rule, TARGET §3): if a resign arrived during the
-    /// prompts and the app is still not foreground-active, the away is processed
-    /// now (normal grace semantics); if the user returned, it is discarded.
+    /// `AuthenticationPromptCoordinator` on macOS). Closes the main-actor mirror
+    /// and decides a deferred away (the `.authenticating` rule, TARGET §3): if a
+    /// resign arrived during the prompts and the app is still not
+    /// foreground-active, the away is processed now (normal grace semantics); if
+    /// the user returned — or an explicit lock already superseded it — it is
+    /// discarded.
     func handleOperationPromptsEnded() {
         #if os(macOS)
+        if openOperationPromptSessions > 0 {
+            openOperationPromptSessions -= 1
+        }
         guard let source = pendingOperationPromptAway else {
             return
         }
         pendingOperationPromptAway = nil
+        guard !isLockedState else {
+            // An explicit lock (lockNow / screen-lock) or a processed away
+            // already locked the app; the deferred decision is moot.
+            traceStore?.record(
+                category: .lifecycle,
+                name: "lock.authenticatingRule.deferredAwaySupersededByLock",
+                metadata: ["source": source]
+            )
+            return
+        }
         guard !isForegroundActive else {
             traceStore?.record(
                 category: .lifecycle,
@@ -377,6 +407,13 @@ final class AppLockController {
     /// Lock immediately regardless of the grace interval (macOS "Lock Now" / screen
     /// lock; also the seam for any future explicit-lock affordance).
     func lockNow(source: String = "lockNow") {
+        #if os(macOS)
+        // Clear the deferred away SYNCHRONOUSLY: the queued `enterLocked` also
+        // clears it, but a prompts-ended hop could run between this call and that
+        // task, and must not process the now-moot deferral into a second relock
+        // cycle. An explicit lock always supersedes the deferred decision.
+        pendingOperationPromptAway = nil
+        #endif
         Task { await enterLocked(source: "lockNow:\(source)") }
     }
 
@@ -385,6 +422,11 @@ final class AppLockController {
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         awayGeneration &+= 1
         #if os(macOS)
+        // Dropping a deferred away here is sound: by the time this runs, Local
+        // Data Reset has already relocked the protected-data session (zeroizing
+        // the wrapping root key) and deleted all keychain items and protected
+        // domains — there is no data left for a lock to protect — and the
+        // post-reset restart gate disables all UI interaction until relaunch.
         pendingOperationPromptAway = nil
         #endif
         discardHandoffContext("localDataReset")

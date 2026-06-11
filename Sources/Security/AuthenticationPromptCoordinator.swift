@@ -59,12 +59,21 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    /// Invoked (outside the lock) whenever the operation-prompt stack becomes
-    /// empty — i.e. the last in-flight operation prompt ended. macOS wires this to
-    /// `AppLockController.handleOperationPromptsEnded()` so a resign deferred by
-    /// the `.authenticating` rule (TARGET §3) is decided at that moment.
-    /// Assign once during container construction, before any prompt begins.
-    var onOperationPromptsEnded: (@Sendable () -> Void)?
+    /// Operation-prompt lifecycle hooks (the `.authenticating` rule's MainActor
+    /// mirror, TARGET §3). `…SessionBegan` fires when the operation-prompt stack
+    /// goes 0 → 1; `…PromptsEnded` fires when it returns to 0. Both fire OUTSIDE
+    /// the lock, on the thread that adjusted the depth; macOS wires them (via a
+    /// main-actor hop) to `AppLockController.handleOperationPromptSessionBegan()` /
+    /// `handleOperationPromptsEnded()`, which maintain the controller's own
+    /// main-actor session counter — the race-free state `handleAwayEvent` consults.
+    /// Write-once: assigned during container construction, before any prompt can
+    /// begin; reassignment traps.
+    var onOperationPromptSessionBegan: (@Sendable () -> Void)? {
+        didSet { precondition(oldValue == nil, "onOperationPromptSessionBegan is write-once") }
+    }
+    var onOperationPromptsEnded: (@Sendable () -> Void)? {
+        didSet { precondition(oldValue == nil, "onOperationPromptsEnded is write-once") }
+    }
     private let traceStore: AuthLifecycleTraceStore?
     private let now: @Sendable () -> Date
     private var privacyPromptDepth = 0
@@ -220,9 +229,11 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             operationGeneration: UInt64,
             operationSessionGeneration: UInt64,
             context: PromptTraceContext,
+            operationSessionBegan: Bool,
             operationPromptsEnded: Bool
         ) in
             let resolvedContext: PromptTraceContext
+            var operationSessionBegan = false
             var operationPromptsEnded = false
             switch kind {
             case .privacy:
@@ -245,6 +256,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                     operationPromptAttemptGenerationValue &+= 1
                     if startsNewOperationSession {
                         operationPromptSessionGenerationValue = operationPromptAttemptGenerationValue
+                        operationSessionBegan = true
                     }
                     lastOperationPromptBeganAt = timestamp
                     lastOperationPromptEndedAt = nil
@@ -268,6 +280,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 operationPromptAttemptGenerationValue,
                 operationPromptSessionGenerationValue,
                 resolvedContext,
+                operationSessionBegan,
                 operationPromptsEnded
             )
         }
@@ -286,6 +299,9 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                 "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
             ]
         )
+        if snapshot.operationSessionBegan {
+            onOperationPromptSessionBegan?()
+        }
         if snapshot.operationPromptsEnded {
             onOperationPromptsEnded?()
         }

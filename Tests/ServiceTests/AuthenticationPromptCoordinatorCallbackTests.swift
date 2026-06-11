@@ -26,6 +26,22 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
         XCTAssertEqual(firedCount, 2, "Each completed prompt session fires once.")
     }
 
+    func test_onOperationPromptSessionBegan_firesOnlyWhenStackOpens() {
+        let coordinator = AuthenticationPromptCoordinator()
+        nonisolated(unsafe) var beganCount = 0
+        coordinator.onOperationPromptSessionBegan = { beganCount += 1 }
+
+        let outer = coordinator.beginOperationPrompt(source: "outer")
+        XCTAssertEqual(beganCount, 1)
+        let inner = coordinator.beginOperationPrompt(source: "inner")
+        XCTAssertEqual(beganCount, 1, "A nested prompt must not fire the began hook.")
+        coordinator.endOperationPrompt(inner)
+        coordinator.endOperationPrompt(outer)
+
+        _ = coordinator.beginOperationPrompt(source: "next")
+        XCTAssertEqual(beganCount, 2, "Each new session fires the began hook once.")
+    }
+
     func test_onOperationPromptsEnded_ignoresPrivacyPrompts() {
         let coordinator = AuthenticationPromptCoordinator()
         nonisolated(unsafe) var firedCount = 0

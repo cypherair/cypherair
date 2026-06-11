@@ -12,7 +12,6 @@ final class AppLockControllerTests: XCTestCase {
         var gracePeriod: Int? = 0
         var lastAuthenticationDate: Date?
         var bypass = false
-        var operationPromptActive = false
 
         /// Outcome the auth stub returns (once unpaused).
         var authOutcome: Result<AppSessionAuthenticationResult, Error> = .success(.authenticated(context: nil))
@@ -101,7 +100,6 @@ final class AppLockControllerTests: XCTestCase {
             postAuthenticationHandler: { await spy.postAuth($0, $1) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
-            isOperationPromptActive: { spy.operationPromptActive },
             traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         )
     }
@@ -448,8 +446,9 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
-        // A private-key operation prompt is in flight when the resign arrives.
-        spy.operationPromptActive = true
+        // A private-key operation prompt is in flight when the resign arrives
+        // (the began-hop has landed on the main actor).
+        controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
         await settle()
@@ -469,7 +468,7 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive(source: "boot")
         XCTAssertEqual(controller.lockState, .unlocked)
 
-        spy.operationPromptActive = true
+        controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
         await settle()
@@ -478,7 +477,6 @@ final class AppLockControllerTests: XCTestCase {
         // The prompts end and the app is STILL not foreground-active: the user
         // genuinely left during the operation — the deferred away is processed now
         // (grace=0 → lock, fail-closed).
-        spy.operationPromptActive = false
         controller.handleOperationPromptsEnded()
         await settle()
 
@@ -494,7 +492,7 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
-        spy.operationPromptActive = true
+        controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
         await settle()
@@ -502,7 +500,6 @@ final class AppLockControllerTests: XCTestCase {
         // The prompt completes and focus returned to the app before the prompts
         // ended: the resign was the prompt's own — the deferred away is discarded.
         controller.noteForegroundActive(true)
-        spy.operationPromptActive = false
         controller.handleOperationPromptsEnded()
         await settle()
 
@@ -520,7 +517,7 @@ final class AppLockControllerTests: XCTestCase {
         // Screen-lock / "Lock Now" routes through lockNow, which the
         // `.authenticating` rule never filters: a genuine lock signal wins even
         // mid-prompt.
-        spy.operationPromptActive = true
+        controller.handleOperationPromptSessionBegan()
         controller.lockNow(source: "screenLock")
         await settle()
 
@@ -534,7 +531,7 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive(source: "boot")
         XCTAssertEqual(controller.lockState, .unlocked)
 
-        spy.operationPromptActive = true
+        controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
         controller.noteForegroundActive(true)
@@ -544,7 +541,6 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .unlocked, "All resigns during the prompt are deferred.")
 
         let relocksBefore = spy.relockCount
-        spy.operationPromptActive = false
         controller.handleOperationPromptsEnded()
         await settle()
 
@@ -559,24 +555,48 @@ final class AppLockControllerTests: XCTestCase {
         await controller.handleForegroundActive(source: "boot")
         XCTAssertEqual(controller.lockState, .unlocked)
 
-        spy.operationPromptActive = true
+        controller.handleOperationPromptSessionBegan()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
         await settle()
 
-        // An explicit lock mid-prompt wins immediately…
+        // Adversarial ordering: the prompts-ended hop runs BEFORE lockNow's
+        // queued enterLocked task. lockNow clears the deferral synchronously, so
+        // the hop must be a no-op and exactly one relock cycle runs.
+        let relocksBeforeLock = spy.relockCount
         controller.lockNow(source: "screenLock")
-        await settle()
-        XCTAssertEqual(controller.lockState, .locked)
-        let relocksAfterLockNow = spy.relockCount
-
-        // …and supersedes the deferred away: the prompts' end is a no-op.
-        spy.operationPromptActive = false
         controller.handleOperationPromptsEnded()
         await settle()
 
         XCTAssertEqual(controller.lockState, .locked)
-        XCTAssertEqual(spy.relockCount, relocksAfterLockNow, "No redundant second relock cycle.")
+        XCTAssertEqual(
+            spy.relockCount,
+            relocksBeforeLock + 1,
+            "Exactly one relock cycle: the deferred away is superseded synchronously by lockNow."
+        )
+    }
+
+    func test_authenticatingRule_overlappingSessionHops_keepMirrorOpen() async {
+        // Counter-not-Bool: a new session's began-hop can land before the previous
+        // session's ended-hop. The mirror must stay open for the live session.
+        let spy = Spy()
+        spy.gracePeriod = 0
+        let controller = makeController(spy: spy)
+        await controller.handleForegroundActive(source: "boot")
+        XCTAssertEqual(controller.lockState, .unlocked)
+
+        controller.handleOperationPromptSessionBegan()   // session 1
+        controller.handleOperationPromptSessionBegan()   // session 2 began-hop arrives early
+        controller.handleOperationPromptsEnded()         // session 1 ended-hop arrives late
+
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+        await settle()
+        XCTAssertEqual(controller.lockState, .unlocked, "The live session keeps the resign deferred.")
+
+        controller.handleOperationPromptsEnded()         // session 2 ends, still away
+        await settle()
+        XCTAssertEqual(controller.lockState, .locked, "The deferred away is decided at the true end.")
     }
 
     func test_authenticatingRule_promptsEndWithoutDeferredAway_isNoOp() async {
