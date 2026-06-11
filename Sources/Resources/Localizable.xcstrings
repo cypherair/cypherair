@@ -10165,6 +10165,22 @@
         }
       }
     },
+    "privacy.locked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已锁定"
+          }
+        }
+      }
+    },
     "privacy.reauth.reason" : {
       "localizations" : {
         "en" : {
