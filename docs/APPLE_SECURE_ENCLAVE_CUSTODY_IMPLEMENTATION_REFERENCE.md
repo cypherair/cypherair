@@ -1,8 +1,16 @@
 # Apple Secure Enclave Custody Implementation Reference
 
-> Status: Draft implementation reference. This document describes proposed
-> future work and does not describe shipped behavior.
-> Date: 2026-05-26.
+> Status: Implementation reference for landed code. The contracts in this
+> document are implemented (Phases 1–6) and production-exposed since Phase 7
+> (issue #501); user exposure remains release-gated on Phases 8–9. Sections
+> describing remaining work say so explicitly.
+> Reading note (P7D): phase sections below were written while the production
+> resolver policy blocked Secure Enclave custody. Where they say "production
+> policy blocks", the production policy now supports those operations; the
+> corresponding fail-closed tests were re-pinned to the explicit
+> `testSecureEnclaveOperationsBlocked` policy, which preserves the
+> pre-exposure shape, and the unrouted-service fallbacks stay fail-closed.
+> Last reviewed: 2026-06-12.
 > Purpose: Provide middle-level implementation contracts for future Apple
 > Secure Enclave-backed OpenPGP private-key custody implementation plans.
 > Audience: Swift/Rust implementers, security reviewers, architecture

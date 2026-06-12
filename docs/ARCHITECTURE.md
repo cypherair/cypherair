@@ -4,7 +4,7 @@
 > Purpose: Module breakdown, dependency relationships, and data flow for CypherAir.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Module ownership, FFI capability families, data flows, tightly-coupled pairs, or storage layout change.
-> Last reviewed: 2026-06-10.
+> Last reviewed: 2026-06-12.
 
 ## 1. Layer Overview
 
@@ -85,13 +85,13 @@ call dedicated FFI adapters rather than `PgpEngine` directly.
 
 | Service | Responsibility |
 |---------|---------------|
-| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter. Text and streaming file optional signing delegate to private-key encryption helpers so software custody keeps the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime APIs. |
+| `EncryptionService` | Text/file encryption with recipient selection, encrypt-to-self, signature toggle, **auto format selection** (SEIPDv1/v2 by recipient key version) through the message FFI adapter. Text and streaming file optional signing delegate to private-key encryption helpers so software custody keeps the existing unwrap/zeroize path while Secure Enclave signer routes use the external signer runtime APIs. |
 | `DecryptionService` | Two-phase decryption: header parse (Phase 1, no auth) → decrypt (Phase 2, auth required). In Phase 2, both recipient-key message decrypt and streaming file decrypt delegate custody dispatch to router-owned helpers (`PrivateKeyMessageDecryptionService` / `PrivateKeyStreamingFileDecryptionService`): software custody unwraps and zeroizes the secret certificate, while a Secure Enclave key-agreement route loads only the `.keyAgreement` handle. Generated decrypt calls and result mapping live behind the message FFI adapter. Handles both SEIPDv1 and SEIPDv2. **Security-critical: Phase 1/Phase 2 boundary must never be bypassed.** |
-| `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Optional password-message signing delegates to a private-key password-message helper so software custody keeps the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. Password-based decrypt remains separate from the recipient-key/two-phase decrypt flow and does not use PKESK matching. |
-| `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext and detached file signing route through private-operation helpers so software custody preserves the existing unwrap/zeroize path while hidden/test Secure Enclave signer routes can use the external signer runtime API. |
-| `KeyManagementService` | Key generation (**profile-aware**: Profile A → Cv25519/RFC4880, Profile B → Cv448/RFC9580), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and hidden/test-only Secure Enclave custody generation through focused internal key-management helpers and key/certificate FFI adapters |
-| `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Current Profile A/B software-key operations are supported; Secure Enclave generation, signing-class operations, and key-agreement operations are independently gated and remain production-unavailable unless an internal hidden/test policy enables a narrow route. |
-| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, hidden/test Secure Enclave signer/key-agreement routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Signing-class operations (cleartext signing; text/password/file sign-plus-encrypt; detached file signing; modify-expiry; selective subkey/User ID revocation export; User ID contact certification) and recipient-key message and streaming file decrypt dispatch through router-owned private-key helpers; direct-key certification, key-level revocation-artifact generation, and standalone binding refresh remain deferred. |
+| `PasswordMessageService` | Password/SKESK message encryption and decryption with optional signing through an app-owned password-message format and the message FFI adapter. Optional password-message signing delegates to a private-key password-message helper so software custody keeps the existing unwrap/zeroize path while Secure Enclave signer routes use the external signer runtime API. Password-based decrypt remains separate from the recipient-key/two-phase decrypt flow and does not use PKESK matching. |
+| `SigningService` | Cleartext text signatures, detached file signatures, and detailed signature-result service APIs used by current verify workflows. Cleartext and detached file signing route through private-operation helpers so software custody preserves the existing unwrap/zeroize path while Secure Enclave signer routes use the external signer runtime API. |
+| `KeyManagementService` | Key generation (**family-aware**: Portable Compatible/Profile A → Cv25519/RFC4880, Portable Modern/Profile B → Cv448/RFC9580, Device-Bound Compatible/Modern → Secure Enclave custody P-256 v4/v6), import, export, expiry modification, revocation export, selector discovery, selective revocation export, and Secure Enclave custody generation (production-wired since P7D, hardware-guarded, prompt-session enrolled) through focused internal key-management helpers and key/certificate FFI adapters |
+| `PGPKeyCapabilityResolver` | Pure policy resolver for app-owned OpenPGP configuration, private-key custody, operation-support vocabulary, and sanitized failure-category resolution. Software-key operations are supported; since P7D the production policy also supports Secure Enclave generation, signing-class, and key-agreement operations (refreshBinding stays explicitly not-implemented; private-material export stays hard-unsupported independent of policy). Narrow test policies remain for route-isolation tests. |
+| `PrivateKeyOperationRouter` | Internal key-management router for private-operation requests. It returns software secret-certificate routes without unwrapping, Secure Enclave signer/key-agreement routes after public-binding and handle checks, or blocked `PGPKeyOperationResolution` values. Signing-class operations (cleartext signing; text/password/file sign-plus-encrypt; detached file signing; modify-expiry; selective subkey/User ID revocation export; User ID contact certification) and recipient-key message and streaming file decrypt dispatch through router-owned private-key helpers; direct-key certification, key-level revocation-artifact generation, and standalone binding refresh remain deferred. |
 | `CertificateSignatureService` | Certificate-signature verification and User ID certification generation. Owns target User ID selector validation, generated artifact validation, and signer identity resolution at the service boundary, while private signing dispatch delegates to a route-aware contact-certification helper. |
 | `ContactService` | App/UI-facing Contacts facade for availability, person-centered public-key import/update through the contact-import FFI adapter, verification state, search/tags, key-record lookup APIs, protected-domain runtime projection, mutation rollback, and relock cleanup |
 | `QRService` | QR generation (CIQRCodeGenerator), QR decoding from photo (CIDetector), URL scheme parsing through the contact-import FFI adapter. **Security-critical: parses untrusted external input.** |
@@ -148,13 +148,13 @@ metadata already models algorithm/profile and private-key custody as separate
 app-owned dimensions, with a capability resolver exposing only supported
 combinations.
 Sequoia 2.3's `Signer` and `Decryptor` traits are the Rust-side seam for this
-external private-key custody model. Current integration planning lives in
+external private-key custody model. The implemented integration record lives in
 [APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md);
 the completed POC validation track is archived as historical context in
 [APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
 
-The boundary keeps fixed ownership across three layers, hidden/test-only behind
-the capability resolver while production policy blocks Secure Enclave custody.
+The boundary keeps fixed ownership across three layers, gated by the
+capability resolver (production-exposed since P7D; release-gated on Phases 8-9).
 
 - **Rust/OpenPGP seam.** A narrow callback delegates only the private scalar
   operation through the Sequoia `Signer`/`Decryptor` traits: signing receives a
@@ -164,7 +164,7 @@ the capability resolver while production policy blocks Secure Enclave custody.
   OpenPGP packet construction, ECDH KDF, AES Key Wrap, session-key validation,
   payload authentication, verification folding, and public-only
   certificate/revocation construction and inspection. The seam reaches Swift only
-  through the hidden/test runtime UniFFI APIs and their FFI provider bridges and
+  through the runtime UniFFI APIs and their FFI provider bridges and
   never accepts or returns secret certificate material.
 
 - **Security-layer custody store.** `SecureEnclaveCustodyHandleStore` owns the two
@@ -203,9 +203,9 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, staged wrapped-DMK validation/promotion, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |
-| `SecureEnclaveCustodyHandleStore` | Future custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing/key-agreement handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Consumed only by hidden/test generation and the router-owned signer/key-agreement helpers while production policy blocks Secure Enclave custody. |
+| `SecureEnclaveCustodyHandleStore` | Custody handle lifecycle boundary for two distinct Secure Enclave P-256 `SecKey` private-operation rows, with role/public-key binding, rollback, inventory, public-binding lookup, signing/key-agreement handle lookup from public bindings, local-reset cleanup, idempotent delete, remaining-handle validation, and sanitized failure-category mapping. Consumed only by the custody generation service and the router-owned signer/key-agreement helpers. |
 | `SecureEnclaveCustodyKeyAgreement` | Security bridge for the external P-256 key-agreement (ECDH) route. It validates loaded `.keyAgreement` handles, recipient public-key binding, P-256 ephemeral public-key shape, and `SecKeyCopyKeyExchangeResult` failures, returning only the raw shared secret to the Rust external key-agreement provider bridge. |
-| `SecureEnclaveCustodyGenerationRecoveryService` | Hidden/test recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories for later router/recovery use. |
+| `SecureEnclaveCustodyGenerationRecoveryService` | Custody recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories consumed at key load and by the key-detail degraded-availability row. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
 | `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
@@ -274,7 +274,7 @@ pgp-mobile/
 │   ├── keys.rs       # Key module root: UniFFI records, shared helpers, internal re-exports
 │   ├── keys/
 │   │   ├── generation.rs          # Profile-aware generation (Cv25519/RFC4880 vs Cv448/RFC9580)
-│   │   ├── secure_enclave_generation/ # Hidden/test SE custody public-only generation (mod.rs, tests.rs)
+│   │   ├── secure_enclave_generation/ # SE custody public-only generation (mod.rs, tests.rs)
 │   │   ├── key_info.rs            # KeyInfo parsing and display metadata
 │   │   ├── selector_discovery.rs  # Subkey/User ID selector discovery
 │   │   ├── public_certificates.rs # Public certificate validation and merge/update
@@ -556,7 +556,7 @@ App Sandbox:
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
-- Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Hidden generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
+- Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Custody generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
 - The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a normal software-ephemeral P-256 ECDH envelope, not the private-key self-ECDH wrapping pattern.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, or out-of-app-custody exception.
 - Post-unlock orchestration opens required domains such as `private-key-control`, `key-metadata`, protected settings, and the framework sentinel by reusing the app privacy authentication context without extra Face ID prompts.

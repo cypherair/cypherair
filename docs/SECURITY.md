@@ -7,7 +7,7 @@
 > Update triggers: Changes to crypto/profile behavior, key lifecycle, Secure Enclave wrapping,
 > authentication modes, the ProtectedData model, tutorial isolation, MIE posture, or the
 > Section 10 red lines.
-> Last reviewed: 2026-06-10.
+> Last reviewed: 2026-06-12.
 
 ## 1. Encryption Scheme
 
@@ -98,23 +98,32 @@ Deletion:
 
 The Secure Enclave supports only P-256. Private keys (Ed25519, X25519, Ed448, or X448) are protected via an indirect wrapping scheme. The wrapping scheme is identical for all key algorithms — the SE wraps raw private key bytes regardless of algorithm.
 
-### Secure Enclave Custody (proposed future private-key model)
+### Secure Enclave Custody (device-bound private-key model)
 
-This wrapping scheme is the **current shipped** model. A separate **proposed
-future** custody model — Apple Secure Enclave Custody — would perform private-key
-operations inside the Secure Enclave and **never export long-term private
-scalars**, instead of unwrapping a complete OpenPGP secret certificate into app
-memory. It is a custody model, not a third OpenPGP profile, and is **blocked in
-production policy** (hidden/test only). Phase staging and per-operation contracts
-live in the
+This wrapping scheme is the model for **software-custody** keys. A second,
+**implemented** custody model — Apple Secure Enclave Custody, presented in the
+product as the **Device-Bound key families** — performs private-key operations
+inside the Secure Enclave and **never exports long-term private scalars**,
+instead of unwrapping a complete OpenPGP secret certificate into app memory. It
+is a custody model, not a third OpenPGP profile. Since Phase 7D (issue #501,
+decision 3) the production capability-resolver policy exposes device-bound
+generation and the implemented private-operation classes, and the production
+container wires the generation service (hardware-guarded; the whole generation
+runs inside one operation-prompt session per §4). User exposure remains
+release-gated: hardware and GnuPG-interop evidence (Phase 8) and the release
+gate (Phase 9) must pass before any tag-first stable release ships it. Phase
+staging and per-operation contracts live in the
 [implementation roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md),
 [implementation reference](APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_REFERENCE.md),
 and [security requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md);
 POC history is archived in
 [archive/apple-secure-enclave-custody-poc](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md).
 The boundaries below are the durable security red lines this model must hold; code
-under `Sources/Security/SecureEnclaveCustody*` and `pgp-mobile` is bound by them
-today even while the feature is hidden.
+under `Sources/Security/SecureEnclaveCustody*` and `pgp-mobile` is bound by them.
+Mode switching is custody-aware: device-bound keys have no SE-wrapped software
+bundle, so the re-wrap workflow and its crash recovery enumerate
+software-custody fingerprints only, and the High Security backup expectation
+applies to software-custody keys only (device-bound keys cannot be backed up).
 
 - **Handles & access control.** Two distinct, role-tagged Secure Enclave P-256
   `SecKey` rows per identity — one `.signing`, one `.keyAgreement` — created with
@@ -482,7 +491,7 @@ These hold for every change, independent of which file is touched:
 | File | Reason |
 |------|--------|
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
-| `Sources/Security/SecureEnclaveCustody*` | Future Secure Enclave custody handle lifecycle, access-control policy, role/public-key binding, and sanitized failure mapping. |
+| `Sources/Security/SecureEnclaveCustody*` | Secure Enclave custody handle lifecycle, access-control policy, role/public-key binding, and sanitized failure mapping. |
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
 | `Sources/Security/ProtectedData/` | App-data root-secret authorization, SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
