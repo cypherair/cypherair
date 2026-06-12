@@ -19,8 +19,9 @@
 > Companion: [Target Design](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) (the end state; the two-subsystem boundary).
 > Companion current-state references: [SECURITY.md](SECURITY.md), [ARCHITECTURE.md](ARCHITECTURE.md),
 > [TESTING.md](TESTING.md), [CODE_REVIEW.md](CODE_REVIEW.md), [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md).
-> Update triggers: a phase completion, a changed phase boundary, a changed red-line surface, a changed
-> validation minimum, or a change in the macOS embedded-UI availability (§1 addendum).
+> Update triggers: a phase completion, a changed phase boundary, a changed red-line surface, or a changed
+> validation minimum. (The former embedded-UI availability trigger was dropped with the in-window
+> abandonment, §7.)
 
 Source anchoring: this roadmap names shipped types and functions by **symbol**, not line number (line numbers
 drift). All claims are grounded in a first-hand read of the shipped `main` sources.
@@ -28,7 +29,8 @@ drift). All claims are grounded in a first-hand read of the shipped `main` sourc
 ## 1. P0 validation results (inlined) — with the macOS 27 addendum
 
 A throwaway macOS validation spike (P0) on a real Mac with Touch ID de-risked the in-window direction before
-the rewrite (frozen PoC branch `poc/auth-lifecycle-macos`, PR #469; none of its code merges to `main`).
+the rewrite (PoC preserved in closed PR #469; none of its code merged to `main`; its branch was deleted
+on 2026-06-12 with the in-window abandonment — §7).
 Validated results, as measured on **macOS 26.x (2026-06-06)**:
 
 - **No resign.** An inline `LAAuthenticationView` driving `evaluatePolicy` / `evaluateAccessControl` does not
@@ -51,8 +53,8 @@ Validated results, as measured on **macOS 26.x (2026-06-06)**:
 ### Addendum (2026-06-10): macOS 27 invalidates the in-window mechanism; the stall motivation is resolved
 
 Measured on this project's development Mac after its upgrade to **macOS 27.0 Golden Gate developer beta
-(26A5353q)**, with a probe suite retained by the maintainer for re-testing on new macOS builds
-(kept untracked as `Tests/ServiceTests/InWindowAuthProbeTests.swift`):
+(26A5353q)**, with a throwaway probe suite (`InWindowAuthProbeTests`, archived in closed PR #496;
+re-probing was dropped with the in-window abandonment — §7):
 
 - **Embedded LocalAuthentication UI is denied to non-Apple-signed processes.** Every combination —
   AppKit `LAAuthenticationView` and SwiftUI `LocalAuthenticationView`, paired with `evaluatePolicy` and
@@ -126,8 +128,8 @@ machine.** The app never infers lock state from lifecycle noise around authentic
   private-key route) and closed unmerged when the maintainer's manual gate caught the macOS 27
   embedded-UI denial (§1 addendum). With the stall motivation also resolved by macOS 27, the cutover —
   including the macOS biometric-only pinning, both one-time migrations, and the mode-picker removal — is
-  withdrawn rather than deferred. The seam/host implementation is parked on branch
-  `feat/p3-in-window-auth-pr1` for the contingency that Apple restores embedded UI (§7).
+  withdrawn rather than deferred. The seam/host implementation record remains in closed PR #491; its
+  branch was deleted on 2026-06-12 when the restore-contingency was dropped (§7).
 
 - **P3′ — Auth-lifecycle completion on the system sheet (DONE; replaces P3).**
   Stages 0–1 landed as individual PRs; the remainder landed as one PR with per-stage commits. The goal
@@ -228,7 +230,7 @@ principle through its own seam when productized.
 | macOS detached system-sheet authentication | **retained** — the system presents authentication; the lock model is correct around it by design |
 | App Access Protection options / Private Key Protection modes | **retained everywhere** — no pinning, no migrations |
 | `LocalDataResetRestartGate` | **retained** — one mount (P2); system-sheet authentication |
-| In-window presentation seam (`AuthenticationPresenting` + macOS presenter/host) | **parked** on `feat/p3-in-window-auth-pr1` (closed #491); contingent on Apple restoring embedded UI |
+| In-window presentation seam (`AuthenticationPresenting` + macOS presenter/host) | **abandoned** (2026-06-12) — record in closed #491; the shipped system-sheet model needs no in-window presentation |
 
 ## 6. Red lines & tests
 
@@ -261,11 +263,12 @@ principle through its own seam when productized.
 
 ## 7. Decisions & validation status
 
-- **Presentation (decided 2026-06-10, reversing the 2026-06-07 decision):** the system authentication
-  sheet, on every platform. In-window presentation is **parked**, not chosen: macOS 27 denies embedded LA
-  UI to third-party processes (§1 addendum), and the stall that motivated in-window is resolved. Re-probe
-  embedded UI on each new macOS build (`InWindowAuthProbeTests`); if Apple restores it, in-window may
-  return as an optional enhancement through the parked seam.
+- **Presentation (decided 2026-06-10, reversing the 2026-06-07 decision; contingency dropped
+  2026-06-12):** the system authentication sheet, on every platform. In-window presentation is
+  **abandoned**: macOS 27 denies embedded LA UI to third-party processes (§1 addendum), the stall that
+  motivated in-window is resolved, and the shipped model needs no app-hosted prompt — so the
+  restore-contingency (re-probing each macOS build, the parked seam branch) was dropped and the seam/PoC
+  branches deleted. The implementation records remain in closed PRs #491 and #469.
 - **Both postures retained (decided 2026-06-10, reversing the biometric-only pin):** macOS keeps
   `.userPresence` (password fallback is a normal product feature) and `.standard`; no migrations. The
   biometric-only decision's premise (no in-window password entry) disappeared with in-window presentation.

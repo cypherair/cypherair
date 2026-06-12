@@ -70,7 +70,7 @@ final class KeyMutationService {
                     localizedReason: reason
                 )
                 guard success else {
-                    throw AuthenticationError.failed
+                    throw CypherAirError.authenticationFailed
                 }
                 return context
             } catch {
@@ -78,13 +78,20 @@ final class KeyMutationService {
                 // exactly once; only a returned (authenticated) context is the
                 // caller's to invalidate.
                 context.invalidate()
-                if let laError = error as? LAError,
-                   [.userCancel, .appCancel, .systemCancel].contains(laError.code) {
-                    // The user dismissed their own prompt: abort the action
-                    // silently (the modify-expiry screen swallows
-                    // operationCancelled by design) instead of surfacing a
-                    // misleading storage/authentication alert.
-                    throw CypherAirError.operationCancelled
+                if let laError = error as? LAError {
+                    if [.userCancel, .appCancel, .systemCancel].contains(laError.code) {
+                        // The user dismissed their own prompt: abort the action
+                        // silently (the modify-expiry screen swallows
+                        // operationCancelled by design) instead of surfacing a
+                        // misleading storage/authentication alert.
+                        throw CypherAirError.operationCancelled
+                    }
+                    // Any other LocalAuthentication failure (failed match,
+                    // lockout, …) surfaces as an authentication failure — a
+                    // raw LAError would fall through the screen model's
+                    // fallback to the misleading "Failed to access secure
+                    // storage." keychain message.
+                    throw CypherAirError.authenticationFailed
                 }
                 throw error
             }

@@ -70,7 +70,7 @@ The target separates three concerns that were entangled before P1, with no share
 - **C. Authentication presentation.** The authentication prompt is the **system authentication sheet** —
   LocalAuthentication's standard presentation — on every platform. The app does not host the prompt
   inside its own window. (In-window presentation via `LAAuthenticationView` /
-  SwiftUI `LocalAuthenticationView` is a **parked option**, §7.)
+  SwiftUI `LocalAuthenticationView` is **abandoned**, §7.)
 
 ## 3. Lock model
 
@@ -186,13 +186,13 @@ The end state explicitly does **not** include the following:
 - The standalone macOS `Settings { }` scene (a second lifecycle/auth surface) — removed (P2).
 - Heuristic disambiguation of authentication-driven lifecycle noise — replaced by the explicit
   `.authenticating` rule (§3, P3′).
-- **In-window (app-hosted) authentication presentation.** Retired from the target on 2026-06-10: macOS 27
-  denies embedded LocalAuthentication UI (`LAAuthenticationView` and SwiftUI `LocalAuthenticationView`,
-  both `evaluatePolicy` and `evaluateAccessControl`) to non-Apple-signed processes with LA error -1007,
-  independent of the app's entitlements. The mechanism-shaped presentation seam built for it is parked on
-  branch `feat/p3-in-window-auth-pr1` (closed PR #491), and the embedded-UI probe suite is re-run against
-  new macOS builds; if Apple restores embedded UI to third-party apps, in-window presentation can return
-  as an optional enhancement through that seam without changing this lock model.
+- **In-window (app-hosted) authentication presentation.** Retired from the target on 2026-06-10 and
+  **abandoned outright on 2026-06-12**: macOS 27 denies embedded LocalAuthentication UI
+  (`LAAuthenticationView` and SwiftUI `LocalAuthenticationView`, both `evaluatePolicy` and
+  `evaluateAccessControl`) to non-Apple-signed processes with LA error -1007, independent of the app's
+  entitlements — and the shipped system-sheet model needs no in-window presentation, so the contingency
+  was dropped (maintainer decision). The seam branch was deleted; the implementation record remains
+  viewable in closed PR #491 and the P0 PoC in closed PR #469.
 
 Local Data Reset and its post-reset restart gate remain, with their authentication presented by the system
 sheet like every other surface.
