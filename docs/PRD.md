@@ -85,7 +85,8 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
   - "Portable Modern" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
   - "Device-Bound Compatible" — "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
   - "Device-Bound Modern" — "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
-  - Device-bound families require passing a commitment sheet (custody, non-exportability, loss consequence, public artifacts are not backups) before generation starts; the rows appear only where the capability resolver and a wired generation service allow them.
+  - Each row has an info button that opens a detail sheet covering algorithms, key version, message format, approximate security level, exportability, GnuPG compatibility, and custody.
+  - Device-bound families require passing a commitment sheet (custody, fixed biometric enforcement, non-exportability, loss consequence, public artifacts are not backups) before generation starts; the rows appear only where the capability resolver and a wired generation service allow them.
 - **Encryption:** Message format is determined automatically by the recipient's key version. If recipient has a v4 key → SEIPDv1. If v6 key → SEIPDv2 (AEAD). Mixed v4+v6 recipients → SEIPDv1 (lowest common denominator). The user does not choose this manually. See [TDD](TDD.md) Section 1.4.
 - **Decryption:** The App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
 - **Multiple keys:** A user may have keys of different profiles (e.g., a Profile A key for GnuPG contacts and a Profile B key for security-conscious contacts).
@@ -258,7 +259,7 @@ Protected app-data scope and per-surface classification are maintained in [PERSI
 
 **Authentication Mode**
 
-The App offers two authentication modes, selectable in Settings:
+The App offers two portable-key authentication modes, selectable in Settings under "Portable Key Protection":
 
 - **Standard Mode (default):** Face ID / Touch ID with device passcode fallback. Suitable for most users. Equivalent to Apple `deviceOwnerAuthentication`.
 - **High Security Mode:** Face ID / Touch ID only, with no passcode fallback for private-key operations. In this mode, decrypt, sign, and export require biometric authorization before private-key material can be used. If biometric authentication is unavailable (sensor damaged, face obscured, or temporarily locked out), private-key operations remain unavailable until biometric authentication is restored.
@@ -269,7 +270,9 @@ The App offers two authentication modes, selectable in Settings:
 2. Verifies that at least one software-custody private key has been backed up (exported); device-bound keys carry no backup obligation. If software keys exist with no backup, the warning is stronger and the user must acknowledge the risk explicitly.
 3. Requires current biometric authentication to confirm the mode change.
 
-*Technical detail: Standard Mode uses `SecAccessControlCreateFlags` `[.biometryAny, .or, .devicePasscode]` + `.privateKeyUsage`. High Security Mode uses `[.biometryAny]` + `.privateKeyUsage` only. Switching modes requires re-wrapping all SE-protected keys with the new access control flags. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 4 for full implementation details.*
+Device-bound keys always require biometric authentication. For security, this enforcement is fixed and cannot be changed; Portable Key Protection does not affect device-bound keys.
+
+*Technical detail: for portable software-custody keys, Standard Mode uses `SecAccessControlCreateFlags` `[.biometryAny, .or, .devicePasscode]` + `.privateKeyUsage`; High Security Mode uses `[.biometryAny]` + `.privateKeyUsage` only. Switching modes requires re-wrapping portable software-custody keys with the new access control flags. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 4 for full implementation details.*
 
 ---
 
@@ -304,9 +307,9 @@ Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 - Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
 - Password / SKESK message workflows are not currently exposed in the shipped app UI.
 
-### 5.5 Private Key Protection
+### 5.5 Portable Key Protection
 
-Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biometric/passcode auth. Keys device-bound. Two access control configurations for Standard/High Security modes. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 3.
+Portable software private keys use Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biometric/passcode auth. Two access control configurations support Standard/High Security modes. The Settings control applies only to portable keys; device-bound keys always use biometric access and are not affected. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 3.
 
 ### 5.6 App Protection
 

@@ -38,6 +38,10 @@ struct DeviceBoundKeyCommitmentSheet: View {
                             defaultValue: "You can export the public key and a revocation certificate, but they are not private-key backups."
                         )
                     )
+                    commitmentRow(
+                        systemImage: "faceid",
+                        text: PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement
+                    )
                 }
 
                 Section {

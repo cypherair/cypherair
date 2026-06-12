@@ -22,6 +22,7 @@ final class KeyGenerationScreenModel {
     var expiryMonths = 24
     var isGenerating = false
     var deviceBoundCommitmentPending = false
+    var presentedFamilyDetail: PGPKeyConfiguration.Identity?
     var error: CypherAirError?
     var showError = false
     var generatedIdentity: PGPKeyIdentity?
@@ -100,6 +101,14 @@ final class KeyGenerationScreenModel {
             return
         }
         selectedFamily = family
+    }
+
+    func presentFamilyDetail(_ family: PGPKeyConfiguration.Identity) {
+        presentedFamilyDetail = family
+    }
+
+    func dismissFamilyDetail() {
+        presentedFamilyDetail = nil
     }
 
     /// Device-bound families never start generating here: the user must pass the
@@ -210,6 +219,7 @@ final class KeyGenerationScreenModel {
         generationTask = nil
         isGenerating = false
         deviceBoundCommitmentPending = false
+        presentedFamilyDetail = nil
         clearTransientInput()
     }
 

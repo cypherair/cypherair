@@ -4778,13 +4778,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No private keys found. Generate or import a key first."
+            "value" : "No portable private keys found. Generate or import a portable key first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到私钥。请先生成或导入密钥。"
+            "value" : "未找到便携私钥。请先生成或导入便携密钥。"
           }
         }
       }
@@ -9445,6 +9445,198 @@
         }
       }
     },
+    "keyFamily.custody.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound Secure Enclave custody"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定安全隔区托管"
+          }
+        }
+      }
+    },
+    "keyFamily.custody.portable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable software key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携软件密钥"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algorithms"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算法"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custody"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "托管方式"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.exportability" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportability"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出能力"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.gnupg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG Compatibility"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG 兼容性"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细信息"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.messageFormat" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message Format"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息格式"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approx. Security Level"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约等安全级别"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥版本"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBound.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P-256 signing + P-256 key agreement"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P-256 签名 + P-256 密钥协商"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBound.biometricRequirement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound keys always require biometric authentication. For security, this enforcement is fixed and cannot be changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥始终需要生物识别认证。为确保安全，此强制要求是固定的，无法更改。"
+          }
+        }
+      }
+    },
     "keyFamily.deviceBoundCompatible.description" : {
       "localizations" : {
         "en" : {
@@ -9541,6 +9733,118 @@
         }
       }
     },
+    "keyFamily.exportability.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key cannot be exported or backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥无法导出或备份"
+          }
+        }
+      }
+    },
+    "keyFamily.exportability.portable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key can be exported and backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥可以导出和备份"
+          }
+        }
+      }
+    },
+    "keyFamily.gnupg.compatible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible with GnuPG"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "keyFamily.gnupg.notCompatible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not compatible with GnuPG"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "keyFamily.messageFormat.seipdv1" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv1 (MDC)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv1（MDC）"
+          }
+        }
+      }
+    },
+    "keyFamily.messageFormat.seipdv2" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv2 (AEAD OCB)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv2（AEAD OCB）"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed25519 signing + X25519 encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed25519 签名 + X25519 加密"
+          }
+        }
+      }
+    },
     "keyFamily.portableCompatible.description" : {
       "localizations" : {
         "en" : {
@@ -9589,6 +9893,22 @@
         }
       }
     },
+    "keyFamily.portableModern.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 signing + X448 encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 签名 + X448 加密"
+          }
+        }
+      }
+    },
     "keyFamily.portableModern.description" : {
       "localizations" : {
         "en" : {
@@ -9633,6 +9953,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "~224 位"
+          }
+        }
+      }
+    },
+    "keyFamily.version.v4" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v4"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v4"
+          }
+        }
+      }
+    },
+    "keyFamily.version.v6" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v6"
           }
         }
       }
@@ -9825,6 +10177,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成密钥"
+          }
+        }
+      }
+    },
+    "keygen.family.info.accessibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show key type details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密钥类型详细信息"
           }
         }
       }
@@ -12378,13 +12746,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Private Key Protection"
+            "value" : "Portable Key Protection"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "私钥保护"
+            "value" : "便携密钥保护"
+          }
+        }
+      }
+    },
+    "settings.authMode.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to portable keys. Device-bound keys always use biometric access and are not affected."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅适用于便携密钥。设备绑定密钥始终使用生物识别访问，不受此设置影响。"
           }
         }
       }

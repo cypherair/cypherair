@@ -76,6 +76,11 @@ Each available choice should communicate:
 - backup and recovery consequence;
 - whether private-key export is supported.
 
+The key-family selection row can stay concise when it includes an adjacent
+detail affordance. The detail sheet should expose algorithms, key version,
+message format, approximate security level, exportability, GnuPG compatibility,
+and custody for each family.
+
 Operational failures, missing local state, or authentication failures should be
 shown as key status or operation errors. They should not be normal choice
 attributes on the configuration surface.
@@ -90,6 +95,8 @@ commitments understandable:
 - Existing private keys cannot be imported into Secure Enclave custody.
 - Losing the device, local device-bound key state, or required
   biometric access can permanently remove signing and decrypt capability.
+- Device-bound keys always require biometric authentication. For security, this
+  enforcement is fixed and cannot be changed.
 - Public certificates and revocation artifacts can be exported, but they are
   not private-key backups.
 

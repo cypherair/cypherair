@@ -148,6 +148,7 @@
 				App/Keys/DeviceBoundKeyExplainerView.swift,
 				App/Keys/ImportKeyScreenModel.swift,
 				App/Keys/ImportKeyView.swift,
+				App/Keys/KeyFamilyDetailSheet.swift,
 				App/Keys/KeyDetailScreenModel.swift,
 				App/Keys/KeyDetailView.swift,
 				App/Keys/KeyFamilySelectionRow.swift,
@@ -898,7 +899,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14313;
+				CURRENT_PROJECT_VERSION = 14314;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1126,7 +1127,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14313;
+				CURRENT_PROJECT_VERSION = 14314;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;
@@ -1274,7 +1275,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = CypherAirMacOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14313;
+				CURRENT_PROJECT_VERSION = 14314;
 				DEVELOPMENT_TEAM = 7P9PPXP2SF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_CPLUSPLUS_BOUNDS_SAFE_BUFFERS = YES;

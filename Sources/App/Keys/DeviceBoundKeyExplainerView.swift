@@ -53,6 +53,13 @@ struct DeviceBoundKeyExplainerView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 }
+
+                Label {
+                    Text(PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement)
+                } icon: {
+                    Image(systemName: "faceid")
+                        .foregroundStyle(.blue)
+                }
             }
         }
         .cypherMacReadableContent()

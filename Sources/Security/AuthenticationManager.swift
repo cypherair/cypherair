@@ -63,7 +63,7 @@ enum AuthenticationError: Error, LocalizedError {
                    defaultValue: "Failed to switch authentication mode. Your keys remain safely protected under the previous mode.")
         case .noIdentities:
             String(localized: "error.auth.noIdentities",
-                   defaultValue: "No private keys found. Generate or import a key first.")
+                   defaultValue: "No portable private keys found. Generate or import a portable key first.")
         case .backupRequired:
             String(localized: "error.auth.backupRequired",
                    defaultValue: "High Security mode requires at least one backed-up key. Please back up a key before enabling this mode.")

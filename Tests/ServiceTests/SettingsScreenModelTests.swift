@@ -365,6 +365,25 @@ final class SettingsScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_portableKeyProtectionCopy_describesPortableOnlyScope() {
+        XCTAssertEqual(
+            String(localized: "settings.authMode", defaultValue: ""),
+            "Portable Key Protection"
+        )
+        let footer = String(localized: "settings.authMode.footer", defaultValue: "")
+        XCTAssertTrue(footer.contains("portable keys"))
+        XCTAssertTrue(footer.contains("Device-bound keys"))
+        XCTAssertTrue(footer.contains("not affected"))
+    }
+
+    func test_noIdentitiesCopy_isPortableAccurate() {
+        let message = AuthenticationError.noIdentities.localizedDescription
+
+        XCTAssertTrue(message.contains("portable private keys"))
+        XCTAssertFalse(message.contains("No private keys found"))
+    }
+
+    @MainActor
     func test_tutorialSettings_configuration_usesTutorialProtectedSettingsState() {
         let store = TutorialSessionStore()
         let model = makeModel(configuration: store.configurationFactory.settingsConfiguration())

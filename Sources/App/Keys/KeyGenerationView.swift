@@ -89,7 +89,8 @@ private struct KeyGenerationScreenHostView: View {
                         family: family,
                         isSelected: model.selectedFamily == family,
                         isEnabled: model.configuration.lockedFamily == nil,
-                        onSelect: { model.selectFamily(family) }
+                        onSelect: { model.selectFamily(family) },
+                        onInfo: { model.presentFamilyDetail(family) }
                     )
                 }
             } header: {
@@ -182,6 +183,17 @@ private struct KeyGenerationScreenHostView: View {
                 onConfirm: { model.confirmDeviceBoundGeneration() },
                 onCancel: { model.cancelDeviceBoundCommitment() }
             )
+        }
+        .sheet(isPresented: Binding(
+            get: { model.presentedFamilyDetail != nil },
+            set: { if !$0 { model.dismissFamilyDetail() } }
+        )) {
+            if let family = model.presentedFamilyDetail {
+                KeyFamilyDetailSheet(
+                    family: family,
+                    onDismiss: { model.dismissFamilyDetail() }
+                )
+            }
         }
         .sheet(item: Binding(
             get: { model.generatedIdentity },

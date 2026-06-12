@@ -61,6 +61,39 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
     }
 
+    func test_presentFamilyDetail_doesNotSelectFamilyAndCanDismiss() {
+        let model = makeModel(
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+
+        model.presentFamilyDetail(.modernP256V6)
+
+        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+        XCTAssertEqual(model.presentedFamilyDetail, .modernP256V6)
+
+        model.dismissFamilyDetail()
+
+        XCTAssertNil(model.presentedFamilyDetail)
+    }
+
+    func test_presentFamilyDetail_stillWorksWhenFamilySelectionIsLocked() {
+        let model = makeModel(
+            configuration: KeyGenerationView.Configuration(
+                lockedFamily: .modernSoftwareV6
+            ),
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        model.handleAppear()
+
+        model.presentFamilyDetail(.compatibleP256V4)
+
+        XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
+        XCTAssertEqual(model.presentedFamilyDetail, .compatibleP256V4)
+    }
+
     func test_availableFamilies_productionPolicyExposesDeviceBoundFamiliesWhenServiceWired() {
         // No wired generation service (this test container): device-bound
         // families stay hidden even under the exposed production policy.
@@ -265,9 +298,13 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         model.generate()
         XCTAssertTrue(model.deviceBoundCommitmentPending)
 
+        model.presentFamilyDetail(.modernP256V6)
+        XCTAssertEqual(model.presentedFamilyDetail, .modernP256V6)
+
         model.handleContentClearGenerationChange()
 
         XCTAssertFalse(model.deviceBoundCommitmentPending)
+        XCTAssertNil(model.presentedFamilyDetail)
         XCTAssertFalse(model.isGenerating)
     }
 

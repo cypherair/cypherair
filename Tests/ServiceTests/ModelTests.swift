@@ -1260,6 +1260,77 @@ final class ModelTests: XCTestCase {
         }
         for identity in PGPKeyConfiguration.Identity.allCases {
             XCTAssertFalse(identity.familySecurityLevel.isEmpty)
+            XCTAssertFalse(identity.familyAlgorithmSummary.isEmpty)
+            XCTAssertFalse(identity.familyKeyVersionDisplay.isEmpty)
+            XCTAssertFalse(identity.familyMessageFormatDisplay.isEmpty)
+            XCTAssertFalse(identity.familyExportabilityDisplay.isEmpty)
+            XCTAssertFalse(identity.familyGnuPGCompatibilityDisplay.isEmpty)
+            XCTAssertFalse(identity.familyCustodyDisplay.isEmpty)
+        }
+        XCTAssertFalse(PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement.isEmpty)
+    }
+
+    func test_keyFamily_detailPresentationValuesAreCorrect() {
+        let expected: [
+            PGPKeyConfiguration.Identity: (
+                algorithms: String,
+                version: String,
+                messageFormat: String,
+                securityLevel: String,
+                exportability: String,
+                gnupg: String,
+                custody: String
+            )
+        ] = [
+            .compatibleSoftwareV4: (
+                "Ed25519 signing + X25519 encryption",
+                "v4",
+                "SEIPDv1 (MDC)",
+                "~128 bit",
+                "Private key can be exported and backed up",
+                "Compatible with GnuPG",
+                "Portable software key"
+            ),
+            .modernSoftwareV6: (
+                "Ed448 signing + X448 encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~224 bit",
+                "Private key can be exported and backed up",
+                "Not compatible with GnuPG",
+                "Portable software key"
+            ),
+            .compatibleP256V4: (
+                "P-256 signing + P-256 key agreement",
+                "v4",
+                "SEIPDv1 (MDC)",
+                "~128 bit",
+                "Private key cannot be exported or backed up",
+                "Compatible with GnuPG",
+                "Device-bound Secure Enclave custody"
+            ),
+            .modernP256V6: (
+                "P-256 signing + P-256 key agreement",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~128 bit",
+                "Private key cannot be exported or backed up",
+                "Not compatible with GnuPG",
+                "Device-bound Secure Enclave custody"
+            ),
+        ]
+
+        for identity in PGPKeyConfiguration.Identity.allCases {
+            guard let values = expected[identity] else {
+                return XCTFail("Missing detail expectations for \(identity)")
+            }
+            XCTAssertEqual(identity.familyAlgorithmSummary, values.algorithms)
+            XCTAssertEqual(identity.familyKeyVersionDisplay, values.version)
+            XCTAssertEqual(identity.familyMessageFormatDisplay, values.messageFormat)
+            XCTAssertEqual(identity.familySecurityLevel, values.securityLevel)
+            XCTAssertEqual(identity.familyExportabilityDisplay, values.exportability)
+            XCTAssertEqual(identity.familyGnuPGCompatibilityDisplay, values.gnupg)
+            XCTAssertEqual(identity.familyCustodyDisplay, values.custody)
         }
     }
 
@@ -1272,6 +1343,13 @@ final class ModelTests: XCTestCase {
                 identity.familyDisplayName,
                 identity.familyDescription,
                 identity.familySecurityLevel,
+                identity.familyAlgorithmSummary,
+                identity.familyKeyVersionDisplay,
+                identity.familyMessageFormatDisplay,
+                identity.familyExportabilityDisplay,
+                identity.familyGnuPGCompatibilityDisplay,
+                identity.familyCustodyDisplay,
+                PGPKeyConfiguration.Identity.deviceBoundBiometricRequirement,
             ].joined(separator: " ")
             XCTAssertFalse(copy.contains("224"))
             XCTAssertFalse(copy.lowercased().contains("stronger"))

@@ -89,6 +89,7 @@ $(SRCROOT)/Sources/App/Keys/DeviceBoundKeyCommitmentSheet.swift
 $(SRCROOT)/Sources/App/Keys/DeviceBoundKeyExplainerView.swift
 $(SRCROOT)/Sources/App/Keys/ImportKeyScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/ImportKeyView.swift
+$(SRCROOT)/Sources/App/Keys/KeyFamilyDetailSheet.swift
 $(SRCROOT)/Sources/App/Keys/KeyDetailScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/KeyDetailView.swift
 $(SRCROOT)/Sources/App/Keys/KeyFamilySelectionRow.swift
