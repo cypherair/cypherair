@@ -114,7 +114,11 @@ struct HomeView: View {
                                 expandsHorizontally: false
                             )
 
-                            KeyBackupStatusBadge(isBackedUp: defaultKey.isBackedUp, style: .badge)
+                            if defaultKey.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations {
+                                KeyCustodyBadge(style: .badge)
+                            } else {
+                                KeyBackupStatusBadge(isBackedUp: defaultKey.isBackedUp, style: .badge)
+                            }
                         }
 
                         Image(systemName: "chevron.right")

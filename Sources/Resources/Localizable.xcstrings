@@ -417,6 +417,38 @@
         }
       }
     },
+    "backup.deviceBound.unavailable.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound keys cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥无法导出或备份。"
+          }
+        }
+      }
+    },
+    "backup.deviceBound.unavailable.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup Not Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法备份"
+          }
+        }
+      }
+    },
     "backup.export" : {
       "localizations" : {
         "en" : {
@@ -3777,6 +3809,22 @@
         }
       }
     },
+    "decrypt.matchedKey.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "decrypt.matchedKey.name" : {
       "localizations" : {
         "en" : {
@@ -3789,22 +3837,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥"
-          }
-        }
-      }
-    },
-    "decrypt.matchedKey.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
           }
         }
       }
@@ -8437,6 +8469,102 @@
         }
       }
     },
+    "keydetail.deviceBound.explainer.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key lives in this device's Secure Enclave. Signing and decryption happen inside the Secure Enclave; the app never sees the private key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保存在本设备的安全隔区中。签名和解密都在安全隔区内完成；App 永远不会接触私钥。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key cannot be exported or backed up. The public key and revocation certificate can be exported."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥无法导出或备份。公钥和吊销证书可以导出。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.recovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this device is lost or erased, or its biometric access is removed, this key's signing and decryption capability is permanently lost."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，此密钥的签名和解密能力将永久丧失。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.noBackup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.status.degraded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some private-key operations are currently unavailable on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的部分私钥操作目前不可用。"
+          }
+        }
+      }
+    },
     "keydetail.expiry" : {
       "localizations" : {
         "en" : {
@@ -8661,6 +8789,22 @@
         }
       }
     },
+    "keydetail.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "keydetail.modifyExpiry" : {
       "localizations" : {
         "en" : {
@@ -8721,22 +8865,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到密钥"
-          }
-        }
-      }
-    },
-    "keydetail.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
           }
         }
       }
@@ -9409,6 +9537,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认"
+          }
+        }
+      }
+    },
+    "keys.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定"
+          }
+        }
+      }
+    },
+    "keys.deviceBound.accessibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound key; cannot be backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥；无法备份"
           }
         }
       }

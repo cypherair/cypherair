@@ -27,6 +27,7 @@ $(SRCROOT)/Sources/App/Common/FileOperationAction.swift
 $(SRCROOT)/Sources/App/Common/FingerprintView.swift
 $(SRCROOT)/Sources/App/Common/IdentityDisplayPresentation.swift
 $(SRCROOT)/Sources/App/Common/KeyBackupStatusBadge.swift
+$(SRCROOT)/Sources/App/Common/KeyCustodyBadge.swift
 $(SRCROOT)/Sources/App/Common/MacPresentationPolish.swift
 $(SRCROOT)/Sources/App/Common/OperationController.swift
 $(SRCROOT)/Sources/App/Common/OutputHandling.swift
@@ -85,6 +86,7 @@ $(SRCROOT)/Sources/App/HomeView.swift
 $(SRCROOT)/Sources/App/Keys/BackupKeyScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/BackupKeyView.swift
 $(SRCROOT)/Sources/App/Keys/DeviceBoundKeyCommitmentSheet.swift
+$(SRCROOT)/Sources/App/Keys/DeviceBoundKeyExplainerView.swift
 $(SRCROOT)/Sources/App/Keys/ImportKeyScreenModel.swift
 $(SRCROOT)/Sources/App/Keys/ImportKeyView.swift
 $(SRCROOT)/Sources/App/Keys/KeyDetailScreenModel.swift

@@ -117,6 +117,15 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
+        case .deviceBoundKeyExplainer(let fingerprint):
+            // Read-only informational surface; tutorial identities are all
+            // software custody, so this route is unreachable in the sandbox,
+            // but the exhaustive switch must still resolve it safely.
+            return AnyView(
+                TutorialSurfaceView(tab: definitionTab, route: route) {
+                    DeviceBoundKeyExplainerView(fingerprint: fingerprint)
+                }
+            )
         case .contactDetail(let contactId):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {

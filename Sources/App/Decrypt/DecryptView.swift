@@ -176,7 +176,7 @@ private struct DecryptScreenHostView: View {
                         value: matchedKey.userId ?? matchedKey.shortKeyId
                     )
                     LabeledContent(
-                        String(localized: "decrypt.matchedKey.profile", defaultValue: "Profile"),
+                        String(localized: "decrypt.matchedKey.keyType", defaultValue: "Key Type"),
                         value: matchedKey.openPGPConfigurationIdentity.familyDisplayName
                     )
                     FingerprintView(

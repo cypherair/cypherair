@@ -11,6 +11,8 @@ struct AppRouteDestinationView: View {
             PostGenerationPromptView(identity: identity)
         case .keyDetail(let fingerprint):
             KeyDetailView(fingerprint: fingerprint)
+        case .deviceBoundKeyExplainer(let fingerprint):
+            DeviceBoundKeyExplainerView(fingerprint: fingerprint)
         case .backupKey(let fingerprint):
             BackupKeyView(fingerprint: fingerprint)
         case .selectiveRevocation(let fingerprint):

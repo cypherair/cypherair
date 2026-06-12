@@ -84,10 +84,34 @@ private struct KeyDetailScreenHostView: View {
                             String(localized: "keydetail.name", defaultValue: "Name"),
                             value: key.userId ?? "—"
                         )
-                        LabeledContent(
-                            String(localized: "keydetail.profile", defaultValue: "Profile"),
-                            value: key.openPGPConfigurationIdentity.familyDisplayName
-                        )
+                        if model.isDeviceBound {
+                            NavigationLink(value: AppRoute.deviceBoundKeyExplainer(fingerprint: model.fingerprint)) {
+                                LabeledContent(
+                                    String(localized: "keydetail.keyType", defaultValue: "Key Type"),
+                                    value: key.openPGPConfigurationIdentity.familyDisplayName
+                                )
+                            }
+                            .accessibilityIdentifier("keydetail.keyType.explainer")
+                        } else {
+                            LabeledContent(
+                                String(localized: "keydetail.keyType", defaultValue: "Key Type"),
+                                value: key.openPGPConfigurationIdentity.familyDisplayName
+                            )
+                        }
+
+                        if model.deviceBoundAvailabilityIsDegraded {
+                            Label {
+                                Text(String(
+                                    localized: "keydetail.deviceBound.status.degraded",
+                                    defaultValue: "Some private-key operations are currently unavailable on this device."
+                                ))
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                            .font(.callout)
+                            .accessibilityIdentifier("keydetail.deviceBound.degraded")
+                        }
                         LabeledContent(
                             String(localized: "keydetail.version", defaultValue: "Key Version"),
                             value: "v\(key.keyVersion)"
@@ -184,20 +208,34 @@ private struct KeyDetailScreenHostView: View {
                     }
 
                     Section {
-                        HStack {
-                            Text(String(localized: "keydetail.backup", defaultValue: "Backup Status"))
-                            Spacer()
-                            KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .inline)
-                        }
+                        if model.isDeviceBound {
+                            Label {
+                                Text(String(
+                                    localized: "keydetail.deviceBound.noBackup",
+                                    defaultValue: "This key cannot be exported or backed up."
+                                ))
+                            } icon: {
+                                Image(systemName: "cpu")
+                                    .foregroundStyle(.blue)
+                            }
+                            .font(.callout)
+                            .accessibilityIdentifier("keydetail.deviceBound.noBackup")
+                        } else {
+                            HStack {
+                                Text(String(localized: "keydetail.backup", defaultValue: "Backup Status"))
+                                Spacer()
+                                KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .inline)
+                            }
 
-                        NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {
-                            Label(
-                                String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
-                                systemImage: "square.and.arrow.up"
-                            )
+                            NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {
+                                Label(
+                                    String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
+                                    systemImage: "square.and.arrow.up"
+                                )
+                            }
+                            .tutorialAnchor(.keyDetailBackupButton)
+                            .accessibilityIdentifier("keydetail.backup")
                         }
-                        .tutorialAnchor(.keyDetailBackupButton)
-                        .accessibilityIdentifier("keydetail.backup")
 
                         Button {
                             model.exportRevocationCertificate()

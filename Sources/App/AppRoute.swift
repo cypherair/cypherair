@@ -11,6 +11,7 @@ enum AppRoute: Hashable {
     case keyGeneration
     case postGenerationPrompt(identity: PGPKeyIdentity)
     case keyDetail(fingerprint: String)
+    case deviceBoundKeyExplainer(fingerprint: String)
     case backupKey(fingerprint: String)
     case selectiveRevocation(fingerprint: String)
     case importKey

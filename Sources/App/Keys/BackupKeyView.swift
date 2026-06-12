@@ -69,7 +69,36 @@ private struct BackupKeyScreenHostView: View {
     var body: some View {
         @Bindable var model = model
 
-        Form {
+        if model.isDeviceBound {
+            deviceBoundUnavailableBody
+        } else {
+            passphraseFormBody
+        }
+    }
+
+    /// Device-bound keys have no private-key backup; this route is not offered
+    /// for them, but stale paths must land on a safe explanation, never the
+    /// passphrase form.
+    private var deviceBoundUnavailableBody: some View {
+        ContentUnavailableView {
+            Label(
+                String(localized: "backup.deviceBound.unavailable.title", defaultValue: "Backup Not Available"),
+                systemImage: "cpu"
+            )
+        } description: {
+            Text(String(
+                localized: "backup.deviceBound.unavailable.description",
+                defaultValue: "Device-Bound keys cannot be exported or backed up."
+            ))
+        }
+        .accessibilityIdentifier("backup.deviceBound.unavailable")
+        .navigationTitle(String(localized: "backup.title", defaultValue: "Backup Key"))
+    }
+
+    private var passphraseFormBody: some View {
+        @Bindable var model = model
+
+        return Form {
             Section {
                 CypherSecureTextField(
                     String(localized: "backup.passphrase", defaultValue: "Passphrase"),

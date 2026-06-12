@@ -14,6 +14,7 @@ final class KeyDetailScreenModel {
     typealias DefaultKeyAction = @MainActor (String) throws -> Void
     typealias DeleteKeyAction = @MainActor (String) throws -> Void
     typealias ClipboardCopyAction = @MainActor (String) -> Void
+    typealias RecoveryReportProvider = @MainActor () -> SecureEnclaveCustodyGenerationRecoveryReport
 
     let fingerprint: String
     let configuration: KeyDetailView.Configuration
@@ -28,6 +29,7 @@ final class KeyDetailScreenModel {
     private let defaultKeyAction: DefaultKeyAction
     private let deleteKeyAction: DeleteKeyAction
     private let clipboardCopyAction: ClipboardCopyAction
+    private let recoveryReportProvider: RecoveryReportProvider
 
     private var hasPrepared = false
     private var revocationExportTask: Task<Void, Never>?
@@ -54,7 +56,8 @@ final class KeyDetailScreenModel {
         revocationExportAction: RevocationExportAction? = nil,
         defaultKeyAction: DefaultKeyAction? = nil,
         deleteKeyAction: DeleteKeyAction? = nil,
-        clipboardCopyAction: ClipboardCopyAction? = nil
+        clipboardCopyAction: ClipboardCopyAction? = nil,
+        recoveryReportProvider: RecoveryReportProvider? = nil
     ) {
         self.fingerprint = fingerprint
         self.configuration = configuration
@@ -83,10 +86,58 @@ final class KeyDetailScreenModel {
             NSPasteboard.general.setString(string, forType: .string)
             #endif
         }
+        self.recoveryReportProvider = recoveryReportProvider ?? {
+            keyManagement.secureEnclaveCustodyRecoveryReport
+        }
     }
 
     var key: PGPKeyIdentity? {
         keyManagement.keys.first { $0.fingerprint == fingerprint }
+    }
+
+    var isDeviceBound: Bool {
+        key?.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+    }
+
+    /// Whether the sanitized recovery report shows a problem for this
+    /// device-bound key. Quiet when healthy; the detail screen renders a
+    /// degraded row only when this is true.
+    var deviceBoundAvailabilityIsDegraded: Bool {
+        guard isDeviceBound else {
+            return false
+        }
+        return Self.isDeviceBoundAvailabilityDegraded(
+            fingerprint: fingerprint,
+            keys: keyManagement.keys,
+            report: recoveryReportProvider()
+        )
+    }
+
+    /// Maps a device-bound key to its recovery assessment by ordinal among
+    /// Secure Enclave custody keys in catalog order — assessments are
+    /// fingerprint-free by design, so the ordinal is the only join key. A
+    /// missing assessment for a device-bound key is reported as degraded
+    /// (fail-visible) rather than silently healthy.
+    nonisolated static func isDeviceBoundAvailabilityDegraded(
+        fingerprint: String,
+        keys: [PGPKeyIdentity],
+        report: SecureEnclaveCustodyGenerationRecoveryReport
+    ) -> Bool {
+        if report.inventoryFailureCategory != nil {
+            return true
+        }
+        let secureEnclaveKeys = keys.filter {
+            $0.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
+        }
+        guard let ordinal = secureEnclaveKeys.firstIndex(where: { $0.fingerprint == fingerprint }) else {
+            return true
+        }
+        guard let assessment = report.assessments.first(where: { $0.identityOrdinal == ordinal }) else {
+            return true
+        }
+        return assessment.publicMaterialAvailability != .available
+            || assessment.revocationArtifactAvailability != .available
+            || assessment.handleAvailability != .available
     }
 
     func prepareIfNeeded() {
