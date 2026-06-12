@@ -101,3 +101,15 @@ Branch: `feat/auth-lifecycle-finish`. Plan: ~/.claude/plans/objective-finish-the
   lock-surface re-check, trace checklist).
 - Lanes at rewritten tip: unit 1339/0 (same content as pre-rewrite run), MacUITests 25/0, visionOS probe
   BUILD SUCCEEDED.
+
+### 2026-06-12 — PR #505 MERGED (70bb565, maintainer-instructed, no CI wait); follow-ups branch
+- Local main updated; merged branch deleted local+remote. Follow-ups branch `feat/auth-lifecycle-followups`
+  created off new main carrying the maintainer's 14312 build bump + this worklog (2a62b32).
+- Maintainer decision: in-window contingency dropped outright (embedded LA UI needs Apple-signed callers;
+  shipped model doesn't need it) → `feat/p3-in-window-auth-pr1` and `poc/auth-lifecycle-macos` DELETED
+  (local + remote); records remain in closed PRs #491/#469 (probe suite in closed #496). Docs revised
+  (TARGET §2.C/§7; ROADMAP header triggers, §1, §3, §5, §7) — commit a2807ab.
+- Maintainer-flagged MINOR fixed (c564238): expiry pre-auth plain-failure path (evaluateAccessControl
+  false-without-throw, or non-cancel LAError) now throws CypherAirError.authenticationFailed instead of
+  falling through to the misleading "Failed to access secure storage." fallback; cancel codes keep the
+  silent operationCancelled abort. Targeted suites 4/0 + 2/0 green.
