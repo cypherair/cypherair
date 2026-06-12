@@ -86,10 +86,10 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
 
 **Profile A `set_features` rationale:** Sequoia 2.3.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
 
-**Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Current Profile A/B identities normalize to software custody; P-256 Secure Enclave custody is representable only as future/hidden vocabulary. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`. Key operation resolution adds non-persistent sanitized failure categories so resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping plans can distinguish unsupported, unavailable, not-yet-implemented, local-authentication, handle, binding, OpenPGP semantic, payload-authentication, migration/recovery, fallback, and cleanup failures without storing private-operation state.
+**Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Profile A/B identities normalize to software custody; P-256 Secure Enclave custody identities persist the device-bound custody kind. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`. Key operation resolution adds non-persistent sanitized failure categories so resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping plans can distinguish unsupported, unavailable, not-yet-implemented, local-authentication, handle, binding, OpenPGP semantic, payload-authentication, migration/recovery, fallback, and cleanup failures without storing private-operation state.
 
-**External P-256 private-operation seam:** Secure Enclave custody (a hidden/test
-future model — see [SECURITY.md](SECURITY.md) §3) delegates only the private
+**External P-256 private-operation seam:** Secure Enclave custody (the
+device-bound key families — see [SECURITY.md](SECURITY.md) §3) delegates only the private
 scalar operation to an external callback through Sequoia's `Signer`/`Decryptor`
 traits. External signing builds v4/v6 public-only certificates and signs
 cleartext/detached/encrypt/expiry/revocation/certification data through the shared
@@ -114,7 +114,7 @@ and `.keyAgreement`) plus their lifecycle, public-binding/role load checks,
 partial-creation rollback, inventory, idempotent delete, Reset All Local Data
 cleanup (including malformed app-owned rows), and sanitized failure classification;
 the access-control flags, application-tag format, and non-disclosure red lines are
-owned by [SECURITY.md](SECURITY.md) §3. Hidden/test generation creates the handle
+owned by [SECURITY.md](SECURITY.md) §3. Custody generation creates the handle
 pair and asks Rust/Sequoia to build a public-only v4/v6 certificate plus key-level
 revocation artifact through the external signer callback, persisting only
 `PGPKeyIdentity` metadata with P-256 configuration and Secure Enclave custody — no

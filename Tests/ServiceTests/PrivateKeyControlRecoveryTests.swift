@@ -179,6 +179,73 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         XCTAssertEqual(authManager.currentMode, .highSecurity)
     }
 
+    func test_rewrapRecovery_commitRequired_softwareOnlyEnumerationPersistsTargetMode() throws {
+        // Regression pin (P7D): the post-unlock recovery call site passes
+        // software-custody fingerprints only. With that contract honored, an
+        // interrupted commit-required switch on a mixed population (the
+        // device-bound key is simply absent from the list) must complete:
+        // target mode persisted, journal cleared.
+        let keychain = MockKeychain()
+        let softwareFingerprint = "mixed-software-\(UUID().uuidString)"
+        try savePendingRecoveryBundle(in: keychain, fingerprint: softwareFingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(
+            mode: .standard,
+            journal: PrivateKeyControlRecoveryJournal(
+                rewrapTargetMode: .highSecurity,
+                rewrapPhase: .commitRequired
+            )
+        )
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(
+            fingerprints: [softwareFingerprint]
+        )
+
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
+        XCTAssertEqual(authManager.currentMode, .highSecurity)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
+        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapPhase)
+    }
+
+    func test_rewrapRecovery_bundlelessFingerprintBlocksTargetModePersistence() throws {
+        // Contract pin (P7D): a fingerprint with no SE-wrapped bundles — the
+        // shape of a device-bound Secure Enclave custody key — classifies as
+        // unrecoverable and blocks target-mode persistence. This is WHY every
+        // caller must pre-filter to software custody; if this behavior ever
+        // changes, revisit the call-site filters.
+        let keychain = MockKeychain()
+        let softwareFingerprint = "mixed-software-\(UUID().uuidString)"
+        let bundlelessFingerprint = "mixed-device-bound-\(UUID().uuidString)"
+        try savePendingRecoveryBundle(in: keychain, fingerprint: softwareFingerprint)
+
+        let privateKeyControlStore = InMemoryPrivateKeyControlStore(
+            mode: .standard,
+            journal: PrivateKeyControlRecoveryJournal(
+                rewrapTargetMode: .highSecurity,
+                rewrapPhase: .commitRequired
+            )
+        )
+        let authManager = makeRecoveryAuthenticationManager(
+            keychain: keychain,
+            privateKeyControlStore: privateKeyControlStore
+        )
+
+        let summary = authManager.checkAndRecoverFromInterruptedRewrap(
+            fingerprints: [softwareFingerprint, bundlelessFingerprint]
+        )
+
+        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe, .unrecoverable])
+        XCTAssertEqual(
+            authManager.currentMode,
+            .standard,
+            "An unrecoverable entry must block target-mode persistence — the failure mode the custody filter prevents."
+        )
+    }
+
     func test_rewrapRecovery_preparingNoPending_clearsJournalWithoutChangingMode() throws {
         let keychain = MockKeychain()
         let fingerprint = "preparing-\(UUID().uuidString)"

@@ -1,8 +1,12 @@
 # Apple Secure Enclave Custody Architecture Plan
 
-> Status: Active architecture proposal. This document describes proposed future
-> architecture and does not describe shipped behavior.
-> Date: 2026-05-25.
+> Status: Implemented architecture record. Phases 1–6 landed the architecture
+> this document defines (configuration/custody vocabulary, metadata v2, handle
+> storage, capability resolver, operation router, external signer/decryptor
+> seams), and Phase 7 (issue #501) exposed it in the production resolver policy
+> and DI. User exposure remains release-gated on Phases 8–9. The
+> "Pre-Integration Baseline" section below is historical context.
+> Last reviewed: 2026-06-12.
 > Purpose: Define architecture requirements for integrating Apple Secure
 > Enclave-backed OpenPGP private-key custody after the Phase 0-5 POC.
 > Audience: Swift/Rust implementers, security reviewers, architecture
@@ -31,22 +35,28 @@ The implementation may choose final type names later. The architecture
 requirement is that these concepts are represented separately and do not leak
 across ownership boundaries.
 
-## Current Integration Facts
+## Pre-Integration Baseline (historical)
 
-The current app code is a software-secret-certificate architecture:
+Before this plan was implemented (Phases 1–6), the app code was a pure
+software-secret-certificate architecture:
 
-- `PGPKeyProfile` has only `.universal` and `.advanced`.
-- `PGPKeyIdentity` and the protected `key-metadata` schema v1 do not record
-  custody kind or Secure Enclave private-operation handle state.
-- Private workflows call `KeyManagementService.unwrapPrivateKey`, which returns
-  complete OpenPGP secret certificate bytes as `Data`.
-- Swift FFI adapters pass `signingKey`, `signerCert`, or `secretKeys` bytes to
-  Rust.
-- Rust currently extracts Sequoia keypairs from secret certificates for signing,
-  decryption, certification, revocation, and expiry mutation.
+- `PGPKeyProfile` had only `.universal` and `.advanced` (it still does — the
+  successor configuration vocabulary lives in `PGPKeyConfiguration.Identity`).
+- `PGPKeyIdentity` and the protected `key-metadata` schema v1 did not record
+  custody kind. Today the schema is v2 and every identity persists an explicit
+  `openPGPConfigurationIdentity` and `privateKeyCustodyKind`.
+- All private workflows called `KeyManagementService.unwrapPrivateKey`, which
+  returns complete OpenPGP secret certificate bytes as `Data`. Today that is
+  the software-custody route only; Secure Enclave custody operations route
+  through `PrivateKeyOperationRouter` and never unwrap a secret certificate.
+- Swift FFI adapters passed `signingKey`, `signerCert`, or `secretKeys` bytes
+  to Rust. Today the Secure Enclave custody route passes
+  `ExternalP256SigningProvider` / `ExternalP256KeyAgreementProvider` callback
+  bridges instead, and Rust performs those operations through external
+  signer/decryptor seams without receiving private scalars.
 
-These facts are not defects in the shipped software. They define the integration
-work needed for a new custody model.
+This baseline defined the integration work; the sections below describe the
+architecture as built.
 
 ## Configuration Model
 

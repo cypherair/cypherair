@@ -81,6 +81,17 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         openPGPConfigurationIdentity.configuration
     }
 
+    /// Fingerprints of software-custody identities — the keys with SE-wrapped
+    /// private-key bundles subject to auth-mode re-wrap and re-wrap recovery.
+    /// Device-bound Secure Enclave custody keys have no bundle and must never
+    /// enter those enumerations: a bundleless fingerprint classifies as
+    /// unrecoverable and poisons the whole mode-switch recovery.
+    static func softwareCustodyFingerprints(in identities: [PGPKeyIdentity]) -> [String] {
+        identities
+            .filter { $0.privateKeyCustodyKind == .softwareSecretCertificate }
+            .map(\.fingerprint)
+    }
+
     init(
         fingerprint: String,
         keyVersion: UInt8,

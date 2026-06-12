@@ -151,6 +151,12 @@ final class BackupKeyScreenModelTests: XCTestCase {
         XCTAssertEqual(model.passphraseConfirm, "")
     }
 
+    func test_softwareOrUnknownKey_isNotDeviceBound() {
+        // The passphrase form stays the backup surface for software custody;
+        // only device-bound keys divert to the unavailable explanation.
+        XCTAssertFalse(makeModel().isDeviceBound)
+    }
+
     private func makeModel(
         configuration: BackupKeyView.Configuration = .default,
         confirmBackupExportedAction: BackupKeyScreenModel.ConfirmBackupExportedAction? = nil,

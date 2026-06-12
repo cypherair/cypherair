@@ -143,7 +143,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         XCTAssertEqual(verification.summaryState, .notSigned)
     }
 
-    func test_productionPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -158,7 +158,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
-            resolver: PGPKeyCapabilityResolver(),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
         )
 
@@ -177,7 +177,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
                 verificationContext: verificationContext(for: fixture.identity),
                 progress: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave file decrypt")
+            XCTFail("Expected blocking policy to stop Secure Enclave file decrypt")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {
@@ -580,6 +580,72 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
 
     // MARK: - Helpers
 
+    func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
+        let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
+        let input = try await writeEncryptedInputFile(
+            plaintext: "authorized streaming decrypt",
+            recipientPublicKey: fixture.identity.publicKeyData
+        )
+        let output = makeTemporaryOutputURL()
+        defer { cleanup(input, output) }
+
+        let successContext = RecordingLAContext()
+        let successService = makeService(
+            router: StaticStreamingPrivateKeyOperationRouter(
+                route: .secureEnclaveKeyAgreement(makeAuthorizedRoute(fixture: fixture, context: successContext))
+            ),
+            unwrapper: RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        )
+        _ = try await successService.decryptFile(
+            inputPath: input.path,
+            outputPath: output.path,
+            recipientFingerprint: fixture.identity.fingerprint,
+            verificationContext: verificationContext(for: fixture.identity),
+            progress: nil
+        )
+        XCTAssertEqual(successContext.invalidateCount, 1)
+
+        let failureOutput = makeTemporaryOutputURL()
+        defer { try? FileManager.default.removeItem(at: failureOutput) }
+        let failureContext = RecordingLAContext()
+        let failingService = makeService(
+            router: StaticStreamingPrivateKeyOperationRouter(
+                route: .secureEnclaveKeyAgreement(makeAuthorizedRoute(fixture: fixture, context: failureContext))
+            ),
+            unwrapper: RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            keyAgreement: ThrowingKeyAgreement(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.keyAgreement)
+            )
+        )
+        do {
+            _ = try await failingService.decryptFile(
+                inputPath: input.path,
+                outputPath: failureOutput.path,
+                recipientFingerprint: fixture.identity.fingerprint,
+                verificationContext: verificationContext(for: fixture.identity),
+                progress: nil
+            )
+            XCTFail("Expected adapter failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(failureContext.invalidateCount, 1)
+    }
+
+    private func makeAuthorizedRoute(
+        fixture: SecureEnclaveFileDecryptFixture,
+        context: RecordingLAContext
+    ) -> SecureEnclaveKeyAgreementRoute {
+        SecureEnclaveKeyAgreementRoute(
+            identity: fixture.identity,
+            operation: .decrypt,
+            publicBindingInspection: fixture.route.publicBindingInspection,
+            keyAgreementHandle: fixture.route.keyAgreementHandle,
+            operationAuthorization: SecureEnclaveCustodyOperationAuthorization(
+                authenticationContext: context
+            )
+        )
+    }
+
     private func makeService(
         router: StaticStreamingPrivateKeyOperationRouter,
         unwrapper: RecordingSoftwareSecretCertificateUnwrapper,
@@ -822,7 +888,7 @@ private final class StaticStreamingPrivateKeyOperationRouter: PrivateKeyOperatio
         routeResult = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         requests.append(request)
         return routeResult
     }

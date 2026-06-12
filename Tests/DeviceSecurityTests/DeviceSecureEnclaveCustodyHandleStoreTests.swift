@@ -25,7 +25,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: DeviceSecurityTestCase {
         XCTAssertEqual(pair.keyAgreement.publicKeyX963.count, 65)
         XCTAssertNotEqual(pair.signing.publicKeyX963, pair.keyAgreement.publicKeyX963)
 
-        let loadedPair = try store.loadHandlePair(expected: pair)
+        let loadedPair = try store.loadHandlePair(expected: pair, authenticationContext: nil)
         XCTAssertEqual(loadedPair.signing.binding, pair.signing)
         XCTAssertEqual(loadedPair.keyAgreement.binding, pair.keyAgreement)
         XCTAssertNotNil(loadedPair.signing.privateKey)
@@ -140,7 +140,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: DeviceSecurityTestCase {
             store.classifyHandleAvailability(expected: wrongPublicPair),
             .unavailable(.handlePublicKeyBindingMismatch)
         )
-        XCTAssertThrowsError(try store.loadHandlePair(expected: wrongPublicPair)) { error in
+        XCTAssertThrowsError(try store.loadHandlePair(expected: wrongPublicPair, authenticationContext: nil)) { error in
             XCTAssertEqual(
                 (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
                 .handlePublicKeyBindingMismatch
@@ -173,7 +173,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: DeviceSecurityTestCase {
         defer {
             try? store.deleteHandlePair(pair)
         }
-        _ = try store.loadHandlePair(expected: pair)
+        _ = try store.loadHandlePair(expected: pair, authenticationContext: nil)
         try store.deleteHandlePair(pair)
 
         assertTraceIsSanitized(traceStore.recentEntries, pair: pair)

@@ -1,16 +1,17 @@
 # Apple Secure Enclave Custody Feasibility Summary
 
-> Status: Active proposal summary / POC feasibility summary. This document
-> summarizes completed validation work and does not describe shipped behavior.
-> Date: 2026-05-24.
+> Status: POC feasibility summary (historical record). It summarizes the
+> Phase 0–5 POC validation that justified the production series; the production
+> implementation has since landed (Phases 1–6) and is production-exposed since
+> Phase 7 (issue #501). The "Remaining gaps" list below carries per-item status.
+> Last reviewed: 2026-06-12.
 > Purpose: Summarize Apple Secure Enclave Custody Phase 0-5 evidence before
 > product design and production architecture planning.
 > Audience: Product, design, security reviewers, Swift/Rust implementers, test
 > owners, reviewers, and AI coding tools.
-> Current-state note: This is not shipped behavior, not production
-> implementation approval, not a current app behavior statement, and not
-> authorization to change
-> security-sensitive code without a later implementation plan.
+> Current-state note: this document records POC evidence, not current app
+> behavior — the production implementation and its current state are described
+> by SECURITY.md §3, ARCHITECTURE.md, and the implementation reference/roadmap.
 > Evidence roots: [Product Model](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY.md),
 > [Security Model](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md),
 > [Validation Reference](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md),
@@ -62,16 +63,26 @@ design, and durable test ownership.
 | Phase 4.5: GnuPG v4 interop | A v4 P-256 SE-shaped certificate imported into GnuPG; SE-shaped signatures verified; GnuPG encryption produced PKESK v3 ECDH plus SEIPDv1/MDC; bidirectional sign+encrypt scenarios passed. | This strengthens v4 as the recommended device-bound compatible candidate, not as the only possible technical format. |
 | Phase 5: Architecture compatibility | The concept can fit the app if custody is separated from algorithm/profile configuration, metadata gains custody state, private-key operation routing is centralized, and Rust uses external signer/decryptor seams. | The main remaining risk is product and lifecycle scope, not the core cryptographic operation. |
 
-Remaining gaps after Phase 0-5:
+Remaining gaps after Phase 0-5 (status as of 2026-06-12):
 
-- Production Rust/UniFFI external private-operation APIs are not designed.
-- Production metadata migration and Keychain handle schema are not designed.
-- iPhone, iPadOS, and visionOS hardware validation has not been run.
-- Product UX for configuration choice, generation, key detail, recovery copy,
-  unavailable states, and error surfaces is not designed.
+- ~~Production Rust/UniFFI external private-operation APIs are not designed.~~
+  CLOSED: implemented in production Phases 2/5/6 (external signer and
+  key-agreement provider seams).
+- ~~Production metadata migration and Keychain handle schema are not
+  designed.~~ CLOSED: key-metadata schema v2 (Phase 1) and the dedicated
+  custody handle store (Phase 3) shipped.
+- iPhone, iPadOS, and visionOS hardware validation has not been run — OPEN
+  (Phase 8; visionOS is a documented exclusion per issue #501 decision 10).
+- ~~Product UX for configuration choice, generation, key detail, recovery
+  copy, unavailable states, and error surfaces is not designed.~~ CLOSED:
+  Phase 7 shipped the key-family generation choice, device-bound surfaces,
+  and per-category failure presentation.
 - Production security validation, mock/hardware test ownership, and release
-  gates are not defined.
-- The POC raw shared-secret response-file bridge remains non-production.
+  gates — PARTIALLY CLOSED: mock-backed validation and source audits shipped
+  with Phases 1–7; hardware evidence and the release gate remain (Phases 8–9).
+- ~~The POC raw shared-secret response-file bridge remains non-production.~~
+  CLOSED: the POC bridge was never promoted; production uses in-process
+  UniFFI callback providers with zeroized handoff.
 
 ## Format Recommendation
 

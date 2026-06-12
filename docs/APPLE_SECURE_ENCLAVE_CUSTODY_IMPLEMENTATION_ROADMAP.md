@@ -1,8 +1,12 @@
 # Apple Secure Enclave Custody Implementation Roadmap
 
-> Status: Draft implementation roadmap. This document describes proposed future
-> work and does not describe shipped behavior.
-> Date: 2026-05-31.
+> Status: Active implementation roadmap. Phases 0–7 are complete — Phase 7
+> landed as one PR with staged commits (issue #501: key-family generation UX,
+> device-bound key-detail/backup surfaces, per-category failure presentation,
+> and the production exposure flip, which moved here from Phase 9 by
+> maintainer decision). Phases 8 (hardware + GnuPG-interop evidence) and 9
+> (release gate; no exposure switch remains) are outstanding.
+> Last reviewed: 2026-06-12.
 > Purpose: Provide staged PR planning guidance for Apple Secure Enclave-backed
 > OpenPGP private-key custody.
 > Audience: Product owners, Swift/Rust implementers, security reviewers,
@@ -66,7 +70,8 @@ changed.
 Completion anchor:
 
 - Future phase plans can cite the implementation reference and this roadmap.
-- Secure Enclave custody remains proposed future work, not shipped behavior.
+- Secure Enclave custody is implemented and production-exposed (P7D); user
+  exposure remains release-gated on Phases 8-9 (tag-first releases).
 - Any later guardrail work still needs a phase-specific plan and temporary
   exception mechanics for staged transitional states.
 
@@ -291,7 +296,17 @@ Goal: prepare product surfaces for configuration choice, key detail,
 availability, non-exportability, recovery consequences, and operation errors
 without exposing Secure Enclave custody before the release gate.
 
-Recommended PR grouping:
+As built (issue #501, decisions recorded 2026-06-12): Phase 7 landed as ONE PR
+with staged commits — 7A key-family generation UX + vocabulary rename and
+device-bound commitment/post-generation surfaces, 7B key-detail "Key Type" +
+device-bound explainer + custody badges + backup-surface gating, 7C
+per-category failure presentation (all 27 sanitized categories, en + zh-Hans),
+7D the production exposure flip + DI + prompt-session enrollment (moved here
+from Phase 9 by maintainer decision: tag-first releases are the user-exposure
+boundary), and 7E this docs alignment. Phase 9 no longer carries an exposure
+switch.
+
+Original PR grouping (superseded by the as-built note above):
 
 - PR 7A: resolver-backed generation-choice presentation behind hidden or
   disabled availability.
@@ -386,6 +401,8 @@ Recommended PR grouping:
 
 - PR 9A: release-gate closeout documentation and current-state doc updates.
 - PR 9B: final product exposure switch for generation choices, if approved.
+  (Superseded: the exposure switch landed in Phase 7D by maintainer decision —
+  no exposure switch remains in Phase 9.)
 - PR 9C: release validation, App Store candidate preparation, and post-release
   documentation cleanup if the feature ships.
 

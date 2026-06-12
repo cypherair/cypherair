@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
@@ -26,7 +27,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 policy: .testSecureEnclaveGeneration
             )
 
-            let identity = try await service.generateHiddenKey(
+            let identity = try await service.generateKey(
                 name: "Secure Enclave",
                 email: "se@example.test",
                 expirySeconds: 3600,
@@ -53,14 +54,14 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
     }
 
     func test_generationPolicyAndConfigurationFailBeforeHandleCreation() async throws {
-        let productionKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let productionService = makeService(
-            keyStore: productionKeyStore,
-            policy: .production
+        let blockedKeyStore = MockSecureEnclaveCustodyKeyStore()
+        let blockedPolicyService = makeService(
+            keyStore: blockedKeyStore,
+            policy: .testSecureEnclaveOperationsBlocked
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await productionService.generateHiddenKey(
+            _ = try await blockedPolicyService.generateKey(
                 name: "Secure Enclave",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -68,7 +69,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
-        XCTAssertEqual(productionKeyStore.storedHandleCount(), 0)
+        XCTAssertEqual(blockedKeyStore.storedHandleCount(), 0)
 
         let invalidConfigurationKeyStore = MockSecureEnclaveCustodyKeyStore()
         let invalidConfigurationService = makeService(
@@ -76,7 +77,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             policy: .testSecureEnclaveGeneration
         )
         await XCTAssertThrowsErrorAsync {
-            _ = try await invalidConfigurationService.generateHiddenKey(
+            _ = try await invalidConfigurationService.generateKey(
                 name: "Software",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -95,7 +96,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await builderFailureService.generateHiddenKey(
+            _ = try await builderFailureService.generateKey(
                 name: "Builder Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -120,7 +121,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await duplicateService.generateHiddenKey(
+            _ = try await duplicateService.generateKey(
                 name: "Duplicate",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -145,7 +146,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Save Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -172,7 +173,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Post Commit",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -203,7 +204,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Rollback Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -274,12 +275,154 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         }
     }
 
+    func test_generationAuthenticatesOnceAndThreadsContextIntoBothHandleLoads() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let stub = StubGenerationCustodyOperationAuthenticator()
+        let service = makeService(
+            keyStore: keyStore,
+            builder: MockSecureEnclaveCustodyCertificateBuilder(
+                result: Self.material(fingerprint: "p7f-success", keyVersion: 4)
+            ),
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        _ = try await service.generateKey(
+            name: "P7F Success",
+            email: Optional<String>.none,
+            expirySeconds: Optional<UInt64>.none,
+            configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+            invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+        )
+
+        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication per generation.")
+        XCTAssertFalse(stub.reasons[0].isEmpty)
+        XCTAssertEqual(keyStore.loadRequests.count, 2)
+        XCTAssertEqual(keyStore.loadRequests.map(\.reference.role), [.signing, .keyAgreement])
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext === stub.context })
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The per-generation context is invalidated exactly once when the action completes."
+        )
+    }
+
+    func test_generationCancelledAuthenticationCreatesNothingAndMapsToLocalAuthenticationCancelled() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let stub = StubGenerationCustodyOperationAuthenticator()
+        stub.errorToThrow = CypherAirError.operationCancelled
+        let metadataStore = MemoryKeyMetadataPersistence()
+        let service = makeService(
+            keyStore: keyStore,
+            metadataStore: metadataStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateKey(
+                name: "P7F Cancel",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        } inspectError: { error in
+            guard case CypherAirError.keyOperationUnavailable(let category) = error else {
+                return XCTFail("Expected keyOperationUnavailable, got \(error)")
+            }
+            XCTAssertEqual(category, .localAuthenticationCancelled)
+        }
+
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0, "A declined prompt aborts before any handle exists.")
+        XCTAssertTrue(keyStore.createRequests.isEmpty)
+        XCTAssertTrue(metadataStore.identities.isEmpty)
+    }
+
+    func test_generationBiometryLockoutCreatesNothingAndMapsToLocalAuthenticationLockedOut() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let stub = StubGenerationCustodyOperationAuthenticator()
+        stub.errorToThrow = LAError(.biometryLockout)
+        let metadataStore = MemoryKeyMetadataPersistence()
+        let service = makeService(
+            keyStore: keyStore,
+            metadataStore: metadataStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateKey(
+                name: "P7F Lockout",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        } inspectError: { error in
+            guard case CypherAirError.keyOperationUnavailable(let category) = error else {
+                return XCTFail("Expected keyOperationUnavailable, got \(error)")
+            }
+            XCTAssertEqual(category, .localAuthenticationLockedOut)
+        }
+
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0, "A locked-out prompt aborts before any handle exists.")
+        XCTAssertTrue(keyStore.createRequests.isEmpty)
+        XCTAssertTrue(metadataStore.identities.isEmpty)
+    }
+
+    func test_generationEndsAuthorizedContextAfterForcedRollback() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let stub = StubGenerationCustodyOperationAuthenticator()
+        let service = makeService(
+            keyStore: keyStore,
+            builder: MockSecureEnclaveCustodyCertificateBuilder(
+                error: CypherAirError.keyGenerationFailed(reason: "builder")
+            ),
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateKey(
+                name: "P7F Rollback",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        }
+
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+    }
+
+    func test_generationWithoutCustodyAuthenticatorKeepsImplicitNilContexts() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let service = makeService(
+            keyStore: keyStore,
+            builder: MockSecureEnclaveCustodyCertificateBuilder(
+                result: Self.material(fingerprint: "p7f-nil", keyVersion: 4)
+            )
+        )
+
+        _ = try await service.generateKey(
+            name: "P7F Nil",
+            email: Optional<String>.none,
+            expirySeconds: Optional<UInt64>.none,
+            configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+            invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+        )
+
+        XCTAssertFalse(keyStore.loadRequests.isEmpty)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+    }
+
     private func makeService(
         keyStore: MockSecureEnclaveCustodyKeyStore,
         metadataStore: MemoryKeyMetadataPersistence = MemoryKeyMetadataPersistence(),
         builder: MockSecureEnclaveCustodyCertificateBuilder? = nil,
         policy: PGPKeyCapabilityResolver.Policy = .testSecureEnclaveGeneration,
         commitCoordinator: KeyProvisioningCommitCoordinator = KeyProvisioningCommitCoordinator(),
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil
     ) -> SecureEnclaveCustodyGenerationService {
         let catalogStore = KeyCatalogStore(metadataStore: metadataStore)
@@ -297,6 +440,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             resolver: PGPKeyCapabilityResolver(policy: policy),
             invalidationGate: KeyProvisioningInvalidationGate(),
             commitCoordinator: commitCoordinator,
+            custodyOperationAuthenticator: custodyOperationAuthenticator,
             afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
         )
     }
@@ -310,7 +454,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             }
         )
         let pair = try store.createHandlePair()
-        return try store.loadHandlePair(expected: pair)
+        return try store.loadHandlePair(expected: pair, authenticationContext: nil)
     }
 
     private static func material(
@@ -453,6 +597,22 @@ private final class MemoryKeyMetadataPersistence: KeyMetadataPersistence {
 
 private enum PostIdentityCommitTestError: Error {
     case simulatedFailure
+}
+
+private final class StubGenerationCustodyOperationAuthenticator: @unchecked Sendable {
+    private(set) var calls = 0
+    private(set) var reasons: [String] = []
+    var errorToThrow: Error?
+    let context = RecordingLAContext()
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        calls += 1
+        reasons.append(reason)
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return context
+    }
 }
 
 private struct RawSigningCallbackError: Error {}

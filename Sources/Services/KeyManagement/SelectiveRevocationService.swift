@@ -52,7 +52,11 @@ final class SelectiveRevocationService {
         )
 
         let binaryRevocation: Data
-        switch routeRevocation(fingerprint: identity.fingerprint, identity: identity) {
+        let operationRoute = await routeRevocation(fingerprint: identity.fingerprint, identity: identity)
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             binaryRevocation = try await generateSoftwareSubkeyRevocation(
                 route: route,
@@ -102,7 +106,11 @@ final class SelectiveRevocationService {
         )
 
         let binaryRevocation: Data
-        switch routeRevocation(fingerprint: identity.fingerprint, identity: identity) {
+        let operationRoute = await routeRevocation(fingerprint: identity.fingerprint, identity: identity)
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             binaryRevocation = try await generateSoftwareUserIdRevocation(
                 route: route,
@@ -180,9 +188,9 @@ final class SelectiveRevocationService {
     private func routeRevocation(
         fingerprint: String,
         identity: PGPKeyIdentity
-    ) -> PrivateKeyOperationRoute {
+    ) async -> PrivateKeyOperationRoute {
         if let revocationRoutingService {
-            return revocationRoutingService.routeRevocation(fingerprint: fingerprint)
+            return await revocationRoutingService.routeRevocation(fingerprint: fingerprint)
         }
 
         let resolution = PGPKeyCapabilityResolver().resolution(

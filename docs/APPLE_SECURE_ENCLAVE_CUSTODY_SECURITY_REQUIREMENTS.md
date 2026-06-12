@@ -1,8 +1,10 @@
 # Apple Secure Enclave Custody Security Requirements
 
-> Status: Active security proposal. This document describes proposed future
-> requirements and does not describe shipped behavior.
-> Date: 2026-05-25.
+> Status: Active security requirements. The required red lines are implemented
+> and test-pinned (Phases 1–6), and the custody model is production-exposed
+> since Phase 7 (issue #501). The interop/hardware evidence requirements and
+> the MVP security gate remain binding for the release decision (Phases 8–9).
+> Last reviewed: 2026-06-12.
 > Purpose: Define security constraints and validation gates for turning Apple
 > Secure Enclave Custody POC evidence into production work.
 > Audience: Security reviewers, Swift/Rust implementers, test owners, product

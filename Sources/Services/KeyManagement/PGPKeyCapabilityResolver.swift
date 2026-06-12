@@ -8,7 +8,20 @@ struct PGPKeyCapabilityResolver: Sendable {
         var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
         var secureEnclaveRefreshBindingOperationSupport: PGPKeyOperationSupport
 
+        /// Production exposure (issue #501 decision 3, P7D): generation and the
+        /// implemented private-operation classes are supported; refreshBinding
+        /// stays `.notImplemented` because no service implements that route.
         static let production = Policy(
+            secureEnclaveGenerationSupport: .supported,
+            secureEnclaveSigningOperationSupport: .supported,
+            secureEnclaveKeyAgreementOperationSupport: .supported,
+            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+        )
+
+        /// All Secure Enclave supports blocked. Pins the resolver-before-
+        /// handle-store ordering in route tests now that the production policy
+        /// is exposed (P7D); this is the pre-exposure production shape.
+        static let testSecureEnclaveOperationsBlocked = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .unavailable,
             secureEnclaveKeyAgreementOperationSupport: .unavailable,

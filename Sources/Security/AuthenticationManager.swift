@@ -63,7 +63,7 @@ enum AuthenticationError: Error, LocalizedError {
                    defaultValue: "Failed to switch authentication mode. Your keys remain safely protected under the previous mode.")
         case .noIdentities:
             String(localized: "error.auth.noIdentities",
-                   defaultValue: "No private keys found. Generate or import a key first.")
+                   defaultValue: "No portable private keys found. Generate or import a portable key first.")
         case .backupRequired:
             String(localized: "error.auth.backupRequired",
                    defaultValue: "High Security mode requires at least one backed-up key. Please back up a key before enabling this mode.")
@@ -727,7 +727,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     ///
     /// - Parameters:
     ///   - newMode: The target authentication mode.
-    ///   - fingerprints: All identity fingerprints (lowercase hex) that have SE-wrapped keys.
+    ///   - fingerprints: Software-custody identity fingerprints (lowercase hex)
+    ///     that have SE-wrapped private-key bundles. Device-bound Secure Enclave
+    ///     custody keys have no bundle to re-wrap and must not be passed; a
+    ///     device-bound-only population yields an empty list and the switch
+    ///     fails closed with `noIdentities`.
     ///   - hasBackup: Whether at least one private key has been backed up.
     ///     If false and switching to High Security, the caller must show a stronger warning.
     ///   - authenticator: The authentication evaluator to use for verifying user identity.
@@ -845,6 +849,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
     /// - commitRequired: complete pending bundles are treated as target-mode
     ///   authoritative data and are promoted/replaced before the target mode is
     ///   persisted.
+    ///
+    /// `fingerprints` must contain software-custody identities only (the keys
+    /// with SE-wrapped bundles). A bundleless fingerprint — e.g. a device-bound
+    /// Secure Enclave custody key — classifies as unrecoverable and blocks
+    /// target-mode persistence while the journal is cleared.
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String]
     ) -> KeyMigrationRecoverySummary? {

@@ -87,3 +87,18 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         softwareExportProtection: .notAvailable
     )
 }
+
+extension PGPKeyConfiguration.Identity {
+    /// The historical software profile this configuration identity maps onto,
+    /// or nil for Secure Enclave custody (P-256) configurations.
+    var equivalentSoftwareProfile: PGPKeyProfile? {
+        switch self {
+        case .compatibleSoftwareV4:
+            .universal
+        case .modernSoftwareV6:
+            .advanced
+        case .compatibleP256V4, .modernP256V6:
+            nil
+        }
+    }
+}

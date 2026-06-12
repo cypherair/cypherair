@@ -44,12 +44,16 @@ final class PrivateKeyStreamingFileDecryptionService: StreamingFileDecrypting, @
         verificationContext: PGPMessageVerificationContext,
         progress: FileProgressReporter?
     ) async throws -> DetailedSignatureVerification {
-        switch router.route(
+        let operationRoute = await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: recipientFingerprint,
                 operation: .decrypt
             )
-        ) {
+        )
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             var secretKey: Data
             do {

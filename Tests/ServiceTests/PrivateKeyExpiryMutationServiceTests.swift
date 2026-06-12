@@ -1,3 +1,4 @@
+import LocalAuthentication
 import Security
 import XCTest
 @testable import CypherAir
@@ -5,7 +6,7 @@ import XCTest
 final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     private let engine = PgpEngine()
 
-    func test_productionPolicyBlocksSecureEnclaveModifyExpiryWithoutFallback() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveModifyExpiryWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
         let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
@@ -20,6 +21,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             TestHelpers.makeExpiryMutator(
                 engine: engine,
                 keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
                 digestSigner: UnexpectedExpiryDigestSigner()
             )
@@ -30,7 +32,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
                 fingerprint: fixture.identity.fingerprint,
                 newExpirySeconds: 31_536_000
             )
-            XCTFail("Expected production policy to block Secure Enclave modify-expiry")
+            XCTFail("Expected blocking policy to stop Secure Enclave modify-expiry")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {
@@ -400,6 +402,163 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         }
     }
 
+    func test_secureEnclaveModifyExpiryAuthenticatesOnceAndEndsAuthorizationOnSuccess() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubExpiryCustodyOperationAuthenticator()
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            TestHelpers.makeExpiryMutator(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            )
+        )
+
+        let updated = try await keyManagement.modifyExpiry(
+            fingerprint: fixture.identity.fingerprint,
+            newExpirySeconds: 31_536_000
+        )
+
+        XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
+        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication for the whole operation.")
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The dispatcher's defer ends the operation authorization exactly once."
+        )
+        let contextBearingLoads = keyStore.loadRequests.filter { $0.authenticationContext != nil }
+        XCTAssertEqual(contextBearingLoads.count, 1)
+        XCTAssertTrue(contextBearingLoads.first?.authenticationContext === stub.context)
+        XCTAssertEqual(mockSE.unwrapCallCount, 0)
+    }
+
+    func test_secureEnclaveModifyExpiryCancelledAuthenticationBlocksBeforeAnyMutation() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubExpiryCustodyOperationAuthenticator()
+        stub.errorToThrow = CypherAirError.operationCancelled
+        let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            privateKeyControlStore: privateKeyControlStore,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            TestHelpers.makeExpiryMutator(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: UnexpectedExpiryDigestSigner()
+            )
+        )
+
+        do {
+            _ = try await keyManagement.modifyExpiry(
+                fingerprint: fixture.identity.fingerprint,
+                newExpirySeconds: 31_536_000
+            )
+            XCTFail("Expected cancelled custody authentication to block")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .localAuthenticationCancelled)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+        XCTAssertEqual(mockSE.unwrapCallCount, 0)
+        XCTAssertEqual(privateKeyControlStore.beginModifyExpiryRequests, [])
+    }
+
+    func test_secureEnclaveModifyExpiryEndsAuthorizationAfterSigningFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubExpiryCustodyOperationAuthenticator()
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            TestHelpers.makeExpiryMutator(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: ThrowingExpiryDigestSigner(
+                    error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+                )
+            )
+        )
+
+        do {
+            _ = try await keyManagement.modifyExpiry(
+                fingerprint: fixture.identity.fingerprint,
+                newExpirySeconds: 31_536_000
+            )
+            XCTFail("Expected signing failure to throw")
+        } catch {
+        }
+
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The dispatcher's defer ends the authorization on the failure path too."
+        )
+    }
+
+    func test_softwareModifyExpiryNeverInvokesCustodyOperationAuthenticator() async throws {
+        let stub = StubExpiryCustodyOperationAuthenticator()
+        let (keyManagement, _, mockKeychain, _, _) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        let identity = try await keyManagement.generateKey(
+            name: "Software Expiry",
+            email: nil,
+            expirySeconds: nil,
+            profile: .universal
+        )
+        keyManagement.configurePrivateKeyExpiryMutationService(
+            TestHelpers.makeExpiryMutator(
+                engine: engine,
+                keyManagement: keyManagement,
+                digestSigner: UnexpectedExpiryDigestSigner()
+            )
+        )
+
+        let updated = try await keyManagement.modifyExpiry(
+            fingerprint: identity.fingerprint,
+            newExpirySeconds: 60 * 60 * 24
+        )
+
+        XCTAssertEqual(updated.fingerprint, identity.fingerprint)
+        XCTAssertEqual(stub.calls, 0, "Software custody never consults the custody pre-authenticator.")
+    }
+
     private func assert(
         _ error: CypherAirError,
         matches expected: ExpectedExpiryError,
@@ -596,7 +755,7 @@ private final class SuspendedExpiryMutationService: PrivateKeyExpiryMutationRout
         self.gate = gate
     }
 
-    func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute {
+    func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
         guard route.identity.fingerprint == fingerprint else {
             return .blocked(.unavailable(.metadataAssociationMismatch))
         }
@@ -615,6 +774,20 @@ private final class SuspendedExpiryMutationService: PrivateKeyExpiryMutationRout
 private enum ExpectedExpiryError {
     case operationCancelled
     case keyOperationUnavailable(PGPKeyOperationFailureCategory)
+}
+
+private final class StubExpiryCustodyOperationAuthenticator: @unchecked Sendable {
+    private(set) var calls = 0
+    var errorToThrow: Error?
+    let context = RecordingLAContext()
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        calls += 1
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return context
+    }
 }
 
 private final class RecordingExpiryPrivateKeyControlStore: PrivateKeyControlStoreProtocol, @unchecked Sendable {

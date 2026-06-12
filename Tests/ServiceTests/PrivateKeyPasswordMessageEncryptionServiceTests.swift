@@ -133,7 +133,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.summaryState, .verified)
     }
 
-    func test_productionPolicyBlocksSecureEnclavePasswordSigningWithoutFallback() async throws {
+    func test_blockingPolicyBlocksSecureEnclavePasswordSigningWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -142,6 +142,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let unwrapper = RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
         let service = PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
             ),
@@ -158,7 +159,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
                 signerFingerprint: fixture.identity.fingerprint,
                 binary: false
             )
-            XCTFail("Expected production policy to block Secure Enclave password signing")
+            XCTFail("Expected blocking policy to stop Secure Enclave password signing")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {
@@ -373,6 +374,64 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(unwrapper.unwrapRequests, [])
     }
 
+    func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+
+        let successContext = RecordingLAContext()
+        let successService = makeService(
+            router: StaticPasswordPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: successContext))
+            ),
+            unwrapper: RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        )
+        _ = try await successService.encrypt(
+            plaintext: Data("authorized password message".utf8),
+            password: "authorized-password",
+            format: .seipdv1,
+            signerFingerprint: fixture.identity.fingerprint,
+            binary: false
+        )
+        XCTAssertEqual(successContext.invalidateCount, 1)
+
+        let failureContext = RecordingLAContext()
+        let failingService = makeService(
+            router: StaticPasswordPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: failureContext))
+            ),
+            unwrapper: RecordingPasswordSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            digestSigner: ThrowingPasswordDigestSigner(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+            )
+        )
+        do {
+            _ = try await failingService.encrypt(
+                plaintext: Data("authorized failure".utf8),
+                password: "authorized-failure-password",
+                format: .seipdv1,
+                signerFingerprint: fixture.identity.fingerprint,
+                binary: false
+            )
+            XCTFail("Expected adapter failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(failureContext.invalidateCount, 1)
+    }
+
+    private func makeAuthorizedRoute(
+        fixture: PasswordSecureEnclaveRouteFixture,
+        context: RecordingLAContext
+    ) -> SecureEnclaveSignerRoute {
+        SecureEnclaveSignerRoute(
+            identity: fixture.identity,
+            operation: .sign,
+            publicBindingInspection: fixture.route.publicBindingInspection,
+            signingHandle: fixture.route.signingHandle,
+            operationAuthorization: SecureEnclaveCustodyOperationAuthorization(
+                authenticationContext: context
+            )
+        )
+    }
+
     private func makeService(
         router: StaticPasswordPrivateKeyOperationRouter,
         unwrapper: RecordingPasswordSoftwareSecretCertificateUnwrapper,
@@ -544,7 +603,7 @@ private final class StaticPasswordPrivateKeyOperationRouter: PrivateKeyOperation
         routeResult = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         requests.append(request)
         return routeResult
     }

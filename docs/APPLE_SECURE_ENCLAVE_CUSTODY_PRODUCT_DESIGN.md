@@ -1,8 +1,13 @@
 # Apple Secure Enclave Custody Product Design
 
-> Status: Active product proposal. This document describes proposed future
-> behavior and does not describe shipped behavior.
-> Date: 2026-05-25.
+> Status: Approved product design, implemented through Phase 7 (issue #501):
+> the key-family generation choice, device-bound commitment and post-generation
+> surfaces, key-detail/availability presentation, per-category failure copy,
+> and the production exposure flip are in code. Final UI vocabulary (decided
+> 2026-06-12): Portable Compatible, Portable Modern, Device-Bound Compatible,
+> Device-Bound Modern. User exposure remains release-gated on Phase 8 evidence
+> and the Phase 9 release gate (tag-first releases are the exposure boundary).
+> Last reviewed: 2026-06-12.
 > Purpose: Define the product shape, user commitments, and first-version scope
 > for Apple Secure Enclave-backed OpenPGP private-key custody.
 > Audience: Product, design, security reviewers, Swift/Rust implementers,
@@ -71,6 +76,11 @@ Each available choice should communicate:
 - backup and recovery consequence;
 - whether private-key export is supported.
 
+The key-family selection row can stay concise when it includes an adjacent
+detail affordance. The detail sheet should expose algorithms, key version,
+message format, approximate security level, exportability, GnuPG compatibility,
+and custody for each family.
+
 Operational failures, missing local state, or authentication failures should be
 shown as key status or operation errors. They should not be normal choice
 attributes on the configuration surface.
@@ -85,6 +95,8 @@ commitments understandable:
 - Existing private keys cannot be imported into Secure Enclave custody.
 - Losing the device, local device-bound key state, or required
   biometric access can permanently remove signing and decrypt capability.
+- Device-bound keys always require biometric authentication. For security, this
+  enforcement is fixed and cannot be changed.
 - Public certificates and revocation artifacts can be exported, but they are
   not private-key backups.
 

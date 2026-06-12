@@ -38,12 +38,16 @@ final class PrivateKeyMessageDecryptionService: RecipientMessageDecrypting, @unc
         recipientFingerprint: String,
         verificationContext: PGPMessageVerificationContext
     ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
-        switch router.route(
+        let operationRoute = await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: recipientFingerprint,
                 operation: .decrypt
             )
-        ) {
+        )
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             var secretKey: Data
             do {

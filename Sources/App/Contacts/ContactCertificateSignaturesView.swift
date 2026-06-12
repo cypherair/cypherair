@@ -235,8 +235,8 @@ private struct ContactCertificateSignaturesHostView: View {
                     )
                 }
                 LabeledContent(
-                    String(localized: "contactdetail.profile", defaultValue: "Profile"),
-                    value: contact.profile.displayName
+                    String(localized: "contactdetail.keyType", defaultValue: "Key Type"),
+                    value: contact.profile.contactKeyKindDisplayName
                 )
                 LabeledContent(
                     String(localized: "contactdetail.shortKeyId", defaultValue: "Short Key ID"),

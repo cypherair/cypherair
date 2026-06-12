@@ -417,6 +417,38 @@
         }
       }
     },
+    "backup.deviceBound.unavailable.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound keys cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥无法导出或备份。"
+          }
+        }
+      }
+    },
+    "backup.deviceBound.unavailable.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup Not Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法备份"
+          }
+        }
+      }
+    },
     "backup.export" : {
       "localizations" : {
         "en" : {
@@ -2529,6 +2561,22 @@
         }
       }
     },
+    "contactdetail.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "contactdetail.manualVerification" : {
       "localizations" : {
         "en" : {
@@ -2849,22 +2897,6 @@
         }
       }
     },
-    "contactdetail.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
     "contactdetail.removeTag" : {
       "localizations" : {
         "en" : {
@@ -3101,6 +3133,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "首选"
+          }
+        }
+      }
+    },
+    "contactKey.compatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "contactKey.modern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modern (RFC 9580)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现代（RFC 9580）"
           }
         }
       }
@@ -3745,6 +3809,22 @@
         }
       }
     },
+    "decrypt.matchedKey.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "decrypt.matchedKey.name" : {
       "localizations" : {
         "en" : {
@@ -3757,22 +3837,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥"
-          }
-        }
-      }
-    },
-    "decrypt.matchedKey.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
           }
         }
       }
@@ -4714,13 +4778,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No private keys found. Generate or import a key first."
+            "value" : "No portable private keys found. Generate or import a portable key first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到私钥。请先生成或导入密钥。"
+            "value" : "未找到便携私钥。请先生成或导入便携密钥。"
           }
         }
       }
@@ -5061,18 +5125,434 @@
         }
       }
     },
-    "error.keyOperationUnavailable" : {
+    "error.keyOperationUnavailable.cleanupOrRollbackFailure" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key operation is unavailable."
+            "value" : "The operation failed and cleanup could not complete."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥操作不可用。"
+            "value" : "操作失败，且清理未能完成。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave operation failed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区操作失败。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationInvalidRequest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave operation request was invalid."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区操作请求无效。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationInvalidResponse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave returned an invalid response."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区返回了无效响应。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.handlePublicKeyBindingMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's device-bound private key does not match its certificate."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的设备绑定私钥与其证书不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.hardwareUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave is not available on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的安全隔区不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.invalidConfigurationCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's configuration and custody settings don't match, so the operation is unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的配置与托管方式不匹配，无法执行该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationCancelled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication was cancelled. Nothing was changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份认证已取消。未进行任何更改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication failed. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份认证失败。请重试。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationLockedOut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is locked. Unlock it on this device, then try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物识别认证已锁定。请先在设备上解锁，然后重试。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationRequired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication is required to use this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用此密钥需要进行身份认证。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is currently unavailable, so this key cannot be used right now."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物识别认证目前不可用，因此暂时无法使用此密钥。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.metadataAssociationMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stored key information does not match this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储的密钥信息与此密钥不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.migrationOrRecoveryRequired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key needs recovery before it can be used."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥需要先恢复才能使用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.openPGPSemanticFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The OpenPGP operation failed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenPGP 操作失败。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationNotImplementedForCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is not yet available for device-bound keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥暂不支持该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationUnavailableByPolicy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is currently unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该操作目前不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationUnsupportedForCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is not supported for this key's custody model."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的托管方式不支持该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.payloadAuthenticationFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message authentication failed. The content may have been tampered with."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息认证失败。内容可能已被篡改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleInaccessible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's private key material could not be accessed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法访问该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's private key material is missing from this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上缺少该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleUnauthorized" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to this key's private key material was not authorized."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未获授权访问该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateOperationRoleMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot perform the requested operation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法执行所请求的操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.prohibitedFallbackAttempted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A prohibited fallback was blocked. Nothing was changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻止被禁止的回退操作。未进行任何更改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.publicCertificateAssociationMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's stored certificate does not match its key information."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥存储的证书与其密钥信息不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.publicMaterialUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's public certificate is unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的公钥证书不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.revocationArtifactUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No revocation certificate is stored for this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥没有已存储的吊销证书。"
           }
         }
       }
@@ -8069,6 +8549,22 @@
         }
       }
     },
+    "import.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "import.passphrase" : {
       "localizations" : {
         "en" : {
@@ -8113,54 +8609,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粘贴 ASCII Armor 格式的私钥"
-          }
-        }
-      }
-    },
-    "import.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
-    "import.profileA" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Universal Compatible (Profile A)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用兼容（配置 A）"
-          }
-        }
-      }
-    },
-    "import.profileB" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Advanced Security (Profile B)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高级安全（配置 B）"
           }
         }
       }
@@ -8437,6 +8885,102 @@
         }
       }
     },
+    "keydetail.deviceBound.explainer.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key lives in this device's Secure Enclave. Signing and decryption happen inside the Secure Enclave; the app never sees the private key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥保存在本设备的安全隔区中。签名和解密都在安全隔区内完成；App 永远不会接触私钥。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.export" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key cannot be exported or backed up. The public key and revocation certificate can be exported."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥无法导出或备份。公钥和吊销证书可以导出。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.recovery" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this device is lost or erased, or its biometric access is removed, this key's signing and decryption capability is permanently lost."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，此密钥的签名和解密能力将永久丧失。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.explainer.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.noBackup" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keydetail.deviceBound.status.degraded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some private-key operations are currently unavailable on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的部分私钥操作目前不可用。"
+          }
+        }
+      }
+    },
     "keydetail.expiry" : {
       "localizations" : {
         "en" : {
@@ -8661,6 +9205,22 @@
         }
       }
     },
+    "keydetail.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "keydetail.modifyExpiry" : {
       "localizations" : {
         "en" : {
@@ -8721,22 +9281,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到密钥"
-          }
-        }
-      }
-    },
-    "keydetail.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
           }
         }
       }
@@ -8901,6 +9445,662 @@
         }
       }
     },
+    "keyFamily.custody.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound Secure Enclave custody"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定安全隔区托管"
+          }
+        }
+      }
+    },
+    "keyFamily.custody.portable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable software key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携软件密钥"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algorithms"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "算法"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custody"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "托管方式"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.exportability" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportability"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出能力"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.gnupg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG Compatibility"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG 兼容性"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "详细信息"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.messageFormat" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message Format"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息格式"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approx. Security Level"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约等安全级别"
+          }
+        }
+      }
+    },
+    "keyFamily.detail.version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥版本"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBound.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P-256 signing + P-256 key agreement"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "P-256 签名 + P-256 密钥协商"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBound.biometricRequirement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound keys always require biometric authentication. For security, this enforcement is fixed and cannot be changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥始终需要生物识别认证。为确保安全，此强制要求是固定的，无法更改。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG 及其他 OpenPGP 工具。私钥保存在本设备的安全隔区中，无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定兼容"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用最新 OpenPGP 标准（RFC 9580）。不兼容 GnuPG。私钥保存在本设备的安全隔区中，无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Modern"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定现代"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.exportability.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key cannot be exported or backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥无法导出或备份"
+          }
+        }
+      }
+    },
+    "keyFamily.exportability.portable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private key can be exported and backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥可以导出和备份"
+          }
+        }
+      }
+    },
+    "keyFamily.gnupg.compatible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatible with GnuPG"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "keyFamily.gnupg.notCompatible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not compatible with GnuPG"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "keyFamily.messageFormat.seipdv1" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv1 (MDC)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv1（MDC）"
+          }
+        }
+      }
+    },
+    "keyFamily.messageFormat.seipdv2" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv2 (AEAD OCB)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEIPDv2（AEAD OCB）"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed25519 signing + X25519 encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed25519 签名 + X25519 加密"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容所有 PGP 工具，包括 GnuPG。私钥可以导出和备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携兼容"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 signing + X448 encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 签名 + X448 加密"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用最新加密标准（RFC 9580）和更强的算法。不兼容 GnuPG。私钥可以导出和备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable Modern"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携现代"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~224 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~224 位"
+          }
+        }
+      }
+    },
+    "keyFamily.version.v4" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v4"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v4"
+          }
+        }
+      }
+    },
+    "keyFamily.version.v6" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v6"
+          }
+        }
+      }
+    },
+    "keygen.custody.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to create your device-bound key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建你的设备绑定密钥需要进行身份认证。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.create" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create Device-Bound Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建设备绑定密钥"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key is created inside this device's Secure Enclave and never leaves this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥在本设备的安全隔区内创建，永远不会离开此设备。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.loss" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this device is lost or erased, or its biometric access is removed, messages to this key become permanently unreadable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，发送给此密钥的消息将永久无法读取。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.portability" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot be exported, backed up, or moved to another device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它无法导出、备份或转移到其他设备。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.publicMaterial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can export the public key and a revocation certificate, but they are not private-key backups."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你可以导出公钥和吊销证书，但它们不是私钥备份。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a Device-Bound Key?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建设备绑定密钥？"
+          }
+        }
+      }
+    },
     "keygen.email" : {
       "localizations" : {
         "en" : {
@@ -8981,6 +10181,22 @@
         }
       }
     },
+    "keygen.family.info.accessibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show key type details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示密钥类型详细信息"
+          }
+        }
+      }
+    },
     "keygen.identity.header" : {
       "localizations" : {
         "en" : {
@@ -8993,6 +10209,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "身份"
+          }
+        }
+      }
+    },
+    "keygen.keyType.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
           }
         }
       }
@@ -9013,38 +10245,6 @@
         }
       }
     },
-    "keygen.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
-    "keygen.profile.header" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encryption Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密配置"
-          }
-        }
-      }
-    },
     "keygen.title" : {
       "localizations" : {
         "en" : {
@@ -9057,6 +10257,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成密钥"
+          }
+        }
+      }
+    },
+    "keyoperation.custody.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to use your device-bound key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的设备绑定密钥需要进行身份认证。"
           }
         }
       }
@@ -9137,6 +10353,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认"
+          }
+        }
+      }
+    },
+    "keys.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定"
+          }
+        }
+      }
+    },
+    "keys.deviceBound.accessibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-bound key; cannot be backed up"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥；无法备份"
           }
         }
       }
@@ -9861,6 +11109,54 @@
         }
       }
     },
+    "postgen.deviceBound.exportRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Revocation Certificate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出吊销证书"
+          }
+        }
+      }
+    },
+    "postgen.deviceBound.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot be backed up. Export its revocation certificate and share your public key with contacts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法备份。请导出其吊销证书，并与联系人分享你的公钥。"
+          }
+        }
+      }
+    },
+    "postgen.deviceBound.success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Created"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥已创建"
+          }
+        }
+      }
+    },
     "postgen.done" : {
       "localizations" : {
         "en" : {
@@ -10225,102 +11521,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "认证以解锁 App"
-          }
-        }
-      }
-    },
-    "profile.advanced.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用最新加密标准（RFC 9580）和更强的算法。不兼容 GnuPG。"
-          }
-        }
-      }
-    },
-    "profile.advanced.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Advanced Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高级安全"
-          }
-        }
-      }
-    },
-    "profile.advanced.securityLevel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~224 bit"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~224 位"
-          }
-        }
-      }
-    },
-    "profile.universal.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Works with all PGP tools including GnuPG."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兼容所有 PGP 工具，包括 GnuPG。"
-          }
-        }
-      }
-    },
-    "profile.universal.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Universal Compatible"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用兼容"
-          }
-        }
-      }
-    },
-    "profile.universal.securityLevel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~128 bit"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~128 位"
           }
         }
       }
@@ -11546,13 +12746,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Private Key Protection"
+            "value" : "Portable Key Protection"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "私钥保护"
+            "value" : "便携密钥保护"
+          }
+        }
+      }
+    },
+    "settings.authMode.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applies to portable keys. Device-bound keys always use biometric access and are not affected."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅适用于便携密钥。设备绑定密钥始终使用生物识别访问，不受此设置影响。"
           }
         }
       }

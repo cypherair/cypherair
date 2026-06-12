@@ -167,7 +167,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         XCTAssertEqual(verification.summaryState, .verified)
     }
 
-    func test_productionPolicyBlocksSecureEnclaveDetachedFileSigning() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveDetachedFileSigning() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -179,6 +179,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
         )
         let input = try makeTemporaryFile(Data("blocked detached file".utf8))
@@ -190,7 +191,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
                 signerFingerprint: fixture.identity.fingerprint,
                 progress: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave detached signing")
+            XCTFail("Expected blocking policy to stop Secure Enclave detached signing")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {
@@ -340,6 +341,62 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(unwrapper.unwrapRequests, [])
+    }
+
+    func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let input = try makeTemporaryFile(Data("authorized detached file".utf8))
+        defer { try? FileManager.default.removeItem(at: input) }
+
+        let successContext = RecordingLAContext()
+        let successService = makeService(
+            router: StaticDetachedPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: successContext))
+            ),
+            unwrapper: RecordingDetachedSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        )
+        _ = try await successService.signDetachedFile(
+            inputPath: input.path,
+            signerFingerprint: fixture.identity.fingerprint,
+            progress: nil
+        )
+        XCTAssertEqual(successContext.invalidateCount, 1)
+
+        let failureContext = RecordingLAContext()
+        let failingService = makeService(
+            router: StaticDetachedPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: failureContext))
+            ),
+            unwrapper: RecordingDetachedSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            digestSigner: ThrowingDetachedDigestSigner(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+            )
+        )
+        do {
+            _ = try await failingService.signDetachedFile(
+                inputPath: input.path,
+                signerFingerprint: fixture.identity.fingerprint,
+                progress: nil
+            )
+            XCTFail("Expected adapter failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(failureContext.invalidateCount, 1)
+    }
+
+    private func makeAuthorizedRoute(
+        fixture: DetachedSecureEnclaveRouteFixture,
+        context: RecordingLAContext
+    ) -> SecureEnclaveSignerRoute {
+        SecureEnclaveSignerRoute(
+            identity: fixture.identity,
+            operation: .sign,
+            publicBindingInspection: fixture.route.publicBindingInspection,
+            signingHandle: fixture.route.signingHandle,
+            operationAuthorization: SecureEnclaveCustodyOperationAuthorization(
+                authenticationContext: context
+            )
+        )
     }
 
     private func makeService(
@@ -530,7 +587,7 @@ private final class StaticDetachedPrivateKeyOperationRouter: PrivateKeyOperation
         routeResult = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         requests.append(request)
         return routeResult
     }

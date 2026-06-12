@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
@@ -89,7 +90,10 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         ]
     }
 
-    func loadKeys(reference: SecureEnclaveCustodyHandleReference) throws -> [SecureEnclaveCustodyLoadedHandle] {
+    func loadKeys(
+        reference: SecureEnclaveCustodyHandleReference,
+        authenticationContext: LAContext?
+    ) throws -> [SecureEnclaveCustodyLoadedHandle] {
         let serviceKind = AuthTraceMetadata.keychainServiceKind(for: reference.applicationTagString)
         traceStore?.record(
             category: .operation,
@@ -99,6 +103,9 @@ struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
         var query = baseQuery(reference: reference)
         query[kSecReturnRef as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitAll
+        if let authenticationContext {
+            query[kSecUseAuthenticationContext as String] = authenticationContext
+        }
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)

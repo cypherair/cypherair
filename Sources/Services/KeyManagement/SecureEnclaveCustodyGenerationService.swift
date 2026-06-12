@@ -1,6 +1,8 @@
 import Foundation
+import LocalAuthentication
 
-/// Internal hidden generation path for Secure Enclave custody public-only keys.
+/// Generation path for Secure Enclave custody public-only keys (device-bound
+/// families). Exposed to the product UI since P7D; previously hidden/test-only.
 final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     typealias GenerationCheckpoint = @Sendable () async throws -> Void
 
@@ -11,6 +13,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let resolver: PGPKeyCapabilityResolver
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let commitCoordinator: KeyProvisioningCommitCoordinator
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
+    private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
@@ -21,6 +25,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         resolver: PGPKeyCapabilityResolver,
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
     ) {
         self.certificateBuilder = certificateBuilder
@@ -30,10 +36,45 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.resolver = resolver
         self.invalidationGate = invalidationGate
         self.commitCoordinator = commitCoordinator
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.custodyOperationAuthenticator = custodyOperationAuthenticator
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
-    func generateHiddenKey(
+    /// Generation drives biometryAny digest signing, which presents auth
+    /// sheets: the WHOLE action runs inside ONE operation-prompt session
+    /// (SECURITY.md §4 uniform rule) when a coordinator is wired. The optional
+    /// coordinator keeps test rigs (which sign with stub signers) unchanged.
+    func generateKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        configurationIdentity: PGPKeyConfiguration.Identity,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    ) async throws -> PGPKeyIdentity {
+        guard let authenticationPromptCoordinator else {
+            return try await performGenerateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                configurationIdentity: configurationIdentity,
+                invalidationToken: token
+            )
+        }
+        return try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "keyProvisioning.generateSecureEnclaveCustody"
+        ) {
+            try await self.performGenerateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                configurationIdentity: configurationIdentity,
+                invalidationToken: token
+            )
+        }
+    }
+
+    private func performGenerateKey(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
@@ -52,20 +93,50 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             custody: .appleSecureEnclavePrivateOperations
         )
         guard resolution.support == .supported else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: resolution.failureCategory?.rawValue
-                    ?? PGPKeyOperationFailureCategory.operationUnavailableByPolicy.rawValue
+            throw CypherAirError.keyOperationUnavailable(
+                category: resolution.failureCategory ?? .operationUnavailableByPolicy
             )
         }
 
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
+        // Single prompt per generation (P7F): pre-authenticate BEFORE any
+        // handle exists — a declined sheet aborts with nothing to roll back —
+        // and thread the evaluated context into the biometryAny handle loads
+        // below. When nil (test rigs, platforms without the production
+        // wiring), the loads authenticate implicitly as before.
+        var authorizedContext: LAContext?
+        if let custodyOperationAuthenticator {
+            do {
+                authorizedContext = try await custodyOperationAuthenticator(
+                    String(
+                        localized: "keygen.custody.auth.reason",
+                        defaultValue: "Authenticate to create your device-bound key."
+                    )
+                )
+            } catch {
+                let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
+                throw CypherAirError.keyOperationUnavailable(
+                    category: PGPKeyOperationFailureMapper.category(
+                        for: normalized,
+                        fallback: .localAuthenticationFailed
+                    )
+                )
+            }
+        }
+        defer {
+            authorizedContext?.invalidate()
+        }
+
         let handlePair = try handleStore.createHandlePair()
         var storedFingerprint: String?
         var didRollbackGeneratedState = false
         do {
-            let loadedPair = try handleStore.loadHandlePair(expected: handlePair)
+            let loadedPair = try handleStore.loadHandlePair(
+                expected: handlePair,
+                authenticationContext: authorizedContext
+            )
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 

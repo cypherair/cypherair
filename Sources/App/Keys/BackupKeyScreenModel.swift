@@ -9,6 +9,7 @@ final class BackupKeyScreenModel {
     let fingerprint: String
     let configuration: BackupKeyView.Configuration
 
+    private let keyManagement: KeyManagementService
     private let exportBackupAction: ExportBackupAction
     private let confirmBackupExportedAction: ConfirmBackupExportedAction
     private var exportTask: Task<Void, Never>?
@@ -32,6 +33,7 @@ final class BackupKeyScreenModel {
     ) {
         self.fingerprint = fingerprint
         self.configuration = configuration
+        self.keyManagement = keyManagement
         self.exportBackupAction = exportBackupAction ?? { fingerprint, passphrase in
             try await keyManagement.exportKeyBackupData(
                 fingerprint: fingerprint,
@@ -41,6 +43,15 @@ final class BackupKeyScreenModel {
         self.confirmBackupExportedAction = confirmBackupExportedAction ?? { fingerprint in
             keyManagement.confirmKeyBackupExported(fingerprint: fingerprint)
         }
+    }
+
+    /// Device-bound Secure Enclave keys have no exportable private material.
+    /// The route is not offered for them in UI; this is defense-in-depth for
+    /// stale navigation paths (the service layer also fails closed). Computed,
+    /// not captured at init, so late key loads cannot read as software custody.
+    var isDeviceBound: Bool {
+        keyManagement.keys.first { $0.fingerprint == fingerprint }?
+            .privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
     }
 
     var exportButtonDisabled: Bool {

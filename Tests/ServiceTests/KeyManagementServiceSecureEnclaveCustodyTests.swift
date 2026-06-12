@@ -31,7 +31,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         let targetService = target.service
 
         let generationTask = Task { [targetService] in
-            try await targetService.generateHiddenSecureEnclaveCustodyKey(
+            try await targetService.generateSecureEnclaveCustodyKey(
                 name: "Hidden Relock Drain",
                 email: "hidden-drain@example.com",
                 expirySeconds: nil,
@@ -160,6 +160,71 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             ["hidden-delete"],
             []
         ])
+    }
+
+    func test_deleteSecureEnclaveCustodyKeyDeletesHandlesAndMetadata() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let pair = try seedCustodyHandles(
+            fixture: fixture,
+            keyStore: keyStore,
+            handleSetIdentifier: "delete-success"
+        )
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([fixture.identity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(keyStore.deleteRequests, pair.references)
+    }
+
+    func test_deleteSecureEnclaveCustodyKeyHandleFailurePreservesMetadataForRetry() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let pair = try seedCustodyHandles(
+            fixture: fixture,
+            keyStore: keyStore,
+            handleSetIdentifier: "delete-failure"
+        )
+        keyStore.failDeleteRole = .signing
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([fixture.identity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        XCTAssertThrowsError(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)) { error in
+            guard case CypherAirError.keychainError(let message) = error else {
+                return XCTFail("Expected keychainError, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Partial key deletion"))
+        }
+
+        XCTAssertEqual(targetService.keys.map(\.fingerprint), [fixture.identity.fingerprint])
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [fixture.identity.fingerprint])
+        XCTAssertTrue(keyStore.contains(reference: pair.signing.reference))
+        XCTAssertFalse(keyStore.contains(reference: pair.keyAgreement.reference))
+
+        keyStore.failDeleteRole = nil
+        try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
     }
 
     func test_confirmKeyBackupExportedRefreshesRecoveryReportWithCurrentSnapshot() throws {
@@ -320,6 +385,128 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore)
         XCTAssertTrue(try loadStoredIdentity(fingerprint: identity.fingerprint).revocationCert.isEmpty)
+    }
+
+    func test_modifyExpiry_secureEnclaveCustodyWithoutRoutingService_staysBlockedUnderExposedPolicy() async throws {
+        // The exposed production policy approves SE modify-expiry at the
+        // resolver, but a container without the expiry-mutation routing service
+        // must still fail closed (never fall back to software custody paths).
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        try storeIdentity(fixture.identity)
+        try service.loadKeys()
+        let unwrapCountBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.modifyExpiry(
+                fingerprint: fixture.identity.fingerprint,
+                newExpirySeconds: 60 * 60 * 24
+            )
+            XCTFail("Expected unrouted Secure Enclave modify-expiry to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
+    func test_selectiveRevocation_secureEnclaveCustodyWithoutRoutingService_staysBlockedUnderExposedPolicy() async throws {
+        // Post-flip, the resolver approves SE revocation, so the unrouted
+        // custody arm in SelectiveRevocationService is the load-bearing
+        // fail-closed barrier — pin it (mirror of the modify-expiry case).
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        try storeIdentity(fixture.identity)
+        try service.loadKeys()
+        let catalog = try service.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+        let unwrapCountBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportSubkeyRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                subkeySelection: subkey
+            )
+            XCTFail("Expected unrouted Secure Enclave selective revocation to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
+    func test_generateSecureEnclaveCustodyKey_withoutWiredService_failsClosedWithPerCategoryError() async {
+        // Containers without the generation factory (UI-test container, or any
+        // device without a Secure Enclave) must fail closed with the sanitized
+        // category so the per-category presentation copy survives — never a
+        // generic reason string.
+        do {
+            _ = try await service.generateSecureEnclaveCustodyKey(
+                name: "Unwired",
+                email: nil,
+                expirySeconds: nil,
+                configurationIdentity: .compatibleP256V4
+            )
+            XCTFail("Expected unwired Secure Enclave custody generation to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+    }
+
+    private func makeSecureEnclaveCustodyDeletionTarget(
+        metadataPersistence: RecordingKeyMetadataPersistence,
+        keyStore: MockSecureEnclaveCustodyKeyStore
+    ) -> KeyManagementService {
+        KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
+            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            ),
+            metadataPersistence: metadataPersistence
+        )
+    }
+
+    private func seedCustodyHandles(
+        fixture: HiddenCustodyExportFixture,
+        keyStore: MockSecureEnclaveCustodyKeyStore,
+        handleSetIdentifier: String
+    ) throws -> SecureEnclaveCustodyHandlePair {
+        let signingReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .signing
+        )
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .keyAgreement
+        )
+        let signingBinding = try SecureEnclaveCustodyHandlePublicBinding(
+            reference: signingReference,
+            publicKeyX963: fixture.signingPublicKeyX963
+        )
+        let keyAgreementBinding = try SecureEnclaveCustodyHandlePublicBinding(
+            reference: keyAgreementReference,
+            publicKeyX963: fixture.keyAgreementPublicKeyX963
+        )
+        keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: signingBinding, privateKey: nil))
+        keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: keyAgreementBinding, privateKey: nil))
+        return try SecureEnclaveCustodyHandlePair(
+            signing: signingBinding,
+            keyAgreement: keyAgreementBinding
+        )
     }
 
 }

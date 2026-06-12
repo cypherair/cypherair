@@ -636,6 +636,8 @@ class KeyManagementServiceTestCase: XCTestCase {
     func makeHiddenSecureEnclaveGenerationService(
         metadataPersistence: RecordingKeyMetadataPersistence = RecordingKeyMetadataPersistence(),
         keyStore: MockSecureEnclaveCustodyKeyStore = MockSecureEnclaveCustodyKeyStore(),
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
@@ -653,6 +655,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             secureEnclave: localSE,
             keychain: localKeychain,
             authenticator: localAuthenticator,
+            authenticationPromptCoordinator: authenticationPromptCoordinator ?? AuthenticationPromptCoordinator(),
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             commitDrainWaiterRegisteredCheckpoint: commitDrainWaiterRegisteredCheckpoint,
@@ -673,6 +676,8 @@ class KeyManagementServiceTestCase: XCTestCase {
                     resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
                     invalidationGate: invalidationGate,
                     commitCoordinator: commitCoordinator,
+                    authenticationPromptCoordinator: authenticationPromptCoordinator,
+                    custodyOperationAuthenticator: custodyOperationAuthenticator,
                     afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
                 )
             }

@@ -183,6 +183,58 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         XCTAssertEqual(unwrapper.unwrapRequests, [])
     }
 
+    func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+
+        let successContext = RecordingLAContext()
+        let successService = makeService(
+            router: StaticPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: successContext))
+            ),
+            unwrapper: RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        )
+        _ = try await successService.signCleartext(
+            Data("authorized cleartext".utf8),
+            signerFingerprint: fixture.identity.fingerprint
+        )
+        XCTAssertEqual(successContext.invalidateCount, 1)
+
+        let failureContext = RecordingLAContext()
+        let failingService = makeService(
+            router: StaticPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: failureContext))
+            ),
+            unwrapper: RecordingSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            digestSigner: ThrowingCleartextDigestSigner(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+            )
+        )
+        do {
+            _ = try await failingService.signCleartext(
+                Data("authorized failure".utf8),
+                signerFingerprint: fixture.identity.fingerprint
+            )
+            XCTFail("Expected adapter failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(failureContext.invalidateCount, 1)
+    }
+
+    private func makeAuthorizedRoute(
+        fixture: SecureEnclaveRouteFixture,
+        context: RecordingLAContext
+    ) -> SecureEnclaveSignerRoute {
+        SecureEnclaveSignerRoute(
+            identity: fixture.identity,
+            operation: .sign,
+            publicBindingInspection: fixture.route.publicBindingInspection,
+            signingHandle: fixture.route.signingHandle,
+            operationAuthorization: SecureEnclaveCustodyOperationAuthorization(
+                authenticationContext: context
+            )
+        )
+    }
+
     private func makeService(
         router: StaticPrivateKeyOperationRouter,
         unwrapper: RecordingSoftwareSecretCertificateUnwrapper,
@@ -335,7 +387,7 @@ private final class StaticPrivateKeyOperationRouter: PrivateKeyOperationRouting,
         routeResult = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         requests.append(request)
         return routeResult
     }

@@ -8,7 +8,7 @@
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, acceptance criteria, or roadmap change.<br>
-> **Last reviewed:** 2026-06-10.
+> **Last reviewed:** 2026-06-12.
 
 ## 1. Product Overview
 
@@ -58,9 +58,9 @@ The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`,
 
 ---
 
-## 3. Encryption Profiles
+## 3. Encryption Profiles and Key Families
 
-The App offers two encryption profiles. The user selects a profile when generating a key. The profile determines the key format, algorithms, and interoperability scope.
+The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody (issue #501, Phase 7): **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), and **Device-Bound Modern** (Secure Enclave custody, P-256 v6). Profile A/B remains the technical vocabulary for the two software configurations; the family vocabulary is the product-facing layer above it. Device-bound families ship in code but remain release-gated on the custody evidence and release phases (Section 3.4).
 
 ### 3.1 Profile A: Universal Compatible (Default)
 
@@ -78,36 +78,43 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 
 **Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+. **Not compatible with GnuPG.**
 
-### 3.3 Profile Selection UX
+### 3.3 Key Type Selection UX
 
-- **Key generation:** User chooses profile before generating a key. Default: Profile A.
-  - "Universal Compatible" — "Works with all PGP tools including GnuPG."
-  - "Advanced Security" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG."
+- **Key generation:** User picks a key family from a flat "Key Type" list before generating. Default: Portable Compatible (Profile A).
+  - "Portable Compatible" — "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
+  - "Portable Modern" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+  - "Device-Bound Compatible" — "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+  - "Device-Bound Modern" — "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+  - Each row has an info button that opens a detail sheet covering algorithms, key version, message format, approximate security level, exportability, GnuPG compatibility, and custody.
+  - Device-bound families require passing a commitment sheet (custody, fixed biometric enforcement, non-exportability, loss consequence, public artifacts are not backups) before generation starts; the rows appear only where the capability resolver and a wired generation service allow them.
 - **Encryption:** Message format is determined automatically by the recipient's key version. If recipient has a v4 key → SEIPDv1. If v6 key → SEIPDv2 (AEAD). Mixed v4+v6 recipients → SEIPDv1 (lowest common denominator). The user does not choose this manually. See [TDD](TDD.md) Section 1.4.
 - **Decryption:** The App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
 - **Multiple keys:** A user may have keys of different profiles (e.g., a Profile A key for GnuPG contacts and a Profile B key for security-conscious contacts).
 
-### 3.4 Future Apple Secure Enclave Custody
+### 3.4 Apple Secure Enclave Custody (Device-Bound key families)
 
-Apple Secure Enclave Custody is a planned hardware-backed private-key custody
-mode, not a shipped replacement for Profile A or Profile B and not a third
-`PGPKeyProfile`. Its goal is to generate and hold P-256 private keys inside
-Apple Secure Enclave so signing and ECDH private-key operations happen in
-hardware and the long-term private scalar does not enter CypherAir's Swift or
-Rust plaintext memory.
+Apple Secure Enclave Custody is the implemented hardware-backed private-key
+custody mode behind the Device-Bound key families — a custody model, not a
+replacement for Profile A or Profile B and not a third `PGPKeyProfile`. It
+generates and holds P-256 private keys inside Apple Secure Enclave so signing
+and ECDH private-key operations happen in hardware and the long-term private
+scalar never enters CypherAir's Swift or Rust plaintext memory.
 
-Future key creation should treat algorithm/profile and private-key custody as
-separate dimensions. A capability resolver must expose only combinations that
-the current platform, OpenPGP rules, Sequoia support, CypherAir implementation,
-and product policy can support.
+Key creation treats algorithm/configuration and private-key custody as separate
+dimensions: `PGPKeyCapabilityResolver` exposes only combinations the platform,
+OpenPGP rules, Sequoia support, CypherAir implementation, and product policy
+support. Since Phase 7 the production policy exposes device-bound generation
+and the implemented private operations; **release remains gated** on the
+hardware/GnuPG-interop evidence phase and the release gate (issue #501,
+Phases 8–9) — no stable release ships the families before that evidence passes.
 
 This mode has a different product tradeoff from ordinary software-key custody:
-the private key is device-bound, not exportable, and cannot be fully migrated or
-restored from a normal backup. Device loss, Secure Enclave/key-handle loss, or
-loss of the required authentication factor may make the key permanently
-unusable. Any future UI must present this as an explicit opt-in with a strong
-availability warning, a distinct custody/status display, and no "private key
-backed up" badge. Current planning lives in
+the private key is device-bound, not exportable, and cannot be migrated or
+restored from a backup. Device loss, Secure Enclave/key-handle loss, or loss of
+the required biometric access may make the key permanently unusable. The shipped
+UI presents this as an explicit opt-in (commitment sheet before generation), a
+distinct custody display ("Key Type" with a device-bound explainer, custody
+badges), and no backup badge or backup flow for device-bound keys. Design record:
 [APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
 with historical POC evidence archived under
 [apple-secure-enclave-custody-poc](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY.md).
@@ -128,7 +135,7 @@ Open App → Onboarding (3 pages) → tutorial decision page
 → Start Guided Tutorial OR Skip Tutorial and Enter App
 → If tutorial starts: isolated sandbox modules → explicit Finish → real app
 → Real app → Keys → Generate Key
-→ Select profile: Universal Compatible (default) / Advanced Security
+→ Select key type: Portable Compatible (default) / Portable Modern / Device-Bound Compatible / Device-Bound Modern (device-bound rows shown only where the resolver and a wired generation service allow them; commitment sheet before device-bound generation)
 → Name (required) + email (optional, recommended) + expiry (default 2y)
 → Done → Prompt: back up private key & share public key
 ```
@@ -252,7 +259,7 @@ Protected app-data scope and per-surface classification are maintained in [PERSI
 
 **Authentication Mode**
 
-The App offers two authentication modes, selectable in Settings:
+The App offers two portable-key authentication modes, selectable in Settings under "Portable Key Protection":
 
 - **Standard Mode (default):** Face ID / Touch ID with device passcode fallback. Suitable for most users. Equivalent to Apple `deviceOwnerAuthentication`.
 - **High Security Mode:** Face ID / Touch ID only, with no passcode fallback for private-key operations. In this mode, decrypt, sign, and export require biometric authorization before private-key material can be used. If biometric authentication is unavailable (sensor damaged, face obscured, or temporarily locked out), private-key operations remain unavailable until biometric authentication is restored.
@@ -260,10 +267,12 @@ The App offers two authentication modes, selectable in Settings:
 **Activation safeguards:** When the user enables High Security Mode, the App:
 
 1. Displays a warning: "In this mode, if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys. Ensure you have a current backup."
-2. Verifies that at least one private key has been backed up (exported). If no backup exists, the warning is stronger and the user must acknowledge the risk explicitly.
+2. Verifies that at least one software-custody private key has been backed up (exported); device-bound keys carry no backup obligation. If software keys exist with no backup, the warning is stronger and the user must acknowledge the risk explicitly.
 3. Requires current biometric authentication to confirm the mode change.
 
-*Technical detail: Standard Mode uses `SecAccessControlCreateFlags` `[.biometryAny, .or, .devicePasscode]` + `.privateKeyUsage`. High Security Mode uses `[.biometryAny]` + `.privateKeyUsage` only. Switching modes requires re-wrapping all SE-protected keys with the new access control flags. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 4 for full implementation details.*
+Device-bound keys always require biometric authentication. For security, this enforcement is fixed and cannot be changed; Portable Key Protection does not affect device-bound keys.
+
+*Technical detail: for portable software-custody keys, Standard Mode uses `SecAccessControlCreateFlags` `[.biometryAny, .or, .devicePasscode]` + `.privateKeyUsage`; High Security Mode uses `[.biometryAny]` + `.privateKeyUsage` only. Switching modes requires re-wrapping portable software-custody keys with the new access control flags. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 4 for full implementation details.*
 
 ---
 
@@ -274,7 +283,7 @@ The App offers two authentication modes, selectable in Settings:
 - **Generation:** Ed25519+X25519 (Profile A) or Ed448+X448 (Profile B). Revocation cert auto-generated.
 - **Multi-Key:** Multiple keys with different profiles supported. One key = "Default."
 - **Public Key Update:** Same UID + same fingerprint = absorb any new public update material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicate re-import remains a no-op. Same UID + different fingerprint = key regenerated (warning: verify with contact before accepting update).
-- **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), profile indicator (A/B), backup status badge, expiry modification (MVP), key-level revocation export, and selective revocation launchers for subkey/User ID revocation export.
+- **Key Detail Page:** Full fingerprint, Short Key ID (de-emphasized), Key Type row (family name; device-bound keys drill into a custody explainer), backup status badge for software keys (device-bound keys show the non-exportable statement instead, with no backup flow), expiry modification (MVP), key-level revocation export, and selective revocation launchers for subkey/User ID revocation export.
 
 ### 5.2 Contacts
 
@@ -298,9 +307,9 @@ Text: cleartext sig. File: detached .sig. Auto-verify. Graded results.
 - Contact detail includes a contact-scoped certificate-signature tool for direct-key verification, User ID binding verification, and User ID certification generation.
 - Password / SKESK message workflows are not currently exposed in the shipped app UI.
 
-### 5.5 Private Key Protection
+### 5.5 Portable Key Protection
 
-Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biometric/passcode auth. Keys device-bound. Two access control configurations for Standard/High Security modes. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 3.
+Portable software private keys use Keychain + Secure Enclave P-256 key wrapping (CryptoKit ECDH + AES-GCM) + biometric/passcode auth. Two access control configurations support Standard/High Security modes. The Settings control applies only to portable keys; device-bound keys always use biometric access and are not affected. See [TDD](TDD.md) Section 3 and [SECURITY](SECURITY.md) Section 3.
 
 ### 5.6 App Protection
 

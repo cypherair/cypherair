@@ -2,6 +2,11 @@ import Foundation
 import LocalAuthentication
 import Security
 
+struct SecureEnclaveCustodyDeletionContext {
+    let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
+    let handleStore: SecureEnclaveCustodyHandleStore
+}
+
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
     /// macOS single-prompt pre-authentication for modify-expiry (TARGET §4):
@@ -25,6 +30,7 @@ final class KeyMutationService {
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let expiryAuthenticator: ExpiryAuthenticator?
+    private let secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext?
     private var expiryMutationService: (any PrivateKeyExpiryMutationRouting)?
 
     init(
@@ -38,7 +44,8 @@ final class KeyMutationService {
         privateKeyAccessService: PrivateKeyAccessService,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        expiryAuthenticator: ExpiryAuthenticator? = nil
+        expiryAuthenticator: ExpiryAuthenticator? = nil,
+        secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil
     ) {
         self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
@@ -51,6 +58,7 @@ final class KeyMutationService {
         self.privateKeyControlStore = privateKeyControlStore
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.expiryAuthenticator = expiryAuthenticator
+        self.secureEnclaveCustodyDeletionContext = secureEnclaveCustodyDeletionContext
     }
 
     #if os(macOS)
@@ -131,7 +139,11 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode?
     ) async throws -> PGPKeyIdentity {
-        switch routeModifyExpiry(fingerprint: fingerprint) {
+        let operationRoute = await routeModifyExpiry(fingerprint: fingerprint)
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             let effectiveAuthMode: AuthenticationMode
             if let authMode {
@@ -315,9 +327,9 @@ final class KeyMutationService {
         return updated
     }
 
-    private func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute {
+    private func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
         if let expiryMutationService {
-            return expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
+            return await expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
         }
 
         guard let identity = catalogStore.identity(for: fingerprint) else {
@@ -346,6 +358,20 @@ final class KeyMutationService {
     }
 
     func deleteKey(fingerprint: String) throws {
+        guard let identity = catalogStore.identity(for: fingerprint) else {
+            try deleteKeychainMaterialAndMetadata(fingerprint: fingerprint)
+            return
+        }
+
+        switch identity.privateKeyCustodyKind {
+        case .softwareSecretCertificate:
+            try deleteKeychainMaterialAndMetadata(fingerprint: fingerprint)
+        case .appleSecureEnclavePrivateOperations:
+            try deleteSecureEnclaveCustodyKey(identity)
+        }
+    }
+
+    private func deleteKeychainMaterialAndMetadata(fingerprint: String) throws {
         var deletionErrors = deleteAllPrivateKeychainMaterial(for: fingerprint)
         do {
             try catalogStore.removeKey(fingerprint: fingerprint)
@@ -354,10 +380,38 @@ final class KeyMutationService {
         }
         clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
 
-        if let firstError = deletionErrors.first {
-            throw CypherAirError.keychainError(
-                "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
+        try reportPartialDeletionIfNeeded(deletionErrors)
+    }
+
+    private func deleteSecureEnclaveCustodyKey(_ identity: PGPKeyIdentity) throws {
+        let handleDeletionErrors = deleteSecureEnclaveCustodyHandles(for: identity)
+        try reportPartialDeletionIfNeeded(handleDeletionErrors)
+        try deleteKeychainMaterialAndMetadata(fingerprint: identity.fingerprint)
+    }
+
+    private func deleteSecureEnclaveCustodyHandles(for identity: PGPKeyIdentity) -> [Error] {
+        guard let secureEnclaveCustodyDeletionContext else {
+            return []
+        }
+
+        do {
+            let inspection = try secureEnclaveCustodyDeletionContext.publicBindingInspector.inspectPublicBindings(
+                publicKeyData: identity.publicKeyData
             )
+            guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
+                  inspection.keyVersion == identity.keyVersion else {
+                return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
+            }
+
+            try secureEnclaveCustodyDeletionContext.handleStore.deleteHandlePair(
+                signingPublicKeyX963: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+            )
+            return []
+        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
+            return []
+        } catch {
+            return [error]
         }
     }
 
@@ -418,6 +472,14 @@ final class KeyMutationService {
 
         if catalogStore.keys.isEmpty {
             try? privateKeyControlStore.clearRewrapJournal()
+        }
+    }
+
+    private func reportPartialDeletionIfNeeded(_ deletionErrors: [Error]) throws {
+        if let firstError = deletionErrors.first {
+            throw CypherAirError.keychainError(
+                "Partial key deletion: \(deletionErrors.count) item(s) could not be removed — \(firstError.localizedDescription)"
+            )
         }
     }
 

@@ -284,6 +284,170 @@ final class KeyDetailScreenModelTests: XCTestCase {
         XCTAssertNil(model.localModifyExpiryRequest)
     }
 
+    // MARK: - Device-bound custody presentation (7B)
+
+    @MainActor
+    func test_softwareKey_isNotDeviceBoundAndNeverShowsDegradedRow() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        // Even a maximally degraded report must not surface for software keys.
+        let degradedReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [],
+            inventorySummary: .empty,
+            inventoryFailureCategory: .privateHandleInaccessible
+        )
+        let model = KeyDetailScreenModel(
+            fingerprint: identity.fingerprint,
+            config: config,
+            keyManagement: stack.keyManagement,
+            macPresentationController: nil,
+            configuration: KeyDetailView.Configuration(),
+            dismissAction: {},
+            recoveryReportProvider: { degradedReport }
+        )
+
+        XCTAssertFalse(model.isDeviceBound)
+        XCTAssertFalse(model.deviceBoundAvailabilityIsDegraded)
+    }
+
+    func test_deviceBoundDegradedMapping_usesOrdinalAmongSecureEnclaveKeysOnly() {
+        let softwareKey = makeCustodyMappingIdentity(
+            fingerprint: "aaaa", custody: .softwareSecretCertificate
+        )
+        let firstSecureEnclaveKey = makeCustodyMappingIdentity(
+            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+        )
+        let secondSecureEnclaveKey = makeCustodyMappingIdentity(
+            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations
+        )
+        let keys = [softwareKey, firstSecureEnclaveKey, secondSecureEnclaveKey]
+        let report = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [
+                makeAssessment(ordinal: 0, handleAvailability: .available),
+                makeAssessment(ordinal: 1, handleAvailability: .unavailable(.privateHandleMissing)),
+            ],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+
+        // Ordinals count Secure Enclave keys only: the software key at index 0
+        // must not shift the mapping.
+        XCTAssertFalse(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb", keys: keys, report: report
+        ))
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "cccc", keys: keys, report: report
+        ))
+    }
+
+    func test_deviceBoundDegradedMapping_failsVisibleForMissingAssessmentAndInventoryFailure() {
+        let secureEnclaveKey = makeCustodyMappingIdentity(
+            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+        )
+
+        // No assessment row for an SE key: degraded, never silently healthy.
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: .empty
+        ))
+
+        // Inventory failure degrades every device-bound key.
+        let inventoryFailureReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [makeAssessment(ordinal: 0, handleAvailability: .available)],
+            inventorySummary: .empty,
+            inventoryFailureCategory: .privateHandleInaccessible
+        )
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: inventoryFailureReport
+        ))
+    }
+
+    func test_deviceBoundDegradedMapping_flagsUnavailablePublicAndRevocationMaterial() {
+        let secureEnclaveKey = makeCustodyMappingIdentity(
+            fingerprint: "bbbb", custody: .appleSecureEnclavePrivateOperations
+        )
+
+        // Each material disjunct must degrade on its own.
+        let publicMaterialReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [
+                SecureEnclaveCustodyGenerationRecoveryAssessment(
+                    identityOrdinal: 0,
+                    configurationIdentity: .compatibleP256V4,
+                    publicMaterialAvailability: .unavailable(.publicMaterialUnavailable),
+                    revocationArtifactAvailability: .available,
+                    handleAvailability: .available
+                ),
+            ],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: publicMaterialReport
+        ))
+
+        let revocationArtifactReport = SecureEnclaveCustodyGenerationRecoveryReport(
+            assessments: [
+                SecureEnclaveCustodyGenerationRecoveryAssessment(
+                    identityOrdinal: 0,
+                    configurationIdentity: .compatibleP256V4,
+                    publicMaterialAvailability: .available,
+                    revocationArtifactAvailability: .unavailable(.revocationArtifactUnavailable),
+                    handleAvailability: .available
+                ),
+            ],
+            inventorySummary: .empty,
+            inventoryFailureCategory: nil
+        )
+        XCTAssertTrue(KeyDetailScreenModel.isDeviceBoundAvailabilityDegraded(
+            fingerprint: "bbbb",
+            keys: [secureEnclaveKey],
+            report: revocationArtifactReport
+        ))
+    }
+
+    private func makeCustodyMappingIdentity(
+        fingerprint: String,
+        custody: PGPPrivateKeyCustodyKind
+    ) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: fingerprint,
+            keyVersion: 4,
+            profile: .universal,
+            userId: nil,
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data("public-\(fingerprint)".utf8),
+            revocationCert: Data("revocation-\(fingerprint)".utf8),
+            primaryAlgo: "P-256",
+            subkeyAlgo: "P-256",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: custody == .appleSecureEnclavePrivateOperations
+                ? .compatibleP256V4
+                : .compatibleSoftwareV4,
+            privateKeyCustodyKind: custody
+        )
+    }
+
+    private func makeAssessment(
+        ordinal: Int,
+        handleAvailability: SecureEnclaveCustodyHandleAvailability
+    ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
+        SecureEnclaveCustodyGenerationRecoveryAssessment(
+            identityOrdinal: ordinal,
+            configurationIdentity: .compatibleP256V4,
+            publicMaterialAvailability: .available,
+            revocationArtifactAvailability: .available,
+            handleAvailability: handleAvailability
+        )
+    }
+
     @MainActor
     private func makeModel(
         fingerprint: String,

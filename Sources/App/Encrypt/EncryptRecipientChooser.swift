@@ -248,7 +248,7 @@ private func recipientAccessibilityLabel(
 ) -> String {
     var parts = [
         IdentityDisplayPresentation.displayName(contact.displayName),
-        contact.preferredKey.profile.displayName
+        contact.preferredKey.profile.contactKeyKindDisplayName
     ]
     if RecipientCompatibility.isSeipdV1Downgrade(
         senderDefaultKeyVersion: defaultKeyVersion,
@@ -299,7 +299,7 @@ private struct RecipientRowContent: View {
                 Text(IdentityDisplayPresentation.displayName(contact.displayName))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
-                    Text(contact.preferredKey.profile.displayName)
+                    Text(contact.preferredKey.profile.contactKeyKindDisplayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if !contact.isPreferredKeyVerified {

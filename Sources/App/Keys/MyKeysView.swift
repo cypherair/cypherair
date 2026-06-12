@@ -132,9 +132,13 @@ private struct KeyRowView: View {
                         color: .accentColor
                     )
                 }
-                KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .compact)
+                if key.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations {
+                    KeyCustodyBadge(style: .compact)
+                } else {
+                    KeyBackupStatusBadge(isBackedUp: key.isBackedUp, style: .compact)
+                }
             }
-            Text(key.profile.displayName)
+            Text(key.openPGPConfigurationIdentity.familyDisplayName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
