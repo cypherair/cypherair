@@ -33,12 +33,16 @@ final class PrivateKeyContactCertificationService: ContactCertificationSigning, 
         selectedUserId: UserIdSelectionOption,
         certificationKind: OpenPGPCertificationKind
     ) async throws -> Data {
-        switch router.route(
+        let operationRoute = await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: signerFingerprint,
                 operation: .certify
             )
-        ) {
+        )
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             var secretKey: Data
             do {

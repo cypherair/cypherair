@@ -28,6 +28,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
+    private let secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let traceStore: AuthLifecycleTraceStore?
     private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
@@ -48,6 +49,7 @@ final class KeyManagementService: @unchecked Sendable {
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
+        secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -87,6 +89,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
         self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
+        self.secureEnclaveCustodyOperationAuthenticator = secureEnclaveCustodyOperationAuthenticator
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
             secureEnclave: secureEnclave,
@@ -560,7 +563,8 @@ final class KeyManagementService: @unchecked Sendable {
             catalogStore: catalogStore,
             resolver: resolver,
             publicBindingInspector: publicBindingInspector,
-            handleStore: handleStore
+            handleStore: handleStore,
+            custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator
         )
     }
 

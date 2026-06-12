@@ -1,9 +1,10 @@
 import Foundation
+import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
 final class PrivateKeyOperationRouterTests: XCTestCase {
-    func test_softwareCustodyRoutesWithoutInspectingSecureEnclaveHandles() throws {
+    func test_softwareCustodyRoutesWithoutInspectingSecureEnclaveHandles() async throws {
         let identity = makeSoftwareIdentity()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -16,7 +17,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             keyStore: keyStore
         )
 
-        let route = router.route(for: PrivateKeyOperationRequest(
+        let route = await router.route(for: PrivateKeyOperationRequest(
             fingerprint: identity.fingerprint,
             operation: .sign
         ))
@@ -29,7 +30,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_blockingPolicyBlocksSecureEnclavePrivateOperationBeforeHandleLookup() throws {
+    func test_blockingPolicyBlocksSecureEnclavePrivateOperationBeforeHandleLookup() async throws {
         let identity = makeSecureEnclaveIdentity()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -43,7 +44,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -52,7 +53,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_signingPolicyRoutesSecureEnclaveSigningClassOperations() throws {
+    func test_signingPolicyRoutesSecureEnclaveSigningClassOperations() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
@@ -76,7 +77,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             .modifyExpiry
         ]
         for operation in signingOperations {
-            let route = router.route(for: PrivateKeyOperationRequest(
+            let route = await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: operation
             ))
@@ -93,7 +94,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         }
     }
 
-    func test_refreshBindingRemainsExplicitlyNotImplementedUnderSigningRoutePolicy() throws {
+    func test_refreshBindingRemainsExplicitlyNotImplementedUnderSigningRoutePolicy() async throws {
         let identity = makeSecureEnclaveIdentity()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -107,7 +108,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .refreshBinding
             )),
@@ -116,7 +117,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_decryptRemainsBlockedForPhase5ASigningRouter() throws {
+    func test_decryptRemainsBlockedForPhase5ASigningRouter() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         let router = try makeRouter(
@@ -127,7 +128,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .decrypt
             )),
@@ -136,7 +137,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_keyAgreementPolicyRoutesSecureEnclaveDecryptOperation() throws {
+    func test_keyAgreementPolicyRoutesSecureEnclaveDecryptOperation() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
@@ -153,7 +154,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             keyStore: keyStore
         )
 
-        let route = router.route(for: PrivateKeyOperationRequest(
+        let route = await router.route(for: PrivateKeyOperationRequest(
             fingerprint: identity.fingerprint,
             operation: .decrypt
         ))
@@ -170,7 +171,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_keyAgreementPolicyBlocksSigningClassOperationsBeforeInspection() throws {
+    func test_keyAgreementPolicyBlocksSigningClassOperationsBeforeInspection() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.error = CypherAirError.invalidKeyData(reason: "Unexpected public binding inspection")
@@ -182,7 +183,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -191,7 +192,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_missingIdentityReturnsSanitizedBlockedRoute() throws {
+    func test_missingIdentityReturnsSanitizedBlockedRoute() async throws {
         let router = try makeRouter(
             identities: [],
             policy: .testSecureEnclaveSigningRoutes,
@@ -200,7 +201,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: "missing",
                 operation: .sign
             )),
@@ -208,7 +209,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_invalidConfigurationCustodyPairBlocksBeforeInspection() throws {
+    func test_invalidConfigurationCustodyPairBlocksBeforeInspection() async throws {
         let identity = PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
             keyVersion: 4,
@@ -236,7 +237,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -245,7 +246,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_publicCertificateInspectionFailureMapsToSanitizedCategory() throws {
+    func test_publicCertificateInspectionFailureMapsToSanitizedCategory() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.error = CypherAirError.invalidKeyData(reason: "Malformed certificate")
@@ -257,7 +258,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -265,7 +266,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_publicCertificateFingerprintMismatchBlocksAsMetadataMismatch() throws {
+    func test_publicCertificateFingerprintMismatchBlocksAsMetadataMismatch() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
@@ -287,7 +288,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -295,7 +296,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_missingHandleBlocksWithoutSoftwareFallback() throws {
+    func test_missingHandleBlocksWithoutSoftwareFallback() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(
@@ -311,7 +312,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -319,7 +320,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_missingKeyAgreementHandleBlocksWithoutSoftwareFallback() throws {
+    func test_missingKeyAgreementHandleBlocksWithoutSoftwareFallback() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(
@@ -335,7 +336,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .decrypt
             )),
@@ -343,7 +344,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_wrongHandleRoleMapsToRoleMismatch() throws {
+    func test_wrongHandleRoleMapsToRoleMismatch() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let signingReference = try reference("router-wrong-role", .signing)
         let keyAgreementReference = try reference("router-wrong-role", .keyAgreement)
@@ -373,7 +374,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -381,7 +382,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_wrongPublicBindingMapsToBindingMismatch() throws {
+    func test_wrongPublicBindingMapsToBindingMismatch() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
@@ -403,7 +404,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
 
         assertBlocked(
-            router.route(for: PrivateKeyOperationRequest(
+            await router.route(for: PrivateKeyOperationRequest(
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
@@ -411,7 +412,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_authenticationHandleFailuresMapToStableCategories() throws {
+    func test_authenticationHandleFailuresMapToStableCategories() async throws {
         let failureCases: [(SecureEnclaveCustodyHandleError, PGPKeyOperationFailureCategory)] = [
             (.localAuthenticationCancelled(.signing), .localAuthenticationCancelled),
             (.localAuthenticationFailed(.signing), .localAuthenticationFailed)
@@ -438,7 +439,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             )
 
             assertBlocked(
-                router.route(for: PrivateKeyOperationRequest(
+                await router.route(for: PrivateKeyOperationRequest(
                     fingerprint: identity.fingerprint,
                     operation: .sign
                 )),
@@ -447,11 +448,261 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         }
     }
 
+    func test_secureEnclaveSignerRouteAuthenticatesOnceAndThreadsContextIntoHandleLoad() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-signer" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        keyStore.resetCallHistory()
+
+        let route = await router.route(for: PrivateKeyOperationRequest(
+            fingerprint: identity.fingerprint,
+            operation: .sign
+        ))
+
+        guard case .secureEnclaveSigner(let signerRoute) = route else {
+            return XCTFail("Expected Secure Enclave signer route")
+        }
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertFalse(stub.reasons[0].isEmpty)
+        XCTAssertTrue(signerRoute.operationAuthorization?.authenticationContext === stub.context)
+        let contextBearingLoads = keyStore.loadRequests.filter { $0.authenticationContext != nil }
+        XCTAssertEqual(contextBearingLoads.count, 1)
+        XCTAssertEqual(contextBearingLoads.first?.reference.role, .signing)
+        XCTAssertTrue(contextBearingLoads.first?.authenticationContext === stub.context)
+        XCTAssertEqual(stub.context.invalidateCount, 0)
+        route.endAuthorizedOperation()
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+    }
+
+    func test_secureEnclaveKeyAgreementRouteAuthenticatesOnceAndThreadsContextIntoHandleLoad() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-agreement" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveKeyAgreementRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        keyStore.resetCallHistory()
+
+        let route = await router.route(for: PrivateKeyOperationRequest(
+            fingerprint: identity.fingerprint,
+            operation: .decrypt
+        ))
+
+        guard case .secureEnclaveKeyAgreement(let keyAgreementRoute) = route else {
+            return XCTFail("Expected Secure Enclave key-agreement route")
+        }
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertTrue(keyAgreementRoute.operationAuthorization?.authenticationContext === stub.context)
+        let contextBearingLoads = keyStore.loadRequests.filter { $0.authenticationContext != nil }
+        XCTAssertEqual(contextBearingLoads.count, 1)
+        XCTAssertEqual(contextBearingLoads.first?.reference.role, .keyAgreement)
+        XCTAssertTrue(contextBearingLoads.first?.authenticationContext === stub.context)
+        route.endAuthorizedOperation()
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+    }
+
+    func test_cancelledCustodyAuthenticationBlocksWithoutContextBearingLoad() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-cancel" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        stub.errorToThrow = CypherAirError.operationCancelled
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        keyStore.resetCallHistory()
+
+        assertBlocked(
+            await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.localAuthenticationCancelled)
+        )
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+    }
+
+    func test_failedCustodyAuthenticationBlocksAsLocalAuthenticationFailed() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-fail" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        stub.errorToThrow = CypherAirError.authenticationFailed
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        keyStore.resetCallHistory()
+
+        assertBlocked(
+            await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.localAuthenticationFailed)
+        )
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+    }
+
+    func test_nilCustodyAuthenticatorKeepsContextFreeLoadsAndNilAuthorization() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-nil" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore
+        )
+        keyStore.resetCallHistory()
+
+        let route = await router.route(for: PrivateKeyOperationRequest(
+            fingerprint: identity.fingerprint,
+            operation: .sign
+        ))
+
+        guard case .secureEnclaveSigner(let signerRoute) = route else {
+            return XCTFail("Expected Secure Enclave signer route")
+        }
+        XCTAssertNil(signerRoute.operationAuthorization)
+        XCTAssertFalse(keyStore.loadRequests.isEmpty)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+    }
+
+    func test_softwareAndBlockedRoutesNeverInvokeCustodyAuthenticator() async throws {
+        let stub = StubCustodyOperationAuthenticator()
+        let softwareIdentity = makeSoftwareIdentity()
+        let softwareRouter = try makeRouter(
+            identities: [softwareIdentity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: RecordingPublicBindingInspector(),
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        guard case .softwareSecretCertificate = await softwareRouter.route(for: PrivateKeyOperationRequest(
+            fingerprint: softwareIdentity.fingerprint,
+            operation: .sign
+        )) else {
+            return XCTFail("Expected software custody route")
+        }
+
+        let secureEnclaveIdentity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(
+            identity: secureEnclaveIdentity,
+            signingPublicKeyX963: makePublicKey(byte: 0x91),
+            keyAgreementPublicKeyX963: makePublicKey(byte: 0x92)
+        )
+        let blockedRouter = try makeRouter(
+            identities: [secureEnclaveIdentity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        assertBlocked(
+            await blockedRouter.route(for: PrivateKeyOperationRequest(
+                fingerprint: secureEnclaveIdentity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.privateHandleMissing)
+        )
+
+        XCTAssertEqual(stub.calls, 0)
+    }
+
+    func test_postAuthenticationLoadFailureBlocksAndEndsNeverReturnedAuthorization() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-loadfail" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        stub.failLoadAfterAuthentication = { keyStore.failLoadError = .privateHandleInaccessible(.signing) }
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        assertBlocked(
+            await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.privateHandleInaccessible)
+        )
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertEqual(
+            stub.context.invalidateCount,
+            1,
+            "The router ends a never-returned authorization itself."
+        )
+    }
+
     private func makeRouter(
         identities: [PGPKeyIdentity],
         policy: PGPKeyCapabilityResolver.Policy,
         inspector: RecordingPublicBindingInspector,
-        keyStore: MockSecureEnclaveCustodyKeyStore
+        keyStore: MockSecureEnclaveCustodyKeyStore,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil
     ) throws -> PrivateKeyOperationRouter {
         let metadata = RouterMemoryKeyMetadataPersistence()
         metadata.seed(identities)
@@ -461,7 +712,8 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             catalogStore: catalogStore,
             resolver: PGPKeyCapabilityResolver(policy: policy),
             publicBindingInspector: inspector,
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            custodyOperationAuthenticator: custodyOperationAuthenticator
         )
     }
 
@@ -572,6 +824,24 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         var data = Data([0x04])
         data.append(Data(repeating: byte, count: 64))
         return data
+    }
+}
+
+private final class StubCustodyOperationAuthenticator: @unchecked Sendable {
+    private(set) var calls = 0
+    private(set) var reasons: [String] = []
+    var errorToThrow: Error?
+    var failLoadAfterAuthentication: (() -> Void)?
+    let context = RecordingLAContext()
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        calls += 1
+        reasons.append(reason)
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        failLoadAfterAuthentication?()
+        return context
     }
 }
 

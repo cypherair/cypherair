@@ -185,6 +185,14 @@ final class AppContainer: @unchecked Sendable {
         #endif
     }
 
+    /// The custody pre-authenticator (P7F single-prompt contract): one biometric
+    /// system-sheet evaluation per Secure Enclave custody private operation,
+    /// threaded into the handle-loading keychain query via kSecUseAuthenticationContext.
+    /// Bypass containers (UI test, tutorial) stay nil.
+    private static var productionSecureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? {
+        PrivateKeyOperationRouter.systemBiometricCustodyOperationAuthenticator
+    }
+
     /// Builds the App Access Protection policy-switch workflow over the
     /// container's live dependencies. The workflow encloses the whole switch in
     /// one operation-prompt session (the uniform rule, TARGET §3).
@@ -742,6 +750,7 @@ final class AppContainer: @unchecked Sendable {
             // The UI-test container stays nil (mock Secure Enclave under the
             // authentication bypass must not drive real LocalAuthentication).
             expiryAuthenticator: Self.productionExpiryAuthenticator,
+            secureEnclaveCustodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
             // Device-bound Secure Enclave custody generation (issue #501 P7D
@@ -760,7 +769,8 @@ final class AppContainer: @unchecked Sendable {
                         resolver: PGPKeyCapabilityResolver(),
                         invalidationGate: invalidationGate,
                         commitCoordinator: commitCoordinator,
-                        authenticationPromptCoordinator: authPromptCoordinator
+                        authenticationPromptCoordinator: authPromptCoordinator,
+                        custodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator
                     )
                 }
                 : nil,

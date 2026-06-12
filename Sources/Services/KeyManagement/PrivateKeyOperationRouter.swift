@@ -1,24 +1,71 @@
 import Foundation
+import LocalAuthentication
 
 final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Sendable {
     private let catalogStore: KeyCatalogStore
     private let resolver: PGPKeyCapabilityResolver
     private let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     private let handleStore: SecureEnclaveCustodyHandleStore
+    private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
 
     init(
         catalogStore: KeyCatalogStore,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
-        handleStore: SecureEnclaveCustodyHandleStore
+        handleStore: SecureEnclaveCustodyHandleStore,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     ) {
         self.catalogStore = catalogStore
         self.resolver = resolver
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
+        self.custodyOperationAuthenticator = custodyOperationAuthenticator
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    /// The production custody pre-authenticator: one fresh biometric
+    /// system-sheet evaluation per Secure Enclave custody private operation.
+    /// The returned context is interaction-disabled, so the subsequent
+    /// keychain handle load and SE crypto consume the evaluated session
+    /// instead of presenting further prompts.
+    static var systemBiometricCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator {
+        { reason in
+            let context = LAContext()
+            context.touchIDAuthenticationAllowableReuseDuration = 0
+            context.localizedFallbackTitle = ""
+            do {
+                let success = try await context.evaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    localizedReason: reason
+                )
+                guard success else {
+                    throw CypherAirError.authenticationFailed
+                }
+                context.interactionNotAllowed = true
+                return context
+            } catch let error as CypherAirError {
+                // Every failure path invalidates the never-returned context
+                // exactly once; only a returned (authenticated) context is the
+                // caller's to invalidate.
+                context.invalidate()
+                throw error
+            } catch {
+                context.invalidate()
+                if let laError = error as? LAError {
+                    switch laError.code {
+                    case .userCancel, .appCancel, .systemCancel:
+                        throw CypherAirError.operationCancelled
+                    case .biometryNotAvailable, .biometryNotEnrolled:
+                        throw CypherAirError.biometricsUnavailable
+                    default:
+                        throw CypherAirError.authenticationFailed
+                    }
+                }
+                throw CypherAirError.authenticationFailed
+            }
+        }
+    }
+
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         guard let identity = catalogStore.identity(for: request.fingerprint) else {
             return .blocked(.unavailable(.metadataAssociationMismatch))
         }
@@ -40,7 +87,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 )
             )
         case .appleSecureEnclavePrivateOperations:
-            return routeSecureEnclaveOperation(
+            return await routeSecureEnclaveOperation(
                 request: request,
                 identity: identity
             )
@@ -50,7 +97,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     private func routeSecureEnclaveOperation(
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity
-    ) -> PrivateKeyOperationRoute {
+    ) async -> PrivateKeyOperationRoute {
         let configuration = identity.openPGPConfiguration
         guard configuration.algorithmSuite == .p256,
               configuration.keyVersion == identity.keyVersion else {
@@ -81,13 +128,13 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
 
         switch request.operation.requiredRole {
         case .signing:
-            return routeSecureEnclaveSigningOperation(
+            return await routeSecureEnclaveSigningOperation(
                 request: request,
                 identity: identity,
                 inspection: inspection
             )
         case .keyAgreement:
-            return routeSecureEnclaveKeyAgreementOperation(
+            return await routeSecureEnclaveKeyAgreementOperation(
                 request: request,
                 identity: identity,
                 inspection: inspection
@@ -99,20 +146,35 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity,
         inspection: PGPSecureEnclaveCustodyPublicBindingInspection
-    ) -> PrivateKeyOperationRoute {
+    ) async -> PrivateKeyOperationRoute {
         do {
-            let signingHandle = try handleStore.loadSigningHandle(
+            // Locate (non-prompting) BEFORE pre-authenticating, load AFTER:
+            // a missing/mismatched handle blocks without a biometric sheet,
+            // and the authenticated context covers exactly one handle load.
+            let pair = try handleStore.locateHandlePair(
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
             )
-            return .secureEnclaveSigner(
-                SecureEnclaveSignerRoute(
-                    identity: identity,
-                    operation: request.operation,
-                    publicBindingInspection: inspection,
-                    signingHandle: signingHandle
+            let authorization = try await makeOperationAuthorizationIfConfigured()
+            do {
+                let signingHandle = try handleStore.loadHandle(
+                    reference: pair.signing.reference,
+                    expectedPublicKeyX963: pair.signing.publicKeyX963,
+                    authenticationContext: authorization?.authenticationContext
                 )
-            )
+                return .secureEnclaveSigner(
+                    SecureEnclaveSignerRoute(
+                        identity: identity,
+                        operation: request.operation,
+                        publicBindingInspection: inspection,
+                        signingHandle: signingHandle,
+                        operationAuthorization: authorization
+                    )
+                )
+            } catch {
+                authorization?.end()
+                throw error
+            }
         } catch {
             return .blocked(.unavailable(
                 PGPKeyOperationFailureMapper.category(
@@ -127,20 +189,32 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity,
         inspection: PGPSecureEnclaveCustodyPublicBindingInspection
-    ) -> PrivateKeyOperationRoute {
+    ) async -> PrivateKeyOperationRoute {
         do {
-            let keyAgreementHandle = try handleStore.loadKeyAgreementHandle(
+            let pair = try handleStore.locateHandlePair(
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
             )
-            return .secureEnclaveKeyAgreement(
-                SecureEnclaveKeyAgreementRoute(
-                    identity: identity,
-                    operation: request.operation,
-                    publicBindingInspection: inspection,
-                    keyAgreementHandle: keyAgreementHandle
+            let authorization = try await makeOperationAuthorizationIfConfigured()
+            do {
+                let keyAgreementHandle = try handleStore.loadHandle(
+                    reference: pair.keyAgreement.reference,
+                    expectedPublicKeyX963: pair.keyAgreement.publicKeyX963,
+                    authenticationContext: authorization?.authenticationContext
                 )
-            )
+                return .secureEnclaveKeyAgreement(
+                    SecureEnclaveKeyAgreementRoute(
+                        identity: identity,
+                        operation: request.operation,
+                        publicBindingInspection: inspection,
+                        keyAgreementHandle: keyAgreementHandle,
+                        operationAuthorization: authorization
+                    )
+                )
+            } catch {
+                authorization?.end()
+                throw error
+            }
         } catch {
             return .blocked(.unavailable(
                 PGPKeyOperationFailureMapper.category(
@@ -149,5 +223,20 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 )
             ))
         }
+    }
+
+    private func makeOperationAuthorizationIfConfigured() async throws -> SecureEnclaveCustodyOperationAuthorization? {
+        guard let custodyOperationAuthenticator else {
+            return nil
+        }
+        let authenticationContext = try await custodyOperationAuthenticator(
+            String(
+                localized: "keyoperation.custody.auth.reason",
+                defaultValue: "Authenticate to use your device-bound key."
+            )
+        )
+        return SecureEnclaveCustodyOperationAuthorization(
+            authenticationContext: authenticationContext
+        )
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 @testable import CypherAir
 
 final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @unchecked Sendable {
@@ -10,6 +11,9 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         (reference: SecureEnclaveCustodyHandleReference, accessPolicy: SecureEnclaveCustodyAccessControlPolicy)
     ] = []
     private(set) var deleteRequests: [SecureEnclaveCustodyHandleReference] = []
+    private(set) var loadRequests: [
+        (reference: SecureEnclaveCustodyHandleReference, authenticationContext: LAContext?)
+    ] = []
 
     var failCreateRole: PGPPrivateOperationRole?
     var failDeleteRole: PGPPrivateOperationRole?
@@ -41,7 +45,11 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         return handle
     }
 
-    func loadKeys(reference: SecureEnclaveCustodyHandleReference) throws -> [SecureEnclaveCustodyLoadedHandle] {
+    func loadKeys(
+        reference: SecureEnclaveCustodyHandleReference,
+        authenticationContext: LAContext?
+    ) throws -> [SecureEnclaveCustodyLoadedHandle] {
+        loadRequests.append((reference, authenticationContext))
         if let failLoadError {
             throw failLoadError
         }
@@ -136,6 +144,7 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     func resetCallHistory() {
         createRequests.removeAll()
         deleteRequests.removeAll()
+        loadRequests.removeAll()
     }
 
     private func nextPublicKey() -> Data {
@@ -146,5 +155,14 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         var data = Data([0x04])
         data.append(Data(repeating: publicKeyCounter, count: 64))
         return data
+    }
+}
+
+final class RecordingLAContext: LAContext {
+    var invalidateCount = 0
+
+    override func invalidate() {
+        invalidateCount += 1
+        super.invalidate()
     }
 }

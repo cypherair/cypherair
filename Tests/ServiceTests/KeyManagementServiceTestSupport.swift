@@ -637,6 +637,7 @@ class KeyManagementServiceTestCase: XCTestCase {
         metadataPersistence: RecordingKeyMetadataPersistence = RecordingKeyMetadataPersistence(),
         keyStore: MockSecureEnclaveCustodyKeyStore = MockSecureEnclaveCustodyKeyStore(),
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: SecureEnclaveCustodyGenerationService.GenerationCheckpoint? = nil,
         commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
@@ -676,6 +677,7 @@ class KeyManagementServiceTestCase: XCTestCase {
                     invalidationGate: invalidationGate,
                     commitCoordinator: commitCoordinator,
                     authenticationPromptCoordinator: authenticationPromptCoordinator,
+                    custodyOperationAuthenticator: custodyOperationAuthenticator,
                     afterIdentityCommitCheckpoint: afterIdentityCommitCheckpoint
                 )
             }

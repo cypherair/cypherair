@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 /// Generation path for Secure Enclave custody public-only keys (device-bound
 /// families). Exposed to the product UI since P7D; previously hidden/test-only.
@@ -13,6 +14,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let commitCoordinator: KeyProvisioningCommitCoordinator
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
+    private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let afterIdentityCommitCheckpoint: GenerationCheckpoint?
 
     init(
@@ -24,6 +26,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         afterIdentityCommitCheckpoint: GenerationCheckpoint? = nil
     ) {
         self.certificateBuilder = certificateBuilder
@@ -34,6 +37,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.invalidationGate = invalidationGate
         self.commitCoordinator = commitCoordinator
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.custodyOperationAuthenticator = custodyOperationAuthenticator
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
@@ -97,11 +101,41 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
+        // Single prompt per generation (P7F): pre-authenticate BEFORE any
+        // handle exists — a declined sheet aborts with nothing to roll back —
+        // and thread the evaluated context into the biometryAny handle loads
+        // below. When nil (test rigs, platforms without the production
+        // wiring), the loads authenticate implicitly as before.
+        var authorizedContext: LAContext?
+        if let custodyOperationAuthenticator {
+            do {
+                authorizedContext = try await custodyOperationAuthenticator(
+                    String(
+                        localized: "keygen.custody.auth.reason",
+                        defaultValue: "Authenticate to create your device-bound key."
+                    )
+                )
+            } catch {
+                throw CypherAirError.keyOperationUnavailable(
+                    category: PGPKeyOperationFailureMapper.category(
+                        for: error,
+                        fallback: .localAuthenticationFailed
+                    )
+                )
+            }
+        }
+        defer {
+            authorizedContext?.invalidate()
+        }
+
         let handlePair = try handleStore.createHandlePair()
         var storedFingerprint: String?
         var didRollbackGeneratedState = false
         do {
-            let loadedPair = try handleStore.loadHandlePair(expected: handlePair)
+            let loadedPair = try handleStore.loadHandlePair(
+                expected: handlePair,
+                authenticationContext: authorizedContext
+            )
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 

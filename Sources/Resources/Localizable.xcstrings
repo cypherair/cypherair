@@ -9637,6 +9637,22 @@
         }
       }
     },
+    "keygen.custody.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to create your device-bound key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建你的设备绑定密钥需要进行身份认证。"
+          }
+        }
+      }
+    },
     "keygen.deviceBound.confirm.create" : {
       "localizations" : {
         "en" : {
@@ -9873,6 +9889,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成密钥"
+          }
+        }
+      }
+    },
+    "keyoperation.custody.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to use your device-bound key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的设备绑定密钥需要进行身份认证。"
           }
         }
       }

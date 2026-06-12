@@ -1,3 +1,4 @@
+import LocalAuthentication
 import Security
 import XCTest
 @testable import CypherAir
@@ -234,6 +235,153 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
         }
     }
 
+    func test_secureEnclaveSelectiveRevocationAuthenticatesOncePerExportAndEndsAuthorization() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubSelectiveRevocationCustodyOperationAuthenticator()
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeySelectiveRevocationService(
+            TestHelpers.makeSelectiveRevocationService(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            )
+        )
+        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+        let userId = try XCTUnwrap(catalog.userIds.first)
+
+        _ = try await keyManagement.exportSubkeyRevocationCertificate(
+            fingerprint: fixture.identity.fingerprint,
+            subkeySelection: subkey
+        )
+        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication per export.")
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+
+        _ = try await keyManagement.exportUserIdRevocationCertificate(
+            fingerprint: fixture.identity.fingerprint,
+            userIdSelection: userId
+        )
+        XCTAssertEqual(stub.calls, 2)
+        XCTAssertEqual(stub.context.invalidateCount, 2)
+        XCTAssertEqual(mockSE.unwrapCallCount, 0)
+    }
+
+    func test_secureEnclaveSelectiveRevocationCancelledAuthenticationBlocksBothExportsWithoutSigning() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubSelectiveRevocationCustodyOperationAuthenticator()
+        stub.errorToThrow = CypherAirError.operationCancelled
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeySelectiveRevocationService(
+            TestHelpers.makeSelectiveRevocationService(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: UnexpectedSelectiveRevocationDigestSigner()
+            )
+        )
+        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+        let userId = try XCTUnwrap(catalog.userIds.first)
+
+        do {
+            _ = try await keyManagement.exportSubkeyRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                subkeySelection: subkey
+            )
+            XCTFail("Expected cancelled custody authentication to block subkey export")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .localAuthenticationCancelled)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        do {
+            _ = try await keyManagement.exportUserIdRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                userIdSelection: userId
+            )
+            XCTFail("Expected cancelled custody authentication to block User ID export")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .localAuthenticationCancelled)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(stub.calls, 2)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+        XCTAssertEqual(mockSE.unwrapCallCount, 0)
+    }
+
+    func test_secureEnclaveSelectiveRevocationEndsAuthorizationAfterSigningFailureInBothExports() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubSelectiveRevocationCustodyOperationAuthenticator()
+        let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        keyManagement.configurePrivateKeySelectiveRevocationService(
+            TestHelpers.makeSelectiveRevocationService(
+                engine: engine,
+                keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+                digestSigner: ThrowingSelectiveRevocationDigestSigner(
+                    error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+                )
+            )
+        )
+        let catalog = try keyManagement.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+        let userId = try XCTUnwrap(catalog.userIds.first)
+
+        do {
+            _ = try await keyManagement.exportSubkeyRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                subkeySelection: subkey
+            )
+            XCTFail("Expected signing failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+
+        do {
+            _ = try await keyManagement.exportUserIdRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                userIdSelection: userId
+            )
+            XCTFail("Expected signing failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(stub.context.invalidateCount, 2)
+    }
+
     private func assertArmoredSignature(
         _ armored: Data,
         file: StaticString = #filePath,
@@ -397,6 +545,20 @@ private struct SelectiveRevocationSecureEnclaveRouteFixture {
 private enum ExpectedSelectiveRevocationError {
     case operationCancelled
     case keyOperationUnavailable(PGPKeyOperationFailureCategory)
+}
+
+private final class StubSelectiveRevocationCustodyOperationAuthenticator: @unchecked Sendable {
+    private(set) var calls = 0
+    var errorToThrow: Error?
+    let context = RecordingLAContext()
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        calls += 1
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return context
+    }
 }
 
 private struct UnexpectedSelectiveRevocationDigestSigner: SecureEnclaveCustodyDigestSigning {

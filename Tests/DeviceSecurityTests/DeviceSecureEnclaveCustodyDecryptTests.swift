@@ -352,7 +352,7 @@ private struct StaticRoute: PrivateKeyOperationRouting {
         self.route = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         route
     }
 }

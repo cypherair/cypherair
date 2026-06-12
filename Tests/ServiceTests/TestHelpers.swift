@@ -16,6 +16,7 @@ enum TestHelpers {
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
+        secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
         service: KeyManagementService,
@@ -43,6 +44,7 @@ enum TestHelpers {
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,
+                secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
                 metadataPersistence: metadataPersistence,
                 provisioningCheckpoint: provisioningCheckpoint
             )
@@ -54,6 +56,7 @@ enum TestHelpers {
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,
+                secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
                 metadataPersistence: metadataPersistence,
                 provisioningCheckpoint: provisioningCheckpoint
             )

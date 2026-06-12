@@ -122,10 +122,41 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         let store = makeStore(keyStore: keyStore, handleSetIdentifier: "load")
         let pair = try store.createHandlePair()
 
-        let loaded = try store.loadHandlePair(expected: pair)
+        let loaded = try store.loadHandlePair(expected: pair, authenticationContext: nil)
 
         XCTAssertEqual(loaded.signing.binding, pair.signing)
         XCTAssertEqual(loaded.keyAgreement.binding, pair.keyAgreement)
+    }
+
+    func test_loadHandlePairThreadsSameAuthenticationContextToBothRoles() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "loadcontext")
+        let pair = try store.createHandlePair()
+        keyStore.resetCallHistory()
+        let authenticationContext = RecordingLAContext()
+
+        _ = try store.loadHandlePair(expected: pair, authenticationContext: authenticationContext)
+
+        XCTAssertEqual(keyStore.loadRequests.count, 2)
+        XCTAssertEqual(keyStore.loadRequests.map(\.reference.role), [.signing, .keyAgreement])
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext === authenticationContext })
+    }
+
+    func test_inspectClassifyAndLocatePathsLoadWithoutAuthenticationContext() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "contextfree")
+        let pair = try store.createHandlePair()
+        keyStore.resetCallHistory()
+
+        _ = store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier)
+        _ = store.classifyHandleAvailability(expected: pair)
+        _ = try store.locateHandlePair(
+            signingPublicKeyX963: pair.signing.publicKeyX963,
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+        )
+
+        XCTAssertFalse(keyStore.loadRequests.isEmpty)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
     }
 
     func test_loadSigningHandleLocatesCompletePairAndReturnsSigningHandle() throws {
@@ -135,7 +166,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
 
         let signing = try store.loadSigningHandle(
             signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963,
+            authenticationContext: nil
         )
 
         XCTAssertEqual(signing.role, .signing)
@@ -149,7 +181,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
 
         let keyAgreement = try store.loadKeyAgreementHandle(
             signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963,
+            authenticationContext: nil
         )
 
         XCTAssertEqual(keyAgreement.role, .keyAgreement)
@@ -169,7 +202,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try store.loadSigningHandle(
                 signingPublicKeyX963: signingHandle.binding.publicKeyX963,
-                keyAgreementPublicKeyX963: makePublicKey(byte: 0x62)
+                keyAgreementPublicKeyX963: makePublicKey(byte: 0x62),
+                authenticationContext: nil
             )
         ) { error in
             XCTAssertEqual(
@@ -194,7 +228,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try store.loadHandle(
                 reference: signingReference,
-                expectedPublicKeyX963: wrongRoleBinding.publicKeyX963
+                expectedPublicKeyX963: wrongRoleBinding.publicKeyX963,
+                authenticationContext: nil
             )
         ) { error in
             XCTAssertEqual(
@@ -217,7 +252,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try store.loadHandle(
                 reference: pair.signing.reference,
-                expectedPublicKeyX963: expectedWrongPublicKey
+                expectedPublicKeyX963: expectedWrongPublicKey,
+                authenticationContext: nil
             )
         ) { error in
             XCTAssertEqual(
@@ -270,7 +306,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try store.loadHandle(
                 reference: try reference("missing", .signing),
-                expectedPublicKeyX963: makePublicKey(byte: 0x99)
+                expectedPublicKeyX963: makePublicKey(byte: 0x99),
+                authenticationContext: nil
             )
         ) { error in
             XCTAssertEqual(
@@ -298,7 +335,8 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         XCTAssertThrowsError(
             try store.loadHandle(
                 reference: signingReference,
-                expectedPublicKeyX963: firstHandle.binding.publicKeyX963
+                expectedPublicKeyX963: firstHandle.binding.publicKeyX963,
+                authenticationContext: nil
             )
         ) { error in
             XCTAssertEqual(

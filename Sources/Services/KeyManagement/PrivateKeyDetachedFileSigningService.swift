@@ -31,12 +31,16 @@ final class PrivateKeyDetachedFileSigningService: DetachedFileSigning, @unchecke
         signerFingerprint: String,
         progress: FileProgressReporter?
     ) async throws -> Data {
-        switch router.route(
+        let operationRoute = await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: signerFingerprint,
                 operation: .sign
             )
-        ) {
+        )
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             var secretKey: Data
             do {

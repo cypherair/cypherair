@@ -1,3 +1,4 @@
+import LocalAuthentication
 import Security
 import XCTest
 @testable import CypherAir
@@ -282,6 +283,71 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         }
     }
 
+    func test_secureEnclaveCertificationEndsAuthorizationAfterSuccessAndSigningFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        let stub = StubCertificationCustodyOperationAuthenticator()
+        let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
+            engine: engine,
+            secureEnclaveCustodyOperationAuthenticator: stub.authenticate
+        )
+        _ = mockKeychain
+        try metadataPersistence.save(fixture.identity)
+        try keyManagement.loadKeys()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.insert(fixture.route.signingHandle)
+        keyStore.insert(fixture.keyAgreementHandle)
+        let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let target = try generatedTarget(profile: .universal)
+        let targetInfo = try engine.parseKeyInfo(keyData: target.publicKeyData)
+        let selectedUserId = try XCTUnwrap(
+            certificateAdapter.validatedCatalog(
+                certData: target.publicKeyData,
+                expectedFingerprint: targetInfo.fingerprint
+            ).userIds.first
+        )
+
+        let service = TestHelpers.makeContactCertificationSigner(
+            engine: engine,
+            keyManagement: keyManagement,
+            certificateAdapter: certificateAdapter,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+        )
+        _ = try await service.generateUserIdCertification(
+            signerFingerprint: fixture.identity.fingerprint,
+            targetCert: target.publicKeyData,
+            selectedUserId: selectedUserId,
+            certificationKind: .positive
+        )
+        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication per certification.")
+        XCTAssertEqual(stub.context.invalidateCount, 1)
+        XCTAssertEqual(mockSE.unwrapCallCount, 0)
+
+        let failingService = TestHelpers.makeContactCertificationSigner(
+            engine: engine,
+            keyManagement: keyManagement,
+            certificateAdapter: certificateAdapter,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            digestSigner: ThrowingCertificationDigestSigner(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+            )
+        )
+        do {
+            _ = try await failingService.generateUserIdCertification(
+                signerFingerprint: fixture.identity.fingerprint,
+                targetCert: target.publicKeyData,
+                selectedUserId: selectedUserId,
+                certificationKind: .positive
+            )
+            XCTFail("Expected signing failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(stub.calls, 2)
+        XCTAssertEqual(stub.context.invalidateCount, 2)
+    }
+
     private func generatedTarget(profile: KeyProfile) throws -> GeneratedKey {
         try engine.generateKey(
             name: "Certification Target",
@@ -490,6 +556,20 @@ private struct UnexpectedCertificationDigestSigner: SecureEnclaveCustodyDigestSi
     ) throws -> SecureEnclaveP256RawSignature {
         XCTFail("Digest signer should not be called")
         throw CancellationError()
+    }
+}
+
+private final class StubCertificationCustodyOperationAuthenticator: @unchecked Sendable {
+    private(set) var calls = 0
+    var errorToThrow: Error?
+    let context = RecordingLAContext()
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        calls += 1
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return context
     }
 }
 

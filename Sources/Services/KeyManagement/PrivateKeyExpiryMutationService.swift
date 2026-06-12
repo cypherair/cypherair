@@ -1,7 +1,7 @@
 import Foundation
 
 protocol PrivateKeyExpiryMutationRouting: Sendable {
-    func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute
+    func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute
 
     func modifySecureEnclaveExpiry(
         route: SecureEnclaveSignerRoute,
@@ -24,8 +24,8 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
         self.digestSigner = digestSigner
     }
 
-    func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute {
-        router.route(
+    func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
+        await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: fingerprint,
                 operation: .modifyExpiry

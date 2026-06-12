@@ -131,7 +131,11 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode?
     ) async throws -> PGPKeyIdentity {
-        switch routeModifyExpiry(fingerprint: fingerprint) {
+        let operationRoute = await routeModifyExpiry(fingerprint: fingerprint)
+        defer {
+            operationRoute.endAuthorizedOperation()
+        }
+        switch operationRoute {
         case .softwareSecretCertificate(let route):
             let effectiveAuthMode: AuthenticationMode
             if let authMode {
@@ -315,9 +319,9 @@ final class KeyMutationService {
         return updated
     }
 
-    private func routeModifyExpiry(fingerprint: String) -> PrivateKeyOperationRoute {
+    private func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
         if let expiryMutationService {
-            return expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
+            return await expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
         }
 
         guard let identity = catalogStore.identity(for: fingerprint) else {

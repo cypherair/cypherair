@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
@@ -114,6 +115,62 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         )
 
         XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+    }
+
+    func test_secureEnclaveGeneration_custodyPreAuthenticationRunsInsideOperationPromptSession() async throws {
+        // P7F: the single-prompt pre-authentication is part of the SAME
+        // operation-prompt session as the rest of the generation, so its own
+        // sheet resign is attributed to this action like every other prompt.
+        let coordinator = AuthenticationPromptCoordinator()
+        let observer = SessionObservingCustodyAuthenticator(coordinator: coordinator)
+        let target = makeHiddenSecureEnclaveGenerationService(
+            authenticationPromptCoordinator: coordinator,
+            custodyOperationAuthenticator: observer.authenticate
+        )
+
+        let identity = try await target.service.generateSecureEnclaveCustodyKey(
+            name: "SE Custody P7F",
+            email: nil,
+            expirySeconds: nil,
+            configurationIdentity: .compatibleP256V4
+        )
+
+        XCTAssertEqual(identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
+        XCTAssertEqual(observer.calls, 1)
+        XCTAssertEqual(
+            observer.sawOperationPromptInProgress,
+            true,
+            "The custody pre-authentication must run while the operation-prompt session is open."
+        )
+        XCTAssertEqual(observer.context.invalidateCount, 1)
+    }
+}
+
+private final class SessionObservingCustodyAuthenticator: @unchecked Sendable {
+    private let coordinator: AuthenticationPromptCoordinator
+    private let lock = NSLock()
+    private var callsStorage = 0
+    private var sawOperationPromptInProgressStorage: Bool?
+    let context = RecordingLAContext()
+
+    init(coordinator: AuthenticationPromptCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    var calls: Int {
+        lock.withLock { callsStorage }
+    }
+
+    var sawOperationPromptInProgress: Bool? {
+        lock.withLock { sawOperationPromptInProgressStorage }
+    }
+
+    @Sendable func authenticate(_ reason: String) async throws -> LAContext {
+        lock.withLock {
+            callsStorage += 1
+            sawOperationPromptInProgressStorage = coordinator.isOperationPromptInProgress
+        }
+        return context
     }
 }
 #endif

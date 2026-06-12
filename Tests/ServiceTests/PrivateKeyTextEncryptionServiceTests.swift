@@ -380,6 +380,64 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         XCTAssertEqual(unwrapper.unwrapRequests, [])
     }
 
+    func test_secureEnclaveRouteEndsOperationAuthorizationAfterSuccessAndAdapterFailure() async throws {
+        let fixture = try await makeSecureEnclaveRouteFixture()
+        var recipient = try makeRecipient()
+        defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
+
+        let successContext = RecordingLAContext()
+        let successService = makeService(
+            router: StaticTextPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: successContext))
+            ),
+            unwrapper: RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00]))
+        )
+        _ = try await successService.encryptText(
+            Data("authorized text".utf8),
+            recipientKeys: [recipient.publicKeyData],
+            signerFingerprint: fixture.identity.fingerprint,
+            selfKey: nil
+        )
+        XCTAssertEqual(successContext.invalidateCount, 1)
+
+        let failureContext = RecordingLAContext()
+        let failingService = makeService(
+            router: StaticTextPrivateKeyOperationRouter(
+                route: .secureEnclaveSigner(makeAuthorizedRoute(fixture: fixture, context: failureContext))
+            ),
+            unwrapper: RecordingTextSoftwareSecretCertificateUnwrapper(secretCert: Data([0x00])),
+            digestSigner: ThrowingTextDigestSigner(
+                error: SecureEnclaveCustodyHandleError.localAuthenticationFailed(.signing)
+            )
+        )
+        do {
+            _ = try await failingService.encryptText(
+                Data("authorized failure".utf8),
+                recipientKeys: [recipient.publicKeyData],
+                signerFingerprint: fixture.identity.fingerprint,
+                selfKey: nil
+            )
+            XCTFail("Expected adapter failure to throw")
+        } catch {
+        }
+        XCTAssertEqual(failureContext.invalidateCount, 1)
+    }
+
+    private func makeAuthorizedRoute(
+        fixture: TextSecureEnclaveRouteFixture,
+        context: RecordingLAContext
+    ) -> SecureEnclaveSignerRoute {
+        SecureEnclaveSignerRoute(
+            identity: fixture.identity,
+            operation: .sign,
+            publicBindingInspection: fixture.route.publicBindingInspection,
+            signingHandle: fixture.route.signingHandle,
+            operationAuthorization: SecureEnclaveCustodyOperationAuthorization(
+                authenticationContext: context
+            )
+        )
+    }
+
     private func makeService(
         router: StaticTextPrivateKeyOperationRouter,
         unwrapper: RecordingTextSoftwareSecretCertificateUnwrapper,
@@ -564,7 +622,7 @@ private final class StaticTextPrivateKeyOperationRouter: PrivateKeyOperationRout
         routeResult = route
     }
 
-    func route(for request: PrivateKeyOperationRequest) -> PrivateKeyOperationRoute {
+    func route(for request: PrivateKeyOperationRequest) async -> PrivateKeyOperationRoute {
         requests.append(request)
         return routeResult
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 protocol PrivateKeySelectiveRevocationRouting: Sendable {
-    func routeRevocation(fingerprint: String) -> PrivateKeyOperationRoute
+    func routeRevocation(fingerprint: String) async -> PrivateKeyOperationRoute
 
     func generateSecureEnclaveSubkeyRevocation(
         route: SecureEnclaveSignerRoute,
@@ -29,8 +29,8 @@ final class PrivateKeySelectiveRevocationService: PrivateKeySelectiveRevocationR
         self.digestSigner = digestSigner
     }
 
-    func routeRevocation(fingerprint: String) -> PrivateKeyOperationRoute {
-        router.route(
+    func routeRevocation(fingerprint: String) async -> PrivateKeyOperationRoute {
+        await router.route(
             for: PrivateKeyOperationRequest(
                 fingerprint: fingerprint,
                 operation: .revoke

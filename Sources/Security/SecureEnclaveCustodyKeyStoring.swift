@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 protocol SecureEnclaveCustodyKeyStoring {
     func createKey(
@@ -6,7 +7,10 @@ protocol SecureEnclaveCustodyKeyStoring {
         accessPolicy: SecureEnclaveCustodyAccessControlPolicy
     ) throws -> SecureEnclaveCustodyLoadedHandle
 
-    func loadKeys(reference: SecureEnclaveCustodyHandleReference) throws -> [SecureEnclaveCustodyLoadedHandle]
+    func loadKeys(
+        reference: SecureEnclaveCustodyHandleReference,
+        authenticationContext: LAContext?
+    ) throws -> [SecureEnclaveCustodyLoadedHandle]
 
     func deleteKey(reference: SecureEnclaveCustodyHandleReference) throws
 
