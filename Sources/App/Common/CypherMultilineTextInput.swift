@@ -53,6 +53,9 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         textView.backgroundColor = .clear
         textView.isEditable = true
         textView.isSelectable = true
+        textView.isScrollEnabled = true
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.adjustsFontForContentSizeCategory = true
         textView.inputModeProfile = mode
         textView.text = text
@@ -66,6 +69,22 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         }
         uiView.inputModeProfile = mode
         applyTraits(to: uiView)
+        uiView.invalidateIntrinsicContentSize()
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        uiView: CypherHardenedTextView,
+        context: Context
+    ) -> CGSize? {
+        guard let width = proposal.width else {
+            return nil
+        }
+
+        return CGSize(
+            width: width,
+            height: proposal.height ?? Self.defaultMeasuredHeight
+        )
     }
 
     private func applyTraits(to textView: UITextView) {
@@ -122,6 +141,8 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         textView.textDragInteraction?.isEnabled = false
     }
 
+    private static let defaultMeasuredHeight: CGFloat = 160
+
     private var configuredFont: UIFont {
         switch mode {
         case .prose:
@@ -148,6 +169,13 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
     }
 
     final class CypherHardenedTextView: UITextView {
+        override var intrinsicContentSize: CGSize {
+            CGSize(
+                width: UIView.noIntrinsicMetric,
+                height: UIView.noIntrinsicMetric
+            )
+        }
+
         var inputModeProfile: CypherMultilineTextInputMode = .prose {
             didSet {
                 applyInteractionRestrictions()
