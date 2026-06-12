@@ -5125,18 +5125,434 @@
         }
       }
     },
-    "error.keyOperationUnavailable" : {
+    "error.keyOperationUnavailable.cleanupOrRollbackFailure" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key operation is unavailable."
+            "value" : "The operation failed and cleanup could not complete."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥操作不可用。"
+            "value" : "操作失败，且清理未能完成。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave operation failed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区操作失败。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationInvalidRequest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave operation request was invalid."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区操作请求无效。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.externalOperationInvalidResponse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave returned an invalid response."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区返回了无效响应。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.handlePublicKeyBindingMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's device-bound private key does not match its certificate."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的设备绑定私钥与其证书不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.hardwareUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Secure Enclave is not available on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上的安全隔区不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.invalidConfigurationCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's configuration and custody settings don't match, so the operation is unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的配置与托管方式不匹配，无法执行该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationCancelled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication was cancelled. Nothing was changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份认证已取消。未进行任何更改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication failed. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份认证失败。请重试。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationLockedOut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is locked. Unlock it on this device, then try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物识别认证已锁定。请先在设备上解锁，然后重试。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationRequired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication is required to use this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用此密钥需要进行身份认证。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.localAuthenticationUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biometric authentication is currently unavailable, so this key cannot be used right now."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生物识别认证目前不可用，因此暂时无法使用此密钥。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.metadataAssociationMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stored key information does not match this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储的密钥信息与此密钥不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.migrationOrRecoveryRequired" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key needs recovery before it can be used."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥需要先恢复才能使用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.openPGPSemanticFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The OpenPGP operation failed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenPGP 操作失败。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationNotImplementedForCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is not yet available for device-bound keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定密钥暂不支持该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationUnavailableByPolicy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is currently unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该操作目前不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.operationUnsupportedForCustody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This operation is not supported for this key's custody model."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的托管方式不支持该操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.payloadAuthenticationFailure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message authentication failed. The content may have been tampered with."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消息认证失败。内容可能已被篡改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleInaccessible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's private key material could not be accessed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法访问该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's private key material is missing from this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备上缺少该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateHandleUnauthorized" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to this key's private key material was not authorized."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未获授权访问该密钥的私钥材料。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.privateOperationRoleMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot perform the requested operation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法执行所请求的操作。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.prohibitedFallbackAttempted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A prohibited fallback was blocked. Nothing was changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻止被禁止的回退操作。未进行任何更改。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.publicCertificateAssociationMismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's stored certificate does not match its key information."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥存储的证书与其密钥信息不匹配。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.publicMaterialUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's public certificate is unavailable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的公钥证书不可用。"
+          }
+        }
+      }
+    },
+    "error.keyOperationUnavailable.revocationArtifactUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No revocation certificate is stored for this key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥没有已存储的吊销证书。"
           }
         }
       }
