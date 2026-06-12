@@ -402,9 +402,9 @@ final class SelfTestService {
     private static func localizedProfileName(for profile: PGPKeyProfile) -> String {
         switch profile {
         case .universal:
-            String(localized: "profile.universal.name", defaultValue: "Universal Compatible")
+            String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Compatible")
         case .advanced:
-            String(localized: "profile.advanced.name", defaultValue: "Advanced Security")
+            String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern")
         }
     }
 }

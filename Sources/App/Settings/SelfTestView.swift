@@ -61,7 +61,7 @@ struct SelfTestView: View {
                                 Text(result.name)
                                     .font(.body)
                                 if let profile = result.profile {
-                                    Text(profile.displayName)
+                                    Text(profile.openPGPConfiguration.identity.familyDisplayName)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

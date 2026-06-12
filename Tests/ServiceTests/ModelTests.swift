@@ -1205,4 +1205,88 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(selectorInput.userIdData, option.userIdData)
         XCTAssertEqual(selectorInput.occurrenceIndex, 1)
     }
+
+    // MARK: - Key-family vocabulary
+
+    func test_keyFamily_equivalentSoftwareProfile_isTotalAndCorrect() {
+        XCTAssertEqual(PGPKeyConfiguration.Identity.compatibleSoftwareV4.equivalentSoftwareProfile, .universal)
+        XCTAssertEqual(PGPKeyConfiguration.Identity.modernSoftwareV6.equivalentSoftwareProfile, .advanced)
+        XCTAssertNil(PGPKeyConfiguration.Identity.compatibleP256V4.equivalentSoftwareProfile)
+        XCTAssertNil(PGPKeyConfiguration.Identity.modernP256V6.equivalentSoftwareProfile)
+
+        // The inverse mapping round-trips through the existing profile bridge.
+        for profile in PGPKeyProfile.allCases {
+            XCTAssertEqual(
+                profile.openPGPConfiguration.identity.equivalentSoftwareProfile,
+                profile
+            )
+        }
+    }
+
+    func test_keyFamily_orderedFamiliesCoverEveryIdentityOnce() {
+        XCTAssertEqual(
+            PGPKeyConfiguration.Identity.orderedFamilies.sorted { $0.rawValue < $1.rawValue },
+            PGPKeyConfiguration.Identity.allCases.sorted { $0.rawValue < $1.rawValue }
+        )
+    }
+
+    func test_keyFamily_deviceBoundFlagsMatchCustodyValidity() {
+        XCTAssertFalse(PGPKeyConfiguration.Identity.compatibleSoftwareV4.isDeviceBoundFamily)
+        XCTAssertFalse(PGPKeyConfiguration.Identity.modernSoftwareV6.isDeviceBoundFamily)
+        XCTAssertTrue(PGPKeyConfiguration.Identity.compatibleP256V4.isDeviceBoundFamily)
+        XCTAssertTrue(PGPKeyConfiguration.Identity.modernP256V6.isDeviceBoundFamily)
+
+        // Device-bound flag agrees with the resolver's valid configuration/custody pairs.
+        let resolver = PGPKeyCapabilityResolver()
+        for identity in PGPKeyConfiguration.Identity.allCases {
+            XCTAssertEqual(
+                resolver.isValidConfigurationCustodyPair(
+                    configuration: identity.configuration,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                identity.isDeviceBoundFamily
+            )
+        }
+    }
+
+    func test_keyFamily_presentationStringsAreDistinctAndNonEmpty() {
+        let names = PGPKeyConfiguration.Identity.allCases.map(\.familyDisplayName)
+        let descriptions = PGPKeyConfiguration.Identity.allCases.map(\.familyDescription)
+
+        XCTAssertEqual(Set(names).count, names.count)
+        XCTAssertEqual(Set(descriptions).count, descriptions.count)
+        for value in names + descriptions {
+            XCTAssertFalse(value.isEmpty)
+        }
+        for identity in PGPKeyConfiguration.Identity.allCases {
+            XCTAssertFalse(identity.familySecurityLevel.isEmpty)
+        }
+    }
+
+    func test_keyFamily_deviceBoundCopyAvoidsBannedClaims() {
+        // Device-bound families are P-256 (~128 bit): they must not inherit the
+        // "~224 bit"/"stronger algorithms" claims, and the commitment copy must
+        // not mention a passcode (access control is biometry-only).
+        for identity in PGPKeyConfiguration.Identity.allCases where identity.isDeviceBoundFamily {
+            let copy = [
+                identity.familyDisplayName,
+                identity.familyDescription,
+                identity.familySecurityLevel,
+            ].joined(separator: " ")
+            XCTAssertFalse(copy.contains("224"))
+            XCTAssertFalse(copy.lowercased().contains("stronger"))
+            XCTAssertFalse(copy.lowercased().contains("passcode"))
+        }
+    }
+
+    func test_contactKeyKindPresentation_avoidsCustodyVocabulary() {
+        // Contact certificates expose compatibility, not custody: contact rows
+        // must not claim portable or device-bound custody for someone else's key.
+        for profile in PGPKeyProfile.allCases {
+            let value = profile.contactKeyKindDisplayName
+            XCTAssertFalse(value.isEmpty)
+            XCTAssertFalse(value.lowercased().contains("portable"))
+            XCTAssertFalse(value.lowercased().contains("device-bound"))
+        }
+    }
 }

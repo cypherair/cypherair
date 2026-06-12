@@ -11,7 +11,7 @@ struct TutorialConfigurationFactory {
                 defaultValue: "Alice Demo"
             ),
             prefilledEmail: "alice@demo.invalid",
-            lockedProfile: .advanced,
+            lockedFamily: .modernSoftwareV6,
             lockedExpiryMonths: 24,
             postGenerationBehavior: .suppressPrompt
         )

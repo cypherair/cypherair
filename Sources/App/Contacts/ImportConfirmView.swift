@@ -70,8 +70,8 @@ struct ImportConfirmView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     infoRow(
-                        String(localized: "import.profile", defaultValue: "Profile"),
-                        value: profileLabel
+                        String(localized: "import.keyType", defaultValue: "Key Type"),
+                        value: metadata.profile.contactKeyKindDisplayName
                     )
                     infoRow(
                         String(localized: "import.algorithm", defaultValue: "Algorithm"),
@@ -213,12 +213,6 @@ struct ImportConfirmView: View {
         .padding(20)
         .frame(maxWidth: .infinity)
         .background(.bar)
-    }
-
-    private var profileLabel: String {
-        metadata.profile == .advanced
-            ? String(localized: "import.profileB", defaultValue: "Advanced Security (Profile B)")
-            : String(localized: "import.profileA", defaultValue: "Universal Compatible (Profile A)")
     }
 
     private var canEncryptLabel: String {

@@ -86,7 +86,7 @@ private struct KeyDetailScreenHostView: View {
                         )
                         LabeledContent(
                             String(localized: "keydetail.profile", defaultValue: "Profile"),
-                            value: key.profile.displayName
+                            value: key.openPGPConfigurationIdentity.familyDisplayName
                         )
                         LabeledContent(
                             String(localized: "keydetail.version", defaultValue: "Key Version"),
@@ -98,7 +98,7 @@ private struct KeyDetailScreenHostView: View {
                         )
                         LabeledContent(
                             String(localized: "keydetail.security", defaultValue: "Security Level"),
-                            value: key.profile.securityLevel
+                            value: key.openPGPConfigurationIdentity.familySecurityLevel
                         )
                         LabeledContent(
                             String(localized: "keydetail.shortKeyId", defaultValue: "Short Key ID"),

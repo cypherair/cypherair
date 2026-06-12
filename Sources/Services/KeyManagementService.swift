@@ -31,6 +31,12 @@ final class KeyManagementService: @unchecked Sendable {
     private let traceStore: AuthLifecycleTraceStore?
     private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
+    /// Whether device-bound Secure Enclave custody generation is wired for this
+    /// container. UI uses this to decide whether device-bound families are offered.
+    var isSecureEnclaveCustodyGenerationAvailable: Bool {
+        secureEnclaveCustodyGenerationService != nil
+    }
+
     init(
         keyAdapter: PGPKeyOperationAdapter,
         certificateAdapter: PGPCertificateOperationAdapter,

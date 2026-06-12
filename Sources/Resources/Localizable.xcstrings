@@ -2529,6 +2529,22 @@
         }
       }
     },
+    "contactdetail.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "contactdetail.manualVerification" : {
       "localizations" : {
         "en" : {
@@ -2849,22 +2865,6 @@
         }
       }
     },
-    "contactdetail.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
     "contactdetail.removeTag" : {
       "localizations" : {
         "en" : {
@@ -3101,6 +3101,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "首选"
+          }
+        }
+      }
+    },
+    "contactKey.compatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG"
+          }
+        }
+      }
+    },
+    "contactKey.modern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modern (RFC 9580)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现代（RFC 9580）"
           }
         }
       }
@@ -8069,6 +8101,22 @@
         }
       }
     },
+    "import.keyType" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "import.passphrase" : {
       "localizations" : {
         "en" : {
@@ -8113,54 +8161,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粘贴 ASCII Armor 格式的私钥"
-          }
-        }
-      }
-    },
-    "import.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
-    "import.profileA" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Universal Compatible (Profile A)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用兼容（配置 A）"
-          }
-        }
-      }
-    },
-    "import.profileB" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Advanced Security (Profile B)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高级安全（配置 B）"
           }
         }
       }
@@ -8901,6 +8901,294 @@
         }
       }
     },
+    "keyFamily.deviceBoundCompatible.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容 GnuPG 及其他 OpenPGP 工具。私钥保存在本设备的安全隔区中，无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定兼容"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用最新 OpenPGP 标准（RFC 9580）。不兼容 GnuPG。私钥保存在本设备的安全隔区中，无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Modern"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定现代"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundModern.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兼容所有 PGP 工具，包括 GnuPG。私钥可以导出和备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable Compatible"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携兼容"
+          }
+        }
+      }
+    },
+    "keyFamily.portableCompatible.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用最新加密标准（RFC 9580）和更强的算法。不兼容 GnuPG。私钥可以导出和备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable Modern"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携现代"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~224 bit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~224 位"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.create" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create Device-Bound Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建设备绑定密钥"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.custody" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key is created inside this device's Secure Enclave and never leaves this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥在本设备的安全隔区内创建，永远不会离开此设备。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.loss" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If this device is lost or erased, or its biometric access is removed, messages to this key become permanently unreadable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果此设备丢失或被抹掉，或其生物识别访问被移除，发送给此密钥的消息将永久无法读取。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.portability" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It cannot be exported, backed up, or moved to another device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它无法导出、备份或转移到其他设备。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.publicMaterial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can export the public key and a revocation certificate, but they are not private-key backups."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你可以导出公钥和吊销证书，但它们不是私钥备份。"
+          }
+        }
+      }
+    },
+    "keygen.deviceBound.confirm.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a Device-Bound Key?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建设备绑定密钥？"
+          }
+        }
+      }
+    },
     "keygen.email" : {
       "localizations" : {
         "en" : {
@@ -8997,6 +9285,22 @@
         }
       }
     },
+    "keygen.keyType.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥类型"
+          }
+        }
+      }
+    },
     "keygen.name" : {
       "localizations" : {
         "en" : {
@@ -9009,38 +9313,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名称"
-          }
-        }
-      }
-    },
-    "keygen.profile" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配置"
-          }
-        }
-      }
-    },
-    "keygen.profile.header" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encryption Profile"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加密配置"
           }
         }
       }
@@ -9861,6 +10133,54 @@
         }
       }
     },
+    "postgen.deviceBound.exportRevocation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Revocation Certificate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出吊销证书"
+          }
+        }
+      }
+    },
+    "postgen.deviceBound.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key cannot be backed up. Export its revocation certificate and share your public key with contacts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥无法备份。请导出其吊销证书，并与联系人分享你的公钥。"
+          }
+        }
+      }
+    },
+    "postgen.deviceBound.success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key Created"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥已创建"
+          }
+        }
+      }
+    },
     "postgen.done" : {
       "localizations" : {
         "en" : {
@@ -10225,102 +10545,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "认证以解锁 App"
-          }
-        }
-      }
-    },
-    "profile.advanced.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用最新加密标准（RFC 9580）和更强的算法。不兼容 GnuPG。"
-          }
-        }
-      }
-    },
-    "profile.advanced.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Advanced Security"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高级安全"
-          }
-        }
-      }
-    },
-    "profile.advanced.securityLevel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~224 bit"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~224 位"
-          }
-        }
-      }
-    },
-    "profile.universal.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Works with all PGP tools including GnuPG."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兼容所有 PGP 工具，包括 GnuPG。"
-          }
-        }
-      }
-    },
-    "profile.universal.name" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Universal Compatible"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通用兼容"
-          }
-        }
-      }
-    },
-    "profile.universal.securityLevel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~128 bit"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "~128 位"
           }
         }
       }

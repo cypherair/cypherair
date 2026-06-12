@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Key generation form: profile selection, name, email, expiry.
+/// Key generation form: key-family (Key Type) selection, name, email, expiry.
 struct KeyGenerationView: View {
     struct Configuration {
         enum PostGenerationBehavior: Equatable {
@@ -11,7 +11,7 @@ struct KeyGenerationView: View {
 
         var prefilledName: String?
         var prefilledEmail: String?
-        var lockedProfile: PGPKeyProfile?
+        var lockedFamily: PGPKeyConfiguration.Identity?
         var lockedExpiryMonths: Int?
         var postGenerationBehavior: PostGenerationBehavior = .showPrompt
         var onGenerated: (@MainActor (PGPKeyIdentity) -> Void)?
@@ -84,21 +84,16 @@ private struct KeyGenerationScreenHostView: View {
 
         Form {
             Section {
-                Picker(
-                    String(localized: "keygen.profile", defaultValue: "Profile"),
-                    selection: $model.profile
-                ) {
-                    Text(PGPKeyProfile.universal.displayName).tag(PGPKeyProfile.universal)
-                    Text(PGPKeyProfile.advanced.displayName).tag(PGPKeyProfile.advanced)
+                ForEach(model.availableFamilies, id: \.self) { family in
+                    KeyFamilySelectionRow(
+                        family: family,
+                        isSelected: model.selectedFamily == family,
+                        isEnabled: model.configuration.lockedFamily == nil,
+                        onSelect: { model.selectFamily(family) }
+                    )
                 }
-                .pickerStyle(.segmented)
-                .disabled(model.configuration.lockedProfile != nil)
-
-                Text(model.profile.shortDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             } header: {
-                Text(String(localized: "keygen.profile.header", defaultValue: "Encryption Profile"))
+                Text(String(localized: "keygen.keyType.header", defaultValue: "Key Type"))
             }
 
             Section {
@@ -178,6 +173,15 @@ private struct KeyGenerationScreenHostView: View {
             }
         } message: { err in
             Text(err.localizedDescription)
+        }
+        .sheet(isPresented: Binding(
+            get: { model.deviceBoundCommitmentPending },
+            set: { if !$0 { model.cancelDeviceBoundCommitment() } }
+        )) {
+            DeviceBoundKeyCommitmentSheet(
+                onConfirm: { model.confirmDeviceBoundGeneration() },
+                onCancel: { model.cancelDeviceBoundCommitment() }
+            )
         }
         .sheet(item: Binding(
             get: { model.generatedIdentity },
