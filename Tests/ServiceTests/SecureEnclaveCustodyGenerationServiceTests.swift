@@ -26,7 +26,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 policy: .testSecureEnclaveGeneration
             )
 
-            let identity = try await service.generateHiddenKey(
+            let identity = try await service.generateKey(
                 name: "Secure Enclave",
                 email: "se@example.test",
                 expirySeconds: 3600,
@@ -53,14 +53,14 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
     }
 
     func test_generationPolicyAndConfigurationFailBeforeHandleCreation() async throws {
-        let productionKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let productionService = makeService(
-            keyStore: productionKeyStore,
-            policy: .production
+        let blockedKeyStore = MockSecureEnclaveCustodyKeyStore()
+        let blockedPolicyService = makeService(
+            keyStore: blockedKeyStore,
+            policy: .testSecureEnclaveOperationsBlocked
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await productionService.generateHiddenKey(
+            _ = try await blockedPolicyService.generateKey(
                 name: "Secure Enclave",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -68,7 +68,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 invalidationToken: KeyProvisioningInvalidationGate().makeToken()
             )
         }
-        XCTAssertEqual(productionKeyStore.storedHandleCount(), 0)
+        XCTAssertEqual(blockedKeyStore.storedHandleCount(), 0)
 
         let invalidConfigurationKeyStore = MockSecureEnclaveCustodyKeyStore()
         let invalidConfigurationService = makeService(
@@ -76,7 +76,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             policy: .testSecureEnclaveGeneration
         )
         await XCTAssertThrowsErrorAsync {
-            _ = try await invalidConfigurationService.generateHiddenKey(
+            _ = try await invalidConfigurationService.generateKey(
                 name: "Software",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -95,7 +95,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await builderFailureService.generateHiddenKey(
+            _ = try await builderFailureService.generateKey(
                 name: "Builder Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -120,7 +120,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await duplicateService.generateHiddenKey(
+            _ = try await duplicateService.generateKey(
                 name: "Duplicate",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -145,7 +145,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Save Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -172,7 +172,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Post Commit",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,
@@ -203,7 +203,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         )
 
         await XCTAssertThrowsErrorAsync {
-            _ = try await service.generateHiddenKey(
+            _ = try await service.generateKey(
                 name: "Rollback Failure",
                 email: Optional<String>.none,
                 expirySeconds: Optional<UInt64>.none,

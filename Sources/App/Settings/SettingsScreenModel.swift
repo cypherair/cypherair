@@ -430,7 +430,29 @@ final class SettingsScreenModel {
     }
 
     private var hasBackup: Bool {
-        keyManagement.keys.contains(where: \.isBackedUp)
+        Self.backupExpectationSatisfied(keys: keyManagement.keys)
+    }
+
+    /// Whether the backup expectation for High Security mode is satisfied.
+    /// Only software-custody keys can be backed up; device-bound Secure
+    /// Enclave keys have no exportable private material, so they carry no
+    /// backup obligation (a device-bound-only population is vacuously
+    /// satisfied rather than permanently nagged with an unsatisfiable task).
+    nonisolated static func backupExpectationSatisfied(keys: [PGPKeyIdentity]) -> Bool {
+        let softwareKeys = keys.filter {
+            $0.privateKeyCustodyKind == .softwareSecretCertificate
+        }
+        guard !softwareKeys.isEmpty else {
+            return true
+        }
+        return softwareKeys.contains(where: \.isBackedUp)
+    }
+
+    /// Mode switching re-wraps SE-wrapped software bundles. Device-bound
+    /// Secure Enclave custody keys have no bundle (their access control is
+    /// fixed, not mode-dependent) and must never enter the rewrap workflow.
+    nonisolated static func rewrapFingerprints(keys: [PGPKeyIdentity]) -> [String] {
+        PGPKeyIdentity.softwareCustodyFingerprints(in: keys)
     }
 
     private var isLocalDataResetAvailable: Bool {
@@ -474,7 +496,7 @@ final class SettingsScreenModel {
         requestID: UUID
     ) {
         isSwitching = true
-        let fingerprints = keyManagement.keys.map(\.fingerprint)
+        let fingerprints = Self.rewrapFingerprints(keys: keyManagement.keys)
         let hasBackup = hasBackup
 
         Task {

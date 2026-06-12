@@ -215,6 +215,26 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         XCTAssertFalse(contents.contains("openSandboxContactsSynchronously"))
     }
 
+    func test_rewrapEnumerationsExcludeDeviceBoundCustodyKeys() throws {
+        // Device-bound Secure Enclave custody keys have no SE-wrapped bundle:
+        // an unfiltered fingerprint enumeration poisons mode-switch rewrap and
+        // its crash recovery (.unrecoverable blocks target-mode persistence
+        // while the journal is destroyed). Pin both call sites to the shared
+        // software-custody filter.
+        let appContainer = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/App/AppContainer.swift"
+        )
+        XCTAssertTrue(appContainer.contains(
+            "fingerprints: PGPKeyIdentity.softwareCustodyFingerprints(in: keyManagement.keys)"
+        ))
+        XCTAssertFalse(appContainer.contains("fingerprints: keyManagement.keys.map"))
+
+        let settingsScreenModel = try RepositoryAuditLoader.loadString(
+            relativePath: "Sources/App/Settings/SettingsScreenModel.swift"
+        )
+        XCTAssertTrue(settingsScreenModel.contains("Self.rewrapFingerprints(keys: keyManagement.keys)"))
+    }
+
     func test_securityMockImplementations_areConfinedToTemporaryMocksDirectory() throws {
         try assertRulePasses(ArchitectureSourceAuditRules.securityMockImplementationContainment)
     }

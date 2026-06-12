@@ -167,7 +167,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         XCTAssertEqual(verification.summaryState, .verified)
     }
 
-    func test_productionPolicyBlocksSecureEnclaveDetachedFileSigning() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveDetachedFileSigning() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -179,6 +179,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
         )
         let input = try makeTemporaryFile(Data("blocked detached file".utf8))
@@ -190,7 +191,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
                 signerFingerprint: fixture.identity.fingerprint,
                 progress: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave detached signing")
+            XCTFail("Expected blocking policy to stop Secure Enclave detached signing")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

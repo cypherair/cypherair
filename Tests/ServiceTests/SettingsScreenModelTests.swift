@@ -1601,6 +1601,79 @@ final class SettingsScreenModelTests: XCTestCase {
         XCTAssertEqual(host.sectionState, .available(clipboardNoticeEnabled: true))
     }
 
+    // MARK: - Device-bound custody awareness (P7D)
+
+    func test_backupExpectation_ignoresDeviceBoundKeys() {
+        let backedUpSoftware = makeCustodySettingsIdentity(
+            fingerprint: "aaaa", custody: .softwareSecretCertificate, isBackedUp: true
+        )
+        let unbackedSoftware = makeCustodySettingsIdentity(
+            fingerprint: "bbbb", custody: .softwareSecretCertificate, isBackedUp: false
+        )
+        let deviceBound = makeCustodySettingsIdentity(
+            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations, isBackedUp: false
+        )
+
+        // Mixed population: software keys carry the expectation.
+        XCTAssertTrue(SettingsScreenModel.backupExpectationSatisfied(keys: [backedUpSoftware, deviceBound]))
+        XCTAssertFalse(SettingsScreenModel.backupExpectationSatisfied(keys: [unbackedSoftware, deviceBound]))
+
+        // Device-bound-only population: no backup is possible, so the High
+        // Security backup nag must not fire an unsatisfiable demand.
+        XCTAssertTrue(SettingsScreenModel.backupExpectationSatisfied(keys: [deviceBound]))
+
+        // Deliberate change from the pre-custody shape (which read false for
+        // an empty population): with no keys the backup expectation is
+        // vacuously satisfied. Behaviorally safe — the mode switch itself
+        // fails closed on noIdentities before backup is ever consulted; only
+        // the pre-switch warning copy is affected.
+        XCTAssertTrue(SettingsScreenModel.backupExpectationSatisfied(keys: []))
+    }
+
+    func test_rewrapFingerprints_excludeDeviceBoundKeys() {
+        let software = makeCustodySettingsIdentity(
+            fingerprint: "aaaa", custody: .softwareSecretCertificate, isBackedUp: true
+        )
+        let deviceBound = makeCustodySettingsIdentity(
+            fingerprint: "cccc", custody: .appleSecureEnclavePrivateOperations, isBackedUp: false
+        )
+
+        // Device-bound keys have no SE-wrapped software bundle: passing them
+        // into the rewrap workflow would fail the whole mode switch.
+        XCTAssertEqual(
+            SettingsScreenModel.rewrapFingerprints(keys: [software, deviceBound]),
+            ["aaaa"]
+        )
+        XCTAssertEqual(SettingsScreenModel.rewrapFingerprints(keys: [deviceBound]), [])
+    }
+
+    private func makeCustodySettingsIdentity(
+        fingerprint: String,
+        custody: PGPPrivateKeyCustodyKind,
+        isBackedUp: Bool
+    ) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: fingerprint,
+            keyVersion: 4,
+            profile: .universal,
+            userId: nil,
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: isBackedUp,
+            publicKeyData: Data("public-\(fingerprint)".utf8),
+            revocationCert: Data("revocation-\(fingerprint)".utf8),
+            primaryAlgo: "Ed25519",
+            subkeyAlgo: "X25519",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: custody == .appleSecureEnclavePrivateOperations
+                ? .compatibleP256V4
+                : .compatibleSoftwareV4,
+            privateKeyCustodyKind: custody
+        )
+    }
+
     @MainActor
     private func makeModel(
         configuration: SettingsView.Configuration = .default,

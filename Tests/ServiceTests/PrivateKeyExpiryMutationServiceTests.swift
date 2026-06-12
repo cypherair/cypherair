@@ -5,7 +5,7 @@ import XCTest
 final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
     private let engine = PgpEngine()
 
-    func test_productionPolicyBlocksSecureEnclaveModifyExpiryWithoutFallback() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveModifyExpiryWithoutFallback() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let privateKeyControlStore = RecordingExpiryPrivateKeyControlStore(mode: .standard)
         let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(
@@ -20,6 +20,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
             TestHelpers.makeExpiryMutator(
                 engine: engine,
                 keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
                 digestSigner: UnexpectedExpiryDigestSigner()
             )
@@ -30,7 +31,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
                 fingerprint: fixture.identity.fingerprint,
                 newExpirySeconds: 31_536_000
             )
-            XCTFail("Expected production policy to block Secure Enclave modify-expiry")
+            XCTFail("Expected blocking policy to stop Secure Enclave modify-expiry")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

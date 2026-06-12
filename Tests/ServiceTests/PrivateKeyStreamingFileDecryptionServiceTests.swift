@@ -143,7 +143,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
         XCTAssertEqual(verification.summaryState, .notSigned)
     }
 
-    func test_productionPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveFileDecryptWithoutUnwrap() async throws {
         let fixture = try await makeSecureEnclaveDecryptFixture(configurationIdentity: .compatibleP256V4)
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -158,7 +158,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
-            resolver: PGPKeyCapabilityResolver(),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
         )
 
@@ -177,7 +177,7 @@ final class PrivateKeyStreamingFileDecryptionServiceTests: XCTestCase {
                 verificationContext: verificationContext(for: fixture.identity),
                 progress: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave file decrypt")
+            XCTFail("Expected blocking policy to stop Secure Enclave file decrypt")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

@@ -247,25 +247,30 @@ final class KeyManagementService: @unchecked Sendable {
         return identity
     }
 
-    func generateHiddenSecureEnclaveCustodyKey(
+    func generateSecureEnclaveCustodyKey(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
         configurationIdentity: PGPKeyConfiguration.Identity
     ) async throws -> PGPKeyIdentity {
         guard let secureEnclaveCustodyGenerationService else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: PGPKeyOperationFailureCategory.operationUnavailableByPolicy.rawValue
-            )
+            throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
         }
         let token = provisioningInvalidationGate.makeToken()
-        let identity = try await secureEnclaveCustodyGenerationService.generateHiddenKey(
-            name: name,
-            email: email,
-            expirySeconds: expirySeconds,
-            configurationIdentity: configurationIdentity,
-            invalidationToken: token
-        )
+        let identity: PGPKeyIdentity
+        do {
+            identity = try await secureEnclaveCustodyGenerationService.generateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                configurationIdentity: configurationIdentity,
+                invalidationToken: token
+            )
+        } catch let error as SecureEnclaveCustodyHandleError {
+            // Normalize handle-store failures to the sanitized category
+            // vocabulary so the per-category presentation copy survives.
+            throw CypherAirError.keyOperationUnavailable(category: error.failureCategory)
+        }
         if let postProvisioningCheckpoint {
             await postProvisioningCheckpoint()
         }

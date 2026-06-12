@@ -61,22 +61,24 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedFamily, .modernSoftwareV6)
     }
 
-    func test_availableFamilies_productionPolicyHidesDeviceBoundFamilies() {
+    func test_availableFamilies_productionPolicyExposesDeviceBoundFamiliesWhenServiceWired() {
+        // No wired generation service (this test container): device-bound
+        // families stay hidden even under the exposed production policy.
         let defaultModel = makeModel()
         XCTAssertEqual(
             defaultModel.availableFamilies,
             [.compatibleSoftwareV4, .modernSoftwareV6]
         )
 
-        // Even with a wired generation service, the production resolver policy
-        // keeps device-bound families hidden.
+        // Production policy + wired service (the shipping configuration since
+        // P7D): all four families are offered, in stable order.
         let availableServiceModel = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(),
             isSecureEnclaveGenerationAvailable: true
         )
         XCTAssertEqual(
             availableServiceModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6]
+            [.compatibleSoftwareV4, .modernSoftwareV6, .compatibleP256V4, .modernP256V6]
         )
     }
 

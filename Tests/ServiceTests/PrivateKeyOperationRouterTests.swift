@@ -29,7 +29,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }
 
-    func test_productionPolicyBlocksSecureEnclavePrivateOperationBeforeHandleLookup() throws {
+    func test_blockingPolicyBlocksSecureEnclavePrivateOperationBeforeHandleLookup() throws {
         let identity = makeSecureEnclaveIdentity()
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
@@ -37,7 +37,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         inspector.error = CypherAirError.invalidKeyData(reason: "Unexpected public binding inspection")
         let router = try makeRouter(
             identities: [identity],
-            policy: .production,
+            policy: .testSecureEnclaveOperationsBlocked,
             inspector: inspector,
             keyStore: keyStore
         )

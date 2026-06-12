@@ -30,7 +30,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
     @MainActor
     func test_keyDetailModel_deviceBoundKey_flagsCustodyAndStaysQuietWhenHealthy() async throws {
         let target = makeHiddenSecureEnclaveGenerationService()
-        let identity = try await target.service.generateHiddenSecureEnclaveCustodyKey(
+        let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
@@ -68,7 +68,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
     @MainActor
     func test_keyDetailModel_deviceBoundKey_missingReportFailsVisible() async throws {
         let target = makeHiddenSecureEnclaveGenerationService()
-        let identity = try await target.service.generateHiddenSecureEnclaveCustodyKey(
+        let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
@@ -86,7 +86,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
     @MainActor
     func test_keyDetailModel_deviceBoundKey_degradedReportSurfacesDegradedState() async throws {
         let target = makeHiddenSecureEnclaveGenerationService()
-        let identity = try await target.service.generateHiddenSecureEnclaveCustodyKey(
+        let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,
@@ -118,7 +118,7 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
     @MainActor
     func test_backupModel_deviceBoundKey_failsClosed() async throws {
         let target = makeHiddenSecureEnclaveGenerationService()
-        let identity = try await target.service.generateHiddenSecureEnclaveCustodyKey(
+        let identity = try await target.service.generateSecureEnclaveCustodyKey(
             name: "Device Bound",
             email: nil,
             expirySeconds: nil,

@@ -227,7 +227,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_productionPolicyBlocksSecureEnclaveTextSigning() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveTextSigning() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, _, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -239,6 +239,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             engine: engine,
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
         )
         var recipient = try makeRecipient()
@@ -251,7 +252,7 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
                 signerFingerprint: fixture.identity.fingerprint,
                 selfKey: nil
             )
-            XCTFail("Expected production policy to block Secure Enclave signing")
+            XCTFail("Expected blocking policy to stop Secure Enclave signing")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

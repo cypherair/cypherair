@@ -38,7 +38,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapCountBefore + 1)
     }
 
-    func test_productionPolicyBlocksSecureEnclaveCertificationBeforeHandleLookup() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveCertificationBeforeHandleLookup() async throws {
         let stack = await TestHelpers.makeServiceStack(engine: engine)
         defer { stack.cleanup() }
         let fixture = try await makeSecureEnclaveRouteFixture()
@@ -48,6 +48,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
         keyStore.failInventory = true
         let service = makeCertificateSignatureService(
             stack: stack,
+            resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
             digestSigner: UnexpectedCertificationDigestSigner()
         )
@@ -61,7 +62,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
                 selectedUserId: selectedUserId,
                 certificationKind: .positive
             )
-            XCTFail("Expected production policy to block Secure Enclave certification")
+            XCTFail("Expected blocking policy to stop Secure Enclave certification")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

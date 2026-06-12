@@ -68,44 +68,69 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         }
     }
 
-    func test_secureEnclaveGenerationIsUnavailableByProductionPolicy() {
+    func test_productionPolicySupportsImplementedSecureEnclaveOperations() {
         let resolver = PGPKeyCapabilityResolver()
 
-        XCTAssertTrue(resolver.isValidConfigurationCustodyPair(
-            configuration: .compatibleP256V4,
-            custody: .appleSecureEnclavePrivateOperations
-        ))
+        for configuration in [PGPKeyConfiguration.compatibleP256V4, .modernP256V6] {
+            XCTAssertTrue(resolver.isValidConfigurationCustodyPair(
+                configuration: configuration,
+                custody: .appleSecureEnclavePrivateOperations
+            ))
+
+            // Positive: generation and every implemented private-operation
+            // class are exposed by the production policy (P7D).
+            for operation: PGPKeyOperationKind in [.generate, .sign, .certify, .revoke, .modifyExpiry, .decrypt] {
+                XCTAssertEqual(
+                    resolver.resolution(
+                        for: operation,
+                        configuration: configuration,
+                        custody: .appleSecureEnclavePrivateOperations
+                    ),
+                    .supported,
+                    "Expected \(operation) supported for \(configuration.identity) under production policy."
+                )
+            }
+
+            // Negative: refreshBinding has no implementing service and must
+            // stay explicitly not-implemented, never silently supported.
+            XCTAssertEqual(
+                resolver.resolution(
+                    for: .refreshBinding,
+                    configuration: configuration,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .notImplemented(.operationNotImplementedForCustody)
+            )
+
+            // Negative: private-material export stays hard-unsupported for
+            // Secure Enclave custody regardless of policy.
+            XCTAssertEqual(
+                resolver.resolution(
+                    for: .exportPrivateMaterial,
+                    configuration: configuration,
+                    custody: .appleSecureEnclavePrivateOperations
+                ),
+                .unsupported(.operationUnsupportedForCustody)
+            )
+        }
+
+        // Negative: invalid configuration/custody pairs stay unsupported under
+        // the exposed policy.
+        XCTAssertEqual(
+            resolver.resolution(
+                for: .generate,
+                configuration: .compatibleSoftwareV4,
+                custody: .appleSecureEnclavePrivateOperations
+            ),
+            .unsupported(.invalidConfigurationCustody)
+        )
         XCTAssertEqual(
             resolver.resolution(
                 for: .generate,
                 configuration: .compatibleP256V4,
-                custody: .appleSecureEnclavePrivateOperations
+                custody: .softwareSecretCertificate
             ),
-            .unavailable(.operationUnavailableByPolicy)
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .generate,
-                configuration: .compatibleP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unavailable
-        )
-        XCTAssertEqual(
-            resolver.resolution(
-                for: .sign,
-                configuration: .compatibleP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unavailable(.operationUnavailableByPolicy)
-        )
-        XCTAssertEqual(
-            resolver.support(
-                for: .sign,
-                configuration: .compatibleP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .unavailable
+            .unsupported(.invalidConfigurationCustody)
         )
     }
 

@@ -48,7 +48,7 @@ final class KeyGenerationScreenModel {
                     profile: profile
                 )
             }
-            return try await keyManagement.generateHiddenSecureEnclaveCustodyKey(
+            return try await keyManagement.generateSecureEnclaveCustodyKey(
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,

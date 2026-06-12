@@ -5,7 +5,7 @@ import XCTest
 final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
     private let engine = PgpEngine()
 
-    func test_productionPolicyBlocksSecureEnclaveSelectiveRevocationBeforeHandleLookup() async throws {
+    func test_blockingPolicyBlocksSecureEnclaveSelectiveRevocationBeforeHandleLookup() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture()
         let (keyManagement, mockSE, mockKeychain, _, metadataPersistence) = TestHelpers.makeKeyManagement(engine: engine)
         try metadataPersistence.save(fixture.identity)
@@ -16,6 +16,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
             TestHelpers.makeSelectiveRevocationService(
                 engine: engine,
                 keyManagement: keyManagement,
+                resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
                 handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
                 digestSigner: UnexpectedSelectiveRevocationDigestSigner()
             )
@@ -28,7 +29,7 @@ final class PrivateKeySelectiveRevocationServiceTests: XCTestCase {
                 fingerprint: fixture.identity.fingerprint,
                 subkeySelection: subkey
             )
-            XCTFail("Expected production policy to block Secure Enclave selective revocation")
+            XCTFail("Expected blocking policy to stop Secure Enclave selective revocation")
         } catch CypherAirError.keyOperationUnavailable(let category) {
             XCTAssertEqual(category, .operationUnavailableByPolicy)
         } catch {

@@ -31,7 +31,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         let targetService = target.service
 
         let generationTask = Task { [targetService] in
-            try await targetService.generateHiddenSecureEnclaveCustodyKey(
+            try await targetService.generateSecureEnclaveCustodyKey(
                 name: "Hidden Relock Drain",
                 email: "hidden-drain@example.com",
                 expirySeconds: nil,
@@ -320,6 +320,80 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore)
         XCTAssertTrue(try loadStoredIdentity(fingerprint: identity.fingerprint).revocationCert.isEmpty)
+    }
+
+    func test_modifyExpiry_secureEnclaveCustodyWithoutRoutingService_staysBlockedUnderExposedPolicy() async throws {
+        // The exposed production policy approves SE modify-expiry at the
+        // resolver, but a container without the expiry-mutation routing service
+        // must still fail closed (never fall back to software custody paths).
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        try storeIdentity(fixture.identity)
+        try service.loadKeys()
+        let unwrapCountBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.modifyExpiry(
+                fingerprint: fixture.identity.fingerprint,
+                newExpirySeconds: 60 * 60 * 24
+            )
+            XCTFail("Expected unrouted Secure Enclave modify-expiry to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
+    func test_selectiveRevocation_secureEnclaveCustodyWithoutRoutingService_staysBlockedUnderExposedPolicy() async throws {
+        // Post-flip, the resolver approves SE revocation, so the unrouted
+        // custody arm in SelectiveRevocationService is the load-bearing
+        // fail-closed barrier — pin it (mirror of the modify-expiry case).
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        try storeIdentity(fixture.identity)
+        try service.loadKeys()
+        let catalog = try service.selectionCatalog(fingerprint: fixture.identity.fingerprint)
+        let subkey = try XCTUnwrap(catalog.subkeys.first)
+        let unwrapCountBefore = mockSE.unwrapCallCount
+
+        do {
+            _ = try await service.exportSubkeyRevocationCertificate(
+                fingerprint: fixture.identity.fingerprint,
+                subkeySelection: subkey
+            )
+            XCTFail("Expected unrouted Secure Enclave selective revocation to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
+
+        XCTAssertEqual(mockSE.unwrapCallCount, unwrapCountBefore)
+    }
+
+    func test_generateSecureEnclaveCustodyKey_withoutWiredService_failsClosedWithPerCategoryError() async {
+        // Containers without the generation factory (UI-test container, or any
+        // device without a Secure Enclave) must fail closed with the sanitized
+        // category so the per-category presentation copy survives — never a
+        // generic reason string.
+        do {
+            _ = try await service.generateSecureEnclaveCustodyKey(
+                name: "Unwired",
+                email: nil,
+                expirySeconds: nil,
+                configurationIdentity: .compatibleP256V4
+            )
+            XCTFail("Expected unwired Secure Enclave custody generation to fail closed")
+        } catch CypherAirError.keyOperationUnavailable(let category) {
+            XCTAssertEqual(category, .operationUnavailableByPolicy)
+        } catch {
+            XCTFail("Expected keyOperationUnavailable, got \(error)")
+        }
     }
 
 }

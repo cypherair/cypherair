@@ -712,6 +712,7 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
         )
+        let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
             handleStore: secureEnclaveCustodyHandleStore
@@ -743,6 +744,26 @@ final class AppContainer: @unchecked Sendable {
             expiryAuthenticator: Self.productionExpiryAuthenticator,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
+            // Device-bound Secure Enclave custody generation (issue #501 P7D
+            // exposure). Hardware-guarded at the composition root; on hardware
+            // without a Secure Enclave the factory stays nil and the UI hides
+            // the device-bound families. The prompt coordinator enrolls the
+            // whole generation (biometryAny digest signing presents auth
+            // sheets) in one operation-prompt session per SECURITY.md §4.
+            secureEnclaveCustodyGenerationServiceFactory: HardwareSecureEnclave.isAvailable
+                ? { catalogStore, invalidationGate, commitCoordinator in
+                    SecureEnclaveCustodyGenerationService(
+                        certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
+                        handleStore: secureEnclaveCustodyHandleStore,
+                        digestSigner: secureEnclaveCustodyDigestSigner,
+                        catalogStore: catalogStore,
+                        resolver: PGPKeyCapabilityResolver(),
+                        invalidationGate: invalidationGate,
+                        commitCoordinator: commitCoordinator,
+                        authenticationPromptCoordinator: authPromptCoordinator
+                    )
+                }
+                : nil,
             secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService
         )
         protectedDataSessionCoordinator.registerRelockParticipant(keyManagement)
@@ -895,7 +916,7 @@ final class AppContainer: @unchecked Sendable {
             keyManagement: keyManagement,
             contactService: contactService,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            secureEnclaveDigestSigner: secureEnclaveCustodyDigestSigner
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
@@ -1401,8 +1422,12 @@ final class AppContainer: @unchecked Sendable {
             return
         }
 
+        // Re-wrap recovery enumerates software-custody keys only: device-bound
+        // Secure Enclave keys have no SE-wrapped bundle, classify as
+        // unrecoverable, and would block target-mode persistence while the
+        // recovery journal is destroyed (silent mode/ACL desync).
         let rewrapSummary = authManager.checkAndRecoverFromInterruptedRewrap(
-            fingerprints: keyManagement.keys.map(\.fingerprint)
+            fingerprints: PGPKeyIdentity.softwareCustodyFingerprints(in: keyManagement.keys)
         )
         let modifyExpiryOutcome = keyManagement.checkAndRecoverFromInterruptedModifyExpiry()
         config.privateKeyControlState = privateKeyControlStore.privateKeyControlState
