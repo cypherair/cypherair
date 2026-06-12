@@ -589,6 +589,38 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
     }
 
+    func test_biometryLockoutCustodyAuthenticationBlocksAsLocalAuthenticationLockedOut() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-p7f-lockout" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let stub = StubCustodyOperationAuthenticator()
+        stub.errorToThrow = LAError(.biometryLockout)
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+        keyStore.resetCallHistory()
+
+        assertBlocked(
+            await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.localAuthenticationLockedOut)
+        )
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+    }
+
     func test_nilCustodyAuthenticatorKeepsContextFreeLoadsAndNilAuthorization() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(

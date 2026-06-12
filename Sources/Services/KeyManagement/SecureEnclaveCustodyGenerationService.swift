@@ -116,9 +116,10 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                     )
                 )
             } catch {
+                let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
                 throw CypherAirError.keyOperationUnavailable(
                     category: PGPKeyOperationFailureMapper.category(
-                        for: error,
+                        for: normalized,
                         fallback: .localAuthenticationFailed
                     )
                 )

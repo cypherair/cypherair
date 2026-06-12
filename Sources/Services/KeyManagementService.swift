@@ -50,6 +50,7 @@ final class KeyManagementService: @unchecked Sendable {
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
         secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
+        secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -132,7 +133,8 @@ final class KeyManagementService: @unchecked Sendable {
             privateKeyAccessService: privateKeyAccessService,
             privateKeyControlStore: effectivePrivateKeyControlStore,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
-            expiryAuthenticator: expiryAuthenticator
+            expiryAuthenticator: expiryAuthenticator,
+            secureEnclaveCustodyDeletionContext: secureEnclaveCustodyDeletionContext
         )
         self.traceStore = authLifecycleTraceStore
     }

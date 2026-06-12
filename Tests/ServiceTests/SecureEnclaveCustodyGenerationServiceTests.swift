@@ -338,6 +338,38 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         XCTAssertTrue(metadataStore.identities.isEmpty)
     }
 
+    func test_generationBiometryLockoutCreatesNothingAndMapsToLocalAuthenticationLockedOut() async throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let stub = StubGenerationCustodyOperationAuthenticator()
+        stub.errorToThrow = LAError(.biometryLockout)
+        let metadataStore = MemoryKeyMetadataPersistence()
+        let service = makeService(
+            keyStore: keyStore,
+            metadataStore: metadataStore,
+            custodyOperationAuthenticator: stub.authenticate
+        )
+
+        await XCTAssertThrowsErrorAsync {
+            _ = try await service.generateKey(
+                name: "P7F Lockout",
+                email: Optional<String>.none,
+                expirySeconds: Optional<UInt64>.none,
+                configurationIdentity: PGPKeyConfiguration.Identity.compatibleP256V4,
+                invalidationToken: KeyProvisioningInvalidationGate().makeToken()
+            )
+        } inspectError: { error in
+            guard case CypherAirError.keyOperationUnavailable(let category) = error else {
+                return XCTFail("Expected keyOperationUnavailable, got \(error)")
+            }
+            XCTAssertEqual(category, .localAuthenticationLockedOut)
+        }
+
+        XCTAssertEqual(stub.calls, 1)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0, "A locked-out prompt aborts before any handle exists.")
+        XCTAssertTrue(keyStore.createRequests.isEmpty)
+        XCTAssertTrue(metadataStore.identities.isEmpty)
+    }
+
     func test_generationEndsAuthorizedContextAfterForcedRollback() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let stub = StubGenerationCustodyOperationAuthenticator()

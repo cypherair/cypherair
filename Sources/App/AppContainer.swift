@@ -720,9 +720,12 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
         )
+        let secureEnclaveCustodyPublicBindingInspector = PGPSecureEnclaveCustodyPublicBindingInspector(
+            engine: engine
+        )
         let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
-            publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+            publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
             handleStore: secureEnclaveCustodyHandleStore
         )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
@@ -751,6 +754,10 @@ final class AppContainer: @unchecked Sendable {
             // authentication bypass must not drive real LocalAuthentication).
             expiryAuthenticator: Self.productionExpiryAuthenticator,
             secureEnclaveCustodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator,
+            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
+                publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
+                handleStore: secureEnclaveCustodyHandleStore
+            ),
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
             // Device-bound Secure Enclave custody generation (issue #501 P7D

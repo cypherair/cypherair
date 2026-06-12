@@ -162,6 +162,71 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         ])
     }
 
+    func test_deleteSecureEnclaveCustodyKeyDeletesHandlesAndMetadata() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let pair = try seedCustodyHandles(
+            fixture: fixture,
+            keyStore: keyStore,
+            handleSetIdentifier: "delete-success"
+        )
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([fixture.identity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        XCTAssertEqual(keyStore.deleteRequests, pair.references)
+    }
+
+    func test_deleteSecureEnclaveCustodyKeyHandleFailurePreservesMetadataForRetry() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let pair = try seedCustodyHandles(
+            fixture: fixture,
+            keyStore: keyStore,
+            handleSetIdentifier: "delete-failure"
+        )
+        keyStore.failDeleteRole = .signing
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([fixture.identity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        XCTAssertThrowsError(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)) { error in
+            guard case CypherAirError.keychainError(let message) = error else {
+                return XCTFail("Expected keychainError, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Partial key deletion"))
+        }
+
+        XCTAssertEqual(targetService.keys.map(\.fingerprint), [fixture.identity.fingerprint])
+        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [fixture.identity.fingerprint])
+        XCTAssertTrue(keyStore.contains(reference: pair.signing.reference))
+        XCTAssertFalse(keyStore.contains(reference: pair.keyAgreement.reference))
+
+        keyStore.failDeleteRole = nil
+        try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)
+
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+    }
+
     func test_confirmKeyBackupExportedRefreshesRecoveryReportWithCurrentSnapshot() throws {
         let metadataPersistence = RecordingKeyMetadataPersistence()
         let hiddenIdentity = Self.hiddenCustodyIdentity(
@@ -394,6 +459,54 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         } catch {
             XCTFail("Expected keyOperationUnavailable, got \(error)")
         }
+    }
+
+    private func makeSecureEnclaveCustodyDeletionTarget(
+        metadataPersistence: RecordingKeyMetadataPersistence,
+        keyStore: MockSecureEnclaveCustodyKeyStore
+    ) -> KeyManagementService {
+        KeyManagementService(
+            keyAdapter: PGPKeyOperationAdapter(engine: engine),
+            certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
+            secureEnclave: MockSecureEnclave(),
+            keychain: MockKeychain(),
+            authenticator: MockAuthenticator(),
+            privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
+            secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
+                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            ),
+            metadataPersistence: metadataPersistence
+        )
+    }
+
+    private func seedCustodyHandles(
+        fixture: HiddenCustodyExportFixture,
+        keyStore: MockSecureEnclaveCustodyKeyStore,
+        handleSetIdentifier: String
+    ) throws -> SecureEnclaveCustodyHandlePair {
+        let signingReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .signing
+        )
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: handleSetIdentifier,
+            role: .keyAgreement
+        )
+        let signingBinding = try SecureEnclaveCustodyHandlePublicBinding(
+            reference: signingReference,
+            publicKeyX963: fixture.signingPublicKeyX963
+        )
+        let keyAgreementBinding = try SecureEnclaveCustodyHandlePublicBinding(
+            reference: keyAgreementReference,
+            publicKeyX963: fixture.keyAgreementPublicKeyX963
+        )
+        keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: signingBinding, privateKey: nil))
+        keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: keyAgreementBinding, privateKey: nil))
+        return try SecureEnclaveCustodyHandlePair(
+            signing: signingBinding,
+            keyAgreement: keyAgreementBinding
+        )
     }
 
 }
