@@ -260,7 +260,7 @@ extension FFIIntegrationTests {
     }
 }
 
-private final class CancellingProgressReporter: ProgressReporter, @unchecked Sendable {
+private final class CancellingProgressReporter: StreamingProgressReporter, @unchecked Sendable {
     func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool {
         false
     }

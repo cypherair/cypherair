@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
-use pgp_mobile::streaming::{self, ProgressReporter};
+use pgp_mobile::streaming::{self, StreamingProgressReporter};
 
 /// Test progress reporter that records callback data.
 struct TestProgressReporter {
@@ -43,7 +43,7 @@ impl TestProgressReporter {
     }
 }
 
-impl ProgressReporter for TestProgressReporter {
+impl StreamingProgressReporter for TestProgressReporter {
     fn on_progress(&self, bytes_processed: u64, total_bytes: u64) -> bool {
         self.last_bytes.store(bytes_processed, Ordering::Relaxed);
         self.last_total.store(total_bytes, Ordering::Relaxed);

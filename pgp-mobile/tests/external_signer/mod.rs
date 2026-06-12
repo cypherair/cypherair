@@ -202,7 +202,7 @@ fn encrypt_streaming_file_with_external_p256_signer(
     recipient_certs: &[Vec<u8>],
     material: CandidateMaterial,
     encrypt_to_self: Option<&[u8]>,
-    progress: Option<Arc<dyn streaming::ProgressReporter>>,
+    progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
 ) -> NamedTempFile {
     let input = write_temp_data_file(plaintext);
     let output = NamedTempFile::new().expect("temp output should be created");
@@ -311,7 +311,7 @@ impl ExternalP256SigningProvider for UnexpectedRuntimeSigningProvider {
 
 struct CancelledProgressReporter;
 
-impl streaming::ProgressReporter for CancelledProgressReporter {
+impl streaming::StreamingProgressReporter for CancelledProgressReporter {
     fn on_progress(&self, _bytes_processed: u64, _total_bytes: u64) -> bool {
         false
     }

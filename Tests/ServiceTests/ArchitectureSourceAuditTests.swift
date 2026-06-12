@@ -598,9 +598,9 @@ final class ArchitectureSourceAuditTests: XCTestCase {
                 "Sources/Services/FileProgressReporter.swift": "fixture exception"
             ]),
             violatingPath: "Sources/App/NewReporterFactory.swift",
-            violatingContents: "struct NewReporterFactory { let reporter: ProgressReporterImpl }",
+            violatingContents: "struct NewReporterFactory { let reporter: StreamingProgressReporterImpl }",
             allowedPath: "Sources/Services/FileProgressReporter.swift",
-            allowedContents: "struct FileProgressReporterBox { let reporter: ProgressReporterImpl }",
+            allowedContents: "struct FileProgressReporterBox { let reporter: StreamingProgressReporterImpl }",
             cleanContents: "struct FileProgressReporterBox {}"
         )
 
@@ -659,7 +659,7 @@ final class ArchitectureSourceAuditTests: XCTestCase {
             contents: """
             // PgpEngine, PgpError, PGPErrorMapper, and PGPKeyMetadataAdapter should be ignored in comments.
             let message = "KeyInfo [Contact] import SwiftUI"
-            let raw = #"ProgressReporterImpl KeyProfile Array<Contact> PGPCertificateSelectionAdapter PGPErrorMapper"#
+            let raw = #"StreamingProgressReporterImpl KeyProfile Array<Contact> PGPCertificateSelectionAdapter PGPErrorMapper"#
             struct NewView {}
             """
         )
@@ -997,12 +997,12 @@ private enum ArchitectureSourceAuditRules {
             "PgpEngine",
             "PgpEngineProtocol",
             "PgpError",
-            "ProgressReporter",
-            "ProgressReporterImpl",
             "PublicCertificateValidationResult",
             "S2kInfo",
             "SignatureStatus",
             "SignatureVerificationState",
+            "StreamingProgressReporter",
+            "StreamingProgressReporterImpl",
             "UserIdSelectorInput",
             "VerifyDetailedResult",
         ]),

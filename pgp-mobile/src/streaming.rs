@@ -9,7 +9,7 @@
 //! - `decrypt_file_detailed` writes to a `.tmp` file first; on any error, `secure_delete_file`
 //!   removes the temp file. Only on full success is the temp renamed to the final path.
 //!   This enforces the AEAD hard-fail requirement.
-//! - Cancellation via `ProgressReporter::on_progress() → false` returns
+//! - Cancellation via `StreamingProgressReporter::on_progress() → false` returns
 //!   `PgpError::OperationCancelled` and cleans up partial output.
 
 use std::fmt;
@@ -48,7 +48,7 @@ const STREAM_BUFFER_SIZE: usize = 64 * 1024; // 64 KB
 ///
 /// Return `false` from `on_progress` to cancel the operation.
 #[uniffi::export(with_foreign)]
-pub trait ProgressReporter: Send + Sync {
+pub trait StreamingProgressReporter: Send + Sync {
     /// Report progress during a streaming operation.
     ///
     /// - `bytes_processed`: Total bytes processed so far.
@@ -62,11 +62,15 @@ struct ProgressReader<R: Read> {
     inner: R,
     bytes_read: u64,
     total_bytes: u64,
-    reporter: Option<Arc<dyn ProgressReporter>>,
+    reporter: Option<Arc<dyn StreamingProgressReporter>>,
 }
 
 impl<R: Read> ProgressReader<R> {
-    fn new(inner: R, total_bytes: u64, reporter: Option<Arc<dyn ProgressReporter>>) -> Self {
+    fn new(
+        inner: R,
+        total_bytes: u64,
+        reporter: Option<Arc<dyn StreamingProgressReporter>>,
+    ) -> Self {
         Self {
             inner,
             bytes_read: 0,
@@ -118,11 +122,15 @@ struct DetachedVerifyProgressReader<R: Read> {
     inner: R,
     bytes_read: u64,
     total_bytes: u64,
-    reporter: Option<Arc<dyn ProgressReporter>>,
+    reporter: Option<Arc<dyn StreamingProgressReporter>>,
 }
 
 impl<R: Read> DetachedVerifyProgressReader<R> {
-    fn new(inner: R, total_bytes: u64, reporter: Option<Arc<dyn ProgressReporter>>) -> Self {
+    fn new(
+        inner: R,
+        total_bytes: u64,
+        reporter: Option<Arc<dyn StreamingProgressReporter>>,
+    ) -> Self {
         Self {
             inner,
             bytes_read: 0,
@@ -272,7 +280,7 @@ pub fn encrypt_file(
     recipient_certs: &[Vec<u8>],
     signing_key: Option<&[u8]>,
     encrypt_to_self: Option<&[u8]>,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<(), PgpError> {
     let policy = StandardPolicy::new();
 
@@ -317,7 +325,7 @@ pub fn encrypt_file_with_external_p256_signer(
     signing_key_fingerprint: &str,
     signer: Arc<dyn ExternalP256SigningProvider>,
     encrypt_to_self: Option<&[u8]>,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<(), PgpError> {
     let policy = StandardPolicy::new();
 
@@ -360,7 +368,7 @@ pub fn encrypt_file_with_external_p256_signer(
 
 fn progress_reader_for_file(
     input_path: &str,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<ProgressReader<File>, PgpError> {
     let input_file = File::open(input_path).map_err(|e| PgpError::FileIoError {
         reason: format!("Cannot open input file '{}': {e}", input_path),
@@ -433,7 +441,7 @@ pub fn decrypt_file_detailed<K: AsRef<[u8]>>(
     output_path: &str,
     secret_keys: &[K],
     verification_keys: &[Vec<u8>],
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<FileDecryptDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
 
@@ -496,7 +504,7 @@ pub(crate) fn decrypt_file_with_helper<'a, H>(
     output_path: &str,
     policy: &'a StandardPolicy<'a>,
     helper: H,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<H, PgpError>
 where
     H: VerificationHelper + DecryptionHelper,
@@ -584,7 +592,7 @@ where
 pub fn sign_detached_file(
     input_path: &str,
     signer_cert: &[u8],
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<Vec<u8>, PgpError> {
     let policy = StandardPolicy::new();
     let signing_keypair = sign::extract_signing_keypair(signer_cert, &policy)?;
@@ -598,7 +606,7 @@ pub fn sign_detached_file_with_external_p256_signer(
     public_cert_data: &[u8],
     signing_key_fingerprint: &str,
     signer: Arc<dyn ExternalP256SigningProvider>,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<Vec<u8>, PgpError> {
     let policy = StandardPolicy::new();
     let signing_public_key =
@@ -615,7 +623,7 @@ pub fn sign_detached_file_with_external_p256_signer(
 fn sign_detached_file_with_signer<S>(
     input_path: &str,
     signing_keypair: S,
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<Vec<u8>, PgpError>
 where
     S: CryptoSigner + Send + Sync,
@@ -691,7 +699,7 @@ pub fn verify_detached_file_detailed(
     data_path: &str,
     signature: &[u8],
     verification_keys: &[Vec<u8>],
-    progress: Option<Arc<dyn ProgressReporter>>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
 ) -> Result<FileVerifyDetailedResult, PgpError> {
     let policy = StandardPolicy::new();
     let certs = parse_verification_certs(verification_keys)?;
