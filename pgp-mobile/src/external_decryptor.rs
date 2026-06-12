@@ -167,7 +167,7 @@ pub(crate) fn decrypt_file_detailed_with_external_p256_key_agreement(
     key_agreement_subkey_fingerprint: &str,
     key_agreement_provider: Arc<dyn ExternalP256KeyAgreementProvider>,
     verification_keys: &[Vec<u8>],
-    progress: Option<Arc<dyn crate::streaming::ProgressReporter>>,
+    progress: Option<Arc<dyn crate::streaming::StreamingProgressReporter>>,
 ) -> Result<FileDecryptDetailedResult, PgpError> {
     let recipient_cert = openpgp::Cert::from_bytes(recipient_public_cert_data).map_err(|e| {
         PgpError::InvalidKeyData {

@@ -624,7 +624,7 @@ impl PgpEngine {
         recipients: Vec<Vec<u8>>,
         signing_key: Option<Vec<u8>>,
         encrypt_to_self: Option<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<(), PgpError> {
         let signing_key = signing_key.map(Zeroizing::new);
         streaming::encrypt_file(
@@ -647,7 +647,7 @@ impl PgpEngine {
         signing_key_fingerprint: String,
         signer: Arc<dyn ExternalP256SigningProvider>,
         encrypt_to_self: Option<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<(), PgpError> {
         streaming::encrypt_file_with_external_p256_signer(
             &input_path,
@@ -668,7 +668,7 @@ impl PgpEngine {
         output_path: String,
         secret_keys: Vec<Vec<u8>>,
         verification_keys: Vec<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<FileDecryptDetailedResult, PgpError> {
         let secret_keys: Vec<Zeroizing<Vec<u8>>> =
             secret_keys.into_iter().map(Zeroizing::new).collect();
@@ -695,7 +695,7 @@ impl PgpEngine {
         key_agreement_subkey_fingerprint: String,
         key_agreement_provider: Arc<dyn ExternalP256KeyAgreementProvider>,
         verification_keys: Vec<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<FileDecryptDetailedResult, PgpError> {
         external_decryptor::decrypt_file_detailed_with_external_p256_key_agreement(
             &input_path,
@@ -714,7 +714,7 @@ impl PgpEngine {
         &self,
         input_path: String,
         signer_cert: Vec<u8>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<Vec<u8>, PgpError> {
         let signer_cert = Zeroizing::new(signer_cert);
         streaming::sign_detached_file(&input_path, &signer_cert, progress)
@@ -727,7 +727,7 @@ impl PgpEngine {
         public_cert: Vec<u8>,
         signing_key_fingerprint: String,
         signer: Arc<dyn ExternalP256SigningProvider>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<Vec<u8>, PgpError> {
         streaming::sign_detached_file_with_external_p256_signer(
             &input_path,
@@ -744,7 +744,7 @@ impl PgpEngine {
         data_path: String,
         signature: Vec<u8>,
         verification_keys: Vec<Vec<u8>>,
-        progress: Option<Arc<dyn streaming::ProgressReporter>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
     ) -> Result<FileVerifyDetailedResult, PgpError> {
         streaming::verify_detached_file_detailed(
             &data_path,

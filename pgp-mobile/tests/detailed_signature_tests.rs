@@ -454,7 +454,7 @@ fn test_decrypt_file_detailed_unsigned_returns_empty_signatures_and_not_signed()
 
 struct CancelImmediately;
 
-impl streaming::ProgressReporter for CancelImmediately {
+impl streaming::StreamingProgressReporter for CancelImmediately {
     fn on_progress(&self, _bytes_processed: u64, _total_bytes: u64) -> bool {
         false
     }

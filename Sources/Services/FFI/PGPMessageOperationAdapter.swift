@@ -514,7 +514,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         recipientKeys: [Data],
         signingKey: Data?,
         selfKey: Data?,
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws {
         try engine.encryptFile(
             inputPath: inputPath,
@@ -536,7 +536,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         signingKeyFingerprint: String,
         signingProvider: ExternalP256SigningProvider,
         selfKey: Data?,
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws {
         try engine.encryptFileWithExternalP256Signer(
             inputPath: inputPath,
@@ -589,7 +589,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         outputPath: String,
         secretKeys: [Data],
         verificationKeys: [Data],
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws -> FileDecryptDetailedResult {
         try engine.decryptFileDetailed(
             inputPath: inputPath,
@@ -609,7 +609,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         keyAgreementSubkeyFingerprint: String,
         keyAgreementProvider: ExternalP256KeyAgreementProvider,
         verificationKeys: [Data],
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws -> FileDecryptDetailedResult {
         try engine.decryptFileDetailedWithExternalP256KeyAgreement(
             inputPath: inputPath,
@@ -722,7 +722,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         engine: PgpEngine,
         inputPath: String,
         signerCert: Data,
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws -> Data {
         try engine.signDetachedFile(
             inputPath: inputPath,
@@ -738,7 +738,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         publicCert: Data,
         signingKeyFingerprint: String,
         signingProvider: ExternalP256SigningProvider,
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws -> Data {
         try engine.signDetachedFileWithExternalP256Signer(
             inputPath: inputPath,
@@ -767,7 +767,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         dataPath: String,
         signature: Data,
         verificationKeys: [Data],
-        progress: ProgressReporter?
+        progress: StreamingProgressReporter?
     ) async throws -> FileVerifyDetailedResult {
         try engine.verifyDetachedFileDetailed(
             dataPath: dataPath,
@@ -778,7 +778,7 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
     }
 }
 
-private final class PGPProgressReporterBridge: ProgressReporter, @unchecked Sendable {
+private final class PGPProgressReporterBridge: StreamingProgressReporter, @unchecked Sendable {
     private let reporter: FileProgressReporter
 
     init(reporter: FileProgressReporter) {

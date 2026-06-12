@@ -1013,7 +1013,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
      */
-    func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
+    func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: StreamingProgressReporter?) throws  -> FileDecryptDetailedResult
 
     /**
      * Decrypt a file using streaming I/O through a public-only P-256 recipient
@@ -1023,7 +1023,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * secret certificate is unwrapped). Payload authentication and the success-only
      * output contract remain Sequoia/streaming responsibilities.
      */
-    func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileDecryptDetailedResult
+    func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: StreamingProgressReporter?) throws  -> FileDecryptDetailedResult
 
     /**
      * Decrypt a password-encrypted message without falling back to recipient-key decryption.
@@ -1080,12 +1080,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
-    func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?) throws
+    func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
 
     /**
      * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
      */
-    func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: ProgressReporter?) throws
+    func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
 
     /**
      * Encrypt plaintext and sign it using a public certificate plus external P-256 signer.
@@ -1266,12 +1266,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
-    func signDetachedFile(inputPath: String, signerCert: Data, progress: ProgressReporter?) throws  -> Data
+    func signDetachedFile(inputPath: String, signerCert: Data, progress: StreamingProgressReporter?) throws  -> Data
 
     /**
      * Create a detached file signature using a public certificate and external P-256 signer.
      */
-    func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: ProgressReporter?) throws  -> Data
+    func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: StreamingProgressReporter?) throws  -> Data
 
     /**
      * Validate contact-import data as a public certificate and return normalized metadata.
@@ -1288,7 +1288,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Verify a detached file signature using streaming I/O and preserve per-signature details.
      */
-    func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?) throws  -> FileVerifyDetailedResult
+    func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: StreamingProgressReporter?) throws  -> FileVerifyDetailedResult
 
     /**
      * Verify a direct-key signature against a target certificate using crypto-only semantics.
@@ -1454,7 +1454,7 @@ open func decryptDetailedWithExternalP256KeyAgreement(ciphertext: Data, recipien
     /**
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
      */
-open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileDecryptDetailedResult  {
+open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed(
             self.uniffiCloneHandle(),
@@ -1462,7 +1462,7 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
         FfiConverterString.lower(outputPath),
         FfiConverterSequenceData.lower(secretKeys),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
 }
@@ -1475,7 +1475,7 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
      * secret certificate is unwrapped). Payload authentication and the success-only
      * output contract remain Sequoia/streaming responsibilities.
      */
-open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileDecryptDetailedResult  {
+open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement(
             self.uniffiCloneHandle(),
@@ -1485,7 +1485,7 @@ open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, out
         FfiConverterString.lower(keyAgreementSubkeyFingerprint),
         FfiConverterTypeExternalP256KeyAgreementProvider_lower(keyAgreementProvider),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
 }
@@ -1617,7 +1617,7 @@ open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, passwo
      * Encrypt a file using streaming I/O. Constant memory usage.
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
-open func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: ProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+open func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -1625,7 +1625,7 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 }
 }
@@ -1633,7 +1633,7 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
     /**
      * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
      */
-open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: ProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -1643,7 +1643,7 @@ open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: Strin
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 }
 }
@@ -2064,13 +2064,13 @@ open func signCleartextWithExternalP256Signer(text: Data, publicCert: Data, sign
      * Create a detached signature for a file using streaming I/O.
      * Returns the ASCII-armored signature.
      */
-open func signDetachedFile(inputPath: String, signerCert: Data, progress: ProgressReporter?)throws  -> Data  {
+open func signDetachedFile(inputPath: String, signerCert: Data, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(signerCert),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
 }
@@ -2078,7 +2078,7 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Progre
     /**
      * Create a detached file signature using a public certificate and external P-256 signer.
      */
-open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: ProgressReporter?)throws  -> Data  {
+open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_p256_signer(
             self.uniffiCloneHandle(),
@@ -2086,7 +2086,7 @@ open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: 
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
 }
@@ -2121,14 +2121,14 @@ open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])
     /**
      * Verify a detached file signature using streaming I/O and preserve per-signature details.
      */
-open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: ProgressReporter?)throws  -> FileVerifyDetailedResult  {
+open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileVerifyDetailedResult  {
     return try  FfiConverterTypeFileVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file_detailed(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dataPath),
         FfiConverterData.lower(signature),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
 }
@@ -2218,7 +2218,7 @@ public func FfiConverterTypePgpEngine_lower(_ value: PgpEngine) -> UInt64 {
  *
  * Return `false` from `on_progress` to cancel the operation.
  */
-public protocol ProgressReporter: AnyObject, Sendable {
+public protocol StreamingProgressReporter: AnyObject, Sendable {
 
     /**
      * Report progress during a streaming operation.
@@ -2236,7 +2236,7 @@ public protocol ProgressReporter: AnyObject, Sendable {
  *
  * Return `false` from `on_progress` to cancel the operation.
  */
-open class ProgressReporterImpl: ProgressReporter, @unchecked Sendable {
+open class StreamingProgressReporterImpl: StreamingProgressReporter, @unchecked Sendable {
     fileprivate let handle: UInt64
 
     /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
@@ -2273,7 +2273,7 @@ open class ProgressReporterImpl: ProgressReporter, @unchecked Sendable {
     @_documentation(visibility: private)
 #endif
     public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_pgp_mobile_fn_clone_progressreporter(self.handle, $0) }
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_streamingprogressreporter(self.handle, $0) }
     }
     // No primary constructor declared for this class.
 
@@ -2283,7 +2283,7 @@ open class ProgressReporterImpl: ProgressReporter, @unchecked Sendable {
             return
         }
 
-        try! rustCall { uniffi_pgp_mobile_fn_free_progressreporter(handle, $0) }
+        try! rustCall { uniffi_pgp_mobile_fn_free_streamingprogressreporter(handle, $0) }
     }
 
 
@@ -2298,7 +2298,7 @@ open class ProgressReporterImpl: ProgressReporter, @unchecked Sendable {
      */
 open func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_pgp_mobile_fn_method_progressreporter_on_progress(
+    uniffi_pgp_mobile_fn_method_streamingprogressreporter_on_progress(
             self.uniffiCloneHandle(),
         FfiConverterUInt64.lower(bytesProcessed),
         FfiConverterUInt64.lower(totalBytes),$0
@@ -2313,25 +2313,25 @@ open func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool  {
 
 
 // Put the implementation in a struct so we don't pollute the top-level namespace
-fileprivate struct UniffiCallbackInterfaceProgressReporter {
+fileprivate struct UniffiCallbackInterfaceStreamingProgressReporter {
 
     // Create the VTable using a series of closures.
     // Swift automatically converts these into C callback functions.
     //
     // Store the vtable directly.
-    static let vtable: UniffiVTableCallbackInterfaceProgressReporter = UniffiVTableCallbackInterfaceProgressReporter(
+    static let vtable: UniffiVTableCallbackInterfaceStreamingProgressReporter = UniffiVTableCallbackInterfaceStreamingProgressReporter(
         uniffiFree: { (uniffiHandle: UInt64) -> () in
             do {
-                try FfiConverterTypeProgressReporter.handleMap.remove(handle: uniffiHandle)
+                try FfiConverterTypeStreamingProgressReporter.handleMap.remove(handle: uniffiHandle)
             } catch {
-                print("Uniffi callback interface ProgressReporter: handle missing in uniffiFree")
+                print("Uniffi callback interface StreamingProgressReporter: handle missing in uniffiFree")
             }
         },
         uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
             do {
-                return try FfiConverterTypeProgressReporter.handleMap.clone(handle: uniffiHandle)
+                return try FfiConverterTypeStreamingProgressReporter.handleMap.clone(handle: uniffiHandle)
             } catch {
-                fatalError("Uniffi callback interface ProgressReporter: handle missing in uniffiClone")
+                fatalError("Uniffi callback interface StreamingProgressReporter: handle missing in uniffiClone")
             }
         },
         onProgress: { (
@@ -2343,7 +2343,7 @@ fileprivate struct UniffiCallbackInterfaceProgressReporter {
         ) in
             let makeCall = {
                 () throws -> Bool in
-                guard let uniffiObj = try? FfiConverterTypeProgressReporter.handleMap.get(handle: uniffiHandle) else {
+                guard let uniffiObj = try? FfiConverterTypeStreamingProgressReporter.handleMap.get(handle: uniffiHandle) else {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return uniffiObj.onProgress(
@@ -2364,39 +2364,39 @@ fileprivate struct UniffiCallbackInterfaceProgressReporter {
 
     // Rust stores this pointer for future callback invocations, so it must live
     // for the process lifetime (not just for the init function call).
-    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceProgressReporter> = {
-        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceProgressReporter>.allocate(capacity: 1)
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceStreamingProgressReporter> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceStreamingProgressReporter>.allocate(capacity: 1)
         ptr.initialize(to: vtable)
         return UnsafePointer(ptr)
     }()
 }
 
-private func uniffiCallbackInitProgressReporter() {
-    uniffi_pgp_mobile_fn_init_callback_vtable_progressreporter(UniffiCallbackInterfaceProgressReporter.vtablePtr)
+private func uniffiCallbackInitStreamingProgressReporter() {
+    uniffi_pgp_mobile_fn_init_callback_vtable_streamingprogressreporter(UniffiCallbackInterfaceStreamingProgressReporter.vtablePtr)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeProgressReporter: FfiConverter {
-    fileprivate static let handleMap = UniffiHandleMap<ProgressReporter>()
+public struct FfiConverterTypeStreamingProgressReporter: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<StreamingProgressReporter>()
 
     typealias FfiType = UInt64
-    typealias SwiftType = ProgressReporter
+    typealias SwiftType = StreamingProgressReporter
 
-    public static func lift(_ handle: UInt64) throws -> ProgressReporter {
+    public static func lift(_ handle: UInt64) throws -> StreamingProgressReporter {
         if ((handle & 1) == 0) {
             // Rust-generated handle, construct a new class that uses the handle to implement the
             // interface
-            return ProgressReporterImpl(unsafeFromHandle: handle)
+            return StreamingProgressReporterImpl(unsafeFromHandle: handle)
         } else {
             // Swift-generated handle, get the object from the handle map
             return try handleMap.remove(handle: handle)
         }
     }
 
-    public static func lower(_ value: ProgressReporter) -> UInt64 {
-         if let rustImpl = value as? ProgressReporterImpl {
+    public static func lower(_ value: StreamingProgressReporter) -> UInt64 {
+         if let rustImpl = value as? StreamingProgressReporterImpl {
              // Rust-implemented object.  Clone the handle and return it
             return rustImpl.uniffiCloneHandle()
          } else {
@@ -2405,12 +2405,12 @@ public struct FfiConverterTypeProgressReporter: FfiConverter {
          }
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ProgressReporter {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StreamingProgressReporter {
         let handle: UInt64 = try readInt(&buf)
         return try lift(handle)
     }
 
-    public static func write(_ value: ProgressReporter, into buf: inout [UInt8]) {
+    public static func write(_ value: StreamingProgressReporter, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
@@ -2419,15 +2419,15 @@ public struct FfiConverterTypeProgressReporter: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeProgressReporter_lift(_ handle: UInt64) throws -> ProgressReporter {
-    return try FfiConverterTypeProgressReporter.lift(handle)
+public func FfiConverterTypeStreamingProgressReporter_lift(_ handle: UInt64) throws -> StreamingProgressReporter {
+    return try FfiConverterTypeStreamingProgressReporter.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeProgressReporter_lower(_ value: ProgressReporter) -> UInt64 {
-    return FfiConverterTypeProgressReporter.lower(value)
+public func FfiConverterTypeStreamingProgressReporter_lower(_ value: StreamingProgressReporter) -> UInt64 {
+    return FfiConverterTypeStreamingProgressReporter.lower(value)
 }
 
 
@@ -6156,8 +6156,8 @@ fileprivate struct FfiConverterOptionData: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeProgressReporter: FfiConverterRustBuffer {
-    typealias SwiftType = ProgressReporter?
+fileprivate struct FfiConverterOptionTypeStreamingProgressReporter: FfiConverterRustBuffer {
+    typealias SwiftType = StreamingProgressReporter?
 
     public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
@@ -6165,13 +6165,13 @@ fileprivate struct FfiConverterOptionTypeProgressReporter: FfiConverterRustBuffe
             return
         }
         writeInt(&buf, Int8(1))
-        FfiConverterTypeProgressReporter.write(value, into: &buf)
+        FfiConverterTypeStreamingProgressReporter.write(value, into: &buf)
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
-        case 1: return try FfiConverterTypeProgressReporter.read(from: &buf)
+        case 1: return try FfiConverterTypeStreamingProgressReporter.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -6359,10 +6359,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement() != 40270) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 34778) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 1210) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement() != 61069) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement() != 48232) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {
@@ -6389,10 +6389,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 2313) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 55907) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 42541) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 37387) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 16230) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_p256_signer() != 51686) {
@@ -6476,10 +6476,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_p256_signer() != 40306) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 18095) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 22541) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_p256_signer() != 64206) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_p256_signer() != 6589) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate() != 24365) {
@@ -6488,7 +6488,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed() != 33764) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 64315) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 22309) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 31324) {
@@ -6503,7 +6503,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 35195) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_progressreporter_on_progress() != 45018) {
+    if (uniffi_pgp_mobile_checksum_method_streamingprogressreporter_on_progress() != 23443) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_constructor_pgpengine_new() != 55978) {
@@ -6512,7 +6512,7 @@ private let initializationResult: InitializationResult = {
 
     uniffiCallbackInitExternalP256KeyAgreementProvider()
     uniffiCallbackInitExternalP256SigningProvider()
-    uniffiCallbackInitProgressReporter()
+    uniffiCallbackInitStreamingProgressReporter()
     return InitializationResult.ok
 }()
 

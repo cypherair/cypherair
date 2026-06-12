@@ -1479,7 +1479,7 @@ impl CancelAfterBytes {
     }
 }
 
-impl crate::streaming::ProgressReporter for CancelAfterBytes {
+impl crate::streaming::StreamingProgressReporter for CancelAfterBytes {
     fn on_progress(&self, bytes_processed: u64, _total_bytes: u64) -> bool {
         self.calls.fetch_add(1, Ordering::SeqCst);
         bytes_processed < self.cancel_after
@@ -1783,7 +1783,7 @@ fn test_runtime_external_key_agreement_file_api_progress_cancellation_cleans_up(
         material.agreement_scalar.clone(),
     ));
     let progress = Arc::new(CancelAfterBytes::new(64 * 1024));
-    let dyn_progress: Arc<dyn crate::streaming::ProgressReporter> = progress.clone();
+    let dyn_progress: Arc<dyn crate::streaming::StreamingProgressReporter> = progress.clone();
 
     let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
         input.to_string_lossy().into_owned(),
@@ -1836,7 +1836,7 @@ fn test_runtime_external_key_agreement_file_api_early_cancellation_maps_to_cance
     // Cancel as soon as the first byte is read — i.e. during decryptor setup, before
     // any payload is streamed to the temp file.
     let progress = Arc::new(CancelAfterBytes::new(1));
-    let dyn_progress: Arc<dyn crate::streaming::ProgressReporter> = progress.clone();
+    let dyn_progress: Arc<dyn crate::streaming::StreamingProgressReporter> = progress.clone();
 
     let result = engine.decrypt_file_detailed_with_external_p256_key_agreement(
         input.to_string_lossy().into_owned(),
