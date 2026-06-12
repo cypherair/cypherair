@@ -173,6 +173,59 @@ final class AppContainer: @unchecked Sendable {
     }
     #endif
 
+    /// The platform modify-expiry pre-authenticator: macOS authenticates once
+    /// via the system sheet and threads the context into both SE operations
+    /// (TARGET §4 single-prompt contract); other platforms keep the implicit
+    /// per-operation prompts unchanged.
+    private static var productionExpiryAuthenticator: KeyMutationService.ExpiryAuthenticator? {
+        #if os(macOS)
+        KeyMutationService.systemSheetExpiryAuthenticator
+        #else
+        nil
+        #endif
+    }
+
+    /// Builds the App Access Protection policy-switch workflow over the
+    /// container's live dependencies. The workflow encloses the whole switch in
+    /// one operation-prompt session (the uniform rule, TARGET §3).
+    @MainActor
+    func makeAppAccessPolicySwitchWorkflow() -> AppAccessPolicySwitchWorkflow {
+        let config = config
+        let protectedDataSessionCoordinator = protectedDataSessionCoordinator
+        let authManager = authManager
+        let appSessionOrchestrator = appSessionOrchestrator
+        return AppAccessPolicySwitchWorkflow(
+            currentPolicy: {
+                config.appSessionAuthenticationPolicy
+            },
+            hasPersistedRootSecret: {
+                protectedDataSessionCoordinator.hasPersistedRootSecret()
+            },
+            canEvaluate: { policy in
+                authManager.canEvaluate(appSessionPolicy: policy)
+            },
+            evaluateAppSession: { policy, reason, source in
+                try await authManager.evaluateAppSession(
+                    policy: policy,
+                    reason: reason,
+                    source: source
+                )
+            },
+            reprotectPersistedRootSecret: { from, to, context in
+                try protectedDataSessionCoordinator.reprotectPersistedRootSecretIfPresent(
+                    from: from,
+                    to: to,
+                    authenticationContext: context
+                )
+            },
+            discardHandoffContextForPolicyChange: {
+                appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
+            },
+            authenticationPromptCoordinator: authPromptCoordinator,
+            traceStore: authLifecycleTraceStore
+        )
+    }
+
     private static func makeProtectedDataSessionCoordinator(
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
@@ -684,6 +737,10 @@ final class AppContainer: @unchecked Sendable {
             defaults: .standard,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
+            // Single-prompt modify-expiry (TARGET §4): wired in production only.
+            // The UI-test container stays nil (mock Secure Enclave under the
+            // authentication bypass must not drive real LocalAuthentication).
+            expiryAuthenticator: Self.productionExpiryAuthenticator,
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
             secureEnclaveCustodyRecoveryService: secureEnclaveCustodyRecoveryService

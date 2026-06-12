@@ -5045,6 +5045,22 @@
         }
       }
     },
+    "error.keyMetadataUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key information is locked or unavailable. Unlock the app and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密钥信息已锁定或不可用。请解锁应用后重试。"
+          }
+        }
+      }
+    },
     "error.keyOperationUnavailable" : {
       "localizations" : {
         "en" : {
@@ -8437,6 +8453,22 @@
         }
       }
     },
+    "keydetail.expiry.auth.reason" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authenticate to change the key's expiry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证以更改密钥的有效期。"
+          }
+        }
+      }
+    },
     "keydetail.expiry.cancel" : {
       "localizations" : {
         "en" : {
@@ -10129,6 +10161,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Optic ID 已被 visionOS 锁定"
+          }
+        }
+      }
+    },
+    "privacy.locked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已锁定"
           }
         }
       }

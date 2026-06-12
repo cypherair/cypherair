@@ -114,6 +114,7 @@ $(SRCROOT)/Sources/App/Onboarding/TutorialSpotlightOverlay.swift
 $(SRCROOT)/Sources/App/Onboarding/TutorialTaskHostView.swift
 $(SRCROOT)/Sources/App/Onboarding/TutorialView.swift
 $(SRCROOT)/Sources/App/Settings/AboutView.swift
+$(SRCROOT)/Sources/App/Settings/AppAccessPolicySwitchWorkflow.swift
 $(SRCROOT)/Sources/App/Settings/AppIconPickerView.swift
 $(SRCROOT)/Sources/App/Settings/AuthMode/AuthModeChangeConfirmation.swift
 $(SRCROOT)/Sources/App/Settings/AuthMode/SettingsAuthModeRequestBuilder.swift

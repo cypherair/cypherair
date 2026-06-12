@@ -1,16 +1,17 @@
 # Authentication / Privacy / Lifecycle Redesign — Migration Roadmap
 
-> Status: Active roadmap, **re-scoped 2026-06-10**, partially landed. P0 (validation PoC; frozen #469;
-> in-window results invalidated on macOS 27 — §1 addendum), P1 (lock foundation + obsolete-cluster
-> removal; PR #472), and P2 (macOS single-window unification; PR #475) are implemented on `main`.
-> The original P3 (macOS in-window authentication cutover) is **retired** — PR #491 closed unmerged
+> Status: **Complete — record of the migration** (P5 doc cutover, 2026-06-11). All phases are on
+> `main`: P0 (validation PoC; frozen #469; in-window results invalidated on macOS 27 — §1 addendum),
+> P1 (lock foundation + obsolete-cluster removal; PR #472), P2 (macOS single-window unification;
+> PR #475), P3′ (stages 0–2′ + the uniform operation-prompt-session enrollment; stage 0 PR #493,
+> stage 1 PR #494, stage 2 PR #495 **withdrawn** after the maintainer's manual gate and redone as
+> stage 2′ — §3), P4 (the opaque app-identified lock surface, all platforms), and P5 (this cutover).
+> The original P3 (macOS in-window authentication cutover) was **retired** — PR #491 closed unmerged
 > after macOS 27 was found to deny embedded LocalAuthentication UI to non-Apple-signed processes, and
 > the stall problem that motivated it no longer reproduces on macOS 27. Its replacement **P3′**
-> (§3) completes the explicit lock-state architecture on the system authentication sheet. P4–P5
-> remain proposed. Phases that have not landed do **not** describe current shipped behavior — shipped
-> behavior remains as documented in [SECURITY.md](SECURITY.md) and [PRD.md](PRD.md), and the
-> current-state docs flip at P5.
-> Date: 2026-06-10 (originally 2026-06-07).
+> (§3) completed the explicit lock-state architecture on the system authentication sheet.
+> [SECURITY.md](SECURITY.md) §4–§5 and [PRD.md](PRD.md) §4.9 state the shipped model.
+> Date: 2026-06-11 (re-scoped 2026-06-10; originally 2026-06-07).
 > Purpose: The migration from the pre-P1 entangled privacy/lock/shield machinery to the target in
 > [Target Design](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md): phasing, the P0 results and their
 > macOS 27 addendum, the current→target component map, tests, and decisions.
@@ -68,7 +69,8 @@ Measured on this project's development Mac after its upgrade to **macOS 27.0 Gol
   detached sheet) is not observed under the P1 lock model on macOS 27 (field observation 2026-06-10; one
   ~2 s settle seen once). Two contributors changed together: P1 deleted the app-side shield/settle
   machinery, and macOS 27 reworked the system authentication window. Formal trace-based validation is
-  P3′ stage 1; macOS 26.5 validation is the release gate (P3′ stage 3).
+  the stage-3 trace checklist; the macOS 26.5 validation pass was **dropped by the release decision**
+  (§3 stage 3, §7): the release ships against macOS 27 only.
 
 **Consequence:** the in-window cutover is retired; presentation stays with the system sheet. The redesign's
 remaining work is the explicit lock-state architecture (P3′), not the prompt.
@@ -83,8 +85,12 @@ machine.** The app never infers lock state from lifecycle noise around authentic
   no migrations, no access-control changes** (TARGET §1).
 - App-driven authentication windows are **explicit state**: `AppLockController.lockState ==
   .authenticating` for app-session unlock, and the `AuthenticationPromptCoordinator` operation-prompt
-  depth for private-key operations. The macOS away-event rule is filtered through that state (the
-  `.authenticating` rule, TARGET §3) instead of heuristics.
+  session for every other auth-sheet-capable user action — **the uniform enrollment rule** (TARGET §3):
+  each such action (private-key operations, key provisioning, key-expiry modification, the mode-switch
+  re-wrap, the App Access Protection policy change, Local Data Reset) is wrapped in one session for its
+  full duration, and privacy prompts deliberately do not count toward the lock controller's mirror. The
+  macOS away-event rule is filtered through that state (the `.authenticating` rule, TARGET §3) instead
+  of heuristics.
 - **Single prompt per user action** (TARGET §4): flows that would prompt twice in one action thread one
   authenticated subsystem-B `LAContext` into both SE operations (the shipped
   `PrivateKeyRewrapWorkflow` pattern). Explicit pre-authentication is not generalized beyond that.
@@ -123,43 +129,61 @@ machine.** The app never infers lock state from lifecycle noise around authentic
   withdrawn rather than deferred. The seam/host implementation is parked on branch
   `feat/p3-in-window-auth-pr1` for the contingency that Apple restores embedded UI (§7).
 
-- **P3′ — Auth-lifecycle completion on the system sheet (IN PROGRESS; replaces P3).**
-  One PR series, per-stage commits; the goal is architecture (explicit, simple, maintainable), not a
-  behavior rescue:
-  - **Stage 0 — Secure Enclave call-site hygiene (salvaged from #491).** Delete the two nil-context
-    convenience overloads in `SecureEnclaveManageable` 🔴 and make every `generateWrappingKey` /
-    `reconstructKey` call site state `authenticationContext:` explicitly (production + tests), so a
-    reviewer sees at each SE operation whether a context is threaded or implicit system authentication is
-    intended. `MockSecureEnclave` records the received context for tests. No behavior change (all
-    existing sites pass `nil`).
-  - **Stage 1 — The `.authenticating` rule 🔴.** Replace the P1-interim `isDrivingAppSessionAuth`
-    resign-suppression guard in `AppLockController` with the designed rule (TARGET §3): an app-resign
-    attributable to an in-flight app-driven authentication (app-session unlock in `.authenticating`, or a
-    private-key operation prompt in flight per the `AuthenticationPromptCoordinator` depth) is not an
-    away event; the operation-prompt case is decided at the prompts' end (deferred, fail-closed if
-    still away); screen-lock and "Lock Now" always win immediately. Pure-state-machine
-    unit tests for every interleaving; a trace-enabled validation session on macOS 27.
-  - **Stage 2 — Single-prompt key-expiry modification 🔴.** `KeyMutationService.modifySoftwareExpiry`
-    currently prompts twice in one user action (unwrap with the old wrapping key; first use of the new
-    wrapping key inside `wrap`). Authenticate **once** via system-sheet
-    `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's access control and thread
-    that context into both SE operations (the `PrivateKeyRewrapWorkflow` pattern; macOS-27-validated via
-    the probe suite). Journal/promote atomicity untouched. This is the only flow with a duplicate prompt;
-    provisioning (generate/import) is already single-prompt and is not changed.
-  - **Stage 3 — Release-gate verification.** The standard lanes, plus: trace-based confirmation of the
-    `.authenticating` rule on macOS 27, and a validation pass of the auth flow on **macOS 26.5** (VM or
-    second machine — the development Mac can no longer run it) before the next release ships. If 26.5
-    behavior is unacceptable and unfixable app-side, the release alternative is to require macOS 27;
-    that is a release decision, not a design fork.
+- **P3′ — Auth-lifecycle completion on the system sheet (DONE; replaces P3).**
+  Stages 0–1 landed as individual PRs; the remainder landed as one PR with per-stage commits. The goal
+  was architecture (explicit, simple, maintainable), not a behavior rescue:
+  - **Stage 0 — Secure Enclave call-site hygiene (DONE; PR #493; salvaged from #491).** Deleted the two
+    nil-context convenience overloads in `SecureEnclaveManageable` 🔴 and made every
+    `generateWrappingKey` / `reconstructKey` call site state `authenticationContext:` explicitly
+    (production + tests), so a reviewer sees at each SE operation whether a context is threaded or
+    implicit system authentication is intended. `MockSecureEnclave` records the received context for
+    tests. No behavior change (all pre-existing sites pass `nil`).
+  - **Stage 1 — The `.authenticating` rule 🔴 (DONE; PR #494).** Replaced the P1-interim
+    `isDrivingAppSessionAuth` resign-suppression guard in `AppLockController` with the designed rule
+    (TARGET §3): an app-resign attributable to an in-flight app-driven authentication (app-session
+    unlock in `.authenticating`, or an open operation-prompt session per the main-actor counter
+    mirrored from `AuthenticationPromptCoordinator`) is not an away event; the operation-prompt case is
+    decided at the session's end (deferred, fail-closed if still away); screen-lock and "Lock Now"
+    always win immediately. Pure-state-machine unit tests for every interleaving, including the
+    hop-delay TOCTOU integration pin.
+  - **Stage 2′ — Single-prompt key-expiry modification 🔴 (DONE; redo of withdrawn PR #495).**
+    `KeyMutationService.modifySoftwareExpiry` prompted twice in one user action (unwrap with the old
+    wrapping key; first use of the new wrapping key inside `wrap`). It now authenticates **once** via
+    system-sheet `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's access
+    control and threads that context into both SE operations (the `PrivateKeyRewrapWorkflow` pattern;
+    macOS-27-validated via the probe suite); journal/promote atomicity untouched. **#495 was withdrawn
+    at the maintainer's manual gate:** its pre-authentication ran *outside* any operation-prompt
+    session, so the pre-auth sheet's own resign locked the app mid-action at grace=Immediately. The
+    redo wraps the whole action in one session and adds the missing test class — composition tests
+    (lock controller + coordinator + real flow) that pin in-session enrollment and the deferred-resign
+    decision. The misleading `noMatchingKey` reuse in the modify flow's catalog guard was replaced by
+    the honest `keyMetadataUnavailable` error at the same time.
+  - **Uniform enrollment (DONE; the #495-class closure).** The session-wrap principle generalized:
+    every auth-sheet-capable user action runs inside one operation-prompt session for its full
+    duration (TARGET §3) — the mode-switch re-wrap (`AuthenticationManager.switchMode`), the App
+    Access Protection policy change (extracted into `AppAccessPolicySwitchWorkflow`), Local Data Reset
+    (`SettingsScreenModel.confirmLocalDataReset`), and key provisioning
+    (`KeyProvisioningService.generateKey` / `importKey`, whose wrap prompt was previously unenrolled).
+    Privacy prompts deliberately do not count toward the lock controller's mirror. Each flow carries a
+    composition regression test on a shared harness.
+  - **Stage 3 — Release-gate verification (DONE, folded into the finish PR).** The standard lanes,
+    plus a consolidated manual handoff: per-flow smoke scenarios and the trace-based confirmation
+    checklist for the `.authenticating` rule on macOS 27 (including the deferred post-auth fan-out
+    watch item from the #494 review). The previously planned **macOS 26.5 validation pass was
+    dropped**: the release decision (2026-06-10) ships ~September against **macOS 27 only**, removing
+    26.5 from the support matrix (the deployment-target bump happens at release prep and is
+    maintainer-owned).
 
-- **P4 — iOS / iPadOS / visionOS custom lock surface.** A custom opaque lock surface with the biometric
-  auto-invoked, retry and biometrics-locked-out messaging preserved, driven by `AppLockController`. The
-  platform authentication model is otherwise unchanged. Depends only on P1. visionOS remains an
+- **P4 — Custom lock surface (DONE; broadened from iOS/iPadOS/visionOS to all platforms by maintainer
+  decision).** One shared **opaque** lock surface — a text-only header (app name + locked-state
+  caption; no decorative lock imagery, by maintainer review decision) — with the
+  biometric auto-invoked, retry and biometrics-locked-out messaging preserved, driven by
+  `AppLockController`. The platform authentication model is otherwise unchanged. visionOS remains an
   unvalidated assumption (no hardware).
 
-- **P5 (last) — Verification + current-state doc cutover.** Full-matrix verification of the new model;
-  then flip [SECURITY.md](SECURITY.md) §4, [PRD.md](PRD.md) §4.9, and the two redesign-doc status blocks
-  from forward-looking to current-state. Substantially smaller than originally planned: there is **no
+- **P5 (last) — Verification + current-state doc cutover (DONE).** Full-lane verification of the new
+  model; [SECURITY.md](SECURITY.md) §4–§5, [PRD.md](PRD.md) §4.9, and the two redesign docs flipped
+  from forward-looking to current-state. Substantially smaller than originally planned: there was **no
   access-control model change, no migration, and no settings-surface removal** to document.
 
 ## 4. Secure Enclave context-threading inventory (private-key)
@@ -169,17 +193,19 @@ Two distinct Secure-Enclave seams — they must not be collapsed:
 **Software / SE-wrapped path** (through `SecureEnclaveManager`):
 - **(a) Already threads a context** — `PrivateKeyRewrapWorkflow` (the mode-switch re-wrap) passes its
   authenticated `LAContext` into both `reconstructKey(…authenticationContext:)` and
-  `generateWrappingKey(…authenticationContext:)`. This is the pattern stage 2 adopts.
+  `generateWrappingKey(…authenticationContext:)`. This is the pattern stage 2′ adopted.
 - **(b) The shared read seam** — `PrivateKeyAccessService.unwrapPrivateKey` → `reconstructKey` with
   `authenticationContext: nil` (explicit after stage 0): the Secure Enclave authenticates implicitly via
   the system prompt, once per user-initiated operation. **Unchanged by design** (per-op posture, TARGET
   §4). Covers signing (including password-message encryption that signs), message decrypt, file-streaming
   decrypt, certification, revocation export, and S2K export/backup.
-- **(c) The key-expiry duplicate** — `KeyMutationService.modifySoftwareExpiry` unwraps (prompt 1) then
-  re-wraps via `generateWrappingKey` + `wrap`, whose first self-ECDH on the new key prompts again
-  (prompt 2). **Fixed in stage 2** with one threaded context.
+- **(c) The key-expiry duplicate** — `KeyMutationService.modifySoftwareExpiry` unwrapped (prompt 1) then
+  re-wrapped via `generateWrappingKey` + `wrap`, whose first self-ECDH on the new key prompted again
+  (prompt 2). **Fixed in stage 2′** with one threaded context, inside one operation-prompt session.
 - **Provisioning** — `KeyProvisioningService.generateKey` / `importKey` produce a single prompt (the new
-  wrapping key's first use inside `wrap`). Already single-prompt; **not changed**.
+  wrapping key's first use inside `wrap`). Already single-prompt; **now enrolled** in one
+  operation-prompt session per action (uniform enrollment) so the wrap prompt's own resign cannot lock
+  the app mid-provisioning.
 
 **Custody path** (separate; hidden / test-only): `SystemSecureEnclaveCustodyKeyStore.loadKeys` with
 `kSecUseAuthenticationContext`, then `SecKeyCreateSignature` / `SecKeyCopyKeyExchangeResult`. It does **not**
@@ -194,9 +220,11 @@ principle through its own seam when productized.
 | `PrivacyScreenLifecycleGate`, union snapshot, settle window | **removed (P1, shipped)** |
 | `isPrivacyScreenBlurred` overload + settle-blur | **removed (P1, shipped)** |
 | macOS standalone `Settings { }` scene | **removed (P2, shipped)** |
-| `isDrivingAppSessionAuth` interim resign-suppression guard | **replaced (P3′ stage 1)** by the designed `.authenticating` rule in `AppLockController` |
-| `SecureEnclaveManageable` nil-context convenience overloads | **removed (P3′ stage 0)** — every call site states `authenticationContext:` explicitly |
-| Key-expiry double prompt (`modifySoftwareExpiry`) | **single prompt (P3′ stage 2)** via one threaded context |
+| `isDrivingAppSessionAuth` interim resign-suppression guard | **replaced (P3′ stage 1, shipped)** by the designed `.authenticating` rule in `AppLockController` |
+| `SecureEnclaveManageable` nil-context convenience overloads | **removed (P3′ stage 0, shipped)** — every call site states `authenticationContext:` explicitly |
+| Key-expiry double prompt (`modifySoftwareExpiry`) | **single prompt (P3′ stage 2′, shipped)** via one threaded context, inside one operation-prompt session |
+| Auth-sheet actions outside the unwrap seam (mode switch / policy switch / Local Data Reset / provisioning) | **wrapped in operation-prompt sessions (uniform enrollment, shipped)** |
+| Minimal P1 lock surface (`.ultraThinMaterial`) | **opaque app-identified lock surface (P4, shipped)** — one shared surface, all platforms |
 | macOS detached system-sheet authentication | **retained** — the system presents authentication; the lock model is correct around it by design |
 | App Access Protection options / Private Key Protection modes | **retained everywhere** — no pinning, no migrations |
 | `LocalDataResetRestartGate` | **retained** — one mount (P2); system-sheet authentication |
@@ -205,21 +233,29 @@ principle through its own seam when productized.
 ## 6. Red lines & tests
 
 - **Red-line review.** `AppLockController` and `Sources/Security/ProtectedData/*` (stage 1),
-  `SecureEnclaveManageable` (stage 0), and the stage-2 context threading
+  `SecureEnclaveManageable` (stage 0), and the stage-2′ context threading
   (`KeyMutationService`, `SecureEnclaveManager` call sites) require human security review per
   [SECURITY.md](SECURITY.md) §10, with positive + negative tests. Entitlements are **not** touched by any
   P3′ stage.
 - **Tests.**
   - Stage 1: `AppLockController` pure-state-machine tests — auth-driven resign during `.authenticating`
     does not lock; genuine background/screen-lock/Lock-Now during `.authenticating` discards the in-flight
-    unlock and fails closed; grace=0 produces no double-auth; per-op prompt-depth suppression covered for
-    the same interleavings; lock-state trace assertions.
-  - Stage 2: device tests — modify-expiry is a single prompt end-to-end; round-trip (the re-wrapped key
-    decrypts/signs); negative: a declined/cancelled authentication aborts before any SE mutation and the
-    journal recovers; the threaded context is created for and confined to the one action (never stored,
-    invalidated after).
+    unlock and fails closed; grace=0 produces no double-auth; session-mirror suppression covered for
+    the same interleavings; the hop-delay TOCTOU integration pin; lock-state trace assertions.
+  - Stage 2′ + uniform enrollment: unit tests — single prompt with the SAME context instance asserted
+    on both SE operations and invalidated exactly once; a declined/cancelled authentication aborts
+    before any SE mutation or journal entry and the flow stays usable; the un-wired path keeps nil
+    contexts; the mid-action catalog relock surfaces `keyMetadataUnavailable`. **Composition
+    regression tests** (the class #495 was missing — lock controller + prompt coordinator + the real
+    flow on a shared harness, `OperationPromptLockHarness`): each enrolled flow asserts its prompt
+    runs with an open operation-prompt session and that a resign during the prompt is deferred and
+    decided at the session's end (`ModifyExpiryOperationPromptCompositionTests`,
+    `ModeSwitchOperationPromptCompositionTests`, `AppAccessPolicySwitchWorkflowTests`,
+    `KeyProvisioningOperationPromptCompositionTests`, plus the Local Data Reset tests in
+    `SettingsScreenModelTests`).
   - Stage 3: the standard lanes (`CypherAir-UnitTests`, `CypherAir-MacUITests`, visionOS build probe,
-    `CypherAir-DeviceTests` for SE/biometric coverage) plus the macOS 26.5 validation pass.
+    `CypherAir-DeviceTests` for SE/biometric coverage) plus the maintainer's manual smoke pass and the
+    macOS 27 trace checklist (the 26.5 validation pass was dropped by the release decision, §7).
 - **Invariants under test throughout:** subsystem A/B context separation; AEAD hard-fail; no partial
   plaintext; no secret logging; zero network; access-control flags byte-identical before/after.
 
@@ -236,6 +272,14 @@ principle through its own seam when productized.
 - **Single-prompt-per-action (decided):** fix the one duplicate (key expiry); do **not** generalize
   explicit pre-authentication to already-single-prompt operations — if ever wanted, that is a separate
   future proposal.
+- **Uniform session enrollment (decided 2026-06-11, after the #495 withdrawal):** every user action
+  that can present an authentication sheet while unlocked runs inside one operation-prompt session for
+  its full duration; enrollment is the wrapped action. **Privacy prompts do not count toward the lock
+  controller's mirror** — making the mirror count them would entangle arm (a)'s unlock with arm (b)'s
+  deferral.
+- **Release gate (decided 2026-06-10):** ship ~September against **macOS 27 only**; macOS 26.5 leaves
+  the support matrix and its stage-3 validation pass is dropped (no VM, no second machine). The
+  deployment-target bump (26.5 → 27) happens at release prep and is maintainer-owned.
 - **Companion devices:** under `.userPresence`, `LAPolicy.deviceOwnerAuthentication` already includes
   Apple Watch on macOS — system behavior, not a CypherAir feature decision. A dedicated
   biometrics-or-Watch (no password) option is an optional future study.
@@ -245,5 +289,6 @@ principle through its own seam when productized.
 
 ---
 
-*Phases land individually (P0–P2 are on `main`; P3′ is in progress). Un-landed phases remain proposals and
-do not change shipped behavior until implemented and reviewed; the current-state docs are updated at P5.*
+*All phases are on `main`; this roadmap is the record of the migration. The current-state docs
+([SECURITY.md](SECURITY.md) §4–§5, [PRD.md](PRD.md) §4.9, and the
+[Target Design](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md)) describe shipped behavior.*

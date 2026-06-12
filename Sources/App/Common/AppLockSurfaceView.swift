@@ -1,48 +1,87 @@
 import SwiftUI
 
-/// The minimal functional lock surface shown while `AppLockController` is locked
-/// (P1 of the auth-lifecycle redesign). It auto-invokes authentication on appear
-/// and hosts the retry / biometrics-locked-out messaging.
+/// The opaque lock surface shown while `AppLockController` is locked
+/// (P4 of the auth-lifecycle redesign — TARGET §5). It auto-invokes
+/// authentication on appear and hosts the retry / biometrics-locked-out
+/// messaging, driven solely by the explicit `AppLockController.lockState`.
 ///
-/// The failure/retry/locked-out content (and its localized strings) is relocated
-/// verbatim from the old `PrivacyScreenModifier`, now driven by the explicit
-/// `AppLockController.lockState` instead of the `isPrivacyScreenBlurred` /
-/// `authFailed` / `isAuthenticating` flags. The polished, fully custom lock surface
-/// is **P4** (TARGET §5); P1 keeps this functional but minimal.
+/// The surface is deliberately OPAQUE — an app-identified screen, not a
+/// material over content: locked content must never show through. The header
+/// is text-only (app name + locked-state caption) by maintainer decision —
+/// no decorative lock imagery. The cosmetic privacy cover
+/// (`CosmeticPrivacyCover`) is a separate, unrelated layer with its own
+/// role. Native platform chrome only; no `.glassEffect()` on a security
+/// surface (PRD §4.9). The failure/retry/locked-out content (and its localized
+/// strings) is unchanged from the P1 surface.
 struct AppLockSurfaceView: View {
     let appLockController: AppLockController
 
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(.background)
                 .ignoresSafeArea()
 
-            switch appLockController.lockState {
-            case .authenticating:
-                ProgressView()
-            case .authenticationFailed(.biometricsLockedOut):
-                biometricsLockedOutCard
-            case .authenticationFailed(.authenticationFailed), .locked:
-                retryAuthenticationButton(
-                    title: String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
-                    accessibilityLabel: String(
-                        localized: "privacy.tapToAuth.a11y",
-                        defaultValue: "Authenticate to unlock the app"
-                    )
-                )
-            case .unlocked:
-                EmptyView()
+            // At accessibility Dynamic Type sizes the locked-out card can
+            // outgrow a small screen; fall back to scrolling only then, so the
+            // retry button is always reachable.
+            ViewThatFits(in: .vertical) {
+                lockContent
+                ScrollView {
+                    lockContent
+                }
             }
         }
         .task {
             await appLockController.handleForegroundActive(source: "lockSurface.appear")
+        }
+        .accessibilityIdentifier("appLock.surface")
+    }
+
+    private var lockContent: some View {
+        VStack(spacing: 28) {
+            lockHeader
+            stateContent
+        }
+        .padding(24)
+    }
+
+    private var lockHeader: some View {
+        VStack(spacing: 8) {
+            Text(AppProductIdentity.localizedDisplayName)
+                .font(.title2.weight(.semibold))
+
+            Text(String(localized: "privacy.locked.title", defaultValue: "Locked"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
+        switch appLockController.lockState {
+        case .authenticating:
+            ProgressView()
+        case .authenticationFailed(.biometricsLockedOut):
+            biometricsLockedOutCard
+        case .authenticationFailed(.authenticationFailed), .locked:
+            retryAuthenticationButton(
+                title: String(localized: "privacy.tapToAuth", defaultValue: "Tap to Authenticate"),
+                accessibilityLabel: String(
+                    localized: "privacy.tapToAuth.a11y",
+                    defaultValue: "Authenticate to unlock the app"
+                )
+            )
+        case .unlocked:
+            EmptyView()
         }
     }
 
     private var biometricIconName: String {
         #if os(macOS)
         "touchid"
+        #elseif os(visionOS)
+        "opticid"
         #else
         "faceid"
         #endif

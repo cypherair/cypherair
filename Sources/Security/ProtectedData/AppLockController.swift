@@ -427,6 +427,10 @@ final class AppLockController {
         // the wrapping root key) and deleted all keychain items and protected
         // domains — there is no data left for a lock to protect — and the
         // post-reset restart gate disables all UI interaction until relaunch.
+        // `openOperationPromptSessions` is deliberately NOT reset: the hooks are
+        // the counter's sole mutators, and the reset action itself runs inside a
+        // balanced operation-prompt session (the uniform rule) whose ended-hook
+        // decrements normally after this method returns.
         pendingOperationPromptAway = nil
         #endif
         discardHandoffContext("localDataReset")

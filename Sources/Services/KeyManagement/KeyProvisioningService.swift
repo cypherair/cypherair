@@ -10,6 +10,7 @@ final class KeyProvisioningService {
     private let bundleStore: KeyBundleStore
     private let catalogStore: KeyCatalogStore
     private let invalidationGate: KeyProvisioningInvalidationGate
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
     private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
     private let afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint?
@@ -24,6 +25,7 @@ final class KeyProvisioningService {
         catalogStore: KeyCatalogStore,
         invalidationGate: KeyProvisioningInvalidationGate,
         commitCoordinator: KeyProvisioningCommitCoordinator,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: ProvisioningCheckpoint? = nil,
         afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint? = nil,
@@ -35,6 +37,7 @@ final class KeyProvisioningService {
         self.bundleStore = bundleStore
         self.catalogStore = catalogStore
         self.invalidationGate = invalidationGate
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
         self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
         self.afterPermanentBundleStoreCheckpoint = afterPermanentBundleStoreCheckpoint
@@ -42,7 +45,34 @@ final class KeyProvisioningService {
         self.commitCoordinator = commitCoordinator
     }
 
+    /// Each whole provisioning action runs inside ONE operation-prompt session
+    /// (the uniform rule, TARGET §3): the new wrapping key's first self-ECDH
+    /// inside `wrap` presents the system prompt, and that sheet's own resign
+    /// must be attributed to this action — deferred to the session's end, never
+    /// a mid-action lock. A long key generation extends the deferral window by
+    /// design: a user who switches away and stays away is locked at the
+    /// action's end (stage-1 fail-closed-at-decision semantics).
     func generateKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        profile: PGPKeyProfile,
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    ) async throws -> PGPKeyIdentity {
+        try await authenticationPromptCoordinator.withOperationPrompt(source: "keyProvisioning.generate") {
+            try await performGenerateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                profile: profile,
+                authMode: authMode,
+                invalidationToken: token
+            )
+        }
+    }
+
+    private func performGenerateKey(
         name: String,
         email: String?,
         expirySeconds: UInt64?,
@@ -99,7 +129,25 @@ final class KeyProvisioningService {
         return identity
     }
 
+    /// See `generateKey` — the same one-session-per-action enrollment applies
+    /// to the import's wrap prompt.
     func importKey(
+        armoredData: Data,
+        passphrase: String,
+        authMode: AuthenticationMode,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    ) async throws -> PGPKeyIdentity {
+        try await authenticationPromptCoordinator.withOperationPrompt(source: "keyProvisioning.import") {
+            try await performImportKey(
+                armoredData: armoredData,
+                passphrase: passphrase,
+                authMode: authMode,
+                invalidationToken: token
+            )
+        }
+    }
+
+    private func performImportKey(
         armoredData: Data,
         passphrase: String,
         authMode: AuthenticationMode,

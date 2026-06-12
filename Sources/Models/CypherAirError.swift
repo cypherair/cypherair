@@ -30,6 +30,7 @@ enum CypherAirError: Error {
     case authenticationFailed
     case authenticationCancelled
     case keychainError(String)
+    case keyMetadataUnavailable
 
     // App-layer errors
     case invalidQRCode

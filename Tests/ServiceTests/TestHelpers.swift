@@ -13,7 +13,10 @@ enum TestHelpers {
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
-        metadataPersistence: (any KeyMetadataPersistence)? = nil
+        metadataPersistence: (any KeyMetadataPersistence)? = nil,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
         service: KeyManagementService,
         mockSE: MockSecureEnclave,
@@ -28,6 +31,7 @@ enum TestHelpers {
         let metadataPersistence = metadataPersistence ?? InMemoryKeyMetadataStore()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        let promptCoordinator = authenticationPromptCoordinator ?? AuthenticationPromptCoordinator()
 
         let service: KeyManagementService
         if let memInfo = memoryInfo {
@@ -36,16 +40,22 @@ enum TestHelpers {
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
                 defaults: .standard,
+                authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
-                metadataPersistence: metadataPersistence
+                expiryAuthenticator: expiryAuthenticator,
+                metadataPersistence: metadataPersistence,
+                provisioningCheckpoint: provisioningCheckpoint
             )
         } else {
             service = KeyManagementService(
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
+                authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
-                metadataPersistence: metadataPersistence
+                expiryAuthenticator: expiryAuthenticator,
+                metadataPersistence: metadataPersistence,
+                provisioningCheckpoint: provisioningCheckpoint
             )
         }
 
