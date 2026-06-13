@@ -2,6 +2,7 @@
 
 pub mod fixtures;
 pub mod format;
+pub mod secure_enclave;
 pub mod tamper;
 
 #[allow(dead_code)]
