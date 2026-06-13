@@ -4,9 +4,13 @@
 > landed as one PR with staged commits (issue #501: key-family generation UX,
 > device-bound key-detail/backup surfaces, per-category failure presentation,
 > and the production exposure flip, which moved here from Phase 9 by
-> maintainer decision). Phases 8 (hardware + GnuPG-interop evidence) and 9
-> (release gate; no exposure switch remains) are outstanding.
-> Last reviewed: 2026-06-12.
+> maintainer decision). Phase 8 (hardware + GnuPG-interop evidence) landed as
+> one PR with staged commits (issue #501): software-backed v4 interop is a
+> mandatory CI lane, v6 AEAD correctness runs in default CI, and real-hardware +
+> real-SE↔gpg evidence runs in operator/maintainer-run manual lanes (capture
+> tracked in [Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md)). Phase 9
+> (release gate; no exposure switch remains) is outstanding.
+> Last reviewed: 2026-06-13.
 > Purpose: Provide staged PR planning guidance for Apple Secure Enclave-backed
 > OpenPGP private-key custody.
 > Audience: Product owners, Swift/Rust implementers, security reviewers,
@@ -347,6 +351,18 @@ Rollback:
 
 Goal: collect release-gate evidence on real Apple hardware and validated OpenPGP
 interop paths.
+
+As built (issue #501, 2026-06-13): Phase 8 landed as ONE PR with staged commits.
+The evidence-capture mechanism is a committed run matrix
+([Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md))
+fed by sanitized one-line summaries. Software-backed v4 GnuPG interop (production
+seams + a software-P256 stand-in) is a mandatory default-CI lane via a
+skip-forbidden knob; v6 RFC 9580/AEAD correctness runs in default CI; real Secure
+Enclave hardware evidence and the bidirectional real-SE↔gpg harness are
+operator/maintainer-run manual lanes (macOS captured now; iPhone/iPad pending;
+visionOS excluded). Positive interactive auth-cancellation/biometric-lockout
+evidence is intentionally out of scope (low-value attended edge case). The
+grouping below is the original plan, superseded by this note.
 
 Recommended PR grouping:
 

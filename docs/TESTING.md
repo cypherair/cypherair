@@ -4,7 +4,7 @@
 > Purpose: Test strategy, how to run and write tests, and expectations for AI-assisted development.
 > Audience: Human developers and AI coding tools.
 > Source of truth: validation commands, Rust artifact refresh, and UniFFI/bindings sync for the current workspace.
-> Last reviewed: 2026-06-10.
+> Last reviewed: 2026-06-13.
 
 ## 1. Test Layers
 
@@ -110,7 +110,7 @@ Guard MIE tests for supported hardware:
 
 ## 2. Test Plans
 
-The workspace currently includes four Xcode Test Plans:
+The workspace currently includes five Xcode Test Plans:
 
 **CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. macOS local validation does not execute iOS-only device classes, and any hardware-dependent test that is visible on another destination must guard and skip at runtime. Layer 1 (Rust unit tests) runs independently via `cargo +stable test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
 
@@ -131,6 +131,8 @@ When adding, moving, or deleting Swift source files that should be visible to bu
 **CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
 
 **CypherAir-DangerousDeviceTests.xctestplan** — Manual physical-device lane for destructive device evidence. Currently selects only the Secure Enclave custody Reset All Local Data cleanup proof, which enumerates and deletes all app-owned custody `kSecClassKey` rows for the current bundle. Do not run this plan against a device/install that may contain custody handles worth preserving.
+
+**CypherAir-InteropEvidenceTests.xctestplan** — Manual macOS-only lane for the real-Secure-Enclave↔GnuPG bidirectional interop evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`). Requires real Secure Enclave hardware, biometric approval, and a local `gpg` binary; it is out of default CI (GnuPG cannot run on iOS/iPadOS). See [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md) §4.
 
 ProtectedData device-test isolation rules:
 
@@ -194,6 +196,7 @@ These jobs must pass on pull requests and nightly validation:
 
 - `rust-dependency-audit` audits `pgp-mobile/Cargo.lock` with `cargo-audit --deny warnings` as an independent failure signal
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
+- `rust-gnupg-interop` installs gpg (`brew install gnupg`), asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the Secure Enclave v4 + Profile A GnuPG interop lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1` so a missing gpg fails the lane; it runs parallel to `rust-full-tests` and needs no XCFramework
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, downloads the arm64e stage1 toolchain in a token-free pre-build step, runs the `./build-xcframework.sh --release` entrypoint without GitHub token variables in the build environment, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
 - `apple-platform-probes` downloads the uploaded XCFramework artifact and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
 - `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, requires an `arm64e` macOS test destination, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, signing profile, build, link, or test failures after readiness still fail the job
@@ -745,9 +748,9 @@ func test_modeSwitch_crashMidway_recoversOnLaunch() throws {
 }
 ```
 
-## 7. GnuPG Interoperability Tests (Profile A Only)
+## 7. GnuPG Interoperability Tests
 
-These tests verify bidirectional compatibility with GnuPG. **Profile B is explicitly excluded from GnuPG interop tests** — Profile B output is expected to be rejected by GnuPG. Verify this in POC test C3.8.
+These tests verify bidirectional compatibility with GnuPG for the software Profile A keys and the device-bound *compatible* (v4) Secure Enclave custody family. **Profile B (software v6) and device-bound *modern* (v6) output is expected to be rejected by GnuPG** — GnuPG does not support v6 keys, and v6 carries no GnuPG interop gate. Verify v6 rejection in POC test C3.8 and `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey`. Secure Enclave custody interop and hardware evidence are tracked in [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md).
 
 **Execution model:** GnuPG (`gpg`) runs on macOS only — it cannot run on iOS. These tests use one of two approaches:
 
@@ -765,6 +768,18 @@ These tests verify bidirectional compatibility with GnuPG. **Profile B is explic
 | Import gpg pubkey fixture → App encrypt → verify | Full round-trip across implementations |
 
 **Regenerate fixtures** when: Sequoia version changes, algorithm selection changes, or GnuPG releases a major version.
+
+### 7.1 Secure Enclave custody interop lanes (Phase 8)
+
+Beyond the fixture approaches above, live lanes exercise the `gpg` binary directly (macOS only). They share `pgp-mobile/tests/common/gnupg.rs` and the `require_gpg_or_skip()` skip-forbidden gate: with `CYPHERAIR_REQUIRE_GPG=1` a missing gpg **fails** the lane instead of skipping silently.
+
+- `pgp-mobile/tests/gnupg_binary_tests.rs` — Profile A (software) Sequoia→gpg, live binary.
+- `pgp-mobile/tests/secure_enclave_gnupg_interop_tests.rs` — device-bound compatible (v4) SE-shaped certificate ↔ gpg, bidirectional, through the production external-signer / key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
+- `pgp-mobile/tests/secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) RFC 9580 / SEIPDv2 AEAD correctness through the production seam (no gpg).
+
+The `rust-gnupg-interop` CI job (pr-checks + nightly) installs gpg, asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the SE-v4 and Profile A lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1`. The v6 lane needs no gpg and runs in the default `rust-full-tests` lane.
+
+Real-SE↔gpg bidirectional evidence is the operator-run macOS manual plan `CypherAir-InteropEvidenceTests` (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`), out of default CI; iPhone/iPad gpg interop is a documented manual cross-device procedure. See [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md).
 
 ## 8. MIE Validation Tests
 
