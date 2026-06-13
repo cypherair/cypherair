@@ -18,9 +18,10 @@ struct PGPKeyCapabilityResolver: Sendable {
             secureEnclaveRefreshBindingOperationSupport: .notImplemented
         )
 
-        /// All Secure Enclave supports blocked. Pins the resolver-before-
-        /// handle-store ordering in route tests now that the production policy
-        /// is exposed (P7D); this is the pre-exposure production shape.
+        /// All Secure Enclave supports blocked — a test-only fixture that pins
+        /// the resolver-before-handle-store ordering in route tests. The
+        /// production policy now exposes these operations (P7D), so this no
+        /// longer mirrors any production shape.
         static let testSecureEnclaveOperationsBlocked = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .unavailable,

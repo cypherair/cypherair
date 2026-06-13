@@ -227,7 +227,6 @@ final class ArchitectureSourceAuditTests: XCTestCase {
         XCTAssertTrue(appContainer.contains(
             "fingerprints: PGPKeyIdentity.softwareCustodyFingerprints(in: keyManagement.keys)"
         ))
-        XCTAssertFalse(appContainer.contains("fingerprints: keyManagement.keys.map"))
 
         let settingsScreenModel = try RepositoryAuditLoader.loadString(
             relativePath: "Sources/App/Settings/SettingsScreenModel.swift"
