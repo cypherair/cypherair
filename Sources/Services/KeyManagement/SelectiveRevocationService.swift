@@ -42,7 +42,7 @@ final class SelectiveRevocationService {
         subkeySelection: SubkeySelectionOption
     ) async throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         let validatedSubkeyFingerprint = try validatedSubkeyFingerprint(
@@ -96,7 +96,7 @@ final class SelectiveRevocationService {
         userIdSelection: UserIdSelectionOption
     ) async throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         let validatedUserIdSelection = try validatedUserIdSelection(

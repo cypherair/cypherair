@@ -228,28 +228,3 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
 
     Ok(std::mem::take(&mut *output))
 }
-
-/// Extract the secret key bytes from a certificate for SE wrapping.
-/// The returned bytes should be immediately wrapped by the Secure Enclave
-/// and then zeroized from memory.
-///
-/// NOTE: This function is not yet exposed via UniFFI. It will be used by the Swift
-/// KeyManagementService when implementing SE wrapping during key generation and import.
-/// See ARCHITECTURE.md Section 3 "SE Key Wrapping" data flow.
-#[allow(dead_code)]
-pub fn extract_secret_key_bytes(cert_data: &[u8]) -> Result<Vec<u8>, PgpError> {
-    let cert = openpgp::Cert::from_bytes(cert_data).map_err(|e| PgpError::InvalidKeyData {
-        reason: e.to_string(),
-    })?;
-
-    // SECURITY: Wrapped in Zeroizing<> so secret bytes are zeroized on drop
-    // if an error occurs or the caller drops the result without explicit cleanup.
-    let mut secret_bytes = Zeroizing::new(Vec::new());
-    cert.as_tsk()
-        .serialize(&mut *secret_bytes)
-        .map_err(|e| PgpError::InvalidKeyData {
-            reason: format!("Failed to extract secret key: {e}"),
-        })?;
-
-    Ok(std::mem::take(&mut *secret_bytes))
-}

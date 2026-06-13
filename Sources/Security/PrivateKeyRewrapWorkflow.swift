@@ -158,10 +158,7 @@ final class PrivateKeyRewrapWorkflow {
                     name: "privateKeyProtection.switch.phaseB.promote.start",
                     metadata: ["index": String(index)]
                 )
-                try bundleStore.promotePendingToPermanent(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
+                try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
                 traceStore?.record(
                     category: .operation,
                     name: "privateKeyProtection.switch.phaseB.promote.finish",

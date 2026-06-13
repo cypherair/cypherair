@@ -610,7 +610,6 @@ struct ContactSnapshotMutator {
         artifact.targetCertificateDigest = currentTargetDigest
         artifact.updatedAt = now
         artifact.lastValidatedAt = artifact.lastValidatedAt ?? now
-        artifact.storageHint = "protected-contacts-domain"
         artifact = try artifact.validatedForPersistence(now: now)
 
         if let deduplicationKey = artifact.deduplicationKey,
@@ -625,7 +624,6 @@ struct ContactSnapshotMutator {
                 artifactId: existing.artifactId,
                 keyId: existing.keyId,
                 createdAt: existing.createdAt,
-                storageHint: "protected-contacts-domain",
                 canonicalSignatureData: artifact.canonicalSignatureData,
                 signatureDigest: artifact.signatureDigest,
                 source: artifact.source,
@@ -716,8 +714,7 @@ struct ContactSnapshotMutator {
             let projection = ContactCertificationProjection(
                 status: status,
                 artifactIds: artifactIds,
-                lastValidatedAt: artifacts.compactMap(\.lastValidatedAt).max(),
-                reconciliationMetadata: nil
+                lastValidatedAt: artifacts.compactMap(\.lastValidatedAt).max()
             )
 
             if snapshot.keyRecords[index].certificationArtifactIds != artifactIds ||

@@ -66,14 +66,14 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         XCTAssertTrue(catalog.subkeys.contains(where: \.isCurrentlyTransportEncryptionCapable))
     }
 
-    func test_selectionCatalog_missingFingerprint_throwsNoMatchingKey() async throws {
+    func test_selectionCatalog_missingFingerprint_throwsKeyMetadataUnavailable() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: service, name: "Selector Missing")
 
         XCTAssertThrowsError(
             try service.selectionCatalog(fingerprint: "missing-fingerprint")
         ) { error in
-            guard case .noMatchingKey = error as? CypherAirError else {
-                return XCTFail("Expected noMatchingKey, got \(error)")
+            guard case .keyMetadataUnavailable = error as? CypherAirError else {
+                return XCTFail("Expected keyMetadataUnavailable, got \(error)")
             }
         }
     }
@@ -161,16 +161,16 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         XCTAssertEqual(mockKC.saveCallCount, saveCountBefore, "Async selector discovery must not rewrite metadata")
     }
 
-    func test_loadSelectionCatalog_missingFingerprint_throwsNoMatchingKey() async throws {
+    func test_loadSelectionCatalog_missingFingerprint_throwsKeyMetadataUnavailable() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: service, name: "Async Selector Missing")
 
         do {
             _ = try await service.loadSelectionCatalog(fingerprint: "missing-fingerprint")
-            XCTFail("Expected noMatchingKey")
-        } catch CypherAirError.noMatchingKey {
+            XCTFail("Expected keyMetadataUnavailable")
+        } catch CypherAirError.keyMetadataUnavailable {
             // Expected.
         } catch {
-            XCTFail("Expected noMatchingKey, got \(error)")
+            XCTFail("Expected keyMetadataUnavailable, got \(error)")
         }
     }
 
@@ -338,7 +338,7 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
         assertNoCatalogOrKeychainMutation(before: snapshot)
     }
 
-    func test_exportSubkeyRevocationCertificate_unknownFingerprint_throwsNoMatchingKeyBeforeUnwrap() async throws {
+    func test_exportSubkeyRevocationCertificate_unknownFingerprint_throwsKeyMetadataUnavailableBeforeUnwrap() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Subkey Rev Missing")
         let catalog = try service.selectionCatalog(fingerprint: identity.fingerprint)
         let subkey = try XCTUnwrap(catalog.subkeys.first)
@@ -350,11 +350,11 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
                 fingerprint: "0000000000000000000000000000000000000000",
                 subkeySelection: subkey
             )
-            XCTFail("Expected noMatchingKey")
-        } catch CypherAirError.noMatchingKey {
+            XCTFail("Expected keyMetadataUnavailable")
+        } catch CypherAirError.keyMetadataUnavailable {
             // Expected.
         } catch {
-            XCTFail("Expected noMatchingKey, got \(error)")
+            XCTFail("Expected keyMetadataUnavailable, got \(error)")
         }
 
         XCTAssertEqual(mockSE.unwrapCallCount, unwrapBefore,

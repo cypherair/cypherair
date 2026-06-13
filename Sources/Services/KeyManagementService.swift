@@ -509,7 +509,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// This is a read-only operation that uses stored public key bytes only.
     func selectionCatalog(fingerprint: String) throws -> CertificateSelectionCatalog {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         let catalog = try certificateAdapter.validatedCatalog(
@@ -524,7 +524,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// This is a read-only operation that uses stored public key bytes only.
     func loadSelectionCatalog(fingerprint: String) async throws -> CertificateSelectionCatalog {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         let catalog = try await Self.discoverSelectionCatalogOffMainActor(

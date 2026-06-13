@@ -312,7 +312,7 @@ private struct KeyDetailScreenHostView: View {
                 model.deleteKey()
             }
         } message: {
-            Text(String(localized: "keydetail.delete.message", defaultValue: "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup."))
+            Text(model.deleteConfirmationMessage)
         }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),

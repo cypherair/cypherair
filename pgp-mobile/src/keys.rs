@@ -437,7 +437,7 @@ pub use expiry::{
     modify_expiry, modify_expiry_with_external_p256_signer, ModifyExpiryPublicResult,
     ModifyExpiryResult,
 };
-pub use generation::{generate_key, generate_key_with_profile};
+pub use generation::generate_key_with_profile;
 pub use key_info::parse_key_info;
 pub use profile::{detect_profile, get_key_version};
 pub use public_certificates::{merge_public_certificate_update, validate_public_certificate};
@@ -447,7 +447,7 @@ pub use revocation::{
     generate_user_id_revocation_by_selector_with_external_p256_signer, parse_revocation_cert,
 };
 pub use s2k::{parse_s2k_params, S2kInfo};
-pub use secret_transfer::{export_secret_key, extract_secret_key_bytes, import_secret_key};
+pub use secret_transfer::{export_secret_key, import_secret_key};
 pub use secure_enclave_generation::{
     generate_secure_enclave_public_certificate, inspect_secure_enclave_public_bindings,
 };

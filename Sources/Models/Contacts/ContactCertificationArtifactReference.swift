@@ -79,7 +79,6 @@ struct ContactCertificationArtifactReference: Codable, Equatable, Hashable, Iden
     let artifactId: String
     let keyId: String
     var createdAt: Date
-    var storageHint: String?
     var canonicalSignatureData: Data
     var signatureDigest: String?
     var source: ContactCertificationArtifactSource

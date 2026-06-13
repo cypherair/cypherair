@@ -37,7 +37,6 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(service.certificationArtifacts(for: keyRecord.keyId).map(\.artifactId), [saved.artifactId])
         XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [saved.artifactId])
-        XCTAssertNil(projectedKey.certificationProjection.reconciliationMetadata)
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
         XCTAssertEqual(export.filename, "artifact-pr6-save.asc")
 
@@ -172,7 +171,6 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             mutation.output.targetCertificateDigest,
             ContactCertificationArtifactReference.sha256Hex(for: keyRecord.publicKeyData)
         )
-        XCTAssertNil(projectedKey.certificationProjection.reconciliationMetadata)
     }
 
     func test_pr6CertificationArtifactDedupeRefreshesValidatedMetadata() async throws {
@@ -334,8 +332,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
             status: .invalidOrStale,
             artifactIds: [artifact.artifactId],
-            lastValidatedAt: lastValidatedAt,
-            reconciliationMetadata: nil
+            lastValidatedAt: lastValidatedAt
         )
         let keyRecordsBefore = snapshot.keyRecords
 

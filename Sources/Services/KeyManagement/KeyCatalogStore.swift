@@ -55,7 +55,7 @@ final class KeyCatalogStore {
         publicKeyData: Data
     ) throws -> PGPKeyIdentity {
         guard let index = keys.firstIndex(where: { $0.fingerprint == metadata.fingerprint }) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         let current = keys[index]

@@ -11,14 +11,12 @@ struct ContactCertificationProjection: Codable, Equatable, Hashable, Sendable {
     var status: Status
     var artifactIds: [String]
     var lastValidatedAt: Date?
-    var reconciliationMetadata: String?
 
     static var empty: ContactCertificationProjection {
         ContactCertificationProjection(
             status: .notCertified,
             artifactIds: [],
-            lastValidatedAt: nil,
-            reconciliationMetadata: nil
+            lastValidatedAt: nil
         )
     }
 }

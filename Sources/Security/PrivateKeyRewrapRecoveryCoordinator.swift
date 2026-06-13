@@ -61,10 +61,7 @@ final class PrivateKeyRewrapRecoveryCoordinator {
         phase: PrivateKeyControlRewrapPhase?
     ) -> KeyMigrationRecoverySummary {
         guard phase == .commitRequired else {
-            return migrationCoordinator.recoverInterruptedMigrations(
-                for: fingerprints,
-                seKeyAccessControl: nil
-            )
+            return migrationCoordinator.recoverInterruptedMigrations(for: fingerprints)
         }
 
         return KeyMigrationRecoverySummary(
@@ -89,20 +86,14 @@ final class PrivateKeyRewrapRecoveryCoordinator {
             return .noActionSafe
         case (.complete, .complete), (.partial, .complete):
             do {
-                try bundleStore.replacePermanentWithPending(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
+                try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
                 return .promotedPendingSafe
             } catch {
                 return .retryableFailure
             }
         case (.missing, .complete):
             do {
-                try bundleStore.promotePendingToPermanent(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: nil
-                )
+                try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
                 return .promotedPendingSafe
             } catch {
                 return .retryableFailure

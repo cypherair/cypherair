@@ -140,8 +140,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
             status: .revalidationNeeded,
             artifactIds: ["artifact-1"],
-            lastValidatedAt: nil,
-            reconciliationMetadata: "placeholder"
+            lastValidatedAt: nil
         )
 
         XCTAssertNoThrow(try snapshot.validateContract())
@@ -205,8 +204,7 @@ final class ContactsDomainSnapshotTests: XCTestCase {
         snapshot.keyRecords[0].certificationProjection = ContactCertificationProjection(
             status: .revalidationNeeded,
             artifactIds: ["artifact-for-key-2"],
-            lastValidatedAt: nil,
-            reconciliationMetadata: "placeholder"
+            lastValidatedAt: nil
         )
 
         XCTAssertThrowsError(try snapshot.validateContract())
@@ -295,7 +293,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
             artifactId: artifactId,
             keyId: keyId,
             createdAt: referenceDate,
-            storageHint: "test",
             canonicalSignatureData: signatureData,
             signatureDigest: signatureDigest ?? ContactCertificationArtifactReference.sha256Hex(
                 for: signatureData

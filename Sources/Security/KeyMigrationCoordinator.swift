@@ -115,10 +115,7 @@ struct KeyMigrationCoordinator {
         }
     }
 
-    func recoverInterruptedMigration(
-        for fingerprint: String,
-        seKeyAccessControl: SecAccessControl? = nil
-    ) -> KeyMigrationRecoveryOutcome {
+    func recoverInterruptedMigration(for fingerprint: String) -> KeyMigrationRecoveryOutcome {
         switch recoveryAction(for: fingerprint) {
         case .none:
             return .noActionSafe
@@ -134,20 +131,14 @@ struct KeyMigrationCoordinator {
             }
         case .promotePending:
             do {
-                try bundleStore.promotePendingToPermanent(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: seKeyAccessControl
-                )
+                try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
                 return .promotedPendingSafe
             } catch {
                 return .retryableFailure
             }
         case .replacePermanentWithPending:
             do {
-                try bundleStore.replacePermanentWithPending(
-                    fingerprint: fingerprint,
-                    seKeyAccessControl: seKeyAccessControl
-                )
+                try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
                 return .promotedPendingSafe
             } catch {
                 return .retryableFailure
@@ -157,12 +148,9 @@ struct KeyMigrationCoordinator {
         }
     }
 
-    func recoverInterruptedMigrations(
-        for fingerprints: [String],
-        seKeyAccessControl: SecAccessControl? = nil
-    ) -> KeyMigrationRecoverySummary {
+    func recoverInterruptedMigrations(for fingerprints: [String]) -> KeyMigrationRecoverySummary {
         let outcomes = fingerprints.map {
-            recoverInterruptedMigration(for: $0, seKeyAccessControl: seKeyAccessControl)
+            recoverInterruptedMigration(for: $0)
         }
         return KeyMigrationRecoverySummary(outcomes: outcomes)
     }

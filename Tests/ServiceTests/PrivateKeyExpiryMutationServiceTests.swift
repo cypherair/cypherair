@@ -311,10 +311,12 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         do {
             _ = try await task.value
             XCTFail("Expected deleted identity to block late Secure Enclave expiry writeback")
-        } catch CypherAirError.noMatchingKey {
-            // Expected.
+        } catch CypherAirError.keyMetadataUnavailable {
+            // Expected: the late SE expiry writeback hits the catalog miss and now
+            // surfaces the honest key-metadata-unavailable error (matching the
+            // software path), not the decrypt-flavored noMatchingKey.
         } catch {
-            XCTFail("Expected noMatchingKey, got \(error)")
+            XCTFail("Expected keyMetadataUnavailable, got \(error)")
         }
         XCTAssertTrue(keyManagement.keys.isEmpty)
         XCTAssertTrue(try metadataPersistence.loadAll().isEmpty)

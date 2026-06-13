@@ -89,7 +89,10 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     static func softwareCustodyFingerprints(in identities: [PGPKeyIdentity]) -> [String] {
         identities
             .filter { $0.privateKeyCustodyKind == .softwareSecretCertificate }
-            .map(\.fingerprint)
+            // Normalize defensively: the downstream re-wrap keying is
+            // case-sensitive and relies on the lowercase-hex fingerprint
+            // invariant; lowercasing here hardens it against any future drift.
+            .map { $0.fingerprint.lowercased() }
     }
 
     init(

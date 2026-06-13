@@ -221,7 +221,6 @@ final class CertificateSignatureService {
             artifactId: "cert-artifact-\(UUID().uuidString)",
             keyId: targetKey.keyId,
             createdAt: now,
-            storageHint: "protected-contacts-domain",
             canonicalSignatureData: canonicalSignatureData,
             signatureDigest: ContactCertificationArtifactReference.sha256Hex(
                 for: canonicalSignatureData

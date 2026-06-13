@@ -99,6 +99,22 @@ final class KeyDetailScreenModel {
         key?.privateKeyCustodyKind == .appleSecureEnclavePrivateOperations
     }
 
+    /// Confirmation copy shown before deleting this key. Device-bound (Secure
+    /// Enclave custody) keys cannot be exported or backed up, so the generic
+    /// "make sure you have a backup" guidance is wrong — and dangerous — for
+    /// them: loss is permanent and unrecoverable. Branch on custody.
+    var deleteConfirmationMessage: String {
+        Self.deleteConfirmationMessage(isDeviceBound: isDeviceBound)
+    }
+
+    nonisolated static func deleteConfirmationMessage(isDeviceBound: Bool) -> String {
+        if isDeviceBound {
+            String(localized: "keydetail.delete.message.deviceBound", defaultValue: "This will permanently delete this key from your device. Device-bound keys cannot be exported or backed up, so this cannot be undone and the key cannot be recovered.")
+        } else {
+            String(localized: "keydetail.delete.message", defaultValue: "This will permanently delete this key from your device. This action cannot be undone. Make sure you have a backup.")
+        }
+    }
+
     /// Whether the sanitized recovery report shows a problem for this
     /// device-bound key. Quiet when healthy; the detail screen renders a
     /// degraded row only when this is true.

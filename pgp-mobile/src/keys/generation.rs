@@ -1,17 +1,5 @@
 use super::*;
 
-/// Generate a new key pair with the specified profile.
-///
-/// - Profile A (Universal): CipherSuite::Cv25519, Profile::RFC4880 → v4 key
-/// - Profile B (Advanced): CipherSuite::Cv448, Profile::RFC9580 → v6 key
-pub fn generate_key(
-    name: String,
-    email: Option<String>,
-    expiry_seconds: Option<u64>,
-) -> Result<GeneratedKey, PgpError> {
-    generate_key_with_profile(name, email, expiry_seconds, KeyProfile::Universal)
-}
-
 /// Generate a new key pair with explicit profile selection.
 pub fn generate_key_with_profile(
     name: String,

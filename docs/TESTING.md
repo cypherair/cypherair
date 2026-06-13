@@ -128,7 +128,7 @@ When adding, moving, or deleting Swift source files that should be visible to bu
 
 `TutorialSessionStoreTests` are the canonical unit-level coverage for the guided tutorial contract. They verify sandbox storage and mocks, the seven-module artifact flow, completion-version persistence, onboarding-to-tutorial handoff, replay unlock rules, unsafe-route blocklisting, output interception, production-page configuration seams, guidance resolver behavior, and source-audit guards that keep tutorial output handling out of production page implementations.
 
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and hidden-generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
+**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
 
 **CypherAir-DangerousDeviceTests.xctestplan** — Manual physical-device lane for destructive device evidence. Currently selects only the Secure Enclave custody Reset All Local Data cleanup proof, which enumerates and deletes all app-owned custody `kSecClassKey` rows for the current bundle. Do not run this plan against a device/install that may contain custody handles worth preserving.
 

@@ -188,7 +188,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         XCTAssertEqual(keyStore.deleteRequests, pair.references)
     }
 
-    func test_deleteSecureEnclaveCustodyKeyHandleFailurePreservesMetadataForRetry() async throws {
+    func test_deleteSecureEnclaveCustodyKeyHandleFailureStillRemovesMetadataAndReportsPartialDeletion() async throws {
         let fixture = try await generatedHiddenCustodyExportFixture(
             configurationIdentity: .compatibleP256V4
         )
@@ -207,6 +207,8 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         )
         try targetService.loadKeys()
 
+        // A non-missing Secure Enclave handle-delete failure still surfaces a
+        // partial-deletion error to the caller…
         XCTAssertThrowsError(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)) { error in
             guard case CypherAirError.keychainError(let message) = error else {
                 return XCTFail("Expected keychainError, got \(error)")
@@ -214,13 +216,80 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             XCTAssertTrue(message.contains("Partial key deletion"))
         }
 
-        XCTAssertEqual(targetService.keys.map(\.fingerprint), [fixture.identity.fingerprint])
-        XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [fixture.identity.fingerprint])
+        // …but the catalog metadata is REMOVED, so the device-bound key is no longer
+        // trapped in the catalog. (The bug: it used to survive and recur on every retry,
+        // clearable only by a full data reset.)
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        // Secure Enclave deletion is genuinely partial: the failing signing handle is
+        // stranded while the key-agreement handle was already removed.
         XCTAssertTrue(keyStore.contains(reference: pair.signing.reference))
         XCTAssertFalse(keyStore.contains(reference: pair.keyAgreement.reference))
 
+        // Idempotency: a second delete does not crash and the key stays gone. It routes
+        // through the catalog-miss orphan path (no resurrection); the stranded signing
+        // handle is left for the inventory-based full-reset cleanup, not re-targeted here.
         keyStore.failDeleteRole = nil
-        try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)
+        XCTAssertNoThrow(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint))
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+    }
+
+    func test_deleteSecureEnclaveCustodyKeyMetadataAssociationMismatchStillRemovesMetadataAndReportsPartialDeletion() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        _ = try seedCustodyHandles(
+            fixture: fixture,
+            keyStore: keyStore,
+            handleSetIdentifier: "delete-mismatch"
+        )
+        // Desync the stored identity from its public-binding inspection: same public-key
+        // bytes and fingerprint, but a key version the inspector will not match → the
+        // handle-deletion guard returns .metadataAssociationMismatch before any delete.
+        let desyncedIdentity = makeIdentity(
+            from: fixture.identity,
+            keyVersion: fixture.identity.keyVersion == 4 ? 6 : 4
+        )
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([desyncedIdentity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        XCTAssertThrowsError(try targetService.deleteKey(fingerprint: desyncedIdentity.fingerprint)) { error in
+            guard case CypherAirError.keychainError(let message) = error else {
+                return XCTFail("Expected keychainError, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Partial key deletion"))
+        }
+
+        // The desync no longer makes the key permanently undeletable.
+        XCTAssertTrue(targetService.keys.isEmpty)
+        XCTAssertTrue(metadataPersistence.identities.isEmpty)
+        // No handle was touched — the mismatch guard tripped before deleteHandlePair.
+        XCTAssertTrue(keyStore.deleteRequests.isEmpty)
+        XCTAssertEqual(keyStore.storedHandleCount(), 2)
+    }
+
+    func test_deleteSecureEnclaveCustodyKeyMissingHandlesIsCleanDeletion() async throws {
+        let fixture = try await generatedHiddenCustodyExportFixture(
+            configurationIdentity: .compatibleP256V4
+        )
+        let keyStore = MockSecureEnclaveCustodyKeyStore() // no handles seeded → already missing
+        let metadataPersistence = RecordingKeyMetadataPersistence()
+        metadataPersistence.seed([fixture.identity])
+        let targetService = makeSecureEnclaveCustodyDeletionTarget(
+            metadataPersistence: metadataPersistence,
+            keyStore: keyStore
+        )
+        try targetService.loadKeys()
+
+        // Handles already gone is a benign, error-free deletion — not a partial-deletion throw.
+        XCTAssertNoThrow(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint))
 
         XCTAssertTrue(targetService.keys.isEmpty)
         XCTAssertTrue(metadataPersistence.identities.isEmpty)
@@ -506,6 +575,30 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         return try SecureEnclaveCustodyHandlePair(
             signing: signingBinding,
             keyAgreement: keyAgreementBinding
+        )
+    }
+
+    /// Rebuilds an identity with a different key version to simulate a stored
+    /// metadata ↔ public-binding desync. The inspector derives the real version from
+    /// `publicKeyData`, so the altered `keyVersion` forces the deletion mismatch guard.
+    private func makeIdentity(from base: PGPKeyIdentity, keyVersion: UInt8) -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: base.fingerprint,
+            keyVersion: keyVersion,
+            profile: base.profile,
+            userId: base.userId,
+            hasEncryptionSubkey: base.hasEncryptionSubkey,
+            isRevoked: base.isRevoked,
+            isExpired: base.isExpired,
+            isDefault: base.isDefault,
+            isBackedUp: base.isBackedUp,
+            publicKeyData: base.publicKeyData,
+            revocationCert: base.revocationCert,
+            primaryAlgo: base.primaryAlgo,
+            subkeyAlgo: base.subkeyAlgo,
+            expiryDate: base.expiryDate,
+            openPGPConfigurationIdentity: base.openPGPConfigurationIdentity,
+            privateKeyCustodyKind: base.privateKeyCustodyKind
         )
     }
 

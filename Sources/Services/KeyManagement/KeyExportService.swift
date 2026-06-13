@@ -25,7 +25,7 @@ final class KeyExportService {
         markBackedUp: Bool = true
     ) async throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
         guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnsupportedForCustody)
@@ -50,7 +50,7 @@ final class KeyExportService {
 
     func exportRevocationCertificate(fingerprint: String) async throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
         guard !identity.revocationCert.isEmpty else {
             throw CypherAirError.keyOperationUnavailable(category: .revocationArtifactUnavailable)
@@ -61,7 +61,7 @@ final class KeyExportService {
 
     func exportPublicKey(fingerprint: String) throws -> Data {
         guard let identity = catalogStore.identity(for: fingerprint) else {
-            throw CypherAirError.noMatchingKey
+            throw CypherAirError.keyMetadataUnavailable
         }
 
         return try keyAdapter.armorPublicKey(certData: identity.publicKeyData)

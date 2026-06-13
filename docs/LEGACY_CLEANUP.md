@@ -320,9 +320,10 @@ format-floor symbols (including `ProtectedDataRootSecretStorageFormat`, the
 format-floor marker/store, the registry envelope-floor recorder, and the
 retired right-store client/handle type names `ProtectedDataRightStoreClient`
 / `ProtectedDataRightStoreClientProtocol` / `ProtectedDataPersistedRightHandle`
-/ `LocalAuthenticationPersistedRightHandle` — banned even though the
-`ProtectedDataRightStoreClient.swift` filename survives for the current
-root-secret store surface), `item2`
+/ `LocalAuthenticationPersistedRightHandle` — banned as type names; the file
+providing the current root-secret store surface, once named
+`ProtectedDataRightStoreClient.swift`, is now
+`KeychainProtectedDataRootSecretStore.swift`), `item2`
 and `item7` cover the retired Phase 3 metadata migration/legacy-row symbols
 (including `PayloadV1` via the `item4` bare token, `sourceSchemaVersion`, the
 migration source/outcome types, `cleanupLegacyMetadataRows`,
