@@ -275,9 +275,7 @@ private struct SignScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.text,
-                mode: .prose
-            )
-            .frame(
+                mode: .prose,
                 minHeight: editorHeightRange.min,
                 idealHeight: editorHeightRange.ideal,
                 maxHeight: editorHeightRange.max

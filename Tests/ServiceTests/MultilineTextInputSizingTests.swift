@@ -3,60 +3,86 @@ import XCTest
 @testable import CypherAir
 
 /// Guards the sizing contract behind the iOS multiline-input fix: the editor must
-/// always report a bounded, concrete height to SwiftUI and must never let the text
-/// view's own content height leak into the enclosing `Form` row. The leak was what
-/// produced the large empty space after the first edit following a long paste.
+/// report the content height *clamped* to its visible range — never the raw content
+/// height (which made SwiftUI lay the text view out at full size and clip it, so it
+/// could not scroll) and never a content-derived value on the no-width pass (which
+/// leaked the full height into the enclosing `Form` row as empty space).
 final class MultilineTextInputSizingTests: XCTestCase {
 
-    // MARK: - resolvedSize contract (platform-agnostic)
+    private let minHeight: CGFloat = 110
+    private let idealHeight: CGFloat = 160
+    private let maxHeight: CGFloat = 240
 
-    func testResolvedSizeReportsMeasuredHeightForProposedWidth() {
+    func testReportsContentHeightWhenWithinRange() {
         let size = MultilineTextInputSizing.resolvedSize(
             proposalWidth: 300,
             boundsWidth: 0,
-            fallbackHeight: 160,
-            measuredHeight: { _ in 512 }
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            contentHeight: 200
         )
 
         XCTAssertEqual(size.width, 300)
-        XCTAssertEqual(size.height, 512)
+        XCTAssertEqual(size.height, 200)
     }
 
-    func testResolvedSizeFallsBackToBoundsWidthWhenProposalIsNil() {
-        var measuredWidth: CGFloat?
+    func testClampsTallContentToMaxHeight() {
+        // The core fix: a long paste must report maxHeight, not the full content
+        // height, so the text view keeps its visible frame and scrolls the overflow
+        // instead of being laid out at full height and clipped.
+        let size = MultilineTextInputSizing.resolvedSize(
+            proposalWidth: 300,
+            boundsWidth: 0,
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            contentHeight: 800
+        )
+
+        XCTAssertEqual(size.height, maxHeight)
+    }
+
+    func testClampsShortContentToMinHeight() {
+        let size = MultilineTextInputSizing.resolvedSize(
+            proposalWidth: 300,
+            boundsWidth: 0,
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            contentHeight: 40
+        )
+
+        XCTAssertEqual(size.height, minHeight)
+    }
+
+    func testFallsBackToBoundsWidthWhenProposalWidthIsNil() {
         let size = MultilineTextInputSizing.resolvedSize(
             proposalWidth: nil,
             boundsWidth: 250,
-            fallbackHeight: 160,
-            measuredHeight: { width in
-                measuredWidth = width
-                return 88
-            }
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            contentHeight: 130
         )
 
-        XCTAssertEqual(measuredWidth, 250)
         XCTAssertEqual(size.width, 250)
-        XCTAssertEqual(size.height, 88)
+        XCTAssertEqual(size.height, 130)
     }
 
-    func testResolvedSizeReturnsFallbackHeightAndSkipsMeasurementWhenNoWidth() {
-        // The regression guard: with no resolvable width (SwiftUI's unspecified
-        // measurement pass), the editor must report a bounded fallback height and
-        // must NOT derive its height from content. Deferring to content-based
-        // sizing on this pass is exactly what leaked the full pasted-text height
-        // into the Form row.
-        var didMeasure = false
+    func testUsesIdealHeightWhenNoContentHeight() {
+        // No resolvable width ⇒ the caller measured nothing (contentHeight nil), so
+        // the editor reports its ideal height. The full text height can never leak
+        // into the Form row on this pass.
         let size = MultilineTextInputSizing.resolvedSize(
             proposalWidth: nil,
             boundsWidth: 0,
-            fallbackHeight: 160,
-            measuredHeight: { _ in
-                didMeasure = true
-                return 9_999
-            }
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            contentHeight: nil
         )
 
-        XCTAssertFalse(didMeasure, "Height must not be measured from content when no width is available")
-        XCTAssertEqual(size.height, 160)
+        XCTAssertEqual(size.height, idealHeight)
     }
 }

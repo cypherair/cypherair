@@ -51,9 +51,7 @@ private struct ImportKeyScreenHostView: View {
                 } else {
                     CypherMultilineTextInput(
                         text: $model.armoredText,
-                        mode: .machineText
-                    )
-                    .frame(
+                        mode: .machineText,
                         minHeight: editorHeightRange.min,
                         idealHeight: editorHeightRange.ideal,
                         maxHeight: editorHeightRange.max

@@ -9,9 +9,7 @@ struct EncryptTextInputSection: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.plaintext,
-                mode: .prose
-            )
-            .frame(
+                mode: .prose,
                 minHeight: editorHeightRange.min,
                 idealHeight: editorHeightRange.ideal,
                 maxHeight: editorHeightRange.max

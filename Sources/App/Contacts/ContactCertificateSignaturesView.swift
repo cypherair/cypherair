@@ -273,9 +273,7 @@ private struct ContactCertificateSignaturesHostView: View {
                     get: { model.signatureInput },
                     set: { model.setSignatureInput($0) }
                 ),
-                mode: .machineText
-            )
-            .frame(
+                mode: .machineText,
                 minHeight: signatureEditorHeightRange.min,
                 idealHeight: signatureEditorHeightRange.ideal,
                 maxHeight: signatureEditorHeightRange.max

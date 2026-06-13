@@ -331,13 +331,11 @@ private struct DecryptScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: ciphertextBinding,
-                mode: .machineText
+                mode: .machineText,
+                minHeight: editorHeightRange.min,
+                idealHeight: editorHeightRange.ideal,
+                maxHeight: editorHeightRange.max
             )
-                .frame(
-                    minHeight: editorHeightRange.min,
-                    idealHeight: editorHeightRange.ideal,
-                    maxHeight: editorHeightRange.max
-                )
 
             Button {
                 model.requestTextCiphertextImport()

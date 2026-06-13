@@ -173,12 +173,10 @@ private struct VerifyScreenHostView: View {
                     get: { model.signedInput },
                     set: { model.setSignedInput($0) }
                 ),
-                mode: .machineText
-            )
-                .frame(
-                    minHeight: editorHeightRange.min,
-                    idealHeight: editorHeightRange.ideal,
-                    maxHeight: editorHeightRange.max
+                mode: .machineText,
+                minHeight: editorHeightRange.min,
+                idealHeight: editorHeightRange.ideal,
+                maxHeight: editorHeightRange.max
             )
 
             Button {

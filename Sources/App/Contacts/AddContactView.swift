@@ -230,9 +230,7 @@ private struct AddContactScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.armoredText,
-                mode: .machineText
-            )
-            .frame(
+                mode: .machineText,
                 minHeight: pasteEditorHeightRange.min,
                 idealHeight: pasteEditorHeightRange.ideal,
                 maxHeight: pasteEditorHeightRange.max
