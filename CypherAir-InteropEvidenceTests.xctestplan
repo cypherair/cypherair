@@ -1,0 +1,34 @@
+{
+  "configurations" : [
+    {
+      "id" : "2C3D4E5F-6A7B-8C9D-0E1F-2A3B4C5D6E7F",
+      "name" : "Interop Evidence Configuration",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:CypherAir.xcodeproj",
+      "identifier" : "CypherAirTests",
+      "name" : "CypherAirTests"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTags" : {
+        "includeXCTests" : true
+      },
+      "selectedTests" : [
+        "DeviceSecureEnclaveGnuPGInteropEvidenceTests"
+      ],
+      "target" : {
+        "containerPath" : "container:CypherAir.xcodeproj",
+        "identifier" : "CypherAirTests",
+        "name" : "CypherAirTests"
+      }
+    }
+  ],
+  "version" : 1
+}

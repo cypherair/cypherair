@@ -18,7 +18,7 @@ import XCTest
 /// availability. (The A19/A19 Pro requirement is for MIE / Hardware Memory Tagging,
 /// not for Secure Enclave.) Where Secure Enclave or biometrics are unavailable —
 /// simulator or a Mac without enrolled Touch ID — the test skips.
-final class DeviceSecureEnclaveCustodyDecryptTests: DeviceSecurityTestCase {
+final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTestCase {
     func test_secureEnclaveRouteDecryptsV4AndV6MessagesWithRealKeyAgreementHandle_onDevice() async throws {
         try requireSecureEnclaveCustodyHardware()
 
@@ -69,6 +69,10 @@ final class DeviceSecureEnclaveCustodyDecryptTests: DeviceSecurityTestCase {
             XCTAssertFalse(
                 unwrapper.didUnwrap,
                 "Secure Enclave decrypt must not unwrap a secret certificate"
+            )
+            recordEvidence(
+                .ecdhDecrypt,
+                configuration: configuration == .compatibleP256V4 ? .compatibleP256V4 : .modernP256V6
             )
         }
     }
@@ -170,6 +174,12 @@ final class DeviceSecureEnclaveCustodyDecryptTests: DeviceSecurityTestCase {
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: tamperedOutput.path),
             "No plaintext output may exist after a tampered file hard-fail"
+        )
+        recordEvidence(.ecdhDecrypt, configuration: .compatibleP256V4)
+        recordEvidence(
+            .payloadTamperHardFail,
+            configuration: .compatibleP256V4,
+            observedCategory: .payloadAuthenticationFailure
         )
     }
 
@@ -281,65 +291,6 @@ final class DeviceSecureEnclaveCustodyDecryptTests: DeviceSecurityTestCase {
         for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
-    }
-
-    // MARK: - Hardware guard and handle loading
-
-    private func requireSecureEnclaveCustodyHardware() throws {
-        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            throw XCTSkip(
-                "Biometric authentication is unavailable: \(error?.localizedDescription ?? "unknown")"
-            )
-        }
-    }
-
-    private func authenticatedBiometricsContext(reason: String) async throws -> LAContext {
-        let context = LAContext()
-        context.localizedFallbackTitle = ""
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            throw XCTSkip(
-                "Biometric authentication is unavailable: \(error?.localizedDescription ?? "unknown")"
-            )
-        }
-
-        try await waitForAuthenticationSessionToSettle()
-        let authenticated = try await context.evaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: reason
-        )
-        XCTAssertTrue(authenticated)
-        context.interactionNotAllowed = true
-        return context
-    }
-
-    private func loadPrivateKey(
-        reference: SecureEnclaveCustodyHandleReference,
-        authenticationContext: LAContext
-    ) throws -> SecKey {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecUseAuthenticationContext as String: authenticationContext,
-            kSecReturnRef as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let result,
-              CFGetTypeID(result) == SecKeyGetTypeID() else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-        }
-        return result as! SecKey
     }
 }
 

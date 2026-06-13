@@ -2,6 +2,8 @@
 
 pub mod fixtures;
 pub mod format;
+pub mod gnupg;
+pub mod secure_enclave;
 pub mod tamper;
 
 #[allow(dead_code)]
@@ -17,6 +19,11 @@ pub fn expected_plaintext() -> Vec<u8> {
 #[allow(dead_code)]
 pub fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
     format::detect_message_format(ciphertext)
+}
+
+#[allow(dead_code)]
+pub fn detect_pkesk_versions(ciphertext: &[u8]) -> Vec<u8> {
+    format::detect_pkesk_versions(ciphertext)
 }
 
 #[allow(dead_code)]

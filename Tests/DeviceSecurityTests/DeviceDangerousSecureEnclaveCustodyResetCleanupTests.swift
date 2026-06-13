@@ -11,7 +11,7 @@ import XCTest
 /// handles is acceptable. It is intentionally excluded from
 /// `CypherAir-DeviceTests` and selected only by
 /// `CypherAir-DangerousDeviceTests`.
-final class DeviceDangerousSecureEnclaveCustodyResetCleanupTests: DeviceSecurityTestCase {
+final class DeviceDangerousSecureEnclaveCustodyResetCleanupTests: SecureEnclaveCustodyDeviceTestCase {
     func test_DANGEROUS_resetCleanupDeletesAllAppOwnedCustodyKeyRows_onDevice() throws {
         try requireSecureEnclaveCustodyHardware()
 
@@ -40,50 +40,6 @@ final class DeviceDangerousSecureEnclaveCustodyResetCleanupTests: DeviceSecurity
             entries.filter { $0.name.hasPrefix("secureEnclaveCustody.") },
             pair: pair
         )
-    }
-
-    private func requireSecureEnclaveCustodyHardware() throws {
-        try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            throw XCTSkip(
-                "Biometric authentication is unavailable: \(error?.localizedDescription ?? "unknown")"
-            )
-        }
-    }
-
-    private func assertTraceIsSanitized(
-        _ entries: [AuthLifecycleTraceStore.Entry],
-        pair: SecureEnclaveCustodyHandlePair,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertFalse(entries.isEmpty, file: file, line: line)
-        let text = entries
-            .flatMap { entry in
-                [entry.name] + entry.metadata.flatMap { [$0.key, $0.value] }
-            }
-            .joined(separator: " ")
-        assertSanitizedText(text, pair: pair, file: file, line: line)
-    }
-
-    private func assertSanitizedText(
-        _ text: String,
-        pair: SecureEnclaveCustodyHandlePair,
-        file: StaticString,
-        line: UInt
-    ) {
-        XCTAssertFalse(text.contains(pair.handleSetIdentifier), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.signing.reference.applicationTagString), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.keyAgreement.reference.applicationTagString), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.signing.publicKeyX963.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.keyAgreement.publicKeyX963.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.signing.publicKeyX963)), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.keyAgreement.publicKeyX963)), file: file, line: line)
-    }
-
-    private func hex(_ data: Data) -> String {
-        data.map { String(format: "%02x", $0) }.joined()
+        recordEvidence(.localResetCleanup, handleCount: result.inspectedHandleCount)
     }
 }

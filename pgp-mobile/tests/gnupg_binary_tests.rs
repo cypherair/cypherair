@@ -2,7 +2,7 @@
 //!
 //! These tests invoke the actual `gpg` binary to verify that GnuPG can correctly
 //! process CypherAir's (Sequoia-generated) output. This complements the existing
-//! `gnupg_interop_tests.rs` which validates the reverse direction (GnuPG output
+//! `gnupg_message_interop_tests.rs` which validates the reverse direction (GnuPG output
 //! processed by Sequoia).
 //!
 //! **Skip behavior:** All tests skip gracefully if `gpg` is not found on the system.
@@ -12,11 +12,10 @@
 //! **Isolation:** Each test creates a temporary GNUPGHOME directory. The user's
 //! real GnuPG keyring is never touched.
 
-use std::path::PathBuf;
-use std::process::Command;
+mod common;
 
-use tempfile::TempDir;
-
+use common::gnupg::{gpg_cmd, gpg_import_key, setup_gpg_home};
+use common::load_fixture;
 use pgp_mobile::armor;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
@@ -25,111 +24,14 @@ use pgp_mobile::streaming;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// Search for the `gpg` binary on this system.
-/// Checks PATH first, then common Homebrew and system paths.
-fn find_gpg() -> Option<PathBuf> {
-    // Check PATH via `which`
-    if let Ok(output) = Command::new("which").arg("gpg").output() {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-
-    // Check common locations
-    let candidates = [
-        "/opt/homebrew/bin/gpg",
-        "/usr/local/bin/gpg",
-        "/usr/bin/gpg",
-    ];
-    for candidate in &candidates {
-        let path = PathBuf::from(candidate);
-        if path.exists() {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
-/// Create a temporary GNUPGHOME with non-interactive configuration.
-fn setup_gpg_home() -> TempDir {
-    let dir = TempDir::new().expect("Failed to create temp GNUPGHOME");
-
-    // Set directory permissions to 700 (required by gpg)
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))
-            .expect("Failed to set GNUPGHOME permissions");
-    }
-
-    // Write gpg.conf for non-interactive use
-    let gpg_conf = dir.path().join("gpg.conf");
-    std::fs::write(
-        &gpg_conf,
-        "no-tty\nbatch\nyes\ntrust-model always\nforce-mdc\n",
-    )
-    .expect("Failed to write gpg.conf");
-
-    // Write gpg-agent.conf
-    let agent_conf = dir.path().join("gpg-agent.conf");
-    std::fs::write(&agent_conf, "allow-preset-passphrase\n")
-        .expect("Failed to write gpg-agent.conf");
-
-    dir
-}
-
-/// Create a `Command` for gpg with the given GNUPGHOME.
-fn gpg_cmd(gpg_path: &PathBuf, gnupghome: &TempDir) -> Command {
-    let mut cmd = Command::new(gpg_path);
-    cmd.env("GNUPGHOME", gnupghome.path());
-    cmd.arg("--batch");
-    cmd.arg("--yes");
-    cmd.arg("--trust-model").arg("always");
-    cmd
-}
-
-/// Import a key (public or secret) into the temporary gpg keyring.
-/// Writes the key data to a temp file, then runs `gpg --import`.
-fn gpg_import_key(gpg_path: &PathBuf, gnupghome: &TempDir, key_data: &[u8]) {
-    let key_file = gnupghome.path().join("import_key.tmp");
-    std::fs::write(&key_file, key_data).expect("Failed to write key file");
-
-    let output = gpg_cmd(gpg_path, gnupghome)
-        .arg("--import")
-        .arg(&key_file)
-        .output()
-        .expect("Failed to run gpg --import");
-
-    assert!(
-        output.status.success(),
-        "gpg --import failed:\nstdout: {}\nstderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    );
-}
-
-/// Load a fixture file from the fixtures directory.
-fn load_fixture(name: &str) -> Vec<u8> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join(name);
-    std::fs::read(&path).unwrap_or_else(|e| panic!("Failed to load fixture {}: {}", name, e))
-}
-
-/// Macro to skip a test if gpg is not found, printing a message.
+/// Resolve the `gpg` binary or skip the test, delegating to the shared
+/// `common::gnupg` harness. Under `CYPHERAIR_REQUIRE_GPG=1` (the mandatory CI
+/// interop lane) a missing gpg fails the test rather than skipping silently.
 macro_rules! require_gpg {
     () => {
-        match find_gpg() {
+        match common::gnupg::require_gpg_or_skip() {
             Some(path) => path,
-            None => {
-                eprintln!("gpg not found on this system, skipping test");
-                return;
-            }
+            None => return,
         }
     };
 }

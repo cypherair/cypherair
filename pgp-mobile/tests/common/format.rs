@@ -28,3 +28,21 @@ pub fn detect_message_format(ciphertext: &[u8]) -> (bool, bool) {
     }
     (has_v1, has_v2)
 }
+
+/// Collect the versions of every PKESK (public-key encrypted session key) packet.
+/// v3 is the classic ECDH shape GnuPG emits for the SE-compatible v4 certificate;
+/// v6 is the RFC 9580 shape. Inspects packet headers without decrypting.
+#[allow(dead_code)]
+pub fn detect_pkesk_versions(ciphertext: &[u8]) -> Vec<u8> {
+    let mut versions = Vec::new();
+    let mut ppr =
+        openpgp::parse::PacketParser::from_bytes(ciphertext).expect("Should parse ciphertext");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        if let openpgp::Packet::PKESK(pkesk) = &pp.packet {
+            versions.push(pkesk.version());
+        }
+        let (_, next) = pp.next().expect("Should advance");
+        ppr = next;
+    }
+    versions
+}
