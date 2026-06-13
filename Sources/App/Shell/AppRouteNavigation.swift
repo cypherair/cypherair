@@ -91,13 +91,5 @@ struct AppRouteHost<Root: View>: View {
                 pathBinding.wrappedValue.append(route)
             }
         )
-        .onChange(of: pathBinding.wrappedValue.count) { oldCount, newCount in
-            // FB23066215 (issue #499) backstop for nested-stack pops that bypass
-            // MacShellNavigationState (e.g. routed sheets using internal @State path).
-            // Idempotent with the setPath hook; the helper no-ops off macOS 27.
-            if newCount < oldCount {
-                MIEWeakTeardownMitigation.resignActiveTextEditing()
-            }
-        }
     }
 }

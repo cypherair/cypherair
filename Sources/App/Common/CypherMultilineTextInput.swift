@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 enum CypherMultilineTextInputMode {
     case prose
@@ -20,11 +23,19 @@ struct CypherMultilineTextInput: View {
         )
         .privacySensitive()
         #else
-        TextEditor(text: $text)
-            .font(font)
-            .applyMacWritingToolsPolicy()
-            .privacySensitive()
-            .cypherMacTextEditorChrome()
+        if MIEWeakTeardownMitigation.isActive {
+            // FB23066215 (#499): on macOS 27 a SwiftUI TextEditor's backing NSTextView
+            // faults on teardown under MIE. Use a pooled, never-deallocated NSTextView.
+            MIEPooledTextEditor(text: $text, mode: mode)
+                .privacySensitive()
+                .cypherMacTextEditorChrome()
+        } else {
+            TextEditor(text: $text)
+                .font(font)
+                .applyMacWritingToolsPolicy()
+                .privacySensitive()
+                .cypherMacTextEditorChrome()
+        }
         #endif
     }
 
@@ -195,5 +206,109 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         }
     }
 
+}
+#endif
+
+#if os(macOS)
+
+/// Process-lifetime pool of multiline AppKit text views for the FB23066215 mitigation
+/// (issue #499). Same rationale as `MIEPooledFieldStore`: `weak_clear_no_lock` faults only
+/// inside `dealloc` under MIE on macOS 27, so we never deallocate the view. We pool the
+/// `NSScrollView` (which owns its `NSTextView`) and recycle it across screens, held alive
+/// for the process lifetime by `retained`. Reached only when
+/// `MIEWeakTeardownMitigation.isActive`; remove with the rest of the mitigation once Apple
+/// ships a fix.
+@MainActor
+final class MIEPooledTextViewStore {
+    static let shared = MIEPooledTextViewStore()
+
+    private var available: [NSScrollView] = []
+    private var retained: [NSScrollView] = []   // strong, process-lifetime — never released
+
+    func obtain() -> NSScrollView {
+        if let reused = available.popLast() { return reused }
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.borderType = .noBorder
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        if let textView = scroll.documentView as? NSTextView {
+            textView.drawsBackground = false
+            textView.isRichText = false
+            textView.allowsUndo = true
+            textView.usesFindBar = false
+            textView.isAutomaticQuoteSubstitutionEnabled = false
+            textView.isAutomaticDashSubstitutionEnabled = false
+            textView.isAutomaticTextReplacementEnabled = false
+            textView.isAutomaticSpellingCorrectionEnabled = false
+            textView.isContinuousSpellCheckingEnabled = false
+            textView.isAutomaticDataDetectionEnabled = false
+            textView.textContainerInset = NSSize(width: 4, height: 8)
+        }
+        retained.append(scroll)
+        return scroll
+    }
+
+    func recycle(_ scroll: NSScrollView) {
+        if let textView = scroll.documentView as? NSTextView {
+            textView.delegate = nil
+            textView.string = ""   // scrub before reuse
+        }
+        scroll.removeFromSuperview()
+        available.append(scroll)
+    }
+}
+
+/// A pooled, never-deallocated multiline editor — FB23066215 mitigation. Drop-in for
+/// SwiftUI `TextEditor` on macOS 27 inside `CypherMultilineTextInput`.
+struct MIEPooledTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    let mode: CypherMultilineTextInputMode
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = MIEPooledTextViewStore.shared.obtain()
+        if let textView = scroll.documentView as? NSTextView {
+            textView.delegate = context.coordinator
+            textView.font = Self.font(for: mode)
+            if textView.string != text { textView.string = text }
+        }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let textView = scroll.documentView as? NSTextView else { return }
+        textView.delegate = context.coordinator
+        textView.font = Self.font(for: mode)
+        if textView.string != text { textView.string = text }
+    }
+
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        MIEPooledTextViewStore.shared.recycle(scroll)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    static func font(for mode: CypherMultilineTextInputMode) -> NSFont {
+        switch mode {
+        case .prose:
+            return .preferredFont(forTextStyle: .body)
+        case .machineText:
+            return .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: MIEPooledTextEditor
+
+        init(_ parent: MIEPooledTextEditor) {
+            self.parent = parent
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+    }
 }
 #endif

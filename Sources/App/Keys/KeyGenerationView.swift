@@ -211,12 +211,6 @@ private struct KeyGenerationScreenHostView: View {
         .onAppear {
             model.handleAppear()
         }
-        .onDisappear {
-            // FB23066215 (issue #499): clear focus as the view leaves so the SwiftUI focus
-            // box does not outlive the popped NSTextField. Matches BackupKeyView; pairs with
-            // the navigation-level field-editor detach in MIEWeakTeardownMitigation.
-            focusedField = nil
-        }
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
             focusedField = nil
             model.handleContentClearGenerationChange()
