@@ -38,13 +38,10 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try store.deleteHandlePair(pair)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         assertTraceIsSanitized(traceStore.recentEntries, pair: pair)
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: .handlePairGenerationPersistence,
-                outcome: .passed,
-                handleCount: summary.totalHandleCount,
-                completeSetCount: summary.completeSetCount
-            )
+        recordEvidence(
+            .handlePairGenerationPersistence,
+            handleCount: summary.totalHandleCount,
+            completeSetCount: summary.completeSetCount
         )
     }
 
@@ -88,9 +85,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         let expectedSecret = try peerPrivateKey.sharedSecretFromKeyAgreement(with: custodyPublicKey)
         let expectedSecretData = expectedSecret.withUnsafeBytes { Data($0) }
         XCTAssertEqual(sharedSecret, expectedSecretData)
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(scenario: .signing, outcome: .passed)
-        )
+        recordEvidence(.signing)
     }
 
     func test_custodyPrivateOperations_interactionNotAllowedFailsClosed_onDevice() throws {
@@ -125,9 +120,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             )
             assertDoesNotLeak(error, pair: pair)
         }
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(scenario: .interactionNotAllowedProxy, outcome: .passed)
-        )
+        recordEvidence(.interactionNotAllowedProxy)
     }
 
     func test_custodyHandleStateFailures_failClosedOnDevice() throws {
@@ -175,20 +168,8 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try keyStore.deleteKey(reference: pair.keyAgreement.reference)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         XCTAssertEqual(store.classifyHandleAvailability(expected: pair), .unavailable(.privateHandleMissing))
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: .wrongPublicBinding,
-                outcome: .passed,
-                observedCategory: .handlePublicKeyBindingMismatch
-            )
-        )
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: .missingHandle,
-                outcome: .passed,
-                observedCategory: .privateHandleMissing
-            )
-        )
+        recordEvidence(.wrongPublicBinding, observedCategory: .handlePublicKeyBindingMismatch)
+        recordEvidence(.missingHandle, observedCategory: .privateHandleMissing)
     }
 
     /// Device-level wrong-role evidence: real Secure Enclave-created handle bindings,
@@ -242,13 +223,7 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             assertDoesNotLeak(error, pair: pair)
         }
 
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: .wrongRole,
-                outcome: .passed,
-                observedCategory: .privateOperationRoleMismatch
-            )
-        )
+        recordEvidence(.wrongRole, observedCategory: .privateOperationRoleMismatch)
     }
 
     func test_custodyTraceMetadataDoesNotLeakHandleLocators_onDevice() throws {

@@ -149,13 +149,7 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         )
         XCTAssertEqual(decrypted.summaryState, .notSigned)
 
-        SecureEnclaveCustodyEvidenceLog.record(
-            SecureEnclaveCustodyEvidenceSummary(
-                scenario: .gnupgInteropV4,
-                configuration: .compatibleP256V4,
-                outcome: .passed
-            )
-        )
+        recordEvidence(.gnupgInteropV4, configuration: .compatibleP256V4)
     }
 
     // MARK: - gpg process harness
@@ -172,7 +166,7 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         which.arguments = ["gpg"]
         let pipe = Pipe()
         which.standardOutput = pipe
-        which.standardError = Pipe()
+        which.standardError = FileHandle.nullDevice
         if (try? which.run()) != nil {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             which.waitUntilExit()
@@ -213,9 +207,10 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         }
     }
 
-    /// Run gpg non-interactively against an isolated GNUPGHOME. Outputs here are
-    /// small (verdicts to stderr, ciphertext to a file), so reading the pipes
-    /// before `waitUntilExit` does not risk a buffer-fill deadlock.
+    /// Run gpg non-interactively against an isolated GNUPGHOME, capturing stdout and
+    /// stderr to files. Files have no buffer limit, so this is deadlock-free
+    /// regardless of output size (unlike reading one pipe to EOF before the other,
+    /// which can fill the second pipe's buffer and block the child).
     private func runGpg(_ args: [String], gpg: URL, gnupgHome: URL) throws -> GpgResult {
         let process = Process()
         process.executableURL = gpg
@@ -224,16 +219,22 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         environment["GNUPGHOME"] = gnupgHome.path
         process.environment = environment
 
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
+        let stdoutURL = gnupgHome.appendingPathComponent("gpg.stdout")
+        let stderrURL = gnupgHome.appendingPathComponent("gpg.stderr")
+        FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
+        let stderrHandle = try FileHandle(forWritingTo: stderrURL)
+        process.standardOutput = stdoutHandle
+        process.standardError = stderrHandle
 
         try process.run()
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        try? stdoutHandle.close()
+        try? stderrHandle.close()
 
+        let stdoutData = (try? Data(contentsOf: stdoutURL)) ?? Data()
+        let stderrData = (try? Data(contentsOf: stderrURL)) ?? Data()
         return GpgResult(status: process.terminationStatus, stdout: stdoutData, stderr: stderrData)
     }
 }

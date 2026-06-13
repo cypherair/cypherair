@@ -262,4 +262,34 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
     final func hex(_ data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
+
+    // MARK: - Evidence
+
+    /// Emit a sanitized Phase 8 evidence line whose `outcome` reflects whether this
+    /// test method has recorded any assertion failure up to this point. XCTest
+    /// assertions are non-fatal, so a literal `.passed` would mislead the evidence
+    /// matrix on a regression (the test goes red, yet the harvested line still
+    /// claimed passed). Deriving the outcome from `testRun?.failureCount` keeps an
+    /// emitted `outcome=passed` honest, and conservatively marks `.failed` once any
+    /// assertion in the method has failed.
+    final func recordEvidence(
+        _ scenario: SecureEnclaveCustodyEvidenceScenario,
+        configuration: SecureEnclaveCustodyEvidenceConfiguration? = nil,
+        observedCategory: PGPKeyOperationFailureCategory? = nil,
+        handleCount: Int? = nil,
+        completeSetCount: Int? = nil
+    ) {
+        let outcome: SecureEnclaveCustodyEvidenceOutcome =
+            (testRun?.failureCount ?? 0) == 0 ? .passed : .failed
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: scenario,
+                configuration: configuration,
+                outcome: outcome,
+                observedCategory: observedCategory,
+                handleCount: handleCount,
+                completeSetCount: completeSetCount
+            )
+        )
+    }
 }
