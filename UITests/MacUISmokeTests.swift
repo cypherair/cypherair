@@ -41,6 +41,46 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("backup.ready")
     }
 
+    /// FB23066215 (issue #499): focusing a SwiftUI text field then popping the screen
+    /// crashes on macOS 27 / MIE v2 (EXC_ARM_MTE_TAGCHECK_FAIL on text-field teardown).
+    /// Drives the user's exact repro — Generate Key → focus + type → Back — in a loop and
+    /// asserts the app process survives each teardown and the Home root returns.
+    ///
+    /// On the 26.5 CI SDK the `MIEWeakTeardownMitigation` gate is inactive, so this runs as
+    /// a navigation regression guard (the churn must not break). The true crash gate is the
+    /// manual run of this same flow on a macOS 27 beta, where the mitigation is active.
+    func test_keygen_focusThenBack_navigationChurn_staysAlive() throws {
+        launchMain()
+
+        for cycle in 0..<6 {
+            XCTAssertTrue(
+                element("home.generate").waitForExistence(timeout: 10),
+                "Expected the Home generate entry to be present at the start of cycle \(cycle)."
+            )
+            element("home.generate").tap()
+
+            waitForScreenReady("keygen.ready")
+            let nameField = element("keygen.name")
+            XCTAssertTrue(
+                nameField.waitForExistence(timeout: 10),
+                "Expected the keygen name field on cycle \(cycle)."
+            )
+            // Tapping + typing focuses the field — focus is the necessary crash condition.
+            nameField.tap()
+            nameField.typeText("Churn \(cycle)")
+
+            navigateBackFromDetail()
+
+            // The pop must tear down the focused field and return us to the Home root without
+            // crashing the app process.
+            waitForElementToDisappear("keygen.ready")
+            XCTAssertTrue(
+                element("home.generate").waitForExistence(timeout: 10),
+                "Expected to return to the Home root after popping Generate Key on cycle \(cycle)."
+            )
+        }
+    }
+
     func test_mainFlow_keyDetail_opensModifyExpirySheet() throws {
         launchMain()
         generateKey()
@@ -402,6 +442,19 @@ final class MacUISmokeTests: XCTestCase {
 
         element("sidebar.settings").tap()
         waitForScreenReady("settings.ready")
+    }
+
+    /// Pop the detail `NavigationStack` back to its root. The macOS `NavigationSplitView`
+    /// detail back affordance is the system toolbar chevron (no app-assigned identifier),
+    /// so fall back to the standard ⌘[ navigate-back shortcut when the labelled button is
+    /// unavailable on a given OS/SDK.
+    private func navigateBackFromDetail() {
+        let backButton = app.buttons["Back"]
+        if backButton.waitForExistence(timeout: 5), backButton.isHittable {
+            backButton.tap()
+        } else {
+            app.typeKey("[", modifierFlags: .command)
+        }
     }
 
     private func generateKey() {
