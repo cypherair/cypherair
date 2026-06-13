@@ -8869,6 +8869,22 @@
         }
       }
     },
+    "keydetail.delete.message.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will permanently delete this key from your device. Device-bound keys cannot be exported or backed up, so this cannot be undone and the key cannot be recovered."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这将从你的设备上永久删除此密钥。设备绑定密钥无法导出或备份，因此此操作无法撤销，且密钥无法恢复。"
+          }
+        }
+      }
+    },
     "keydetail.delete.title" : {
       "localizations" : {
         "en" : {

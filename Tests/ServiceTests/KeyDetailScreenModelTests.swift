@@ -309,6 +309,27 @@ final class KeyDetailScreenModelTests: XCTestCase {
         XCTAssertFalse(model.deviceBoundAvailabilityIsDegraded)
     }
 
+    @MainActor
+    func test_deleteConfirmationMessage_branchesOnCustody() async throws {
+        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let model = makeModel(fingerprint: identity.fingerprint)
+
+        // The instance property delegates to the custody branch for a real
+        // (software) key.
+        XCTAssertFalse(model.isDeviceBound)
+        XCTAssertEqual(
+            model.deleteConfirmationMessage,
+            KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: false)
+        )
+        // Device-bound keys get distinct, custody-appropriate copy. (#512: the
+        // shared message wrongly told device-bound users to back up a key that
+        // cannot be exported or backed up.)
+        XCTAssertNotEqual(
+            KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: true),
+            KeyDetailScreenModel.deleteConfirmationMessage(isDeviceBound: false)
+        )
+    }
+
     func test_deviceBoundDegradedMapping_usesOrdinalAmongSecureEnclaveKeysOnly() {
         let softwareKey = makeCustodyMappingIdentity(
             fingerprint: "aaaa", custody: .softwareSecretCertificate
