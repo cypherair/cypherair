@@ -38,6 +38,32 @@ struct CypherMultilineTextInput: View {
     }
 }
 
+/// Sizing contract for the multiline text editor, kept platform-agnostic so the
+/// decision that fixes the Form-row height leak stays unit-testable everywhere.
+enum MultilineTextInputSizing {
+    /// The size the UIKit representable reports to SwiftUI from `sizeThatFits`.
+    ///
+    /// The invariant is that this never defers to the text view's own content-based
+    /// sizing: when no width is resolvable yet it returns a neutral `fallbackHeight`
+    /// rather than nil. Returning nil (or a content-derived height) here is what let
+    /// the full pasted-text height leak into the enclosing Form row and produced the
+    /// empty space after the first post-paste edit. When a width is available it
+    /// reports the measured content height and lets the caller's
+    /// `.frame(minHeight:idealHeight:maxHeight:)` clamp it to the visible range.
+    static func resolvedSize(
+        proposalWidth: CGFloat?,
+        boundsWidth: CGFloat,
+        fallbackHeight: CGFloat,
+        measuredHeight: (CGFloat) -> CGFloat
+    ) -> CGSize {
+        let width = proposalWidth ?? boundsWidth
+        guard width > 0 else {
+            return CGSize(width: proposalWidth ?? 0, height: fallbackHeight)
+        }
+        return CGSize(width: width, height: measuredHeight(width))
+    }
+}
+
 #if canImport(UIKit)
 private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
     @Binding var text: String
@@ -54,8 +80,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         textView.isEditable = true
         textView.isSelectable = true
         textView.isScrollEnabled = true
-        textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        textView.setContentHuggingPriority(.defaultLow, for: .vertical)
         textView.adjustsFontForContentSizeCategory = true
         textView.inputModeProfile = mode
         textView.text = text
@@ -69,7 +93,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         }
         uiView.inputModeProfile = mode
         applyTraits(to: uiView)
-        uiView.invalidateIntrinsicContentSize()
     }
 
     func sizeThatFits(
@@ -77,13 +100,14 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         uiView: CypherHardenedTextView,
         context: Context
     ) -> CGSize? {
-        guard let width = proposal.width else {
-            return nil
-        }
-
-        return CGSize(
-            width: width,
-            height: proposal.height ?? Self.defaultMeasuredHeight
+        // Always report a concrete size. The caller's frame clamps the height to
+        // its minHeight...maxHeight range, so the editor grows up to the maximum
+        // and then scrolls (isScrollEnabled) instead of expanding the Form row.
+        MultilineTextInputSizing.resolvedSize(
+            proposalWidth: proposal.width,
+            boundsWidth: uiView.bounds.width,
+            fallbackHeight: Self.defaultMeasuredHeight,
+            measuredHeight: { MultilineTextInputSizing.measuredHeight(for: uiView, width: $0) }
         )
     }
 
@@ -223,5 +247,14 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         }
     }
 
+}
+
+extension MultilineTextInputSizing {
+    /// Height the text view needs to lay out all of its content at `width`.
+    static func measuredHeight(for textView: UITextView, width: CGFloat) -> CGFloat {
+        textView.sizeThatFits(
+            CGSize(width: width, height: .greatestFiniteMagnitude)
+        ).height
+    }
 }
 #endif
