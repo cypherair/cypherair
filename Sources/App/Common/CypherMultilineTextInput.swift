@@ -15,16 +15,27 @@ struct CypherMultilineTextInput: View {
     var idealHeight: CGFloat = 160
     var maxHeight: CGFloat = 240
 
+    #if canImport(UIKit)
+    // The text view's measured content height (0 until first layout). SwiftUI's
+    // Form sizes a UITextView-backed row to the text view's own content height and
+    // ignores sizeThatFits / intrinsicContentSize / range frames, so we measure the
+    // content ourselves and pin the editor to a *definite* height instead.
+    @State private var measuredContentHeight: CGFloat = 0
+    #endif
+
     var body: some View {
         #if canImport(UIKit)
         CypherMultilineTextInputRepresentable(
             text: $text,
             mode: mode,
+            measuredContentHeight: $measuredContentHeight
+        )
+        .frame(height: MultilineTextInputSizing.editorHeight(
+            contentHeight: measuredContentHeight,
             minHeight: minHeight,
             idealHeight: idealHeight,
             maxHeight: maxHeight
-        )
-        .frame(minHeight: minHeight, idealHeight: idealHeight, maxHeight: maxHeight)
+        ))
         .privacySensitive()
         #else
         TextEditor(text: $text)
@@ -46,40 +57,20 @@ struct CypherMultilineTextInput: View {
     }
 }
 
-/// Sizing contract for the multiline text editor, kept platform-agnostic so the
-/// decision that fixes the Form-row height leak stays unit-testable everywhere.
+/// Sizing decision for the multiline editor, kept platform-agnostic so it stays unit-testable.
 enum MultilineTextInputSizing {
-    /// The size the UIKit representable reports to SwiftUI from `sizeThatFits`.
-    ///
-    /// Two invariants matter:
-    /// 1. It never returns nil and never defers to the text view's own content-based
-    ///    sizing. When no width is resolvable yet (SwiftUI's unspecified measurement
-    ///    pass) it returns `idealHeight`. Returning nil here let the full pasted-text
-    ///    height leak into the enclosing Form row (the empty space after the first
-    ///    post-paste edit).
-    /// 2. The reported height is `contentHeight` *clamped* to `minHeight...maxHeight`,
-    ///    never the raw content height. Reporting the raw height makes SwiftUI lay the
-    ///    text view out at full size and clip it, so its content fits its own bounds
-    ///    and nothing scrolls. Clamping keeps the text view's frame at the visible
-    ///    size, so it grows up to the maximum and then scrolls internally.
-    ///
-    /// `contentHeight` is the measured text height (nil when no width was resolvable,
-    /// so nothing was measured). Measurement stays in the caller (it touches the
-    /// main-actor text view); this stays pure and unit-testable.
-    static func resolvedSize(
-        proposalWidth: CGFloat?,
-        boundsWidth: CGFloat,
+    /// The editor's definite height for a measured content height, clamped to the
+    /// visible `minHeight...maxHeight` range so it grows with content up to the
+    /// maximum and then scrolls internally. `contentHeight <= 0` means the content
+    /// has not been measured yet, in which case the editor sits at `idealHeight`.
+    static func editorHeight(
+        contentHeight: CGFloat,
         minHeight: CGFloat,
         idealHeight: CGFloat,
-        maxHeight: CGFloat,
-        contentHeight: CGFloat?
-    ) -> CGSize {
-        let width = proposalWidth ?? boundsWidth
-        guard width > 0, let contentHeight else {
-            return CGSize(width: proposalWidth ?? 0, height: idealHeight)
-        }
-        let clampedHeight = min(max(contentHeight, minHeight), maxHeight)
-        return CGSize(width: width, height: clampedHeight)
+        maxHeight: CGFloat
+    ) -> CGFloat {
+        let base = contentHeight > 0 ? contentHeight : idealHeight
+        return min(max(base, minHeight), maxHeight)
     }
 }
 
@@ -87,12 +78,10 @@ enum MultilineTextInputSizing {
 private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
     @Binding var text: String
     let mode: CypherMultilineTextInputMode
-    let minHeight: CGFloat
-    let idealHeight: CGFloat
-    let maxHeight: CGFloat
+    @Binding var measuredContentHeight: CGFloat
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, measuredContentHeight: $measuredContentHeight)
     }
 
     func makeUIView(context: Context) -> CypherHardenedTextView {
@@ -105,38 +94,23 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         textView.adjustsFontForContentSizeCategory = true
         textView.inputModeProfile = mode
         textView.text = text
+        let coordinator = context.coordinator
+        textView.onLayout = { [weak textView] in
+            guard let textView else { return }
+            coordinator.reportContentHeight(of: textView)
+        }
         applyTraits(to: textView)
         return textView
     }
 
     func updateUIView(_ uiView: CypherHardenedTextView, context: Context) {
+        context.coordinator.measuredContentHeight = $measuredContentHeight
         if uiView.text != text {
             uiView.text = text
         }
         uiView.inputModeProfile = mode
         applyTraits(to: uiView)
-    }
-
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        uiView: CypherHardenedTextView,
-        context: Context
-    ) -> CGSize? {
-        // Report the content height clamped to the editor's range, so it grows up
-        // to maxHeight and then scrolls (isScrollEnabled) instead of being laid out
-        // at full height and clipped. Measure here (main actor); clamp in resolvedSize.
-        let width = proposal.width ?? uiView.bounds.width
-        let contentHeight = width > 0
-            ? MultilineTextInputSizing.measuredHeight(for: uiView, width: width)
-            : nil
-        return MultilineTextInputSizing.resolvedSize(
-            proposalWidth: proposal.width,
-            boundsWidth: uiView.bounds.width,
-            minHeight: minHeight,
-            idealHeight: idealHeight,
-            maxHeight: maxHeight,
-            contentHeight: contentHeight
-        )
+        context.coordinator.reportContentHeight(of: uiView)
     }
 
     private func applyTraits(to textView: UITextView) {
@@ -206,24 +180,47 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextViewDelegate {
         @Binding private var text: String
+        var measuredContentHeight: Binding<CGFloat>
+        private var lastReportedHeight: CGFloat = -1
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, measuredContentHeight: Binding<CGFloat>) {
             self._text = text
+            self.measuredContentHeight = measuredContentHeight
         }
 
         func textViewDidChange(_ textView: UITextView) {
             let newText = textView.text ?? ""
-            guard newText != text else { return }
-            text = newText
+            if newText != text {
+                text = newText
+            }
+            reportContentHeight(of: textView)
+        }
+
+        /// Measures the height the content needs at the current width and pushes it
+        /// back to SwiftUI (guarded against no-op churn). Dispatched async because
+        /// this is also called from `updateUIView`, where mutating state inline is
+        /// disallowed.
+        func reportContentHeight(of textView: UITextView) {
+            let width = textView.bounds.width
+            guard width > 0 else { return }
+            let height = textView.sizeThatFits(
+                CGSize(width: width, height: .greatestFiniteMagnitude)
+            ).height
+            guard abs(height - lastReportedHeight) > 0.5 else { return }
+            lastReportedHeight = height
+            let binding = measuredContentHeight
+            DispatchQueue.main.async {
+                binding.wrappedValue = height
+            }
         }
     }
 
     final class CypherHardenedTextView: UITextView {
-        override var intrinsicContentSize: CGSize {
-            CGSize(
-                width: UIView.noIntrinsicMetric,
-                height: UIView.noIntrinsicMetric
-            )
+        var onLayout: (() -> Void)?
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            onLayout?()
         }
 
         var inputModeProfile: CypherMultilineTextInputMode = .prose {
@@ -271,17 +268,6 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
                 isFindInteractionEnabled = false
             }
         }
-    }
-
-}
-
-extension MultilineTextInputSizing {
-    /// Height the text view needs to lay out all of its content at `width`.
-    @MainActor
-    static func measuredHeight(for textView: UITextView, width: CGFloat) -> CGFloat {
-        textView.sizeThatFits(
-            CGSize(width: width, height: .greatestFiniteMagnitude)
-        ).height
     }
 }
 #endif
