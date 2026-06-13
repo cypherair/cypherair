@@ -99,7 +99,7 @@ emit sanitized `SE-CUSTODY-EVIDENCE` summary lines for this matrix.
 | wrong public binding fails closed | ✅ captured (non-interactive) | pending | pending | N/A |
 | wrong role fails closed (signer/KA guards) | ✅ captured (non-interactive) | pending | pending | N/A |
 | payload tamper hard-fail (no partial plaintext) | ✅ captured (biometric) | pending | pending | N/A |
-| local-reset cleanup (dangerous plan) | pending (dangerous plan) | pending | pending | N/A |
+| local-reset cleanup (dangerous plan) | ✅ captured (dangerous plan) | pending | pending | N/A |
 | interaction-not-allowed proxy (fail-closed) | ✅ captured (non-interactive) | pending | pending | N/A |
 
 Tests: `Tests/DeviceSecurityTests/DeviceSecureEnclaveCustody*Tests.swift` +
@@ -107,9 +107,10 @@ Tests: `Tests/DeviceSecurityTests/DeviceSecureEnclaveCustody*Tests.swift` +
 arm64e (real Secure Enclave, 2026-06-13): the five non-interactive scenarios and
 the four biometric scenarios (signing, ECDH decrypt v4/v6, hidden generation,
 payload tamper — Touch ID approved at the sensor) all passed and emitted
-sanitized `SE-CUSTODY-EVIDENCE` lines. The local-reset proof lives in the
-destructive `CypherAir-DangerousDeviceTests` plan (not yet run); all iPhone/iPad
-rows are pending the maintainer's interactive runs.
+sanitized `SE-CUSTODY-EVIDENCE` lines, as did the destructive local-reset proof
+(`CypherAir-DangerousDeviceTests`, which deleted 12 app-owned custody rows). All
+macOS hardware-evidence rows are now captured; all iPhone/iPad rows are pending
+the maintainer's interactive runs.
 
 **Authentication-cancellation and biometric-lockout** positive *interactive*
 evidence is intentionally out of scope: it is a low-value attended edge case that
