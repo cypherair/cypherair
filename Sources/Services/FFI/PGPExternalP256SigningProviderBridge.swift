@@ -74,5 +74,3 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
         }
     }
 }
-
-typealias PGPSecureEnclaveExternalSigningProviderBridge = PGPExternalP256SigningProviderBridge

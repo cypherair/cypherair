@@ -149,39 +149,30 @@ struct KeyBundleStore {
 
     /// Promote a complete pending bundle into the permanent namespace.
     /// Permanent writes are rolled back on partial failure to preserve pending-only state.
-    func promotePendingToPermanent(
-        fingerprint: String,
-        seKeyAccessControl: SecAccessControl? = nil
-    ) throws {
+    func promotePendingToPermanent(fingerprint: String) throws {
         let pending = try loadBundle(fingerprint: fingerprint, namespace: .pending)
         try persistPermanentBundle(
             pending,
-            fingerprint: fingerprint,
-            seKeyAccessControl: seKeyAccessControl
+            fingerprint: fingerprint
         )
         cleanupPendingBundle(fingerprint: fingerprint)
     }
 
     /// Replace any residual permanent bundle items with the complete pending bundle.
     /// Residual permanent entries are deleted first, tolerating only item-not-found.
-    func replacePermanentWithPending(
-        fingerprint: String,
-        seKeyAccessControl: SecAccessControl? = nil
-    ) throws {
+    func replacePermanentWithPending(fingerprint: String) throws {
         let pending = try loadBundle(fingerprint: fingerprint, namespace: .pending)
         try deleteBundleAllowingMissing(fingerprint: fingerprint, namespace: .permanent)
         try persistPermanentBundle(
             pending,
-            fingerprint: fingerprint,
-            seKeyAccessControl: seKeyAccessControl
+            fingerprint: fingerprint
         )
         cleanupPendingBundle(fingerprint: fingerprint)
     }
 
     private func persistPermanentBundle(
         _ bundle: WrappedKeyBundle,
-        fingerprint: String,
-        seKeyAccessControl: SecAccessControl?
+        fingerprint: String
     ) throws {
         let permanentServices = serviceNames(for: fingerprint, namespace: .permanent)
         var savedPermanentServices: [String] = []
@@ -191,7 +182,7 @@ struct KeyBundleStore {
                 bundle.seKeyData,
                 service: permanentServices.seKey,
                 account: KeychainConstants.defaultAccount,
-                accessControl: seKeyAccessControl
+                accessControl: nil
             )
             savedPermanentServices.append(permanentServices.seKey)
 

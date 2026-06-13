@@ -224,7 +224,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
     func test_signingCallbackMapsHandleErrorToSanitizedCallbackFailure() throws {
         let loadedPair = try loadedHandlePair()
-        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+        let bridge = PGPExternalP256SigningProviderBridge(
             handle: loadedPair.signing,
             digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(
                 error: SecureEnclaveCustodyHandleError.hardwareUnavailable
@@ -243,7 +243,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
     func test_signingCallbackMapsCancellationToCallbackCancellation() throws {
         let loadedPair = try loadedHandlePair()
-        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+        let bridge = PGPExternalP256SigningProviderBridge(
             handle: loadedPair.signing,
             digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(error: CancellationError())
         )
@@ -260,7 +260,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
     func test_signingCallbackMapsUnknownErrorToExternalOperationFailed() throws {
         let loadedPair = try loadedHandlePair()
-        let bridge = PGPSecureEnclaveExternalSigningProviderBridge(
+        let bridge = PGPExternalP256SigningProviderBridge(
             handle: loadedPair.signing,
             digestSigner: ThrowingSecureEnclaveCustodyDigestSigner(error: RawSigningCallbackError())
         )

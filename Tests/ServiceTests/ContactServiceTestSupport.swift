@@ -112,7 +112,6 @@ class ContactServiceTestCase: XCTestCase {
             keyRecord: snapshot.keyRecords[keyIndex],
             signatureData: Data("test-signature-\(artifactId)".utf8)
         ) { artifact in
-            artifact.storageHint = "test-\(artifactId)"
             artifact.source = .imported
             artifact.targetSelector = .directKey
             artifact.validationStatus = .revalidationNeeded
@@ -123,8 +122,7 @@ class ContactServiceTestCase: XCTestCase {
         snapshot.keyRecords[keyIndex].certificationProjection = ContactCertificationProjection(
             status: .revalidationNeeded,
             artifactIds: [artifactId],
-            lastValidatedAt: nil,
-            reconciliationMetadata: "test-\(artifactId)"
+            lastValidatedAt: nil
         )
     }
 
@@ -209,7 +207,6 @@ class ContactServiceTestCase: XCTestCase {
             artifactId: artifactId,
             keyId: keyRecord.keyId,
             createdAt: Date(),
-            storageHint: "test",
             canonicalSignatureData: signatureData,
             signatureDigest: ContactCertificationArtifactReference.sha256Hex(
                 for: signatureData

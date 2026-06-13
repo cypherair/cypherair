@@ -1125,7 +1125,6 @@ private enum ArchitectureSourceAuditRules {
             "PGPErrorMapper",
             "PGPSecureEnclaveCustodyGenerationAdapter",
             "PGPSecureEnclaveCustodyPublicBindingInspector",
-            "PGPSecureEnclaveExternalSigningProviderBridge",
             "PGPSelfTestOperationAdapter",
         ]),
         scope: { path in
@@ -1728,7 +1727,7 @@ private enum ArchitectureSourceAuditRules {
     ]
 
     private static let phase5ExternalSignerRuntimePattern =
-        #"\b(?:PGPExternalP256SigningProviderBridge|PGPSecureEnclaveExternalSigningProviderBridge|[A-Za-z0-9_]*WithExternalP256Signer)\b"#
+        #"\b(?:PGPExternalP256SigningProviderBridge|[A-Za-z0-9_]*WithExternalP256Signer)\b"#
 
     private static let phase6ExternalKeyAgreementRuntimePattern =
         #"\b(?:PGPExternalP256KeyAgreementProviderBridge|ExternalP256KeyAgreementProvider|ExternalP256KeyAgreementRequest|ExternalP256KeyAgreementError|ExternalP256KeyAgreementFailureCategory|P256RawSharedSecret|[A-Za-z0-9_]*WithExternalP256KeyAgreement)\b"#
