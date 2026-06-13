@@ -372,6 +372,17 @@ final class KeyMutationService {
     }
 
     private func deleteKeychainMaterialAndMetadata(fingerprint: String) throws {
+        try reportPartialDeletionIfNeeded(
+            collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: fingerprint)
+        )
+    }
+
+    /// Removes all private keychain material and the catalog metadata for `fingerprint`,
+    /// accumulating (never throwing) every removal failure so callers can merge error
+    /// sets and report once. Catalog metadata removal is attempted unconditionally — a
+    /// keychain failure never short-circuits it — so a key can never become permanently
+    /// undeletable.
+    private func collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: String) -> [Error] {
         var deletionErrors = deleteAllPrivateKeychainMaterial(for: fingerprint)
         do {
             try catalogStore.removeKey(fingerprint: fingerprint)
@@ -379,14 +390,19 @@ final class KeyMutationService {
             deletionErrors.append(error)
         }
         clearRecoveryStateIfNeeded(afterDeleting: fingerprint)
-
-        try reportPartialDeletionIfNeeded(deletionErrors)
+        return deletionErrors
     }
 
     private func deleteSecureEnclaveCustodyKey(_ identity: PGPKeyIdentity) throws {
-        let handleDeletionErrors = deleteSecureEnclaveCustodyHandles(for: identity)
-        try reportPartialDeletionIfNeeded(handleDeletionErrors)
-        try deleteKeychainMaterialAndMetadata(fingerprint: identity.fingerprint)
+        // Collect Secure Enclave handle-deletion failures, then ALWAYS run keychain +
+        // catalog metadata removal (orphan-cleanup fallback), mirroring the software-key
+        // path. Merge both error sets and report once — so the key always leaves the
+        // catalog (stays deletable) while a partial deletion still surfaces to the caller.
+        var deletionErrors = deleteSecureEnclaveCustodyHandles(for: identity)
+        deletionErrors.append(
+            contentsOf: collectKeychainMaterialAndMetadataDeletionErrors(fingerprint: identity.fingerprint)
+        )
+        try reportPartialDeletionIfNeeded(deletionErrors)
     }
 
     private func deleteSecureEnclaveCustodyHandles(for identity: PGPKeyIdentity) -> [Error] {
