@@ -221,7 +221,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration and root-secret operation tracing
 - `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider
 - `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
-- `ProtectedDataRightStoreClient.swift` — Keychain-backed root-secret store for the `CAPDSEV2` envelope
+- `KeychainProtectedDataRootSecretStore.swift` — Keychain-backed root-secret store for the `CAPDSEV2` envelope
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff

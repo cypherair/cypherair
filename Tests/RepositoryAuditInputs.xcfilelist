@@ -267,7 +267,7 @@ $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataPostUnlockCoordinator.swi
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRegistry.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRegistryStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRelockParticipant.swift
-$(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRightStoreClient.swift
+$(SRCROOT)/Sources/Security/ProtectedData/KeychainProtectedDataRootSecretStore.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRootSecretEnvelope.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataRootSecretCoordinator.swift
 $(SRCROOT)/Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift
@@ -343,6 +343,7 @@ $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyStreamingFileDecryptionServi
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyStreamingFileEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyTextEncryptionService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouter.swift
+$(SRCROOT)/Sources/Services/KeyManagement/SecureEnclaveCustodyAuthenticationErrorNormalizer.swift
 $(SRCROOT)/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SelectiveRevocationService.swift
 $(SRCROOT)/Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift
