@@ -38,6 +38,14 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try store.deleteHandlePair(pair)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         assertTraceIsSanitized(traceStore.recentEntries, pair: pair)
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .handlePairGenerationPersistence,
+                outcome: .passed,
+                handleCount: summary.totalHandleCount,
+                completeSetCount: summary.completeSetCount
+            )
+        )
     }
 
     func test_custodyPrivateOperations_succeedAfterBiometricAuthentication_onDevice() async throws {
@@ -80,6 +88,9 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         let expectedSecret = try peerPrivateKey.sharedSecretFromKeyAgreement(with: custodyPublicKey)
         let expectedSecretData = expectedSecret.withUnsafeBytes { Data($0) }
         XCTAssertEqual(sharedSecret, expectedSecretData)
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(scenario: .signing, outcome: .passed)
+        )
     }
 
     func test_custodyPrivateOperations_interactionNotAllowedFailsClosed_onDevice() throws {
@@ -114,6 +125,9 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             )
             assertDoesNotLeak(error, pair: pair)
         }
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(scenario: .interactionNotAllowedProxy, outcome: .passed)
+        )
     }
 
     func test_custodyHandleStateFailures_failClosedOnDevice() throws {
@@ -161,6 +175,80 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try keyStore.deleteKey(reference: pair.keyAgreement.reference)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         XCTAssertEqual(store.classifyHandleAvailability(expected: pair), .unavailable(.privateHandleMissing))
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .wrongPublicBinding,
+                outcome: .passed,
+                observedCategory: .handlePublicKeyBindingMismatch
+            )
+        )
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .missingHandle,
+                outcome: .passed,
+                observedCategory: .privateHandleMissing
+            )
+        )
+    }
+
+    /// Device-level wrong-role evidence: real Secure Enclave-created handle bindings,
+    /// fed to the production digest signer and key-agreement guards with the roles
+    /// swapped. The role guard fires before any private-key use, so no private key and
+    /// no biometric prompt are needed — this proves real bindings carry the correct
+    /// role and that both guards fail closed on a cross-role handle.
+    func test_custodyRoleGuards_crossRoleUseFailsClosed_onDevice() throws {
+        try requireSecureEnclaveCustodyHardware()
+
+        let keyStore = SystemSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let pair = try store.createHandlePair()
+        defer {
+            try? store.deleteHandlePair(pair)
+        }
+
+        let keyAgreementBoundHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: pair.keyAgreement,
+            privateKey: nil
+        )
+        let signingBoundHandle = SecureEnclaveCustodyLoadedHandle(
+            binding: pair.signing,
+            privateKey: nil
+        )
+
+        // A .keyAgreement handle must not sign.
+        let digest = Data(SHA256.hash(data: Data("CypherAir custody wrong-role evidence".utf8)))
+        XCTAssertThrowsError(
+            try SystemSecureEnclaveCustodyDigestSigner().signSHA256Digest(digest, using: keyAgreementBoundHandle)
+        ) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .privateOperationRoleMismatch
+            )
+            assertDoesNotLeak(error, pair: pair)
+        }
+
+        // A .signing handle must not perform key agreement.
+        let request = ExternalP256KeyAgreementRequest(
+            recipientPublicKey: pair.signing.publicKeyX963,
+            ephemeralPublicKey: pair.keyAgreement.publicKeyX963
+        )
+        XCTAssertThrowsError(
+            try SystemSecureEnclaveCustodyKeyAgreement().deriveSharedSecret(request: request, using: signingBoundHandle)
+        ) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .privateOperationRoleMismatch
+            )
+            assertDoesNotLeak(error, pair: pair)
+        }
+
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .wrongRole,
+                outcome: .passed,
+                observedCategory: .privateOperationRoleMismatch
+            )
+        )
     }
 
     func test_custodyTraceMetadataDoesNotLeakHandleLocators_onDevice() throws {

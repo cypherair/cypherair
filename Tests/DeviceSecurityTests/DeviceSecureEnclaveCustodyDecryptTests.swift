@@ -70,6 +70,13 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
                 unwrapper.didUnwrap,
                 "Secure Enclave decrypt must not unwrap a secret certificate"
             )
+            SecureEnclaveCustodyEvidenceLog.record(
+                SecureEnclaveCustodyEvidenceSummary(
+                    scenario: .ecdhDecrypt,
+                    configuration: configuration == .compatibleP256V4 ? .compatibleP256V4 : .modernP256V6,
+                    outcome: .passed
+                )
+            )
         }
     }
 
@@ -170,6 +177,21 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: tamperedOutput.path),
             "No plaintext output may exist after a tampered file hard-fail"
+        )
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .ecdhDecrypt,
+                configuration: .compatibleP256V4,
+                outcome: .passed
+            )
+        )
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .payloadTamperHardFail,
+                configuration: .compatibleP256V4,
+                outcome: .passed,
+                observedCategory: .payloadAuthenticationFailure
+            )
         )
     }
 

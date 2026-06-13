@@ -40,5 +40,12 @@ final class DeviceDangerousSecureEnclaveCustodyResetCleanupTests: SecureEnclaveC
             entries.filter { $0.name.hasPrefix("secureEnclaveCustody.") },
             pair: pair
         )
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .localResetCleanup,
+                outcome: .passed,
+                handleCount: result.inspectedHandleCount
+            )
+        )
     }
 }

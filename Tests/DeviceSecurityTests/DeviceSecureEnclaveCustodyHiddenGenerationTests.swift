@@ -63,5 +63,12 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
             keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
         )
         XCTAssertEqual(located, pair)
+        SecureEnclaveCustodyEvidenceLog.record(
+            SecureEnclaveCustodyEvidenceSummary(
+                scenario: .hiddenGeneration,
+                configuration: .compatibleP256V4,
+                outcome: .passed
+            )
+        )
     }
 }
