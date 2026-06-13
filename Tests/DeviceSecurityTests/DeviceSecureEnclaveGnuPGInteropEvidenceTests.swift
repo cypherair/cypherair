@@ -186,8 +186,13 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
     }
 
     private func makeGnupgHome() throws -> URL {
+        // gpg-agent's Unix socket is created inside GNUPGHOME; the sandboxed test
+        // host's temporary directory is already a long path, so keep the directory
+        // name short to stay under the ~104-character sun_path limit — otherwise gpg
+        // fails with "can't connect to the gpg-agent: File name too long".
+        let shortID = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("se-gpg-interop-\(UUID().uuidString)")
+            .appendingPathComponent("seg-\(shortID)")
         try FileManager.default.createDirectory(
             at: dir,
             withIntermediateDirectories: true,
