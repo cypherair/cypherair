@@ -23,6 +23,7 @@
         "DeviceSecureEnclaveCustodyHiddenGenerationTests",
         "DeviceSecureEnclaveCustodyHandleStoreTests",
         "DeviceSecureEnclaveCustodyDecryptTests",
+        "DeviceSecureEnclaveGnuPGInteropEvidenceTests",
         "DeviceAuthenticationManagerTests",
         "DeviceModeSwitchTests",
         "DeviceMIETests",

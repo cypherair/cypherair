@@ -14,6 +14,7 @@ enum SecureEnclaveCustodyEvidenceScenario: String, CaseIterable, Sendable {
     case interactionNotAllowedProxy
     case payloadTamperHardFail
     case localResetCleanup
+    case gnupgInteropV4
 }
 
 /// The OpenPGP configuration a scenario exercised, when relevant.
