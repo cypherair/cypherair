@@ -91,24 +91,24 @@ emit sanitized `SE-CUSTODY-EVIDENCE` summary lines for this matrix.
 | Scenario | macOS | iPhone | iPad | visionOS |
 | --- | --- | --- | --- | --- |
 | handle-pair generation + persistence | ✅ captured (non-interactive) | pending (maintainer) | pending (maintainer) | N/A |
-| signing (real ECDSA) | pending (biometric) | pending | pending | N/A |
-| ECDH decrypt v4 (SEIPDv1/MDC) | pending (biometric) | pending | pending | N/A |
-| ECDH decrypt v6 (SEIPDv2/AEAD) | pending (biometric) | pending | pending | N/A |
-| hidden generation (v4 public cert via real signing handle) | pending (biometric) | pending | pending | N/A |
+| signing (real ECDSA) | ✅ captured (biometric) | pending | pending | N/A |
+| ECDH decrypt v4 (SEIPDv1/MDC) | ✅ captured (biometric) | pending | pending | N/A |
+| ECDH decrypt v6 (SEIPDv2/AEAD) | ✅ captured (biometric) | pending | pending | N/A |
+| hidden generation (v4 public cert via real signing handle) | ✅ captured (biometric) | pending | pending | N/A |
 | missing handle fails closed | ✅ captured (non-interactive) | pending | pending | N/A |
 | wrong public binding fails closed | ✅ captured (non-interactive) | pending | pending | N/A |
 | wrong role fails closed (signer/KA guards) | ✅ captured (non-interactive) | pending | pending | N/A |
-| payload tamper hard-fail (no partial plaintext) | pending (biometric) | pending | pending | N/A |
+| payload tamper hard-fail (no partial plaintext) | ✅ captured (biometric) | pending | pending | N/A |
 | local-reset cleanup (dangerous plan) | pending (dangerous plan) | pending | pending | N/A |
 | interaction-not-allowed proxy (fail-closed) | ✅ captured (non-interactive) | pending | pending | N/A |
 
 Tests: `Tests/DeviceSecurityTests/DeviceSecureEnclaveCustody*Tests.swift` +
 `DeviceDangerousSecureEnclaveCustodyResetCleanupTests.swift`. Captured on macOS
-arm64e (real Secure Enclave, 2026-06-13): the five non-interactive scenarios
-above passed and emitted sanitized `SE-CUSTODY-EVIDENCE` lines. The
-biometric-gated scenarios (signing, ECDH decrypt, hidden generation, payload
-tamper) require an operator at the Touch ID sensor; the local-reset proof is in
-the destructive `CypherAir-DangerousDeviceTests` plan. These and all iPhone/iPad
+arm64e (real Secure Enclave, 2026-06-13): the five non-interactive scenarios and
+the four biometric scenarios (signing, ECDH decrypt v4/v6, hidden generation,
+payload tamper — Touch ID approved at the sensor) all passed and emitted
+sanitized `SE-CUSTODY-EVIDENCE` lines. The local-reset proof lives in the
+destructive `CypherAir-DangerousDeviceTests` plan (not yet run); all iPhone/iPad
 rows are pending the maintainer's interactive runs.
 
 **Authentication-cancellation and biometric-lockout** positive *interactive*
@@ -128,10 +128,10 @@ local gpg); it is out of default CI.
 
 | Direction | macOS | iPhone / iPad |
 | --- | --- | --- |
-| SE signs → gpg verifies | operator-automated (manual plan) | documented manual cross-device |
-| gpg encrypts → production seam decrypts (real SE ECDH) | operator-automated (manual plan) | documented manual cross-device |
+| SE signs → gpg verifies | ✅ captured (manual plan) | documented manual cross-device |
+| gpg encrypts → production seam decrypts (real SE ECDH) | ✅ captured (manual plan) | documented manual cross-device |
 
-Run: `xcodebuild test -scheme CypherAir -testPlan CypherAir-InteropEvidenceTests -destination 'platform=macOS,arch=arm64e'` (status: harness compiles on macOS + iOS; capture pending operator run).
+Run: `xcodebuild test -scheme CypherAir -testPlan CypherAir-InteropEvidenceTests -destination 'platform=macOS,arch=arm64e'`. Captured on real Secure Enclave + gpg 2.5.19 (macOS arm64e, 2026-06-13): both directions passed (`SE-CUSTODY-EVIDENCE scenario=gnupgInteropV4 outcome=passed`).
 
 **iPhone/iPad documented manual cross-device procedure** (gpg runs only on the
 Mac):
