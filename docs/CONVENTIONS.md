@@ -115,7 +115,7 @@ struct ContentView: View {
 
 ### Liquid Glass
 
-CypherAir targets iOS 26.5+, iPadOS 26.5+, macOS 26.5+, and visionOS 26.5+. Fully embrace modern SwiftUI chrome across those platforms. General Liquid Glass implementation guidance lives in agent/tooling guidance; the archived background guide is in `docs/archive/LIQUID_GLASS.md`. Current project rules:
+CypherAir targets iOS 26.5+, iPadOS 26.5+, macOS 26.5+, and visionOS 26.5+. Fully embrace modern SwiftUI chrome across those platforms. General Liquid Glass implementation guidance lives in agent/tooling guidance. Current project rules:
 
 - On iOS and iPadOS, standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically. Do not override their backgrounds.
 - On macOS and visionOS, prefer platform-native SwiftUI chrome instead of forcing iOS-styled glass.
