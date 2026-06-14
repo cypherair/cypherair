@@ -2,6 +2,22 @@
 
 This document is the implementation planning record for active accepted security-review follow-ups. Use the `SR-FIX-*` IDs in future issues, commits, and pull requests. Closed items are moved to `docs/CODEX_SECURITY_REVIEW_CLOSED.md` with a new `SR-CLOSED-*` ID while retaining their former `SR-FIX-*` and legacy `CA-*` references.
 
+## Pending Triage (2026-06-14 Scan)
+
+The 2026-06-14 Codex scan recorded eleven newly detected findings, listed in `docs/CODEX_SECURITY_REVIEW_INDEX.md` as `SR-NEW-01`–`SR-NEW-11`. Per maintainer direction, triage (disposition) and fix planning for these are deferred until the in-progress whole-codebase review completes — no `SR-FIX-*` IDs, dispositions, or fix plans are assigned here yet.
+
+- `SR-NEW-01` — Provisioning sessions bypass immediate macOS relock (medium)
+- `SR-NEW-02` — Modify-expiry can suppress immediate relock on macOS (medium)
+- `SR-NEW-03` — Stale prompt mirror can swallow macOS away events (medium)
+- `SR-NEW-04` — Local reset no longer removes legacy LARight root secrets (medium)
+- `SR-NEW-05` — Legacy high-security mode can be silently downgraded (medium)
+- `SR-NEW-06` — Local reset leaves retired key metadata rows behind (medium)
+- `SR-NEW-07` — Legacy grace period reset weakens app relock timing (medium)
+- `SR-NEW-08` — Foreground resume can briefly reveal locked content (medium)
+- `SR-NEW-09` — Hidden recipients remain selected during encryption (medium)
+- `SR-NEW-10` — GPG version check uses non-portable macOS sort option (informational)
+- `SR-NEW-11` — Perl fixture scrubber allows path-based code injection (informational)
+
 ## Fix Queue
 
 ### SR-FIX-05: Untrusted certifications can mark contacts certified
