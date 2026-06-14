@@ -27,7 +27,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         // with no corresponding metadata identity (e.g. from interrupted/partial
         // generation). Do NOT gate the inventory on the presence of Secure Enclave
         // identities; that would hide orphan handles whenever no such identity
-        // exists. See docs/APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md (PR 4B).
+        // exists. See docs/SECURE_ENCLAVE_CUSTODY.md.
         let inventorySummary: SecureEnclaveCustodyHandleInventorySummary
         let inventoryFailureCategory: PGPKeyOperationFailureCategory?
         do {

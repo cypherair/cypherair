@@ -109,15 +109,11 @@ is a custody model, not a third OpenPGP profile. Since Phase 7D (issue #501,
 decision 3) the production capability-resolver policy exposes device-bound
 generation and the implemented private-operation classes, and the production
 container wires the generation service (hardware-guarded; the whole generation
-runs inside one operation-prompt session per §4). User exposure remains
-release-gated: hardware and GnuPG-interop evidence (Phase 8) and the release
-gate (Phase 9) must pass before any tag-first stable release ships it. Phase
-staging and per-operation contracts live in the
-[implementation roadmap](APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_ROADMAP.md),
-[implementation reference](APPLE_SECURE_ENCLAVE_CUSTODY_IMPLEMENTATION_REFERENCE.md),
-and [security requirements](APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY_REQUIREMENTS.md);
-POC history is archived in
-[archive/apple-secure-enclave-custody-poc](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_SECURITY.md).
+runs inside one operation-prompt session per §4). Phase 8 hardware and
+GnuPG-interop evidence is captured and the Phase 9 release gate is satisfied
+(2026-06-14); the families ship with the next tag-first stable release. The
+custody model, security contract, operation surface, and evidence record live in
+[Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md).
 The boundaries below are the durable security red lines this model must hold; code
 under `Sources/Security/SecureEnclaveCustody*` and `pgp-mobile` is bound by them.
 Mode switching is custody-aware: device-bound keys have no SE-wrapped software

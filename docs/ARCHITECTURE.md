@@ -136,25 +136,24 @@ generated-error normalization, progress bridging where applicable, and generated
 result mapping. `PasswordMessageService` remains intentionally service-only until
 product scope adds a dedicated route and plaintext-handling contract.
 
-### Future Apple Secure Enclave Custody Boundary
+### Apple Secure Enclave Custody Boundary
 
-The current Security layer uses Secure Enclave as a device-bound wrapper around
-complete OpenPGP secret certificate bytes. The proposed Apple Secure Enclave
-Custody mode is a future boundary change: Secure Enclave would own distinct
-P-256 signing and key-agreement private-key operations directly, while software
-keeps owning OpenPGP packet construction, KDF / AES Key Wrap processing,
-session-key handling, payload decryption, and signature verification. Current key
-metadata already models algorithm/profile and private-key custody as separate
-app-owned dimensions, with a capability resolver exposing only supported
+The software-custody Security layer uses Secure Enclave as a device-bound wrapper
+around complete OpenPGP secret certificate bytes. Apple Secure Enclave Custody is
+an implemented, production-exposed boundary (since issue #501 Phase 7D): Secure
+Enclave owns distinct P-256 signing and key-agreement private-key operations
+directly, while software keeps owning OpenPGP packet construction, KDF / AES Key
+Wrap processing, session-key handling, payload decryption, and signature
+verification. Key metadata models algorithm/profile and private-key custody as
+separate app-owned dimensions, with a capability resolver exposing only supported
 combinations.
 Sequoia 2.3's `Signer` and `Decryptor` traits are the Rust-side seam for this
-external private-key custody model. The implemented integration record lives in
-[APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN](APPLE_SECURE_ENCLAVE_CUSTODY_ARCHITECTURE_PLAN.md);
-the completed POC validation track is archived as historical context in
-[APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY_REFERENCE.md).
+external private-key custody model. The full custody reference (model, contract,
+operation surface, evidence) lives in
+[SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md).
 
 The boundary keeps fixed ownership across three layers, gated by the
-capability resolver (production-exposed since P7D; release-gated on Phases 8-9).
+capability resolver (production-exposed since P7D; Phase 9 release gate satisfied).
 
 - **Rust/OpenPGP seam.** A narrow callback delegates only the private scalar
   operation through the Sequoia `Signer`/`Decryptor` traits: signing receives a
@@ -184,7 +183,8 @@ capability resolver (production-exposed since P7D; release-gated on Phases 8-9).
   falls back to software secret-certificate material.
 
 Software custody is unchanged on every path: it unwraps and zeroizes the complete
-secret certificate as before. Product UI and production availability are deferred.
+secret certificate as before. Product UI and production availability are live since
+Phase 7D (capability-resolver-gated).
 
 ### Security Layer (`Sources/Security/`)
 

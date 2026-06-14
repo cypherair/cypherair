@@ -1,8 +1,8 @@
 import Foundation
 @testable import CypherAir
 
-/// A Secure Enclave custody Phase 8 evidence scenario (the rows of the evidence
-/// matrix in docs/APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md).
+/// A Secure Enclave custody evidence scenario (the rows of the evidence
+/// matrix in docs/SECURE_ENCLAVE_CUSTODY.md §8.1).
 enum SecureEnclaveCustodyEvidenceScenario: String, CaseIterable, Sendable {
     case handlePairGenerationPersistence
     case signing

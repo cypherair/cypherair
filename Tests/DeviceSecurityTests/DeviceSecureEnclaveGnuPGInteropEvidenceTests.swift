@@ -22,7 +22,7 @@ import XCTest
 /// Secure Enclave hardware + enrolled biometrics (one approval) AND a local `gpg`
 /// binary. GnuPG cannot run on iOS/iPadOS, so this automated lane is macOS-only;
 /// iPhone/iPad gpg interop follows the documented manual cross-device procedure in
-/// docs/APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md.
+/// docs/SECURE_ENCLAVE_CUSTODY.md §8.3.
 ///
 /// Run: xcodebuild test -scheme CypherAir \
 ///        -testPlan CypherAir-InteropEvidenceTests \
