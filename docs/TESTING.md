@@ -132,7 +132,7 @@ When adding, moving, or deleting Swift source files that should be visible to bu
 
 **CypherAir-DangerousDeviceTests.xctestplan** — Manual physical-device lane for destructive device evidence. Currently selects only the Secure Enclave custody Reset All Local Data cleanup proof, which enumerates and deletes all app-owned custody `kSecClassKey` rows for the current bundle. Do not run this plan against a device/install that may contain custody handles worth preserving.
 
-**CypherAir-InteropEvidenceTests.xctestplan** — Manual macOS-only lane for the real-Secure-Enclave↔GnuPG bidirectional interop evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`). Requires real Secure Enclave hardware, biometric approval, and a local `gpg` binary; it is out of default CI (GnuPG cannot run on iOS/iPadOS). See [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md) §4.
+**CypherAir-InteropEvidenceTests.xctestplan** — Manual macOS-only lane for the real-Secure-Enclave↔GnuPG bidirectional interop evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`). Requires real Secure Enclave hardware, biometric approval, and a local `gpg` binary; it is out of default CI (GnuPG cannot run on iOS/iPadOS). See [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.3.
 
 ProtectedData device-test isolation rules:
 
@@ -750,7 +750,7 @@ func test_modeSwitch_crashMidway_recoversOnLaunch() throws {
 
 ## 7. GnuPG Interoperability Tests
 
-These tests verify bidirectional compatibility with GnuPG for the software Profile A keys and the device-bound *compatible* (v4) Secure Enclave custody family. **Profile B (software v6) and device-bound *modern* (v6) output is expected to be rejected by GnuPG** — GnuPG does not support v6 keys, and v6 carries no GnuPG interop gate. Verify v6 rejection in POC test C3.8 and `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey`. Secure Enclave custody interop and hardware evidence are tracked in [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md).
+These tests verify bidirectional compatibility with GnuPG for the software Profile A keys and the device-bound *compatible* (v4) Secure Enclave custody family. **Profile B (software v6) and device-bound *modern* (v6) output is expected to be rejected by GnuPG** — GnuPG does not support v6 keys, and v6 carries no GnuPG interop gate. Verify v6 rejection in POC test C3.8 and `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey`. Secure Enclave custody interop and hardware evidence are recorded in [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.
 
 **Execution model:** GnuPG (`gpg`) runs on macOS only — it cannot run on iOS. These tests use one of two approaches:
 
@@ -769,7 +769,7 @@ These tests verify bidirectional compatibility with GnuPG for the software Profi
 
 **Regenerate fixtures** when: Sequoia version changes, algorithm selection changes, or GnuPG releases a major version.
 
-### 7.1 Secure Enclave custody interop lanes (Phase 8)
+### 7.1 Secure Enclave custody interop lanes
 
 Beyond the fixture approaches above, live lanes exercise the `gpg` binary directly (macOS only). They share `pgp-mobile/tests/common/gnupg.rs` and the `require_gpg_or_skip()` skip-forbidden gate: with `CYPHERAIR_REQUIRE_GPG=1` a missing gpg **fails** the lane instead of skipping silently.
 
@@ -779,7 +779,7 @@ Beyond the fixture approaches above, live lanes exercise the `gpg` binary direct
 
 The `rust-gnupg-interop` CI job (pr-checks + nightly) installs gpg, asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the SE-v4 and Profile A lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1`. The v6 lane needs no gpg and runs in the default `rust-full-tests` lane.
 
-Real-SE↔gpg bidirectional evidence is the operator-run macOS manual plan `CypherAir-InteropEvidenceTests` (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`), out of default CI; iPhone/iPad gpg interop is a documented manual cross-device procedure. See [Apple Secure Enclave Custody Evidence](APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md).
+Real-SE↔gpg bidirectional evidence is the operator-run macOS manual plan `CypherAir-InteropEvidenceTests` (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`), out of default CI; iPhone/iPad gpg interop is a documented manual cross-device procedure. See [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.3.
 
 ## 8. MIE Validation Tests
 

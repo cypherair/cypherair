@@ -60,7 +60,7 @@ The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`,
 
 ## 3. Encryption Profiles and Key Families
 
-The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody (issue #501, Phase 7): **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), and **Device-Bound Modern** (Secure Enclave custody, P-256 v6). Profile A/B remains the technical vocabulary for the two software configurations; the family vocabulary is the product-facing layer above it. Device-bound families ship in code but remain release-gated on the custody evidence and release phases (Section 3.4).
+The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody (issue #501, Phase 7): **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), and **Device-Bound Modern** (Secure Enclave custody, P-256 v6). Profile A/B remains the technical vocabulary for the two software configurations; the family vocabulary is the product-facing layer above it. Device-bound families are product-selectable in the shipped key-generation surface (issue #501 Phase 7D); the release gate is satisfied (Phase 9 closeout) and they ship with the next stable release (Section 3.4).
 
 ### 3.1 Profile A: Universal Compatible (Default)
 
@@ -104,9 +104,10 @@ Key creation treats algorithm/configuration and private-key custody as separate
 dimensions: `PGPKeyCapabilityResolver` exposes only combinations the platform,
 OpenPGP rules, Sequoia support, CypherAir implementation, and product policy
 support. Since Phase 7 the production policy exposes device-bound generation
-and the implemented private operations; **release remains gated** on the
-hardware/GnuPG-interop evidence phase and the release gate (issue #501,
-Phases 8–9) — no stable release ships the families before that evidence passes.
+and the implemented private operations. Phase 8 hardware/GnuPG-interop evidence
+is captured and the Phase 9 release gate is satisfied (2026-06-14); the families
+ship with the next tag-first stable release. See
+[SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md).
 
 This mode has a different product tradeoff from ordinary software-key custody:
 the private key is device-bound, not exportable, and cannot be migrated or
@@ -114,10 +115,8 @@ restored from a backup. Device loss, Secure Enclave/key-handle loss, or loss of
 the required biometric access may make the key permanently unusable. The shipped
 UI presents this as an explicit opt-in (commitment sheet before generation), a
 distinct custody display ("Key Type" with a device-bound explainer, custody
-badges), and no backup badge or backup flow for device-bound keys. Design record:
-[APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN](APPLE_SECURE_ENCLAVE_CUSTODY_PRODUCT_DESIGN.md),
-with historical POC evidence archived under
-[apple-secure-enclave-custody-poc](archive/apple-secure-enclave-custody-poc/APPLE_SECURE_ENCLAVE_CUSTODY.md).
+badges), and no backup badge or backup flow for device-bound keys. Full custody
+reference: [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md).
 
 ### 3.5 Security Hard Rules
 

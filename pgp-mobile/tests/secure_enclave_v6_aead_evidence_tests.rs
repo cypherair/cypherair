@@ -5,7 +5,7 @@
 //! the shared software-P256 stand-in. v6 carries no GnuPG interop gate (GnuPG does
 //! not support v6 keys); the documented gpg-rejection and the third-party-AEAD
 //! interop limitation are recorded in
-//! docs/APPLE_SECURE_ENCLAVE_CUSTODY_EVIDENCE.md. These tests need no gpg and run in
+//! docs/SECURE_ENCLAVE_CUSTODY.md §8. These tests need no gpg and run in
 //! the default lane.
 
 mod common;
