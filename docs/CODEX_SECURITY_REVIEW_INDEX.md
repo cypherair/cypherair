@@ -4,17 +4,21 @@ This index is the durable cross-reference for the 2026-06-01 Codex security revi
 
 Raw exported CSV files are retained under `docs/archive/codex-security-review/` for traceability. The curated Markdown records in this directory are authoritative for decisions, numbering, and follow-up planning.
 
+**2026-06-14 update:** The raw CSV exports were refreshed to the 2026-06-14 Codex scan (`codex-security-findings-2026-06-14T18-15-13.442Z.csv` and `codex-security-archived-findings-2026-06-14T18-15-17.938Z.csv`, replacing the 2026-06-01 exports). That scan re-confirmed the four still-open pending-fix findings (`SR-FIX-05`, `SR-FIX-17`, `SR-FIX-18`, `SR-FIX-21`), surfaced eleven newly detected findings recorded below as `SR-NEW-*` (pending triage — not yet assessed for disposition or fix planning), and added two newly auto-closed findings recorded as `SR-CLOSED-46` and `SR-CLOSED-47`.
+
 ## Identifier Policy
 
 - `SR-FIX-*` identifies findings that remain active accepted follow-up work.
 - When an `SR-FIX-*` item is closed, it receives the next `SR-CLOSED-*` ID and records the former `SR-FIX-*` ID for traceability.
 - Former `SR-FIX-*` IDs are not reused, so the active fix queue can have gaps.
 - `SR-CLOSED-*` identifies findings that were reviewed and closed as false positive, fixed, or intentionally not planned for a fix.
+- `SR-NEW-*` identifies findings imported from a later scan that have been recorded but not yet triaged. On triage, an `SR-NEW-*` item becomes the next `SR-FIX-*` (if accepted) or `SR-CLOSED-*` (if closed), recording the former `SR-NEW-*` ID for traceability.
 - Legacy `CA-*` IDs are kept only so older notes, links, and discussion transcripts can be reconciled with this record.
 
 ## Disposition Values
 
 - `pending-fix`: accepted as real or useful hardening and queued for later implementation.
+- `pending-triage`: recorded from a scan import but not yet reviewed; no disposition or fix decision has been made.
 - `closed-false-positive`: reviewed and found not to describe a real reachable CypherAir security issue.
 - `closed-wont-fix`: understood but intentionally not planned for implementation under the current product or threat model.
 - `closed-fixed`: addressed by current code or documentation.
@@ -27,6 +31,24 @@ Raw exported CSV files are retained under `docs/archive/codex-security-review/` 
 | SR-FIX-17 | CA-38 | low | selector-discovery | pending-fix | Selector discovery exposes unauthenticated User IDs | [finding](https://chatgpt.com/codex/cloud/security/findings/f6c9737226248191a651f043b8b6f146) | Confirmed low-impact OpenPGP validity display issue. Selector discovery exposes unauthenticated User IDs without distinguishing them in data or UI. |
 | SR-FIX-18 | CA-40 | low | build-integration | pending-fix | Production Xcode target compiles security test mocks | [finding](https://chatgpt.com/codex/cloud/security/findings/715f18cb62e48191abe332c39da5f2bd) | Interim guardrails added; still pending until tutorial moves to isolated real Protected Data / hardware-backed tutorial domains and target membership proves test-only mocks are absent from production builds. |
 | SR-FIX-21 | none | medium | security-review-docs | pending-fix | Public docs disclose unfixed security findings | [finding](https://chatgpt.com/codex/cloud/security/findings/90434042d17c819187a2df545d7848e4) | Confirmed documentation governance follow-up. Public security-review records disclose exploit-relevant details for unresolved findings and need a dedicated publication-policy fix. |
+
+## Newly Detected Findings (2026-06-14 — Pending Triage)
+
+These eleven findings were imported from the 2026-06-14 Codex scan and have **not** been triaged. No disposition or fix plan is assigned; the summaries below are factual restatements of the scanner descriptions only. On triage, each becomes the next `SR-FIX-*` (if accepted) or `SR-CLOSED-*` (if closed), recording the former `SR-NEW-*` ID.
+
+| Review ID | Severity | Area | Title | Source Link | Summary |
+| --- | --- | --- | --- | --- | --- |
+| SR-NEW-01 | medium | auth-lifecycle | Provisioning sessions bypass immediate macOS relock | [finding](https://chatgpt.com/codex/cloud/security/findings/125bb562d9b48191bbceb02c1c9e934a) | A key-provisioning operation-prompt session opens before the Secure Enclave prompt, so `AppLockController` can defer a genuine macOS away event during long key generation/import and leave the app unlocked with grace=0. |
+| SR-NEW-02 | medium | auth-lifecycle | Modify-expiry can suppress immediate relock on macOS | [finding](https://chatgpt.com/codex/cloud/security/findings/d72b05196e888191baeb4b742c6b1dc4) | The modify-expiry operation-prompt session spans the whole operation, so a macOS app-switch after authentication but before completion can suppress immediate relock under grace=0. |
+| SR-NEW-03 | medium | auth-lifecycle | Stale prompt mirror can swallow macOS away events | [finding](https://chatgpt.com/codex/cloud/security/findings/c1b8e2983ee881918e8d9f8bba910eb1) | A main-actor operation-prompt counter stays positive briefly after the prompt ends, so a macOS resign/return inside that gap can be consumed as prompt-related and bypass lock-on-away. |
+| SR-NEW-04 | medium | local-reset | Local reset no longer removes legacy LARight root secrets | [finding](https://chatgpt.com/codex/cloud/security/findings/67b9413549a08191a90b3f1cd8366edc) | `LocalDataResetService` no longer deletes legacy `LARightStore` root-secret rows, so reset can complete while a high-value root secret remains in local-authentication storage on upgraded installs. |
+| SR-NEW-05 | medium | app-auth | Legacy high-security mode can be silently downgraded | [finding](https://chatgpt.com/codex/cloud/security/findings/a8f749680bc481918621107051952f96) | Private-key-control bootstrap always seeds `authMode=.standard`, so upgrading from a legacy high-security state can silently weaken new-key protection to passcode fallback. |
+| SR-NEW-06 | medium | local-reset | Local reset leaves retired key metadata rows behind | [finding](https://chatgpt.com/codex/cloud/security/findings/42d4a486ba0c8191b45aaea7240f0ff0) | Reset and per-key deletion no longer clear retired `com.cypherair.v1.metadata.` Keychain rows, so legacy key metadata (public key + revocation cert) can survive a full local-data reset on upgraded installs. |
+| SR-NEW-07 | medium | app-auth | Legacy grace period reset weakens app relock timing | [finding](https://chatgpt.com/codex/cloud/security/findings/621d7464ee3881918feb6b6db61fce81) | Protected-settings creation seeds the default 180s grace period instead of preserving a stricter legacy value, so an upgrading user who chose immediate re-auth can be silently relaxed to 180s. |
+| SR-NEW-08 | medium | privacy-lifecycle | Foreground resume can briefly reveal locked content | [finding](https://chatgpt.com/codex/cloud/security/findings/29a69695a80c8191826be766e180208b) | On foreground resume the cosmetic cover is removed before the async lock task runs, so with an expired grace period content can be briefly visible before authentication is required. |
+| SR-NEW-09 | medium | encryption-ui | Hidden recipients remain selected during encryption | [finding](https://chatgpt.com/codex/cloud/security/findings/c288746885708191993660abfdb983b8) | A recipient hidden by a search term or tag filter stays in the selected set, so encryption can target a recipient no longer shown in the chooser. |
+| SR-NEW-10 | informational | ci-tests | GPG version check uses non-portable macOS sort option | [finding](https://chatgpt.com/codex/cloud/security/findings/b137c5719a8c8191891d132c46e722ab) | `scripts/assert_min_gpg_version.sh` uses GNU `sort -V`, unsupported by macOS BSD `sort`, so the required interop job fails before tests run (CI reliability). |
+| SR-NEW-11 | informational | test-fixtures | Perl fixture scrubber allows path-based code injection | [finding](https://chatgpt.com/codex/cloud/security/findings/f636a09289a481919377fd3f9d027990) | The GnuPG fixture scrubber builds a `perl -e` program with an interpolated `$SCRIPT_DIR`, allowing path-based Perl code injection when run from an attacker-influenced directory (developer-workstation/supply-chain). |
 
 ## Closed Findings
 
@@ -77,3 +99,5 @@ Raw exported CSV files are retained under `docs/archive/codex-security-review/` 
 | SR-CLOSED-43 | CA-29 | medium | decrypt-file-output | closed-fixed | Decrypted file can persist after cancelled/abandoned decrypt | [finding](https://chatgpt.com/codex/cloud/security/findings/a2a7f41bec048191b18443eaa38268e6) | Former SR-FIX-14. Closed as fixed. Decrypt route disappearance cancels/invalidates in-flight work, and late file decrypt outputs are cleaned instead of adopted. |
 | SR-CLOSED-44 | CA-33 | medium | decrypt-verify-ui | closed-fixed | Decrypt view can show stale signature for wrong content | [finding](https://chatgpt.com/codex/cloud/security/findings/ffff6cd467088191ab32b29040dd40ab) | Former SR-FIX-16. Closed as fixed. Decrypt text and file results now own separate signature verification state, and the view renders only the active result's verification. |
 | SR-CLOSED-45 | CA-42 | informational | decrypt-verify-ui | closed-fixed | Text input section is recreated on every edit | [finding](https://chatgpt.com/codex/cloud/security/findings/3f03eebb98448191b26dbb3af9dcafa0) | Former SR-FIX-20. Closed as fixed. Ordinary Decrypt/Verify text edits clear stale state without changing the text input section identity. |
+| SR-CLOSED-46 | none | medium | privacy-lifecycle | closed-fixed | Prompt settle window can bypass grace=0 re-auth | [finding](https://chatgpt.com/codex/cloud/security/archives/dd04b6c16bc48191acb683536c2fb633) | Auto-closed by the scanner (no longer detected) and imported from the 2026-06-14 archived export. Detected 2026-06-05 as a grace=0 settle-window regression; recorded as fixed pending the maintainer's post-review curation. |
+| SR-CLOSED-47 | none | medium | privacy-lifecycle | closed-fixed | Stale resume authentication can unlock after backgrounding | [finding](https://chatgpt.com/codex/cloud/security/archives/de7b1bdfb5b88191ad0fd84580d82d1a) | Auto-closed by the scanner (no longer detected) and imported from the 2026-06-14 archived export. Detected 2026-06-05 as a stale-resume backgrounding regression; recorded as fixed pending the maintainer's post-review curation. |

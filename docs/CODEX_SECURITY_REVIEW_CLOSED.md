@@ -489,3 +489,23 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Decision: Fixed. Ordinary Decrypt and Verify text edits now clear stale parse/result state without changing the text input section identity.
 - Resolution: Decrypt and Verify screen models separate result invalidation from explicit section refresh. Import, reset, and completion workflows can still refresh the section, while normal text edits preserve focus-friendly section identity. Regression tests assert ordinary ciphertext and signed-message edits leave `textInputSectionEpoch` unchanged.
 - Relevant paths: `Sources/App/Decrypt/DecryptScreenModel.swift`, `Sources/App/Sign/VerifyScreenModel.swift`, `Tests/ServiceTests/DecryptScreenModelTests.swift`, `Tests/ServiceTests/VerifyScreenModelTests.swift`
+
+### SR-CLOSED-46: Prompt settle window can bypass grace=0 re-auth
+
+- Legacy ID: `none`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/dd04b6c16bc48191acb683536c2fb633)
+- Decision: Auto-closed by the security scanner (no longer detected) and imported from the 2026-06-14 archived export. Detected 2026-06-05: a coalesced prompt/resign cycle within a 30s settle window could consume a real return as the prompt's paired activation, suppressing grace=0 content-clear / relock / re-authentication. Recorded as fixed pending the maintainer's post-review curation.
+- Relevant paths: `Sources/App/Common/PrivacyScreenLifecycleGate.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`, `Sources/Security/AuthenticationPromptCoordinator.swift`
+
+### SR-CLOSED-47: Stale resume authentication can unlock after backgrounding
+
+- Legacy ID: `none`
+- Severity: `medium`
+- Area: `privacy-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/archives/de7b1bdfb5b88191ad0fd84580d82d1a)
+- Decision: Auto-closed by the security scanner (no longer detected) and imported from the 2026-06-14 archived export. Detected 2026-06-05: an in-flight successful resume that completed after a background transition could clear the blur from the pre-background authentication instead of forcing a fresh resume check under an expired grace period. Recorded as fixed pending the maintainer's post-review curation.
+- Relevant paths: `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
