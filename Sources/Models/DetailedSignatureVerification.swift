@@ -99,8 +99,7 @@ extension SignatureVerification.VerificationState {
 extension MessageSignatureStatus {
     /// Graded status consistent with a verification state, for display models that still carry a
     /// `status` field alongside `verificationState`. The dual-field redundancy is tracked for a later
-    /// "collapse the signature state model" cleanup (see docs/LEGACY_CLEANUP.md "Follow-Ups Outside
-    /// This Roadmap").
+    /// "collapse the signature state model" cleanup.
     init(verificationState: SignatureVerification.VerificationState) {
         switch verificationState {
         case .verified:

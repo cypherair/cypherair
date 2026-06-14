@@ -1,8 +1,8 @@
 import Foundation
 import LocalAuthentication
 
-/// The single source of truth for the app lock state (P1 of the auth-lifecycle
-/// redesign — see docs/AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md §2/§3).
+/// The single source of truth for the app lock state (the auth-lifecycle
+/// redesign; shipped model in docs/SECURITY.md §4–§5).
 ///
 /// `AppLockController` replaces the previous, entangled model where "locked" was
 /// *inferred* from `AppSessionOrchestrator.isPrivacyScreenBlurred` plus a cluster
