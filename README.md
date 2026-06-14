@@ -212,7 +212,6 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
 | [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
 | [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
-| [COMPLIANCE_REMEDIATION_PLAN (Archive)](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md) | Archived remediation plan and close-out history for the licensing/distribution rollout |
 | [POC](docs/archive/POC.md) | Proof-of-concept test plan (archived) |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
@@ -237,4 +236,4 @@ Third-party components remain under their own licenses. See the bundled notices
 and repository documentation for third-party license details and distribution
 compliance materials.
 
-Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/APP_RELEASE_PROCESS.md](docs/APP_RELEASE_PROCESS.md) and [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md). The historical rollout record is preserved in [docs/archive/COMPLIANCE_REMEDIATION_PLAN.md](docs/archive/COMPLIANCE_REMEDIATION_PLAN.md).
+Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/APP_RELEASE_PROCESS.md](docs/APP_RELEASE_PROCESS.md) and [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
