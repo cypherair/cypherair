@@ -260,9 +260,7 @@ second interactive prompt.
 > modification authenticates **once** per action with a subsystem-B `LAContext` confined to that
 > action. The previously planned in-window (`LAAuthenticationView`) cutover and the macOS
 > passcode-fallback removals were **retired**: macOS 27 denies embedded LocalAuthentication UI to
-> non-Apple-signed processes (LA -1007). Design and migration history:
-> [AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md](AUTH_LIFECYCLE_REDESIGN_TARGET_DESIGN.md) and
-> [AUTH_LIFECYCLE_REDESIGN_ROADMAP.md](AUTH_LIFECYCLE_REDESIGN_ROADMAP.md).
+> non-Apple-signed processes (LA -1007).
 
 ### Standard Mode (default)
 
