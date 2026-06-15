@@ -31,11 +31,17 @@ CypherAir uses five durable documentation classes:
    - Historical context only
    - Archived documents must never outrank current code or active canonical docs
 
-Agent skill files under `.claude/skills/` are workflow-choreography
-instructions for AI coding tools, not documentation: they must defer to the
-canonical documents they cite and must never become the sole home of a
-contract, rule, or fact. Skill-file changes follow the same review checklist
-as documentation changes (Section 7).
+`CLAUDE.md` and `AGENTS.md` are separate entry docs for different agent
+runners. Keep shared project constraints semantically aligned when either
+changes, but allow wording and tool-specific workflow guidance to diverge.
+Root agent entry docs should avoid volatile phase, issue, PR, or next-release
+status claims unless the fact is a durable workflow rule; point to canonical
+current-state or release docs instead.
+Agent skill files under `.claude/skills/` are workflow-choreography instructions
+for Claude-facing sessions, not documentation: they must defer to the canonical
+documents they cite and must never become the sole home of a contract, rule, or
+fact. Skill-file changes follow the same review checklist as documentation
+changes (Section 7).
 
 ## 2. Required Metadata
 
@@ -86,6 +92,8 @@ Archived docs should include:
 ## 3. Path And Naming Rules
 
 - Root-level `README.md`, `CLAUDE.md`, and `AGENTS.md` remain entry docs.
+  `CLAUDE.md` and `AGENTS.md` should stay semantically aligned on shared project
+  constraints, but they are not required to be text-identical.
 - Top-level `docs/` is for active canonical docs, active proposal docs, and active review snapshots that still need regular human consumption.
 - Only archived material belongs in `docs/archive/`.
 - New filenames should describe the document itself, not a self-referential action on that document. Prefer names such as `..._REVIEW.md` or `..._AUDIT.md` over titles like “verification of X”.
@@ -109,13 +117,13 @@ Archived docs should include:
 Update the relevant docs in the same change when one of these surfaces changes:
 
 - **Build or linkage model changes**
-  - Update `README.md`, `CLAUDE.md`, `docs/PRD.md`, `docs/TDD.md`, and `docs/TESTING.md`
+  - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/PRD.md`, `docs/TDD.md`, and `docs/TESTING.md`
 
 - **Test-plan or workflow changes**
-  - Update `README.md`, `CLAUDE.md`, and `docs/TESTING.md`
+  - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, and `docs/TESTING.md`
 
 - **Release / compliance surface changes**
-  - Update `README.md`, `CLAUDE.md`, `docs/APP_RELEASE_PROCESS.md`, and `docs/XCFRAMEWORK_RELEASES.md`
+  - Update `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/APP_RELEASE_PROCESS.md`, and `docs/XCFRAMEWORK_RELEASES.md`
   - Update these docs when stable release workflow behavior, stable tag rules, `Source & Compliance` metadata, release asset names, relink-kit semantics, or immutability guarantees change
 
 - **Rust / FFI service ownership, downstream adoption, or durable contract changes**
