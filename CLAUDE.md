@@ -2,7 +2,7 @@
 
 Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
-This file is the single agent-facing source of truth; `AGENTS.md` defers here. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/DOCUMENTATION_GOVERNANCE.md; archived docs under `docs/archive/` are historical context only.
+This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/DOCUMENTATION_GOVERNANCE.md; archived docs under `docs/archive/` are historical context only.
 
 ## Tech Stack
 
