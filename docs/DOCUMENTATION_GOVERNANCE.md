@@ -34,6 +34,9 @@ CypherAir uses five durable documentation classes:
 `CLAUDE.md` and `AGENTS.md` are separate entry docs for different agent
 runners. Keep shared project constraints semantically aligned when either
 changes, but allow wording and tool-specific workflow guidance to diverge.
+Root agent entry docs should avoid volatile phase, issue, PR, or next-release
+status claims unless the fact is a durable workflow rule; point to canonical
+current-state or release docs instead.
 Agent skill files under `.claude/skills/` are workflow-choreography instructions
 for Claude-facing sessions, not documentation: they must defer to the canonical
 documents they cite and must never become the sole home of a contract, rule, or
