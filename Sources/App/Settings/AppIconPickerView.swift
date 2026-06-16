@@ -53,7 +53,7 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     case obsidian = "AppIconD"
     case violet = "AppIconE"
 
-    private static let primary: AppIconOption = .violet
+    private static let primary: AppIconOption = .glass
 
     var id: String { rawValue }
 
