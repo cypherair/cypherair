@@ -101,6 +101,24 @@ def head_commit_sha(repo_root: Path) -> str:
     return run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
 
 
+def xcode_cloud_context(env: dict[str, str] | None = None) -> dict[str, str] | None:
+    """Return the Xcode Cloud tag/commit identity when running in Xcode Cloud.
+
+    Xcode Cloud checks out a detached HEAD at the triggering tag, so the local
+    ``main`` branch identity check does not apply. When ``CI_XCODE_CLOUD`` is
+    set, callers verify the build's tag and commit identity from the Xcode Cloud
+    environment instead. Returns ``None`` for local/non-Xcode-Cloud runs so the
+    existing break-glass branch logic is preserved unchanged.
+    """
+    resolved_env = os.environ if env is None else env
+    if resolved_env.get("CI_XCODE_CLOUD", "").strip().upper() not in {"TRUE", "1", "YES"}:
+        return None
+    return {
+        "tag": resolved_env.get("CI_TAG", "").strip(),
+        "commit": resolved_env.get("CI_COMMIT", "").strip(),
+    }
+
+
 def remote_tag_commit_sha(repo_root: Path, release_tag: str, repository_url: str) -> str:
     try:
         completed = run_git(
@@ -333,11 +351,33 @@ def validate_candidate_release(
             "MARKETING_VERSION and CURRENT_PROJECT_VERSION are required for App Store candidate archives."
         )
 
-    branch = current_branch(repo_root)
-    if branch != "main":
-        raise CandidateValidationError(
-            f"App Store candidate archives are only allowed from the main branch. Current branch: {branch or 'unknown'}."
-        )
+    release_tag = derived_release_tag(marketing_version.strip(), build_number.strip())
+
+    xcode_cloud = xcode_cloud_context()
+    if xcode_cloud is not None:
+        # Xcode Cloud checks out a detached HEAD at the triggering tag, so the
+        # local "main branch" identity check does not apply. Verify tag/commit
+        # identity from the Xcode Cloud environment instead; the remote stable
+        # tag commit match below still anchors HEAD to the canonical tag.
+        if xcode_cloud["tag"] != release_tag:
+            raise CandidateValidationError(
+                "Xcode Cloud build tag does not match the App Store candidate tag.\n"
+                f"CI_TAG: {xcode_cloud['tag'] or 'unknown'}\n"
+                f"Candidate tag: {release_tag}"
+            )
+        ci_head_sha = head_commit_sha(repo_root)
+        if xcode_cloud["commit"] and xcode_cloud["commit"] != ci_head_sha:
+            raise CandidateValidationError(
+                "Xcode Cloud HEAD does not match CI_COMMIT.\n"
+                f"CI_COMMIT: {xcode_cloud['commit']}\n"
+                f"HEAD: {ci_head_sha}"
+            )
+    else:
+        branch = current_branch(repo_root)
+        if branch != "main":
+            raise CandidateValidationError(
+                f"App Store candidate archives are only allowed from the main branch. Current branch: {branch or 'unknown'}."
+            )
 
     dirty_lines = tracked_status_lines(repo_root)
     if dirty_lines:
@@ -347,7 +387,6 @@ def validate_candidate_release(
             f"Tracked changes:\n{details}"
         )
 
-    release_tag = derived_release_tag(marketing_version.strip(), build_number.strip())
     if not stable_release_exists(repository_full_name, release_tag):
         raise CandidateValidationError(
             f"Missing GitHub stable release {release_tag}. Publish the stable release before archiving an App Store candidate."

@@ -278,6 +278,80 @@ version = "1.4.0"
             self.assertEqual(payload["commitSHA"], metadata_commit)
             self.assertEqual(payload["stableReleaseTag"], "cypherair-v1.2.9-build4")
 
+    def test_source_compliance_phase_derives_from_xcode_cloud_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_root = Path(temp_dir_name)
+            srcroot = temp_root / "repo"
+            scripts_dir = srcroot / "scripts"
+            cargo_dir = srcroot / "pgp-mobile"
+            target_build_dir = temp_root / "build"
+            target_temp_dir = temp_root / "temp"
+            output_path = target_build_dir / "Resources/SourceComplianceInfo.json"
+            ci_commit = "0123456789abcdef0123456789abcdef01234567"
+            ci_tag = "cypherair-v1.2.9-build4"
+
+            scripts_dir.mkdir(parents=True, exist_ok=True)
+            cargo_dir.mkdir(parents=True, exist_ok=True)
+            target_temp_dir.mkdir(parents=True, exist_ok=True)
+            (scripts_dir / "generate_source_compliance_info.py").symlink_to(
+                REPO_ROOT / "scripts/generate_source_compliance_info.py"
+            )
+            (cargo_dir / "Cargo.lock").write_text(
+                """
+[[package]]
+name = "sequoia-openpgp"
+version = "2.2.0"
+
+[[package]]
+name = "buffered-reader"
+version = "1.4.0"
+""",
+                encoding="utf-8",
+            )
+
+            # No SourceComplianceOverrides.json metadata file is written: Xcode
+            # Cloud does not run the local scheme pre-action, so the values must
+            # come from the CI_* environment.
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SRCROOT": str(srcroot),
+                    "TARGET_BUILD_DIR": str(target_build_dir),
+                    "TARGET_TEMP_DIR": str(target_temp_dir),
+                    "UNLOCALIZED_RESOURCES_FOLDER_PATH": "Resources",
+                    "MARKETING_VERSION": "1.2.9",
+                    "CURRENT_PROJECT_VERSION": "4",
+                    "SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE": "YES",
+                    "CI_XCODE_CLOUD": "TRUE",
+                    "CI_TAG": ci_tag,
+                    "CI_COMMIT": ci_commit,
+                }
+            )
+            # Ensure no stray local override leaks in from the parent environment.
+            for stale_key in (
+                "SOURCE_COMPLIANCE_COMMIT_SHA",
+                "SOURCE_COMPLIANCE_STABLE_RELEASE_TAG",
+                "SOURCE_COMPLIANCE_STABLE_RELEASE_URL",
+            ):
+                env.pop(stale_key, None)
+
+            subprocess.run(
+                ["bash", str(REPO_ROOT / "scripts/generate_source_compliance_build_phase.sh")],
+                check=True,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["commitSHA"], ci_commit)
+            self.assertEqual(payload["stableReleaseTag"], ci_tag)
+            self.assertEqual(
+                payload["stableReleaseURL"],
+                f"https://github.com/cypherair/cypherair/releases/tag/{ci_tag}",
+            )
+            self.assertTrue(payload["isStableReleaseBuild"])
+
     def test_build_apple_arm64e_xcframework_manifest_backup_guard_is_static_valid(self) -> None:
         script_path = REPO_ROOT / "scripts/build_apple_arm64e_xcframework.sh"
 

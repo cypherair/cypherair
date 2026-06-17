@@ -1,0 +1,158 @@
+#!/bin/bash
+# Xcode Cloud post-clone hook for CypherAir.
+#
+# Runs after Xcode Cloud clones the primary repository, before xcodebuild. Two
+# release workflows share this script and branch on $CI_WORKFLOW:
+#
+#   "PgpMobile XCFramework" (WF1): build the arm64e PgpMobile.xcframework from
+#       source so the app build action links the freshly built dependency, and
+#       gate the build on the Rust dependency audit + arm64e freshness checks.
+#
+#   "CypherAir Release"    (WF2): download the exact attested xcframework that
+#       WF1 published to the (draft) stable GitHub Release, verify its checksum,
+#       extract it for linking, and run the App Store candidate gate.
+#
+# The arm64e stage1 toolchain pin is owned by build_apple_arm64e_xcframework.sh
+# (DEFAULT_ARM64E_STAGE1_RELEASE_TAG) and docs/ARM64E_STATUS.md; this script does
+# not re-pin it. GitHub tokens are intentionally kept out of the Rust/xcframework
+# build subprocesses (the build script unsets them).
+
+set -euo pipefail
+
+XCFRAMEWORK_WORKFLOW_NAME="${XCFRAMEWORK_WORKFLOW_NAME:-PgpMobile XCFramework}"
+RELEASE_WORKFLOW_NAME="${RELEASE_WORKFLOW_NAME:-CypherAir Release}"
+GITHUB_REPOSITORY_SLUG="${GITHUB_REPOSITORY_SLUG:-cypherair/cypherair}"
+
+XCFRAMEWORK_ZIP="PgpMobile.xcframework.zip"
+XCFRAMEWORK_CHECKSUM="PgpMobile.xcframework.sha256"
+ARM64E_MANIFEST="PgpMobile.arm64e-build-manifest.json"
+
+log() { echo "[ci_post_clone] $*"; }
+fail() { echo "[ci_post_clone] error: $*" >&2; exit 1; }
+
+# Keep stdout active so Xcode Cloud's ~30 minute inactivity timeout does not
+# cancel the long, deliberately uncached Rust build.
+HEARTBEAT_PID=""
+start_heartbeat() {
+    ( while true; do sleep 240; echo "[ci_post_clone] heartbeat $(date -u +%Y-%m-%dT%H:%M:%SZ)"; done ) &
+    HEARTBEAT_PID=$!
+}
+stop_heartbeat() {
+    if [ -n "$HEARTBEAT_PID" ]; then
+        kill "$HEARTBEAT_PID" 2>/dev/null || true
+        HEARTBEAT_PID=""
+    fi
+}
+trap stop_heartbeat EXIT INT TERM
+
+require_repo_path() {
+    [ -n "${CI_PRIMARY_REPOSITORY_PATH:-}" ] || fail "CI_PRIMARY_REPOSITORY_PATH is not set"
+    cd "$CI_PRIMARY_REPOSITORY_PATH"
+}
+
+ensure_homebrew_formula() {
+    # Xcode Cloud forbids sudo; Homebrew is available and installs to a
+    # user-writable prefix.
+    local formula="$1"
+    if ! command -v "$formula" >/dev/null 2>&1; then
+        log "Installing $formula via Homebrew"
+        brew install "$formula"
+    fi
+}
+
+ensure_rust_stable() {
+    if ! command -v rustup >/dev/null 2>&1; then
+        log "Installing rustup (stable, minimal)"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable
+    fi
+    # shellcheck disable=SC1090
+    [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+    rustup toolchain install stable --profile minimal
+    rustup component add rustfmt --toolchain stable
+}
+
+project_setting() {
+    # Read a resolved Xcode build setting (MARKETING_VERSION / CURRENT_PROJECT_VERSION).
+    local key="$1"
+    xcodebuild -showBuildSettings -scheme CypherAir -project CypherAir.xcodeproj 2>/dev/null \
+        | sed -n "s/^[[:space:]]*${key} = //p" | head -n1
+}
+
+build_xcframework_workflow() {
+    log "WF1: building arm64e PgpMobile.xcframework from source"
+    ensure_homebrew_formula zstd
+    ensure_rust_stable
+
+    log "WF1: Rust dependency audit gate"
+    cargo +stable install cargo-audit --version 0.22.1 --locked
+    cargo audit --file pgp-mobile/Cargo.lock --deny warnings
+
+    log "WF1: arm64e dependency-chain freshness gate"
+    python3 scripts/arm64e_release_metadata.py \
+        --cargo-lock pgp-mobile/Cargo.lock \
+        --output arm64e-dependency-chain.json \
+        --freshness-level "${ARM64E_DEPENDENCY_FRESHNESS_LEVEL:-error}"
+
+    log "WF1: building xcframework (force-download pinned stage1, no Cargo cache)"
+    ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
+
+    [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
+    [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
+    log "WF1: xcframework build complete"
+}
+
+release_consumer_workflow() {
+    log "WF2: consuming the published xcframework for the App Store archive"
+    [ -n "${CI_TAG:-}" ] || fail "WF2 must be started for a stable tag (CI_TAG is empty)"
+    ensure_homebrew_formula gh
+
+    [ -n "${GITHUB_PAT:-}" ] || fail "GITHUB_PAT secret is required to read the stable release"
+    log "WF2: authenticating gh"
+    printf '%s' "$GITHUB_PAT" | gh auth login --with-token
+
+    log "WF2: downloading attested xcframework assets for $CI_TAG"
+    gh release download "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" \
+        --pattern "$XCFRAMEWORK_ZIP" \
+        --pattern "$XCFRAMEWORK_CHECKSUM" \
+        --pattern "$ARM64E_MANIFEST"
+
+    log "WF2: verifying checksum"
+    shasum -a 256 -c "$XCFRAMEWORK_CHECKSUM"
+
+    log "WF2: extracting xcframework"
+    rm -rf PgpMobile.xcframework
+    ditto -x -k "$XCFRAMEWORK_ZIP" .
+    [ -f "PgpMobile.xcframework/Info.plist" ] || fail "extracted xcframework is missing Info.plist"
+
+    local marketing_version build_number
+    marketing_version="$(project_setting MARKETING_VERSION)"
+    build_number="$(project_setting CURRENT_PROJECT_VERSION)"
+
+    log "WF2: App Store candidate gate (tag/commit/manifest)"
+    SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE=YES \
+    SOURCE_COMPLIANCE_REQUIRE_ARM64E_RELEASE_MANIFEST=YES \
+    python3 scripts/validate_app_store_candidate_release.py \
+        --repo-root "$PWD" \
+        --marketing-version "$marketing_version" \
+        --build-number "$build_number" \
+        --github-repository "$GITHUB_REPOSITORY_SLUG" \
+        --require-stable-release YES
+    log "WF2: candidate gate passed"
+}
+
+main() {
+    require_repo_path
+    start_heartbeat
+    log "workflow=${CI_WORKFLOW:-<unset>} tag=${CI_TAG:-<none>} commit=${CI_COMMIT:-<none>}"
+
+    case "${CI_WORKFLOW:-}" in
+        "$XCFRAMEWORK_WORKFLOW_NAME") build_xcframework_workflow ;;
+        "$RELEASE_WORKFLOW_NAME") release_consumer_workflow ;;
+        *)
+            log "no release-specific post-clone work for workflow '${CI_WORKFLOW:-<unset>}'"
+            ;;
+    esac
+}
+
+main "$@"
