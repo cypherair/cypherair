@@ -275,5 +275,95 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             self.assertFalse(output_path.exists())
 
 
+    def test_xcode_cloud_detached_head_matching_tag_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            release_tag = create_annotated_stable_tag(repo_root)
+            run(["git", "checkout", release_tag], cwd=repo_root)
+            ci_env = {
+                "CI_XCODE_CLOUD": "TRUE",
+                "CI_TAG": release_tag,
+                "CI_COMMIT": head_sha(repo_root),
+            }
+            with mock.patch.dict(module.os.environ, ci_env):
+                with mock.patch.object(module, "stable_release_exists", return_value=True):
+                    with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                        validated_tag = module.validate_candidate_release(
+                            repo_root=repo_root,
+                            marketing_version="1.2.9",
+                            build_number="3",
+                            repository_full_name="cypherair/cypherair",
+                            require_stable_release=True,
+                            require_arm64e_release_manifest=False,
+                        )
+            self.assertEqual(validated_tag, release_tag)
+
+    def test_xcode_cloud_tag_mismatch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            release_tag = create_annotated_stable_tag(repo_root)
+            run(["git", "checkout", release_tag], cwd=repo_root)
+            ci_env = {
+                "CI_XCODE_CLOUD": "TRUE",
+                "CI_TAG": "cypherair-v1.2.9-build999",
+                "CI_COMMIT": head_sha(repo_root),
+            }
+            with mock.patch.dict(module.os.environ, ci_env):
+                with mock.patch.object(module, "stable_release_exists", return_value=True):
+                    with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                        with self.assertRaisesRegex(
+                            module.CandidateValidationError,
+                            "does not match the App Store candidate tag",
+                        ):
+                            module.validate_candidate_release(
+                                repo_root=repo_root,
+                                marketing_version="1.2.9",
+                                build_number="3",
+                                repository_full_name="cypherair/cypherair",
+                                require_stable_release=True,
+                                require_arm64e_release_manifest=False,
+                            )
+
+    def test_xcode_cloud_commit_mismatch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            release_tag = create_annotated_stable_tag(repo_root)
+            run(["git", "checkout", release_tag], cwd=repo_root)
+            ci_env = {
+                "CI_XCODE_CLOUD": "TRUE",
+                "CI_TAG": release_tag,
+                "CI_COMMIT": "0" * 40,
+            }
+            with mock.patch.dict(module.os.environ, ci_env):
+                with self.assertRaisesRegex(
+                    module.CandidateValidationError,
+                    "HEAD does not match CI_COMMIT",
+                ):
+                    module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                        require_arm64e_release_manifest=False,
+                    )
+
+    def test_local_detached_head_without_xcode_cloud_still_requires_main(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, _ = init_repo_with_remote(Path(temp_dir_name))
+            release_tag = create_annotated_stable_tag(repo_root)
+            run(["git", "checkout", release_tag], cwd=repo_root)
+            with mock.patch.dict(module.os.environ, {"CI_XCODE_CLOUD": ""}):
+                with self.assertRaisesRegex(module.CandidateValidationError, "main branch"):
+                    module.validate_candidate_release(
+                        repo_root=repo_root,
+                        marketing_version="1.2.9",
+                        build_number="3",
+                        repository_full_name="cypherair/cypherair",
+                        require_stable_release=True,
+                        require_arm64e_release_manifest=False,
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()

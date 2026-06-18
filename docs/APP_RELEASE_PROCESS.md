@@ -8,6 +8,7 @@
 > Update triggers: stable tag rules, stable asset names, arm64e stage1 pin changes, `Source & Compliance` archive metadata, App Store candidate gating, or release-ordering changes.
 > Scope: App build release flow and the exact stable GitHub release contract used by the app. `XCFramework` channel discovery and verification remain in [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md).
 > Agent choreography: `.claude/skills/release-stable` sequences this flow for agent sessions; this document stays canonical for every rule it cites.
+> Migration in progress: an Xcode Cloud-first execution of this same tag-first contract is being introduced — see [XCODE_CLOUD_RELEASE.md](XCODE_CLOUD_RELEASE.md). Until that cutover completes, the GitHub Actions `stable-build-release.yml` path described here remains the active release path.
 
 ## 1. Release Modes
 

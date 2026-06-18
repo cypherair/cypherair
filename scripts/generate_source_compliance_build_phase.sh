@@ -13,6 +13,9 @@ OUTPUT_PATH="${OUTPUT_PATH:-${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_P
 METADATA_FILE="${METADATA_FILE:-${TARGET_TEMP_DIR}/SourceComplianceOverrides.json}"
 COMMIT_SHA="${SOURCE_COMPLIANCE_COMMIT_SHA:-}"
 REQUIRE_STABLE_RELEASE="${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}"
+REPOSITORY_URL="https://github.com/cypherair/cypherair"
+STABLE_RELEASE_TAG="${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}"
+STABLE_RELEASE_URL="${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}"
 
 is_commit_sha() {
     printf '%s\n' "$1" | grep -Eq '^[0-9a-fA-F]{40}$'
@@ -60,6 +63,26 @@ fallback_git_commit_sha() {
 
 mkdir -p "$(dirname "$OUTPUT_PATH")"
 
+# Xcode Cloud checks out a detached HEAD at the triggering tag and does not run
+# the local scheme pre-action that writes SourceComplianceOverrides.json. When
+# building in Xcode Cloud, derive the exact commit/tag/release URL from the
+# Xcode Cloud environment so the in-app Source & Compliance page binds to the
+# stable release. Explicit SOURCE_COMPLIANCE_* values still win, and
+# non-Xcode-Cloud builds are unaffected.
+case "${CI_XCODE_CLOUD:-}" in
+    TRUE|true|1|YES|yes)
+        if ! is_commit_sha "$COMMIT_SHA" && is_commit_sha "${CI_COMMIT:-}"; then
+            COMMIT_SHA="${CI_COMMIT}"
+        fi
+        if [ -z "$STABLE_RELEASE_TAG" ] && [ -n "${CI_TAG:-}" ]; then
+            STABLE_RELEASE_TAG="${CI_TAG}"
+        fi
+        if [ -z "$STABLE_RELEASE_URL" ] && [ -n "$STABLE_RELEASE_TAG" ]; then
+            STABLE_RELEASE_URL="${REPOSITORY_URL}/releases/tag/${STABLE_RELEASE_TAG}"
+        fi
+        ;;
+esac
+
 case "$REQUIRE_STABLE_RELEASE" in
     YES|yes|TRUE|true|1)
         if ! is_commit_sha "$COMMIT_SHA"; then
@@ -80,9 +103,9 @@ set -- \
     --marketing-version "${MARKETING_VERSION}" \
     --build-number "${CURRENT_PROJECT_VERSION}" \
     --commit-sha "${COMMIT_SHA}" \
-    --repository-url "https://github.com/cypherair/cypherair" \
-    --stable-release-tag "${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}" \
-    --stable-release-url "${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}" \
+    --repository-url "${REPOSITORY_URL}" \
+    --stable-release-tag "${STABLE_RELEASE_TAG}" \
+    --stable-release-url "${STABLE_RELEASE_URL}" \
     --require-stable-release "${REQUIRE_STABLE_RELEASE}" \
     --output "$OUTPUT_PATH"
 
