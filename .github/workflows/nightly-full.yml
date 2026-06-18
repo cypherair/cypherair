@@ -30,7 +30,7 @@ jobs:
           cargo +stable --version
       - name: Audit Rust dependencies
         run: |
-          cargo +stable install cargo-audit --version 0.22.1 --locked
+          cargo +stable install cargo-audit --version 0.22.2 --locked
           cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
   rust-full-tests:
