@@ -339,7 +339,7 @@ Recommended path:
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 \
     ./build-xcframework.sh --release
 ```
 
@@ -349,10 +349,11 @@ The sync script normalizes generated Swift bindings, C headers, and modulemaps b
 
 For local packaging, prefer the same force-download mode used by GitHub Actions.
 It downloads the pinned `cypherair/rust` `rust-arm64e-stage1-stable196-*`
-prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, verifies the packaged
-checksum, validates the stable196 prebuilt-std manifest, and avoids depending on
-stale or incomplete local `stage1-arm64e-patch` rustup state. The downloader
-rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; when a new Rust fork stage1
+prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, selects the
+`rust-stage1-for-arm64e-<host-triple>.*` asset set for the current build host,
+verifies the packaged checksum, validates the stable196 prebuilt-std manifest,
+and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup
+state. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; when a new Rust fork stage1
 prerelease becomes the official input, follow the re-pin rule in
 `docs/ARM64E_STATUS.md`, which enumerates every pinned location (agent
 checklist: `.claude/skills/repin-arm64e`).

@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PINNED_STAGE1_RELEASE_TAG = "rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
+PINNED_STAGE1_RELEASE_TAG = "rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
 
 
 def read(relative_path: str) -> str:
@@ -175,6 +175,10 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
         text = read("scripts/build_apple_arm64e_xcframework.sh")
 
         self.assertIn(f'DEFAULT_ARM64E_STAGE1_RELEASE_TAG="{PINNED_STAGE1_RELEASE_TAG}"', text)
+        self.assertIn("rust-stage1-for-arm64e-*.json", text)
+        self.assertIn("asset.purpose", text)
+        self.assertIn("hostTriple", text)
+        self.assertIn("includedHostStdTarget", text)
         self.assertIn("'latest' is not allowed", text)
         self.assertNotIn("latest_stage1_release_tag", text)
         self.assertNotIn("releases?per_page", text)
@@ -185,8 +189,12 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
 
         self.assertIn("unset GH_TOKEN GITHUB_TOKEN", text)
         self.assertIn(f'DEFAULT_ARM64E_STAGE1_RELEASE_TAG="{PINNED_STAGE1_RELEASE_TAG}"', text)
+        self.assertIn('STAGE1_ASSET_PREFIX="${STAGE1_ASSET_PREFIX:-rust-stage1-for-arm64e}"', text)
+        self.assertIn("host_triple=\"$(rustc -vV", text)
+        self.assertIn('stage1_asset_base="${STAGE1_ASSET_PREFIX}-${host_triple}"', text)
         self.assertIn("'latest' is not allowed", text)
         self.assertIn("/releases/download/${tag}", text)
+        self.assertNotIn("rust-stage1-arm64e-apple-darwin", text)
         self.assertNotIn("GH_TOKEN=", text)
         self.assertNotIn("GITHUB_TOKEN=", text)
         self.assertNotIn("gh release list", text)

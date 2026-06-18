@@ -7,14 +7,10 @@ unset GH_TOKEN GITHUB_TOKEN
 
 OUTPUT_ROOT="${1:?usage: download_arm64e_stage1_toolchain.sh <output-root>}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
 ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
-EXPECTED_STAGE1_ASSETS=(
-    "rust-stage1-arm64e-apple-darwin.tar.zst"
-    "rust-stage1-arm64e-apple-darwin.sha256"
-    "rust-stage1-arm64e-apple-darwin.json"
-)
+STAGE1_ASSET_PREFIX="${STAGE1_ASSET_PREFIX:-rust-stage1-for-arm64e}"
 
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -37,6 +33,7 @@ require_command curl
 require_command shasum
 require_command zstd
 require_command bsdtar
+require_command rustc
 
 tag="$ARM64E_STAGE1_RELEASE_TAG"
 if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
@@ -48,9 +45,20 @@ fi
 download_dir="$OUTPUT_ROOT/download"
 toolchain_root="$OUTPUT_ROOT/toolchain"
 stage1_dir="$toolchain_root/stage1-arm64e-patch"
-stage1_manifest="$download_dir/rust-stage1-arm64e-apple-darwin.json"
+host_triple="$(rustc -vV | sed -n 's/^host: //p')"
+if [ -z "$host_triple" ]; then
+    echo "error: unable to determine host triple from rustc -vV" >&2
+    exit 1
+fi
+stage1_asset_base="${STAGE1_ASSET_PREFIX}-${host_triple}"
+EXPECTED_STAGE1_ASSETS=(
+    "${stage1_asset_base}.tar.zst"
+    "${stage1_asset_base}.sha256"
+    "${stage1_asset_base}.json"
+)
+stage1_manifest="$download_dir/${stage1_asset_base}.json"
 
-echo "Downloading Rust arm64e stage1 prerelease ${tag}..."
+echo "Downloading Rust arm64e stage1 prerelease ${tag} for host ${host_triple}..."
 rm -rf "$OUTPUT_ROOT"
 mkdir -p "$download_dir" "$toolchain_root"
 
@@ -58,8 +66,8 @@ download_stage1_release
 
 (
     cd "$download_dir"
-    shasum -a 256 -c rust-stage1-arm64e-apple-darwin.sha256
-    zstd -d -c rust-stage1-arm64e-apple-darwin.tar.zst | bsdtar -xf - -C "$toolchain_root"
+    shasum -a 256 -c "${stage1_asset_base}.sha256"
+    zstd -d -c "${stage1_asset_base}.tar.zst" | bsdtar -xf - -C "$toolchain_root"
 )
 
 if [ ! -x "$stage1_dir/bin/rustc" ]; then
