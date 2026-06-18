@@ -522,12 +522,12 @@
     ]
   },
   {
-    "id": "getrandom@0.4.2",
+    "id": "getrandom@0.4.3",
     "displayName": "getrandom",
-    "version": "0.4.2",
+    "version": "0.4.3",
     "repositoryURL": "https://github.com/rust-random/getrandom",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "getrandom-0.4.2.txt",
+    "licenseFileResourceName": "getrandom-0.4.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1238,12 +1238,12 @@
     ]
   },
   {
-    "id": "smawk@0.3.2",
+    "id": "smawk@0.3.3",
     "displayName": "smawk",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "repositoryURL": "https://github.com/mgeisler/smawk",
     "licenseName": "MIT",
-    "licenseFileResourceName": "smawk-0.3.2.txt",
+    "licenseFileResourceName": "smawk-0.3.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1444,101 +1444,101 @@
     ]
   },
   {
-    "id": "uniffi@0.31.1",
+    "id": "uniffi@0.31.2",
     "displayName": "uniffi",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi-0.31.1.txt",
+    "licenseFileResourceName": "uniffi-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_bindgen@0.31.1",
+    "id": "uniffi_bindgen@0.31.2",
     "displayName": "uniffi_bindgen",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_bindgen-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_bindgen-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_build@0.31.1",
+    "id": "uniffi_build@0.31.2",
     "displayName": "uniffi_build",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_build-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_build-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_core@0.31.1",
+    "id": "uniffi_core@0.31.2",
     "displayName": "uniffi_core",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_core-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_core-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_meta@0.31.1",
+    "id": "uniffi_meta@0.31.2",
     "displayName": "uniffi_meta",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_meta-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_meta-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_pipeline@0.31.1",
+    "id": "uniffi_pipeline@0.31.2",
     "displayName": "uniffi_pipeline",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_pipeline-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_pipeline-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {
-    "id": "uniffi_udl@0.31.1",
+    "id": "uniffi_udl@0.31.2",
     "displayName": "uniffi_udl",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "repositoryURL": "https://github.com/mozilla/uniffi-rs",
     "licenseName": "MPL-2.0",
-    "licenseFileResourceName": "uniffi_udl-0.31.1.txt",
+    "licenseFileResourceName": "uniffi_udl-0.31.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "repositoryArchive",
     "licenseSourceItems": [
-      "v0.31.1:LICENSE"
+      "v0.31.2:LICENSE"
     ]
   },
   {

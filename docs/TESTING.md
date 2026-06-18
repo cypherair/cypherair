@@ -40,12 +40,12 @@ Run the RustSec audit whenever `pgp-mobile/Cargo.lock` changes and before
 formal release validation:
 
 ```bash
-cargo +stable install cargo-audit --version 0.22.1 --locked
+cargo +stable install cargo-audit --version 0.22.2 --locked
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
 The GitHub PR, nightly, and edge XCFramework workflows pin `cargo-audit` to
-`0.22.1` in an independent `rust-dependency-audit` job, and the Xcode Cloud
+`0.22.2` in an independent `rust-dependency-audit` job, and the Xcode Cloud
 `PgpMobile XCFramework` workflow runs the same `cargo audit --deny warnings`
 gate in `ci_post_clone`. A failed audit makes the workflow/check fail. PR and
 nightly asset generation can still run for diagnostic signal, but release

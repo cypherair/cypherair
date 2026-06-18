@@ -85,7 +85,7 @@ build_xcframework_workflow() {
     ensure_rust_stable
 
     log "WF1: Rust dependency audit gate"
-    cargo +stable install cargo-audit --version 0.22.1 --locked
+    cargo +stable install cargo-audit --version 0.22.2 --locked
     cargo audit --file pgp-mobile/Cargo.lock --deny warnings
 
     log "WF1: arm64e dependency-chain freshness gate"

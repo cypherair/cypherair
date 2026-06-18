@@ -91,9 +91,9 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
                             "isDirectDependency": False,
                         },
                         {
-                            "id": "uniffi@0.31.1",
+                            "id": "uniffi@0.31.2",
                             "displayName": "uniffi",
-                            "version": "0.31.1",
+                            "version": "0.31.2",
                             "licenseName": "MPL-2.0",
                             "kind": "thirdParty",
                             "isDirectDependency": True,
@@ -148,7 +148,7 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
             self.assertEqual(values_by_title["Sequoia OpenPGP"], "2.2.0 / LGPL-2.0-or-later")
             self.assertEqual(values_by_title["OpenSSL Rust Bindings"], "0.10.77 / Apache-2.0")
             self.assertEqual(values_by_title["OpenSSL Source"], "300.6.0+3.6.2 / MIT/Apache-2.0")
-            self.assertEqual(values_by_title["UniFFI"], "0.31.1 / MPL-2.0")
+            self.assertEqual(values_by_title["UniFFI"], "0.31.2 / MPL-2.0")
             self.assertIn("Apple Swift", module.toolchain_summary(swift_version="", rust_version=""))
             self.assertNotIn("transitive-only", values_by_title)
 
