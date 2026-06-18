@@ -50,7 +50,7 @@
     stable commands such as `cargo +stable`
   - Rust fork repository: `cypherair/rust`
   - Rust stage1 carry branch: `carry/cypherair-arm64e-toolchain-stable-1.96`
-  - current Rust stage1 carry head: `ecc85bfa110`
+  - current Rust stage1 carry head: `abeb8459f2`
   - Rust stable base release: `1.96.0`
   - Rust stable base commit: `ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`
   - the former `carry/cypherair-arm64e-toolchain` line and its
@@ -66,7 +66,7 @@
     `std`/`proc_macro` plus prebuilt std for arm64e Darwin, iOS, tvOS, and
     visionOS to be usable for app packaging
   - local app-side full packaging should use
-    `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 ./build-xcframework.sh --release`
+    `ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 ./build-xcframework.sh --release`
     so it consumes the same pinned `cypherair/rust` stage1 prerelease path as
     GitHub Actions instead of implicitly trusting local rustup-linked toolchain
     state
@@ -83,16 +83,20 @@
     using stable Cargo with prebuilt std payloads; the official app path does
     not use nightly Cargo or `-Zbuild-std`
   - current pinned stage1 prerelease:
-    `rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1`
+    `rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1`
   - current pinned stage1 source ref:
     `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96`
   - current pinned stage1 source commit:
-    `ecc85bfa110f4232246be6ff27c1e9c20e5539d9`
-  - current pinned stage1 workflow run: `26679152716`
+    `abeb8459f2b459704c1d698c01d8b8c0df8ffffd`
+  - current pinned stage1 workflow run: `27765229620`
   - current pinned stage1 manifest declares `stableBaseRelease: "1.96.0"`,
     `stableBaseCommit: "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96"`,
-    `requiresBuildStd: false`, includes host `std`/`proc_macro`, and includes
-    Apple arm64e std targets for Darwin, iOS, tvOS, and visionOS
+    `requiresBuildStd: false`, `asset.purpose: "rust-stage1-for-arm64e"`,
+    a host-specific `hostTriple`/`includedHostStdTarget`, and Apple arm64e std
+    targets for Darwin, iOS, tvOS, and visionOS. The prerelease publishes
+    separate `rust-stage1-for-arm64e-aarch64-apple-darwin.*` and
+    `rust-stage1-for-arm64e-x86_64-apple-darwin.*` asset sets; app-side
+    downloaders must select the asset matching the build host.
   - when publishing a new official stage1 prerelease, update every pinned-tag
     location in the same PR: the GitHub Actions workflow env values, the script
     default, the workflow hardening tests, this file (the pin lines above and
@@ -131,8 +135,8 @@
   - `arm64e-stage1-prerelease.yml` validates the stable196 stage1 carry branch,
     builds the patched stage1 compiler, host `std`/`proc_macro`, and arm64e
     Apple std payloads, smoke-tests the packaged toolchain with
-    `cargo +stable`, and publishes a `rust-arm64e-stage1-stable196-*`
-    prerelease asset for app CI
+    `cargo +stable`, and publishes host-specific
+    `rust-stage1-for-arm64e-<host-triple>.*` prerelease assets for app CI
   - `arm64e-upstream-sync-prep.yml` performs manual upstream-sync dry-runs and
     can open a refresh PR without force-pushing the integration branch
 - `cypherair/cypherair`:

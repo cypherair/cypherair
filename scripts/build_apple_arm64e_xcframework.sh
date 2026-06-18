@@ -21,7 +21,7 @@ STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
 ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
@@ -116,11 +116,17 @@ download_stage1_toolchain() {
     ARM64E_STAGE1_RELEASE_TAG="$tag" download_stage1_release_assets
 
     ARM64E_STAGE1_DIR="$STAGE1_CACHE_DIR/toolchain/stage1-arm64e-patch"
-    ARM64E_RUST_STAGE1_MANIFEST="$STAGE1_CACHE_DIR/download/rust-stage1-arm64e-apple-darwin.json"
+    ARM64E_RUST_STAGE1_MANIFEST="$(find "$STAGE1_CACHE_DIR/download" -maxdepth 1 -name 'rust-stage1-for-arm64e-*.json' -print -quit)"
+    if [ -z "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
+        echo "error: downloaded arm64e stage1 manifest is missing from $STAGE1_CACHE_DIR/download" >&2
+        exit 1
+    fi
     export ARM64E_RUST_STAGE1_RELEASE_TAG="$tag"
 }
 
 validate_stage1_manifest() {
+    local stage1_host_triple
+
     if [ -z "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
         return
     fi
@@ -128,15 +134,21 @@ validate_stage1_manifest() {
         echo "error: arm64e stage1 manifest is missing: $ARM64E_RUST_STAGE1_MANIFEST" >&2
         exit 1
     fi
+    stage1_host_triple="$("$ARM64E_RUSTC" -vV | sed -n 's/^host: //p')"
+    if [ -z "$stage1_host_triple" ]; then
+        echo "error: unable to determine arm64e stage1 host triple from $ARM64E_RUSTC" >&2
+        exit 1
+    fi
 
     env -u GH_TOKEN -u GITHUB_TOKEN \
-        "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
+        "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "$stage1_host_triple" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
 import json
 import sys
 
 manifest_path = sys.argv[1]
 release_prefix = sys.argv[2]
-required_targets = set(sys.argv[3:])
+current_host_triple = sys.argv[3]
+required_targets = set(sys.argv[4:])
 
 with open(manifest_path, encoding="utf-8") as handle:
     payload = json.load(handle)
@@ -148,18 +160,40 @@ if payload.get("stableBaseCommit") != "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96"
     errors.append("stableBaseCommit must be ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96")
 if payload.get("requiresBuildStd") is not False:
     errors.append("requiresBuildStd must be false")
+if payload.get("asset", {}).get("purpose") != "rust-stage1-for-arm64e":
+    errors.append("asset.purpose must be rust-stage1-for-arm64e")
 
 release_tag = str(payload.get("releaseTag") or "")
 if release_tag and not release_tag.startswith(release_prefix):
     errors.append(f"releaseTag must start with {release_prefix}")
 
+host_triple = str(payload.get("hostTriple") or "")
+included_host_target = str(payload.get("includedHostStdTarget") or "")
+if not host_triple:
+    errors.append("hostTriple must be present")
+elif host_triple != current_host_triple:
+    errors.append(f"hostTriple must be {current_host_triple}")
+if included_host_target != host_triple:
+    errors.append("includedHostStdTarget must match hostTriple")
+
 included_targets = payload.get("includedPrebuiltStdTargets")
 if not isinstance(included_targets, list):
     errors.append("includedPrebuiltStdTargets must be present")
 else:
-    missing = sorted(required_targets.difference(str(target) for target in included_targets))
+    included_target_set = set(str(target) for target in included_targets)
+    missing = sorted(required_targets.difference(included_target_set))
     if missing:
         errors.append("includedPrebuiltStdTargets missing: " + ", ".join(missing))
+    if host_triple and host_triple not in included_target_set:
+        errors.append("includedPrebuiltStdTargets missing host target: " + host_triple)
+
+included_arm64e_targets = payload.get("includedAppleArm64eTargets")
+if not isinstance(included_arm64e_targets, list):
+    errors.append("includedAppleArm64eTargets must be present")
+else:
+    missing_arm64e = sorted(required_targets.difference(str(target) for target in included_arm64e_targets))
+    if missing_arm64e:
+        errors.append("includedAppleArm64eTargets missing: " + ", ".join(missing_arm64e))
 
 if errors:
     for error in errors:

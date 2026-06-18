@@ -41,7 +41,7 @@ Detailed module breakdown: docs/ARCHITECTURE.md
 # Full Rust + UniFFI + packaged-artifact sync; matches the GitHub Actions
 # pinned stage1 path. When it is required: .claude/skills/rust-sync.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260530T083949Z-ecc85bf-r26679152716-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 \
     ./build-xcframework.sh --release
 
 # Run Rust tests
