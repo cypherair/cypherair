@@ -85,8 +85,8 @@ with `.claude/skills/repin-arm64e` as usual.
 ## 6. Cutover (completed 2026-06-18)
 
 The legacy GitHub Actions stable build/publish workflow has been retired. The cutover PR made these changes:
-1. Replace `.github/workflows/stable-build-release.yml` with `stable-release-attest.yml` (`on: release.published`, tag `cypherair-v*-build*`): re-verify the signed tag + asset checksums and run `actions/attest-build-provenance` over the published assets.
-2. Update `scripts/tests/test_workflow_security_hardening.py`: drop `stable-build-release.yml` from `workflows_with_xcframework_build`; replace the two stable-publish tests with assertions for the attest workflow.
+1. Replace the legacy tag-triggered stable build/publish workflow with `stable-release-attest.yml` (`on: release.published`, tag `cypherair-v*-build*`): re-verify the signed tag + asset checksums and run `actions/attest-build-provenance` over the published assets.
+2. Update `scripts/tests/test_workflow_security_hardening.py`: remove the legacy workflow from `workflows_with_xcframework_build`; replace the two stable-publish tests with assertions for the attest workflow.
 3. Update `docs/XCFRAMEWORK_RELEASES.md` verify commands to `--signer-workflow .../stable-release-attest.yml` (attestation is now a publication witness, not in-process build provenance — note this).
 4. Update `docs/APP_RELEASE_PROCESS.md`, `docs/ARM64E_STATUS.md`, and `.claude/skills/release-stable/SKILL.md` to the tag → WF1 → WF2 → attestation choreography.
 5. Leave `xcframework-edge-release.yml`, `nightly-full.yml`, `pr-checks.yml` unchanged (CI / edge-SDK validation channels).

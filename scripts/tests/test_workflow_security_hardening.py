@@ -123,6 +123,9 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
         self.assertIn("must be an annotated signed tag", revalidate)
         self.assertIn('verification.get("verified") is not True', revalidate)
         self.assertIn('signature.startswith("-----BEGIN SSH SIGNATURE-----")', revalidate)
+        self.assertIn('"$COMPLIANCE_MANIFEST"', revalidate)
+        self.assertIn('manifest.get("releaseTag") != release_tag', revalidate)
+        self.assertIn('manifest.get("commitSHA") != target_sha', revalidate)
 
     def test_attest_workflow_pins_attestation_action_by_sha(self) -> None:
         text = read(".github/workflows/stable-release-attest.yml")

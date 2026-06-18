@@ -87,13 +87,15 @@ jobs:
 
           tag_object_json="$(mktemp)"
           gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" > "$tag_object_json"
-          python3 - "$tag_object_json" "$RELEASE_TAG" <<'PY'
+          python3 - "$tag_object_json" "$RELEASE_TAG" "$COMPLIANCE_MANIFEST" <<'PY'
           import json
           import sys
 
-          path, release_tag = sys.argv[1], sys.argv[2]
+          path, release_tag, manifest_path = sys.argv[1], sys.argv[2], sys.argv[3]
           with open(path, encoding="utf-8") as handle:
               tag_object = json.load(handle)
+          with open(manifest_path, encoding="utf-8") as handle:
+              manifest = json.load(handle)
 
           errors = []
           if tag_object.get("tag") != release_tag:
@@ -102,6 +104,20 @@ jobs:
           target = tag_object.get("object") or {}
           if target.get("type") != "commit":
               errors.append(f"stable tag peels to {target.get('type')!r}, not commit")
+          target_sha = target.get("sha")
+          if not target_sha:
+              errors.append("stable tag object is missing target commit SHA")
+
+          if manifest.get("releaseTag") != release_tag:
+              errors.append(
+                  f"compliance manifest releaseTag {manifest.get('releaseTag')!r} "
+                  f"does not match {release_tag!r}"
+              )
+          if target_sha and manifest.get("commitSHA") != target_sha:
+              errors.append(
+                  f"compliance manifest commitSHA {manifest.get('commitSHA')!r} "
+                  f"does not match stable tag commit {target_sha!r}"
+              )
 
           verification = tag_object.get("verification") or {}
           signature = verification.get("signature") or ""
@@ -117,7 +133,7 @@ jobs:
                   print(f"::error::{error}", file=sys.stderr)
               sys.exit(1)
 
-          print(f"Stable tag {release_tag} is an SSH-signed annotated tag")
+          print(f"Stable tag {release_tag} is an SSH-signed annotated tag for {target_sha}")
           PY
           rm -f "$tag_object_json"
 
