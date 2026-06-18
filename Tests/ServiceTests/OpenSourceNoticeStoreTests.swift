@@ -80,11 +80,10 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(thirdPartyNames, sortedNames)
     }
 
-    func test_manifest_excludesTestOnlyAndNonAppleTargetDependencies() throws {
+    func test_manifest_excludesNonAppleTargetDependenciesAndKeepsReachableTransitiveDependencies() throws {
         let notices = try store.loadNotices()
         let ids = Set(notices.map(\.id))
 
-        XCTAssertFalse(ids.contains("rand@0.8.5"))
         XCTAssertFalse(ids.contains("r-efi@6.0.0"))
         XCTAssertFalse(ids.contains { $0.hasPrefix("wasm-bindgen@") })
         XCTAssertFalse(ids.contains { $0.hasPrefix("windows-sys@") })
