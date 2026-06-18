@@ -1,6 +1,6 @@
 # Xcode Cloud Release Flow (Setup & Migration)
 
-> Status: Transitional — setup guide for the Xcode Cloud-first release path.
+> Status: Canonical — setup and operations guide for the Xcode Cloud release path.
 > Purpose: Stand up the two Xcode Cloud workflows that build, sign, deliver, and
 > publish CypherAir releases, and define the cutover from the GitHub Actions
 > stable-build path.
@@ -8,10 +8,11 @@
 > Source of truth for the asset contract and tag rules: docs/APP_RELEASE_PROCESS.md
 > (Section 2) and docs/ARM64E_STATUS.md (stage1 pin). This document does not
 > redefine those; it describes the Xcode Cloud execution of the same contract.
-> Last reviewed: 2026-06-17.
+> Last reviewed: 2026-06-18.
 
-Until cutover (Step 6), `.github/workflows/stable-build-release.yml` remains the
-active release path. Do not delete it before the Xcode Cloud path is verified.
+The legacy GitHub Actions stable build/publish workflow has been retired;
+`.github/workflows/stable-release-attest.yml` now provides post-publish
+provenance attestation. Xcode Cloud is the release path.
 
 ## 1. Overview
 
@@ -81,9 +82,9 @@ with `.claude/skills/repin-arm64e` as usual.
 6. Environment: set the WF2 variables from Section 2.
 7. Reconcile `DEVELOPMENT_TEAM` to the single distribution team across the archived configs and resolve the stray `Y2ZPV6SKBT` configs in `CypherAir.xcodeproj/project.pbxproj` (security-sensitive pbxproj edit — itemize for review).
 
-## 6. Cutover (after WF1+WF2 are verified)
+## 6. Cutover (completed 2026-06-18)
 
-Only after a real tag has driven WF1 → WF2 to a published release successfully:
+The legacy GitHub Actions stable build/publish workflow has been retired. The cutover PR made these changes:
 1. Replace `.github/workflows/stable-build-release.yml` with `stable-release-attest.yml` (`on: release.published`, tag `cypherair-v*-build*`): re-verify the signed tag + asset checksums and run `actions/attest-build-provenance` over the published assets.
 2. Update `scripts/tests/test_workflow_security_hardening.py`: drop `stable-build-release.yml` from `workflows_with_xcframework_build`; replace the two stable-publish tests with assertions for the attest workflow.
 3. Update `docs/XCFRAMEWORK_RELEASES.md` verify commands to `--signer-workflow .../stable-release-attest.yml` (attestation is now a publication witness, not in-process build provenance — note this).
@@ -94,7 +95,7 @@ Only after a real tag has driven WF1 → WF2 to a published release successfully
 
 - **Dry run** on a throwaway tag against a test app record: confirm WF1 builds the xcframework (watch for the `ci_post_clone` heartbeat; total < 120 min), creates the draft, and triggers WF2; confirm WF2 downloads + `shasum -c` the xcframework, archives 3 platforms, delivers TestFlight, attaches `.ipa`/`.pkg`, and publishes the draft.
 - **In-app compliance:** install a TestFlight build → About → Source & Compliance shows the expected version/build, commit SHA, and stable tag/URL.
-- **Attestation (post-cutover):** `gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair --signer-workflow .../stable-release-attest.yml`.
+- **Attestation:** `gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair --signer-workflow .../stable-release-attest.yml`.
 - **Local break-glass** still works: the candidate scheme/validator behave unchanged off Xcode Cloud (covered by `scripts/tests/test_validate_app_store_candidate_release.py`).
 
 ## 8. Notes & risks

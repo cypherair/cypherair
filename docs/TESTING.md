@@ -44,13 +44,14 @@ cargo +stable install cargo-audit --version 0.22.1 --locked
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
-The GitHub PR, nightly, edge XCFramework, and stable release workflows pin
-`cargo-audit` to `0.22.1` in an independent `rust-dependency-audit` job. A
-failed audit makes the workflow/check fail. PR, nightly, and stable asset
-generation can still run for diagnostic signal, but release publication is
-gated: edge/drill publishing and stable tag-push publishing both depend on
-`rust-dependency-audit` and will not create tags, releases, attestations, or
-published release assets unless the audit passes.
+The GitHub PR, nightly, and edge XCFramework workflows pin `cargo-audit` to
+`0.22.1` in an independent `rust-dependency-audit` job, and the Xcode Cloud
+`PgpMobile XCFramework` workflow runs the same `cargo audit --deny warnings`
+gate in `ci_post_clone`. A failed audit makes the workflow/check fail. PR and
+nightly asset generation can still run for diagnostic signal, but release
+publication is gated: edge/drill publishing depends on `rust-dependency-audit`,
+and the Xcode Cloud stable build stops before the XCFramework build if the WF1
+audit fails.
 
 ### Layer 2: Swift Unit Tests
 
@@ -216,7 +217,7 @@ The repository also publishes unique edge XCFramework prereleases:
   built with official stable Rust, while `arm64e` slices use stable Cargo with
   `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt
   std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
-- `Stable Build Release` splits asset generation from publishing: `build-stable-release-assets` uses the same hosted Xcode 26.5 platform preflight as edge, runs app-side iOS/visionOS probes only when the runner is platform-ready, records skipped probes in release notes when the hosted image lags, fails before packaging on project or scheme destination regressions, and can upload diagnostic stable asset artifacts even if `rust-dependency-audit` fails. `workflow_dispatch` is dry-run only; `publish-stable-release` runs only for stable tag pushes, depends on both jobs, verifies checked-out `HEAD` against the peeled stable tag commit, revalidates that the current remote tag is an SSH-signed annotated tag for the artifact commit before attestation, and creates the immutable GitHub Release only after the audit passes.
+- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/XCODE_CLOUD_RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, creates the draft stable release, and starts WF2, which archives iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag and XCFramework checksum and attest the SDK/compliance assets (publication-witness provenance).
 
 Toolchain contract:
 

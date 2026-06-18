@@ -34,7 +34,6 @@ def job_block(workflow_text: str, job_name: str) -> str:
 
 class WorkflowSecurityHardeningTests(unittest.TestCase):
     workflows_with_xcframework_build = [
-        ".github/workflows/stable-build-release.yml",
         ".github/workflows/xcframework-edge-release.yml",
         ".github/workflows/pr-checks.yml",
         ".github/workflows/nightly-full.yml",
@@ -89,34 +88,51 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
                     block = text[match.start() : end]
                     self.assertIn("persist-credentials: false", block)
 
-    def test_stable_workflow_dispatch_cannot_publish(self) -> None:
-        text = read(".github/workflows/stable-build-release.yml")
+    def test_attest_workflow_triggers_on_release_published_and_is_tag_scoped(self) -> None:
+        text = read(".github/workflows/stable-release-attest.yml")
         trigger_block = text.split("\npermissions:", 1)[0]
 
-        self.assertNotIn("create_release:", trigger_block)
-        self.assertNotIn("INPUT_CREATE_RELEASE", text)
-        self.assertIn('CREATE_RELEASE="false"', text)
-        self.assertIn("Validate publish source matches stable tag", text)
-        self.assertIn('git rev-parse "refs/tags/$RELEASE_TAG^{commit}"', text)
+        self.assertIn("release:", trigger_block)
+        self.assertIn("types: [published]", trigger_block)
+        self.assertIn(
+            "if: startsWith(github.event.release.tag_name, 'cypherair-v')",
+            text,
+        )
 
-    def test_stable_publish_revalidates_tag_commit_before_attestation(self) -> None:
-        text = read(".github/workflows/stable-build-release.yml")
-        publish_job = job_block(text, "publish-stable-release")
-        revalidate = step_block(publish_job, "Revalidate stable tag before publishing")
-        attestation = step_block(publish_job, "Generate artifact attestation")
-        release = step_block(publish_job, "Create immutable stable release")
+    def test_attest_workflow_has_minimal_attestation_permissions(self) -> None:
+        text = read(".github/workflows/stable-release-attest.yml")
+        job = job_block(text, "attest-stable-release")
 
-        self.assertLess(publish_job.index(revalidate), publish_job.index(attestation))
-        self.assertLess(publish_job.index(revalidate), publish_job.index(release))
-        self.assertIn('GITHUB_TOKEN: ${{ github.token }}', revalidate)
+        self.assertIn("id-token: write", job)
+        self.assertIn("attestations: write", job)
+        self.assertIn("contents: read", job)
+        # Top-level permissions stay read-only.
+        self.assertIn("permissions:\n  contents: read", text)
+
+    def test_attest_workflow_revalidates_signed_tag_and_checksum_before_attesting(self) -> None:
+        text = read(".github/workflows/stable-release-attest.yml")
+        checksum = step_block(text, "Verify XCFramework checksum")
+        revalidate = step_block(text, "Revalidate SSH-signed annotated stable tag")
+        attestation = step_block(text, "Generate artifact attestation")
+
+        self.assertLess(text.index(checksum), text.index(attestation))
+        self.assertLess(text.index(revalidate), text.index(attestation))
+        self.assertIn("sha256sum -c", checksum)
         self.assertIn('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}"', revalidate)
-        self.assertIn('gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}"', revalidate)
         self.assertIn('if [ "$tag_object_type" != "tag" ]; then', revalidate)
         self.assertIn("must be an annotated signed tag", revalidate)
         self.assertIn('verification.get("verified") is not True', revalidate)
-        self.assertIn('verification.get("reason") != "valid"', revalidate)
         self.assertIn('signature.startswith("-----BEGIN SSH SIGNATURE-----")', revalidate)
-        self.assertIn("tag_commit != commit_sha", revalidate)
+
+    def test_attest_workflow_pins_attestation_action_by_sha(self) -> None:
+        text = read(".github/workflows/stable-release-attest.yml")
+
+        self.assertIn(
+            "actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32",
+            text,
+        )
+        # No floating action tags.
+        self.assertNotRegex(text, r"uses: actions/[^@\n]+@v\d")
 
     def test_edge_publish_is_audit_gated_and_write_scoped(self) -> None:
         text = read(".github/workflows/xcframework-edge-release.yml")

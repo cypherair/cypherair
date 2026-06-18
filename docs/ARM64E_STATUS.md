@@ -4,7 +4,7 @@
 > Purpose: Current arm64e toolchain chain, packaging posture, automation contract, and pinned stage1 consumption policy.
 > Audience: Human developers, release owners, and AI coding tools.
 > Update triggers: See "Update Rules" at the end of this file.
-> Last reviewed: 2026-06-10.
+> Last reviewed: 2026-06-18.
 
 ## Repo Identity
 
@@ -72,9 +72,10 @@
     state
   - `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and `stage1-arm64e-patch` remain
     supported only when deliberately testing a local compiler build
-  - GitHub-hosted PR, nightly, edge, and stable release workflows force-download
-    the pinned Rust fork stage1 prerelease and record the resolved tag, commit,
-    and checksums in `PgpMobile.arm64e-build-manifest.json`
+  - GitHub-hosted PR, nightly, and edge workflows force-download the pinned Rust
+    fork stage1 prerelease and record the resolved tag, commit, and checksums in
+    `PgpMobile.arm64e-build-manifest.json`; the Xcode Cloud `PgpMobile XCFramework`
+    workflow (WF1) does the same via `build_apple_arm64e_xcframework.sh`
   - GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
     cache actions; clean CI builds avoid reusing `target/` artifacts produced
     by an older Rust fork stage1 compiler
@@ -135,8 +136,9 @@
   - `arm64e-upstream-sync-prep.yml` performs manual upstream-sync dry-runs and
     can open a refresh PR without force-pushing the integration branch
 - `cypherair/cypherair`:
-  - PR, nightly, edge, and stable workflows call the official arm64e
-    `./build-xcframework.sh --release` path
+  - PR, nightly, and edge workflows call the official arm64e
+    `./build-xcframework.sh --release` path; the Xcode Cloud `PgpMobile
+    XCFramework` workflow (WF1) calls it too
   - no active workflow or script path depends on the removed
     `scripts/experiments/` diagnostics
   - ordinary Rust validation and release metadata use explicit `+stable`
