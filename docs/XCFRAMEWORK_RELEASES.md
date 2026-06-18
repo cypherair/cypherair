@@ -3,8 +3,8 @@
 > Status: Canonical current-state.
 > Purpose: Describe the current edge, drill, and stable `PgpMobile.xcframework` release channels, including discovery, verification, and the stable channel's relationship to the unified app-build release page.
 > Audience: Human developers and automation that consume prebuilt `PgpMobile.xcframework` assets.
-> Source of truth: `.github/workflows/xcframework-edge-release.yml`, `.github/workflows/stable-build-release.yml`, and published GitHub releases.
-> Last reviewed: 2026-06-10.
+> Source of truth: `.github/workflows/xcframework-edge-release.yml`, the Xcode Cloud release workflows ([XCODE_CLOUD_RELEASE.md](XCODE_CLOUD_RELEASE.md)), `.github/workflows/stable-release-attest.yml`, and published GitHub releases.
+> Last reviewed: 2026-06-18.
 > Update triggers: channel naming/routing, asset names, verification commands, stable asset contract, or relink-kit semantics.
 
 ## 1. Release Channels
@@ -59,7 +59,7 @@ This is intentional: a single app marketing version can have multiple Xcode buil
 
 ### Stable Channel
 
-CypherAir publishes stable XCFramework assets through the same unified stable GitHub release page used by formal app builds.
+CypherAir publishes stable XCFramework assets through the same unified stable GitHub release page used by formal app builds, built and published by Xcode Cloud (WF1 `PgpMobile XCFramework` → WF2 `CypherAir Release`; see [XCODE_CLOUD_RELEASE.md](XCODE_CLOUD_RELEASE.md)).
 
 - The stable tag format, six-asset contract, binding rules, and immutability
   rules are defined in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md)
@@ -71,6 +71,7 @@ CypherAir publishes stable XCFramework assets through the same unified stable Gi
   commit, and the verified XCFramework slice layout.
 - `PgpMobile-relink-kit.tar.zst` is a technical supplement for SDK consumers and relink-focused compliance review. It does not replace the shared source bundle and is not an in-app asset.
 - Edge and drill prereleases remain separate from the stable channel.
+- Provenance attestation for the stable SDK/compliance assets is produced by `.github/workflows/stable-release-attest.yml` on `release.published` (publication-witness semantics); verify it with the attestation command in Section 4.
 
 ### CI Cache Policy
 
@@ -171,17 +172,22 @@ shasum -a 256 -c PgpMobile.xcframework.sha256
 gh release verify "$TAG" -R cypherair/cypherair
 gh release verify-asset "$TAG" PgpMobile.xcframework.zip -R cypherair/cypherair
 gh release verify-asset "$TAG" PgpMobile.arm64e-build-manifest.json -R cypherair/cypherair
+gh attestation verify PgpMobile.xcframework.zip \
+    -R cypherair/cypherair \
+    --signer-workflow cypherair/cypherair/.github/workflows/stable-release-attest.yml
+gh attestation verify PgpMobile.arm64e-build-manifest.json \
+    -R cypherair/cypherair \
+    --signer-workflow cypherair/cypherair/.github/workflows/stable-release-attest.yml
 ```
 
 Use the source bundle, compliance manifest, and relink kit together when you need exact source-compliance materials for that stable SDK build.
 
 ## 5. Failed Run Cleanup
 
-The workflow performs best-effort cleanup if a run fails after creating a draft release or tag.
+The Xcode Cloud release runs in two stages: WF1 creates the stable release as a draft, and WF2 publishes it after attaching the app binaries. If a run fails before WF2 publishes, the draft release (and sometimes the tag) can remain and requires manual cleanup.
 
-- If the release still exists as a draft, the workflow deletes the draft and its tag automatically.
-- If the release was never created but the tag exists, the workflow deletes the orphan tag automatically.
-- If cleanup itself fails, manual cleanup may still be required.
+- If the release still exists as a draft, delete the draft and its tag.
+- If the tag exists but no release was created, delete the orphan tag.
 
 Manual cleanup commands:
 

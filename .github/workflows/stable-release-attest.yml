@@ -1,0 +1,149 @@
+name: Stable Release Attestation
+
+# The stable GitHub Release is created and published by Xcode Cloud (the
+# "PgpMobile XCFramework" + "CypherAir Release" workflows; see
+# docs/XCODE_CLOUD_RELEASE.md). This job restores verifiable build provenance for
+# the published SDK/compliance assets so `gh attestation verify` keeps working.
+#
+# It runs *after* publication, so it is an integrity witness and tamper alarm,
+# not a release gate. It fires because Xcode Cloud publishes the release with a
+# personal access token (not the Actions GITHUB_TOKEN), so the release event is
+# delivered. Provenance semantics here are "publication witness" (the bytes were
+# published on this repo's release), not in-process build provenance.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  attest-stable-release:
+    if: startsWith(github.event.release.tag_name, 'cypherair-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      GITHUB_TOKEN: ${{ github.token }}
+      XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
+      XCFRAMEWORK_CHECKSUM: PgpMobile.xcframework.sha256
+      ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
+      SOURCE_BUNDLE: CypherAir-source-bundle.tar.zst
+      COMPLIANCE_MANIFEST: CypherAir-compliance-manifest.json
+      RELINK_KIT: PgpMobile-relink-kit.tar.zst
+    steps:
+      - name: Validate stable tag format
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^cypherair-v[0-9]+\.[0-9]+\.[0-9]+-build[0-9]+$'; then
+            echo "::error::Unexpected stable release tag: $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Download stable SDK and compliance assets
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            --pattern "$SOURCE_BUNDLE" \
+            --pattern "$COMPLIANCE_MANIFEST" \
+            --pattern "$XCFRAMEWORK_ZIP" \
+            --pattern "$XCFRAMEWORK_CHECKSUM" \
+            --pattern "$ARM64E_MANIFEST" \
+            --pattern "$RELINK_KIT"
+          for asset in \
+            "$SOURCE_BUNDLE" \
+            "$COMPLIANCE_MANIFEST" \
+            "$XCFRAMEWORK_ZIP" \
+            "$XCFRAMEWORK_CHECKSUM" \
+            "$ARM64E_MANIFEST" \
+            "$RELINK_KIT"
+          do
+            if [ ! -f "$asset" ]; then
+              echo "::error::Missing released asset: $asset"
+              exit 1
+            fi
+          done
+
+      - name: Verify XCFramework checksum
+        run: sha256sum -c "$XCFRAMEWORK_CHECKSUM"
+
+      - name: Revalidate SSH-signed annotated stable tag
+        run: |
+          set -euo pipefail
+
+          read -r tag_object_type tag_object_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+              --jq '.object | [.type, .sha] | @tsv'
+          )
+
+          if [ "$tag_object_type" != "tag" ]; then
+            echo "::error::Stable tag $RELEASE_TAG must be an annotated signed tag, got $tag_object_type"
+            exit 1
+          fi
+
+          tag_object_json="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object_sha}" > "$tag_object_json"
+          python3 - "$tag_object_json" "$RELEASE_TAG" "$COMPLIANCE_MANIFEST" <<'PY'
+          import json
+          import sys
+
+          path, release_tag, manifest_path = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, encoding="utf-8") as handle:
+              tag_object = json.load(handle)
+          with open(manifest_path, encoding="utf-8") as handle:
+              manifest = json.load(handle)
+
+          errors = []
+          if tag_object.get("tag") != release_tag:
+              errors.append(f"tag object name {tag_object.get('tag')!r} does not match {release_tag!r}")
+
+          target = tag_object.get("object") or {}
+          if target.get("type") != "commit":
+              errors.append(f"stable tag peels to {target.get('type')!r}, not commit")
+          target_sha = target.get("sha")
+          if not target_sha:
+              errors.append("stable tag object is missing target commit SHA")
+
+          if manifest.get("releaseTag") != release_tag:
+              errors.append(
+                  f"compliance manifest releaseTag {manifest.get('releaseTag')!r} "
+                  f"does not match {release_tag!r}"
+              )
+          if target_sha and manifest.get("commitSHA") != target_sha:
+              errors.append(
+                  f"compliance manifest commitSHA {manifest.get('commitSHA')!r} "
+                  f"does not match stable tag commit {target_sha!r}"
+              )
+
+          verification = tag_object.get("verification") or {}
+          signature = verification.get("signature") or ""
+          if verification.get("verified") is not True:
+              errors.append(f"stable tag signature is not verified: {verification.get('reason')}")
+          if verification.get("reason") != "valid":
+              errors.append(f"stable tag signature verification reason is {verification.get('reason')!r}")
+          if not signature.startswith("-----BEGIN SSH SIGNATURE-----"):
+              errors.append("stable tag must be SSH-signed")
+
+          if errors:
+              for error in errors:
+                  print(f"::error::{error}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"Stable tag {release_tag} is an SSH-signed annotated tag for {target_sha}")
+          PY
+          rm -f "$tag_object_json"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            ${{ env.SOURCE_BUNDLE }}
+            ${{ env.COMPLIANCE_MANIFEST }}
+            ${{ env.XCFRAMEWORK_ZIP }}
+            ${{ env.XCFRAMEWORK_CHECKSUM }}
+            ${{ env.ARM64E_MANIFEST }}
+            ${{ env.RELINK_KIT }}
