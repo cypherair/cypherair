@@ -202,7 +202,7 @@ attach_app_artifact_and_maybe_publish() {
     [ -n "${CI_TAG:-}" ] || fail "WF2 must run for a stable tag (CI_TAG empty)"
     require_gh_auth
 
-    local platform ext signed_path artifact_path asset_name
+    local platform ext signed_path artifact_path asset_name staging_dir staged_artifact
     case "${CI_PRODUCT_PLATFORM:-}" in
         iOS) platform="iOS"; ext="ipa" ;;
         macOS) platform="macOS"; ext="pkg" ;;
@@ -220,8 +220,13 @@ attach_app_artifact_and_maybe_publish() {
     artifact_path="$(find "$signed_path" -maxdepth 2 -name "*.${ext}" -print -quit)"
     [ -n "$artifact_path" ] || fail "no .${ext} found under $signed_path"
 
+    staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/cypherair-release-asset.XXXXXX")"
+    staged_artifact="$staging_dir/$asset_name"
+    cp "$artifact_path" "$staged_artifact"
+
+    # gh release upload treats file#text as a display label, not a rename.
     log "WF2: attaching $asset_name from $artifact_path"
-    gh release upload "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" --clobber "${artifact_path}#${asset_name}"
+    gh release upload "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" --clobber "$staged_artifact"
 
     # Publish only once every expected platform artifact is present, so the
     # last archive action to finish flips the draft regardless of action order.
