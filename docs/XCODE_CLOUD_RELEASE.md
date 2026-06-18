@@ -22,7 +22,7 @@ CLAUDE.md). Two Xcode Cloud workflows then own the release end to end:
 | Workflow | Start condition | What it does |
 |---|---|---|
 | **PgpMobile XCFramework** (WF1) | Tag `cypherair-v*-build*` | `ci_post_clone.sh` builds the arm64e `PgpMobile.xcframework` from source (audit + freshness gated); the build action probes that the app links it; `ci_post_xcodebuild.sh` packages the six SDK/compliance assets, creates the stable GitHub Release as a **draft**, and starts WF2 for the same tag via the App Store Connect API. |
-| **CypherAir Release** (WF2) | **Manual / API only** (started by WF1) | `ci_post_clone.sh` downloads + checksum-verifies the exact xcframework from the draft release and runs the App Store candidate gate; Archive actions build iOS / macOS / visionOS with cloud signing and deliver to TestFlight; `ci_post_xcodebuild.sh` attaches the signed `.ipa`/`.pkg` to the release and **publishes** the draft once all platform artifacts are present. |
+| **CypherAir Release** (WF2) | **Manual / API only** (started by WF1) | `ci_post_clone.sh` downloads + checksum-verifies the exact xcframework from the draft release and runs the App Store candidate gate; Archive actions build iOS / macOS / visionOS with cloud signing and deliver to TestFlight; `ci_post_xcodebuild.sh` attaches the App Store upload `.ipa`/`.pkg` (`CypherAir-*-AppStore.*`, Transporter payloads) to the release and **publishes** the draft once all platform artifacts are present. |
 
 A lean GitHub Actions job (`stable-release-attest.yml`, added at cutover) runs on
 `release.published` to attest the published assets, restoring
@@ -51,7 +51,7 @@ WF1 (PgpMobile XCFramework):
 
 WF2 (CypherAir Release):
 - `GITHUB_PAT` *(secret)* — same PAT (download draft assets, attach binaries, publish).
-- `XCODE_CLOUD_RELEASE_ARTIFACTS` *(optional)* — defaults to `CypherAir-iOS.ipa CypherAir-visionOS.ipa CypherAir-macOS.pkg`; the draft publishes only once all listed artifacts are attached.
+- `XCODE_CLOUD_RELEASE_ARTIFACTS` *(optional)* — defaults to `CypherAir-iOS-AppStore.ipa CypherAir-visionOS-AppStore.ipa CypherAir-macOS-AppStore.pkg`; the draft publishes only once all listed artifacts are attached.
 
 The arm64e stage1 pin is **not** an Xcode Cloud env var: it stays repo-controlled
 via `DEFAULT_ARM64E_STAGE1_RELEASE_TAG` in `scripts/build_apple_arm64e_xcframework.sh`
@@ -76,7 +76,7 @@ with `.claude/skills/repin-arm64e` as usual.
 1. New workflow, name exactly `CypherAir Release`.
 2. Start condition: **none** (manual / API only — WF1 starts it). Do **not** add a tag condition, or it will race WF1.
 3. Actions: three **Archive** actions — iOS, macOS, visionOS — scheme `CypherAir AppStore Candidate`, Deployment Preparation **TestFlight & App Store**.
-4. Post-actions: **TestFlight Internal Testing** for each platform's archive artifact.
+4. Post-actions: **TestFlight Internal Testing** for each platform's archive artifact. Do **not** add a macOS **notarization** post-action or a **Developer ID** archive action (see §8 — the macOS asset is an App Store package, reviewed by Apple, not notarized).
 5. Enable **Restrict Editing** (required for external-testing delivery later).
 6. Environment: set the WF2 variables from Section 2.
 7. Reconcile `DEVELOPMENT_TEAM` to the single distribution team across the archived configs and resolve the stray `Y2ZPV6SKBT` configs in `CypherAir.xcodeproj/project.pbxproj` (security-sensitive pbxproj edit — itemize for review).
@@ -102,3 +102,4 @@ Only after a real tag has driven WF1 → WF2 to a published release successfully
 - **120-min cap / 30-min inactivity:** the heavy Rust build lives in WF1 alone (no archive); `ci_post_clone.sh` emits a heartbeat. If WF1 ever exceeds budget, fall back to having GitHub Actions build the attested xcframework and WF2 consume it.
 - **Immutability:** the SDK/compliance asset set is fixed when WF1 creates the draft; WF2 only adds the app `.ipa`/`.pkg` and flips the draft to published. If a run fails mid-way, delete the draft + tag and re-release with a new build number.
 - **Compute hours:** each release spends ~1 compute-hour on the clean Rust build; releases are infrequent.
+- **macOS artifact is App Store, not notarized:** the attached `CypherAir-macOS-AppStore.pkg` (and the `CypherAir-*-AppStore.ipa`s) come from `CI_APP_STORE_SIGNED_APP_PATH` — App-Store-signed payloads for **upload to App Store Connect via Transporter only**. They are **not directly installable** (double-clicking gives "unidentified developer") and **cannot be notarized**: notarization is exclusively for *Developer ID* builds distributed outside the App Store, whereas Apple reviews App Store builds. CypherAir ships through the Mac App Store (consistent with iOS/visionOS, which can only ship via the App Store), so there is no Developer ID / notarization step. If you ever need a directly-installable macOS download, that is a separate Developer ID distribution channel (a distinct Archive action; note Xcode Cloud's post-build environment has no signing identities, so a notarized `.pkg` is hard to produce there).

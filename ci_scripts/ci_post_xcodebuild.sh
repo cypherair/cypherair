@@ -18,8 +18,10 @@ set -euo pipefail
 XCFRAMEWORK_WORKFLOW_NAME="${XCFRAMEWORK_WORKFLOW_NAME:-PgpMobile XCFramework}"
 RELEASE_WORKFLOW_NAME="${RELEASE_WORKFLOW_NAME:-CypherAir Release}"
 GITHUB_REPOSITORY_SLUG="${GITHUB_REPOSITORY_SLUG:-cypherair/cypherair}"
-# Artifacts WF2 must attach before the draft release is published.
-XCODE_CLOUD_RELEASE_ARTIFACTS="${XCODE_CLOUD_RELEASE_ARTIFACTS:-CypherAir-iOS.ipa CypherAir-visionOS.ipa CypherAir-macOS.pkg}"
+# App Store-signed upload artifacts WF2 attaches before the draft release is
+# published. These are App Store Connect upload payloads (Transporter): NOT
+# directly installable and NOT notarized (notarization is for Developer ID only).
+XCODE_CLOUD_RELEASE_ARTIFACTS="${XCODE_CLOUD_RELEASE_ARTIFACTS:-CypherAir-iOS-AppStore.ipa CypherAir-visionOS-AppStore.ipa CypherAir-macOS-AppStore.pkg}"
 
 XCFRAMEWORK_ZIP="PgpMobile.xcframework.zip"
 XCFRAMEWORK_CHECKSUM="PgpMobile.xcframework.sha256"
@@ -161,9 +163,13 @@ Exact source and compliance materials for stable build \`$CI_TAG\`.
 - Built by: Xcode Cloud workflow \`$CI_WORKFLOW\` (build $CI_BUILD_NUMBER)
 
 This stable build page is the exact source and compliance landing page for the
-tagged App build and the stable \`PgpMobile.xcframework\` assets. The signed app
-binaries (.ipa/.pkg) are attached by the "CypherAir Release" workflow before the
-release is published.
+tagged App build and the stable \`PgpMobile.xcframework\` assets.
+
+The \`CypherAir-*-AppStore.ipa\`/\`.pkg\` files are **App Store Connect upload
+artifacts** (Transporter) attached by the "CypherAir Release" workflow before the
+release is published. They are App-Store-signed: not directly installable and not
+notarized (Apple reviews App Store builds; notarization applies only to
+Developer ID distribution). Use them only to upload to App Store Connect.
 EOF
 
     if gh release view "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" >/dev/null 2>&1; then
@@ -203,8 +209,12 @@ attach_app_artifact_and_maybe_publish() {
         xrOS|visionOS) platform="visionOS"; ext="ipa" ;;
         *) platform="${CI_PRODUCT_PLATFORM:-unknown}"; ext="ipa" ;;
     esac
-    asset_name="CypherAir-${platform}.${ext}"
+    # The -AppStore suffix marks these as App Store Connect upload payloads
+    # (Transporter): App-Store-signed, not directly installable, not notarized.
+    asset_name="CypherAir-${platform}-AppStore.${ext}"
 
+    # App Store package from the archive's "TestFlight & App Store" deployment.
+    # This is NOT a Developer ID build and cannot be notarized.
     signed_path="${CI_APP_STORE_SIGNED_APP_PATH:-}"
     [ -d "$signed_path" ] || fail "CI_APP_STORE_SIGNED_APP_PATH is not a directory: $signed_path"
     artifact_path="$(find "$signed_path" -maxdepth 2 -name "*.${ext}" -print -quit)"
