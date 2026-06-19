@@ -96,15 +96,13 @@ private struct SignScreenHostView: View {
 
         Form {
             Section {
-                CypherModePickerRow(
-                    title: String(localized: "sign.mode", defaultValue: "Mode"),
-                    selection: $model.signMode,
-                    isDisabled: operation.isRunning
-                ) {
+                Picker(String(localized: "sign.mode", defaultValue: "Mode"), selection: $model.signMode) {
                     ForEach(SignView.SignMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
+                .pickerStyle(.segmented)
+                .disabled(operation.isRunning)
             }
 
             if model.signMode == .text {
