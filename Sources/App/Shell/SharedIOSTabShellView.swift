@@ -21,6 +21,7 @@ struct SharedIOSTabShellView: View {
                 }
             }
 
+            #if !os(visionOS)
             TabSection(String(localized: "tab.section.tools", defaultValue: "Tools")) {
                 ForEach(toolTabs) { definition in
                     SwiftUI.Tab(
@@ -32,7 +33,9 @@ struct SharedIOSTabShellView: View {
                     }
                 }
             }
+            .tabPlacement(.sidebarOnly)
             .hidden(sizeClass == .compact)
+            #endif
         }
         .tabViewStyle(.sidebarAdaptable)
         .onChange(of: sizeClass) { _, newSizeClass in

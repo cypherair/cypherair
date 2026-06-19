@@ -4,7 +4,7 @@ struct TutorialGuidanceResolver {
     func guidance(
         session: TutorialSessionState,
         navigation: TutorialNavigationState,
-        sizeClass: UserInterfaceSizeClass?,
+        sizeClass _: UserInterfaceSizeClass?,
         selectedTab: AppShellTab
     ) -> TutorialGuidancePayload? {
         guard navigation.activeModal == nil else { return nil }
@@ -59,42 +59,30 @@ struct TutorialGuidanceResolver {
             )
 
         case .encryptDemoMessage:
-            if visibleRoute == .encrypt {
+            if selectedTab == .encrypt || visibleRoute == .encrypt {
                 return payload(
                     module,
                     body: String(localized: "guidedTutorial.encrypt.form", defaultValue: "Bob is preselected. Review the draft and encrypt the message."),
                     target: nil
                 )
             }
-            if selectedTab == .home, visibleRoute == nil {
+
+            if selectedTab != .home {
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.nav.homeEncrypt", defaultValue: "Open the Home tab to reach the Encrypt shortcut."),
+                    target: nil
+                )
+            }
+
+            if visibleRoute == nil {
                 return payload(
                     module,
                     body: String(localized: "guidedTutorial.home.encrypt", defaultValue: "Use the real Encrypt shortcut to open the message form."),
                     target: .homeEncryptAction
                 )
             }
-            if sizeClass == .compact {
-                if selectedTab != .home {
-                    return payload(
-                        module,
-                        body: String(localized: "guidedTutorial.nav.homeEncrypt", defaultValue: "Open the Home tab to reach the Encrypt shortcut."),
-                        target: nil
-                    )
-                }
-                if visibleRoute == nil {
-                    return payload(
-                        module,
-                        body: String(localized: "guidedTutorial.home.encrypt", defaultValue: "Use the real Encrypt shortcut to open the message form."),
-                        target: .homeEncryptAction
-                    )
-                }
-            } else if selectedTab != .encrypt {
-                return payload(
-                    module,
-                    body: String(localized: "guidedTutorial.nav.encrypt", defaultValue: "Open Encrypt from the Tools section to continue."),
-                    target: nil
-                )
-            }
+
             return payload(
                 module,
                 body: String(localized: "guidedTutorial.encrypt.form", defaultValue: "Bob is preselected. Review the draft and encrypt the message."),
@@ -102,7 +90,7 @@ struct TutorialGuidanceResolver {
             )
 
         case .decryptAndVerify:
-            if visibleRoute == .decrypt {
+            if selectedTab == .decrypt || visibleRoute == .decrypt {
                 if session.artifacts.parseResult == nil {
                     return payload(
                         module,
@@ -116,35 +104,23 @@ struct TutorialGuidanceResolver {
                     target: nil
                 )
             }
-            if selectedTab == .home, visibleRoute == nil {
+
+            if selectedTab != .home {
+                return payload(
+                    module,
+                    body: String(localized: "guidedTutorial.nav.homeDecrypt", defaultValue: "Open the Home tab to reach the Decrypt shortcut."),
+                    target: nil
+                )
+            }
+
+            if visibleRoute == nil {
                 return payload(
                     module,
                     body: String(localized: "guidedTutorial.home.decrypt", defaultValue: "Use the real Decrypt shortcut to inspect the encrypted message."),
                     target: .homeDecryptAction
                 )
             }
-            if sizeClass == .compact {
-                if selectedTab != .home {
-                    return payload(
-                        module,
-                        body: String(localized: "guidedTutorial.nav.homeDecrypt", defaultValue: "Open the Home tab to reach the Decrypt shortcut."),
-                        target: nil
-                    )
-                }
-                if visibleRoute == nil {
-                    return payload(
-                        module,
-                        body: String(localized: "guidedTutorial.home.decrypt", defaultValue: "Use the real Decrypt shortcut to inspect the encrypted message."),
-                        target: .homeDecryptAction
-                    )
-                }
-            } else if selectedTab != .decrypt {
-                return payload(
-                    module,
-                    body: String(localized: "guidedTutorial.nav.decrypt", defaultValue: "Open Decrypt from the Tools section to continue."),
-                    target: nil
-                )
-            }
+
             if session.artifacts.parseResult == nil {
                 return payload(
                     module,
