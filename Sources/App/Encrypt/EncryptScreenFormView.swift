@@ -9,15 +9,13 @@ struct EncryptScreenFormView: View {
 
         Form {
             Section {
-                CypherModePickerRow(
-                    title: String(localized: "encrypt.mode", defaultValue: "Mode"),
-                    selection: $model.encryptMode,
-                    isDisabled: operation.isRunning
-                ) {
+                Picker(String(localized: "encrypt.mode", defaultValue: "Mode"), selection: $model.encryptMode) {
                     ForEach(EncryptView.EncryptMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
+                .pickerStyle(.segmented)
+                .disabled(operation.isRunning)
             }
 
             if model.encryptMode == .text {

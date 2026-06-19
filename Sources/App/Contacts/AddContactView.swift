@@ -155,18 +155,19 @@ private struct AddContactScreenHostView: View {
 
         return Form {
             Section {
-                CypherModePickerRow(
-                    title: String(localized: "addcontact.mode", defaultValue: "Import Method"),
+                Picker(
+                    String(localized: "addcontact.mode", defaultValue: "Import Method"),
                     selection: Binding(
                         get: { model.importMode },
                         set: { model.setImportMode($0) }
-                    ),
-                    isDisabled: model.configuration.allowedImportModes.count == 1
+                    )
                 ) {
                     ForEach(model.configuration.allowedImportModes, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
+                .pickerStyle(.segmented)
+                .disabled(model.configuration.allowedImportModes.count == 1)
             }
 
             switch model.importMode {
