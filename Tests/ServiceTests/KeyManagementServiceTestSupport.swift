@@ -8,7 +8,21 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
     let base: MockSecureEnclave
     let coordinator: CypherAir.AuthenticationPromptCoordinator
     private let observationLock = NSLock()
+    private var sawOperationPromptInProgressDuringGenerateStorage = false
+    private var sawOperationPromptInProgressDuringWrapStorage = false
     private var sawOperationPromptInProgressDuringReconstructStorage = false
+
+    var sawOperationPromptInProgressDuringGenerateWrappingKey: Bool {
+        observationLock.lock()
+        defer { observationLock.unlock() }
+        return sawOperationPromptInProgressDuringGenerateStorage
+    }
+
+    var sawOperationPromptInProgressDuringWrap: Bool {
+        observationLock.lock()
+        defer { observationLock.unlock() }
+        return sawOperationPromptInProgressDuringWrapStorage
+    }
 
     /// Whether the operation-prompt depth was > 0 when `reconstructKey` ran.
     /// `reconstructKey` now runs off the main actor (the SE unwrap is hopped off-main
@@ -34,7 +48,11 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
         accessControl: SecAccessControl?,
         authenticationContext: LAContext?
     ) throws -> any SEKeyHandle {
-        try base.generateWrappingKey(
+        let inProgress = coordinator.isOperationPromptInProgress
+        observationLock.lock()
+        sawOperationPromptInProgressDuringGenerateStorage = inProgress
+        observationLock.unlock()
+        return try base.generateWrappingKey(
             accessControl: accessControl,
             authenticationContext: authenticationContext
         )
@@ -45,7 +63,11 @@ final class PromptObservingSecureEnclave: SecureEnclaveManageable, @unchecked Se
         using handle: any SEKeyHandle,
         fingerprint: String
     ) throws -> WrappedKeyBundle {
-        try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
+        let inProgress = coordinator.isOperationPromptInProgress
+        observationLock.lock()
+        sawOperationPromptInProgressDuringWrapStorage = inProgress
+        observationLock.unlock()
+        return try base.wrap(privateKey: privateKey, using: handle, fingerprint: fingerprint)
     }
 
     func unwrap(

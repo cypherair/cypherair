@@ -20,6 +20,7 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     var failLoadError: SecureEnclaveCustodyHandleError?
     var failInventory = false
     var publicKeyResponses: [Data] = []
+    var onLoadKeys: (() -> Void)?
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
@@ -49,6 +50,7 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         reference: SecureEnclaveCustodyHandleReference,
         authenticationContext: LAContext?
     ) throws -> [SecureEnclaveCustodyLoadedHandle] {
+        onLoadKeys?()
         loadRequests.append((reference, authenticationContext))
         if let failLoadError {
             throw failLoadError

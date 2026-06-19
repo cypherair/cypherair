@@ -3,10 +3,10 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Uniform enrollment rule — App Access Protection policy switch: branch logic
-/// of the extracted `AppAccessPolicySwitchWorkflow` (previously an untestable
-/// `CypherAirApp` closure), plus the macOS composition pin that the whole
-/// action runs inside one operation-prompt session.
+/// App Access Protection policy switch branch logic of the extracted
+/// `AppAccessPolicySwitchWorkflow` (previously an untestable `CypherAirApp`
+/// closure), plus the macOS composition pin that the authentication /
+/// reprotection window runs inside one operation-prompt session.
 @MainActor
 final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
     private final class TrackingLAContext: LAContext {
@@ -172,7 +172,7 @@ final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
         XCTAssertEqual(
             observedInSession,
             true,
-            "The policy-switch prompt must run inside an operation-prompt session (the uniform rule)."
+            "The policy-switch prompt must run inside an operation-prompt session."
         )
 
         harness.deliverResign()

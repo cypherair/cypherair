@@ -41,10 +41,10 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
-    /// Generation drives biometryAny digest signing, which presents auth
-    /// sheets: the WHOLE action runs inside ONE operation-prompt session
-    /// (SECURITY.md §4 uniform rule) when a coordinator is wired. The optional
-    /// coordinator keeps test rigs (which sign with stub signers) unchanged.
+    /// Only the custody authorization and immediately authorized handle-load
+    /// window is enrolled in an operation-prompt session. Certificate building
+    /// and durable metadata commit stay outside that window so a genuine macOS
+    /// away still locks immediately when grace period is 0.
     func generateKey(
         name: String,
         email: String?,
@@ -52,26 +52,13 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         configurationIdentity: PGPKeyConfiguration.Identity,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        guard let authenticationPromptCoordinator else {
-            return try await performGenerateKey(
-                name: name,
-                email: email,
-                expirySeconds: expirySeconds,
-                configurationIdentity: configurationIdentity,
-                invalidationToken: token
-            )
-        }
-        return try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "keyProvisioning.generateSecureEnclaveCustody"
-        ) {
-            try await self.performGenerateKey(
-                name: name,
-                email: email,
-                expirySeconds: expirySeconds,
-                configurationIdentity: configurationIdentity,
-                invalidationToken: token
-            )
-        }
+        try await performGenerateKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            configurationIdentity: configurationIdentity,
+            invalidationToken: token
+        )
     }
 
     private func performGenerateKey(
@@ -101,42 +88,17 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        // Single prompt per generation (P7F): pre-authenticate BEFORE any
-        // handle exists — a declined sheet aborts with nothing to roll back —
-        // and thread the evaluated context into the biometryAny handle loads
-        // below. When nil (test rigs, platforms without the production
-        // wiring), the loads authenticate implicitly as before.
-        var authorizedContext: LAContext?
-        if let custodyOperationAuthenticator {
-            do {
-                authorizedContext = try await custodyOperationAuthenticator(
-                    String(
-                        localized: "keygen.custody.auth.reason",
-                        defaultValue: "Authenticate to create your device-bound key."
-                    )
-                )
-            } catch {
-                let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
-                throw CypherAirError.keyOperationUnavailable(
-                    category: PGPKeyOperationFailureMapper.category(
-                        for: normalized,
-                        fallback: .localAuthenticationFailed
-                    )
-                )
-            }
-        }
+        let authorizedPair = try await createAuthorizedHandlePair()
+        let authorizedContext = authorizedPair.authenticationContext
         defer {
             authorizedContext?.invalidate()
         }
 
-        let handlePair = try handleStore.createHandlePair()
+        let handlePair = authorizedPair.handlePair
         var storedFingerprint: String?
         var didRollbackGeneratedState = false
         do {
-            let loadedPair = try handleStore.loadHandlePair(
-                expected: handlePair,
-                authenticationContext: authorizedContext
-            )
+            let loadedPair = authorizedPair.loadedPair
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
@@ -213,6 +175,73 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
     }
 
+    private func createAuthorizedHandlePair() async throws -> AuthorizedCustodyGenerationHandlePair {
+        try await withOperationPromptIfConfigured(
+            source: "keyProvisioning.generateSecureEnclaveCustody.authorize"
+        ) {
+            var authorizedContext: LAContext?
+            if let custodyOperationAuthenticator {
+                do {
+                    authorizedContext = try await custodyOperationAuthenticator(
+                        String(
+                            localized: "keygen.custody.auth.reason",
+                            defaultValue: "Authenticate to create your device-bound key."
+                        )
+                    )
+                } catch {
+                    authorizedContext?.invalidate()
+                    let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
+                    throw CypherAirError.keyOperationUnavailable(
+                        category: PGPKeyOperationFailureMapper.category(
+                            for: normalized,
+                            fallback: .localAuthenticationFailed
+                        )
+                    )
+                }
+            }
+
+            do {
+                let handlePair = try handleStore.createHandlePair()
+                do {
+                    let loadedPair = try handleStore.loadHandlePair(
+                        expected: handlePair,
+                        authenticationContext: authorizedContext
+                    )
+                    return AuthorizedCustodyGenerationHandlePair(
+                        handlePair: handlePair,
+                        loadedPair: loadedPair,
+                        authenticationContext: authorizedContext
+                    )
+                } catch {
+                    do {
+                        try rollbackGeneratedState(
+                            handlePair: handlePair,
+                            storedFingerprint: nil
+                        )
+                    } catch {
+                        throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+                    }
+                    throw error
+                }
+            } catch {
+                authorizedContext?.invalidate()
+                throw error
+            }
+        }
+    }
+
+    private func withOperationPromptIfConfigured<T>(
+        source: String,
+        operation: () async throws -> T
+    ) async throws -> T {
+        guard let authenticationPromptCoordinator else {
+            return try await operation()
+        }
+        return try await authenticationPromptCoordinator.withOperationPrompt(source: source) {
+            try await operation()
+        }
+    }
+
     private func rollbackGeneratedState(
         handlePair: SecureEnclaveCustodyHandlePair,
         storedFingerprint: String?
@@ -222,4 +251,10 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
         try handleStore.deleteHandlePair(handlePair)
     }
+}
+
+private struct AuthorizedCustodyGenerationHandlePair {
+    let handlePair: SecureEnclaveCustodyHandlePair
+    let loadedPair: SecureEnclaveCustodyLoadedHandlePair
+    let authenticationContext: LAContext?
 }

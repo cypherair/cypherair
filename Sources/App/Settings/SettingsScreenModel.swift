@@ -26,10 +26,9 @@ final class SettingsScreenModel {
     private let localDataResetAuthenticationAction: LocalDataResetAuthenticationAction
     private let localDataResetService: LocalDataResetService?
     private let localDataResetRestartCoordinator: LocalDataResetRestartCoordinator?
-    /// Encloses the whole Local Data Reset action in one operation-prompt
-    /// session (the uniform rule, TARGET §3). Defaults to the app-wide
-    /// coordinator the injected `authManager` already holds, so the model
-    /// enrolls in the same lock-controller mirror as every other flow.
+    /// Enrolls the Local Data Reset confirmation authentication in an
+    /// operation-prompt session. The destructive reset itself runs after that
+    /// short authentication window closes.
     private let operationPromptCoordinator: AuthenticationPromptCoordinator
 
     var pendingMode: AuthenticationMode?
@@ -384,34 +383,31 @@ final class SettingsScreenModel {
 
         Task {
             do {
-                // The WHOLE reset — confirmation authentication, the reset
-                // itself, and the restart-gate marking — runs inside ONE
-                // operation-prompt session (the uniform rule, TARGET §3): the
-                // confirmation sheet's own resign is attributed to this action
-                // and the away decision is deferred to the session's end.
-                try await operationPromptCoordinator.withOperationPrompt(source: "localDataReset") {
-                    var resetAuthenticationContext: LAContext?
-                    defer {
-                        resetAuthenticationContext?.invalidate()
-                    }
-                    let result = try await localDataResetAuthenticationAction(
+                var resetAuthenticationContext: LAContext?
+                defer {
+                    resetAuthenticationContext?.invalidate()
+                }
+                let result = try await operationPromptCoordinator.withOperationPrompt(
+                    source: "localDataReset.authenticate"
+                ) {
+                    try await localDataResetAuthenticationAction(
                         appConfiguration.appSessionAuthenticationPolicy,
                         String(
                             localized: "settings.resetAll.authReason",
                             defaultValue: "Authenticate to reset all CypherAir X data on this device."
                         )
                     )
-                    guard result.isAuthenticated else {
-                        throw AuthenticationError.failed
-                    }
-                    resetAuthenticationContext = result.context
-
-                    let summary = try await localDataResetService.resetAllLocalData(
-                        authenticationContext: resetAuthenticationContext
-                    )
-                    localDataResetSucceeded = true
-                    localDataResetRestartCoordinator?.markRestartRequired(summary: summary)
                 }
+                guard result.isAuthenticated else {
+                    throw AuthenticationError.failed
+                }
+                resetAuthenticationContext = result.context
+
+                let summary = try await localDataResetService.resetAllLocalData(
+                    authenticationContext: resetAuthenticationContext
+                )
+                localDataResetSucceeded = true
+                localDataResetRestartCoordinator?.markRestartRequired(summary: summary)
             } catch {
                 localDataResetErrorMessage = error.localizedDescription
             }

@@ -433,7 +433,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(updated.fingerprint, fixture.identity.fingerprint)
-        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication for the whole operation.")
+        XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication context is minted for modify-expiry.")
         XCTAssertEqual(
             stub.context.invalidateCount,
             1,

@@ -2,8 +2,8 @@ import Foundation
 import LocalAuthentication
 
 /// Produces one authenticated `LAContext` per Secure Enclave custody private
-/// operation (P7F single-prompt contract). The string parameter is the
-/// localized system-sheet reason.
+/// operation. The router keeps the system sheet and immediately authorized
+/// handle load inside the same short operation-prompt window.
 typealias SecureEnclaveCustodyOperationAuthenticator = (String) async throws -> LAContext
 
 /// Pre-authenticated, operation-confined authorization for ONE Secure Enclave

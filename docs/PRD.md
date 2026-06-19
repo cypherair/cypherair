@@ -244,11 +244,13 @@ Two separate layers protect on-screen content (cover ≠ lock):
   app data relocked.
 - **Grace period options:** Immediately (0s) / 1 min (60s) / 3 min (180s, default) / 5 min (300s).
 
-*App-level auth is independent of per-operation Keychain auth. Any user action that can present an
-authentication sheet while the app is unlocked (private-key operations, key generation/import,
-key-expiry change, protection-mode and App Access Protection changes, Local Data Reset) runs as one
-operation-prompt session for its full duration, so the sheet's own lifecycle noise never locks the
-app mid-action.*
+*App-level auth is independent of per-operation Keychain auth. When an unlocked user action presents
+system authentication (private-key operations, key generation/import wrapping, key-expiry change,
+protection-mode and App Access Protection changes, Local Data Reset), the prompt and the immediately
+following Keychain / Secure Enclave work that consumes the authenticated context run inside a short
+operation-prompt session. Longer action work stays outside that window, so the sheet's own lifecycle
+noise never locks the app mid-prompt while genuine macOS away events under grace=0 still relock
+promptly outside the authentication window.*
 
 **Protected App Data**
 

@@ -25,10 +25,10 @@ final class PrivateKeyAccessService {
     ///
     /// `authenticationContext`: a pre-authenticated subsystem-B `LAContext` to
     /// consume for the Secure Enclave reconstruction instead of the implicit
-    /// system prompt (the single-prompt-per-action contract, TARGET §4 — e.g.
-    /// the macOS modify-expiry flow authenticates once and threads the same
-    /// context into both its SE operations). `nil` (the default, and the only
-    /// value used on iOS/iPadOS/visionOS) keeps today's implicit prompt.
+    /// system prompt. For example, macOS modify-expiry authenticates once and
+    /// threads the same context into its short unwrap and rewrap windows. `nil`
+    /// (the default, and the only value used on iOS/iPadOS/visionOS) keeps
+    /// today's implicit prompt.
     /// The caller retains ownership and invalidates the context after its action.
     func unwrapPrivateKey(
         fingerprint: String,

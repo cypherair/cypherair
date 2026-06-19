@@ -3,7 +3,8 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// P3′ stage 2′ — single-prompt modify-expiry (TARGET §4).
+/// Modify-expiry pre-authentication: one `LAContext`, consumed by short Secure
+/// Enclave unwrap/rewrap windows.
 ///
 /// Positive: with the expiry authenticator wired, the flow authenticates exactly
 /// once and threads the SAME context into both Secure Enclave operations (the
@@ -17,8 +18,7 @@ import XCTest
 /// decrypt-flavored `noMatchingKey`.
 final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
     /// Counts invalidations so tests can pin "exactly one invalidate after the
-    /// action completes" (TARGET §6: the per-action context is confined and
-    /// invalidated).
+    /// action completes" (the per-action context is confined and invalidated).
     private final class TrackingLAContext: LAContext {
         private(set) var invalidateCount = 0
         override func invalidate() {
@@ -63,7 +63,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
             newExpirySeconds: 60 * 60 * 24 * 30
         )
 
-        XCTAssertEqual(stub.calls, 1, "Exactly one authentication for the whole action.")
+        XCTAssertEqual(stub.calls, 1, "Exactly one authentication context is minted for modify-expiry.")
         XCTAssertFalse(stub.reasons[0].isEmpty)
         XCTAssertTrue(
             made.mockSE.lastReconstructAuthenticationContext === stub.context,

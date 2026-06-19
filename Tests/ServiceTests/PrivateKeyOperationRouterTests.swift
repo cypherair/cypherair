@@ -729,12 +729,136 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
+    #if os(macOS)
+    @MainActor
+    func test_secureEnclaveSignerAuthorizationWindowRunsInsideOperationPromptSession() async throws {
+        try await assertCustodyAuthorizationWindowRunsInsideOperationPromptSession(
+            policy: .testSecureEnclaveSigningRoutes,
+            operation: .sign,
+            expectedRole: .signing
+        )
+    }
+
+    @MainActor
+    func test_secureEnclaveKeyAgreementAuthorizationWindowRunsInsideOperationPromptSession() async throws {
+        try await assertCustodyAuthorizationWindowRunsInsideOperationPromptSession(
+            policy: .testSecureEnclaveKeyAgreementRoutes,
+            operation: .decrypt,
+            expectedRole: .keyAgreement
+        )
+    }
+
+    @MainActor
+    func test_missingHandleWithPromptCoordinatorBlocksBeforeCustodyAuthentication() async throws {
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(
+            identity: identity,
+            signingPublicKeyX963: makePublicKey(byte: 0xA1),
+            keyAgreementPublicKeyX963: makePublicKey(byte: 0xA2)
+        )
+        let stub = StubCustodyOperationAuthenticator()
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .testSecureEnclaveSigningRoutes,
+            inspector: inspector,
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            custodyOperationAuthenticator: stub.authenticate,
+            authenticationPromptCoordinator: harness.coordinator
+        )
+
+        assertBlocked(
+            await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: .sign
+            )),
+            .unavailable(.privateHandleMissing)
+        )
+        XCTAssertEqual(stub.calls, 0)
+        XCTAssertFalse(harness.coordinator.isOperationPromptInProgress)
+    }
+
+    @MainActor
+    private func assertCustodyAuthorizationWindowRunsInsideOperationPromptSession(
+        policy: PGPKeyCapabilityResolver.Policy,
+        operation: PGPPrivateOperationKind,
+        expectedRole: PGPPrivateOperationRole
+    ) async throws {
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        await harness.unlockForTest()
+        let relocksBefore = harness.relockCount
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let setupStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            handleSetIdentifierGenerator: { "router-composition" }
+        )
+        let pair = try setupStore.createHandlePair()
+        let identity = makeSecureEnclaveIdentity()
+        let inspector = RecordingPublicBindingInspector()
+        inspector.inspection = makeInspection(identity: identity, pair: pair)
+        let loadObservation = LockedBool()
+        keyStore.onLoadKeys = {
+            loadObservation.set(harness.coordinator.isOperationPromptInProgress)
+        }
+        let gate = GatedRouterCustodyAuthenticator(coordinator: harness.coordinator)
+        let router = try makeRouter(
+            identities: [identity],
+            policy: policy,
+            inspector: inspector,
+            keyStore: keyStore,
+            custodyOperationAuthenticator: gate.authenticate,
+            authenticationPromptCoordinator: harness.coordinator
+        )
+        keyStore.resetCallHistory()
+
+        var routed: PrivateKeyOperationRoute?
+        let routeFinished = expectation(description: "router route finished")
+        Task { @MainActor in
+            routed = await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: operation
+            ))
+            routeFinished.fulfill()
+        }
+        await fulfillment(of: [gate.suspendedExpectation], timeout: 10)
+        await harness.settle()
+
+        XCTAssertEqual(gate.wasInOperationPromptSession, true)
+        harness.deliverResign()
+        await harness.settle()
+        XCTAssertEqual(harness.lockState, .unlocked)
+        XCTAssertEqual(harness.relockCount, relocksBefore)
+
+        gate.resume()
+        await fulfillment(of: [routeFinished], timeout: 10)
+        guard let route = routed else {
+            return XCTFail("Expected route result")
+        }
+        switch (expectedRole, route) {
+        case (.signing, .secureEnclaveSigner(let signerRoute)):
+            XCTAssertEqual(signerRoute.signingHandle.binding, pair.signing)
+        case (.keyAgreement, .secureEnclaveKeyAgreement(let keyAgreementRoute)):
+            XCTAssertEqual(keyAgreementRoute.keyAgreementHandle.binding, pair.keyAgreement)
+        default:
+            XCTFail("Expected Secure Enclave \(expectedRole) route")
+        }
+        XCTAssertTrue(loadObservation.value, "The authorized handle load must stay inside the prompt session.")
+
+        await harness.settle()
+        XCTAssertEqual(harness.lockState, .locked)
+        XCTAssertGreaterThan(harness.relockCount, relocksBefore)
+        route.endAuthorizedOperation()
+    }
+    #endif
+
     private func makeRouter(
         identities: [PGPKeyIdentity],
         policy: PGPKeyCapabilityResolver.Policy,
         inspector: RecordingPublicBindingInspector,
         keyStore: MockSecureEnclaveCustodyKeyStore,
-        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil
     ) throws -> PrivateKeyOperationRouter {
         let metadata = RouterMemoryKeyMetadataPersistence()
         metadata.seed(identities)
@@ -745,7 +869,8 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             resolver: PGPKeyCapabilityResolver(policy: policy),
             publicBindingInspector: inspector,
             handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
-            custodyOperationAuthenticator: custodyOperationAuthenticator
+            custodyOperationAuthenticator: custodyOperationAuthenticator,
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
     }
 
@@ -876,6 +1001,58 @@ private final class StubCustodyOperationAuthenticator: @unchecked Sendable {
         return context
     }
 }
+
+#if os(macOS)
+private final class GatedRouterCustodyAuthenticator: @unchecked Sendable {
+    private let coordinator: AuthenticationPromptCoordinator
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var observedInSession: Bool?
+    let context = RecordingLAContext()
+    let suspendedExpectation = XCTestExpectation(description: "router custody authorization suspended")
+
+    init(coordinator: AuthenticationPromptCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    var wasInOperationPromptSession: Bool? {
+        lock.withLock { observedInSession }
+    }
+
+    func authenticate(_ reason: String) async throws -> LAContext {
+        lock.withLock {
+            observedInSession = coordinator.isOperationPromptInProgress
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            lock.withLock { continuation = cont }
+            suspendedExpectation.fulfill()
+        }
+        return context
+    }
+
+    func resume() {
+        let cont = lock.withLock {
+            let value = continuation
+            continuation = nil
+            return value
+        }
+        cont?.resume()
+    }
+}
+
+private final class LockedBool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = false
+
+    var value: Bool {
+        lock.withLock { storage }
+    }
+
+    func set(_ value: Bool) {
+        lock.withLock { storage = value }
+    }
+}
+#endif
 
 private final class RecordingPublicBindingInspector: SecureEnclaveCustodyPublicBindingInspecting, @unchecked Sendable {
     var inspection: PGPSecureEnclaveCustodyPublicBindingInspection?

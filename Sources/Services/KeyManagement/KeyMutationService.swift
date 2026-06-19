@@ -9,13 +9,11 @@ struct SecureEnclaveCustodyDeletionContext {
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
-    /// macOS single-prompt pre-authentication for modify-expiry (TARGET §4):
-    /// evaluates the persisted mode's access control once (system sheet) and
-    /// returns the authenticated context, which the flow then threads into BOTH
-    /// Secure Enclave operations (unwrap of the old wrapping key; generation of
-    /// the new one, whose first self-ECDH inside `wrap` would otherwise prompt a
-    /// second time). `nil` (the default, and the only value on other platforms /
-    /// in unit tests) keeps the legacy two-prompt behavior; production macOS
+    /// macOS modify-expiry pre-authentication: evaluates the persisted mode's
+    /// access control once (system sheet) and returns the authenticated context,
+    /// which the flow threads into the short Secure Enclave unwrap and rewrap
+    /// windows. `nil` (the default, and the only value on other platforms / in
+    /// unit tests) keeps implicit per-operation authentication; production macOS
     /// wiring passes `systemSheetExpiryAuthenticator`.
     typealias ExpiryAuthenticator = (SecAccessControl, String) async throws -> LAContext
 
@@ -178,21 +176,11 @@ final class KeyMutationService {
         newExpirySeconds: UInt64?,
         authMode: AuthenticationMode
     ) async throws -> PGPKeyIdentity {
-        // The WHOLE action — pre-authentication included — runs inside ONE
-        // operation-prompt session, so the lock controller's `.authenticating`
-        // rule attributes every authentication-sheet resign to this action and
-        // defers the away decision to the session's end. (#495's failure: the
-        // pre-auth prompt ran outside any session, and its own sheet resign
-        // locked the app mid-action at grace=Immediately.) The inner
-        // `privateKey.unwrap` session nests on the coordinator's stack; the
-        // lifecycle hooks fire only on the outermost open/close.
-        try await authenticationPromptCoordinator.withOperationPrompt(source: "modifyExpiry") {
-            try await performModifySoftwareExpiry(
-                route: route,
-                newExpirySeconds: newExpirySeconds,
-                authMode: authMode
-            )
-        }
+        try await performModifySoftwareExpiry(
+            route: route,
+            newExpirySeconds: newExpirySeconds,
+            authMode: authMode
+        )
     }
 
     private func performModifySoftwareExpiry(
@@ -203,22 +191,14 @@ final class KeyMutationService {
         let fingerprint = route.identity.fingerprint
         let accessControl = try authMode.createAccessControl()
 
-        // Single prompt per user action (TARGET §4): when the authenticator is
-        // wired (production macOS), authenticate once BEFORE touching anything —
-        // a declined prompt aborts here, before any unwrap, pending bundle, or
-        // journal entry exists — and consume the same context in both Secure
-        // Enclave operations below. When nil (other platforms, unit tests), the
-        // SE authenticates implicitly as before.
+        // Authenticate before touching secret material, but scope the
+        // operation-prompt session only to the system sheet. The unwrap and
+        // rewrap Secure Enclave windows below have their own short enrollment;
+        // certificate mutation and durable storage do not.
         var authenticationContext: LAContext?
-        if let expiryAuthenticator {
-            authenticationContext = try await expiryAuthenticator(
-                accessControl,
-                String(
-                    localized: "keydetail.expiry.auth.reason",
-                    defaultValue: "Authenticate to change the key's expiry."
-                )
-            )
-        }
+        authenticationContext = try await authenticateModifyExpiryIfConfigured(
+            accessControl: accessControl
+        )
         defer {
             authenticationContext?.invalidate()
         }
@@ -247,14 +227,11 @@ final class KeyMutationService {
             throw CypherAirError.keyMetadataUnavailable
         }
 
-        let seHandle = try secureEnclave.generateWrappingKey(
+        let bundle = try await rewrapModifiedExpiryResult(
+            certData: result.certData,
+            fingerprint: fingerprint,
             accessControl: accessControl,
             authenticationContext: authenticationContext
-        )
-        let bundle = try secureEnclave.wrap(
-            privateKey: result.certData,
-            using: seHandle,
-            fingerprint: fingerprint
         )
 
         do {
@@ -304,6 +281,46 @@ final class KeyMutationService {
 
         try privateKeyControlStore.clearModifyExpiryJournal()
         return updated
+    }
+
+    private func authenticateModifyExpiryIfConfigured(
+        accessControl: SecAccessControl
+    ) async throws -> LAContext? {
+        guard let expiryAuthenticator else {
+            return nil
+        }
+        return try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "modifyExpiry.authenticate"
+        ) {
+            try await expiryAuthenticator(
+                accessControl,
+                String(
+                    localized: "keydetail.expiry.auth.reason",
+                    defaultValue: "Authenticate to change the key's expiry."
+                )
+            )
+        }
+    }
+
+    private func rewrapModifiedExpiryResult(
+        certData: Data,
+        fingerprint: String,
+        accessControl: SecAccessControl,
+        authenticationContext: LAContext?
+    ) async throws -> WrappedKeyBundle {
+        try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "modifyExpiry.rewrap"
+        ) {
+            let seHandle = try secureEnclave.generateWrappingKey(
+                accessControl: accessControl,
+                authenticationContext: authenticationContext
+            )
+            return try secureEnclave.wrap(
+                privateKey: certData,
+                using: seHandle,
+                fingerprint: fingerprint
+            )
+        }
     }
 
     private func modifySecureEnclaveExpiry(

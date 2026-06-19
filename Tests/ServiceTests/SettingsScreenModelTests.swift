@@ -534,8 +534,7 @@ final class SettingsScreenModelTests: XCTestCase {
 
     @MainActor
     func test_localDataReset_runsInsideOperationPromptSession_resignDeferredAndDecidedAtEnd() async {
-        // Uniform enrollment rule: the WHOLE reset action — confirmation
-        // authentication + the reset + restart-gate marking — runs inside one
+        // Short-window rule: only confirmation authentication runs inside the
         // operation-prompt session, so the confirmation sheet's own resign is
         // deferred and decided at the session's end.
         let resetContainer = AppContainer.makeUITest()
@@ -571,7 +570,7 @@ final class SettingsScreenModelTests: XCTestCase {
         XCTAssertEqual(
             observedInSession,
             true,
-            "The Local Data Reset confirmation prompt must run inside an operation-prompt session (the uniform rule)."
+            "The Local Data Reset confirmation prompt must run inside an operation-prompt session."
         )
 
         harness.deliverResign()

@@ -15,9 +15,11 @@ enum TestHelpers {
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
         metadataPersistence: (any KeyMetadataPersistence)? = nil,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil,
+        secureEnclaveOverride: (any SecureEnclaveManageable)? = nil,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
         secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
-        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
+        provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        provisioningWrappingPromptCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil
     ) -> (
         service: KeyManagementService,
         mockSE: MockSecureEnclave,
@@ -33,11 +35,12 @@ enum TestHelpers {
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let promptCoordinator = authenticationPromptCoordinator ?? AuthenticationPromptCoordinator()
+        let secureEnclave = secureEnclaveOverride ?? mockSE
 
         let service: KeyManagementService
         if let memInfo = memoryInfo {
             service = KeyManagementService(
-                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
+                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
                 keychain: mockKC, authenticator: mockAuth,
                 memoryInfo: memInfo,
                 defaults: .standard,
@@ -46,11 +49,12 @@ enum TestHelpers {
                 expiryAuthenticator: expiryAuthenticator,
                 secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
                 metadataPersistence: metadataPersistence,
-                provisioningCheckpoint: provisioningCheckpoint
+                provisioningCheckpoint: provisioningCheckpoint,
+                provisioningWrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint
             )
         } else {
             service = KeyManagementService(
-                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: mockSE,
+                keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
                 keychain: mockKC, authenticator: mockAuth,
                 defaults: .standard,
                 authenticationPromptCoordinator: promptCoordinator,
@@ -58,7 +62,8 @@ enum TestHelpers {
                 expiryAuthenticator: expiryAuthenticator,
                 secureEnclaveCustodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
                 metadataPersistence: metadataPersistence,
-                provisioningCheckpoint: provisioningCheckpoint
+                provisioningCheckpoint: provisioningCheckpoint,
+                provisioningWrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint
             )
         }
 
