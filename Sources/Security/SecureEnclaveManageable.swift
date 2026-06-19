@@ -87,8 +87,8 @@ protocol SecureEnclaveManageable: Sendable {
 // `reconstructKey` were removed in P3' stage 0: every call site states its
 // `authenticationContext:` explicitly, so a reviewer can see at each Secure
 // Enclave operation whether an authenticated context is threaded (e.g. the
-// mode-switch re-wrap, the stage-2 single-prompt key expiry) or implicit
-// system authentication is intended (`nil`).
+// mode-switch re-wrap or modify-expiry rewrap window) or implicit system
+// authentication is intended (`nil`).
 
 /// HKDF info string constant.
 /// CRITICAL: This exact string must be used in both wrapping and unwrapping.

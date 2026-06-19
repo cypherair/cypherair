@@ -4,10 +4,9 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Uniform enrollment rule — mode-switch rewrap: the WHOLE
-/// `AuthenticationManager.switchMode` action (pre-authentication + both re-wrap
-/// phases) runs inside one operation-prompt session, so the pre-auth sheet's
-/// own resign is deferred and decided at the session's end.
+/// Short operation-prompt window - mode-switch: only the pre-authentication and
+/// Secure Enclave rewrap windows run inside operation-prompt sessions, so the
+/// pre-auth sheet's own resign is deferred and decided at the session's end.
 @MainActor
 final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
     /// Suspends inside the mode-switch pre-auth so the test can deliver a
@@ -100,7 +99,7 @@ final class ModeSwitchOperationPromptCompositionTests: XCTestCase {
         XCTAssertEqual(
             stub.wasInOperationPromptSession,
             true,
-            "The mode-switch pre-auth must run inside an operation-prompt session (the uniform rule)."
+            "The mode-switch pre-auth must run inside an operation-prompt session."
         )
 
         harness.deliverResign()

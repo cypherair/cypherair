@@ -67,6 +67,10 @@ final class AppLockController {
     private let contentClearHandler: () -> Void
     /// UI-test bypass (the orchestrator's old `shouldBypassPrivacyAuthentication`).
     private let shouldBypassAuthentication: () -> Bool
+    /// Live coordinator query used on macOS to close begin/end hook races. When
+    /// absent, tests that exercise the controller directly fall back to the
+    /// main-actor mirror.
+    private let operationPromptInProgressProvider: (() -> Bool)?
     private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var lockState: LockState = .locked
@@ -82,10 +86,10 @@ final class AppLockController {
     /// Main-actor mirror of "an operation-prompt session is open", maintained by
     /// `handleOperationPromptSessionBegan()` / `handleOperationPromptsEnded()`
     /// (wired from `AuthenticationPromptCoordinator`'s lifecycle hooks). The away
-    /// rule consults THIS, not the coordinator's live depth: the mirror stays
-    /// open until the ended-hop lands on the main actor, so a resign delivered in
-    /// the gap between the prompt ending off-main and that hop is still deferred
-    /// (and then decided) instead of locking the app at the tail of an operation.
+    /// rule combines this mirror with the coordinator's live depth when one is
+    /// injected: live depth catches a resign that beats the began-hop, while a
+    /// false live depth prevents a stale ended-hop mirror from swallowing a real
+    /// away after the prompt has ended.
     /// A counter, not a Bool: if a new session's began-hop lands before the
     /// previous session's ended-hop, the count stays positive — correct under any
     /// hop interleaving. (A resign racing ahead of the very first began-hop is
@@ -136,6 +140,7 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
+        operationPromptInProgressProvider: (() -> Bool)? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.gracePeriodProvider = gracePeriodProvider
@@ -147,6 +152,7 @@ final class AppLockController {
         self.postAuthenticationHandler = postAuthenticationHandler
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
+        self.operationPromptInProgressProvider = operationPromptInProgressProvider
         self.traceStore = traceStore
     }
 
@@ -223,7 +229,7 @@ final class AppLockController {
         //     app is still not foreground-active then, and discards it if the user
         //     returned. This replaces the accepted P1-interim regression (a per-op
         //     prompt at grace=0 used to lock the app mid-operation).
-        if openOperationPromptSessions > 0 {
+        if isOperationPromptInProgressForAwayRule {
             // First resign wins: later resigns during the same prompt session carry
             // no additional information (the decision at the prompts' end depends
             // only on `isForegroundActive`), and keeping the earliest source makes
@@ -322,6 +328,15 @@ final class AppLockController {
         handleAwayEvent(source: "deferredOperationAway:\(source)")
         #endif
     }
+
+    #if os(macOS)
+    private var isOperationPromptInProgressForAwayRule: Bool {
+        if let operationPromptInProgressProvider {
+            return operationPromptInProgressProvider()
+        }
+        return openOperationPromptSessions > 0
+    }
+    #endif
 
     /// The app returned to the foreground. Idempotent: safe to call from both the
     /// lifecycle observer (`.active` / `didBecomeActive`) and the lock surface's
@@ -428,9 +443,8 @@ final class AppLockController {
         // domains — there is no data left for a lock to protect — and the
         // post-reset restart gate disables all UI interaction until relaunch.
         // `openOperationPromptSessions` is deliberately NOT reset: the hooks are
-        // the counter's sole mutators, and the reset action itself runs inside a
-        // balanced operation-prompt session (the uniform rule) whose ended-hook
-        // decrements normally after this method returns.
+        // the counter's sole mutators, and any in-flight reset authentication
+        // prompt session decrements normally after this method returns.
         pendingOperationPromptAway = nil
         #endif
         discardHandoffContext("localDataReset")

@@ -89,7 +89,10 @@ final class AppLockControllerTests: XCTestCase {
         }
     }
 
-    private func makeController(spy: Spy) -> AppLockController {
+    private func makeController(
+        spy: Spy,
+        operationPromptInProgressProvider: (() -> Bool)? = nil
+    ) -> AppLockController {
         AppLockController(
             gracePeriodProvider: { spy.gracePeriod },
             lastAuthenticationDateProvider: { spy.lastAuthenticationDate },
@@ -100,6 +103,7 @@ final class AppLockControllerTests: XCTestCase {
             postAuthenticationHandler: { await spy.postAuth($0, $1) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
+            operationPromptInProgressProvider: operationPromptInProgressProvider,
             traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         )
     }
@@ -599,17 +603,60 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .locked, "The deferred away is decided at the true end.")
     }
 
-    func test_authenticatingRule_hopDelayRace_resignAfterPromptEndsButBeforeHopLands_isDeferred() async {
-        // Integration pin for the TOCTOU the mirror exists to close: wire a REAL
-        // coordinator through the same Task-hop pattern AppContainer uses, end the
-        // prompt on the main thread (the ended-hop Task is enqueued but has NOT
-        // run), and deliver a resign in that gap. Live-depth polling would see
-        // "no prompt" and lock at the tail of the operation; the mirror keeps the
-        // resign deferred until the hop lands and decides.
+    func test_authenticatingRule_beginHopDelay_livePromptStillDefersResign() async {
+        // The coordinator live-depth closes the other side of the hop race: if
+        // a prompt begins and a resign arrives before the began-hop opens the
+        // main-actor mirror, the live prompt still marks the resign ambiguous.
         let spy = Spy()
         spy.gracePeriod = 0
-        let controller = makeController(spy: spy)
         let coordinator = AuthenticationPromptCoordinator()
+        let controller = makeController(
+            spy: spy,
+            operationPromptInProgressProvider: {
+                coordinator.isOperationPromptInProgress
+            }
+        )
+        coordinator.onOperationPromptSessionBegan = { [weak controller] in
+            Task { @MainActor in controller?.handleOperationPromptSessionBegan() }
+        }
+        coordinator.onOperationPromptsEnded = { [weak controller] in
+            Task { @MainActor in controller?.handleOperationPromptsEnded() }
+        }
+
+        await controller.handleForegroundActive(source: "boot")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        let relocksBefore = spy.relockCount
+
+        let prompt = coordinator.beginOperationPrompt(source: "op")
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "macResignActive")
+
+        XCTAssertEqual(
+            controller.lockState,
+            .unlocked,
+            "The live prompt must defer a resign that beats the began-hop."
+        )
+        XCTAssertEqual(spy.relockCount, relocksBefore, "No relock before the deferred decision.")
+
+        coordinator.endOperationPrompt(prompt)
+        await settle()
+
+        XCTAssertEqual(controller.lockState, .locked, "Still away at the decision point -> fail-closed lock.")
+        XCTAssertGreaterThan(spy.relockCount, relocksBefore)
+    }
+
+    func test_authenticatingRule_endHopDelay_livePromptEndedTreatsResignAsRealAway() async {
+        // When the prompt has ended but the ended-hop has not landed, the stale
+        // mirror must not swallow a real macOS away. Live-depth false wins.
+        let spy = Spy()
+        spy.gracePeriod = 0
+        let coordinator = AuthenticationPromptCoordinator()
+        let controller = makeController(
+            spy: spy,
+            operationPromptInProgressProvider: {
+                coordinator.isOperationPromptInProgress
+            }
+        )
         coordinator.onOperationPromptSessionBegan = { [weak controller] in
             Task { @MainActor in controller?.handleOperationPromptSessionBegan() }
         }
@@ -623,23 +670,17 @@ final class AppLockControllerTests: XCTestCase {
 
         let prompt = coordinator.beginOperationPrompt(source: "op")
         await settle() // began-hop lands: mirror opens
-
-        // The prompt ends (coordinator depth -> 0; ended-hop Task enqueued, not
-        // yet run) and the resign arrives on the main actor inside that gap.
         coordinator.endOperationPrompt(prompt)
+
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
+        await settle()
 
         XCTAssertEqual(
             controller.lockState,
-            .unlocked,
-            "The resign in the prompt-end gap must be deferred, not processed as a genuine away."
+            .locked,
+            "A resign after live prompt end is a real away even if the ended-hop is still queued."
         )
-        XCTAssertEqual(spy.relockCount, relocksBefore, "No relock before the deferred decision.")
-
-        await settle() // ended-hop lands: mirror closes, deferred away is decided
-
-        XCTAssertEqual(controller.lockState, .locked, "Still away at the decision point -> fail-closed lock.")
         XCTAssertGreaterThan(spy.relockCount, relocksBefore)
     }
 

@@ -24,6 +24,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
     private let provisioningInvalidationGate: KeyProvisioningInvalidationGate
     private let provisioningCommitCoordinator: KeyProvisioningCommitCoordinator
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let postProvisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
@@ -55,6 +56,7 @@ final class KeyManagementService: @unchecked Sendable {
         metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
+        provisioningWrappingPromptCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         afterPermanentBundleStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         identityStoreCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -86,6 +88,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.privateKeyControlStore = effectivePrivateKeyControlStore
         self.provisioningInvalidationGate = provisioningInvalidationGate
         self.provisioningCommitCoordinator = provisioningCommitCoordinator
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.beforeAuthModeReadCheckpoint = beforeAuthModeReadCheckpoint
         self.postProvisioningCheckpoint = postProvisioningCheckpoint
         self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
@@ -101,6 +104,7 @@ final class KeyManagementService: @unchecked Sendable {
             commitCoordinator: provisioningCommitCoordinator,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             beforePermanentStorageCheckpoint: provisioningCheckpoint,
+            wrappingPromptCheckpoint: provisioningWrappingPromptCheckpoint,
             afterImportOffMainActorCheckpoint: afterImportOffMainActorCheckpoint,
             afterPermanentBundleStoreCheckpoint: afterPermanentBundleStoreCheckpoint,
             afterIdentityStoreCheckpoint: identityStoreCheckpoint
@@ -566,7 +570,8 @@ final class KeyManagementService: @unchecked Sendable {
             resolver: resolver,
             publicBindingInspector: publicBindingInspector,
             handleStore: handleStore,
-            custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator
+            custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
     }
 

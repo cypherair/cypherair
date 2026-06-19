@@ -4,11 +4,8 @@ This document is the implementation planning record for active accepted security
 
 ## Pending Triage (2026-06-14 Scan)
 
-The 2026-06-14 Codex scan recorded eleven newly detected findings, listed in `docs/CODEX_SECURITY_REVIEW_INDEX.md` as `SR-NEW-01`–`SR-NEW-11`. Per maintainer direction, triage (disposition) and fix planning for these are deferred until the in-progress whole-codebase review completes — no `SR-FIX-*` IDs, dispositions, or fix plans are assigned here yet.
+The 2026-06-14 Codex scan recorded eleven newly detected findings, listed in `docs/CODEX_SECURITY_REVIEW_INDEX.md` as `SR-NEW-01`–`SR-NEW-11`. `SR-NEW-01`, `SR-NEW-02`, and `SR-NEW-03` have been fixed by the short operation-prompt window redesign and moved to the closed record. Per maintainer direction, triage (disposition) and fix planning for the remaining findings are deferred until the in-progress whole-codebase review completes — no `SR-FIX-*` IDs, dispositions, or fix plans are assigned here yet.
 
-- `SR-NEW-01` — Provisioning sessions bypass immediate macOS relock (medium)
-- `SR-NEW-02` — Modify-expiry can suppress immediate relock on macOS (medium)
-- `SR-NEW-03` — Stale prompt mirror can swallow macOS away events (medium)
 - `SR-NEW-04` — Local reset no longer removes legacy LARight root secrets (medium)
 - `SR-NEW-05` — Legacy high-security mode can be silently downgraded (medium)
 - `SR-NEW-06` — Local reset leaves retired key metadata rows behind (medium)

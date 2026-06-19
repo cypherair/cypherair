@@ -146,15 +146,12 @@ final class AppContainer: @unchecked Sendable {
 
     #if os(macOS)
     /// Wire the operation-prompt lifecycle hooks to the lock controller's
-    /// main-actor mirror (the `.authenticating` rule, TARGET §3). The hooks fire
-    /// on the thread that adjusted the prompt depth and hop to the main actor;
-    /// the controller's session counter is what `handleAwayEvent` consults, so a
-    /// resign delivered between a prompt ending off-main and the ended-hop
-    /// landing is still deferred and decided — never misread as a genuine away.
-    /// Either hop ordering against a concurrent didBecomeActive is safe (the
-    /// decision reads `isForegroundActive` on the main actor: user back →
-    /// discard, still away → lock — both fail-closed). The coordinator's hooks
-    /// are write-once; every `AppLockController` construction site must call this.
+    /// main-actor mirror (the `.authenticating` rule). The controller also gets
+    /// the coordinator's live depth as an injected closure: live depth catches a
+    /// resign that beats the began-hop, while a false live depth prevents a stale
+    /// ended-hop mirror from swallowing a real away after the prompt has ended.
+    /// The coordinator's hooks are write-once; every `AppLockController`
+    /// construction site must call this on macOS.
     @MainActor
     private static func wireOperationPromptLifecycle(
         from coordinator: AuthenticationPromptCoordinator,
@@ -173,10 +170,9 @@ final class AppContainer: @unchecked Sendable {
     }
     #endif
 
-    /// The platform modify-expiry pre-authenticator: macOS authenticates once
-    /// via the system sheet and threads the context into both SE operations
-    /// (TARGET §4 single-prompt contract); other platforms keep the implicit
-    /// per-operation prompts unchanged.
+    /// The platform modify-expiry pre-authenticator: macOS authenticates via the
+    /// system sheet and threads the context into the short SE unwrap/rewrap
+    /// windows; other platforms keep the implicit per-operation prompts unchanged.
     private static var productionExpiryAuthenticator: KeyMutationService.ExpiryAuthenticator? {
         #if os(macOS)
         KeyMutationService.systemSheetExpiryAuthenticator
@@ -185,17 +181,18 @@ final class AppContainer: @unchecked Sendable {
         #endif
     }
 
-    /// The custody pre-authenticator (P7F single-prompt contract): one biometric
-    /// system-sheet evaluation per Secure Enclave custody private operation,
-    /// threaded into the handle-loading keychain query via kSecUseAuthenticationContext.
+    /// The custody pre-authenticator: one biometric system-sheet evaluation per
+    /// Secure Enclave custody private operation, threaded into the handle-loading
+    /// keychain query via kSecUseAuthenticationContext.
     /// Bypass containers (UI test, tutorial) stay nil.
     private static var productionSecureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? {
         PrivateKeyOperationRouter.systemBiometricCustodyOperationAuthenticator
     }
 
     /// Builds the App Access Protection policy-switch workflow over the
-    /// container's live dependencies. The workflow encloses the whole switch in
-    /// one operation-prompt session (the uniform rule, TARGET §3).
+    /// container's live dependencies. The workflow enrolls only its authentication
+    /// and immediate root-secret re-protection window in an operation-prompt
+    /// session.
     @MainActor
     func makeAppAccessPolicySwitchWorkflow() -> AppAccessPolicySwitchWorkflow {
         let config = config
@@ -749,7 +746,7 @@ final class AppContainer: @unchecked Sendable {
             defaults: .standard,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
-            // Single-prompt modify-expiry (TARGET §4): wired in production only.
+            // Short-window modify-expiry pre-auth: wired in production only.
             // The UI-test container stays nil (mock Secure Enclave under the
             // authentication bypass must not drive real LocalAuthentication).
             expiryAuthenticator: Self.productionExpiryAuthenticator,
@@ -763,9 +760,8 @@ final class AppContainer: @unchecked Sendable {
             // Device-bound Secure Enclave custody generation (issue #501 P7D
             // exposure). Hardware-guarded at the composition root; on hardware
             // without a Secure Enclave the factory stays nil and the UI hides
-            // the device-bound families. The prompt coordinator enrolls the
-            // whole generation (biometryAny digest signing presents auth
-            // sheets) in one operation-prompt session per SECURITY.md §4.
+            // the device-bound families. The prompt coordinator enrolls only
+            // the custody authorization and immediate handle-load window.
             secureEnclaveCustodyGenerationServiceFactory: HardwareSecureEnclave.isAvailable
                 ? { catalogStore, invalidationGate, commitCoordinator in
                     SecureEnclaveCustodyGenerationService(
@@ -919,6 +915,9 @@ final class AppContainer: @unchecked Sendable {
                 appSessionOrchestrator.requestContentClear()
             },
             shouldBypassAuthentication: { false },
+            operationPromptInProgressProvider: {
+                authPromptCoordinator.isOperationPromptInProgress
+            },
             traceStore: authLifecycleTraceStore
         )
         #if os(macOS)
@@ -1233,6 +1232,9 @@ final class AppContainer: @unchecked Sendable {
                 appSessionOrchestrator.requestContentClear()
             },
             shouldBypassAuthentication: { !requiresManualAuthentication },
+            operationPromptInProgressProvider: {
+                authPromptCoordinator.isOperationPromptInProgress
+            },
             traceStore: authLifecycleTraceStore
         )
         #if os(macOS)

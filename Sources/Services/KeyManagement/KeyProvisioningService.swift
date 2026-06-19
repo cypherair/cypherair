@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Owns key generation and import workflows behind the key-management facade.
 final class KeyProvisioningService {
@@ -12,6 +13,7 @@ final class KeyProvisioningService {
     private let invalidationGate: KeyProvisioningInvalidationGate
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let beforePermanentStorageCheckpoint: ProvisioningCheckpoint?
+    private let wrappingPromptCheckpoint: ProvisioningCheckpoint?
     private let afterImportOffMainActorCheckpoint: ProvisioningCheckpoint?
     private let afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint?
     private let afterIdentityStoreCheckpoint: ProvisioningCheckpoint?
@@ -27,6 +29,7 @@ final class KeyProvisioningService {
         commitCoordinator: KeyProvisioningCommitCoordinator,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         beforePermanentStorageCheckpoint: ProvisioningCheckpoint? = nil,
+        wrappingPromptCheckpoint: ProvisioningCheckpoint? = nil,
         afterImportOffMainActorCheckpoint: ProvisioningCheckpoint? = nil,
         afterPermanentBundleStoreCheckpoint: ProvisioningCheckpoint? = nil,
         afterIdentityStoreCheckpoint: ProvisioningCheckpoint? = nil
@@ -39,19 +42,17 @@ final class KeyProvisioningService {
         self.invalidationGate = invalidationGate
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.beforePermanentStorageCheckpoint = beforePermanentStorageCheckpoint
+        self.wrappingPromptCheckpoint = wrappingPromptCheckpoint
         self.afterImportOffMainActorCheckpoint = afterImportOffMainActorCheckpoint
         self.afterPermanentBundleStoreCheckpoint = afterPermanentBundleStoreCheckpoint
         self.afterIdentityStoreCheckpoint = afterIdentityStoreCheckpoint
         self.commitCoordinator = commitCoordinator
     }
 
-    /// Each whole provisioning action runs inside ONE operation-prompt session
-    /// (the uniform rule, TARGET §3): the new wrapping key's first self-ECDH
-    /// inside `wrap` presents the system prompt, and that sheet's own resign
-    /// must be attributed to this action — deferred to the session's end, never
-    /// a mid-action lock. A long key generation extends the deferral window by
-    /// design: a user who switches away and stays away is locked at the
-    /// action's end (stage-1 fail-closed-at-decision semantics).
+    /// Only the Secure Enclave wrapping window is enrolled in an
+    /// operation-prompt session. Long Rust generation and durable storage stay
+    /// outside that window so a genuine macOS away still locks immediately when
+    /// grace period is 0.
     func generateKey(
         name: String,
         email: String?,
@@ -60,16 +61,14 @@ final class KeyProvisioningService {
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        try await authenticationPromptCoordinator.withOperationPrompt(source: "keyProvisioning.generate") {
-            try await performGenerateKey(
-                name: name,
-                email: email,
-                expirySeconds: expirySeconds,
-                profile: profile,
-                authMode: authMode,
-                invalidationToken: token
-            )
-        }
+        try await performGenerateKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            profile: profile,
+            authMode: authMode,
+            invalidationToken: token
+        )
     }
 
     private func performGenerateKey(
@@ -95,11 +94,11 @@ final class KeyProvisioningService {
 
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(
+        let bundle = try await wrapForProvisioning(
             privateKey: generated.certData,
-            using: seHandle,
-            fingerprint: generated.metadata.fingerprint
+            fingerprint: generated.metadata.fingerprint,
+            accessControl: accessControl,
+            source: "keyProvisioning.generate.wrap"
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
@@ -129,22 +128,20 @@ final class KeyProvisioningService {
         return identity
     }
 
-    /// See `generateKey` — the same one-session-per-action enrollment applies
-    /// to the import's wrap prompt.
+    /// See `generateKey` — import parsing stays outside the prompt session; the
+    /// Secure Enclave wrap is the only enrolled window.
     func importKey(
         armoredData: Data,
         passphrase: String,
         authMode: AuthenticationMode,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        try await authenticationPromptCoordinator.withOperationPrompt(source: "keyProvisioning.import") {
-            try await performImportKey(
-                armoredData: armoredData,
-                passphrase: passphrase,
-                authMode: authMode,
-                invalidationToken: token
-            )
-        }
+        try await performImportKey(
+            armoredData: armoredData,
+            passphrase: passphrase,
+            authMode: authMode,
+            invalidationToken: token
+        )
     }
 
     private func performImportKey(
@@ -182,11 +179,11 @@ final class KeyProvisioningService {
 
         try await prepareForPermanentStorage(token: token)
         let accessControl = try authMode.createAccessControl()
-        let seHandle = try secureEnclave.generateWrappingKey(accessControl: accessControl, authenticationContext: nil)
-        let bundle = try secureEnclave.wrap(
+        let bundle = try await wrapForProvisioning(
             privateKey: imported.secretKeyData,
-            using: seHandle,
-            fingerprint: imported.metadata.fingerprint
+            fingerprint: imported.metadata.fingerprint,
+            accessControl: accessControl,
+            source: "keyProvisioning.import.wrap"
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
@@ -214,6 +211,28 @@ final class KeyProvisioningService {
         try await commitIdentity(identity, bundle: bundle, token: token)
 
         return identity
+    }
+
+    private func wrapForProvisioning(
+        privateKey: Data,
+        fingerprint: String,
+        accessControl: SecAccessControl,
+        source: String
+    ) async throws -> WrappedKeyBundle {
+        try await authenticationPromptCoordinator.withOperationPrompt(source: source) {
+            if let wrappingPromptCheckpoint {
+                await wrappingPromptCheckpoint()
+            }
+            let seHandle = try secureEnclave.generateWrappingKey(
+                accessControl: accessControl,
+                authenticationContext: nil
+            )
+            return try secureEnclave.wrap(
+                privateKey: privateKey,
+                using: seHandle,
+                fingerprint: fingerprint
+            )
+        }
     }
 
     private func prepareForPermanentStorage(

@@ -4,15 +4,13 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Uniform enrollment rule — Secure Enclave custody generation (P7D): the
-/// whole device-bound generation runs inside one operation-prompt session, so
-/// the biometryAny digest-signing prompts' own sheet resign is deferred and
-/// decided at the session's end (mirrors KeyProvisioningOperationPromptCompositionTests).
+/// Short operation-prompt window — Secure Enclave custody generation (P7D):
+/// only custody authorization plus immediate handle loading runs inside the
+/// session; certificate building and metadata commit stay outside it.
 @MainActor
 final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementServiceTestCase {
-    /// Suspends inside the post-identity-commit checkpoint so the test can
-    /// deliver a resign mid-action, recording whether the coordinator saw the
-    /// action as an operation session.
+    /// Suspends inside a checkpoint and records whether the coordinator saw
+    /// that checkpoint as part of an operation session.
     private final class CheckpointGate: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<Void, Never>?
@@ -53,14 +51,14 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         }
     }
 
-    func test_secureEnclaveGeneration_runsInsideOperationPromptSession_resignDeferred_thenLockedWhenStillAway() async throws {
+    func test_secureEnclaveGeneration_authorizationWindowResignDeferred_thenLockedWhenStillAway() async throws {
         let harness = OperationPromptLockHarness(gracePeriod: 0)
         await harness.unlockForTest()
         let relocksBefore = harness.relockCount
-        let gate = CheckpointGate(coordinator: harness.coordinator)
+        let gate = GatedCustodyAuthenticator(coordinator: harness.coordinator)
         let target = makeHiddenSecureEnclaveGenerationService(
             authenticationPromptCoordinator: harness.coordinator,
-            afterIdentityCommitCheckpoint: gate.checkpoint
+            custodyOperationAuthenticator: gate.authenticate
         )
 
         let action = Task { [service = target.service] in
@@ -77,7 +75,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         XCTAssertEqual(
             gate.wasInOperationPromptSession,
             true,
-            "Device-bound generation must run inside an operation-prompt session (the uniform rule)."
+            "The device-bound generation authorization window must run inside an operation-prompt session."
         )
 
         harness.deliverResign()
@@ -85,7 +83,7 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
         XCTAssertEqual(
             harness.lockState,
             .unlocked,
-            "A resign during in-session generation is deferred, never a mid-action lock."
+            "A resign during in-session custody authorization is deferred, never a mid-action lock."
         )
         XCTAssertEqual(harness.relockCount, relocksBefore)
 
@@ -100,6 +98,45 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
             "Still away at the prompts' end -> the deferred away is processed fail-closed."
         )
         XCTAssertGreaterThan(harness.relockCount, relocksBefore)
+    }
+
+    func test_secureEnclaveGeneration_postCommitResignLocksImmediately() async throws {
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        await harness.unlockForTest()
+        let relocksBefore = harness.relockCount
+        let gate = CheckpointGate(coordinator: harness.coordinator)
+        let target = makeHiddenSecureEnclaveGenerationService(
+            authenticationPromptCoordinator: harness.coordinator,
+            afterIdentityCommitCheckpoint: gate.checkpoint
+        )
+
+        let action = Task { [service = target.service] in
+            try await service.generateSecureEnclaveCustodyKey(
+                name: "SE Custody Outside Prompt",
+                email: nil,
+                expirySeconds: nil,
+                configurationIdentity: .compatibleP256V4
+            )
+        }
+        await fulfillment(of: [gate.suspendedExpectation], timeout: 30)
+
+        XCTAssertEqual(
+            gate.wasInOperationPromptSession,
+            false,
+            "The post-identity-commit checkpoint must stay outside the operation-prompt session."
+        )
+
+        harness.deliverResign()
+        await harness.settle()
+        XCTAssertEqual(
+            harness.lockState,
+            .locked,
+            "A genuine resign after the authorization window locks immediately at grace=0."
+        )
+        XCTAssertGreaterThan(harness.relockCount, relocksBefore)
+
+        gate.resume()
+        _ = try await action.value
     }
 
     func test_secureEnclaveGeneration_withoutCoordinator_stillGenerates() async throws {
@@ -118,9 +155,9 @@ final class SecureEnclaveCustodyGenerationPromptCompositionTests: KeyManagementS
     }
 
     func test_secureEnclaveGeneration_custodyPreAuthenticationRunsInsideOperationPromptSession() async throws {
-        // P7F: the single-prompt pre-authentication is part of the SAME
-        // operation-prompt session as the rest of the generation, so its own
-        // sheet resign is attributed to this action like every other prompt.
+        // The custody pre-authentication and immediate handle load share one
+        // short operation-prompt session, so the sheet's own resign is deferred
+        // without covering the rest of generation.
         let coordinator = AuthenticationPromptCoordinator()
         let observer = SessionObservingCustodyAuthenticator(coordinator: coordinator)
         let target = makeHiddenSecureEnclaveGenerationService(
@@ -171,6 +208,43 @@ private final class SessionObservingCustodyAuthenticator: @unchecked Sendable {
             sawOperationPromptInProgressStorage = coordinator.isOperationPromptInProgress
         }
         return context
+    }
+}
+
+private final class GatedCustodyAuthenticator: @unchecked Sendable {
+    private let coordinator: AuthenticationPromptCoordinator
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var observedInSession: Bool?
+    let context = RecordingLAContext()
+    let suspendedExpectation = XCTestExpectation(description: "custody authorization suspended")
+
+    init(coordinator: AuthenticationPromptCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    var wasInOperationPromptSession: Bool? {
+        lock.withLock { observedInSession }
+    }
+
+    @Sendable func authenticate(_ reason: String) async throws -> LAContext {
+        lock.withLock {
+            observedInSession = coordinator.isOperationPromptInProgress
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            lock.withLock { continuation = cont }
+            suspendedExpectation.fulfill()
+        }
+        return context
+    }
+
+    func resume() {
+        let cont = lock.withLock {
+            let value = continuation
+            continuation = nil
+            return value
+        }
+        cont?.resume()
     }
 }
 #endif

@@ -4,8 +4,8 @@ import LocalAuthentication
 import XCTest
 @testable import CypherAir
 
-/// Shared composition harness for the uniform operation-prompt enrollment tests
-/// (P3′ stage 2′ + the uniform rule): a REAL `AuthenticationPromptCoordinator`
+/// Shared composition harness for short operation-prompt window tests: a REAL
+/// `AuthenticationPromptCoordinator`
 /// wired to a REAL `AppLockController` through the same `Task { @MainActor in }`
 /// hop pattern `AppContainer.wireOperationPromptLifecycle` uses, with closure-spy
 /// dependencies (grace 0, auto-success auth, relock counter).
@@ -18,11 +18,8 @@ import XCTest
 /// and use `deliverResign()` / `deliverReturn()` + `settle()` to drive the
 /// deferred-away decision.
 ///
-/// Usage gotcha: always `settle()` AFTER the in-flow stub signals it is running
-/// and BEFORE `deliverResign()`. The mirror opens only when the session-began
-/// hop lands on the main actor; a resign delivered before that is processed as
-/// a genuine away (designed fail-closed), which makes the test flaky, not the
-/// production code wrong.
+/// The controller also receives the coordinator's live operation-prompt state,
+/// so tests cover the production fallback for begin/end main-actor hop lag.
 @MainActor
 final class OperationPromptLockHarness {
     /// Captured by the controller's closures; holds no reference back to the
@@ -35,7 +32,7 @@ final class OperationPromptLockHarness {
         func contentClear() { contentClearCount += 1 }
     }
 
-    let coordinator = AuthenticationPromptCoordinator()
+    let coordinator: AuthenticationPromptCoordinator
     let state: State
     let controller: AppLockController
 
@@ -43,8 +40,10 @@ final class OperationPromptLockHarness {
     var lockState: AppLockController.LockState { controller.lockState }
 
     init(gracePeriod: Int? = 0) {
+        let coordinator = AuthenticationPromptCoordinator()
         let state = State()
         state.gracePeriod = gracePeriod
+        self.coordinator = coordinator
         self.state = state
         let controller = AppLockController(
             gracePeriodProvider: { state.gracePeriod },
@@ -56,6 +55,9 @@ final class OperationPromptLockHarness {
             postAuthenticationHandler: { _, _ in },
             contentClearHandler: { state.contentClear() },
             shouldBypassAuthentication: { false },
+            operationPromptInProgressProvider: { [weak coordinator] in
+                coordinator?.isOperationPromptInProgress ?? false
+            },
             traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
         )
         self.controller = controller

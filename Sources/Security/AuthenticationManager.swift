@@ -104,11 +104,10 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private let rewrapRecoveryCoordinator: PrivateKeyRewrapRecoveryCoordinator
     private let rewrapWorkflow: PrivateKeyRewrapWorkflow
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    /// The app-wide prompt coordinator, exposed so user-action owners (e.g. the
-    /// settings model's Local Data Reset) can enroll their WHOLE action in one
-    /// operation-prompt session (the uniform rule, TARGET §3): any user action
-    /// that can present an authentication sheet while unlocked runs inside one
-    /// session for its full duration.
+    /// The app-wide prompt coordinator, exposed so user-action owners can enroll
+    /// only the authentication sheet and immediate authenticated Keychain/Secure
+    /// Enclave window. Long-running action work must stay outside this session
+    /// so genuine macOS away events still lock immediately at grace period 0.
     var promptCoordinator: AuthenticationPromptCoordinator {
         authenticationPromptCoordinator
     }
@@ -180,6 +179,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.rewrapWorkflow = PrivateKeyRewrapWorkflow(
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
+            authenticationPromptCoordinator: authenticationPromptCoordinator,
             traceStore: traceStore
         )
     }
@@ -742,22 +742,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
         hasBackup: Bool,
         authenticator: any AuthenticationEvaluable
     ) async throws {
-        // The WHOLE switch — pre-authentication and both re-wrap phases — runs
-        // inside ONE operation-prompt session (the uniform rule, TARGET §3):
-        // the pre-auth sheet's own resign is attributed to this action and the
-        // away decision is deferred to the session's end, never a mid-action
-        // lock. The nested `evaluate(mode:)` privacy prompt rides the
-        // coordinator's separate privacy stack by design.
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "privateKeyProtection.switch"
-        ) {
-            try await performSwitchMode(
-                to: newMode,
-                fingerprints: fingerprints,
-                hasBackup: hasBackup,
-                authenticator: authenticator
-            )
-        }
+        try await performSwitchMode(
+            to: newMode,
+            fingerprints: fingerprints,
+            hasBackup: hasBackup,
+            authenticator: authenticator
+        )
     }
 
     private func performSwitchMode(
@@ -811,13 +801,17 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
-        try await modeSwitchAuthenticator.authenticateCurrentMode(
-            oldMode,
-            targetMode: newMode,
-            authenticator: authenticator
-        )
+        try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "privateKeyProtection.switch.authenticate"
+        ) {
+            try await modeSwitchAuthenticator.authenticateCurrentMode(
+                oldMode,
+                targetMode: newMode,
+                authenticator: authenticator
+            )
+        }
 
-        try rewrapWorkflow.run(
+        try await rewrapWorkflow.run(
             targetMode: newMode,
             fingerprints: fingerprints,
             authenticator: authenticator,

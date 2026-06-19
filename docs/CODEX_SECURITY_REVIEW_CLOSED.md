@@ -509,3 +509,39 @@ The archived CSV exports are retained as raw source exports. This Markdown file 
 - Source: [finding](https://chatgpt.com/codex/cloud/security/archives/de7b1bdfb5b88191ad0fd84580d82d1a)
 - Decision: Auto-closed by the security scanner (no longer detected) and imported from the 2026-06-14 archived export. Detected 2026-06-05: an in-flight successful resume that completed after a background transition could clear the blur from the pre-background authentication instead of forcing a fresh resume check under an expired grace period. Recorded as fixed pending the maintainer's post-review curation.
 - Relevant paths: `Sources/Security/ProtectedData/AppSessionOrchestrator.swift`, `Sources/App/Common/PrivacyScreenModifier.swift`
+
+### SR-CLOSED-48: Provisioning sessions bypass immediate macOS relock
+
+- Former Review ID: `SR-NEW-01`
+- Legacy ID: `none`
+- Severity: `medium`
+- Area: `auth-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/125bb562d9b48191bbceb02c1c9e934a)
+- Decision: Fixed. Key generation and import now keep long provisioning work outside the operation-prompt session and enroll only the Secure Enclave wrapping key generation / wrap window that can consume the authenticated context.
+- Resolution: `KeyProvisioningService` scopes `withOperationPrompt` to the provisioning wrap helper. Composition tests assert a resign before the wrap window locks immediately under grace=0, while a resign during the wrap window is deferred and decided at prompt end.
+- Relevant paths: `Sources/Services/KeyManagement/KeyProvisioningService.swift`, `Tests/ServiceTests/KeyProvisioningOperationPromptCompositionTests.swift`
+
+### SR-CLOSED-49: Modify-expiry can suppress immediate relock on macOS
+
+- Former Review ID: `SR-NEW-02`
+- Legacy ID: `none`
+- Severity: `medium`
+- Area: `auth-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/d72b05196e888191baeb4b742c6b1dc4)
+- Decision: Fixed. Modify-expiry no longer wraps the whole mutation in one operation-prompt session.
+- Resolution: The workflow scopes sessions to the pre-authentication window, the existing private-key unwrap window, and the required Secure Enclave rewrap window. Journaling, metadata updates, and other mutation work run outside the prompt sessions, preserving immediate macOS relock outside the authentication windows.
+- Relevant paths: `Sources/Services/KeyManagement/KeyMutationService.swift`, `Tests/ServiceTests/ModifyExpiryOperationPromptCompositionTests.swift`, `Tests/ServiceTests/KeyMutationServiceSinglePromptExpiryTests.swift`
+
+### SR-CLOSED-50: Stale prompt mirror can swallow macOS away events
+
+- Former Review ID: `SR-NEW-03`
+- Legacy ID: `none`
+- Severity: `medium`
+- Area: `auth-lifecycle`
+- Disposition: `closed-fixed`
+- Source: [finding](https://chatgpt.com/codex/cloud/security/findings/c1b8e2983ee881918e8d9f8bba910eb1)
+- Decision: Fixed. macOS away classification now consults the coordinator's live operation-prompt state when available, instead of relying only on the main-actor mirror counter.
+- Resolution: `AppLockController` accepts an `operationPromptInProgressProvider`, and `AppContainer` wires it to `AuthenticationPromptCoordinator.isOperationPromptInProgress`. Regression tests cover both begin-hop lag (live active defers prompt resign) and end-hop lag (live inactive treats a real away as a lock-worthy event).
+- Relevant paths: `Sources/Security/ProtectedData/AppLockController.swift`, `Sources/App/AppContainer.swift`, `Tests/ServiceTests/AppLockControllerTests.swift`

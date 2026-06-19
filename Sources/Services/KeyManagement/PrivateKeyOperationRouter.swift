@@ -7,19 +7,22 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     private let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     private let handleStore: SecureEnclaveCustodyHandleStore
     private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
 
     init(
         catalogStore: KeyCatalogStore,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore,
-        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
+        custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil
     ) {
         self.catalogStore = catalogStore
         self.resolver = resolver
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
         self.custodyOperationAuthenticator = custodyOperationAuthenticator
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
     }
 
     /// The production custody pre-authenticator: one fresh biometric
@@ -145,26 +148,34 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
             )
-            let authorization = try await makeOperationAuthorizationIfConfigured()
-            do {
-                let signingHandle = try handleStore.loadHandle(
-                    reference: pair.signing.reference,
-                    expectedPublicKeyX963: pair.signing.publicKeyX963,
-                    authenticationContext: authorization?.authenticationContext
-                )
-                return .secureEnclaveSigner(
-                    SecureEnclaveSignerRoute(
-                        identity: identity,
-                        operation: request.operation,
-                        publicBindingInspection: inspection,
-                        signingHandle: signingHandle,
-                        operationAuthorization: authorization
+            let authorized = try await withOperationPromptIfConfigured(
+                source: "privateKeyOperation.sign.authorize"
+            ) {
+                let authorization = try await makeOperationAuthorizationIfConfigured()
+                do {
+                    let signingHandle = try handleStore.loadHandle(
+                        reference: pair.signing.reference,
+                        expectedPublicKeyX963: pair.signing.publicKeyX963,
+                        authenticationContext: authorization?.authenticationContext
                     )
-                )
-            } catch {
-                authorization?.end()
-                throw error
+                    return AuthorizedSigningHandle(
+                        handle: signingHandle,
+                        authorization: authorization
+                    )
+                } catch {
+                    authorization?.end()
+                    throw error
+                }
             }
+            return .secureEnclaveSigner(
+                SecureEnclaveSignerRoute(
+                    identity: identity,
+                    operation: request.operation,
+                    publicBindingInspection: inspection,
+                    signingHandle: authorized.handle,
+                    operationAuthorization: authorized.authorization
+                )
+            )
         } catch {
             return .blocked(.unavailable(
                 PGPKeyOperationFailureMapper.category(
@@ -185,26 +196,34 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
             )
-            let authorization = try await makeOperationAuthorizationIfConfigured()
-            do {
-                let keyAgreementHandle = try handleStore.loadHandle(
-                    reference: pair.keyAgreement.reference,
-                    expectedPublicKeyX963: pair.keyAgreement.publicKeyX963,
-                    authenticationContext: authorization?.authenticationContext
-                )
-                return .secureEnclaveKeyAgreement(
-                    SecureEnclaveKeyAgreementRoute(
-                        identity: identity,
-                        operation: request.operation,
-                        publicBindingInspection: inspection,
-                        keyAgreementHandle: keyAgreementHandle,
-                        operationAuthorization: authorization
+            let authorized = try await withOperationPromptIfConfigured(
+                source: "privateKeyOperation.keyAgreement.authorize"
+            ) {
+                let authorization = try await makeOperationAuthorizationIfConfigured()
+                do {
+                    let keyAgreementHandle = try handleStore.loadHandle(
+                        reference: pair.keyAgreement.reference,
+                        expectedPublicKeyX963: pair.keyAgreement.publicKeyX963,
+                        authenticationContext: authorization?.authenticationContext
                     )
-                )
-            } catch {
-                authorization?.end()
-                throw error
+                    return AuthorizedKeyAgreementHandle(
+                        handle: keyAgreementHandle,
+                        authorization: authorization
+                    )
+                } catch {
+                    authorization?.end()
+                    throw error
+                }
             }
+            return .secureEnclaveKeyAgreement(
+                SecureEnclaveKeyAgreementRoute(
+                    identity: identity,
+                    operation: request.operation,
+                    publicBindingInspection: inspection,
+                    keyAgreementHandle: authorized.handle,
+                    operationAuthorization: authorized.authorization
+                )
+            )
         } catch {
             return .blocked(.unavailable(
                 PGPKeyOperationFailureMapper.category(
@@ -233,4 +252,28 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             throw SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
         }
     }
+
+    private func withOperationPromptIfConfigured<T>(
+        source: String,
+        operation: () async throws -> T
+    ) async throws -> T {
+        guard let authenticationPromptCoordinator else {
+            return try await operation()
+        }
+        return try await authenticationPromptCoordinator.withOperationPrompt(
+            source: source
+        ) {
+            try await operation()
+        }
+    }
+}
+
+private struct AuthorizedSigningHandle {
+    let handle: SecureEnclaveCustodyLoadedHandle
+    let authorization: SecureEnclaveCustodyOperationAuthorization?
+}
+
+private struct AuthorizedKeyAgreementHandle {
+    let handle: SecureEnclaveCustodyLoadedHandle
+    let authorization: SecureEnclaveCustodyOperationAuthorization?
 }

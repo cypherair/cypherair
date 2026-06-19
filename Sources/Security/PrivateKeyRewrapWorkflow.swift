@@ -1,18 +1,22 @@
 import Foundation
 import LocalAuthentication
+import Security
 
 final class PrivateKeyRewrapWorkflow {
     private let secureEnclave: any SecureEnclaveManageable
     private let bundleStore: KeyBundleStore
+    private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
     init(
         secureEnclave: any SecureEnclaveManageable,
         bundleStore: KeyBundleStore,
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.secureEnclave = secureEnclave
         self.bundleStore = bundleStore
+        self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.traceStore = traceStore
     }
 
@@ -21,11 +25,11 @@ final class PrivateKeyRewrapWorkflow {
         fingerprints: [String],
         authenticator: any AuthenticationEvaluable,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol
-    ) throws {
+    ) async throws {
         // Step 1: Write protected rewrap journal before any Keychain modifications.
         try privateKeyControlStore.beginRewrap(targetMode: targetMode)
 
-        try runPhaseA(
+        try await runPhaseA(
             targetMode: targetMode,
             fingerprints: fingerprints,
             authenticator: authenticator,
@@ -43,7 +47,7 @@ final class PrivateKeyRewrapWorkflow {
         fingerprints: [String],
         authenticator: any AuthenticationEvaluable,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol
-    ) throws {
+    ) async throws {
         // Phase A: Create all pending items. If anything fails here, old items
         // are intact, so pending artifacts can be cleaned up.
         do {
@@ -61,29 +65,11 @@ final class PrivateKeyRewrapWorkflow {
                     metadata: ["index": String(index), "keyCount": String(fingerprints.count)]
                 )
                 let existingBundle = try bundleStore.loadBundle(fingerprint: fingerprint)
-                let existingHandle = try secureEnclave.reconstructKey(
-                    from: existingBundle.seKeyData,
-                    authenticationContext: authenticator.lastEvaluatedContext
-                )
-
-                var rawKeyBytes = try secureEnclave.unwrap(
-                    bundle: existingBundle,
-                    using: existingHandle,
-                    fingerprint: fingerprint
-                )
-
-                defer {
-                    rawKeyBytes.resetBytes(in: rawKeyBytes.startIndex..<rawKeyBytes.endIndex)
-                }
-
-                let newHandle = try secureEnclave.generateWrappingKey(
-                    accessControl: newAccessControl,
-                    authenticationContext: authenticator.lastEvaluatedContext
-                )
-                let newBundle = try secureEnclave.wrap(
-                    privateKey: rawKeyBytes,
-                    using: newHandle,
-                    fingerprint: fingerprint
+                let newBundle = try await rewrapBundleForModeSwitch(
+                    existingBundle: existingBundle,
+                    fingerprint: fingerprint,
+                    newAccessControl: newAccessControl,
+                    authenticator: authenticator
                 )
 
                 try bundleStore.saveBundle(
@@ -127,6 +113,42 @@ final class PrivateKeyRewrapWorkflow {
                 metadata: traceErrorMetadata(error, extra: ["result": "phaseAFailed"])
             )
             throw AuthenticationError.modeSwitchFailed(underlying: error)
+        }
+    }
+
+    private func rewrapBundleForModeSwitch(
+        existingBundle: WrappedKeyBundle,
+        fingerprint: String,
+        newAccessControl: SecAccessControl,
+        authenticator: any AuthenticationEvaluable
+    ) async throws -> WrappedKeyBundle {
+        try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "privateKeyProtection.switch.rewrap"
+        ) {
+            let existingHandle = try secureEnclave.reconstructKey(
+                from: existingBundle.seKeyData,
+                authenticationContext: authenticator.lastEvaluatedContext
+            )
+
+            var rawKeyBytes = try secureEnclave.unwrap(
+                bundle: existingBundle,
+                using: existingHandle,
+                fingerprint: fingerprint
+            )
+
+            defer {
+                rawKeyBytes.resetBytes(in: rawKeyBytes.startIndex..<rawKeyBytes.endIndex)
+            }
+
+            let newHandle = try secureEnclave.generateWrappingKey(
+                accessControl: newAccessControl,
+                authenticationContext: authenticator.lastEvaluatedContext
+            )
+            return try secureEnclave.wrap(
+                privateKey: rawKeyBytes,
+                using: newHandle,
+                fingerprint: fingerprint
+            )
         }
     }
 

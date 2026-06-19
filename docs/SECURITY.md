@@ -108,8 +108,9 @@ instead of unwrapping a complete OpenPGP secret certificate into app memory. It
 is a custody model, not a third OpenPGP profile. Since Phase 7D (issue #501,
 decision 3) the production capability-resolver policy exposes device-bound
 generation and the implemented private-operation classes, and the production
-container wires the generation service (hardware-guarded; the whole generation
-runs inside one operation-prompt session per §4). Phase 8 hardware and
+container wires the generation service (hardware-guarded; only the custody
+authorization and handle-load window runs inside an operation-prompt session
+per §4). Phase 8 hardware and
 GnuPG-interop evidence is captured and the Phase 9 release gate is satisfied
 (2026-06-14); the families ship with the next tag-first stable release. The
 custody model, security contract, operation surface, and evidence record live in
@@ -252,13 +253,14 @@ second interactive prompt.
 > sheet** for both subsystems on every platform, and both private-key modes (this section) and both
 > app-session policies (§5) are permanent, user-selectable product features everywhere. App lock is
 > an explicit state machine (`AppLockController`: `.locked` / `.authenticating` / `.unlocked`) with
-> per-platform away events, and **every user action that can present an authentication sheet while
-> unlocked runs inside one operation-prompt session for its full duration** — private-key
-> operations, key generation/import, key-expiry modification, the mode-switch re-wrap, the App
-> Access Protection policy change, and Local Data Reset — so an authentication sheet's own
-> transient resign is never treated as the user leaving (the `.authenticating` rule). Key-expiry
-> modification authenticates **once** per action with a subsystem-B `LAContext` confined to that
-> action. The previously planned in-window (`LAAuthenticationView`) cutover and the macOS
+> per-platform away events, and **each system authentication prompt runs inside a short
+> operation-prompt session that covers the prompt and the immediately following Keychain /
+> Secure Enclave call that consumes that same `LAContext`**. Longer user-action work such as
+> PGP generation, import parsing, journaling, commits, reset I/O, and UI state updates stays
+> outside the session, so prompt lifecycle resigns are deferred while genuine macOS away
+> events under grace=0 still relock as soon as they occur. Key-expiry modification authenticates
+> **once** per action with a subsystem-B `LAContext` confined to that action. The previously
+> planned in-window (`LAAuthenticationView`) cutover and the macOS
 > passcode-fallback removals were **retired**: macOS 27 denies embedded LocalAuthentication UI to
 > non-Apple-signed processes (LA -1007).
 

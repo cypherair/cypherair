@@ -3,17 +3,14 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-/// Uniform enrollment rule — key provisioning: each whole generate / import
-/// action runs inside one operation-prompt session, so the wrap prompt's own
-/// sheet resign (the new wrapping key's first self-ECDH) is deferred and
-/// decided at the session's end. The existing `beforePermanentStorageCheckpoint`
-/// seam — which fires between the Rust key material existing and the SE wrap —
-/// is the in-session observation point.
+/// Short operation-prompt window — key provisioning: generate / import keep
+/// long Rust work outside the session, and enroll only the Secure Enclave wrap
+/// window so the wrap prompt's own sheet resign is deferred and decided at the
+/// session's end.
 @MainActor
 final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
-    /// Suspends inside the provisioning checkpoint so the test can deliver a
-    /// resign mid-action, recording whether the coordinator saw the action as
-    /// an operation session.
+    /// Suspends inside an injected checkpoint and records whether the
+    /// coordinator saw that checkpoint as part of an operation session.
     private final class CheckpointGate: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<Void, Never>?
@@ -63,7 +60,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         let gate = CheckpointGate(coordinator: harness.coordinator)
         let made = TestHelpers.makeKeyManagement(
             authenticationPromptCoordinator: harness.coordinator,
-            provisioningCheckpoint: gate.checkpoint
+            provisioningWrappingPromptCheckpoint: gate.checkpoint
         )
 
         let action = Task {
@@ -80,7 +77,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         XCTAssertEqual(
             gate.wasInOperationPromptSession,
             true,
-            "Key generation must run inside an operation-prompt session (the uniform rule)."
+            "The key-generation SE wrap window must run inside an operation-prompt session."
         )
 
         harness.deliverResign()
@@ -88,7 +85,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         XCTAssertEqual(
             harness.lockState,
             .unlocked,
-            "A resign during the in-session provisioning is deferred, never a mid-action lock."
+            "A resign during the in-session wrap window is deferred, never a mid-action lock."
         )
         XCTAssertEqual(harness.relockCount, relocksBefore)
 
@@ -127,7 +124,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         let gate = CheckpointGate(coordinator: harness.coordinator)
         let made = TestHelpers.makeKeyManagement(
             authenticationPromptCoordinator: harness.coordinator,
-            provisioningCheckpoint: gate.checkpoint
+            provisioningWrappingPromptCheckpoint: gate.checkpoint
         )
 
         let action = Task {
@@ -139,7 +136,7 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
         XCTAssertEqual(
             gate.wasInOperationPromptSession,
             true,
-            "Key import must run inside an operation-prompt session (the uniform rule)."
+            "The key-import SE wrap window must run inside an operation-prompt session."
         )
 
         harness.deliverResign()
@@ -155,6 +152,45 @@ final class KeyProvisioningOperationPromptCompositionTests: XCTestCase {
             "Foreground returned before the prompts' end -> the deferred away is discarded."
         )
         XCTAssertEqual(harness.relockCount, relocksBefore)
+    }
+
+    func test_generateKey_resignBeforeWrapWindowLocksImmediately() async throws {
+        let harness = OperationPromptLockHarness(gracePeriod: 0)
+        await harness.unlockForTest()
+        let relocksBefore = harness.relockCount
+        let gate = CheckpointGate(coordinator: harness.coordinator)
+        let made = TestHelpers.makeKeyManagement(
+            authenticationPromptCoordinator: harness.coordinator,
+            provisioningCheckpoint: gate.checkpoint
+        )
+
+        let action = Task {
+            try await made.service.generateKey(
+                name: "Provision Outside Prompt",
+                email: nil,
+                expirySeconds: nil,
+                profile: .universal
+            )
+        }
+        await fulfillment(of: [gate.suspendedExpectation], timeout: 30)
+
+        XCTAssertEqual(
+            gate.wasInOperationPromptSession,
+            false,
+            "The pre-wrap provisioning checkpoint must stay outside the operation-prompt session."
+        )
+
+        harness.deliverResign()
+        await harness.settle()
+        XCTAssertEqual(
+            harness.lockState,
+            .locked,
+            "A genuine resign before the wrap prompt locks immediately at grace=0."
+        )
+        XCTAssertGreaterThan(harness.relockCount, relocksBefore)
+
+        gate.resume()
+        _ = try await action.value
     }
 }
 #endif

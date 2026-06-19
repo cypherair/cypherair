@@ -2,11 +2,10 @@ import Foundation
 import LocalAuthentication
 
 /// Owns the App Access Protection policy-switch action (previously an inline
-/// closure in `CypherAirApp`, untestable there). The WHOLE action — the
-/// app-session authentication, the root-secret re-protection, and the handoff
-/// discard — runs inside ONE operation-prompt session (the uniform rule,
-/// TARGET §3): the prompt's own sheet resign is attributed to this action and
-/// the away decision is deferred to the session's end, never a mid-action lock.
+/// closure in `CypherAirApp`, untestable there). Only the app-session
+/// authentication and immediate root-secret re-protection window is enrolled in
+/// an operation-prompt session; the rest of the policy switch remains a normal
+/// action so genuine macOS away events still lock immediately at grace period 0.
 @MainActor
 final class AppAccessPolicySwitchWorkflow {
     private let currentPolicy: () -> AppSessionAuthenticationPolicy
@@ -60,14 +59,7 @@ final class AppAccessPolicySwitchWorkflow {
             return
         }
 
-        // Both branches run inside the session: the no-root-secret branch
-        // presents no prompt, so its (brief, balanced) session is harmless,
-        // and uniformity keeps the rule reviewable.
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "appAccessPolicy.switch"
-        ) {
-            try await performSwitch(from: currentPolicy, to: newPolicy)
-        }
+        try await performSwitch(from: currentPolicy, to: newPolicy)
     }
 
     private func performSwitch(
@@ -92,22 +84,15 @@ final class AppAccessPolicySwitchWorkflow {
                         "hasRootSecret": "true"
                     ]
                 )
-                let result = try await evaluateAppSession(
-                    authenticationPolicy,
-                    String(
-                        localized: "settings.appAccessPolicy.change.reason",
-                        defaultValue: "Authenticate to change App Access Protection."
-                    ),
-                    "appAccessPolicy.switch"
+                let result = try await authenticateAndReprotectRootSecret(
+                    currentPolicy: currentPolicy,
+                    newPolicy: newPolicy,
+                    authenticationPolicy: authenticationPolicy
                 )
-                guard result.isAuthenticated else {
-                    throw AuthenticationError.failed
-                }
                 defer {
                     result.context?.invalidate()
                 }
 
-                try reprotectPersistedRootSecret(currentPolicy, newPolicy, result.context)
                 discardHandoffContextForPolicyChange()
                 traceStore?.record(
                     category: .operation,
@@ -160,6 +145,35 @@ final class AppAccessPolicySwitchWorkflow {
                 )
             }
             throw error
+        }
+    }
+
+    private func authenticateAndReprotectRootSecret(
+        currentPolicy: AppSessionAuthenticationPolicy,
+        newPolicy: AppSessionAuthenticationPolicy,
+        authenticationPolicy: AppSessionAuthenticationPolicy
+    ) async throws -> AppSessionAuthenticationResult {
+        try await authenticationPromptCoordinator.withOperationPrompt(
+            source: "appAccessPolicy.switch.authenticate"
+        ) {
+            let result = try await evaluateAppSession(
+                authenticationPolicy,
+                String(
+                    localized: "settings.appAccessPolicy.change.reason",
+                    defaultValue: "Authenticate to change App Access Protection."
+                ),
+                "appAccessPolicy.switch"
+            )
+            guard result.isAuthenticated else {
+                throw AuthenticationError.failed
+            }
+            do {
+                try reprotectPersistedRootSecret(currentPolicy, newPolicy, result.context)
+            } catch {
+                result.context?.invalidate()
+                throw error
+            }
+            return result
         }
     }
 }
