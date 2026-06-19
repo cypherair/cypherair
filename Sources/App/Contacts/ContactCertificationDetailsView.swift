@@ -400,19 +400,19 @@ private struct ContactCertificationDetailsHostView: View {
 
     private var importSection: some View {
         Section {
-            Picker(
-                String(localized: "contactcertification.import.mode", defaultValue: "Signature Type"),
+            CypherModePickerRow(
+                title: String(localized: "contactcertification.import.mode", defaultValue: "Signature Type"),
                 selection: Binding(
                     get: { model.importMode },
                     set: { model.selectImportMode($0) }
-                )
+                ),
+                prominence: .form,
+                isDisabled: model.isOperationLocked
             ) {
                 ForEach(ContactCertificationDetailsScreenModel.ImportMode.allCases) { mode in
                     Text(model.title(for: mode)).tag(mode)
                 }
             }
-            .pickerStyle(.segmented)
-            .disabled(model.isOperationLocked)
 
             CypherMultilineTextInput(
                 text: Binding(

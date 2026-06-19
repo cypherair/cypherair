@@ -132,13 +132,15 @@ private struct DecryptScreenHostView: View {
 
         Form {
             Section {
-                Picker(String(localized: "decrypt.mode", defaultValue: "Mode"), selection: $model.decryptMode) {
+                CypherModePickerRow(
+                    title: String(localized: "decrypt.mode", defaultValue: "Mode"),
+                    selection: $model.decryptMode,
+                    isDisabled: operation.isRunning
+                ) {
                     ForEach(DecryptView.DecryptMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
-                .pickerStyle(.segmented)
-                .disabled(operation.isRunning)
             }
 
             if model.decryptMode == .text {

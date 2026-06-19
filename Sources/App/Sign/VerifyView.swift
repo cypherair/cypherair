@@ -67,13 +67,15 @@ private struct VerifyScreenHostView: View {
 
         Form {
             Section {
-                Picker(String(localized: "verify.mode", defaultValue: "Mode"), selection: $model.verifyMode) {
+                CypherModePickerRow(
+                    title: String(localized: "verify.mode", defaultValue: "Mode"),
+                    selection: $model.verifyMode,
+                    isDisabled: operation.isRunning
+                ) {
                     ForEach(VerifyView.VerifyMode.allCases, id: \.self) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
-                .pickerStyle(.segmented)
-                .disabled(operation.isRunning)
             }
 
             if model.verifyMode == .cleartext {
