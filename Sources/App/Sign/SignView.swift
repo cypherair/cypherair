@@ -64,6 +64,7 @@ struct SignView: View {
 private struct SignScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: SignScreenModel
 
     init(
@@ -93,16 +94,25 @@ private struct SignScreenHostView: View {
         let operation = model.operation
         let exportController = model.exportController
         let fileImportRequestToken = model.fileImportRequestToken
+        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
+            horizontalSizeClass: horizontalSizeClass
+        )
 
         Form {
-            Section {
-                Picker(String(localized: "sign.mode", defaultValue: "Mode"), selection: $model.signMode) {
-                    ForEach(SignView.SignMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
+            if !usesToolbarModePicker {
+                Section {
+                    CypherModePicker(
+                        title: String(localized: "sign.mode", defaultValue: "Mode"),
+                        selection: $model.signMode,
+                        selectedValueLabel: model.signMode.label,
+                        isDisabled: operation.isRunning,
+                        accessibilityIdentifier: "sign.mode.picker"
+                    ) {
+                        ForEach(SignView.SignMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                .disabled(operation.isRunning)
             }
 
             if model.signMode == .text {
@@ -208,6 +218,23 @@ private struct SignScreenHostView: View {
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
+        .toolbar {
+            if usesToolbarModePicker {
+                ToolbarItem(placement: .principal) {
+                    CypherModePicker(
+                        title: String(localized: "sign.mode", defaultValue: "Mode"),
+                        selection: $model.signMode,
+                        selectedValueLabel: model.signMode.label,
+                        isDisabled: operation.isRunning,
+                        accessibilityIdentifier: "sign.mode.picker"
+                    ) {
+                        ForEach(SignView.SignMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                }
+            }
+        }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(
