@@ -21,8 +21,7 @@ struct SharedIOSTabShellView: View {
                 }
             }
 
-            #if !os(visionOS)
-            TabSection(String(localized: "tab.section.tools", defaultValue: "Tools")) {
+            TabSection {
                 ForEach(toolTabs) { definition in
                     SwiftUI.Tab(
                         definition.title,
@@ -32,10 +31,16 @@ struct SharedIOSTabShellView: View {
                         definition.content
                     }
                 }
+            } header: {
+                Label(
+                    String(localized: "tab.section.tools", defaultValue: "Tools"),
+                    systemImage: "wrench.and.screwdriver"
+                )
             }
+            #if !os(visionOS)
             .tabPlacement(.sidebarOnly)
-            .hidden(sizeClass == .compact)
             #endif
+            .hidden(sizeClass == .compact)
         }
         .tabViewStyle(.sidebarAdaptable)
         .onChange(of: sizeClass) { _, newSizeClass in
