@@ -15,6 +15,7 @@ $(SRCROOT)/Sources/App/Common/ColorTheme+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherAirError+Presentation.swift
 $(SRCROOT)/Sources/App/Common/CypherMultilineTextInput.swift
 $(SRCROOT)/Sources/App/Common/CypherMotion.swift
+$(SRCROOT)/Sources/App/Common/CypherModePicker.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationButtonLabel.swift
 $(SRCROOT)/Sources/App/Common/CypherOperationCancelSection.swift
 $(SRCROOT)/Sources/App/Common/CypherPressFeedbackModifier.swift

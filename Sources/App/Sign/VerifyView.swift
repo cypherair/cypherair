@@ -44,6 +44,7 @@ struct VerifyView: View {
 private struct VerifyScreenHostView: View {
     let appSessionOrchestrator: AppSessionOrchestrator
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: VerifyScreenModel
 
     init(
@@ -64,16 +65,25 @@ private struct VerifyScreenHostView: View {
         @Bindable var model = model
         let operation = model.operation
         let fileImportRequestToken = model.fileImportRequestToken
+        let usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(
+            horizontalSizeClass: horizontalSizeClass
+        )
 
         Form {
-            Section {
-                Picker(String(localized: "verify.mode", defaultValue: "Mode"), selection: $model.verifyMode) {
-                    ForEach(VerifyView.VerifyMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
+            if !usesToolbarModePicker {
+                Section {
+                    CypherModePicker(
+                        title: String(localized: "verify.mode", defaultValue: "Mode"),
+                        selection: $model.verifyMode,
+                        selectedValueLabel: model.verifyMode.label,
+                        isDisabled: operation.isRunning,
+                        accessibilityIdentifier: "verify.mode.picker"
+                    ) {
+                        ForEach(VerifyView.VerifyMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                .disabled(operation.isRunning)
             }
 
             if model.verifyMode == .cleartext {
@@ -134,6 +144,23 @@ private struct VerifyScreenHostView: View {
         #endif
         .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
+        .toolbar {
+            if usesToolbarModePicker {
+                ToolbarItem(placement: .principal) {
+                    CypherModePicker(
+                        title: String(localized: "verify.mode", defaultValue: "Mode"),
+                        selection: $model.verifyMode,
+                        selectedValueLabel: model.verifyMode.label,
+                        isDisabled: operation.isRunning,
+                        accessibilityIdentifier: "verify.mode.picker"
+                    ) {
+                        ForEach(VerifyView.VerifyMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                }
+            }
+        }
         .alert(
             String(localized: "error.title", defaultValue: "Error"),
             isPresented: Binding(

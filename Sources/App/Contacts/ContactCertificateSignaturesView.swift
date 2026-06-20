@@ -250,19 +250,20 @@ private struct ContactCertificateSignaturesHostView: View {
 
     private var modeSection: some View {
         Section {
-            Picker(
-                String(localized: "contactcertsig.mode", defaultValue: "Mode"),
+            CypherModePicker(
+                title: String(localized: "contactcertsig.mode", defaultValue: "Mode"),
                 selection: Binding(
                     get: { model.mode },
                     set: { model.setMode($0) }
-                )
+                ),
+                selectedValueLabel: model.title(for: model.mode),
+                isDisabled: model.isOperationLocked,
+                accessibilityIdentifier: "contactcertsig.mode.picker"
             ) {
                 ForEach(ContactCertificateSignaturesScreenModel.Mode.allCases) { mode in
                     Text(model.title(for: mode)).tag(mode)
                 }
             }
-            .pickerStyle(.segmented)
-            .disabled(model.isOperationLocked)
         }
     }
 

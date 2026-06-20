@@ -7253,38 +7253,6 @@
         }
       }
     },
-    "guidedTutorial.nav.decrypt" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Decrypt from the Tools section to continue."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从工具区打开“解密”以继续。"
-          }
-        }
-      }
-    },
-    "guidedTutorial.nav.encrypt" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Encrypt from the Tools section to continue."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从工具区打开“加密”以继续。"
-          }
-        }
-      }
-    },
     "guidedTutorial.nav.homeDecrypt" : {
       "localizations" : {
         "en" : {
@@ -10181,22 +10149,6 @@
         }
       }
     },
-    "keygen.generate" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成密钥"
-          }
-        }
-      }
-    },
     "keygen.family.info.accessibility" : {
       "localizations" : {
         "en" : {
@@ -10209,6 +10161,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示密钥类型详细信息"
+          }
+        }
+      }
+    },
+    "keygen.generate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成密钥"
           }
         }
       }
