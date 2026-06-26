@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  attestations: read
 
 env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
@@ -147,6 +148,11 @@ jobs:
         run: |
           rm -rf PgpMobile.xcframework
           ditto -x -k "$XCFRAMEWORK_ZIP" .
+      - name: Restore SQLCipher XCFramework
+        if: steps.platform_preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
       - name: Probe iOS build
         if: steps.platform_preflight.outputs.ready == 'true'
         run: |
@@ -188,6 +194,11 @@ jobs:
         run: |
           rm -rf PgpMobile.xcframework
           ditto -x -k "$XCFRAMEWORK_ZIP" .
+      - name: Restore SQLCipher XCFramework
+        if: steps.swift_unit_preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
       - name: Run hosted macOS unit-test preview
         if: steps.swift_unit_preflight.outputs.ready == 'true'
         run: |

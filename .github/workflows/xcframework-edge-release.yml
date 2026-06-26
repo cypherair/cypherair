@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  attestations: read
 
 env:
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
@@ -189,6 +190,11 @@ jobs:
         env:
           ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
         run: ./build-xcframework.sh --release
+      - name: Restore SQLCipher XCFramework
+        if: steps.platform_preflight.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
       - name: Probe iOS build
         if: steps.platform_preflight.outputs.ready == 'true'
         run: |

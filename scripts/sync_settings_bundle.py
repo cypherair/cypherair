@@ -18,6 +18,8 @@ CORE_DEPENDENCY_IDS = {
     "openssl",
     "openssl-src",
     "sequoia-openpgp",
+    "sqlcipher",
+    "sqlite",
     "thiserror",
     "uniffi",
     "zeroize",

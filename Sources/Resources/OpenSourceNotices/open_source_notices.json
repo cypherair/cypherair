@@ -1710,5 +1710,33 @@
     "licenseSourceItems": [
       "LICENSE-MIT"
     ]
+  },
+  {
+    "id": "sqlcipher@4.16.0",
+    "displayName": "SQLCipher",
+    "version": "4.16.0 community",
+    "repositoryURL": "https://github.com/sqlcipher/sqlcipher",
+    "licenseName": "BSD-3-Clause",
+    "licenseFileResourceName": "SQLCipher-4.16.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "projectFile",
+    "licenseSourceItems": [
+      "third_party/sqlcipher-notices/SQLCipher-LICENSE.md"
+    ]
+  },
+  {
+    "id": "sqlite@3.53.1",
+    "displayName": "SQLite",
+    "version": "3.53.1",
+    "repositoryURL": "https://sqlite.org",
+    "licenseName": "Public Domain",
+    "licenseFileResourceName": "SQLite-3.53.1.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": true,
+    "licenseSourceKind": "projectFile",
+    "licenseSourceItems": [
+      "third_party/sqlcipher-notices/SQLite-PUBLIC-DOMAIN.md"
+    ]
   }
 ]

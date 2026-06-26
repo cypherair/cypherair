@@ -22,6 +22,11 @@ Packages/
 # XCFramework (built artifact, not source)
 *.xcframework/
 PgpMobile.arm64e-build-manifest.json
+SQLCipher.arm64e-build-manifest.json
+SQLCipher-PrivacyInfo.xcprivacy
+SQLCipher.xcframework.sha256
+SQLCipher.xcframework.zip
+sqlcipher-xcframework-experiment.json
 
 # Claude Code local/personal config (not shared project config)
 .claude/worktrees/

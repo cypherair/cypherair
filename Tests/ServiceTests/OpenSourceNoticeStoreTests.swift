@@ -75,7 +75,16 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
         XCTAssertEqual(sections.appNotices.map(\.id), ["cypherair"])
         XCTAssertEqual(
             coreNames,
-            ["base64", "openssl", "sequoia-openpgp", "thiserror", "uniffi", "zeroize"]
+            [
+                "base64",
+                "openssl",
+                "sequoia-openpgp",
+                "SQLCipher",
+                "SQLite",
+                "thiserror",
+                "uniffi",
+                "zeroize"
+            ]
         )
         XCTAssertEqual(thirdPartyNames, sortedNames)
     }
