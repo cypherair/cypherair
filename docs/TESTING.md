@@ -199,8 +199,8 @@ These jobs must pass on pull requests and nightly validation:
 - `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
 - `rust-gnupg-interop` installs gpg (`brew install gnupg`), asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the Secure Enclave v4 + Profile A GnuPG interop lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1` so a missing gpg fails the lane; it runs parallel to `rust-full-tests` and needs no XCFramework
 - `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, downloads the arm64e stage1 toolchain in a token-free pre-build step, runs the `./build-xcframework.sh --release` entrypoint without GitHub token variables in the build environment, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
-- `apple-platform-probes` downloads the uploaded XCFramework artifact and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
-- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, requires an `arm64e` macOS test destination, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, and runs hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, signing profile, build, link, or test failures after readiness still fail the job
+- `apple-platform-probes` downloads the uploaded XCFramework artifact, restores the pinned SQLCipher preflight artifact with mandatory GitHub attestation verification, and validates the packaged output with `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; during GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
+- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, requires an `arm64e` macOS test destination, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, restores the pinned SQLCipher preflight artifact with mandatory GitHub attestation verification, and runs hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, signing profile, build, link, or test failures after readiness still fail the job
 
 The repository also publishes unique edge XCFramework prereleases:
 
@@ -217,7 +217,7 @@ The repository also publishes unique edge XCFramework prereleases:
   built with official stable Rust, while `arm64e` slices use stable Cargo with
   `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt
   std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
-- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/XCODE_CLOUD_RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, creates the draft stable release, and starts WF2, which archives iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag and XCFramework checksum and attest the SDK/compliance assets (publication-witness provenance).
+- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/XCODE_CLOUD_RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, restores the pinned SQLCipher preflight artifact for app link validation, creates the draft stable release, and starts WF2, which restores the same SQLCipher artifact before archiving iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag and XCFramework checksum and attest the SDK/compliance assets (publication-witness provenance). SQLCipher remains an experimental preflight input here; it is not yet a formal stable release artifact.
 
 Toolchain contract:
 
@@ -271,14 +271,47 @@ The release steps and candidate gating rules live in [APP_RELEASE_PROCESS.md](AP
 
 Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
 
-Today, the Xcode project links:
+Today, the Xcode project consumes:
 
 - `PgpMobile.xcframework`
 - `PgpMobile.arm64e-build-manifest.json`
 - `bindings/module.modulemap`
 - `Sources/PgpMobile/pgp_mobile.swift`
+- `SQLCipher.xcframework` restored from the pinned external preflight release
+- `SQLCipher.arm64e-build-manifest.json`
+- `SQLCipher-PrivacyInfo.xcprivacy`
+- `sqlcipher-xcframework-experiment.json`
 
 `PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with the full sync path below after Rust or UniFFI changes that can affect Swift-visible behavior. The build also emits `PgpMobile.arm64e-build-manifest.json`, which records the Rust stage1 prerelease provenance, the OpenSSL carry-chain commits, and the verified XCFramework slice layout. The shared scheme and app target both check for the XCFramework artifact and fail with a clear error if it is missing.
+
+`SQLCipher.xcframework` is also ignored by git, but it is not built in this
+repository. Restore it from the pinned `cypherair/sqlcipher-xcframework`
+experimental release before Xcode builds:
+
+```bash
+scripts/restore_sqlcipher_xcframework.sh
+```
+
+CI and GitHub-hosted app probes require release-asset attestations:
+
+```bash
+scripts/restore_sqlcipher_xcframework.sh --require-attestation
+```
+
+The restore script rejects `latest`, verifies the pinned zip checksum before
+extraction, validates release metadata, upstream SQLCipher `v4.16.0` source
+commit `e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc`, expected slices, headers,
+modulemap, crypto-provider flags, privacy manifest, and macOS smoke behavior.
+The app target consumes a static framework-shaped `SQLCipher.xcframework`
+through the normal Frameworks build phase. The artifact keeps each module map
+inside `SQLCipher.framework/Modules`, so the app project does not carry
+slice-specific SQLCipher linker or modulemap paths. Contacts storage does not
+use SQLCipher yet.
+
+To refresh SQLCipher, publish a new experimental release from
+`cypherair/sqlcipher-xcframework` first. Then update the release tag, expected
+hashes, manifest expectations, docs, and tests in this repository. Do not commit
+the downloaded SQLCipher assets or extracted XCFramework directory.
 
 Treat `pgp-mobile/Cargo.lock` updates as Rust artifact inputs. Even when a
 lockfile-only dependency update does not change Rust source or UniFFI surface,

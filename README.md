@@ -48,6 +48,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Language | Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.3.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
+| SQLCipher Preflight | Pinned experimental `SQLCipher.xcframework` 4.16.0 static library from `cypherair/sqlcipher-xcframework`; restored as an ignored artifact and linked for app-build validation only |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
 | Build | Xcode 26.5, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`; `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release |
 | Localization | English + Simplified Chinese (.xcstrings) |
@@ -137,11 +138,15 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=<pinned-tag> \
     ./build-xcframework.sh --release
 
-# 3. Validate Swift unit + FFI behavior locally
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS'
+# 3. Restore the pinned SQLCipher preflight artifact used by Xcode.
+# The artifact is ignored by git and Contacts storage is not yet SQLCipher-backed.
+scripts/restore_sqlcipher_xcframework.sh
 
-# 4. Probe the native visionOS app build
+# 4. Validate Swift unit + FFI behavior locally
+xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
+    -destination 'platform=macOS,arch=arm64e'
+
+# 5. Probe the native visionOS app build
 xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS' \
     CODE_SIGNING_ALLOWED=NO
@@ -177,6 +182,20 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 ### XCFramework Prerelease
 
 CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and the current stable-release channel contract, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
+
+### SQLCipher Preflight Artifact
+
+CypherAir also consumes a pinned experimental SQLCipher static framework-shaped
+XCFramework from the separate public build-wrapper repository
+`cypherair/sqlcipher-xcframework`. The main repository does not commit
+`SQLCipher.xcframework` or downloaded release assets; local and CI builds
+restore them with `scripts/restore_sqlcipher_xcframework.sh`, verify the pinned
+release checksum and manifest, and validate the restored static framework slices
+before Xcode builds. The app consumes SQLCipher through Xcode's normal
+Frameworks phase, not slice-specific linker paths. Refreshes must be published
+in `cypherair/sqlcipher-xcframework` first, then re-pinned here. This is an
+app-build preflight only; Contacts storage still uses the current ProtectedData
+domain until the later issue #540 implementation.
 
 ## Security Model
 

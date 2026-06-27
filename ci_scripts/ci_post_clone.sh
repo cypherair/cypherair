@@ -99,6 +99,8 @@ build_xcframework_workflow() {
 
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
     [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
+    log "WF1: restoring pinned SQLCipher.xcframework for app link preflight"
+    scripts/restore_sqlcipher_xcframework.sh
     log "WF1: xcframework build complete"
 }
 
@@ -124,6 +126,8 @@ release_consumer_workflow() {
     rm -rf PgpMobile.xcframework
     ditto -x -k "$XCFRAMEWORK_ZIP" .
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "extracted xcframework is missing Info.plist"
+    log "WF2: restoring pinned SQLCipher.xcframework for app archive"
+    scripts/restore_sqlcipher_xcframework.sh
 
     local marketing_version build_number
     marketing_version="$(project_setting MARKETING_VERSION)"

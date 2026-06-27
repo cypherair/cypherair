@@ -27,6 +27,36 @@ APP_LICENSE_TEXT_PATHS = [
     ROOT / "LICENSE-MPL",
 ]
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
+EXTERNAL_NOTICE_RECORDS = [
+    {
+        "id": "sqlcipher@4.16.0",
+        "displayName": "SQLCipher",
+        "version": "4.16.0 community",
+        "repositoryURL": "https://github.com/sqlcipher/sqlcipher",
+        "licenseName": "BSD-3-Clause",
+        "licenseFileResourceName": "SQLCipher-4.16.0.txt",
+        "kind": "thirdParty",
+        "isDirectDependency": True,
+        "licenseSourceKind": "projectFile",
+        "licenseSourceItems": [
+            "third_party/sqlcipher-notices/SQLCipher-LICENSE.md",
+        ],
+    },
+    {
+        "id": "sqlite@3.53.1",
+        "displayName": "SQLite",
+        "version": "3.53.1",
+        "repositoryURL": "https://sqlite.org",
+        "licenseName": "Public Domain",
+        "licenseFileResourceName": "SQLite-3.53.1.txt",
+        "kind": "thirdParty",
+        "isDirectDependency": True,
+        "licenseSourceKind": "projectFile",
+        "licenseSourceItems": [
+            "third_party/sqlcipher-notices/SQLite-PUBLIC-DOMAIN.md",
+        ],
+    },
+]
 REGISTRY_LICENSE_PATTERN = re.compile(r"(?i)^(license|copying|unlicense|copyright)([.-].+)?$")
 LICENSE_FETCH_HEADERS = {"User-Agent": "CypherAir Open Source Notices"}
 APPLE_NOTICE_TARGETS = (
@@ -405,6 +435,7 @@ def build_notice_manifest(packages: list[PackageRecord], license_sources: dict[s
             }
         )
 
+    notices.extend(EXTERNAL_NOTICE_RECORDS)
     return notices
 
 
@@ -449,6 +480,16 @@ def generate() -> None:
         license_text, license_source = render_license_text(package)
         license_sources[package.id] = license_source
         (RESOURCE_DIR / resource_file_name(package)).write_text(license_text, encoding="utf-8")
+
+    for notice in EXTERNAL_NOTICE_RECORDS:
+        source_item = notice["licenseSourceItems"][0]
+        source_path = ROOT / source_item
+        if not source_path.is_file():
+            raise RuntimeError(f"External notice source is missing: {source_path}")
+        (RESOURCE_DIR / notice["licenseFileResourceName"]).write_text(
+            normalize_text_hygiene(source_path.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
 
     notices = build_notice_manifest(packages, license_sources)
     NOTICE_FILE.write_text(json.dumps(notices, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

@@ -13,6 +13,10 @@
 		CE0065272F676EBC008604AB /* AppIconA.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE0065222F676EBC008604AB /* AppIconA.icon */; };
 		CE5181B12FBB9EAA00D21B02 /* AppIconE.icon in Resources */ = {isa = PBXBuildFile; fileRef = CE5181B02FBB9EAA00D21B02 /* AppIconE.icon */; };
 		CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE58C0002F96000000000001 /* PgpMobile.xcframework */; };
+		CEA0C0012FA0000000000001 /* SQLCipher.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0002FA0000000000001 /* SQLCipher.xcframework */; };
+		CEA0C0032FA0000000000001 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0022FA0000000000001 /* Security.framework */; };
+		CEA0C0052FA0000000000001 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0042FA0000000000001 /* CoreFoundation.framework */; };
+		CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CEA0C0062FA0000000000001 /* Foundation.framework */; };
 		CEB560272F944C05004A1CA7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEB560262F944C05004A1CA7 /* Assets.xcassets */; };
 		CEF297622F7612DF00DB6BF6 /* AppIconD.icon in Resources */ = {isa = PBXBuildFile; fileRef = CEF297612F7612DF00DB6BF6 /* AppIconD.icon */; };
 /* End PBXBuildFile section */
@@ -47,6 +51,10 @@
 		CE58C0062F96000000000001 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAir.entitlements; sourceTree = "<group>"; };
 		CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CypherAirMacOS.entitlements; sourceTree = "<group>"; };
+		CEA0C0002FA0000000000001 /* SQLCipher.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = SQLCipher.xcframework; sourceTree = "<group>"; };
+		CEA0C0022FA0000000000001 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		CEA0C0042FA0000000000001 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		CEA0C0062FA0000000000001 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		CEB560262F944C05004A1CA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CEF297612F7612DF00DB6BF6 /* AppIconD.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconD.icon; sourceTree = "<group>"; };
 		E10000012F90000100000001 /* CypherAirMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CypherAirMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -449,6 +457,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CEA0C0072FA0000000000001 /* Foundation.framework in Frameworks */,
+				CEA0C0052FA0000000000001 /* CoreFoundation.framework in Frameworks */,
+				CEA0C0032FA0000000000001 /* Security.framework in Frameworks */,
+				CEA0C0012FA0000000000001 /* SQLCipher.xcframework in Frameworks */,
 				CE58C0012F96000000000001 /* PgpMobile.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -460,6 +472,10 @@
 			isa = PBXGroup;
 			children = (
 				CE58C0002F96000000000001 /* PgpMobile.xcframework */,
+				CEA0C0002FA0000000000001 /* SQLCipher.xcframework */,
+				CEA0C0022FA0000000000001 /* Security.framework */,
+				CEA0C0042FA0000000000001 /* CoreFoundation.framework */,
+				CEA0C0062FA0000000000001 /* Foundation.framework */,
 				CEB560262F944C05004A1CA7 /* Assets.xcassets */,
 				CE5F0F372F75EF3E007C896C /* CypherAir.entitlements */,
 				CE5F0F382F75EF45007C896C /* CypherAirMacOS.entitlements */,
@@ -496,6 +512,7 @@
 			buildConfigurationList = 04FFA0AC2AEDE901A06224E1 /* Build configuration list for PBXNativeTarget "CypherAir" */;
 			buildPhases = (
 				CE58C0032F96000000000001 /* Check PgpMobile XCFramework */,
+				CEA0C0082FA0000000000001 /* Check SQLCipher XCFramework */,
 				CE58C0042F96000000000001 /* Generate Source Compliance Info */,
 				C1FB1E6897EF4454B406EDAF /* Sources */,
 				CE58C0022F96000000000001 /* Frameworks */,
@@ -761,6 +778,28 @@
 			shellPath = /bin/sh;
 			shellScript = "python3 \"${SRCROOT}/scripts/sync_settings_bundle.py\"\n";
 		};
+		CEA0C0082FA0000000000001 /* Check SQLCipher XCFramework */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"$(SRCROOT)/SQLCipherArtifactInputs.xcfilelist",
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/validate_sqlcipher_xcframework.py",
+				"$(SRCROOT)/SQLCipherArtifactInputs.xcfilelist",
+			);
+			name = "Check SQLCipher XCFramework";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"${SRCROOT}/scripts/validate_sqlcipher_xcframework.py\" --root \"${SRCROOT}\" --skip-release-assets --skip-smoke\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -825,8 +864,9 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.tests;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -866,8 +906,9 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.tests;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -935,9 +976,10 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
 				OTHER_LDFLAGS = "$(inherited)";
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -1163,9 +1205,10 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
 				OTHER_LDFLAGS = "$(inherited)";
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -1311,9 +1354,10 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
 				OTHER_LDFLAGS = "$(inherited)";
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -1357,8 +1401,9 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap",
+					"-DSQLITE_HAS_CODEC",
 				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap";
+				OTHER_SWIFT_FLAGS = "$(inherited) -Xcc -fmodule-map-file=$(PROJECT_DIR)/bindings/module.modulemap -Xcc -DSQLITE_HAS_CODEC";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chentianren.cypherair.tests;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
