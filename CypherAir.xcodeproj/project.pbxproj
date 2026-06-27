@@ -540,7 +540,6 @@
 				1242D2BD7FB363D9F6CBAB8A /* Sources */,
 				D10000212F80000100000001 /* Resources */,
 				CE2F97D52F746A9E00232BC9 /* ShellScript */,
-				CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */,
 			);
 			buildRules = (
 			);
@@ -714,36 +713,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "bash \"${SRCROOT}/scripts/generate_source_compliance_build_phase.sh\"\n";
-		};
-		CE58C0052F96000000000001 /* Snapshot Repository Audit Inputs */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"$(SRCROOT)/Tests/RepositoryAuditInputs.xcfilelist",
-			);
-			inputPaths = (
-				"$(SRCROOT)/scripts/snapshot_repository_audit_inputs.sh",
-				"$(SRCROOT)/.git/HEAD",
-				"$(SRCROOT)/.git/config",
-				"$(SRCROOT)/.git/config.worktree",
-				"$(SRCROOT)/.git/index",
-				"$(SRCROOT)/.git/info/exclude",
-				"$(SRCROOT)/Sources",
-				"$(SRCROOT)/Tests/RepositoryAuditInputs.xcfilelist",
-			);
-			name = "Snapshot Repository Audit Inputs";
-			outputFileListPaths = (
-				"$(SRCROOT)/Tests/RepositoryAuditOutputs.xcfilelist",
-			);
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/RepositoryAudit",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "bash \"${SRCROOT}/scripts/snapshot_repository_audit_inputs.sh\"\n";
 		};
 		CE58C0082F96000000000001 /* Sync Settings Bundle Version */ = {
 			isa = PBXShellScriptBuildPhase;

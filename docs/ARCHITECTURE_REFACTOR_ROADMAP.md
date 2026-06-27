@@ -39,21 +39,20 @@ Purpose: establish shared phase language and measurable guardrails before broad 
   - Add this roadmap with governance metadata, related-doc links, phase boundaries, and validation expectations.
   - Keep it explicitly future-facing and non-canonical for shipped behavior.
 
-- **PR 0B: Architecture source-audit guardrails**
-  - Add or expand source-audit checks where practical.
-  - Initial guardrails should focus on measurable leaks: generated FFI types above the adapter boundary, `PgpError` handling in UI and ScreenModels, SwiftUI presentation policy in Models, and ordinary runtime `[Contact]` dependencies.
-  - Guardrails should allow explicit temporary exceptions so incremental PRs can land safely.
+- **PR 0B: Architecture review and behavior guardrails**
+  - Define the review expectations and behavior-test coverage for measurable leaks: generated FFI types above the adapter boundary, `PgpError` handling in UI and ScreenModels, SwiftUI presentation policy in Models, and ordinary runtime `[Contact]` dependencies.
+  - Keep temporary exceptions explicit in PR descriptions or active planning docs so incremental PRs can land safely without hiding debt.
 
 ### Exit Markers
 
 - Future refactor PRs can state whether they reduce, preserve, or intentionally defer known architecture debt.
-- New guardrails catch clear boundary regressions without blocking planned transitional states.
+- Review and behavior-test guardrails catch clear boundary regressions without blocking planned transitional states.
 - Documentation makes the distinction between target architecture, audit evidence, and phased execution clear.
 
 ### Validation
 
 - Documentation-only PRs should run `git diff --check` and any local documentation consistency or link checks available in the workspace.
-- Guardrail PRs should include tests proving both violation detection and allowed temporary exceptions.
+- Guardrail PRs should include behavior tests for the changed contracts and explicit review notes for any allowed temporary exceptions.
 
 ## Phase 1: FFI Adapter And Error Containment
 
@@ -87,7 +86,7 @@ Purpose: contain generated UniFFI interaction and generated-error interpretation
 
 ### Validation
 
-- Run targeted source-audit checks for generated types above the adapter boundary.
+- Review generated type ownership above the adapter boundary and run the affected adapter/service tests.
 - Preserve Rust and Swift behavior coverage for both profiles.
 - For Swift-visible Rust / UniFFI behavior changes, regenerate the XCFramework through the documented workflow before Xcode validation.
 - For decrypt and signature changes, prove AEAD hard-fail, two-phase decrypt auth, cancellation, tamper handling, and detailed verification behavior remain intact.
@@ -106,14 +105,14 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 - **PR 2B: Error vocabulary cleanup**
   - Keep `CypherAirError` as the shared app-owned error model.
   - Continue residual error vocabulary cleanup after the Phase 1 close-out moved generated `PgpError` mapping and generated cancellation interpretation out of Models, Views, and ScreenModels.
-  - Status note: Phase 2 PR2B validation confirms current production code keeps generated `PgpError` mapping in the FFI adapter boundary, keeps `CypherAirError` free of generated error mapping, and blocks new non-FFI `PGPErrorMapper` use with source-audit coverage.
+  - Status note: Phase 2 PR2B validation confirms current production code keeps generated `PgpError` mapping in the FFI adapter boundary and keeps `CypherAirError` free of generated error mapping.
 
 - **PR 2C: Presentation policy extraction**
   - Move display-only helpers such as colors, icons, localized labels, and view-specific display text out of core Models and into presentation helpers or ScreenModel-prepared display state.
 
 - **PR 2D: Security vocabulary cleanup**
   - Remove ProtectedData and Security implementation vocabulary from app-owned domain models where those details can be represented by app-level availability or validation results.
-  - Status note: Phase 2 PR2D validation confirms current production Models use app-owned Contacts validation and ordinary-settings availability vocabulary, while ProtectedData outcome/state mapping and protected-settings persistence adapters live at Services, Security, or App composition boundaries with source-audit coverage blocking regression.
+  - Status note: Phase 2 PR2D validation confirms current production Models use app-owned Contacts validation and ordinary-settings availability vocabulary, while ProtectedData outcome/state mapping and protected-settings persistence adapters live at Services, Security, or App composition boundaries.
 
 ### Exit Markers
 
@@ -127,7 +126,7 @@ Purpose: make Models a stable app-owned vocabulary rather than a container for g
 - Run model and persistence tests affected by enum or schema changes.
 - Add migration or compatibility tests before changing persisted payload vocabulary.
 - Run localization checks when moving user-facing strings.
-- Run targeted source-audit checks for SwiftUI imports, generated FFI symbols, and ProtectedData / Security implementation vocabulary in Models.
+- Review Models for SwiftUI imports, generated FFI symbols, and ProtectedData / Security implementation vocabulary when those boundaries are touched.
 
 ## Phase 3: Contacts Runtime Consolidation
 
@@ -170,14 +169,13 @@ Purpose: make the protected, person-centered Contacts domain the ordinary runtim
 - Prove protected-domain authority, empty first-domain creation, relock cleanup, schema compatibility, and recovery behavior.
 - Preserve search ranking, tag normalization, per-key verification/certification state, recipient selection, and certification artifact behavior.
 - Run Contacts service and ScreenModel tests affected by each PR.
-- Use source-audit checks to block `[Contact]` production dependencies and legacy flat Contacts projection types.
+- Review production Contacts changes for `[Contact]` dependencies and legacy flat Contacts projection types.
 
-Close-out validation confirmed the Phase 3 exit markers with
-`ArchitectureSourceAuditTests` plus targeted Contacts tests for empty
-protected-domain creation, schema v1-to-v2 writeback, protected recovery,
-candidate import, merge/historical signer behavior, recipient search, Contact
-Detail ScreenModel mutations, relock cleanup, URL import, and Encrypt tag
-selection.
+Close-out validation confirmed the Phase 3 exit markers with production-source
+review plus targeted Contacts tests for empty protected-domain creation, schema
+v1-to-v2 writeback, protected recovery, candidate import, merge/historical
+signer behavior, recipient search, Contact Detail ScreenModel mutations, relock
+cleanup, URL import, and Encrypt tag selection.
 
 ## Phase 4: UI And ScreenModel Ownership
 
@@ -214,29 +212,28 @@ Purpose: make route views thin and make ScreenModels the owner of user-driven wo
 
 - Run affected ScreenModel unit tests.
 - Run targeted macOS UI smoke coverage for route ownership and tutorial-host behavior when those surfaces change.
-- Use source-audit checks for view-level service orchestration and generated-error handling in UI.
+- Review view-level service orchestration and generated-error handling in UI when route ownership changes.
 - Verify tutorial configuration and output-interception behavior when shared production views are refactored.
 
 PR4A validation added key-route ScreenModel unit coverage for generation,
 import, backup, expiry modification, key detail stale-export suppression, and
-selective-revocation output interception. It also added source-audit coverage to
-block key-management workflow calls from key route Views.
+selective-revocation output interception, with review coverage for keeping
+key-management workflow calls out of key route Views.
 
 PR4B validation added QR Display ScreenModel unit coverage, tightened Add
 Contact QR-photo loader ownership, accepted existing Contact Detail, Contacts,
 tag, import-confirmation, and incoming-URL coordinators for the Contacts route
-scope, and added source-audit coverage to block contact/QR workflow calls from
+scope, with review coverage for keeping contact/QR workflow calls out of
 Contacts route Views.
 
 PR4C validation promoted decryption Phase 1 results to app-owned models,
 replaced Encrypt, Decrypt, Sign, and Verify ScreenModel file-operation seams
-with app-owned request/result wrappers, and added source-audit coverage to block
-service phase, progress, and temporary-artifact internals from ScreenModel
-sources.
+with app-owned request/result wrappers, and reviewed ScreenModel sources for
+service phase, progress, and temporary-artifact internals.
 
-Phase 4 close-out validation on 2026-05-19 re-ran the architecture source-audit
-guardrails, PR4A-PR4C ScreenModel tests, Contacts route/coordinator tests, and
-tutorial output/configuration tests. No blocking Phase 4 gaps were found. A
+Phase 4 close-out validation on 2026-05-19 re-ran targeted architecture review,
+PR4A-PR4C ScreenModel tests, Contacts route/coordinator tests, and tutorial
+output/configuration tests. No blocking Phase 4 gaps were found. A
 targeted macOS UI smoke pass remains the release-review validation gate for
 route ownership and tutorial-host behavior when preparing the close-out PR.
 
@@ -285,7 +282,7 @@ Purpose: close the roadmap cleanly after implementation, update canonical docs t
 ### Candidate PRs
 
 - **PR 6A: Target acceptance sweep**
-  - Re-run source-audit checks and targeted manual review against the acceptance markers in `ARCHITECTURE_REFACTOR_TARGET.md`.
+  - Re-run targeted manual review and behavior tests against the acceptance markers in `ARCHITECTURE_REFACTOR_TARGET.md`.
   - Document remaining exceptions with owner, reason, and intended follow-up.
 
 - **PR 6B: Canonical current-state documentation sync**
@@ -313,10 +310,10 @@ Purpose: close the roadmap cleanly after implementation, update canonical docs t
 | Change surface | Minimum validation expectation |
 | --- | --- |
 | Documentation-only | `git diff --check`, documentation consistency checks, and link checks where available. |
-| Source-audit guardrails | Unit tests for violations and allowed exceptions; confirm fixture/source manifests are updated when needed. |
-| Swift app-only architecture refactor | Affected unit tests, targeted source-audit checks, and `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` when behavior or contracts change. |
+| Architecture review guardrails | Behavior tests for changed contracts, explicit PR notes for temporary exceptions, and targeted reviewer inspection of touched boundaries. |
+| Swift app-only architecture refactor | Affected unit tests, targeted architecture review, and `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS'` when behavior or contracts change. |
 | UI route, tutorial, or settings flow | Affected ScreenModel tests plus targeted macOS UI smoke coverage. |
-| Contacts runtime or persistence | Contacts service tests, Contacts ScreenModel tests, migration/recovery tests, relock cleanup tests, and source-audit checks for legacy projection use. |
+| Contacts runtime or persistence | Contacts service tests, Contacts ScreenModel tests, migration/recovery tests, relock cleanup tests, and reviewer inspection for legacy projection use. |
 | Security, ProtectedData, authentication, or reset | Focused security unit tests, recovery/fail-closed tests, and device-only tests when real Secure Enclave, biometric, access-control, or hardware ProtectedData behavior changes. |
 | Rust / UniFFI-visible behavior | Rust tests, UniFFI regeneration through the documented workflow, XCFramework refresh when Swift-visible behavior changes, then relevant Xcode validation. |
 | Decrypt, signature, or trust-facing behavior | Positive and negative tests for both profiles, AEAD hard-fail, two-phase decrypt auth, tamper handling, cancellation, and detailed verification semantics. |

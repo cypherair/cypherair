@@ -4,7 +4,7 @@
 > Date: 2026-05-19.
 > Scope: First-party Swift production sources under `Sources/`, generated
 > UniFFI Swift bindings as origin evidence, Swift FFI adapter files, selected
-> service-level tests, and architecture source-audit tests.
+> service-level tests, and architecture review evidence.
 > Purpose: Independently audit whether generated UniFFI and FFI-boundary
 > vocabulary leak above the intended Swift adapter boundary.
 > Audience: CypherAir maintainers, reviewers, and coding agents preparing
@@ -13,7 +13,6 @@
 > `Sources/Services/FFI/`, `Sources/App/AppContainer.swift`,
 > `Sources/App/Onboarding/TutorialSandboxContainer.swift`,
 > ordinary production Services under `Sources/Services/`,
-> `Tests/ServiceTests/ArchitectureSourceAuditTests.swift`,
 > `Tests/ServiceTests/TestHelpers.swift`, service/device/FFI tests under
 > `Tests/`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, and
 > `docs/DOCUMENTATION_GOVERNANCE.md`.
@@ -23,6 +22,11 @@ remediation plan, or a canonical current-state replacement for
 `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, or `docs/TESTING.md`. Current code
 and canonical current-state documentation outrank this snapshot whenever they
 drift.
+
+Update: the 2026-06-26 testing cleanup retired the former text-scanning XCTest
+guardrails and build-time repository snapshot. Current FFI boundary maintenance
+relies on architecture review, behavior tests, and canonical current-state
+documentation rather than source-text assertions.
 
 ## Summary
 
@@ -62,10 +66,9 @@ adapter-local `PGP*` contract vocabulary outside the adapter directory. The
 matches were manually checked in the App composition roots, FFI adapters,
 ordinary Services, Models, and selected tests.
 
-The audit also reviewed the source-audit guardrails in
-`ArchitectureSourceAuditTests`, including generated UniFFI type containment,
-generated error mapper containment, App-layer `PgpError` handling, and
-App-layer FFI adapter usage.
+The audit also reviewed the then-current architecture guardrail inventory,
+including generated UniFFI type containment, generated error mapper
+containment, App-layer `PgpError` handling, and App-layer FFI adapter usage.
 
 ## Findings
 
@@ -84,10 +87,10 @@ Risk: Low for ordinary production routes. The hard generated-result and
 generated-error vocabulary no longer appears to be part of normal UI,
 ScreenModel, Models, or ordinary Service public paths.
 
-Recommendation: Keep the existing generated-type source-audit rule active and
-avoid broadening its temporary exceptions. Treat any new generated symbol match
-outside composition roots and `Sources/Services/FFI/**` as a regression until
-proven otherwise.
+Recommendation: Keep generated-type ownership visible in review and avoid
+broadening temporary exceptions. Treat any new generated symbol use outside
+composition roots and `Sources/Services/FFI/**` as a regression until proven
+otherwise.
 
 ### 2. App Composition Roots Still Expose `PgpEngine`
 
@@ -116,7 +119,7 @@ through `ContactService`.
 
 Risk: Medium. This is not an ordinary user path, but it is still App-layer code
 calling a generated engine operation outside the FFI adapter boundary. It also
-requires the source-audit exception for `AppContainer` to cover more than
+requires the `AppContainer` composition-root exception to cover more than
 dependency wiring.
 
 Recommendation: Move the preload key generation behind an app-owned service or
@@ -199,25 +202,24 @@ service orchestration rather than Rust/UniFFI behavior. Convert test helpers
 incrementally so the production boundary can tighten without a large test
 rewrite.
 
-### 8. Existing Guardrails Cover Hard Generated Leaks But Not All Coupling
+### 8. Review Expectations Cover Hard Generated Leaks But Not All Coupling
 
-Evidence: `ArchitectureSourceAuditTests` defines guardrails for generated
-UniFFI type containment, generated error mapping containment, App-layer
-`PgpError` handling, and App-layer FFI adapter usage. Temporary exceptions
-currently include `AppContainer`, `TutorialSandboxContainer`, and FFI adapter
-files for generated-type containment. The rules strip comments and strings and
-also detect stale temporary exceptions.
+Evidence: the boundary inventory covers generated UniFFI type containment,
+generated error mapping containment, App-layer `PgpError` handling, and
+App-layer FFI adapter usage. Temporary exceptions currently include
+`AppContainer`, `TutorialSandboxContainer`, and FFI adapter files for
+generated-type containment.
 
-Risk: Medium. The current guardrails are valuable for preventing hard
+Risk: Medium. The current review expectations are valuable for preventing hard
 regressions. They do not fully block ordinary Services from depending on
 concrete FFI adapter classes or adapter-local helper contracts, because that
 coupling is currently present and partly intentional.
 
-Recommendation: Add new guardrails only after choosing the remediation shape.
-Prematurely blocking all adapter class mentions in Services would fail on the
-current architecture. A better sequence is to introduce app-owned protocols or
-neutral contracts first, then add source-audit rules that prevent new direct
-adapter coupling in migrated areas.
+Recommendation: Add new behavior-test or review guardrails only after choosing
+the remediation shape. Prematurely blocking all adapter class mentions in
+Services would fail on the current architecture. A better sequence is to
+introduce app-owned protocols or neutral contracts first, then document the
+review expectations that prevent new direct adapter coupling in migrated areas.
 
 ## Non-Findings
 
@@ -251,21 +253,15 @@ adapter coupling in migrated areas.
 5. Split service-level tests by intent: keep generated engine assertions in FFI
    integration tests, and use app-owned fakes/errors for service orchestration
    tests.
-6. Add follow-up source-audit rules after each migrated area has a stable
-   app-owned contract.
+6. Add follow-up review expectations and behavior tests after each migrated
+   area has a stable app-owned contract.
 
 ## Validation Notes
 
-Targeted architecture source-audit validation was run with:
-
-```bash
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-  -destination 'platform=macOS' \
-  -only-testing:CypherAirTests/ArchitectureSourceAuditTests
-```
-
-Result: `ArchitectureSourceAuditTests` executed 19 tests with 0 failures, and
-the test session ended with `TEST SUCCEEDED`.
+The original snapshot used the then-current architecture text-scanning XCTest
+lane as supplementary evidence. That lane has since been removed; current
+validation should run behavior tests for changed services/adapters and include
+targeted reviewer inspection of generated-type ownership.
 
 This docs-only audit does not require a full Rust or Swift validation run. Full
 validation should be selected when a follow-up remediation changes Swift
