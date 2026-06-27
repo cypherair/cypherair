@@ -33,11 +33,10 @@
 - The build emits `PgpMobile.arm64e-build-manifest.json` with Rust stage1
   provenance, OpenSSL carry-chain commits, runner metadata, and verified
   XCFramework slice metadata.
-- The app-build preflight also restores a pinned experimental
-  `SQLCipher.xcframework` from `cypherair/sqlcipher-xcframework` before Xcode
-  builds. This validates SQLCipher arm64e linkage for future Contacts work, but
-  it is not yet a formal stable release artifact and Contacts storage is not yet
-  SQLCipher-backed.
+- The app build also restores the pinned formal external
+  `SQLCipher.xcframework` dependency from `cypherair/sqlcipher-xcframework`
+  before Xcode builds. This validates SQLCipher arm64e linkage for future
+  Contacts work, but Contacts storage is not yet SQLCipher-backed.
 - PR #222 run `24915498511` passed `rust-full-tests`, the formal
   `xcframework-package` build/probe path, and the hosted Swift preview job.
 - Pre-merge release validation passed through edge drill run `24897042096` and
@@ -120,24 +119,29 @@
   - app-side release workflows publish `PgpMobile.arm64e-build-manifest.json`
     with Rust stage1 provenance, OpenSSL carry-chain commits, and verified
     XCFramework slice metadata
-- SQLCipher app-build preflight:
+- SQLCipher formal external dependency:
   - wrapper repository: `cypherair/sqlcipher-xcframework`
   - pinned release:
-    `sqlcipher-xcframework-experiment-20260626T224724Z-61d7f56-r28269517779-a1`
-  - wrapper commit: `61d7f56baa687a19270c93f85b3663adc22fa9f2`
+    `sqlcipher-xcframework-v4.16.0-cypherair.1`
+  - wrapper commit: `aee70b13ddf0eb262ac1283930760cac44dbe873`
+  - consumer pin file: `third_party/sqlcipher-xcframework.pin.json`
   - upstream SQLCipher tag: `v4.16.0`
   - upstream SQLCipher peeled commit:
     `e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc`
   - zip SHA-256:
-    `22bd894ded5bdde119c87f81809b9b99a19dcd7afdf9410858a7fc34555ee20d`
+    `3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e`
+  - release shape: SSH-signed annotated tag, non-prerelease immutable GitHub
+    Release, verified with `gh release verify`, `gh release verify-asset`, and
+    `gh attestation verify`
   - restored slices cover iOS/macOS/visionOS device `arm64` + `arm64e` and
     iOS/visionOS simulator `arm64`; each slice is a static
     `SQLCipher.framework` bundle inside `SQLCipher.xcframework`; the artifact is
     restored with `scripts/restore_sqlcipher_xcframework.sh` and validated by
     `scripts/validate_sqlcipher_xcframework.py`
-  - SQLCipher refreshes must be published by the wrapper repository first, then
-    re-pinned in this app repository; do not commit the restored
-    `SQLCipher.xcframework` or downloaded SQLCipher release assets
+  - SQLCipher refreshes must be published by the wrapper repository first as a
+    new stable immutable release, then re-pinned in this app repository; do not
+    commit the restored `SQLCipher.xcframework` or downloaded SQLCipher release
+    assets
 - OpenSSL source carry:
   - `pgp-mobile/Cargo.toml` patches `openssl-src` to
     `https://github.com/cypherair/openssl-src-rs`

@@ -14,6 +14,24 @@ module = load_script_module(
 
 
 class BuildComplianceReleaseAssetsTests(unittest.TestCase):
+    def test_external_binary_dependency_entry_records_sqlcipher_pin(self) -> None:
+        entries = module.external_binary_dependency_entries(
+            [REPO_ROOT / "third_party" / "sqlcipher-xcframework.pin.json"]
+        )
+
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        self.assertEqual(entry["name"], "SQLCipher.xcframework")
+        self.assertEqual(entry["repository"], "cypherair/sqlcipher-xcframework")
+        self.assertEqual(entry["releaseTag"], "sqlcipher-xcframework-v4.16.0-cypherair.1")
+        self.assertEqual(entry["releaseChannel"], "stable")
+        self.assertTrue(entry["releaseIsImmutable"])
+        self.assertFalse(entry["releaseIsPrerelease"])
+        self.assertFalse(entry["mirroredInCypherAirRelease"])
+        self.assertEqual(entry["upstreamTag"], "v4.16.0")
+        self.assertIn("SQLCipher.xcframework.zip", entry["assetHashes"])
+        self.assertIn("ios-arm64_arm64e", entry["sliceHashes"])
+
     def test_source_bundle_uses_relative_vendor_path_and_supports_offline_metadata(self) -> None:
         commit_sha = run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).stdout.strip()
 

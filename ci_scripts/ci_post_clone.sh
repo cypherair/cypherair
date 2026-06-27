@@ -60,6 +60,15 @@ ensure_homebrew_formula() {
     fi
 }
 
+require_gh_auth() {
+    ensure_homebrew_formula gh
+    [ -n "${GITHUB_PAT:-}" ] || fail "GITHUB_PAT secret is required for SQLCipher release verification"
+    if ! gh auth status >/dev/null 2>&1; then
+        log "authenticating gh"
+        printf '%s' "$GITHUB_PAT" | gh auth login --with-token
+    fi
+}
+
 ensure_rust_stable() {
     if ! command -v rustup >/dev/null 2>&1; then
         log "Installing rustup (stable, minimal)"
@@ -100,18 +109,15 @@ build_xcframework_workflow() {
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
     [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
     log "WF1: restoring pinned SQLCipher.xcframework for app link preflight"
-    scripts/restore_sqlcipher_xcframework.sh
+    require_gh_auth
+    scripts/restore_sqlcipher_xcframework.sh --require-attestation
     log "WF1: xcframework build complete"
 }
 
 release_consumer_workflow() {
     log "WF2: consuming the published xcframework for the App Store archive"
     [ -n "${CI_TAG:-}" ] || fail "WF2 must be started for a stable tag (CI_TAG is empty)"
-    ensure_homebrew_formula gh
-
-    [ -n "${GITHUB_PAT:-}" ] || fail "GITHUB_PAT secret is required to read the stable release"
-    log "WF2: authenticating gh"
-    printf '%s' "$GITHUB_PAT" | gh auth login --with-token
+    require_gh_auth
 
     log "WF2: downloading attested xcframework assets for $CI_TAG"
     gh release download "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" \
@@ -127,7 +133,7 @@ release_consumer_workflow() {
     ditto -x -k "$XCFRAMEWORK_ZIP" .
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "extracted xcframework is missing Info.plist"
     log "WF2: restoring pinned SQLCipher.xcframework for app archive"
-    scripts/restore_sqlcipher_xcframework.sh
+    scripts/restore_sqlcipher_xcframework.sh --require-attestation
 
     local marketing_version build_number
     marketing_version="$(project_setting MARKETING_VERSION)"

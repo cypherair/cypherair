@@ -12,6 +12,12 @@ from support import REPO_ROOT, load_script_module
 
 
 class XcodeBuildPhaseScriptTests(unittest.TestCase):
+    def test_source_compliance_phase_declares_sqlcipher_pin_input(self) -> None:
+        project_text = (REPO_ROOT / "CypherAir.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+
+        self.assertIn("Generate Source Compliance Info", project_text)
+        self.assertIn("$(SRCROOT)/third_party/sqlcipher-xcframework.pin.json", project_text)
+
     def test_settings_bundle_phase_generates_acknowledgements_from_manifest(self) -> None:
         module = load_script_module("sync_settings_bundle", "scripts/sync_settings_bundle.py")
 

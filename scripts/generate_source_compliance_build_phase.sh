@@ -16,6 +16,7 @@ REQUIRE_STABLE_RELEASE="${SOURCE_COMPLIANCE_REQUIRE_STABLE_RELEASE:-NO}"
 REPOSITORY_URL="https://github.com/cypherair/cypherair"
 STABLE_RELEASE_TAG="${SOURCE_COMPLIANCE_STABLE_RELEASE_TAG:-}"
 STABLE_RELEASE_URL="${SOURCE_COMPLIANCE_STABLE_RELEASE_URL:-}"
+SQLCIPHER_PIN_FILE="${SOURCE_COMPLIANCE_SQLCIPHER_PIN_FILE:-${SRCROOT}/third_party/sqlcipher-xcframework.pin.json}"
 
 is_commit_sha() {
     printf '%s\n' "$1" | grep -Eq '^[0-9a-fA-F]{40}$'
@@ -111,6 +112,9 @@ set -- \
 
 if [ -f "$METADATA_FILE" ]; then
     set -- "$@" --metadata-file "$METADATA_FILE"
+fi
+if [ -f "$SQLCIPHER_PIN_FILE" ]; then
+    set -- "$@" --external-binary-dependency "$SQLCIPHER_PIN_FILE"
 fi
 
 python3 "${SRCROOT}/scripts/generate_source_compliance_info.py" "$@"

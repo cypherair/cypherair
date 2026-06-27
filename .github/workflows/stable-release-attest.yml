@@ -119,6 +119,46 @@ jobs:
                   f"does not match stable tag commit {target_sha!r}"
               )
 
+          external = manifest.get("externalBinaryDependencies")
+          if not isinstance(external, list):
+              errors.append("compliance manifest externalBinaryDependencies must be a list")
+          else:
+              sqlcipher = next(
+                  (
+                      item
+                      for item in external
+                      if isinstance(item, dict) and item.get("name") == "SQLCipher.xcframework"
+                  ),
+                  None,
+              )
+              if sqlcipher is None:
+                  errors.append("compliance manifest is missing SQLCipher external binary dependency")
+              else:
+                  if sqlcipher.get("releaseChannel") != "stable":
+                      errors.append("SQLCipher external dependency must use a stable release")
+                  if sqlcipher.get("releaseIsImmutable") is not True:
+                      errors.append("SQLCipher external dependency release must be immutable")
+                  if sqlcipher.get("releaseIsPrerelease") is not False:
+                      errors.append("SQLCipher external dependency release must not be prerelease")
+                  sqlcipher_release_tag = str(sqlcipher.get("releaseTag") or "")
+                  if not sqlcipher_release_tag or sqlcipher_release_tag == "latest" or "experiment" in sqlcipher_release_tag:
+                      errors.append(f"SQLCipher external dependency tag is not a stable exact pin: {sqlcipher_release_tag!r}")
+                  if sqlcipher.get("mirroredInCypherAirRelease") is not False:
+                      errors.append("SQLCipher external dependency must not be mirrored into the CypherAir release")
+
+          binary_assets = manifest.get("binaryAssets")
+          if isinstance(binary_assets, list):
+              mirrored_sqlcipher_assets = [
+                  asset.get("fileName")
+                  for asset in binary_assets
+                  if isinstance(asset, dict) and str(asset.get("fileName") or "").startswith("SQLCipher")
+              ]
+              if mirrored_sqlcipher_assets:
+                  errors.append(
+                      "CypherAir stable release must not mirror SQLCipher release assets: "
+                      + ", ".join(mirrored_sqlcipher_assets)
+                  )
+
           verification = tag_object.get("verification") or {}
           signature = verification.get("signature") or ""
           if verification.get("verified") is not True:

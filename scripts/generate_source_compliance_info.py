@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--commit-sha", default="")
     parser.add_argument("--metadata-file", type=Path)
     parser.add_argument("--arm64e-manifest", type=Path)
+    parser.add_argument("--external-binary-dependency", type=Path, action="append", default=[])
     parser.add_argument("--repository-url", default=DEFAULT_REPOSITORY_URL)
     parser.add_argument("--stable-release-tag", default="")
     parser.add_argument("--stable-release-url", default="")
@@ -85,6 +86,37 @@ def load_arm64e_manifest(path: Path | None) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise RuntimeError("arm64e manifest must contain a JSON object")
     return payload
+
+
+def external_binary_dependency_entries(paths: list[Path]) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for path in paths:
+        if not path.exists():
+            continue
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"external binary dependency pin must contain a JSON object: {path}")
+        release = payload.get("release") or {}
+        upstream = payload.get("upstream") or {}
+        entries.append(
+            {
+                "name": str(payload.get("dependencyName", "")),
+                "repository": str(payload.get("repository", "")),
+                "releaseTag": str(release.get("tag", "")),
+                "releaseURL": str(release.get("url", "")),
+                "releaseChannel": str(release.get("channel", "")),
+                "releaseCommitSHA": str(release.get("commitSha", "")),
+                "releaseSourceRef": str(release.get("sourceRef", "")),
+                "releaseSignerWorkflow": str(release.get("signerWorkflow", "")),
+                "releaseIsImmutable": bool(release.get("isImmutable")),
+                "releaseIsPrerelease": bool(release.get("isPrerelease")),
+                "upstreamRepository": str(upstream.get("repository", "")),
+                "upstreamTag": str(upstream.get("tag", "")),
+                "upstreamCommit": str(upstream.get("commit", "")),
+                "mirroredInCypherAirRelease": False,
+            }
+        )
+    return entries
 
 
 def resolved_metadata_value(explicit_value: str, metadata_value: str) -> str:
@@ -169,6 +201,7 @@ def generate() -> None:
         "stableReleaseURL": stable_release_url,
         "dependencies": load_dependency_versions(args.cargo_lock),
         "arm64eBuild": load_arm64e_manifest(args.arm64e_manifest),
+        "externalBinaryDependencies": external_binary_dependency_entries(args.external_binary_dependency),
         "firstPartyLicense": "GPL-3.0-or-later OR MPL-2.0",
         "fulfillmentBasis": "LGPL 2.1",
         "isStableReleaseBuild": bool(stable_release_url),

@@ -48,7 +48,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 | Language | Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
 | OpenPGP Engine | Sequoia PGP 2.3.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
-| SQLCipher Preflight | Pinned experimental `SQLCipher.xcframework` 4.16.0 static library from `cypherair/sqlcipher-xcframework`; restored as an ignored artifact and linked for app-build validation only |
+| SQLCipher | Formal pinned external `SQLCipher.xcframework` 4.16.0 static library from `cypherair/sqlcipher-xcframework`; restored as an ignored artifact and linked by the app target |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |
 | Build | Xcode 26.5, Rust stable, targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`; `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release |
 | Localization | English + Simplified Chinese (.xcstrings) |
@@ -138,8 +138,8 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=<pinned-tag> \
     ./build-xcframework.sh --release
 
-# 3. Restore the pinned SQLCipher preflight artifact used by Xcode.
-# The artifact is ignored by git and Contacts storage is not yet SQLCipher-backed.
+# 3. Restore the pinned SQLCipher external dependency used by Xcode.
+# The artifact is ignored by git; Contacts storage is not yet SQLCipher-backed.
 scripts/restore_sqlcipher_xcframework.sh
 
 # 4. Validate Swift unit + FFI behavior locally
@@ -183,19 +183,19 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 
 CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and the current stable-release channel contract, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
 
-### SQLCipher Preflight Artifact
+### SQLCipher External Dependency
 
-CypherAir also consumes a pinned experimental SQLCipher static framework-shaped
+CypherAir also consumes a pinned stable SQLCipher static framework-shaped
 XCFramework from the separate public build-wrapper repository
 `cypherair/sqlcipher-xcframework`. The main repository does not commit
 `SQLCipher.xcframework` or downloaded release assets; local and CI builds
 restore them with `scripts/restore_sqlcipher_xcframework.sh`, verify the pinned
-release checksum and manifest, and validate the restored static framework slices
-before Xcode builds. The app consumes SQLCipher through Xcode's normal
-Frameworks phase, not slice-specific linker paths. Refreshes must be published
-in `cypherair/sqlcipher-xcframework` first, then re-pinned here. This is an
-app-build preflight only; Contacts storage still uses the current ProtectedData
-domain until the later issue #540 implementation.
+immutable release, checksum, manifest, asset attestations, and restored static
+framework slices before Xcode builds. The app consumes SQLCipher through Xcode's
+normal Frameworks phase, not slice-specific linker paths. Refreshes must be
+published in `cypherair/sqlcipher-xcframework` first, then re-pinned in
+`third_party/sqlcipher-xcframework.pin.json`. Contacts storage still uses the
+current ProtectedData domain until the later issue #540 implementation.
 
 ## Security Model
 
@@ -235,7 +235,7 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
 | [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
-| [SQLCIPHER_XCFRAMEWORK_EXPERIMENT](docs/SQLCIPHER_XCFRAMEWORK_EXPERIMENT.md) | External experimental SQLCipher XCFramework build repository for arm64e feasibility work |
+| [SQLCIPHER_XCFRAMEWORK_DEPENDENCY](docs/SQLCIPHER_XCFRAMEWORK_DEPENDENCY.md) | Formal pinned external SQLCipher XCFramework dependency and refresh flow |
 
 ## License
 

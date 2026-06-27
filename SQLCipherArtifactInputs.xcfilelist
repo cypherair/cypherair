@@ -41,5 +41,6 @@ $(SRCROOT)/SQLCipher.xcframework/xros-arm64-simulator/SQLCipher.framework/Privac
 $(SRCROOT)/SQLCipher.xcframework/xros-arm64-simulator/SQLCipher.framework/SQLCipher
 $(SRCROOT)/SQLCipher.arm64e-build-manifest.json
 $(SRCROOT)/SQLCipher-PrivacyInfo.xcprivacy
-$(SRCROOT)/sqlcipher-xcframework-experiment.json
+$(SRCROOT)/SQLCipher.xcframework.release.json
 $(SRCROOT)/Sources/Resources/PrivacyInfo.xcprivacy
+$(SRCROOT)/third_party/sqlcipher-xcframework.pin.json
