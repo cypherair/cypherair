@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "dependencyName": "SQLCipher.xcframework",
+  "repository": "cypherair/sqlcipher-xcframework",
+  "release": {
+    "tag": "sqlcipher-xcframework-v4.16.0-cypherair.1",
+    "url": "https://github.com/cypherair/sqlcipher-xcframework/releases/tag/sqlcipher-xcframework-v4.16.0-cypherair.1",
+    "channel": "stable",
+    "isImmutable": true,
+    "isPrerelease": false,
+    "sourceRef": "refs/tags/sqlcipher-xcframework-v4.16.0-cypherair.1",
+    "commitSha": "aee70b13ddf0eb262ac1283930760cac44dbe873",
+    "publishedAt": "2026-06-27T20:59:03Z",
+    "signerWorkflow": "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
+    "runId": "28301592523"
+  },
+  "upstream": {
+    "repository": "https://github.com/sqlcipher/sqlcipher.git",
+    "tag": "v4.16.0",
+    "commit": "e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc",
+    "sqliteVersion": "3.53.1"
+  },
+  "assets": {
+    "SQLCipher.xcframework.zip": {
+      "sha256": "3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e",
+      "size": 5655372
+    },
+    "SQLCipher.xcframework.sha256": {
+      "sha256": "1121b4047fc980478fab2d577d99cd96ddb51f9490b972748d7ca7056df112df",
+      "size": 92
+    },
+    "SQLCipher.arm64e-build-manifest.json": {
+      "sha256": "c6c332387ef2c409e9b4e9876b4de45288a06a40eb641876845d8eb4a02b573d",
+      "size": 4689
+    },
+    "SQLCipher-PrivacyInfo.xcprivacy": {
+      "sha256": "9362796ba800a7b4169834eff8bde990866f40114ff7baac002b8bae543e8dd1",
+      "size": 840
+    },
+    "SQLCipher.xcframework.release.json": {
+      "sha256": "09f2d3d0cc88fa36264636370dead5e54affd273ef19b4446ef1271c8dec6b89",
+      "size": 1084
+    }
+  },
+  "slices": {
+    "ios-arm64_arm64e": {
+      "platform": "ios",
+      "variant": null,
+      "architectures": ["arm64", "arm64e"],
+      "sha256": "c0c0744bfc1c58cff446bfbf8c9000b87b79292cf82865a3177057bf56a67438"
+    },
+    "macos-arm64_arm64e": {
+      "platform": "macos",
+      "variant": null,
+      "architectures": ["arm64", "arm64e"],
+      "sha256": "32bca8f42cb98c03ec16a5d8aeabc88360c5288a39f403b5eafe34e2cda93bdc"
+    },
+    "xros-arm64_arm64e": {
+      "platform": "xros",
+      "variant": null,
+      "architectures": ["arm64", "arm64e"],
+      "sha256": "e7d689553353128a6ac6c5d502d85c340d18c919501e95fa0763a459fd47e8c7"
+    },
+    "ios-arm64-simulator": {
+      "platform": "ios",
+      "variant": "simulator",
+      "architectures": ["arm64"],
+      "sha256": "4be3bab597e1ee69ff39492ac3b93033dda1d160968f768e649f11a22d422bfb"
+    },
+    "xros-arm64-simulator": {
+      "platform": "xros",
+      "variant": "simulator",
+      "architectures": ["arm64"],
+      "sha256": "bd3cb3f52d465b6d9ba040d99e7b8042bf08815983c2ff911c50988024bcc53e"
+    }
+  }
+}

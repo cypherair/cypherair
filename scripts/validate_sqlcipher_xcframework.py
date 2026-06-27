@@ -13,51 +13,21 @@ import tempfile
 from pathlib import Path
 
 
-RELEASE_TAG = "sqlcipher-xcframework-experiment-20260626T224724Z-61d7f56-r28269517779-a1"
-RELEASE_COMMIT = "61d7f56baa687a19270c93f85b3663adc22fa9f2"
+ROOT = Path(__file__).resolve().parent.parent
+PIN_PATH = ROOT / "third_party" / "sqlcipher-xcframework.pin.json"
 SOURCE_REPOSITORY = "https://github.com/sqlcipher/sqlcipher.git"
 SOURCE_TAG = "v4.16.0"
 SOURCE_COMMIT = "e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc"
-EXPECTED_ZIP_SHA = "22bd894ded5bdde119c87f81809b9b99a19dcd7afdf9410858a7fc34555ee20d"
-EXPECTED_CHECKSUM_SHA = "89a62d5427c86bf2ef285d7278d3b708ab3986070730b3faf4f3b484a31c8440"
-EXPECTED_MANIFEST_SHA = "8f85c82c2d1cd420404f3efe5b4a853edeb9ca4659b73e212a6146acb72c1276"
-EXPECTED_PRIVACY_SHA = "9362796ba800a7b4169834eff8bde990866f40114ff7baac002b8bae543e8dd1"
-EXPECTED_METADATA_SHA = "5a296e5f8503ad99d02a8e324ef723968df5f485f2a390bf77962683bf144b9b"
 EXPECTED_CIPHER_VERSION_PREFIX = "4.16.0"
 EXPECTED_SQLITE_VERSION = "3.53.1"
-
-EXPECTED_LIBRARIES = {
-    "ios-arm64_arm64e": {
-        "platform": "ios",
-        "variant": None,
-        "architectures": ["arm64", "arm64e"],
-        "sha256": "e4aae045539ec8326ebea4d1024653b300b5e1f31d2ec08c9a6b99c682bf61e9",
-    },
-    "macos-arm64_arm64e": {
-        "platform": "macos",
-        "variant": None,
-        "architectures": ["arm64", "arm64e"],
-        "sha256": "45066377d3f01693037ad99cb886562ad7047004f168871e7e4c3c9f6491289f",
-    },
-    "xros-arm64_arm64e": {
-        "platform": "xros",
-        "variant": None,
-        "architectures": ["arm64", "arm64e"],
-        "sha256": "5d3f4386888a77c027c534c55ad7e2f19a08ea93e39ce93c6a357ad5da75cf82",
-    },
-    "ios-arm64-simulator": {
-        "platform": "ios",
-        "variant": "simulator",
-        "architectures": ["arm64"],
-        "sha256": "c52cead9dbe42b58ce55d6b591db8ec70da56cf8cf4a65e75ed5408c4a23d43b",
-    },
-    "xros-arm64-simulator": {
-        "platform": "xros",
-        "variant": "simulator",
-        "architectures": ["arm64"],
-        "sha256": "c7aa5f9beaf310e1701a1ec3d4ca74213bddb787b2e4063a7b650e8787c9ed06",
-    },
-}
+RELEASE_METADATA_NAME = "SQLCipher.xcframework.release.json"
+EXPECTED_ASSET_NAMES = [
+    "SQLCipher.xcframework.zip",
+    "SQLCipher.xcframework.sha256",
+    "SQLCipher.arm64e-build-manifest.json",
+    "SQLCipher-PrivacyInfo.xcprivacy",
+    RELEASE_METADATA_NAME,
+]
 
 REQUIRED_HEADERS = ["SQLCipher.h", "sqlite3.h", "sqlite3ext.h", "sqlite3session.h"]
 REQUIRED_FRAMEWORK_FILES = ["Info.plist", "Modules/module.modulemap", "PrivacyInfo.xcprivacy"]
@@ -85,6 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate CypherAir's pinned SQLCipher XCFramework input.")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--release-assets", type=Path)
+    parser.add_argument("--pin-file", type=Path, default=PIN_PATH)
     parser.add_argument("--skip-release-assets", action="store_true")
     parser.add_argument("--skip-smoke", action="store_true")
     return parser.parse_args()
@@ -119,23 +90,96 @@ def load_plist(path: Path) -> dict:
         return plistlib.load(handle)
 
 
-def validate_release_assets(assets: Path) -> None:
+def load_pin(path: Path) -> dict:
+    pin = load_json(path)
+    if not isinstance(pin, dict):
+        raise ValidationError("SQLCipher pin file must contain a JSON object")
+    return pin
+
+
+def validate_pin(pin: dict) -> None:
+    if pin.get("schemaVersion") != 1:
+        raise ValidationError("SQLCipher pin schemaVersion must be 1")
+    if pin.get("dependencyName") != "SQLCipher.xcframework":
+        raise ValidationError("SQLCipher pin dependencyName mismatch")
+    if pin.get("repository") != "cypherair/sqlcipher-xcframework":
+        raise ValidationError("SQLCipher pin repository mismatch")
+
+    release = pin.get("release") or {}
+    tag = str(release.get("tag") or "")
+    if not tag or tag == "latest" or "experiment" in tag:
+        raise ValidationError(f"SQLCipher pin must use an exact stable release tag, got {tag!r}")
+    if release.get("channel") != "stable":
+        raise ValidationError("SQLCipher pin release channel must be stable")
+    if release.get("isImmutable") is not True:
+        raise ValidationError("SQLCipher pin must require an immutable release")
+    if release.get("isPrerelease") is not False:
+        raise ValidationError("SQLCipher pin must not target a prerelease")
+    if release.get("sourceRef") != f"refs/tags/{tag}":
+        raise ValidationError("SQLCipher pin sourceRef must match the release tag")
+    if not str(release.get("commitSha") or ""):
+        raise ValidationError("SQLCipher pin release commitSha is missing")
+    if release.get("signerWorkflow") != "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml":
+        raise ValidationError("SQLCipher pin signerWorkflow mismatch")
+
+    upstream = pin.get("upstream") or {}
+    if upstream.get("repository") != SOURCE_REPOSITORY:
+        raise ValidationError("SQLCipher pin upstream repository mismatch")
+    if upstream.get("tag") != SOURCE_TAG:
+        raise ValidationError("SQLCipher pin upstream tag mismatch")
+    if upstream.get("commit") != SOURCE_COMMIT:
+        raise ValidationError("SQLCipher pin upstream commit mismatch")
+    if upstream.get("sqliteVersion") != EXPECTED_SQLITE_VERSION:
+        raise ValidationError("SQLCipher pin SQLite version mismatch")
+
+    assets = pin.get("assets")
+    if not isinstance(assets, dict) or list(assets) != EXPECTED_ASSET_NAMES:
+        raise ValidationError(f"SQLCipher pin assets must be {EXPECTED_ASSET_NAMES!r}")
+    for asset_name, entry in assets.items():
+        if not isinstance(entry, dict) or not str(entry.get("sha256") or ""):
+            raise ValidationError(f"SQLCipher pin asset {asset_name} is missing sha256")
+
+    slices = pin.get("slices")
+    if not isinstance(slices, dict):
+        raise ValidationError("SQLCipher pin slices must be a JSON object")
+    required_slice_archs = {
+        "ios-arm64_arm64e": ["arm64", "arm64e"],
+        "macos-arm64_arm64e": ["arm64", "arm64e"],
+        "xros-arm64_arm64e": ["arm64", "arm64e"],
+        "ios-arm64-simulator": ["arm64"],
+        "xros-arm64-simulator": ["arm64"],
+    }
+    if set(slices) != set(required_slice_archs):
+        raise ValidationError(f"SQLCipher pin slices mismatch: {sorted(slices)}")
+    for identifier, expected_archs in required_slice_archs.items():
+        entry = slices[identifier]
+        if entry.get("architectures") != expected_archs:
+            raise ValidationError(f"SQLCipher pin slice {identifier} architecture mismatch")
+        if not str(entry.get("sha256") or ""):
+            raise ValidationError(f"SQLCipher pin slice {identifier} is missing sha256")
+
+
+def asset_sha(pin: dict, name: str) -> str:
+    return str(((pin.get("assets") or {}).get(name) or {}).get("sha256") or "")
+
+
+def validate_release_assets(assets: Path, pin: dict) -> None:
     zip_path = assets / "SQLCipher.xcframework.zip"
     checksum_path = assets / "SQLCipher.xcframework.sha256"
     manifest_path = assets / "SQLCipher.arm64e-build-manifest.json"
     privacy_path = assets / "SQLCipher-PrivacyInfo.xcprivacy"
-    metadata_path = assets / "sqlcipher-xcframework-experiment.json"
+    metadata_path = assets / RELEASE_METADATA_NAME
     for path in (zip_path, checksum_path, manifest_path, privacy_path, metadata_path):
         require_file(path)
 
-    expect_sha(zip_path, EXPECTED_ZIP_SHA)
-    expect_sha(checksum_path, EXPECTED_CHECKSUM_SHA)
-    expect_sha(manifest_path, EXPECTED_MANIFEST_SHA)
-    expect_sha(privacy_path, EXPECTED_PRIVACY_SHA)
-    expect_sha(metadata_path, EXPECTED_METADATA_SHA)
+    expect_sha(zip_path, asset_sha(pin, "SQLCipher.xcframework.zip"))
+    expect_sha(checksum_path, asset_sha(pin, "SQLCipher.xcframework.sha256"))
+    expect_sha(manifest_path, asset_sha(pin, "SQLCipher.arm64e-build-manifest.json"))
+    expect_sha(privacy_path, asset_sha(pin, "SQLCipher-PrivacyInfo.xcprivacy"))
+    expect_sha(metadata_path, asset_sha(pin, RELEASE_METADATA_NAME))
 
     checksum_text = checksum_path.read_text(encoding="utf-8").strip()
-    expected_checksum_text = f"{EXPECTED_ZIP_SHA}  SQLCipher.xcframework.zip"
+    expected_checksum_text = f"{asset_sha(pin, 'SQLCipher.xcframework.zip')}  SQLCipher.xcframework.zip"
     if checksum_text != expected_checksum_text:
         raise ValidationError(f"unexpected SQLCipher checksum file content: {checksum_text!r}")
 
@@ -146,16 +190,20 @@ def expect_sha(path: Path, expected: str) -> None:
         raise ValidationError(f"{path.name} sha256 {actual} != expected {expected}")
 
 
-def validate_release_metadata(path: Path) -> None:
+def validate_release_metadata(path: Path, pin: dict) -> None:
     metadata = load_json(path)
+    release = pin["release"]
+    upstream = pin["upstream"]
     expected = {
-        "release_tag": RELEASE_TAG,
-        "commit_sha": RELEASE_COMMIT,
-        "source_ref": "refs/heads/main",
-        "release_channel": "experiment",
-        "sqlcipher_source_repository": SOURCE_REPOSITORY,
-        "sqlcipher_source_tag": SOURCE_TAG,
-        "sqlcipher_source_commit": SOURCE_COMMIT,
+        "release_tag": release["tag"],
+        "release_url": release["url"],
+        "commit_sha": release["commitSha"],
+        "source_ref": release["sourceRef"],
+        "release_channel": "stable",
+        "signer_workflow": release["signerWorkflow"],
+        "sqlcipher_source_repository": upstream["repository"],
+        "sqlcipher_source_tag": upstream["tag"],
+        "sqlcipher_source_commit": upstream["commit"],
     }
     for key, expected_value in expected.items():
         actual = metadata.get(key)
@@ -163,22 +211,15 @@ def validate_release_metadata(path: Path) -> None:
             raise ValidationError(f"release metadata {key} {actual!r} != {expected_value!r}")
 
     assets = metadata.get("assets")
-    expected_assets = [
-        "SQLCipher.xcframework.zip",
-        "SQLCipher.xcframework.sha256",
-        "SQLCipher.arm64e-build-manifest.json",
-        "SQLCipher-PrivacyInfo.xcprivacy",
-        "sqlcipher-xcframework-experiment.json",
-    ]
-    if assets != expected_assets:
-        raise ValidationError(f"release metadata assets {assets!r} != {expected_assets!r}")
+    if assets != EXPECTED_ASSET_NAMES:
+        raise ValidationError(f"release metadata assets {assets!r} != {EXPECTED_ASSET_NAMES!r}")
 
 
-def validate_manifest(path: Path, privacy_path: Path) -> dict:
+def validate_manifest(path: Path, privacy_path: Path, pin: dict) -> dict:
     manifest = load_json(path)
     checks = {
         "schemaVersion": 1,
-        "status": "experimental",
+        "status": "stable",
         "artifactName": "SQLCipher.xcframework",
         "packageShape": "static-framework-xcframework",
     }
@@ -188,13 +229,14 @@ def validate_manifest(path: Path, privacy_path: Path) -> dict:
             raise ValidationError(f"manifest {key} {actual!r} != {expected!r}")
 
     source = manifest.get("source") or {}
-    if source.get("repository") != SOURCE_REPOSITORY:
+    upstream = pin["upstream"]
+    if source.get("repository") != upstream["repository"]:
         raise ValidationError("manifest source repository mismatch")
-    if source.get("tag") != SOURCE_TAG:
+    if source.get("tag") != upstream["tag"]:
         raise ValidationError("manifest source tag mismatch")
-    if source.get("resolvedCommit") != SOURCE_COMMIT:
+    if source.get("resolvedCommit") != upstream["commit"]:
         raise ValidationError("manifest source commit mismatch")
-    if source.get("versionFile") != EXPECTED_SQLITE_VERSION:
+    if source.get("versionFile") != upstream["sqliteVersion"]:
         raise ValidationError("manifest SQLite version mismatch")
 
     build = manifest.get("build") or {}
@@ -205,13 +247,13 @@ def validate_manifest(path: Path, privacy_path: Path) -> dict:
 
     artifacts = manifest.get("artifacts") or {}
     zip_artifact = artifacts.get("xcframeworkZip") or {}
-    if zip_artifact.get("sha256") != EXPECTED_ZIP_SHA:
+    if zip_artifact.get("sha256") != asset_sha(pin, "SQLCipher.xcframework.zip"):
         raise ValidationError("manifest zip sha mismatch")
     checksum_artifact = artifacts.get("checksumFile") or {}
-    if checksum_artifact.get("sha256") != EXPECTED_CHECKSUM_SHA:
+    if checksum_artifact.get("sha256") != asset_sha(pin, "SQLCipher.xcframework.sha256"):
         raise ValidationError("manifest checksum-file sha mismatch")
     privacy_artifact = artifacts.get("privacyManifest") or {}
-    if privacy_artifact.get("sha256") != EXPECTED_PRIVACY_SHA:
+    if privacy_artifact.get("sha256") != asset_sha(pin, "SQLCipher-PrivacyInfo.xcprivacy"):
         raise ValidationError("manifest privacy sha mismatch")
 
     validation = manifest.get("validation") or {}
@@ -251,7 +293,7 @@ def validate_app_privacy_manifest(root: Path) -> None:
     validate_privacy_payload(payload)
 
 
-def validate_xcframework(root: Path, manifest: dict) -> None:
+def validate_xcframework(root: Path, manifest: dict, pin: dict) -> None:
     xcframework = root / "SQLCipher.xcframework"
     info_path = xcframework / "Info.plist"
     if not info_path.is_file():
@@ -264,7 +306,8 @@ def validate_xcframework(root: Path, manifest: dict) -> None:
     if not isinstance(libraries, list):
         raise ValidationError("SQLCipher.xcframework Info.plist lacks AvailableLibraries")
     by_identifier = {str(entry.get("LibraryIdentifier")): entry for entry in libraries}
-    if set(by_identifier) != set(EXPECTED_LIBRARIES):
+    expected_libraries = pin["slices"]
+    if set(by_identifier) != set(expected_libraries):
         raise ValidationError(f"unexpected SQLCipher slices: {sorted(by_identifier)}")
 
     manifest_libraries = {
@@ -272,7 +315,7 @@ def validate_xcframework(root: Path, manifest: dict) -> None:
         for entry in ((manifest.get("xcframework") or {}).get("libraries") or [])
     }
 
-    for identifier, expected in EXPECTED_LIBRARIES.items():
+    for identifier, expected in expected_libraries.items():
         entry = by_identifier[identifier]
         if entry.get("SupportedPlatform") != expected["platform"]:
             raise ValidationError(f"{identifier}: platform mismatch")
@@ -455,18 +498,20 @@ def main() -> int:
     root = args.root.resolve()
     manifest_path = root / "SQLCipher.arm64e-build-manifest.json"
     privacy_path = root / "SQLCipher-PrivacyInfo.xcprivacy"
-    metadata_path = root / "sqlcipher-xcframework-experiment.json"
+    metadata_path = root / RELEASE_METADATA_NAME
 
     try:
-        validate_release_metadata(metadata_path)
-        manifest = validate_manifest(manifest_path, privacy_path)
-        validate_xcframework(root, manifest)
+        pin = load_pin(args.pin_file.resolve())
+        validate_pin(pin)
+        validate_release_metadata(metadata_path, pin)
+        manifest = validate_manifest(manifest_path, privacy_path, pin)
+        validate_xcframework(root, manifest, pin)
         validate_app_privacy_manifest(root)
         if args.release_assets and not args.skip_release_assets:
-            validate_release_assets(args.release_assets)
+            validate_release_assets(args.release_assets, pin)
         if not args.skip_smoke:
             smoke_test(root)
-    except (ValidationError, subprocess.CalledProcessError, json.JSONDecodeError, plistlib.InvalidFileException) as error:
+    except (KeyError, TypeError, ValidationError, subprocess.CalledProcessError, json.JSONDecodeError, plistlib.InvalidFileException) as error:
         print(f"error: SQLCipher XCFramework validation failed: {error}", file=sys.stderr)
         return 1
 

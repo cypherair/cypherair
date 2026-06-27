@@ -9,36 +9,48 @@ module = load_script_module("validate_sqlcipher_xcframework", "scripts/validate_
 
 
 class SQLCipherXCFrameworkValidationTests(unittest.TestCase):
-    def test_expected_release_is_exactly_pinned(self) -> None:
+    def test_pin_release_is_stable_immutable_and_exactly_pinned(self) -> None:
+        pin = module.load_pin(module.PIN_PATH)
+        module.validate_pin(pin)
+
+        release = pin["release"]
         self.assertEqual(
-            module.RELEASE_TAG,
-            "sqlcipher-xcframework-experiment-20260626T224724Z-61d7f56-r28269517779-a1",
+            release["tag"],
+            "sqlcipher-xcframework-v4.16.0-cypherair.1",
         )
-        self.assertNotEqual(module.RELEASE_TAG, "latest")
+        self.assertNotEqual(release["tag"], "latest")
+        self.assertEqual(release["channel"], "stable")
+        self.assertTrue(release["isImmutable"])
+        self.assertFalse(release["isPrerelease"])
         self.assertEqual(
-            module.SOURCE_COMMIT,
+            release["signerWorkflow"],
+            "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
+        )
+        self.assertEqual(
+            pin["upstream"]["commit"],
             "e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc",
         )
         self.assertEqual(
-            module.EXPECTED_ZIP_SHA,
-            "22bd894ded5bdde119c87f81809b9b99a19dcd7afdf9410858a7fc34555ee20d",
+            pin["assets"]["SQLCipher.xcframework.zip"]["sha256"],
+            "3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e",
         )
 
     def test_expected_slices_require_device_arm64e(self) -> None:
+        slices = module.load_pin(module.PIN_PATH)["slices"]
         self.assertEqual(
-            module.EXPECTED_LIBRARIES["ios-arm64_arm64e"]["architectures"],
+            slices["ios-arm64_arm64e"]["architectures"],
             ["arm64", "arm64e"],
         )
         self.assertEqual(
-            module.EXPECTED_LIBRARIES["macos-arm64_arm64e"]["architectures"],
+            slices["macos-arm64_arm64e"]["architectures"],
             ["arm64", "arm64e"],
         )
         self.assertEqual(
-            module.EXPECTED_LIBRARIES["xros-arm64_arm64e"]["architectures"],
+            slices["xros-arm64_arm64e"]["architectures"],
             ["arm64", "arm64e"],
         )
         self.assertEqual(
-            module.EXPECTED_LIBRARIES["ios-arm64-simulator"]["architectures"],
+            slices["ios-arm64-simulator"]["architectures"],
             ["arm64"],
         )
 

@@ -237,6 +237,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 output_metadata_file=output_path,
                 require_stable_release="YES",
                 require_arm64e_release_manifest="NO",
+                require_sqlcipher_release_pin="NO",
             )
 
             with mock.patch.object(module, "parse_args", return_value=args):
@@ -266,6 +267,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 output_metadata_file=output_path,
                 require_stable_release="YES",
                 require_arm64e_release_manifest="NO",
+                require_sqlcipher_release_pin="NO",
             )
 
             with mock.patch.object(module, "parse_args", return_value=args):
@@ -297,6 +299,28 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                             require_arm64e_release_manifest=False,
                         )
             self.assertEqual(validated_tag, release_tag)
+
+    def test_sqlcipher_dependency_gate_runs_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            repo_root, canonical_remote = init_repo_with_remote(Path(temp_dir_name))
+            create_annotated_stable_tag(repo_root)
+            with mock.patch.object(module, "stable_release_exists", return_value=True):
+                with mock.patch.object(module, "canonical_repository_url", return_value=str(canonical_remote)):
+                    with mock.patch.object(
+                        module,
+                        "validate_sqlcipher_dependency",
+                        side_effect=module.CandidateValidationError("missing SQLCipher"),
+                    ):
+                        with self.assertRaisesRegex(module.CandidateValidationError, "missing SQLCipher"):
+                            module.validate_candidate_release(
+                                repo_root=repo_root,
+                                marketing_version="1.2.9",
+                                build_number="3",
+                                repository_full_name="cypherair/cypherair",
+                                require_stable_release=True,
+                                require_arm64e_release_manifest=False,
+                                require_sqlcipher_release_pin=True,
+                            )
 
     def test_xcode_cloud_tag_mismatch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:

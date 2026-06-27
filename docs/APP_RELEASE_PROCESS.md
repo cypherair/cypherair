@@ -72,6 +72,12 @@ Every published stable build release must include these SDK/compliance assets:
 - `PgpMobile.arm64e-build-manifest.json`
 - `PgpMobile-relink-kit.tar.zst`
 
+CypherAir also records formal external binary dependencies in
+`CypherAir-compliance-manifest.json`, including the pinned SQLCipher
+`SQLCipher.xcframework` release from `cypherair/sqlcipher-xcframework`. Those
+external binary assets and the SQLCipher upstream source are not mirrored into
+the CypherAir stable release.
+
 It also carries the App Store upload artifacts (Transporter payloads — App
 Store-signed, not directly installable; see [XCODE_CLOUD_RELEASE.md](XCODE_CLOUD_RELEASE.md) §8):
 `CypherAir-iOS-AppStore.ipa`, `CypherAir-visionOS-AppStore.ipa`, and
@@ -82,7 +88,7 @@ Stable build binding and immutability rules:
 - The source bundle, compliance manifest, XCFramework zip/checksum, arm64e manifest, and relink kit are built from the tagged commit by WF1; formal stable assets are not promoted from edge or drill prereleases.
 - Stable assets must bind to one exact marketing version, build number, release tag, and commit SHA.
 - App Store candidate archives must embed the exact stable release tag, stable release URL, and commit SHA in `SourceComplianceInfo.json`.
-- Stable assets are immutable once published. WF1 creates the release as a draft and WF2 publishes it once the app binaries are attached, so "published" is atomic. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
+- Stable assets are immutable once published. WF1 creates the release as a draft and WF2 publishes it once the app binaries are attached, so "published" is atomic. WF2 upload retries skip an already-present asset only when the digest matches; a same-name different-digest asset fails and requires a cleaned draft or a new build. If the asset set is wrong, fix it with a new build number, new stable tag, and new release rather than replacing assets in place.
 
 Version and build-number rules:
 
@@ -167,6 +173,7 @@ The App Store candidate path is intentionally strict:
 - the archive's commit must be the stable tag commit
 - it requires a GitHub stable release for the tag to already exist
 - it requires that release to include a valid `PgpMobile.arm64e-build-manifest.json`
+- it requires the restored SQLCipher artifact to match `third_party/sqlcipher-xcframework.pin.json`
 - it requires `HEAD` to match the remote stable tag commit exactly
 - it requires the app archive to embed the exact stable release tag and URL in `SourceComplianceInfo.json`
 - it requires the app archive to embed an exact commit SHA in `SourceComplianceInfo.json`
@@ -181,8 +188,10 @@ The candidate path performs an automatic pre-archive validation
 - locally (break-glass): confirms the current branch is `main` and the tracked
   worktree and index are clean
 - both: derives the tag, confirms the GitHub stable release exists, downloads and
-  validates `PgpMobile.arm64e-build-manifest.json`, resolves the remote stable
-  tag commit from `origin`, and blocks archive if `HEAD` does not match it or the
+  validates `PgpMobile.arm64e-build-manifest.json`, validates the restored
+  SQLCipher formal external dependency against
+  `third_party/sqlcipher-xcframework.pin.json`, resolves the remote stable tag
+  commit from `origin`, and blocks archive if `HEAD` does not match it or the
   release does not exist
 
 In WF2, `ci_post_clone` also downloads and `shasum`-verifies the exact

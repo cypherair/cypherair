@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest-output", type=Path, required=True)
     parser.add_argument("--arm64e-manifest", type=Path)
     parser.add_argument("--binary-asset", type=Path, action="append", default=[])
+    parser.add_argument("--external-binary-dependency", type=Path, action="append", default=[])
     return parser.parse_args()
 
 
@@ -165,6 +166,45 @@ def load_arm64e_manifest(path: Path | None) -> dict[str, object]:
     return payload
 
 
+def external_binary_dependency_entries(paths: list[Path]) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for path in paths:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"external binary dependency pin must be a JSON object: {path}")
+        release = payload.get("release") or {}
+        upstream = payload.get("upstream") or {}
+        entries.append(
+            {
+                "name": str(payload.get("dependencyName", "")),
+                "repository": str(payload.get("repository", "")),
+                "releaseTag": str(release.get("tag", "")),
+                "releaseURL": str(release.get("url", "")),
+                "releaseChannel": str(release.get("channel", "")),
+                "releaseCommitSHA": str(release.get("commitSha", "")),
+                "releaseSourceRef": str(release.get("sourceRef", "")),
+                "releaseSignerWorkflow": str(release.get("signerWorkflow", "")),
+                "releaseIsImmutable": bool(release.get("isImmutable")),
+                "releaseIsPrerelease": bool(release.get("isPrerelease")),
+                "upstreamRepository": str(upstream.get("repository", "")),
+                "upstreamTag": str(upstream.get("tag", "")),
+                "upstreamCommit": str(upstream.get("commit", "")),
+                "assetHashes": {
+                    str(name): str((asset or {}).get("sha256", ""))
+                    for name, asset in (payload.get("assets") or {}).items()
+                    if isinstance(asset, dict)
+                },
+                "sliceHashes": {
+                    str(identifier): str((slice_payload or {}).get("sha256", ""))
+                    for identifier, slice_payload in (payload.get("slices") or {}).items()
+                    if isinstance(slice_payload, dict)
+                },
+                "mirroredInCypherAirRelease": False,
+            }
+        )
+    return entries
+
+
 def main() -> None:
     global args
     args = parse_args()
@@ -177,6 +217,7 @@ def main() -> None:
     binary_entries = binary_asset_entries(args.binary_asset)
     dependencies = dependency_versions()
     arm64e_manifest = load_arm64e_manifest(args.arm64e_manifest)
+    external_binary_dependencies = external_binary_dependency_entries(args.external_binary_dependency)
 
     manifest = {
         "productKind": "unifiedBuild",
@@ -190,6 +231,7 @@ def main() -> None:
             "sha256": source_bundle_sha,
         },
         "binaryAssets": binary_entries,
+        "externalBinaryDependencies": external_binary_dependencies,
         "sequoiaOpenPGPVersion": dependencies["sequoia-openpgp"],
         "bufferedReaderVersion": dependencies["buffered-reader"],
         "arm64eBuild": arm64e_manifest,

@@ -182,6 +182,13 @@ gh attestation verify PgpMobile.arm64e-build-manifest.json \
 
 Use the source bundle, compliance manifest, and relink kit together when you need exact source-compliance materials for that stable SDK build.
 
+SQLCipher is a separate formal external binary dependency. It is restored from
+`cypherair/sqlcipher-xcframework` using
+`third_party/sqlcipher-xcframework.pin.json`; CypherAir stable releases record
+that pin in `CypherAir-compliance-manifest.json` but do not mirror
+`SQLCipher.xcframework.zip`, SQLCipher release metadata, or upstream SQLCipher
+source as CypherAir release assets.
+
 ## 5. Failed Run Cleanup
 
 The Xcode Cloud release runs in two stages: WF1 creates the stable release as a draft, and WF2 publishes it after attaching the app binaries. If a run fails before WF2 publishes, the draft release (and sometimes the tag) can remain and requires manual cleanup.

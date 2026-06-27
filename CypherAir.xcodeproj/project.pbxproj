@@ -700,6 +700,7 @@
 				"$(SRCROOT)/scripts/generate_source_compliance_build_phase.sh",
 				"$(SRCROOT)/scripts/generate_source_compliance_info.py",
 				"$(SRCROOT)/pgp-mobile/Cargo.lock",
+				"$(SRCROOT)/third_party/sqlcipher-xcframework.pin.json",
 				"$(TARGET_TEMP_DIR)/SourceComplianceOverrides.json",
 				"$(SRCROOT)/.git/HEAD",
 				"$(SRCROOT)/.git/logs/HEAD",

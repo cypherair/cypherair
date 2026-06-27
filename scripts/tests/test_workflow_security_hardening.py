@@ -126,6 +126,28 @@ class WorkflowSecurityHardeningTests(unittest.TestCase):
         self.assertIn('"$COMPLIANCE_MANIFEST"', revalidate)
         self.assertIn('manifest.get("releaseTag") != release_tag', revalidate)
         self.assertIn('manifest.get("commitSHA") != target_sha', revalidate)
+        self.assertIn('manifest.get("externalBinaryDependencies")', revalidate)
+        self.assertIn('"SQLCipher.xcframework"', revalidate)
+        self.assertIn('sqlcipher.get("releaseChannel") != "stable"', revalidate)
+        self.assertIn('sqlcipher.get("releaseIsImmutable") is not True', revalidate)
+        self.assertIn('sqlcipher.get("mirroredInCypherAirRelease") is not False', revalidate)
+        self.assertIn('str(asset.get("fileName") or "").startswith("SQLCipher")', revalidate)
+
+    def test_xcode_cloud_restores_sqlcipher_with_mandatory_attestation(self) -> None:
+        text = read("ci_scripts/ci_post_clone.sh")
+
+        self.assertIn("require_gh_auth()", text)
+        self.assertEqual(text.count("scripts/restore_sqlcipher_xcframework.sh --require-attestation"), 2)
+        self.assertNotIn("scripts/restore_sqlcipher_xcframework.sh\n", text)
+
+    def test_stable_release_uploads_are_non_clobbering_and_record_sqlcipher_pin(self) -> None:
+        text = read("ci_scripts/ci_post_xcodebuild.sh")
+
+        self.assertNotIn("--clobber", text)
+        self.assertIn("upload_release_asset_once()", text)
+        self.assertIn("already has $asset_name with matching digest; skipping upload", text)
+        self.assertIn("create a fresh draft or clean the bad draft", text)
+        self.assertIn('--external-binary-dependency "$SQLCIPHER_PIN_FILE"', text)
 
     def test_attest_workflow_pins_attestation_action_by_sha(self) -> None:
         text = read(".github/workflows/stable-release-attest.yml")

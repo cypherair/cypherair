@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from support import head_sha, init_repo_with_remote, load_script_module
+from support import REPO_ROOT, head_sha, init_repo_with_remote, load_script_module
 
 
 module = load_script_module(
@@ -16,6 +16,21 @@ module = load_script_module(
 
 
 class GenerateSourceComplianceInfoTests(unittest.TestCase):
+    def test_external_binary_dependency_entry_records_sqlcipher_pin(self) -> None:
+        entries = module.external_binary_dependency_entries(
+            [REPO_ROOT / "third_party" / "sqlcipher-xcframework.pin.json"]
+        )
+
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        self.assertEqual(entry["name"], "SQLCipher.xcframework")
+        self.assertEqual(entry["releaseTag"], "sqlcipher-xcframework-v4.16.0-cypherair.1")
+        self.assertEqual(entry["releaseChannel"], "stable")
+        self.assertTrue(entry["releaseIsImmutable"])
+        self.assertFalse(entry["releaseIsPrerelease"])
+        self.assertFalse(entry["mirroredInCypherAirRelease"])
+        self.assertEqual(entry["upstreamTag"], "v4.16.0")
+
     def test_regular_build_allows_unknown_when_commit_is_missing(self) -> None:
         self.assertEqual(
             module.resolved_commit_sha("", require_stable_release=False),

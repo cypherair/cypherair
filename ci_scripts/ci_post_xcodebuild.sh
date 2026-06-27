@@ -29,6 +29,7 @@ ARM64E_MANIFEST="PgpMobile.arm64e-build-manifest.json"
 SOURCE_BUNDLE="CypherAir-source-bundle.tar.zst"
 COMPLIANCE_MANIFEST="CypherAir-compliance-manifest.json"
 RELINK_KIT="PgpMobile-relink-kit.tar.zst"
+SQLCIPHER_PIN_FILE="third_party/sqlcipher-xcframework.pin.json"
 
 log() { echo "[ci_post_xcodebuild] $*"; }
 fail() { echo "[ci_post_xcodebuild] error: $*" >&2; exit 1; }
@@ -101,6 +102,29 @@ print(f"stable tag {tag} is an SSH-signed annotated tag for {commit}")
 PY
 }
 
+upload_release_asset_once() {
+    local tag="$1" repo="$2" asset_path="$3" asset_name local_digest existing_asset_line existing_digest
+    asset_name="$(basename "$asset_path")"
+    local_digest="sha256:$(shasum -a 256 "$asset_path" | awk '{print $1}')"
+    existing_asset_line="$(
+        gh release view "$tag" -R "$repo" --json assets \
+            --jq ".assets[] | select(.name == \"${asset_name}\") | [.name, (.digest // \"\")] | @tsv" 2>/dev/null || true
+    )"
+
+    if [ -n "$existing_asset_line" ]; then
+        existing_digest="${existing_asset_line#*$'\t'}"
+        [ -n "$existing_digest" ] || fail "release $tag already has $asset_name but GitHub did not return its digest; cannot safely retry upload"
+        if [ "$existing_digest" = "$local_digest" ]; then
+            log "release $tag already has $asset_name with matching digest; skipping upload"
+            return
+        fi
+        fail "release $tag already has $asset_name with digest $existing_digest, expected $local_digest; create a fresh draft or clean the bad draft before retrying"
+    fi
+
+    log "uploading $asset_name ($local_digest)"
+    gh release upload "$tag" -R "$repo" "$asset_path"
+}
+
 package_and_publish_draft() {
     require_build_succeeded
     [ -n "${CI_TAG:-}" ] || fail "WF1 must run for a stable tag (CI_TAG empty)"
@@ -145,6 +169,7 @@ package_and_publish_draft() {
         --source-bundle-output "$SOURCE_BUNDLE" \
         --manifest-output "$COMPLIANCE_MANIFEST" \
         --arm64e-manifest "$ARM64E_MANIFEST" \
+        --external-binary-dependency "$SQLCIPHER_PIN_FILE" \
         --binary-asset "$XCFRAMEWORK_ZIP" \
         --binary-asset "$XCFRAMEWORK_CHECKSUM" \
         --binary-asset "$ARM64E_MANIFEST" \
@@ -224,9 +249,8 @@ attach_app_artifact_and_maybe_publish() {
     staged_artifact="$staging_dir/$asset_name"
     cp "$artifact_path" "$staged_artifact"
 
-    # gh release upload treats file#text as a display label, not a rename.
     log "WF2: attaching $asset_name from $artifact_path"
-    gh release upload "$CI_TAG" -R "$GITHUB_REPOSITORY_SLUG" --clobber "$staged_artifact"
+    upload_release_asset_once "$CI_TAG" "$GITHUB_REPOSITORY_SLUG" "$staged_artifact"
 
     # Publish only once every expected platform artifact is present, so the
     # last archive action to finish flips the draft regardless of action order.
