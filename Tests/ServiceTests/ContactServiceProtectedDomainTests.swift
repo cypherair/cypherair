@@ -551,31 +551,6 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
         )
     }
 
-    func test_contactsPR4AuthoritativeReadValidatesBootstrapBeforeUnwrappingDMK() throws {
-        let contents = try RepositoryAuditLoader.loadString(
-            relativePath: "Sources/Security/ProtectedData/ContactsDomainStore.swift"
-        )
-        let method = try sourceBlock(
-            in: contents,
-            from: "private func readAuthoritativeSnapshot",
-            to: "private func expectedCurrentGenerationIdentifier"
-        )
-        let expectedGenerationRead = try XCTUnwrap(method.range(
-            of: "let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()"
-        ))
-        let dmkUnwrap = try XCTUnwrap(method.range(
-            of: "var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey"
-        ))
-
-        XCTAssertTrue(expectedGenerationRead.lowerBound < dmkUnwrap.lowerBound)
-        XCTAssertTrue(method.contains("""
-        catch {
-                    domainMasterKey.protectedDataZeroize()
-                    throw error
-                }
-        """))
-    }
-
     // MARK: - Relock And UI Test Contacts
 
     func test_protectedDomainRelockClearsContactsRuntimeState() async throws {

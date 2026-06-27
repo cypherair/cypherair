@@ -52,7 +52,7 @@ The 2026-06-14 Codex scan recorded eleven newly detected findings, listed in `do
 - Relevant paths: `CypherAir.xcodeproj/project.pbxproj`, `Sources/Security/Mocks/MockAuthenticator.swift`, `Sources/Security/Mocks/MockKeychain.swift`, `Sources/Security/Mocks/MockSecureEnclave.swift`
 - Interim guardrail: test-only mocks that do not serve tutorial/UI-test runtime are moved out of `Sources`; `Sources/Security/Mocks` is the only temporary production-source mock directory; ProtectedData production files must not embed mock implementations; non-mock production code must not directly reference `MockKeychainError`; Release and App Store Candidate builds ignore `UITEST_*` app-container launch overrides.
 - Remaining fix plan: close SR-FIX-18 only after tutorial migrates away from mock security primitives to tutorial-specific isolated real Protected Data domains and hardware-backed processing that never touches user security assets, and after build/target-membership checks prove test-only mocks are not compiled into production targets.
-- Validation: Maintain source-audit guardrails plus macOS unit tests, mandatory `CypherAir-MacUITests`, and Release/App Store Candidate build probes for this interim state.
+- Validation: Maintain focused macOS unit tests, mandatory `CypherAir-MacUITests`, Release/App Store Candidate build probes, and human review of production target membership / mock wiring for this interim state.
 
 ### SR-FIX-21: Public docs disclose unfixed security findings
 

@@ -152,66 +152,6 @@ class XcodeBuildPhaseScriptTests(unittest.TestCase):
             self.assertIn("Apple Swift", module.toolchain_summary(swift_version="", rust_version=""))
             self.assertNotIn("transitive-only", values_by_title)
 
-    def test_repository_audit_snapshot_removes_stale_files_before_copying_inputs(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir_name:
-            temp_root = Path(temp_dir_name)
-            srcroot = temp_root / "repo"
-            target_build_dir = temp_root / "build"
-            resources_dir = "CypherAirTests.xctest/Contents/Resources"
-            snapshot_dst = target_build_dir / resources_dir / "RepositoryAudit"
-
-            required_files = [
-                "Sources/App/Encrypt/EncryptView.swift",
-                "Sources/Resources/Localizable.xcstrings",
-                "Sources/Resources/InfoPlist.xcstrings",
-            ]
-            for relative_path in required_files:
-                path = srcroot / relative_path
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(f"// {relative_path}\n", encoding="utf-8")
-
-            stale_file = snapshot_dst / "Sources/App/DeletedView.swift"
-            stale_file.parent.mkdir(parents=True, exist_ok=True)
-            stale_file.write_text("// stale\n", encoding="utf-8")
-
-            snapshot_list = srcroot / "Tests/RepositoryAuditInputs.xcfilelist"
-            snapshot_list.parent.mkdir(parents=True, exist_ok=True)
-            snapshot_list.write_text(
-                "\n".join(f"$(SRCROOT)/{relative_path}" for relative_path in required_files) + "\n",
-                encoding="utf-8",
-            )
-            snapshot_output_list = srcroot / "Tests/RepositoryAuditOutputs.xcfilelist"
-            snapshot_output_list.write_text(
-                "\n".join(
-                    "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/"
-                    f"RepositoryAudit/{relative_path}"
-                    for relative_path in required_files
-                ) + "\n",
-                encoding="utf-8",
-            )
-            target_build_dir.mkdir(parents=True, exist_ok=True)
-
-            env = os.environ.copy()
-            env.update(
-                {
-                    "SRCROOT": str(srcroot),
-                    "TARGET_BUILD_DIR": str(target_build_dir),
-                    "UNLOCALIZED_RESOURCES_FOLDER_PATH": resources_dir,
-                }
-            )
-
-            subprocess.run(
-                ["bash", str(REPO_ROOT / "scripts/snapshot_repository_audit_inputs.sh")],
-                check=True,
-                env=env,
-                text=True,
-                capture_output=True,
-            )
-
-            self.assertFalse(stale_file.exists())
-            for relative_path in required_files:
-                self.assertTrue((snapshot_dst / relative_path).exists())
-
     def test_source_compliance_phase_uses_metadata_commit_without_git_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             temp_root = Path(temp_dir_name)

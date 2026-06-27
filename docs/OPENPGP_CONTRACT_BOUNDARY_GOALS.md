@@ -94,10 +94,10 @@ examples:
   same View / ScreenModel separation applied to the main OpenPGP flows
 
 Each category should be governed by a small app-owned boundary before adding
-stricter source-audit rules. The existing architecture guardrails already cover
-hard generated UniFFI leaks above the adapter boundary; follow-up guardrails
-should come after the migrated surface has a stable app-owned Contract or mapper
-boundary.
+new process or test expectations. Architecture review and behavior tests should
+track hard generated UniFFI leaks above the adapter boundary; follow-up
+guardrails should come after the migrated surface has a stable app-owned
+Contract or mapper boundary.
 
 ## Layer Responsibility Addendum
 
@@ -130,7 +130,7 @@ engine ownership concentrated inside the adapter graph.
 ## Follow-Up Document Expectations
 
 Later documents can define concrete Contract families, migration sequence,
-adapter refactoring order, test cleanup, and source-audit hardening. Those
+adapter refactoring order, test cleanup, and review expectations. Those
 documents can also decide where durable app-owned request, result, and context
 values should live.
 

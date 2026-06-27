@@ -286,16 +286,6 @@ class ContactServiceTestCase: XCTestCase {
         )
     }
 
-    func sourceBlock(
-        in contents: String,
-        from startMarker: String,
-        to endMarker: String
-    ) throws -> String {
-        let start = try XCTUnwrap(contents.range(of: startMarker))
-        let end = try XCTUnwrap(contents.range(of: endMarker, range: start.upperBound..<contents.endIndex))
-        return String(contents[start.lowerBound..<end.lowerBound])
-    }
-
     func cleanup(_ container: AppContainer) {
         try? FileManager.default.removeItem(
             at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
