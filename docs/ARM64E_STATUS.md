@@ -35,8 +35,8 @@
   XCFramework slice metadata.
 - The app build also restores the pinned formal external
   `SQLCipher.xcframework` dependency from `cypherair/sqlcipher-xcframework`
-  before Xcode builds. This validates SQLCipher arm64e linkage for future
-  Contacts work, but Contacts storage is not yet SQLCipher-backed.
+  before Xcode builds. Contacts storage now uses that artifact as the
+  SQLCipher-backed protected-domain payload.
 - PR #222 run `24915498511` passed `rust-full-tests`, the formal
   `xcframework-package` build/probe path, and the hosted Swift preview job.
 - Pre-merge release validation passed through edge drill run `24897042096` and
