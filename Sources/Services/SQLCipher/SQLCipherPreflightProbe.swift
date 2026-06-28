@@ -11,6 +11,7 @@ struct SQLCipherPreflightResult: Equatable {
 enum SQLCipherPreflightError: Error, Equatable {
     case openFailed(operation: String, code: Int32)
     case closeFailed(code: Int32)
+    case invalidRawKeyLength(Int)
     case keyFailed(code: Int32)
     case execFailed(operation: String, code: Int32)
     case queryFailed(operation: String, code: Int32)
@@ -20,6 +21,7 @@ enum SQLCipherPreflightError: Error, Equatable {
 
 enum SQLCipherPreflightProbe {
     private static let databaseBaseName = "sqlcipher-preflight.sqlite"
+    private static let rawKeyLength = 32
 
     static func run(in directory: URL) throws -> SQLCipherPreflightResult {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -102,12 +104,35 @@ enum SQLCipherPreflightProbe {
     }
 
     private static func applyKey(_ key: [UInt8], to db: OpaquePointer) throws {
-        let rc = key.withUnsafeBytes { buffer in
-            sqlite3_key(db, buffer.baseAddress, Int32(buffer.count))
+        var keySpec = try rawKeySpec(for: key)
+        defer {
+            zeroizeKey(&keySpec)
+        }
+
+        let rc = keySpec.withUnsafeBytes { buffer in
+            sqlite3_key_v2(db, "main", buffer.baseAddress, Int32(buffer.count))
         }
         guard rc == SQLITE_OK else {
             throw SQLCipherPreflightError.keyFailed(code: rc)
         }
+    }
+
+    private static func rawKeySpec(for key: [UInt8]) throws -> [UInt8] {
+        guard key.count == rawKeyLength else {
+            throw SQLCipherPreflightError.invalidRawKeyLength(key.count)
+        }
+
+        let hexDigits = Array("0123456789abcdef".utf8)
+        var keySpec = [UInt8]()
+        keySpec.reserveCapacity(67)
+        keySpec.append(UInt8(ascii: "x"))
+        keySpec.append(UInt8(ascii: "'"))
+        for byte in key {
+            keySpec.append(hexDigits[Int(byte >> 4)])
+            keySpec.append(hexDigits[Int(byte & 0x0f)])
+        }
+        keySpec.append(UInt8(ascii: "'"))
+        return keySpec
     }
 
     private static func zeroizeKey(_ key: inout [UInt8]) {

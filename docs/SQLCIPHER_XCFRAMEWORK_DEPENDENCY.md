@@ -99,8 +99,9 @@ Main-repository policy:
 - The restore flow reads the pin file, rejects `latest` and non-stable pins,
   verifies the checksum before extraction, validates release metadata, source
   tag/commit, slices, headers, modulemap, compile flags, privacy manifest, and
-  macOS smoke behavior, then restores `SQLCipher.xcframework` at the repository
-  root for Xcode builds.
+  macOS smoke behavior, including raw-key syntax through `sqlite3_key_v2`,
+  good-key read/write, and wrong-key rejection, then restores
+  `SQLCipher.xcframework` at the repository root for Xcode builds.
 - CI and Xcode Cloud use `--require-attestation`, which additionally requires
   immutable release verification, release-asset verification, and workflow
   artifact attestation verification.
@@ -146,23 +147,28 @@ release assets. Publish a new semantic stable tag and repin this repository.
 
 ## Contacts Follow-Up
 
-This dependency PR does not migrate Contacts storage. Contacts persistence, DB
-key wrapping, Keychain records, reset cleanup, relock cleanup, and self-ECDH
-cleanup remain future work under issue #540.
+This dependency PR does not migrate Contacts storage. Keychain-backed
+ProtectedData wrapped-DMK storage, Contacts SQLCipher persistence, reset
+cleanup, relock cleanup, and self-ECDH cleanup remain future work under
+issue #540.
 
 The future-facing implementation reference for that pending work is
 [Contacts SQLCipher Storage Design](CONTACTS_SQLCIPHER_STORAGE_DESIGN.md).
 
-Before Contacts can move to SQLCipher-backed storage, a later CypherAir PR must
-add the actual Contacts persistence layer and security lifecycle:
+Before Contacts can move to SQLCipher-backed storage, later CypherAir PRs must
+add the shared ProtectedData foundation and the actual Contacts persistence
+layer:
 
-- app-generated high-entropy DB key
-- wrapped DB key Keychain record tied to the existing ProtectedData / Secure
-  Enclave device-binding authority
+- Keychain-backed staged and committed wrapped-DMK records under the existing
+  ProtectedData / Secure Enclave device-binding authority
+- retained `contacts` ProtectedData domain identity, with SQLCipher replacing
+  the current Contacts payload implementation
+- direct use of the `contacts` domain master key through SQLCipher raw-key
+  syntax, without a separate Contacts-specific key custody record
 - post-unlock preload without a normal-flow second authentication prompt
 - relock connection/statement/key cleanup
-- reset cleanup for DB, sidecars, Keychain record, and obsolete Contacts
-  ProtectedData artifacts
+- reset cleanup for DB, sidecars, Keychain-backed domain-key records, and
+  obsolete Contacts ProtectedData artifacts
 - fail-closed recovery for corrupt/missing/mismatched key, schema, config, or
   integrity state
 
