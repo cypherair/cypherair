@@ -3,8 +3,9 @@
 > Status: Draft implementation reference. This document is future-facing and
 > does not describe current shipped behavior.
 > Purpose: Define the design constraints, storage shape, lifecycle rules,
-> failure semantics, validation gates, and PR boundaries for migrating Contacts
-> persistence to device-bound SQLCipher under GitHub issue #540.
+> failure semantics, validation gates, and PR boundaries for moving ProtectedData
+> wrapped domain keys to Keychain and migrating Contacts persistence to
+> device-bound SQLCipher under GitHub issue #540.
 > Audience: CypherAir maintainers, security reviewers, QA, and agents planning
 > or reviewing Contacts SQLCipher implementation work.
 > Companions: [GitHub issue #540](https://github.com/cypherair/cypherair/issues/540),
@@ -13,15 +14,20 @@
 > [Security](SECURITY.md), [Architecture](ARCHITECTURE.md), [TDD](TDD.md),
 > [Testing](TESTING.md), and [Code Review](CODE_REVIEW.md).
 > Last reviewed: 2026-06-28.
-> Update triggers: Contacts SQLCipher storage path, DB-key custody, Keychain
-> record naming, schema versioning, SQLCipher configuration, post-unlock,
-> relock, reset, recovery, self-ECDH cleanup, or PR slicing changes.
+> Update triggers: Contacts SQLCipher storage path, ProtectedData wrapped-DMK
+> custody, Keychain record naming, schema versioning, SQLCipher configuration,
+> post-unlock, relock, reset, recovery, self-ECDH cleanup, or PR slicing changes.
 
 ## 1. Scope And Current Status
 
-GitHub issue #540 tracks migrating Contacts persistence from the current
-`ProtectedData/contacts` snapshot domain to SQLCipher-backed storage while
-preserving security properties no weaker than the current ProtectedData design.
+GitHub issue #540 tracks two related storage/security changes:
+
+- move generic ProtectedData wrapped domain master key records from
+  file-backed `wrapped-dmk.plist` artifacts to Keychain rows
+- migrate Contacts persistence from the current `ProtectedData/contacts`
+  snapshot-envelope payload to SQLCipher-backed storage while preserving
+  security properties no weaker than the current ProtectedData design
+
 The issue also tracks the related cleanup to replace the remaining private-key
 self-ECDH wrapping design with a standard Secure Enclave public-key ECDH
 envelope pattern.
@@ -30,17 +36,18 @@ envelope pattern.
 [PR #544](https://github.com/cypherair/cypherair/pull/544) are already
 dependency groundwork: the app consumes the pinned `SQLCipher.xcframework`,
 validates the artifact, and records the formal external dependency. They do not
-implement Contacts SQLCipher storage, DB-key wrapping, reset/relock business
-logic, or self-ECDH cleanup.
+implement Keychain-backed ProtectedData wrapped-DMK storage, Contacts SQLCipher
+storage, reset/relock business logic, or self-ECDH cleanup.
 
 This document is not an issue copy and is not a canonical current-state
 document. The issue remains the tracker for implementation progress. Canonical
 current-state docs should be updated only by implementation PRs after behavior
 actually changes.
 
-No legacy Contacts migration path is required because CypherAir X has not had a
-formal App Store release. After the cutover, old `ProtectedData/contacts`
-snapshot artifacts must not become a fallback source of truth.
+No legacy Contacts or ProtectedData wrapped-DMK migration path is required
+because CypherAir X has not had a formal App Store release. After the cutover,
+old file-backed wrapped-DMK records and old `ProtectedData/contacts` snapshot
+artifacts must not become fallback sources of truth.
 
 ## 2. Evidence Base
 
@@ -57,14 +64,17 @@ Repository sources that constrain this design:
 - `ContactService`, `ContactSnapshotMutator`, and `ContactsSearchIndex` are the
   behavior surface to preserve while the persistence layer changes underneath.
 - `SQLCipherPreflightProbe` proves the current artifact can be opened through
-  the C API, keyed with bytes, reject wrong keys, report `cipher_version`, and
-  clean basic sidecar files.
+  the C API with SQLCipher raw-key syntax, reject wrong keys, report
+  `cipher_version`, and clean basic sidecar files.
 
 Primary external references:
 
 - [SQLCipher API](https://www.zetetic.net/sqlcipher/sqlcipher-api/) for
-  `sqlite3_key`, PRAGMA keying, `PRAGMA cipher_version`, and
+  `sqlite3_key_v2`, raw-key syntax, PRAGMA keying, `PRAGMA cipher_version`, and
   `PRAGMA cipher_integrity_check`.
+- Zetetic [technical guidance for random SQLCipher keys](https://www.zetetic.net/blog/2019/06/07/technical-guidance-using-random-values-as-sqlcipher-keys/)
+  for using SQLCipher raw-key syntax instead of passing random bytes through
+  the passphrase/KDF path.
 - [SQLCipher Design](https://www.zetetic.net/sqlcipher/design/) for page-level
   encryption, per-page authentication, key derivation, and plaintext header
   considerations.
@@ -80,7 +90,33 @@ Primary external references:
   documentation, which supports the standard persistent Secure Enclave private
   key plus software ephemeral public-key ECDH envelope model.
 
-## 3. Design Invariants
+## 3. Architecture Decision
+
+Contacts SQLCipher is not a new ProtectedData domain and not a cache beside the
+old snapshot payload. The `contacts` ProtectedData domain ID and registry
+membership remain the app-owned Contacts identity. SQLCipher replaces the
+domain's authoritative payload implementation.
+
+The `contacts` domain master key is the SQLCipher database key. It is the same
+32-byte CSPRNG domain key that ProtectedData already generates and wraps for a
+domain; for Contacts SQLCipher it is handed to SQLCipher through raw-key syntax
+instead of being used to seal a snapshot envelope. Do not create a separate
+Contacts DB-key record or a second Contacts-specific key custody system.
+
+The wrapped-DMK persistence change is global ProtectedData infrastructure:
+committed and staged wrapped domain master key records move from files under
+`Application Support/ProtectedData/<domain>/` to Keychain rows under
+`KeychainConstants.prefix`. Existing registry membership, app-auth handoff,
+relock, recovery, and reset semantics remain the lifecycle boundary.
+
+Old file-backed wrapped-DMK records and old Contacts snapshot-envelope artifacts
+are not migrated. A clean first run creates the protected domain key and the
+SQLCipher database. A state that has old artifacts, a missing Keychain-backed
+domain key, a missing database for a committed SQLCipher Contacts domain, or an
+unreadable database enters fail-closed recovery/reset; it must not silently
+create empty Contacts data.
+
+## 4. Design Invariants
 
 ### App/Auth Boundary
 
@@ -89,45 +125,67 @@ ProtectedData lifecycle. Normal unlock should create or reuse an authenticated
 handoff, open ProtectedData, and preload Contacts without a second interactive
 authentication prompt.
 
-The DB-key unwrap path must not create an independent normal-flow Keychain or
-LocalAuthentication domain. If a Keychain query needs authentication, it must use
-the same post-unlock context and preserve the no-second-prompt contract. A path
-that requires UI outside the explicit app-authentication operation is a design
-failure unless a later human-reviewed plan explicitly changes product behavior.
+The domain-key unwrap path must not create an independent normal-flow Keychain
+or LocalAuthentication domain. Keychain-backed wrapped-DMK rows must not add
+their own `SecAccessControl` prompt. Normal access remains gated by the
+ProtectedData root-secret load and the existing app-session authentication
+handoff. A path that requires UI outside the explicit app-authentication
+operation is a design failure unless a later human-reviewed plan explicitly
+changes product behavior.
 
-### DB-Key Custody
+### ProtectedData Domain-Key Custody
 
-The Contacts DB key should be an app-generated 32-byte random key. It must never
-be derived from a user passphrase and must not be stored raw.
+ProtectedData domain master keys remain app-generated 32-byte random keys. They
+must never be derived from user passphrases and must not be stored raw.
 
-Persist only a versioned wrapped DB-key record. The recommended Keychain service
-is:
+Persist only versioned wrapped domain master key records. The Keychain service
+names are:
 
 ```text
-com.cypherair.v1.contacts.sqlcipher.db-key
+com.cypherair.v1.protected-data.domain-key.<domainID>
+com.cypherair.v1.protected-data.domain-key.staged.<domainID>
 ```
 
-with `KeychainConstants.defaultAccount`. The service name must stay under
-`KeychainConstants.prefix` so Reset All Local Data can inventory and delete it.
+with `KeychainConstants.defaultAccount`. The service names must stay under
+`KeychainConstants.prefix` so Reset All Local Data can inventory, delete, and
+post-condition-check them.
 
-The wrapper should bind to the existing ProtectedData root-secret / Secure
-Enclave device-binding authority. It must be a new, explicit Contacts DB-key
-record type with its own version, magic, AAD/domain binding, and validation
-errors. It must not reuse or reinterpret private-key bundle rows.
+This is a storage-location change for the ProtectedData wrapped-DMK primitive,
+not a new Contacts crypto envelope. The wrapped record should keep the existing
+ProtectedData root-secret / Secure Enclave device-binding authority and
+domain-bound AAD contract unless a later security review explicitly revises the
+generic ProtectedData wrapping format. It must not reuse or reinterpret
+private-key bundle rows.
+
+Writes must preserve the current staged/committed semantics: write and validate
+the staged Keychain row before committing registry membership or replacing the
+committed row, treat duplicate/stale staged rows as recovery inputs, and delete
+staged rows on successful promotion or reset.
 
 ### Raw Key Lifetime
 
-The raw DB key may exist only long enough to key and validate a SQLCipher
-connection. The implementation must pass bytes to `sqlite3_key` or the chosen
-equivalent, then zeroize all Swift-owned copies immediately.
+For Contacts SQLCipher, the raw `contacts` domain master key may exist only long
+enough to key and validate a SQLCipher connection. Production code must build a
+short-lived byte buffer using SQLCipher raw-key syntax:
+
+```text
+x'<64 hex characters>'
+```
+
+and pass those bytes to `sqlite3_key_v2(db, "main", keySpec, keySpecLength)`,
+where key-only raw syntax is 67 bytes. Do not pass the 32 binary key bytes
+directly to `sqlite3_key`/`sqlite3_key_v2`; SQLCipher treats that as passphrase
+input and runs the KDF path.
 
 After keying, the SQLCipher connection is itself sensitive runtime state because
 SQLCipher retains key material internally until close. The connection owner must
 therefore participate in relock and reset, finalize statements, close handles,
 and clear any cached runtime projections.
 
-The raw key must not be represented as a `String`, hex passphrase, log field,
-trace value, UI value, export value, or persisted app model.
+The raw key and transient raw-key syntax buffer must be zeroized immediately
+after keying and validation. They must not be represented as a Swift `String`,
+PRAGMA SQL statement, log field, trace value, UI value, export value, or
+persisted app model.
 
 ### Storage Location And Files
 
@@ -146,8 +204,11 @@ account for SQLCipher/SQLite sidecars:
 - `contacts.sqlite-journal`
 - temporary files created by SQLite or SQLCipher near the database
 
-Reset All Local Data must delete the DB, sidecars, wrapped DB-key record, and
-obsolete `ProtectedData/contacts` snapshot artifacts.
+The DB and sidecars must use explicit complete file protection where the platform
+supports it. Reset All Local Data must close the SQLCipher connection before
+removing files, then delete the DB, sidecars, staged and committed
+Keychain-backed domain-key rows, and obsolete `ProtectedData/contacts` snapshot
+artifacts.
 
 ### SQLCipher Configuration And Validation
 
@@ -155,8 +216,8 @@ The implementation should keep SQLCipher configuration small and test-proven.
 At minimum, open validation must prove:
 
 - SQLCipher is the active library, using `PRAGMA cipher_version`.
-- The key is applied before schema reads, metadata reads, or other database
-  access.
+- The raw-key syntax buffer is applied before schema reads, metadata reads, or
+  other database access.
 - The database rejects the wrong key through an actual read after keying.
 - The expected schema version and application identity match.
 - Integrity checks fail closed when they report corruption.
@@ -175,15 +236,17 @@ cutover; current search ranking is app-derived behavior.
 
 These states must enter Contacts recovery or an equivalent fail-closed state:
 
-- missing wrapped DB-key record when the DB exists
-- corrupt or undecodable wrapped DB-key record
+- missing Keychain-backed wrapped domain master key when the DB exists
+- corrupt or undecodable wrapped domain master key
 - Secure Enclave device-binding mismatch or unavailable unwrap authority
-- wrong DB key
-- missing DB when a committed wrapped key indicates a DB should exist
+- wrong SQLCipher key
+- missing DB when the committed `contacts` domain and domain key indicate a DB
+  should exist
 - downgraded or unsupported schema
 - SQLCipher config mismatch
 - `cipher_integrity_check` or equivalent integrity failure
-- stale old `ProtectedData/contacts` snapshot state with no SQLCipher authority
+- stale file-backed wrapped-DMK or old `ProtectedData/contacts` snapshot state
+  with no SQLCipher authority
 - partial create/cutover artifacts
 
 None of these cases may silently reset Contacts to empty data. None may read old
@@ -195,10 +258,10 @@ ProtectedData Contacts state as a fallback source of truth.
 a Contacts persistence boundary beneath it rather than moving SQL awareness into
 views, screen models, encryption/decryption services, or certification flows.
 
-The first cutover should keep current behavior stable by hydrating a
+The first cutover should keep current behavior stable by hydrating an in-memory
 `ContactsDomainSnapshot`-compatible DTO for `ContactSnapshotMutator`,
-`ContactsSearchIndex`, and existing projection code. SQLCipher can persist
-relational tables for:
+`ContactsSearchIndex`, and existing projection code. SQLCipher is the only
+persisted authoritative payload and can persist relational tables for:
 
 - contact identities
 - contact key records
@@ -221,7 +284,8 @@ The cutover must preserve:
   password-message, and certificate-signature flows
 
 Do not move search to SQL/FTS in the first cutover unless a separate plan and
-golden behavior tests prove exact parity.
+golden behavior tests prove exact parity. Do not persist a transitional snapshot
+blob as a parallel source of truth.
 
 ### Data Exclusion Rules
 
@@ -229,7 +293,7 @@ Contacts SQLCipher storage must not contain private-key material or
 Security-private local locators. Excluded data includes:
 
 - OpenPGP secret certificate bytes
-- raw DB keys
+- raw domain master keys or SQLCipher keys
 - ProtectedData root secret or wrapping root key
 - Secure Enclave handle locators or handle-set identifiers
 - access-control policy values
@@ -241,58 +305,71 @@ Contacts may store public certificates, contact identity fields, tags,
 verification state, and certification artifacts that already belong to the
 Contacts domain.
 
-## 4. PR Roadmap
+## 5. PR Roadmap
 
-### PR 1: Documentation
+### PR 1: Documentation And Raw-Key Preflight Alignment
 
 Add this implementation reference and, at most, a neutral cross-link from
 [SQLCipher XCFramework Dependency](SQLCIPHER_XCFRAMEWORK_DEPENDENCY.md). Do not
 change canonical current-state docs to say Contacts has migrated.
+
+Align runtime and artifact SQLCipher preflight probes with raw-key syntax so the
+project does not keep direct 32-byte `sqlite3_key` examples that would exercise
+SQLCipher's passphrase/KDF path.
 
 Validation:
 
 - `git diff --check`
 - markdown link audit, if available
 - `python3 scripts/check_text_hygiene.py`, if available
+- `python3 -m unittest discover scripts/tests`
+- focused SQLCipher preflight XCTest, where available
 - targeted `rg` checks that active canonical docs do not claim SQLCipher
   Contacts is shipped
 
-### PR 2: SQLCipher/DB-Key Foundation
+### PR 2: Keychain-Backed ProtectedData Domain Keys
 
-Implement the low-level foundation without cutting over `ContactService`.
+Move generic ProtectedData wrapped-DMK persistence to Keychain without cutting
+over `ContactService` to SQLCipher.
 
 Owned behavior:
 
-- DB-key generation and versioned wrapped record
-- Keychain service/account ownership
-- SQLCipher connection owner
-- open, key, schema/config/integrity validation
-- statement finalization and connection close
-- raw key zeroization
-- DB/sidecar cleanup helpers
-- focused tests for wrong key, corrupt key, missing DB/key mismatch,
-  unsupported schema, and reset cleanup
+- staged and committed Keychain service/account ownership for wrapped domain
+  master key records
+- reuse of the existing ProtectedData wrapping primitive and domain-bound AAD
+- no independent Keychain access-control prompt for wrapped-DMK rows
+- staged write, validation, promotion, stale-staged cleanup, and reset cleanup
+- registry recovery behavior when a committed domain has a missing/corrupt
+  Keychain-backed wrapped-DMK row
+- no migration or fallback from old file-backed wrapped-DMK records
 
-Do not implement user-visible Contacts behavior changes in this PR.
+Do not implement user-visible Contacts behavior changes or SQLCipher Contacts
+cutover in this PR.
 
 Validation:
 
-- `scripts/restore_sqlcipher_xcframework.sh --require-attestation`
-- `python3 scripts/validate_sqlcipher_xcframework.py --root .`
 - `python3 -m unittest discover scripts/tests`
-- focused SQLCipher/DB-key XCTest
-- generic iOS and visionOS builds
+- focused ProtectedData domain-key XCTest
+- reset deletion and postcondition tests for new Keychain rows
+- no-second-prompt tests through the existing app-auth handoff
+- generic iOS, macOS arm64e, and visionOS builds where available
 - focused macOS arm64e tests where available
 
 ### PR 3: Contacts Cutover
 
-Swap Contacts persistence behind the stable `ContactService` facade.
+Swap the `contacts` ProtectedData domain payload from snapshot envelopes to
+SQLCipher behind the stable `ContactService` facade.
 
 Owned behavior:
 
 - SQLCipher-backed Contacts store under `Application Support/ProtectedData/contacts/`
-- snapshot-compatible load/save boundary for current mutator and search behavior
-- no legacy `ProtectedData/contacts` fallback
+- `contacts` domain ID and registry membership retained
+- direct use of the `contacts` domain master key through SQLCipher raw-key
+  syntax
+- in-memory snapshot-compatible load/save boundary for current mutator and
+  search behavior
+- no legacy `ProtectedData/contacts` snapshot fallback and no parallel persisted
+  snapshot source of truth
 - post-unlock preload through existing handoff
 - relock cleanup of runtime snapshot, search index, statements, and connection
 - Reset All Local Data cleanup and postcondition checks
@@ -303,6 +380,7 @@ Validation:
 
 - full Contacts service/model test coverage affected by the cutover
 - new SQLCipher recovery/reset/relock/no-fallback tests
+- raw-key keyspec zeroization tests where practical
 - existing encryption/signing/decryption/password-message/certificate-signature
   verification-context tests affected by Contacts availability
 - update [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
@@ -318,6 +396,8 @@ Owned behavior:
 - replace the remaining private-key self-ECDH wrapping with a standard envelope
   using a software ephemeral P-256 private key and the persistent Secure Enclave
   public key
+- persist the public envelope inputs needed to reseal/open consistently, matching
+  the root-secret envelope pattern's explicit public-parameter binding
 - add new envelope/version/service names so old rows cannot be silently misread
 - preserve private-key material red lines, zeroization, and fail-closed recovery
 - update canonical docs and tests for the private-key security model
@@ -329,13 +409,12 @@ Validation:
 - guarded Secure Enclave device evidence where required
 - reset cleanup checks if Keychain rows or service names change
 
-## 5. Open Decisions For Implementation PRs
+## 6. Open Decisions For Implementation PRs
 
 The documentation PR should not overfit these details. The implementation PRs
 must decide and justify them with tests:
 
 - exact schema table layout and indexes
-- whether the SQLCipher store keeps a transitional snapshot blob during cutover
 - final PRAGMA set beyond the minimum validation contract above
 - integrity-check cadence after open
 - whether recovery UI needs any Contacts-specific copy beyond existing recovery
@@ -343,14 +422,18 @@ must decide and justify them with tests:
 - whether relock/reset/recovery hardening should stay inside PR 2 and PR 3 or
   split into an additional PR if review size grows
 
-## 6. Review Red Lines
+## 7. Review Red Lines
 
 Stop and return to design review if a future implementation:
 
 - introduces a normal-flow second authentication prompt
-- stores raw DB keys or converts them to strings
+- adds a separate Contacts DB-key custody record instead of using the `contacts`
+  domain master key
+- stores raw domain master keys or SQLCipher keys, or converts raw key material
+  to Swift `String` / PRAGMA SQL
 - leaves a SQLCipher connection open across relock or reset
 - silently creates an empty Contacts DB after corruption or key mismatch
+- reads old file-backed wrapped-DMK records as a migration or fallback source
 - falls back to old ProtectedData Contacts snapshots
 - moves SQL details into UI or unrelated app services
 - stores private-key material, Secure Enclave handle locators, salts, sealed

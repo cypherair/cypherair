@@ -408,7 +408,18 @@ static int query_value(sqlite3 *db, const char *sql, char *value, size_t value_l
 }
 
 static int apply_key(sqlite3 *db, unsigned char key[32]) {
-  return sqlite3_key(db, key, 32);
+  static const char hex[] = "0123456789abcdef";
+  char key_spec[68] = {0};
+  key_spec[0] = 'x';
+  key_spec[1] = '\'';
+  for (int i = 0; i < 32; i++) {
+    key_spec[2 + (i * 2)] = hex[(key[i] >> 4) & 0x0f];
+    key_spec[3 + (i * 2)] = hex[key[i] & 0x0f];
+  }
+  key_spec[66] = '\'';
+  int rc = sqlite3_key_v2(db, "main", key_spec, 67);
+  memset(key_spec, 0, sizeof(key_spec));
+  return rc;
 }
 
 int main(int argc, char **argv) {
