@@ -170,15 +170,11 @@ final class AppContainer: @unchecked Sendable {
     }
     #endif
 
-    /// The platform modify-expiry pre-authenticator: macOS authenticates via the
-    /// system sheet and threads the context into the short SE unwrap/rewrap
-    /// windows; other platforms keep the implicit per-operation prompts unchanged.
-    private static var productionExpiryAuthenticator: KeyMutationService.ExpiryAuthenticator? {
-        #if os(macOS)
-        KeyMutationService.systemSheetExpiryAuthenticator
-        #else
-        nil
-        #endif
+    /// The production modify-expiry pre-authenticator: one system access-control
+    /// authentication whose context is threaded into the short SE unwrap/rewrap
+    /// windows. Bypass containers (UI test, tutorial) stay nil.
+    static var productionExpiryAuthenticator: KeyMutationService.ExpiryAuthenticator? {
+        KeyMutationService.systemAccessControlExpiryAuthenticator
     }
 
     /// The custody pre-authenticator: one biometric system-sheet evaluation per
