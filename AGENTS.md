@@ -151,6 +151,8 @@ especially Section 10. Review gates live in `docs/CODE_REVIEW.md`.
   user-owned. Read it from the project; never invent, increment, or reset it.
 - Work on a topic branch and submit a PR. Do not commit directly to `main`
   unless the user explicitly asks.
+- Do not set `autoResolutionMs` on `request_user_input` and wait for an
+  explicit user response.
 - Prefer regular merge commits over squash or rebase merges.
 - Commits are signed and use conventional prefixes (`feat:`, `fix:`,
   `refactor:`, `test:`, `docs:`). If the signing key is unavailable, ask the
