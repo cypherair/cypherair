@@ -9,12 +9,12 @@ struct SecureEnclaveCustodyDeletionContext {
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
 final class KeyMutationService {
-    /// macOS modify-expiry pre-authentication: evaluates the persisted mode's
-    /// access control once (system sheet) and returns the authenticated context,
-    /// which the flow threads into the short Secure Enclave unwrap and rewrap
-    /// windows. `nil` (the default, and the only value on other platforms / in
-    /// unit tests) keeps implicit per-operation authentication; production macOS
-    /// wiring passes `systemSheetExpiryAuthenticator`.
+    /// Modify-expiry pre-authentication: evaluates the persisted mode's access
+    /// control once and returns the authenticated context, which the flow
+    /// threads into the short Secure Enclave unwrap and rewrap windows.
+    /// `nil` keeps implicit per-operation authentication for unwired test and
+    /// bypass graphs; production wiring passes
+    /// `systemAccessControlExpiryAuthenticator`.
     typealias ExpiryAuthenticator = (SecAccessControl, String) async throws -> LAContext
 
     private let keyAdapter: PGPKeyOperationAdapter
@@ -59,13 +59,12 @@ final class KeyMutationService {
         self.secureEnclaveCustodyDeletionContext = secureEnclaveCustodyDeletionContext
     }
 
-    #if os(macOS)
-    /// The production macOS `ExpiryAuthenticator`: one system-sheet
+    /// The production `ExpiryAuthenticator`: one system access-control
     /// `evaluateAccessControl(.useKeyKeyExchange)` against the persisted mode's
     /// access control (a biometric satisfies both the Standard OR-gate and the
     /// High Security flag set). Biometric reuse is disabled: this is exactly one
     /// fresh authentication for exactly one user action.
-    static var systemSheetExpiryAuthenticator: ExpiryAuthenticator {
+    static var systemAccessControlExpiryAuthenticator: ExpiryAuthenticator {
         { accessControl, reason in
             let context = LAContext()
             context.touchIDAuthenticationAllowableReuseDuration = 0
@@ -103,7 +102,6 @@ final class KeyMutationService {
             }
         }
     }
-    #endif
 
     func configureExpiryMutationService(_ service: any PrivateKeyExpiryMutationRouting) {
         expiryMutationService = service
@@ -192,9 +190,9 @@ final class KeyMutationService {
         let accessControl = try authMode.createAccessControl()
 
         // Authenticate before touching secret material, but scope the
-        // operation-prompt session only to the system sheet. The unwrap and
-        // rewrap Secure Enclave windows below have their own short enrollment;
-        // certificate mutation and durable storage do not.
+        // operation-prompt session only to the access-control prompt. The
+        // unwrap and rewrap Secure Enclave windows below have their own short
+        // enrollment; certificate mutation and durable storage do not.
         var authenticationContext: LAContext?
         authenticationContext = try await authenticateModifyExpiryIfConfigured(
             accessControl: accessControl

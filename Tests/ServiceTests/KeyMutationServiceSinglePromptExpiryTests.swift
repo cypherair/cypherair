@@ -11,8 +11,8 @@ import XCTest
 /// unwrap reconstruct and the new wrapping key's generation).
 /// Negative: a declined authentication aborts before any Secure Enclave
 /// operation, pending bundle, or journal entry, and the flow remains usable.
-/// Legacy: with no authenticator wired (other platforms, default), both SE
-/// operations receive a nil context — byte-for-byte the prior behavior.
+/// Unwired: with no authenticator wired (test/bypass graphs), both SE
+/// operations receive a nil context.
 /// Honesty: a catalog that vanishes mid-action (the key-metadata domain
 /// relocking underneath the flow) surfaces `keyMetadataUnavailable`, not the
 /// decrypt-flavored `noMatchingKey`.
@@ -45,6 +45,13 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
 
     private enum TestError: Error {
         case declined
+    }
+
+    func test_productionExpiryAuthenticator_isWiredForSupportedPlatforms() {
+        XCTAssertNotNil(
+            AppContainer.productionExpiryAuthenticator,
+            "Production modify-expiry must pre-authenticate once and reuse that context across unwrap and rewrap."
+        )
     }
 
     func test_modifyExpiry_authenticatesOnce_andThreadsSameContextIntoBothSEOperations() async throws {
@@ -149,7 +156,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
         XCTAssertNil(
             made.mockSE.lastReconstructAuthenticationContext,
-            "Un-wired flow keeps the implicit prompt (nil context) — the non-macOS/test posture."
+            "Unwired test/bypass graphs keep the implicit prompt (nil context)."
         )
         XCTAssertNil(made.mockSE.lastGenerateAuthenticationContext)
     }
