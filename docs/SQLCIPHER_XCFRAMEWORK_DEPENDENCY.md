@@ -150,6 +150,9 @@ This dependency PR does not migrate Contacts storage. Contacts persistence, DB
 key wrapping, Keychain records, reset cleanup, relock cleanup, and self-ECDH
 cleanup remain future work under issue #540.
 
+The future-facing implementation reference for that pending work is
+[Contacts SQLCipher Storage Design](CONTACTS_SQLCIPHER_STORAGE_DESIGN.md).
+
 Before Contacts can move to SQLCipher-backed storage, a later CypherAir PR must
 add the actual Contacts persistence layer and security lifecycle:
 
