@@ -10,22 +10,18 @@ enum ContactsDomainStoreState: Equatable {
 final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Sendable {
     static let domainID: ProtectedDataDomainID = "contacts"
 
-    private struct OpenedSnapshot {
-        let snapshot: ContactsDomainSnapshot
-        let generationIdentifier: Int
-    }
-
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
     private let bootstrapStore: ProtectedDomainBootstrapStore
     private let currentWrappingRootKey: (() throws -> Data)?
     private let initialSnapshotProvider: () throws -> ContactsDomainSnapshot
+    private let databaseFactory: (ProtectedDataStorageRoot, ProtectedDataDomainID) -> ContactsSQLCipherDatabase
 
     private(set) var snapshot: ContactsDomainSnapshot?
     private(set) var domainState: ContactsDomainStoreState = .locked
 
-    private var unlockedGenerationIdentifier: Int?
+    private var database: ContactsSQLCipherDatabase?
 
     init(
         storageRoot: ProtectedDataStorageRoot,
@@ -35,6 +31,12 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         currentWrappingRootKey: (() throws -> Data)? = nil,
         initialSnapshotProvider: @escaping () throws -> ContactsDomainSnapshot = {
             ContactsDomainSnapshot.empty()
+        },
+        databaseFactory: @escaping (
+            ProtectedDataStorageRoot,
+            ProtectedDataDomainID
+        ) -> ContactsSQLCipherDatabase = { storageRoot, domainID in
+            ContactsSQLCipherDatabase(storageRoot: storageRoot, domainID: domainID)
         }
     ) {
         self.storageRoot = storageRoot
@@ -43,6 +45,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         self.bootstrapStore = bootstrapStore ?? ProtectedDomainBootstrapStore(storageRoot: storageRoot)
         self.currentWrappingRootKey = currentWrappingRootKey
         self.initialSnapshotProvider = initialSnapshotProvider
+        self.databaseFactory = databaseFactory
     }
 
     func ensureCommittedIfNeeded(
@@ -90,11 +93,9 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                 )
             },
             validateArtifacts: { [self] in
-                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
-                    try readAuthoritativeSnapshot(
-                        wrappingRootKey: wrappingRootKeyBox.dataCopy()
-                    )
-                }
+                try validateAuthoritativeSnapshot(
+                    wrappingRootKey: wrappingRootKeyBox.dataCopy()
+                )
             }
         )
 
@@ -130,18 +131,12 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         }
 
         do {
-            let openedSnapshot: OpenedSnapshot
-            var unwrappedDomainMasterKey: Data
-            (openedSnapshot, unwrappedDomainMasterKey) = try readAuthoritativeSnapshot(
-                wrappingRootKey: wrappingRootKey
+            let opened = try openAuthoritativeDatabase(
+                wrappingRootKey: wrappingRootKey,
+                keepDatabaseOpen: true
             )
-            defer {
-                unwrappedDomainMasterKey.protectedDataZeroize()
-            }
-            let cachedDomainMasterKey = Data(unwrappedDomainMasterKey)
-            domainKeyManager.cacheUnlockedDomainMasterKey(cachedDomainMasterKey, for: Self.domainID)
-            snapshot = openedSnapshot.snapshot
-            unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
+            snapshot = opened.snapshot
+            database = opened.database
             domainState = .loaded
 
             if registry.committedMembership[Self.domainID] == .recoveryNeeded {
@@ -151,8 +146,9 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                 )
             }
 
-            return openedSnapshot.snapshot
+            return opened.snapshot
         } catch {
+            try? closeDatabase()
             clearUnlockedState()
             domainState = .recoveryNeeded
             if registry.committedMembership[Self.domainID] != .recoveryNeeded {
@@ -174,27 +170,28 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
             }
             throw ProtectedDataError.authorizingUnavailable
         }
-        try validateSnapshotForProtectedData(updatedSnapshot)
-
-        var domainMasterKey = try activeDomainMasterKey()
-        defer {
-            domainMasterKey.protectedDataZeroize()
+        guard let database else {
+            throw ProtectedDataError.authorizingUnavailable
         }
 
-        let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
-        try writeSnapshotGeneration(
-            updatedSnapshot,
-            generationIdentifier: nextGenerationIdentifier,
-            domainMasterKey: domainMasterKey
-        )
+        try validateSnapshotForProtectedData(updatedSnapshot)
+        try database.replaceSnapshot(updatedSnapshot)
         snapshot = updatedSnapshot
-        unlockedGenerationIdentifier = nextGenerationIdentifier
         domainState = .loaded
     }
 
     func relockProtectedData() async throws {
-        clearUnlockedState()
-        if domainState == .loaded {
+        let wasLoaded = domainState == .loaded
+        snapshot = nil
+        do {
+            try closeDatabase()
+        } catch {
+            if wasLoaded {
+                domainState = .locked
+            }
+            throw error
+        }
+        if wasLoaded {
             domainState = .locked
         }
     }
@@ -217,60 +214,68 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
             wrappedRecord,
             wrappingRootKey: wrappingRootKey
         )
-        try writeSnapshotGeneration(
-            snapshot,
-            generationIdentifier: 1,
-            domainMasterKey: domainMasterKey
+
+        let stagedDatabase = databaseFactory(storageRoot, Self.domainID)
+        do {
+            try stagedDatabase.createFresh(
+                snapshot: snapshot,
+                domainMasterKey: domainMasterKey
+            )
+            try stagedDatabase.close()
+        } catch {
+            try? stagedDatabase.close()
+            throw error
+        }
+
+        try saveBootstrapMetadata()
+    }
+
+    private func openAuthoritativeDatabase(
+        wrappingRootKey: Data,
+        keepDatabaseOpen: Bool
+    ) throws -> (snapshot: ContactsDomainSnapshot, database: ContactsSQLCipherDatabase?) {
+        try validateBootstrapMetadata()
+
+        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
+            for: Self.domainID
+        ) else {
+            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
+        }
+
+        var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
+            from: wrappedRecord,
+            wrappingRootKey: wrappingRootKey
+        )
+        defer {
+            domainMasterKey.protectedDataZeroize()
+        }
+
+        let openedDatabase = databaseFactory(storageRoot, Self.domainID)
+        do {
+            let openedSnapshot = try openedDatabase.openExisting(domainMasterKey: domainMasterKey)
+            if keepDatabaseOpen {
+                return (openedSnapshot, openedDatabase)
+            }
+            try openedDatabase.close()
+            return (openedSnapshot, nil)
+        } catch {
+            try? openedDatabase.close()
+            throw error
+        }
+    }
+
+    private func validateAuthoritativeSnapshot(wrappingRootKey: Data) throws {
+        _ = try openAuthoritativeDatabase(
+            wrappingRootKey: wrappingRootKey,
+            keepDatabaseOpen: false
         )
     }
 
-    private func writeSnapshotGeneration(
-        _ snapshot: ContactsDomainSnapshot,
-        generationIdentifier: Int,
-        domainMasterKey: Data
-    ) throws {
-        try storageRoot.ensureDomainDirectoryExists(for: Self.domainID)
-
-        var plaintext = try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)
-        defer {
-            plaintext.protectedDataZeroize()
-        }
-
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        let envelope = try ProtectedDomainEnvelopeCodec.seal(
-            plaintext: plaintext,
-            domainID: Self.domainID,
-            schemaVersion: ContactsDomainSnapshot.currentSchemaVersion,
-            generationIdentifier: generationIdentifier,
-            domainMasterKey: domainMasterKey
-        )
-        let envelopeData = try encoder.encode(envelope)
-        let pendingURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
-        try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
-
-        let validatedData = try storageRoot.readManagedData(at: pendingURL)
-        let decodedEnvelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: validatedData)
-        var validatedPlaintext = try ProtectedDomainEnvelopeCodec.open(
-            envelope: decodedEnvelope,
-            domainMasterKey: domainMasterKey
-        )
-        defer {
-            validatedPlaintext.protectedDataZeroize()
-        }
-        _ = try ContactsDomainSnapshotCodec.decodeSnapshot(validatedPlaintext)
-
-        let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
-        let previousURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
-        if try storageRoot.managedItemExists(at: currentURL) {
-            try storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
-        }
-        try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
-
+    private func saveBootstrapMetadata() throws {
         try bootstrapStore.saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: ContactsDomainSnapshot.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
+                expectedCurrentGenerationIdentifier: nil,
                 coarseRecoveryReason: nil,
                 wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
             ),
@@ -278,119 +283,38 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         )
     }
 
-    private func readAuthoritativeSnapshot(
-        wrappingRootKey: Data
-    ) throws -> (OpenedSnapshot, Data) {
-        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
-            for: Self.domainID
-        ) else {
-            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
-        }
-
-        let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()
-        var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
-            from: wrappedRecord,
-            wrappingRootKey: wrappingRootKey
-        )
-        do {
-            var candidates: [OpenedSnapshot] = []
-            var highestObservedGenerationIdentifier: Int?
-
-            for slot in ProtectedDomainGenerationSlot.allCases {
-                let url = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: slot)
-                guard try storageRoot.managedItemExists(at: url) else {
-                    continue
-                }
-
-                do {
-                    let data = try storageRoot.readManagedData(at: url)
-                    let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
-                    highestObservedGenerationIdentifier = max(
-                        highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
-                        envelope.generationIdentifier
-                    )
-                    var plaintext = try ProtectedDomainEnvelopeCodec.open(
-                        envelope: envelope,
-                        domainMasterKey: domainMasterKey
-                    )
-                    defer {
-                        plaintext.protectedDataZeroize()
-                    }
-                    let decodedSnapshot = try ContactsDomainSnapshotCodec.decodeSnapshot(plaintext)
-                    candidates.append(
-                        OpenedSnapshot(
-                            snapshot: decodedSnapshot,
-                            generationIdentifier: envelope.generationIdentifier
-                        )
-                    )
-                } catch {
-                    continue
-                }
-            }
-
-            guard let selectedSnapshot = candidates.max(by: {
-                $0.generationIdentifier < $1.generationIdentifier
-            }) else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts domain does not contain a readable authoritative generation."
-                )
-            }
-            if selectedSnapshot.generationIdentifier < expectedCurrentGenerationIdentifier {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts expected current generation is not readable."
-                )
-            }
-            if let highestObservedGenerationIdentifier,
-               selectedSnapshot.generationIdentifier < highestObservedGenerationIdentifier {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Contacts highest observed generation is not readable."
-                )
-            }
-
-            return (selectedSnapshot, domainMasterKey)
-        } catch {
-            domainMasterKey.protectedDataZeroize()
-            throw error
-        }
-    }
-
-    private func expectedCurrentGenerationIdentifier() throws -> Int {
-        guard let metadata = try bootstrapStore.loadMetadata(for: Self.domainID),
-              let value = metadata.expectedCurrentGenerationIdentifier,
-              let generationIdentifier = Int(value),
-              generationIdentifier > 0 else {
+    private func validateBootstrapMetadata() throws {
+        guard let metadata = try bootstrapStore.loadMetadata(for: Self.domainID) else {
             throw ProtectedDataError.invalidEnvelope(
-                "Contacts bootstrap metadata is missing expected current generation."
+                "Contacts bootstrap metadata is missing."
             )
         }
-        return generationIdentifier
-    }
-
-    private func activeDomainMasterKey() throws -> Data {
-        if let cachedKey = domainKeyManager.unlockedDomainMasterKey(for: Self.domainID) {
-            return Data(cachedKey)
+        guard metadata.schemaVersion == ContactsDomainSnapshot.currentSchemaVersion else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Contacts bootstrap metadata schema is unsupported."
+            )
         }
-
-        guard let currentWrappingRootKey else {
-            throw ProtectedDataError.authorizingUnavailable
+        guard metadata.expectedCurrentGenerationIdentifier == nil else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Contacts bootstrap metadata contains a legacy generation authority."
+            )
         }
-        let wrappingRootKey = SensitiveBytesBox(data: try currentWrappingRootKey())
-        defer {
-            wrappingRootKey.zeroize()
+        guard metadata.coarseRecoveryReason == nil else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Contacts bootstrap metadata records a recovery reason."
+            )
         }
-        guard let wrappedRecord = try domainKeyManager.loadWrappedDomainMasterKeyRecord(
-            for: Self.domainID
-        ) else {
-            throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
+        guard metadata.wrappedDomainMasterKeyRecordVersion == WrappedDomainMasterKeyRecord.currentFormatVersion else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Contacts bootstrap metadata references an unsupported wrapped-DMK version."
+            )
         }
-
-        return try domainKeyManager.unwrapDomainMasterKey(
-            from: wrappedRecord,
-            wrappingRootKey: wrappingRootKey.dataCopy()
-        )
     }
 
     private func deleteDomainArtifacts() throws {
+        try closeDatabase()
+        clearUnlockedState()
+        try storageRoot.removeContactsSQLCipherDatabaseFilesIfPresent(for: Self.domainID)
         try storageRoot.removeItemIfPresent(
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
         )
@@ -400,14 +324,28 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         try storageRoot.removeItemIfPresent(
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
         )
+        try storageRoot.removeItemIfPresent(
+            at: storageRoot.stagedWrappedDomainMasterKeyURL(for: Self.domainID)
+        )
+        try storageRoot.removeItemIfPresent(
+            at: storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
+        )
         try domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: Self.domainID)
         try bootstrapStore.removeMetadata(for: Self.domainID)
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)
     }
 
+    private func closeDatabase() throws {
+        guard let database else {
+            return
+        }
+        try database.close()
+        self.database = nil
+    }
+
     private func clearUnlockedState() {
         snapshot = nil
-        unlockedGenerationIdentifier = nil
+        database = nil
     }
 
     private func validateSnapshotForProtectedData(_ snapshot: ContactsDomainSnapshot) throws {
@@ -464,11 +402,9 @@ extension ContactsDomainStore: ProtectedDomainRecoveryHandler {
                 )
             },
             validateArtifacts: { [self] in
-                try protectedDataValidateSnapshotAndZeroizeDomainMasterKey {
-                    try readAuthoritativeSnapshot(
-                        wrappingRootKey: wrappingRootKey.dataCopy()
-                    )
-                }
+                try validateAuthoritativeSnapshot(
+                    wrappingRootKey: wrappingRootKey.dataCopy()
+                )
             }
         )
     }

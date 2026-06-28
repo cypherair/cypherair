@@ -1,7 +1,7 @@
 # SQLCipher XCFramework Dependency
 
-> Status: Formal pinned external binary dependency. Contacts storage is not yet
-> migrated.
+> Status: Formal pinned external binary dependency. Contacts storage uses the
+> pinned SQLCipher artifact as its authoritative protected-domain payload.
 > Purpose: Define CypherAir's consumer contract for the external SQLCipher
 > XCFramework build repository and the restore/validation/release process.
 > Audience: CypherAir maintainers, release owners, and agents working on
@@ -145,33 +145,25 @@ To refresh SQLCipher:
 If a stable SQLCipher artifact is wrong after publication, do not replace
 release assets. Publish a new semantic stable tag and repin this repository.
 
-## Contacts Follow-Up
+## Contacts Consumer Contract
 
-This dependency PR does not migrate Contacts storage. Keychain-backed
-ProtectedData wrapped-DMK storage, Contacts SQLCipher persistence, reset
-cleanup, relock cleanup, and self-ECDH cleanup remain future work under
-issue #540.
+Contacts storage consumes this pinned SQLCipher artifact through the app target's
+normal framework linkage. The protected `contacts` domain remains the stable
+ProtectedData identity, while `contacts.sqlite` replaces the older snapshot
+envelope as the authoritative Contacts payload.
 
-The future-facing implementation reference for that pending work is
-[Contacts SQLCipher Storage Design](CONTACTS_SQLCIPHER_STORAGE_DESIGN.md).
+The Contacts implementation uses the existing `contacts` domain master key
+directly with SQLCipher raw-key syntax. It must not add a separate
+Contacts-specific database-key custody row, fall back to legacy snapshot
+artifacts, or change the SQLCipher dependency pin/release model as part of
+Contacts persistence work.
 
-Before Contacts can move to SQLCipher-backed storage, later CypherAir PRs must
-add the shared ProtectedData foundation and the actual Contacts persistence
-layer:
+Contacts SQLCipher changes remain covered by
+[Contacts SQLCipher Storage Design](CONTACTS_SQLCIPHER_STORAGE_DESIGN.md) and
+must preserve post-unlock opening without a normal-flow second prompt, relock
+connection cleanup, reset cleanup for DB sidecars and obsolete ProtectedData
+artifacts, and fail-closed recovery for corrupt, missing, mismatched key,
+schema, config, or integrity state.
 
-- Keychain-backed staged and committed wrapped-DMK records under the existing
-  ProtectedData / Secure Enclave device-binding authority
-- retained `contacts` ProtectedData domain identity, with SQLCipher replacing
-  the current Contacts payload implementation
-- direct use of the `contacts` domain master key through SQLCipher raw-key
-  syntax, without a separate Contacts-specific key custody record
-- post-unlock preload without a normal-flow second authentication prompt
-- relock connection/statement/key cleanup
-- reset cleanup for DB, sidecars, Keychain-backed domain-key records, and
-  obsolete Contacts ProtectedData artifacts
-- fail-closed recovery for corrupt/missing/mismatched key, schema, config, or
-  integrity state
-
-That adoption PR should also update the canonical current-state docs that become
-affected at that point, including persisted state inventory, security, Contacts
-architecture, and reset/relock documentation.
+Self-ECDH cleanup remains separate issue #540 follow-up work and is not part of
+the SQLCipher dependency contract.

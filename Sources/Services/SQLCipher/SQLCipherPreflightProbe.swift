@@ -21,7 +21,6 @@ enum SQLCipherPreflightError: Error, Equatable {
 
 enum SQLCipherPreflightProbe {
     private static let databaseBaseName = "sqlcipher-preflight.sqlite"
-    private static let rawKeyLength = 32
 
     static func run(in directory: URL) throws -> SQLCipherPreflightResult {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -104,9 +103,17 @@ enum SQLCipherPreflightProbe {
     }
 
     private static func applyKey(_ key: [UInt8], to db: OpaquePointer) throws {
-        var keySpec = try rawKeySpec(for: key)
+        var keySpec: [UInt8]
+        do {
+            keySpec = try SQLCipherRawKey.keySpecBytes(for: key)
+        } catch let error as SQLCipherRawKeyError {
+            switch error {
+            case .invalidRawKeyLength(let length):
+                throw SQLCipherPreflightError.invalidRawKeyLength(length)
+            }
+        }
         defer {
-            zeroizeKey(&keySpec)
+            SQLCipherRawKey.zeroize(&keySpec)
         }
 
         let rc = keySpec.withUnsafeBytes { buffer in
@@ -117,30 +124,8 @@ enum SQLCipherPreflightProbe {
         }
     }
 
-    private static func rawKeySpec(for key: [UInt8]) throws -> [UInt8] {
-        guard key.count == rawKeyLength else {
-            throw SQLCipherPreflightError.invalidRawKeyLength(key.count)
-        }
-
-        let hexDigits = Array("0123456789abcdef".utf8)
-        var keySpec = [UInt8]()
-        keySpec.reserveCapacity(67)
-        keySpec.append(UInt8(ascii: "x"))
-        keySpec.append(UInt8(ascii: "'"))
-        for byte in key {
-            keySpec.append(hexDigits[Int(byte >> 4)])
-            keySpec.append(hexDigits[Int(byte & 0x0f)])
-        }
-        keySpec.append(UInt8(ascii: "'"))
-        return keySpec
-    }
-
     private static func zeroizeKey(_ key: inout [UInt8]) {
-        guard !key.isEmpty else { return }
-        key.withUnsafeMutableBufferPointer { buffer in
-            guard let base = buffer.baseAddress else { return }
-            opaqueZero(base, buffer.count)
-        }
+        SQLCipherRawKey.zeroize(&key)
     }
 
     private static func exec(_ db: OpaquePointer, sql: String, operation: String) throws {
@@ -201,9 +186,4 @@ enum SQLCipherPreflightProbe {
             "\(name)-journal",
         ]
     }
-}
-
-@_optimize(none)
-private func opaqueZero(_ ptr: UnsafeMutablePointer<UInt8>, _ count: Int) {
-    ptr.initialize(repeating: 0, count: count)
 }

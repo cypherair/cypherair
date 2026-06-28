@@ -323,8 +323,15 @@ rejection.
 The app target consumes a static framework-shaped `SQLCipher.xcframework`
 through the normal Frameworks build phase. The artifact keeps each module map
 inside `SQLCipher.framework/Modules`, so the app project does not carry
-slice-specific SQLCipher linker or modulemap paths. Contacts storage does not
-use SQLCipher yet.
+slice-specific SQLCipher linker or modulemap paths. Contacts storage now uses
+SQLCipher as the authoritative protected-domain payload at
+`Application Support/ProtectedData/contacts/contacts.sqlite`.
+
+Contacts SQLCipher changes should keep focused XCTest coverage for raw-key
+syntax, artifact preflight, fresh create, relock/reopen persistence, wrong-key
+and corrupt-DB recovery, missing committed DB authority, schema/application-id
+mismatch, integrity failure, reset deletion of DB sidecars and obsolete
+snapshot-envelope artifacts, and absence of any legacy snapshot fallback.
 
 To refresh SQLCipher, publish a new stable immutable release from
 `cypherair/sqlcipher-xcframework` first. Then update

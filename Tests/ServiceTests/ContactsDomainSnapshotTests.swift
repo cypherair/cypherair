@@ -5,15 +5,12 @@ import XCTest
 final class ContactsDomainSnapshotTests: XCTestCase {
     private let referenceDate = Date(timeIntervalSince1970: 1_774_000_000)
 
-    func test_emptySnapshot_validatesAndRoundTripsAsBinaryPlist() throws {
+    func test_emptySnapshot_validates() throws {
         let snapshot = ContactsDomainSnapshot.empty(now: referenceDate)
 
-        let encoded = try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)
-        XCTAssertEqual(String(data: encoded.prefix(6), encoding: .utf8), "bplist")
-
-        let decoded = try ContactsDomainSnapshotCodec.decodeSnapshot(encoded)
-        XCTAssertEqual(decoded, snapshot)
-        try decoded.validateContract()
+        XCTAssertEqual(snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
+        XCTAssertTrue(snapshot.identities.isEmpty)
+        try snapshot.validateContract()
     }
 
     func test_unsupportedSchemaVersion_isRejected() throws {
@@ -22,27 +19,6 @@ final class ContactsDomainSnapshotTests: XCTestCase {
 
         XCTAssertThrowsError(try snapshot.validateContract()) { error in
             XCTAssertTrue(error is ContactsDomainValidationError)
-        }
-        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.encodeSnapshot(snapshot)) { error in
-            XCTAssertEqual(
-                error as? ProtectedDataError,
-                .invalidEnvelope("Contacts payload has an unsupported schema version.")
-            )
-        }
-    }
-
-    func test_decodeSnapshot_rejectsUnsupportedSchemaVersion() throws {
-        var snapshot = try makeValidSnapshot()
-        snapshot.schemaVersion = ContactsDomainSnapshot.currentSchemaVersion + 1
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        let payload = try encoder.encode(snapshot)
-
-        XCTAssertThrowsError(try ContactsDomainSnapshotCodec.decodeSnapshot(payload)) { error in
-            XCTAssertEqual(
-                error as? ProtectedDataError,
-                .invalidEnvelope("Contacts payload has an unsupported schema version.")
-            )
         }
     }
 

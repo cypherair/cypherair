@@ -71,6 +71,20 @@ struct ProtectedDataStorageRoot {
         domainDirectory(for: domainID).appendingPathComponent("\(slot.rawValue).plist")
     }
 
+    func contactsSQLCipherDatabaseURL(for domainID: ProtectedDataDomainID) -> URL {
+        domainDirectory(for: domainID).appendingPathComponent("contacts.sqlite")
+    }
+
+    func contactsSQLCipherDatabaseFileURLs(for domainID: ProtectedDataDomainID) -> [URL] {
+        let databaseURL = contactsSQLCipherDatabaseURL(for: domainID)
+        return [
+            databaseURL,
+            databaseURL.deletingLastPathComponent().appendingPathComponent("\(databaseURL.lastPathComponent)-wal"),
+            databaseURL.deletingLastPathComponent().appendingPathComponent("\(databaseURL.lastPathComponent)-shm"),
+            databaseURL.deletingLastPathComponent().appendingPathComponent("\(databaseURL.lastPathComponent)-journal"),
+        ]
+    }
+
     func ensureRootDirectoryExists() throws {
         traceStorageContract(stage: "rootEnsure", result: "start")
         do {
@@ -164,6 +178,21 @@ struct ProtectedDataStorageRoot {
             return
         }
         try fileManager.removeItem(at: url)
+    }
+
+    func applyProtectionToManagedItemIfPresent(at url: URL) throws {
+        let validatedContract = try validatedPersistentStorageContract()
+        let resolvedURL = try validateManagedPath(url, within: validatedContract)
+        guard fileManager.fileExists(atPath: resolvedURL.path) else {
+            return
+        }
+        try applyAndVerifyFileProtection(to: resolvedURL)
+    }
+
+    func removeContactsSQLCipherDatabaseFilesIfPresent(for domainID: ProtectedDataDomainID) throws {
+        for url in contactsSQLCipherDatabaseFileURLs(for: domainID) {
+            try removeItemIfPresent(at: url)
+        }
     }
 
     func removeDomainDirectoryIfPresent(for domainID: ProtectedDataDomainID) throws {

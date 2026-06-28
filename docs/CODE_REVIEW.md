@@ -52,7 +52,8 @@ Changes touching `Sources/Security/`, `Sources/Services/DecryptionService.swift`
 - [ ] ProtectedData changes preserve the app-data/private-key-material boundary: no SE-wrapped private-key bundle bytes are copied into ProtectedData payloads
 - [ ] ProtectedData changes preserve registry authority, explicit pending-mutation recovery, no-silent-reset behavior, relock zeroization, and `restartRequired` fail-closed semantics
 - [ ] ProtectedData changes that migrate a persisted surface update `PERSISTED_STATE_INVENTORY.md` and the companion docs per [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md) Section 6
-- [ ] Contacts changes preserve protected-domain-only production state, no legacy flat-file reads or fallback, runtime-only search/filter/tag-applied recipient selection state, per-key manual verification and certification state, relock cleanup, unsupported-schema fail-closed behavior, and the no-package-exchange / mandatory-encrypted-future-backup boundary
+- [ ] Contacts changes preserve protected-domain-only production state, SQLCipher `contacts.sqlite` as the sole Contacts payload authority, no legacy flat-file or snapshot-envelope fallback, runtime-only search/filter/tag-applied recipient selection state, per-key manual verification and certification state, relock connection cleanup, unsupported-schema/config/integrity fail-closed behavior, and the no-package-exchange / mandatory-encrypted-future-backup boundary
+- [ ] Contacts SQLCipher changes use the existing `contacts` domain master key through raw-key syntax, zeroize copied key/key-spec buffers after keying, avoid `PRAGMA key` and Swift `String` key material, and do not introduce a second Contacts database-key Keychain row
 
 ## Rust API Changes
 

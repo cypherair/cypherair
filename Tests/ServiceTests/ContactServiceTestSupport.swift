@@ -36,6 +36,7 @@ class ContactServiceTestCase: XCTestCase {
     }
 
     func contactsDomainArtifactsExist(in storageRoot: ProtectedDataStorageRoot) -> Bool {
+        // Contacts SQLCipher authority must not recreate legacy snapshot-envelope plists.
         let fileManager = FileManager.default
         let urls = ProtectedDomainGenerationSlot.allCases.map {
             storageRoot.domainEnvelopeURL(for: ContactsDomainStore.domainID, slot: $0)
@@ -267,16 +268,6 @@ class ContactServiceTestCase: XCTestCase {
             wrappingRootKey: wrappingRootKey,
             store: store
         )
-    }
-
-    func currentContactsEnvelope(in storageRoot: ProtectedDataStorageRoot) throws -> ProtectedDomainEnvelope {
-        let data = try storageRoot.readManagedData(
-            at: storageRoot.domainEnvelopeURL(
-                for: ContactsDomainStore.domainID,
-                slot: .current
-            )
-        )
-        return try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
     }
 
     func authorizedContactsGate() -> ContactsPostAuthGateDecision {
