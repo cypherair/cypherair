@@ -16,6 +16,12 @@ enum AuthTraceMetadata {
         if service == KeychainConstants.protectedDataDeviceBindingKeyService {
             return "protectedDataDeviceBindingKey"
         }
+        if service.hasPrefix(KeychainConstants.protectedDataDomainKeyServicePrefix) {
+            if service.hasPrefix("\(KeychainConstants.protectedDataDomainKeyServicePrefix)staged.") {
+                return "protectedDataStagedDomainKey"
+            }
+            return "protectedDataDomainKey"
+        }
         if service.hasPrefix("\(KeychainConstants.prefix).pending-se-key.") {
             return "pendingSeKey"
         }

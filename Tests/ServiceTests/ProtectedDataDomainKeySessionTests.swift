@@ -10,7 +10,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         var rawSecret = Data(repeating: 0x7A, count: 32)
         let domainMasterKey = Data(repeating: 0x42, count: 32)
 
@@ -46,7 +46,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         var rawSecret = Data(repeating: 0x33, count: 32)
         let wrappingRootKey = try keyManager.deriveWrappingRootKey(from: &rawSecret)
         let malformedRecord = ProtectedDataTestAppWrappedDomainMasterKeyRecord(
@@ -78,7 +78,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xAB, count: 32), identifier: "com.cypherair.tests.protected-data.session")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -139,7 +139,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let identifier = "com.cypherair.tests.protected-data.session-remove-shared-right"
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xA1, count: 32), identifier: identifier)
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -180,7 +180,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
 
         let identifier = "com.cypherair.tests.protected-data.session-reauthorization"
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xA2, count: 32), identifier: identifier)
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -220,7 +220,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rootSecretStore = RecordingProtectedDataRootSecretStore()
         rootSecretStore.seedRootSecret(Data(repeating: 0xBC, count: 32), identifier: "com.cypherair.tests.protected-data.session-handoff")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -255,7 +255,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rootSecretStore = RecordingProtectedDataRootSecretStore()
         rootSecretStore.seedRootSecret(Data(repeating: 0xB7, count: 32), identifier: "com.cypherair.tests.protected-data.reprotect")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -282,7 +282,7 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xAC, count: 32), identifier: "com.cypherair.tests.protected-data.restart")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(

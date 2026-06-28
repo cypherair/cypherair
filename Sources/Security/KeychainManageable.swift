@@ -27,6 +27,15 @@ protocol KeychainManageable {
     /// - Throws: If the item is not found or access is denied.
     func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data
 
+    /// Update an existing Keychain item's data.
+    ///
+    /// - Parameters:
+    ///   - data: The replacement data.
+    ///   - service: The Keychain service identifier.
+    ///   - account: The Keychain account identifier.
+    /// - Throws: If the item is not found or the update fails.
+    func update(_ data: Data, service: String, account: String, authenticationContext: LAContext?) throws
+
     /// Delete an item from the Keychain.
     ///
     /// - Parameters:
@@ -50,6 +59,10 @@ protocol KeychainManageable {
 extension KeychainManageable {
     func load(service: String, account: String) throws -> Data {
         try load(service: service, account: account, authenticationContext: nil)
+    }
+
+    func update(_ data: Data, service: String, account: String) throws {
+        try update(data, service: service, account: account, authenticationContext: nil)
     }
 
     func delete(service: String, account: String) throws {
@@ -103,6 +116,19 @@ enum KeychainConstants {
 
     /// ProtectedData Secure Enclave device-binding key representation.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
+
+    /// Prefix for ProtectedData wrapped domain master key rows.
+    static let protectedDataDomainKeyServicePrefix = "\(prefix).protected-data.domain-key."
+
+    /// ProtectedData committed wrapped domain master key record.
+    static func protectedDataDomainKeyService(domainID: ProtectedDataDomainID) -> String {
+        "\(protectedDataDomainKeyServicePrefix)\(domainID.rawValue)"
+    }
+
+    /// ProtectedData staged wrapped domain master key record.
+    static func stagedProtectedDataDomainKeyService(domainID: ProtectedDataDomainID) -> String {
+        "\(protectedDataDomainKeyServicePrefix)staged.\(domainID.rawValue)"
+    }
 
     /// Default Keychain account identifier.
     static let defaultAccount = "com.cypherair"

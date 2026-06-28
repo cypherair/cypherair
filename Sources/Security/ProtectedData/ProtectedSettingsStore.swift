@@ -595,20 +595,9 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
     }
 
     private func loadProtectedSettingsWrappedDomainMasterKeyRecord() throws -> WrappedDomainMasterKeyRecord {
-        try storageRoot.validatePersistentStorageContract()
-        let url = storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
-        guard try storageRoot.managedItemExists(at: url) else {
+        guard let record = try domainKeyManager.loadWrappedDomainMasterKeyRecord(for: Self.domainID) else {
             throw ProtectedDataError.missingWrappedDomainMasterKey(Self.domainID)
         }
-
-        let data: Data
-        do {
-            data = try storageRoot.readManagedData(at: url)
-        } catch {
-            throw ProtectedSettingsStorageReadFailure(underlying: error)
-        }
-        let record = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: data)
-        try record.validateContract()
         return record
     }
 
@@ -664,12 +653,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         try storageRoot.removeItemIfPresent(
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
         )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.stagedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
+        try domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: Self.domainID)
         try bootstrapStore.removeMetadata(for: Self.domainID)
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)
     }

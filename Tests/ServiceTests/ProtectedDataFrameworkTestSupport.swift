@@ -311,16 +311,24 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
+        keychain: MockKeychain,
         store: ProtectedSettingsStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
         let sharedRightIdentifier = "com.cypherair.tests.protected-settings.\(UUID().uuidString)"
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
         let store = ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
@@ -330,6 +338,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             storageRoot,
             registryStore,
             domainKeyManager,
+            keychain,
             store
         )
     }
@@ -511,16 +520,24 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         storageRoot: ProtectedDataTestAppProtectedDataStorageRoot,
         registryStore: ProtectedDataTestAppProtectedDataRegistryStore,
         domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager,
+        keychain: MockKeychain,
         wrappingRootKey: Data,
         store: ProtectedDataTestAppKeyMetadataDomainStore
     ) {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory(prefix))
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
         let registryStore = ProtectedDataTestAppProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.key-metadata.\(UUID().uuidString)"
+            sharedRightIdentifier: "com.cypherair.tests.key-metadata.\(UUID().uuidString)",
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
 
         let defaultsSuiteName = "com.cypherair.tests.key-metadata.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
@@ -558,6 +575,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
+            keychain: keychain,
             wrappingRootKey: wrappingRootKey,
             store: store
         )

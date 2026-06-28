@@ -17,7 +17,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let store = ProtectedDataTestAppPrivateKeyControlStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
 
         let created = try await store.bootstrapFirstDomainAfterAppAuthenticationIfNeeded(
@@ -38,7 +38,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedRightIdentifier: "com.cypherair.tests.private-key-control.first"
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let store = ProtectedDataTestAppPrivateKeyControlStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
@@ -101,7 +101,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedRightIdentifier: sharedRightIdentifier
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
 
         let defaultsSuiteName = "com.cypherair.tests.real-components.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
@@ -186,7 +186,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let store = ProtectedDataTestAppPrivateKeyControlStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
 
         do {
@@ -211,7 +211,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
 
         try await sentinelStore.ensureCommittedIfNeeded(
@@ -234,7 +234,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let rootSecretStore = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: registry.sharedRightIdentifier
         )
         let coordinator = ProtectedDataTestAppProtectedDataPostUnlockCoordinator(
@@ -264,7 +264,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
     func test_authorization_missingRight_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationMissingRight"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
@@ -292,7 +292,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
     func test_authorization_secretUnreadable_returnsFrameworkRecoveryNeededAndDeauthorizes() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationUnreadableSecret"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(
             Data(repeating: 0xAE, count: 32),
@@ -336,7 +336,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
                 baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationMock-\(testCase.suffix)")
             )
-            let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
             let rootSecretStore = ProtectedDataTestAppMockProtectedDataRootSecretStore()
             try rootSecretStore.saveRootSecret(
                 Data(repeating: 0xB0, count: 32),
@@ -372,7 +372,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
 
     func test_authorization_userCancelled_returnsCancelledOrDenied() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAuthorizationCancelled"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(
             Data(repeating: 0xAF, count: 32),
@@ -524,7 +524,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let protectedSettingsStore = ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -561,10 +561,15 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             sharedRightIdentifier: "com.cypherair.tests.protected-data.handler-list"
         )
         let wrappingRootKey = Data(repeating: 0xA4, count: 32)
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
         let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: domainKeyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
         let mismatchedHandler = MockProtectedDomainRecoveryHandler(domainID: "other-domain")
@@ -603,10 +608,11 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         XCTAssertNil(recoveredRegistry.pendingMutation)
         XCTAssertEqual(mismatchedHandler.deleteArtifactsCallCount, 0)
         XCTAssertTrue(mismatchedHandler.continuedCreatePhases.isEmpty)
-        XCTAssertTrue(try storageRoot.managedItemExists(
-            at: storageRoot.committedWrappedDomainMasterKeyURL(
-                for: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID
-            )
+        XCTAssertTrue(keychain.exists(
+            service: KeychainConstants.protectedDataDomainKeyService(
+                domainID: ProtectedDataTestAppProtectedDataFrameworkSentinelStore.domainID
+            ),
+            account: KeychainConstants.defaultAccount
         ))
     }
 }

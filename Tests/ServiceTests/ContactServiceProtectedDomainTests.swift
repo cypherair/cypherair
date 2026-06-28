@@ -305,6 +305,155 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
         )
     }
 
+    func test_contactsMissingWrappedDomainMasterKeyRequiresRecoveryWithoutRecreation() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsMissingWrappedDMK")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let generated = try engine.generateKey(
+            name: "Missing Wrapped DMK",
+            email: "missing-wrapped-dmk@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
+        try await opened.service.relockProtectedData()
+        opened.harness.domainKeyManager.clearUnlockedDomainMasterKeys()
+        try opened.harness.domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: ContactsDomainStore.domainID)
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: opened.harness.storageRoot,
+            registryStore: opened.harness.registryStore,
+            domainKeyManager: opened.harness.domainKeyManager,
+            currentWrappingRootKey: { opened.harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain must not be recreated when the DMK row is missing.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateDecision: authorizedContactsGate(),
+            wrappingRootKey: { opened.harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
+        XCTAssertEqual(
+            try opened.harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_contactsCorruptWrappedDomainMasterKeyRequiresRecoveryWithoutRecreation() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCorruptWrappedDMK")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let generated = try engine.generateKey(
+            name: "Corrupt Wrapped DMK",
+            email: "corrupt-wrapped-dmk@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
+        try await opened.service.relockProtectedData()
+        opened.harness.domainKeyManager.clearUnlockedDomainMasterKeys()
+        try opened.harness.keychain.update(
+            Data("not a wrapped contacts dmk".utf8),
+            service: KeychainConstants.protectedDataDomainKeyService(domainID: ContactsDomainStore.domainID),
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: nil
+        )
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: opened.harness.storageRoot,
+            registryStore: opened.harness.registryStore,
+            domainKeyManager: opened.harness.domainKeyManager,
+            currentWrappingRootKey: { opened.harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Committed Contacts domain must not be recreated when the DMK row is corrupt.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateDecision: authorizedContactsGate(),
+            wrappingRootKey: { opened.harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
+        XCTAssertEqual(
+            try opened.harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_contactsLegacyFileBackedWrappedDomainMasterKeyIsNotFallback() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsLegacyDMKIgnored")
+        defer {
+            try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
+        }
+        let generated = try engine.generateKey(
+            name: "Legacy Wrapped DMK",
+            email: "legacy-wrapped-dmk@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        _ = try opened.service.importContact(publicKeyData: generated.publicKeyData)
+        try await opened.service.relockProtectedData()
+        opened.harness.domainKeyManager.clearUnlockedDomainMasterKeys()
+        try opened.harness.domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: ContactsDomainStore.domainID)
+
+        let legacyRecord = try opened.harness.domainKeyManager.wrapDomainMasterKey(
+            Data(repeating: 0x71, count: 32),
+            for: ContactsDomainStore.domainID,
+            wrappingRootKey: opened.harness.wrappingRootKey
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        try opened.harness.storageRoot.writeProtectedData(
+            try encoder.encode(legacyRecord),
+            to: opened.harness.storageRoot.committedWrappedDomainMasterKeyURL(for: ContactsDomainStore.domainID)
+        )
+
+        let reopenedStore = ContactsDomainStore(
+            storageRoot: opened.harness.storageRoot,
+            registryStore: opened.harness.registryStore,
+            domainKeyManager: opened.harness.domainKeyManager,
+            currentWrappingRootKey: { opened.harness.wrappingRootKey },
+            initialSnapshotProvider: {
+                XCTFail("Legacy file-backed DMK must not recreate or open Contacts.")
+                return ContactsDomainSnapshot.empty()
+            }
+        )
+        let reopenedService = ContactService(
+            engine: engine,
+            contactsDomainStore: reopenedStore
+        )
+
+        let availability = await reopenedService.openContactsAfterPostUnlock(
+            gateDecision: authorizedContactsGate(),
+            wrappingRootKey: { opened.harness.wrappingRootKey }
+        )
+
+        XCTAssertEqual(availability, .recoveryNeeded)
+        XCTAssertTrue(reopenedService.testContactKeyRecords.isEmpty)
+        XCTAssertEqual(
+            try opened.harness.registryStore.loadRegistry().committedMembership[ContactsDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
     func test_contactsProtectedMutationsPersistAcrossReopen() async throws {
         let documentDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirContactsMutation-\(UUID().uuidString)", isDirectory: true)

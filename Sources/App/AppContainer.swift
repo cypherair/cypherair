@@ -250,6 +250,7 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeFirstDomainSharedRightCleaner(
         storageRoot: ProtectedDataStorageRoot,
+        domainKeyManager: ProtectedDomainKeyManager,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         traceStore: AuthLifecycleTraceStore?
     ) -> ProtectedDataFirstDomainSharedRightCleaner {
@@ -257,6 +258,9 @@ final class AppContainer: @unchecked Sendable {
             storageRoot: storageRoot,
             hasPersistedSharedRight: { identifier in
                 protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
+            },
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
             },
             removePersistedSharedRight: { identifier in
                 try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
@@ -653,10 +657,16 @@ final class AppContainer: @unchecked Sendable {
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
         let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
-        let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
+        let protectedDomainKeyManager = ProtectedDomainKeyManager(
+            storageRoot: protectedDataStorageRoot,
+            keychain: keychain
+        )
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            hasExternalProtectedDataArtifacts: {
+                try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
+            },
             traceStore: authLifecycleTraceStore
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
@@ -671,6 +681,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
+            domainKeyManager: protectedDomainKeyManager,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -1041,10 +1052,16 @@ final class AppContainer: @unchecked Sendable {
             validationMode: .enforceAppSupportContainment,
             traceStore: authLifecycleTraceStore
         )
-        let protectedDomainKeyManager = ProtectedDomainKeyManager(storageRoot: protectedDataStorageRoot)
+        let protectedDomainKeyManager = ProtectedDomainKeyManager(
+            storageRoot: protectedDataStorageRoot,
+            keychain: keychain
+        )
         let protectedDataRegistryStore = ProtectedDataRegistryStore(
             storageRoot: protectedDataStorageRoot,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
+            hasExternalProtectedDataArtifacts: {
+                try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
+            },
             traceStore: authLifecycleTraceStore
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
@@ -1059,6 +1076,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
+            domainKeyManager: protectedDomainKeyManager,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
             traceStore: authLifecycleTraceStore
         )
@@ -1109,7 +1127,8 @@ final class AppContainer: @unchecked Sendable {
                     "contacts-sandbox",
                     isDirectory: true
                 ),
-                wrappingRootKey: contactsWrappingRootKey
+                wrappingRootKey: contactsWrappingRootKey,
+                keychain: keychain
             )
         } catch {
             fatalError("Failed to create UI-test Contacts protected domain: \(error)")
@@ -1386,12 +1405,20 @@ final class AppContainer: @unchecked Sendable {
 
     private static func makeSandboxContactsDomainStore(
         baseDirectory: URL,
-        wrappingRootKey: Data
+        wrappingRootKey: Data,
+        keychain: any KeychainManageable
     ) throws -> ContactsDomainStore {
         let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let domainKeyManager = ProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
         let registryStore = ProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.uitests.contacts.\(UUID().uuidString)"
+            sharedRightIdentifier: "com.cypherair.uitests.contacts.\(UUID().uuidString)",
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
         )
         _ = try registryStore.performSynchronousBootstrap()
         var registry = try registryStore.loadRegistry()
@@ -1405,7 +1432,7 @@ final class AppContainer: @unchecked Sendable {
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: domainKeyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
     }

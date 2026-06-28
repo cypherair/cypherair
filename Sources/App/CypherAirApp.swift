@@ -93,6 +93,9 @@ struct CypherAirApp: App {
             hasPersistedSharedRight: { identifier in
                 container.protectedDataSessionCoordinator.hasPersistedRootSecret(identifier: identifier)
             },
+            hasExternalProtectedDataArtifacts: {
+                try container.protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
+            },
             removePersistedSharedRight: { identifier in
                 try await container.protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
             },

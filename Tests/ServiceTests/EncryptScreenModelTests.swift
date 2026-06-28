@@ -1534,7 +1534,7 @@ final class EncryptScreenModelTests: XCTestCase {
         registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
         try registryStore.saveRegistry(registry)
 
-        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let wrappingRootKey = Data(repeating: 0xB5, count: 32)
         let store = ContactsDomainStore(
             storageRoot: storageRoot,

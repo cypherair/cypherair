@@ -112,9 +112,14 @@ enum TestHelpers {
                 isDirectory: true
             )
         )
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: keychain)
         let registryStore = ProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)"
+            sharedRightIdentifier: "com.cypherair.tests.contacts.\(UUID().uuidString)",
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
         )
         _ = try registryStore.performSynchronousBootstrap()
         var registry = try registryStore.loadRegistry()
@@ -128,7 +133,7 @@ enum TestHelpers {
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: domainKeyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
     }

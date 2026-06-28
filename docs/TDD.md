@@ -320,6 +320,8 @@ com.cypherair.v1.sealed-key.<fingerprint>
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | ProtectedData SE device-binding key | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
+| ProtectedData committed wrapped-DMK record | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
+| ProtectedData staged wrapped-DMK record | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 
 ProtectedData uses this device-binding key only to open the app-data
 root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
@@ -379,8 +381,8 @@ Current framework contracts:
 - `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, and a single pending create/delete mutation.
 - Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the shared app-data root secret, unwrap any domain master key, or open protected payload generations.
 - The shared app-data root secret is stored in the Keychain as a v2 `CAPDSEV2` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key silently unwraps that envelope under the same app-session gate.
-- `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from wrapped-DMK records.
-- Protected domain files live under the inventory's protected app-data storage root; registry, bootstrap metadata, scratch writes, and wrapped-DMK files verify explicit file protection where available.
+- `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from Keychain-backed wrapped-DMK records.
+- Protected domain files live under the inventory's protected app-data storage root; registry, bootstrap metadata, scratch writes, and domain payload generations verify explicit file protection where available. Wrapped-DMK records live in Keychain staged/committed rows under `com.cypherair.v1.protected-data.domain-key.*`.
 - Relock clears the wrapping root key, unwrapped DMKs, and registered domain-local decrypted state. A relock participant failure latches runtime-only `restartRequired`.
 
 Current production domain families and their row-level payload classification are tracked in [PERSISTED_STATE_INVENTORY](PERSISTED_STATE_INVENTORY.md). At the technical-contract level, each production domain must open through the post-auth handoff, decode strictly, enter recovery instead of silently resetting unreadable committed state, and clear decrypted domain-local state on relock.

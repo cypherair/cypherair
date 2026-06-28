@@ -23,6 +23,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
     private(set) var lastSavedService: String?
     private(set) var lastDeletedService: String?
     private(set) var loadCalls: [(service: String, account: String, hasAuthenticationContext: Bool)] = []
+    private(set) var saveCalls: [(service: String, account: String, hasAccessControl: Bool)] = []
+    private(set) var updateCalls: [(service: String, account: String, hasAuthenticationContext: Bool)] = []
     private(set) var listItemsCalls: [(servicePrefix: String, account: String, hasAuthenticationContext: Bool)] = []
 
     /// If set, the next save operation will throw this error (one-shot).
@@ -69,6 +71,7 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
             throw MockKeychainError.saveFailed
         }
         lastSavedService = service
+        saveCalls.append((service: service, account: account, hasAccessControl: accessControl != nil))
         storage[key] = data
     }
 
@@ -90,6 +93,25 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
             throw MockKeychainError.itemNotFound
         }
         return data
+    }
+
+    func update(_ data: Data, service: String, account: String, authenticationContext: LAContext?) throws {
+        updateCalls.append(
+            (
+                service: service,
+                account: account,
+                hasAuthenticationContext: authenticationContext != nil
+            )
+        )
+        if let error = saveError {
+            saveError = nil
+            throw error
+        }
+        let key = storageKey(service: service, account: account)
+        guard storage[key] != nil else {
+            throw MockKeychainError.itemNotFound
+        }
+        storage[key] = data
     }
 
     func delete(service: String, account: String, authenticationContext: LAContext?) throws {
@@ -158,6 +180,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         lastSavedService = nil
         lastDeletedService = nil
         loadCalls.removeAll()
+        saveCalls.removeAll()
+        updateCalls.removeAll()
         listItemsCalls.removeAll()
     }
 }

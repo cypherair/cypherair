@@ -53,6 +53,57 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         XCTAssertFalse(FileManager.default.fileExists(atPath: storageRoot.registryURL.path))
     }
 
+    func test_registryBootstrap_missingRegistryWithKeychainDomainKeyArtifacts_entersFrameworkRecoveryNeeded() throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataKeychainArtifacts")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
+        try keychain.save(
+            Data("orphaned domain key".utf8),
+            service: KeychainConstants.protectedDataDomainKeyService(domainID: "contacts"),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        let store = ProtectedDataTestAppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.keychain-artifacts",
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
+        )
+
+        let result = try store.performSynchronousBootstrap()
+
+        XCTAssertEqual(result.bootstrapOutcome, .frameworkRecoveryNeeded)
+        XCTAssertEqual(result.frameworkState, .frameworkRecoveryNeeded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storageRoot.registryURL.path))
+    }
+
+    func test_registryBootstrap_missingRegistryWithKeychainInventoryFailure_entersFrameworkRecoveryNeeded() throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataKeychainInventoryFailure")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let store = ProtectedDataTestAppProtectedDataRegistryStore(
+            storageRoot: storageRoot,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.keychain-inventory-failure",
+            hasExternalProtectedDataArtifacts: {
+                throw MockKeychainError.itemNotFound
+            }
+        )
+
+        let result = try store.performSynchronousBootstrap()
+
+        XCTAssertEqual(result.bootstrapOutcome, .frameworkRecoveryNeeded)
+        XCTAssertEqual(result.frameworkState, .frameworkRecoveryNeeded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: storageRoot.registryURL.path))
+    }
+
     func test_registryBootstrap_loadedRegistry_preservesContinuePendingMutationDisposition() throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataPendingMutation")
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
@@ -233,6 +284,54 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         XCTAssertFalse(snapshot.events.contains("remove"))
     }
 
+    func test_firstDomainSharedRightCleaner_blocksWhenKeychainDomainKeyArtifactsRemain() async throws {
+        let baseDirectory = makeTemporaryDirectory("ProtectedDataFirstDomainCleanupKeychainArtifacts")
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+
+        let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
+        try keychain.save(
+            Data("staged domain key".utf8),
+            service: KeychainConstants.stagedProtectedDataDomainKeyService(domainID: "protected-settings"),
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        let rootSecretProbe = ProtectedDataRootSecretCleanupProbe(exists: true)
+        let cleaner = ProtectedDataFirstDomainSharedRightCleaner(
+            storageRoot: storageRoot,
+            hasPersistedSharedRight: { _ in rootSecretProbe.rootSecretExists() },
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            },
+            removePersistedSharedRight: { _ in rootSecretProbe.removeRootSecret() }
+        )
+        let registry = ProtectedDataRegistry(
+            formatVersion: ProtectedDataRegistry.currentFormatVersion,
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.first-domain-cleanup-keychain-artifacts",
+            sharedResourceLifecycleState: .absent,
+            committedMembership: [:],
+            pendingMutation: .createDomain(
+                targetDomainID: "protected-settings",
+                phase: .journaled
+            )
+        )
+
+        let outcome = try await cleaner.cleanupJournaledFirstDomainSharedRightIfSafe(
+            expectedDomainID: "protected-settings",
+            source: "unitTest",
+            loadCurrentRegistry: { registry }
+        )
+
+        let snapshot = rootSecretProbe.snapshot()
+        XCTAssertEqual(outcome, .blockedByArtifacts)
+        XCTAssertTrue(snapshot.exists)
+        XCTAssertFalse(snapshot.events.contains("remove"))
+    }
+
 
     func test_secondDomainDeletePreservesSharedRootUntilLastDomainIsRemoved() async throws {
         let baseDirectory = makeTemporaryDirectory("ProtectedDataSecondDomainDelete")
@@ -243,7 +342,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             storageRoot: storageRoot,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.second-domain-delete"
         )
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let wrappingRootKey = Data(repeating: 0xB4, count: 32)
         let sentinelStore = ProtectedDataTestAppProtectedDataFrameworkSentinelStore(
             storageRoot: storageRoot,
@@ -312,7 +411,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             storageRoot: storageRoot,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.abandon-create"
         )
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
@@ -416,7 +515,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -500,7 +599,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -599,7 +698,7 @@ final class ProtectedDataRegistryLifecycleTests: ProtectedDataFrameworkTestCase 
             storageRoot: storageRoot,
             sharedRightIdentifier: "com.cypherair.tests.protected-data.complete-delete"
         )
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
