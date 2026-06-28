@@ -390,15 +390,23 @@ Validation:
 ### PR 4: self-ECDH Cleanup
 
 Handle private-key self-ECDH cleanup as a linked but separate security phase.
+This Contacts SQLCipher reference does not specify the PR4 envelope structure,
+versioning, service names, row count, or compatibility strategy.
 
 Owned behavior:
 
 - replace the remaining private-key self-ECDH wrapping with a standard envelope
   using a software ephemeral P-256 private key and the persistent Secure Enclave
   public key
-- persist the public envelope inputs needed to reseal/open consistently, matching
-  the root-secret envelope pattern's explicit public-parameter binding
-- add new envelope/version/service names so old rows cannot be silently misread
+- persist the public, non-secret inputs needed to reopen sealed private-key
+  material and bind those inputs through HKDF/AAD or an equivalent authenticated
+  context
+- keep migration readers, compatibility open paths, legacy-format
+  classification, and special reset behavior out of scope because there is no
+  supported legacy self-ECDH local data to preserve
+- decide the exact persisted representation, version/domain-separation
+  constants, row count, and Keychain service names in the PR4 implementation
+  plan based on code and review evidence
 - preserve private-key material red lines, zeroization, and fail-closed recovery
 - update canonical docs and tests for the private-key security model
 
@@ -407,7 +415,8 @@ Validation:
 - positive and negative envelope tests
 - tamper and wrong-binding tests
 - guarded Secure Enclave device evidence where required
-- reset cleanup checks if Keychain rows or service names change
+- reset cleanup and postcondition checks for the final private-key bundle
+  storage shape chosen by PR4
 
 ## 6. Open Decisions For Implementation PRs
 
