@@ -154,6 +154,58 @@ struct SystemKeychain: KeychainManageable {
         }
     }
 
+    func update(_ data: Data, service: String, account: String, authenticationContext: LAContext?) throws {
+        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
+        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.update.start",
+            metadata: [
+                "serviceKind": serviceKind,
+                "accountKind": accountKind,
+                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
+            ]
+        )
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        if let authenticationContext {
+            query[kSecUseAuthenticationContext as String] = authenticationContext
+        }
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        traceStore?.record(
+            category: .operation,
+            name: "keychain.update.finish",
+            metadata: AuthTraceMetadata.statusMetadata(
+                status,
+                extra: ["serviceKind": serviceKind, "accountKind": accountKind]
+            )
+        )
+
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            throw KeychainError.itemNotFound
+        case errSecUserCanceled:
+            throw KeychainError.userCancelled
+        case errSecAuthFailed:
+            throw KeychainError.authenticationFailed
+        case errSecInteractionNotAllowed:
+            throw KeychainError.interactionNotAllowed
+        default:
+            throw KeychainError.unhandledError(status)
+        }
+    }
+
     func delete(service: String, account: String, authenticationContext: LAContext?) throws {
         let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
         let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)

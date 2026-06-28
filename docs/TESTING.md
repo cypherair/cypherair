@@ -170,13 +170,14 @@ Current ProtectedData unit-test expectations for the implemented AppData and Con
 - verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
 - verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
 - verify that onboarding, root tint/theme, guided tutorial entry/completion, Settings controls, and encrypt-to-self behavior consume `ProtectedOrdinarySettingsCoordinator` state rather than `AppConfiguration` or `ProtectedSettingsHost`
-- verify that Contacts creates an empty protected `contacts` domain after authorized unlock, treats corrupt or missing protected Contacts state as recovery, persists protected mutations across reopen, fails closed on unsupported Contacts schema versions by routing the domain to recovery, and clears Contacts runtime state on relock or framework reset
-- verify that Reset All Local Data deletes default-account CypherAir Keychain items plus app-owned Secure Enclave custody `kSecClassKey` rows, treats missing items as success, clears in-memory state, validates no remaining custody handles, and exposes only sanitized cleanup categories/counts on failure
+- verify that Contacts creates an empty protected `contacts` domain after authorized unlock, treats corrupt or missing protected Contacts state or wrapped-DMK Keychain rows as recovery, persists protected mutations across reopen, fails closed on unsupported Contacts schema versions by routing the domain to recovery, and clears Contacts runtime state on relock or framework reset
+- verify that ProtectedData domain-key custody writes staged and committed Keychain rows with the default account and no access control, validates staged rows before promotion, deletes stale staged rows, updates duplicate committed rows, ignores legacy file-backed wrapped-DMK artifacts, and fails closed for missing or corrupt committed rows
+- verify that Reset All Local Data deletes default-account CypherAir Keychain items, including staged and committed ProtectedData domain-key rows, plus app-owned Secure Enclave custody `kSecClassKey` rows; treats missing items as success; clears in-memory state; validates no remaining custody handles; and exposes only sanitized cleanup categories/counts on failure
 
 Current ProtectedData file-protection expectations:
 
 - verify that default and UI-test ProtectedData roots remain inside `Application Support`
-- verify that registry, bootstrap metadata, staged wrapped-DMK files, and committed wrapped-DMK files read back with explicit `NSFileProtectionComplete`
+- verify that registry, bootstrap metadata, scratch writes, and domain payload generations read back with explicit `NSFileProtectionComplete`
 - verify that protected-file promotion preserves explicit file protection on the committed path
 - verify that macOS ProtectedData bootstrap fails closed when the storage root is outside `Application Support` or when the volume-capability probe reports that file protection is unavailable
 - verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
@@ -585,6 +586,7 @@ Define a protocol that captures Keychain operations. Inject the real or mock imp
 protocol KeychainManageable {
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
     func load(service: String, account: String) throws -> Data
+    func update(_ data: Data, service: String, account: String) throws
     func delete(service: String, account: String) throws
 }
 

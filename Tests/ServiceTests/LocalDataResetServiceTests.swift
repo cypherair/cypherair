@@ -36,6 +36,20 @@ final class LocalDataResetServiceTests: XCTestCase {
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
+        let committedDomainKeyService = KeychainConstants.protectedDataDomainKeyService(domainID: "contacts")
+        let stagedDomainKeyService = KeychainConstants.stagedProtectedDataDomainKeyService(domainID: "contacts")
+        try container.keychain.save(
+            Data([0x07]),
+            service: committedDomainKeyService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
+        try container.keychain.save(
+            Data([0x08]),
+            service: stagedDomainKeyService,
+            account: KeychainConstants.defaultAccount,
+            accessControl: nil
+        )
 
         try container.protectedDataStorageRoot.ensureRootDirectoryExists()
         let protectedMarker = container.protectedDataStorageRoot.rootURL
@@ -50,7 +64,7 @@ final class LocalDataResetServiceTests: XCTestCase {
 
         let summary = try await container.localDataResetService.resetAllLocalData()
 
-        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 3)
+        XCTAssertGreaterThanOrEqual(summary.deletedKeychainItemCount, 5)
         XCTAssertFalse(container.keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertFalse(container.keychain.exists(
             service: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
@@ -58,6 +72,14 @@ final class LocalDataResetServiceTests: XCTestCase {
         ))
         XCTAssertFalse(container.keychain.exists(
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: committedDomainKeyService,
+            account: KeychainConstants.defaultAccount
+        ))
+        XCTAssertFalse(container.keychain.exists(
+            service: stagedDomainKeyService,
             account: KeychainConstants.defaultAccount
         ))
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
@@ -504,6 +526,10 @@ private final class ResidualProtectedResetRowKeychain: KeychainManageable {
 
     func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
         try base.load(service: service, account: account, authenticationContext: authenticationContext)
+    }
+
+    func update(_ data: Data, service: String, account: String, authenticationContext: LAContext?) throws {
+        try base.update(data, service: service, account: account, authenticationContext: authenticationContext)
     }
 
     func delete(service: String, account: String, authenticationContext: LAContext?) throws {

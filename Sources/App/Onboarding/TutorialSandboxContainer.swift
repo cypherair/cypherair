@@ -112,7 +112,8 @@ final class TutorialSandboxContainer {
         self.contactsWrappingRootKey = contactsWrappingRootKey
         let contactsDomainStore = try Self.makeContactsDomainStore(
             baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
-            wrappingRootKey: contactsWrappingRootKey
+            wrappingRootKey: contactsWrappingRootKey,
+            keychain: mockKeychain
         )
         self.contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
@@ -284,12 +285,20 @@ final class TutorialSandboxContainer {
 
     private static func makeContactsDomainStore(
         baseDirectory: URL,
-        wrappingRootKey: Data
+        wrappingRootKey: Data,
+        keychain: any KeychainManageable
     ) throws -> ContactsDomainStore {
         let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
+        let domainKeyManager = ProtectedDomainKeyManager(
+            storageRoot: storageRoot,
+            keychain: keychain
+        )
         let registryStore = ProtectedDataRegistryStore(
             storageRoot: storageRoot,
-            sharedRightIdentifier: "com.cypherair.tutorial.contacts.\(UUID().uuidString)"
+            sharedRightIdentifier: "com.cypherair.tutorial.contacts.\(UUID().uuidString)",
+            hasExternalProtectedDataArtifacts: {
+                try domainKeyManager.hasAnyPersistedDomainKeyRecord()
+            }
         )
         _ = try registryStore.performSynchronousBootstrap()
         var registry = try registryStore.loadRegistry()
@@ -303,7 +312,7 @@ final class TutorialSandboxContainer {
         return ContactsDomainStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
-            domainKeyManager: ProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: domainKeyManager,
             currentWrappingRootKey: { wrappingRootKey }
         )
     }

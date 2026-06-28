@@ -605,12 +605,7 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         try storageRoot.removeItemIfPresent(
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
         )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.stagedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
+        try domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: Self.domainID)
         try bootstrapStore.removeMetadata(for: Self.domainID)
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)
     }

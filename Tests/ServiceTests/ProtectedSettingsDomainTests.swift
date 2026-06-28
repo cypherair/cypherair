@@ -15,7 +15,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
             sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-reset-preflight"
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,
@@ -177,11 +177,11 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
             store: harness.store,
             domainKeyManager: harness.domainKeyManager
         )
-        try harness.storageRoot.writeProtectedData(
+        try harness.keychain.update(
             Data("not a plist wrapped DMK".utf8),
-            to: harness.storageRoot.committedWrappedDomainMasterKeyURL(
-                for: ProtectedSettingsStore.domainID
-            )
+            service: KeychainConstants.protectedDataDomainKeyService(domainID: ProtectedSettingsStore.domainID),
+            account: KeychainConstants.defaultAccount,
+            authenticationContext: nil
         )
 
         let reopenedStore = ProtectedSettingsStore(
@@ -193,6 +193,36 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
         do {
             _ = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
             XCTFail("Expected corrupt wrapped domain master key to fail closed.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertNil(reopenedStore.payload)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedSettingsStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
+    func test_protectedSettingsMissingWrappedDomainMasterKeyFailsClosedAndRequiresRecovery() async throws {
+        let harness = try makeProtectedSettingsHarness("ProtectedSettingsMissingWrappedDMK")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+
+        let wrappingRootKey = try await createProtectedSettingsDomain(
+            store: harness.store,
+            domainKeyManager: harness.domainKeyManager
+        )
+        try harness.domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: ProtectedSettingsStore.domainID)
+
+        let reopenedStore = ProtectedSettingsStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { wrappingRootKey }
+        )
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
+            XCTFail("Expected missing wrapped domain master key to fail closed.")
         } catch {
         }
 
@@ -269,7 +299,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
             sharedRightIdentifier: "com.cypherair.tests.protected-data.settings-reset-with-key"
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
             registryStore: registryStore,

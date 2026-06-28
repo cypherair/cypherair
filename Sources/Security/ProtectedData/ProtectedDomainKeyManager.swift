@@ -32,10 +32,18 @@ struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
 
 final class ProtectedDomainKeyManager {
     private let storageRoot: ProtectedDataStorageRoot
+    private let keychain: any KeychainManageable
+    private let account: String
     private var unlockedDomainMasterKeys: [ProtectedDataDomainID: Data] = [:]
 
-    init(storageRoot: ProtectedDataStorageRoot) {
+    init(
+        storageRoot: ProtectedDataStorageRoot,
+        keychain: any KeychainManageable = SystemKeychain(),
+        account: String = KeychainConstants.defaultAccount
+    ) {
         self.storageRoot = storageRoot
+        self.keychain = keychain
+        self.account = account
     }
 
     func deriveWrappingRootKey(from rawSecretData: inout Data) throws -> Data {
@@ -140,35 +148,77 @@ final class ProtectedDomainKeyManager {
         wrappingRootKey: Data
     ) throws {
         try storageRoot.validatePersistentStorageContract()
-        try storageRoot.ensureDomainDirectoryExists(for: record.domainID)
-
         let encoder = PropertyListEncoder()
         encoder.outputFormat = .binary
         let data = try encoder.encode(record)
-        let stagedURL = storageRoot.stagedWrappedDomainMasterKeyURL(for: record.domainID)
-        let committedURL = storageRoot.committedWrappedDomainMasterKeyURL(for: record.domainID)
+        let stagedService = KeychainConstants.stagedProtectedDataDomainKeyService(domainID: record.domainID)
+        let committedService = KeychainConstants.protectedDataDomainKeyService(domainID: record.domainID)
 
-        try storageRoot.writeProtectedData(data, to: stagedURL)
+        try deleteKeychainRowIfPresent(service: stagedService)
+        try keychain.save(
+            data,
+            service: stagedService,
+            account: account,
+            accessControl: nil
+        )
 
-        let stagedData = try storageRoot.readManagedData(at: stagedURL)
+        let stagedData = try keychain.load(
+            service: stagedService,
+            account: account,
+            authenticationContext: nil
+        )
         let decoded = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: stagedData)
         var validatedDomainMasterKey = try unwrapDomainMasterKey(from: decoded, wrappingRootKey: wrappingRootKey)
         validatedDomainMasterKey.protectedDataZeroize()
 
-        try storageRoot.promoteStagedFile(from: stagedURL, to: committedURL)
+        try saveOrUpdateKeychainRow(
+            stagedData,
+            service: committedService
+        )
+        try keychain.delete(
+            service: stagedService,
+            account: account,
+            authenticationContext: nil
+        )
     }
 
     func loadWrappedDomainMasterKeyRecord(for domainID: ProtectedDataDomainID) throws -> WrappedDomainMasterKeyRecord? {
         try storageRoot.validatePersistentStorageContract()
-        let url = storageRoot.committedWrappedDomainMasterKeyURL(for: domainID)
-        guard try storageRoot.managedItemExists(at: url) else {
+        let service = KeychainConstants.protectedDataDomainKeyService(domainID: domainID)
+        let data: Data
+        do {
+            data = try keychain.load(
+                service: service,
+                account: account,
+                authenticationContext: nil
+            )
+        } catch where KeychainFailureClassifier.isItemNotFound(error) {
             return nil
+        } catch {
+            throw error
         }
 
-        let data = try storageRoot.readManagedData(at: url)
         let record = try PropertyListDecoder().decode(WrappedDomainMasterKeyRecord.self, from: data)
         try record.validateContract()
         return record
+    }
+
+    func deleteWrappedDomainMasterKeyRecords(for domainID: ProtectedDataDomainID) throws {
+        try storageRoot.validatePersistentStorageContract()
+        try deleteKeychainRowIfPresent(
+            service: KeychainConstants.stagedProtectedDataDomainKeyService(domainID: domainID)
+        )
+        try deleteKeychainRowIfPresent(
+            service: KeychainConstants.protectedDataDomainKeyService(domainID: domainID)
+        )
+    }
+
+    func hasAnyPersistedDomainKeyRecord() throws -> Bool {
+        try !keychain.listItems(
+            servicePrefix: KeychainConstants.protectedDataDomainKeyServicePrefix,
+            account: account,
+            authenticationContext: nil
+        ).isEmpty
     }
 
     func cacheUnlockedDomainMasterKey(_ domainMasterKey: Data, for domainID: ProtectedDataDomainID) {
@@ -206,6 +256,36 @@ final class ProtectedDomainKeyManager {
         }
 
         return data
+    }
+
+    private func saveOrUpdateKeychainRow(_ data: Data, service: String) throws {
+        do {
+            try keychain.save(
+                data,
+                service: service,
+                account: account,
+                accessControl: nil
+            )
+        } catch where KeychainFailureClassifier.isDuplicateItem(error) {
+            try keychain.update(
+                data,
+                service: service,
+                account: account,
+                authenticationContext: nil
+            )
+        }
+    }
+
+    private func deleteKeychainRowIfPresent(service: String) throws {
+        do {
+            try keychain.delete(
+                service: service,
+                account: account,
+                authenticationContext: nil
+            )
+        } catch where KeychainFailureClassifier.isItemNotFound(error) {
+            return
+        }
     }
 
     private func wrappedDMKKeyInfo(domainID: ProtectedDataDomainID) throws -> Data {

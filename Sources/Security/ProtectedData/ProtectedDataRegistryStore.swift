@@ -14,16 +14,19 @@ private actor ProtectedDataRegistryMutationGate {
 final class ProtectedDataRegistryStore: @unchecked Sendable {
     private let storageRoot: ProtectedDataStorageRoot
     private let sharedRightIdentifier: String
+    private let hasExternalProtectedDataArtifacts: () throws -> Bool
     private let traceStore: AuthLifecycleTraceStore?
     private let mutationGate = ProtectedDataRegistryMutationGate()
 
     init(
         storageRoot: ProtectedDataStorageRoot,
         sharedRightIdentifier: String,
+        hasExternalProtectedDataArtifacts: @escaping () throws -> Bool = { false },
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.storageRoot = storageRoot
         self.sharedRightIdentifier = sharedRightIdentifier
+        self.hasExternalProtectedDataArtifacts = hasExternalProtectedDataArtifacts
         self.traceStore = traceStore
     }
 
@@ -75,7 +78,15 @@ final class ProtectedDataRegistryStore: @unchecked Sendable {
             )
         }
 
-        if try storageRoot.hasProtectedDataArtifactsExcludingRegistry() {
+        let hasExternalArtifacts: Bool
+        do {
+            hasExternalArtifacts = try hasExternalProtectedDataArtifacts()
+        } catch {
+            hasExternalArtifacts = true
+        }
+
+        if try storageRoot.hasProtectedDataArtifactsExcludingRegistry()
+            || hasExternalArtifacts {
             return ProtectedDataRegistryBootstrapResult(
                 bootstrapOutcome: .frameworkRecoveryNeeded,
                 frameworkState: .frameworkRecoveryNeeded,

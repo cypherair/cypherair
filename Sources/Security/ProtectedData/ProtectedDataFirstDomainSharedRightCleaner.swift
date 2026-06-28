@@ -10,6 +10,7 @@ enum ProtectedDataFirstDomainSharedRightCleanupOutcome: Equatable, Sendable {
 struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
     private let storageRoot: ProtectedDataStorageRoot
     private let hasPersistedSharedRight: @Sendable (_ identifier: String) -> Bool
+    private let hasExternalProtectedDataArtifacts: () throws -> Bool
     // The actual root-secret deletion must happen before this closure's first suspension point.
     // Delaying deletion past an await would reopen the first-domain cleanup race.
     private let removePersistedSharedRight: @Sendable (_ identifier: String) async throws -> Void
@@ -18,11 +19,13 @@ struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
     init(
         storageRoot: ProtectedDataStorageRoot,
         hasPersistedSharedRight: @escaping @Sendable (_ identifier: String) -> Bool,
+        hasExternalProtectedDataArtifacts: @escaping () throws -> Bool = { false },
         removePersistedSharedRight: @escaping @Sendable (_ identifier: String) async throws -> Void,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.storageRoot = storageRoot
         self.hasPersistedSharedRight = hasPersistedSharedRight
+        self.hasExternalProtectedDataArtifacts = hasExternalProtectedDataArtifacts
         self.removePersistedSharedRight = removePersistedSharedRight
         self.traceStore = traceStore
     }
@@ -48,7 +51,8 @@ struct ProtectedDataFirstDomainSharedRightCleaner: @unchecked Sendable {
             return .noSharedRightPresent
         }
 
-        guard try !storageRoot.hasProtectedDataArtifactsExcludingRegistry() else {
+        guard try !storageRoot.hasProtectedDataArtifactsExcludingRegistry(),
+              try !hasExternalProtectedDataArtifacts() else {
             traceFinish(.blockedByArtifacts, source: source)
             return .blockedByArtifacts
         }

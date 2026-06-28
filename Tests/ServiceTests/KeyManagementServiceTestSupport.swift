@@ -719,7 +719,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             sharedRightIdentifier: sharedRightIdentifier
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let defaultsSuiteName = "com.cypherair.tests.key-metadata-provisioning.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)

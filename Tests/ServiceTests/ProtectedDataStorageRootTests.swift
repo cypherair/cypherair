@@ -113,16 +113,16 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         try assertCompleteFileProtection(at: storageRoot.bootstrapMetadataURL(for: "settings"))
     }
 
-    func test_wrappedDMKStagedWriteAndPromotion_keepCompleteFileProtection() throws {
-        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataWrappedDMK")
+    func test_domainEnvelopeStagedWriteAndPromotion_keepCompleteFileProtection() throws {
+        let baseDirectory = try makeApplicationSupportTestDirectory("ProtectedDataDomainEnvelope")
         defer { try? fileManager.removeItem(at: baseDirectory) }
 
         let storageRoot = makeProductionStorageRoot(baseDirectory: baseDirectory)
         let domainID: ProtectedDataDomainID = "settings"
-        let stagedURL = storageRoot.stagedWrappedDomainMasterKeyURL(for: domainID)
-        let committedURL = storageRoot.committedWrappedDomainMasterKeyURL(for: domainID)
+        let stagedURL = storageRoot.domainEnvelopeURL(for: domainID, slot: .pending)
+        let committedURL = storageRoot.domainEnvelopeURL(for: domainID, slot: .current)
 
-        try storageRoot.writeProtectedData(Data("wrapped-dmk".utf8), to: stagedURL)
+        try storageRoot.writeProtectedData(Data("domain-envelope".utf8), to: stagedURL)
         try assertCompleteFileProtection(at: stagedURL)
 
         try storageRoot.promoteStagedFile(from: stagedURL, to: committedURL)

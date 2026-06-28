@@ -6,6 +6,7 @@ class ContactServiceTestCase: XCTestCase {
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
+        keychain: MockKeychain,
         wrappingRootKey: Data,
         store: ContactsDomainStore
     )
@@ -38,10 +39,7 @@ class ContactServiceTestCase: XCTestCase {
         let fileManager = FileManager.default
         let urls = ProtectedDomainGenerationSlot.allCases.map {
             storageRoot.domainEnvelopeURL(for: ContactsDomainStore.domainID, slot: $0)
-        } + [
-            storageRoot.committedWrappedDomainMasterKeyURL(for: ContactsDomainStore.domainID),
-            storageRoot.stagedWrappedDomainMasterKeyURL(for: ContactsDomainStore.domainID)
-        ]
+        }
         return urls.contains { fileManager.fileExists(atPath: $0.path) }
     }
 
@@ -251,7 +249,8 @@ class ContactServiceTestCase: XCTestCase {
         registry.committedMembership = [ProtectedSettingsStore.domainID: .active]
         try registryStore.saveRegistry(registry)
 
-        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keychain = MockKeychain()
+        let domainKeyManager = ProtectedDomainKeyManager(storageRoot: storageRoot, keychain: keychain)
         let wrappingRootKey = Data(repeating: 0xA4, count: 32)
         let store = ContactsDomainStore(
             storageRoot: storageRoot,
@@ -264,6 +263,7 @@ class ContactServiceTestCase: XCTestCase {
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
+            keychain: keychain,
             wrappingRootKey: wrappingRootKey,
             store: store
         )

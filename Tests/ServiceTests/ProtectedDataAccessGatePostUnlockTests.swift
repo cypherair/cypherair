@@ -121,7 +121,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_emptySteadyState_returnsNoProtectedDomainPresent() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessEmpty"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
@@ -147,7 +147,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_continuePendingMutation_returnsPendingMutationRecoveryRequired() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessPending"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
@@ -177,7 +177,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_readyRegistryWithoutAuthorization_requiresAuthorization() throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessAuth"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
@@ -209,7 +209,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_readyRegistryWithAuthorizedSession_returnsAlreadyAuthorized() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessAlreadyAuthorized"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xAD, count: 32), identifier: "com.cypherair.tests.protected-data.gate.reuse")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -248,7 +248,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_readyRegistryWithLatchedFrameworkRecovery_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessFrameworkRecovery"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
@@ -285,7 +285,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
 
     func test_accessGate_readyRegistryWithRestartRequired_returnsFrameworkRecoveryNeeded() async throws {
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataAccessRestartRequired"))
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xB0, count: 32), identifier: "com.cypherair.tests.protected-data.gate.restart-required")
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -329,7 +329,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: makeTemporaryDirectory("ProtectedDataPostUnlockOpen"))
         defer { try? FileManager.default.removeItem(at: storageRoot.rootURL.deletingLastPathComponent()) }
 
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         rightStoreClient.seedRootSecret(Data(repeating: 0xCA, count: 32), identifier: "com.cypherair.tests.protected-data.post-unlock.open")
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
@@ -382,7 +382,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.no-context"
         )
         let coordinator = ProtectedDataTestAppProtectedDataPostUnlockCoordinator(
@@ -417,7 +417,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.pending"
         )
         let registry = ProtectedDataRegistry(
@@ -471,7 +471,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         rootSecretStore.loadError = .interactionNotAllowed
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
-            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: sharedRightIdentifier
         )
         let registry = ProtectedDataRegistry(
@@ -521,7 +521,7 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
             sharedRightIdentifier: sharedRightIdentifier
         )
         _ = try registryStore.performSynchronousBootstrap()
-        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let domainKeyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rootSecretStore = RecordingProtectedDataRootSecretStore()
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,

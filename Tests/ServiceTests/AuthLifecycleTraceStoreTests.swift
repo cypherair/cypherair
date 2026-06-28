@@ -1173,7 +1173,7 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         )
         let coordinator = TraceProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
-            domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot),
+            domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: "com.cypherair.tests.trace.root-secret",
             traceStore: traceStore
         )

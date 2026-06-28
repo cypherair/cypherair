@@ -17,7 +17,7 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(
             baseDirectory: makeTemporaryDirectory("OrchestratorCustody")
         )
-        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot)
+        let keyManager = ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain())
         let rightStoreClient = RecordingProtectedDataRootSecretStore()
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
