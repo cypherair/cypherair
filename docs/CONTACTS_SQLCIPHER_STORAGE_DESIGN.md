@@ -314,8 +314,8 @@ Add this implementation reference and, at most, a neutral cross-link from
 change canonical current-state docs to say Contacts has migrated.
 
 Align runtime and artifact SQLCipher preflight probes with raw-key syntax so the
-project does not keep direct 32-byte `sqlite3_key` examples that would exercise
-SQLCipher's passphrase/KDF path.
+project does not keep examples that pass binary key material to `sqlite3_key`
+and exercise SQLCipher's passphrase/KDF path.
 
 Validation:
 

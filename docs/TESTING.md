@@ -316,8 +316,9 @@ The restore script reads `third_party/sqlcipher-xcframework.pin.json`, rejects
 `latest` and non-stable pins, verifies the pinned zip checksum before
 extraction, validates immutable release metadata, upstream SQLCipher `v4.16.0`
 source commit `e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc`, expected slices,
-headers, modulemap, crypto-provider flags, privacy manifest, and macOS smoke
-behavior.
+headers, modulemap, crypto-provider flags, privacy manifest, and macOS raw-key
+smoke behavior through `sqlite3_key_v2` with good-key read/write plus wrong-key
+rejection.
 The app target consumes a static framework-shaped `SQLCipher.xcframework`
 through the normal Frameworks build phase. The artifact keeps each module map
 inside `SQLCipher.framework/Modules`, so the app project does not carry
