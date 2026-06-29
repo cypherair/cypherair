@@ -196,8 +196,8 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `KeychainManager` | CRUD for Keychain items (private-key envelope rows and ProtectedData support rows), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and post-unlock auth-mode crash recovery |
 | `PrivateKeyModeSwitchAuthenticator` | Current-mode authentication gate for private-key mode switching before any rewrap journal or Keychain mutation |
-| `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending bundle creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
-| `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain bundle state and protected `private-key-control` journal state |
+| `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending envelope-row creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
+| `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain envelope-row state and protected `private-key-control` journal state |
 | `ProtectedDataSessionCoordinator` | ProtectedData session state owner for authenticated root-secret access, wrapping-root-key derivation, relock, secret clearing, and `restartRequired` latching for protected app-data domains |
 | `Sources/Security/Mocks/` | Temporary SR-FIX-18 tutorial/UI-test mock boundary. Mock implementations kept here must remain visibly named `Mock*`; production ProtectedData files must not embed mock implementations. |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, Keychain-backed staged/committed wrapped-DMK record storage, and unlocked-domain-key zeroization |
@@ -208,7 +208,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `SecureEnclaveCustodyGenerationRecoveryService` | Custody recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories consumed at key load and by the key-detail degraded-availability row. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
-| `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
+| `KeyBundleStore` | Shared storage helper for single-row private-key envelopes (permanent/pending namespaces, rollback, replace-from-pending semantics) |
 | `KeyMetadataDomainStore` | ProtectedData `key-metadata` schema v2 domain for `PGPKeyIdentity` payloads opened after app privacy authentication |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |

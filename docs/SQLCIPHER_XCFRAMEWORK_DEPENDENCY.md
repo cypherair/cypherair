@@ -165,5 +165,5 @@ connection cleanup, reset cleanup for DB sidecars and obsolete ProtectedData
 artifacts, and fail-closed recovery for corrupt, missing, mismatched key,
 schema, config, or integrity state.
 
-Self-ECDH cleanup remains separate issue #540 follow-up work and is not part of
-the SQLCipher dependency contract.
+Private-key wrapping cleanup remains separate issue #540 follow-up work and is
+not part of the SQLCipher dependency contract.

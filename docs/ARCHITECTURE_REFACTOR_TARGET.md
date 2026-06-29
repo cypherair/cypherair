@@ -139,7 +139,7 @@ Generated types such as `PgpEngine`, `PgpError`, `KeyInfo`, `SignatureVerificati
 Security owns hardware-backed and protected-data behavior. It is the authority for:
 
 - Secure Enclave wrapping and unwrapping
-- Keychain bundle storage and access-control flags
+- Keychain private-key envelope storage and access-control flags
 - authentication mode evaluation and mode switching
 - ProtectedData root-secret, domain-key, registry, recovery, relock, and post-unlock lifecycle
 - sensitive-buffer zeroization and secret lifetime

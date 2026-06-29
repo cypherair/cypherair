@@ -303,7 +303,7 @@ The stored envelope is decoded and validated, then reconstructing the SE key fro
 | Standard (default) | `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]` | Face ID / Touch ID with passcode fallback. Equivalent to `deviceOwnerAuthentication`. |
 | High Security | `[.privateKeyUsage, .biometryAny]` | Face ID / Touch ID only. No passcode fallback. If biometrics unavailable, private key is inaccessible. |
 
-**Mode switching:** Changing the authentication mode re-wraps all SE-protected private keys with the new access control flags under a single authentication, atomically — original keys stay intact until the complete new bundle is verified, and crash recovery uses the post-unlock `private-key-control.recoveryJournal`. Authoritative procedure, atomicity ordering, and recovery rules: [SECURITY.md](SECURITY.md) Section 4.
+**Mode switching:** Changing the authentication mode re-wraps all SE-protected private keys with the new access control flags under a single authentication, atomically — original keys stay intact until the complete pending envelope row is verified, and crash recovery uses the post-unlock `private-key-control.recoveryJournal`. Authoritative procedure, atomicity ordering, and recovery rules: [SECURITY.md](SECURITY.md) Section 4.
 
 ### 3.5 Keychain Layout
 
