@@ -16,7 +16,7 @@
 > Last reviewed: 2026-06-28.
 > Update triggers: Contacts SQLCipher storage path, ProtectedData wrapped-DMK
 > custody, Keychain record naming, schema versioning, SQLCipher configuration,
-> post-unlock, relock, reset, recovery, self-ECDH cleanup, or PR slicing changes.
+> post-unlock, relock, reset, recovery, private-key wrapping cleanup, or PR slicing changes.
 
 ## 1. Scope And Current Status
 
@@ -28,16 +28,15 @@ GitHub issue #540 tracks two related storage/security changes:
   snapshot-envelope payload to SQLCipher-backed storage while preserving
   security properties no weaker than the current ProtectedData design
 
-The issue also tracks the related cleanup to replace the remaining private-key
-self-ECDH wrapping design with a standard Secure Enclave public-key ECDH
-envelope pattern.
+The issue also tracks the related cleanup to modernize the remaining private-key
+wrapping design to the standard Secure Enclave public-key ECDH envelope pattern.
 
 [PR #542](https://github.com/cypherair/cypherair/pull/542) and
 [PR #544](https://github.com/cypherair/cypherair/pull/544) are already
 dependency groundwork: the app consumes the pinned `SQLCipher.xcframework`,
 validates the artifact, and records the formal external dependency. They do not
 implement Keychain-backed ProtectedData wrapped-DMK storage, Contacts SQLCipher
-storage, reset/relock business logic, or self-ECDH cleanup.
+storage, reset/relock business logic, or private-key wrapping cleanup.
 
 This document is not an issue copy and is not a canonical current-state
 document. The issue remains the tracker for implementation progress. Canonical
@@ -60,7 +59,7 @@ Repository sources that constrain this design:
   persisted-state classification and currently records Contacts as a protected
   `ContactsDomainSnapshot` payload under `Application Support/ProtectedData/contacts/`.
 - [Security](SECURITY.md) and [TDD](TDD.md) define ProtectedData root-secret,
-  Secure Enclave device-binding, relock, recovery, and self-ECDH constraints.
+  Secure Enclave device-binding, relock, recovery, and private-key wrapping constraints.
 - `ContactService`, `ContactSnapshotMutator`, and `ContactsSearchIndex` are the
   behavior surface to preserve while the persistence layer changes underneath.
 - `SQLCipherPreflightProbe` proves the current artifact can be opened through
@@ -155,7 +154,7 @@ not a new Contacts crypto envelope. The wrapped record should keep the existing
 ProtectedData root-secret / Secure Enclave device-binding authority and
 domain-bound AAD contract unless a later security review explicitly revises the
 generic ProtectedData wrapping format. It must not reuse or reinterpret
-private-key bundle rows.
+private-key envelope rows.
 
 Writes must preserve the current staged/committed semantics: write and validate
 the staged Keychain row before committing registry membership or replacing the
@@ -387,15 +386,15 @@ Validation:
   [Security](SECURITY.md), [Architecture](ARCHITECTURE.md), [TDD](TDD.md),
   [Testing](TESTING.md), and [Code Review](CODE_REVIEW.md)
 
-### PR 4: self-ECDH Cleanup
+### PR 4: Private-Key Wrapping Cleanup
 
-Handle private-key self-ECDH cleanup as a linked but separate security phase.
+Handle private-key wrapping cleanup as a linked but separate security phase.
 This Contacts SQLCipher reference does not specify the PR4 envelope structure,
 versioning, service names, row count, or compatibility strategy.
 
 Owned behavior:
 
-- replace the remaining private-key self-ECDH wrapping with a standard envelope
+- replace the remaining private-key wrapping with a standard envelope
   using a software ephemeral P-256 private key and the persistent Secure Enclave
   public key
 - persist the public, non-secret inputs needed to reopen sealed private-key
@@ -403,7 +402,7 @@ Owned behavior:
   context
 - keep migration readers, compatibility open paths, legacy-format
   classification, and special reset behavior out of scope because there is no
-  supported legacy self-ECDH local data to preserve
+  supported legacy private-key wrapping local data to preserve
 - decide the exact persisted representation, version/domain-separation
   constants, row count, and Keychain service names in the PR4 implementation
   plan based on code and review evidence
@@ -415,7 +414,7 @@ Validation:
 - positive and negative envelope tests
 - tamper and wrong-binding tests
 - guarded Secure Enclave device evidence where required
-- reset cleanup and postcondition checks for the final private-key bundle
+- reset cleanup and postcondition checks for the final private-key envelope
   storage shape chosen by PR4
 
 ## 6. Open Decisions For Implementation PRs
@@ -449,5 +448,5 @@ Stop and return to design review if a future implementation:
   private-key blobs, or access-control policy in Contacts
 - changes the SQLCipher dependency pin or release model as part of Contacts
   cutover without a separate dependency plan
-- combines the Contacts cutover and self-ECDH cleanup into one large security PR
+- combines the Contacts cutover and private-key wrapping cleanup into one large security PR
   without explicit human approval

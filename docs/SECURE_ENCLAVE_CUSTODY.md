@@ -82,8 +82,8 @@ Persisted state: protected `key-metadata` schema v2 stores only the non-secret
 certificate/handle association, operation-availability projection, revocation
 presence, non-exportability) and never the access-control policy, handle
 locators, or secret material. The signing and key-agreement handles live in the
-data-protection Keychain/Secure Enclave boundary, separate from the legacy
-`se-key`/`salt`/`sealed-key` software bundle. Classification is owned by
+data-protection Keychain/Secure Enclave boundary, separate from the retired
+multi-row software-custody wrapping scheme. Classification is owned by
 [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md).
 
 ## 3. Security contract

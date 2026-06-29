@@ -326,7 +326,7 @@ com.cypherair.v1.pending-privkey-envelope.<fingerprint>
 
 ProtectedData uses this device-binding key only to open the app-data
 root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
-It is not part of the private-key bundle model and must fail closed if missing.
+It is not part of the private-key envelope model and must fail closed if missing.
 
 ### 3.6 Security Properties
 
@@ -402,7 +402,7 @@ Migration and exception rules:
 
 - `private-key-control` settings and recovery-journal state are created and mutated only inside the protected payload.
 - Key metadata persists only in the protected `key-metadata` domain.
-- Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
+- Permanent and pending private-key envelope rows remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
 - Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.

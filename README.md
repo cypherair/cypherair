@@ -88,7 +88,7 @@ CypherAir-Info.plist  # Root-level app Info.plist source
 The current app structure keeps maintainability and safety work behind stable user-facing cryptographic behavior:
 
 - **Shared recovery infrastructure** — Secure Enclave / Keychain migration and crash-recovery logic now runs through shared transaction helpers instead of being duplicated across services.
-- **Safer recovery semantics** — Crash recovery now explicitly prefers complete bundles over partial ones, distinguishes retryable vs unrecoverable recovery failures, and feeds generic startup diagnostics into the existing warning surface.
+- **Safer recovery semantics** — Crash recovery now explicitly prefers authoritative envelope rows over stale pending rows, distinguishes retryable vs unrecoverable recovery failures, and feeds generic startup diagnostics into the existing warning surface.
 - **Shared operation controllers** — Encrypt, decrypt, sign, and verify flows now reuse common helpers for security-scoped file access, export, cancellation, progress, and clipboard behavior.
 - **Cleaner startup wiring** — App dependency construction and startup recovery live in a dedicated container/coordinator instead of the app entry point.
 - **Shared identity presentation helpers** — Fingerprint formatting and accessibility labels are defined once and reused across the UI.
