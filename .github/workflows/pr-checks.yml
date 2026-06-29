@@ -158,6 +158,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
+      # GitHub-hosted runners do not carry CypherAir signing material; these
+      # generic probes are unsigned compile/link checks. Local and Xcode Cloud
+      # app validation use signing and must not copy CODE_SIGNING_ALLOWED=NO.
       - name: Probe iOS build
         if: steps.platform_preflight.outputs.ready == 'true'
         run: |

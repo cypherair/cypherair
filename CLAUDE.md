@@ -61,8 +61,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
 
 # Run the native visionOS build probe (there is no dedicated visionOS test plan)
 xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS' \
-    CODE_SIGNING_ALLOWED=NO
+    -destination 'generic/platform=visionOS'
 ```
 
 Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. The pinned `ARM64E_STAGE1_RELEASE_TAG` value is owned by docs/ARM64E_STATUS.md and rotates with each stage1 re-pin.

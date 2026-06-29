@@ -148,8 +148,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
 
 # 5. Probe the native visionOS app build
 xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS' \
-    CODE_SIGNING_ALLOWED=NO
+    -destination 'generic/platform=visionOS'
 ```
 
 For Secure Enclave, biometrics, and MIE coverage on hardware:
