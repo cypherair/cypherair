@@ -59,9 +59,15 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
 
-# Run device-only tests (Secure Enclave, biometrics, MIE).
+# Run device-only tests (Secure Enclave, biometrics, MIE). These need a real
+# Secure Enclave, not a specific iPhone: an Apple Silicon Mac runs the whole lane
+# locally (the `platform=macOS` host has a Secure Enclave), and so does a physical
+# iPhone/iPad. Only the iOS Simulator cannot run them. Biometric steps use Touch ID
+# / the system auth prompt; biometric-gated tests skip when no biometric is enrolled.
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
-    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
+    -destination 'platform=macOS,arch=arm64e'          # Apple Silicon Mac (full lane, local)
+# or a physical iOS device:
+#   -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
 
 # Run targeted macOS UI smoke coverage.
 xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \

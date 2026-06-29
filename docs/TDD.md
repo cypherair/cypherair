@@ -290,11 +290,11 @@ SE supports P-256 only. Ed25519/X25519/Ed448/X448 keys all require indirect wrap
 
 ### 3.2 Wrapping Flow
 
-Self-ECDH inside the SE (the P-256 key agreement against its own public key) feeds HKDF-SHA256 with a random salt and the info string `"CypherAir-SE-Wrap-v1:" + hexFingerprint` to derive an AES-256 key, which seals the raw private key bytes via AES-GCM. The SE key `dataRepresentation`, salt, and sealed box are stored as three Keychain items; the raw key bytes and symmetric key are zeroized only after all three writes are confirmed. Authoritative step-by-step flow, info-string warning, and ordering rationale: [SECURITY.md](SECURITY.md) Section 3.
+An ephemeral-static ECDH (a fresh software-ephemeral P-256 key agreed against the persistent per-key SE public key) feeds HKDF-SHA256 with a random salt and a domain-separated `sharedInfo` to derive an AES-256 key, which seals the raw private key bytes via AES-GCM whose AAD binds every public parameter (fingerprint, SE key blob, both public keys, plaintext length). The result is a single self-contained `CAPKEV1` envelope (`PrivateKeyEnvelope`) — SE key `dataRepresentation`, ephemeral public key, salt, nonce, ciphertext, and tag — stored as one Keychain row; the raw key bytes are zeroized only after the write is confirmed. Authoritative step-by-step flow, binding details, and ordering rationale: [SECURITY.md](SECURITY.md) Section 3.
 
 ### 3.3 Unwrapping Flow
 
-Reconstructing the SE key from its `dataRepresentation` triggers device authentication (per auth mode); the symmetric key is re-derived (self-ECDH inside the SE plus HKDF with the stored salt and same info string), and the sealed box opens to raw private key bytes that are zeroized immediately after the PGP operation completes. Full flow and security analysis: [SECURITY.md](SECURITY.md) Section 3.
+The stored envelope is decoded and validated, then reconstructing the SE key from its `dataRepresentation` triggers device authentication (per auth mode); after a fail-closed bound-public-key check, the symmetric key is re-derived from `ECDH(SE private × envelope ephemeral public)` plus HKDF with the stored salt and the same binding, and the AAD-checked AES-GCM open yields raw private key bytes that are zeroized immediately after the PGP operation completes. Full flow and security analysis: [SECURITY.md](SECURITY.md) Section 3.
 
 ### 3.4 Access Control (Dual Mode)
 
@@ -307,11 +307,10 @@ Reconstructing the SE key from its `dataRepresentation` triggers device authenti
 
 ### 3.5 Keychain Layout
 
-Per identity (fingerprint = lowercase hex, no spaces):
+Per identity (fingerprint = lowercase hex, no spaces) — one self-contained envelope row, plus a transient pending row during mode-switch / modify-expiry:
 ```
-com.cypherair.v1.se-key.<fingerprint>
-com.cypherair.v1.salt.<fingerprint>
-com.cypherair.v1.sealed-key.<fingerprint>
+com.cypherair.v1.privkey-envelope.<fingerprint>
+com.cypherair.v1.pending-privkey-envelope.<fingerprint>
 ```
 
 **Keychain item configuration:**

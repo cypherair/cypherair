@@ -22,14 +22,14 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
-    func test_recoveryAction_permanentCompleteAndPendingPartial_returnsDeletePending() throws {
+    // The single-row envelope makes intra-bundle `.partial` states impossible: a row is
+    // atomically present (`.complete`) or absent (`.missing`). These tests therefore cover
+    // the reachable `(permanent, pending)` state space; the coordinator keeps its `.partial`
+    // arms as fail-closed dead-defense.
+
+    func test_recoveryAction_permanentCompleteAndPendingComplete_returnsDeletePending() throws {
         try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint)
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
 
         XCTAssertEqual(
             migrationCoordinator.recoveryAction(for: fingerprint),
@@ -37,35 +37,25 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         )
     }
 
-    func test_recoveryAction_partialPermanentAndCompletePending_returnsReplacePermanent() throws {
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
+    func test_recoveryAction_permanentCompleteAndPendingMissing_returnsNone() throws {
+        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint)
+
+        XCTAssertEqual(
+            migrationCoordinator.recoveryAction(for: fingerprint),
+            .none
         )
+    }
+
+    func test_recoveryAction_permanentMissingAndPendingComplete_returnsPromotePending() throws {
         try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
 
         XCTAssertEqual(
             migrationCoordinator.recoveryAction(for: fingerprint),
-            .replacePermanentWithPending
+            .promotePending
         )
     }
 
-    func test_recoveryAction_withoutCompleteBundle_returnsUnrecoverable() throws {
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try keychain.save(
-            Data([0xBB]),
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-
+    func test_recoveryAction_withoutCompleteBundle_returnsUnrecoverable() {
         XCTAssertEqual(
             migrationCoordinator.recoveryAction(for: fingerprint),
             .unrecoverable
@@ -88,21 +78,16 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         )
     }
 
-    func test_recoverInterruptedMigration_permanentCompleteAndPendingPartial_cleansPendingSafe() throws {
-        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint)
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
+    func test_recoverInterruptedMigration_pendingOnlyComplete_promotesPendingContent() throws {
+        let pending = makeBundle(0x42)
+        try bundleStore.saveBundle(pending, fingerprint: fingerprint, namespace: .pending)
 
         let outcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
 
-        XCTAssertEqual(outcome, .cleanedPendingSafe)
+        XCTAssertEqual(outcome, .promotedPendingSafe)
         XCTAssertEqual(
-            bundleStore.bundleState(fingerprint: fingerprint, namespace: .pending),
-            .missing
+            try bundleStore.loadBundle(fingerprint: fingerprint).envelope,
+            pending.envelope
         )
     }
 
@@ -123,24 +108,6 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         )
     }
 
-    func test_recoverInterruptedMigration_partialPermanentAndCompletePending_replacesPermanent() throws {
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-        try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
-
-        let outcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
-
-        XCTAssertEqual(outcome, .promotedPendingSafe)
-        XCTAssertEqual(
-            try bundleStore.loadBundle(fingerprint: fingerprint).salt,
-            makeBundle().salt
-        )
-    }
-
     func test_recoverInterruptedMigration_retryableFailure_returnsRetryableFailure() throws {
         try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint, namespace: .pending)
         keychain.failOnSaveNumber = keychain.saveCallCount + 1
@@ -150,14 +117,7 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         XCTAssertEqual(outcome, .retryableFailure)
     }
 
-    func test_recoverInterruptedMigration_withoutCompleteBundle_returnsUnrecoverable() throws {
-        try keychain.save(
-            Data([0xAA]),
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount,
-            accessControl: nil
-        )
-
+    func test_recoverInterruptedMigration_withoutCompleteBundle_returnsUnrecoverable() {
         let outcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
 
         XCTAssertEqual(outcome, .unrecoverable)
@@ -182,11 +142,7 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
         })
     }
 
-    private func makeBundle() -> WrappedKeyBundle {
-        WrappedKeyBundle(
-            seKeyData: Data([0x10, 0x11, 0x12]),
-            salt: Data([0x13, 0x14, 0x15]),
-            sealedBox: Data([0x16, 0x17, 0x18])
-        )
+    private func makeBundle(_ tag: UInt8 = 0x10) -> WrappedKeyBundle {
+        WrappedKeyBundle(envelope: Data([tag, tag &+ 1, tag &+ 2]))
     }
 }

@@ -22,23 +22,11 @@ enum AuthTraceMetadata {
             }
             return "protectedDataDomainKey"
         }
-        if service.hasPrefix("\(KeychainConstants.prefix).pending-se-key.") {
-            return "pendingSeKey"
+        if service.hasPrefix("\(KeychainConstants.prefix).pending-privkey-envelope.") {
+            return "pendingPrivateKeyEnvelope"
         }
-        if service.hasPrefix("\(KeychainConstants.prefix).pending-salt.") {
-            return "pendingSalt"
-        }
-        if service.hasPrefix("\(KeychainConstants.prefix).pending-sealed-key.") {
-            return "pendingSealedKey"
-        }
-        if service.hasPrefix("\(KeychainConstants.prefix).se-key.") {
-            return "seKey"
-        }
-        if service.hasPrefix("\(KeychainConstants.prefix).salt.") {
-            return "salt"
-        }
-        if service.hasPrefix("\(KeychainConstants.prefix).sealed-key.") {
-            return "sealedKey"
+        if service.hasPrefix("\(KeychainConstants.prefix).privkey-envelope.") {
+            return "privateKeyEnvelope"
         }
         if service == ProtectedDataRightIdentifiers.productionSharedRightIdentifier {
             return "protectedDataRootSecret"

@@ -78,7 +78,7 @@ final class KeyMutationServiceSinglePromptExpiryTests: XCTestCase {
         )
         XCTAssertTrue(
             made.mockSE.lastGenerateAuthenticationContext === stub.context,
-            "The new wrapping key must be generated with the SAME context (covers the wrap's first self-ECDH)."
+            "The new wrapping key must be generated with the SAME context so the re-wrap stays within one authentication session."
         )
         XCTAssertEqual(updated.fingerprint, identity.fingerprint)
         XCTAssertEqual(

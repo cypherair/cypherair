@@ -33,27 +33,16 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let authenticated = try await authManager.evaluate(mode: mode, reason: reason)
         XCTAssertTrue(authenticated, "Authentication must succeed before SE reconstruction")
 
-        let loadedSEKey = try keychain.load(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+        let loadedEnvelope = try keychain.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         )
-        let loadedSalt = try keychain.load(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
-        let loadedSealed = try keychain.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        )
+        let loadedSEKey = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
         let handle = try secureEnclave.reconstructKey(
             from: loadedSEKey,
             authenticationContext: authManager.lastEvaluatedContext
         )
-        let storedBundle = WrappedKeyBundle(
-            seKeyData: loadedSEKey,
-            salt: loadedSalt,
-            sealedBox: loadedSealed
-        )
+        let storedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let unwrapped = try secureEnclave.unwrap(
             bundle: storedBundle,
             using: handle,
@@ -168,16 +157,12 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
-        // Simulate: old items exist (the original keys).
-        let oldData = Data("original-se-key".utf8)
-        try keychain.save(oldData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(Data("old-salt".utf8), service: KeychainConstants.saltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(Data("old-sealed".utf8), service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        // Simulate: the old permanent envelope exists (the original key).
+        let oldData = Data("original-envelope".utf8)
+        try keychain.save(oldData, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
-        // Simulate: pending items also exist (partially completed re-wrap).
-        try keychain.save(Data("pending-se-key".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(Data("pending-salt".utf8), service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(Data("pending-sealed".utf8), service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        // Simulate: a pending envelope also exists (interrupted re-wrap).
+        try keychain.save(Data("pending-envelope".utf8), service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // Set the protected recovery journal and simulate switching from standard -> highSecurity.
         let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
@@ -194,14 +179,14 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertEqual(summary?.outcomes, [.cleanedPendingSafe])
         XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
-        // Verify: old items still intact.
-        let loadedOld = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-        XCTAssertEqual(loadedOld, oldData, "Original SE key must be intact after crash recovery")
+        // Verify: old envelope still intact.
+        let loadedOld = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
+        XCTAssertEqual(loadedOld, oldData, "Original envelope must be intact after crash recovery")
 
-        // Verify: pending items removed.
+        // Verify: pending envelope removed.
         XCTAssertFalse(
-            keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account),
-            "Pending items must be cleaned up"
+            keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account),
+            "Pending envelope must be cleaned up"
         )
 
         // Verify: auth mode remains standard (old keys have standard ACLs).
@@ -216,13 +201,9 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
-        // Simulate: old items deleted, only pending items remain.
-        let pendingSEKey = Data("promoted-se-key".utf8)
-        let pendingSalt = Data("promoted-salt".utf8)
-        let pendingSealed = Data("promoted-sealed".utf8)
-        try keychain.save(pendingSEKey, service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        // Simulate: old envelope deleted, only the pending envelope remains.
+        let pendingEnvelope = Data("promoted-envelope".utf8)
+        try keychain.save(pendingEnvelope, service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // Simulate switching from standard -> highSecurity.
         let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
@@ -239,18 +220,12 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
         XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
 
-        // Verify: items promoted to permanent names.
-        let loadedSEKey = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-        XCTAssertEqual(loadedSEKey, pendingSEKey, "Pending SE key must be promoted to permanent")
+        // Verify: envelope promoted to the permanent row.
+        let loadedEnvelope = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
+        XCTAssertEqual(loadedEnvelope, pendingEnvelope, "Pending envelope must be promoted to permanent")
 
-        let loadedSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
-        XCTAssertEqual(loadedSalt, pendingSalt)
-
-        let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
-        XCTAssertEqual(loadedSealed, pendingSealed)
-
-        // Verify: pending items removed.
-        XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+        // Verify: pending envelope removed.
+        XCTAssertFalse(keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
 
         // Verify: auth mode updated to highSecurity (promoted keys have new ACLs).
         XCTAssertEqual(
@@ -264,8 +239,8 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
-        // No journal entry set, but pending items exist (should be left alone).
-        try keychain.save(Data("stale".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        // No journal entry set, but a pending envelope exists (should be left alone).
+        try keychain.save(Data("stale".utf8), service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         let authManager = makeAuthenticationManager(
             secureEnclave: secureEnclave,
@@ -273,59 +248,20 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         )
         let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
 
-        // Pending items should still be there (recovery did not run).
+        // Pending envelope should still be there (recovery did not run).
         XCTAssertNil(summary)
-        XCTAssertTrue(keychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+        XCTAssertTrue(keychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
     }
 
-    func test_crashRecovery_partialPermanentAndCompletePending_replacesPermanent() throws {
-        let fingerprint = uniqueFingerprint()
-        let account = KeychainConstants.defaultAccount
-
-        let oldData = Data("original-se-key".utf8)
-        try keychain.save(oldData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-
-        let pendingSEKey = Data("promoted-se-key".utf8)
-        let pendingSalt = Data("promoted-salt".utf8)
-        let pendingSealed = Data("promoted-sealed".utf8)
-        try keychain.save(pendingSEKey, service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(pendingSalt, service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(pendingSealed, service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-
-        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
-        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
-
-        let authManager = makeAuthenticationManager(
-            secureEnclave: secureEnclave,
-            keychain: keychain,
-            privateKeyControlStore: privateKeyControlStore
-        )
-        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
-
-        XCTAssertEqual(summary?.outcomes, [.promotedPendingSafe])
-        XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
-        XCTAssertEqual(
-            try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account),
-            pendingSEKey
-        )
-        XCTAssertEqual(
-            try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account),
-            pendingSalt
-        )
-        XCTAssertEqual(
-            try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account),
-            pendingSealed
-        )
-        XCTAssertEqual(authManager.currentMode, .highSecurity)
-    }
+    // The former `test_crashRecovery_partialPermanentAndCompletePending_replacesPermanent`
+    // was removed: a partially-present permanent bundle is structurally impossible with the
+    // single-row envelope, so that scenario collapses to
+    // `test_crashRecovery_onlyPendingExist_promotesToPermanent` above.
 
     func test_crashRecovery_unrecoverable_clearsFlagAndLeavesAuthModeUnchanged() {
         let fingerprint = uniqueFingerprint()
-        let account = KeychainConstants.defaultAccount
 
-        try? keychain.save(Data("partial-old".utf8), service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try? keychain.save(Data("partial-pending".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-
+        // Neither a permanent nor a pending envelope is present → unrecoverable.
         let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         try? privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
 
@@ -350,9 +286,7 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
 
-        try? mockKeychain.save(Data("pending-se-key".utf8), service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try? mockKeychain.save(Data("pending-salt".utf8), service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try? mockKeychain.save(Data("pending-sealed".utf8), service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        try? mockKeychain.save(Data("pending-envelope".utf8), service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         mockKeychain.failOnSaveNumber = mockKeychain.saveCallCount + 1
 
@@ -370,6 +304,6 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         XCTAssertEqual(summary?.outcomes, [.retryableFailure])
         XCTAssertEqual((try? privateKeyControlStore.recoveryJournal())?.rewrapTargetMode, .highSecurity)
         XCTAssertEqual(authManager.currentMode, .standard)
-        XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account))
+        XCTAssertTrue(mockKeychain.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account))
     }
 }

@@ -192,7 +192,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 
 | Component | Responsibility |
 |-----------|---------------|
-| `SecureEnclaveManager` | P-256 key generation in SE, self-ECDH + HKDF + AES-GCM wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
+| `SecureEnclaveManager` | P-256 key generation in SE, ephemeral-static ECDH + HKDF + AES-GCM (AAD-bound) `CAPKEV1` envelope wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
 | `KeychainManager` | CRUD for Keychain items (private-key bundle rows and ProtectedData support rows), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and post-unlock auth-mode crash recovery |
 | `PrivateKeyModeSwitchAuthenticator` | Current-mode authentication gate for private-key mode switching before any rewrap journal or Keychain mutation |
@@ -422,15 +422,13 @@ sequenceDiagram
     App->>SEM: wrapPrivateKey(privateKeyBytes, authMode, fingerprint)
     SEM->>SE: Generate P-256 KeyAgreement key (access control per authMode)
     SE-->>SEM: SE private key handle
-    SEM->>SE: Self-ECDH (SE privkey × SE pubkey)
-    SE-->>SEM: Shared secret (computed inside SE)
-    SEM->>SEM: HKDF(SHA-256, sharedSecret, randomSalt, info="CypherAir-SE-Wrap-v1:"+fingerprint) → AES-256 key
-    SEM->>SEM: AES-GCM seal(privateKeyBytes) → sealed box
-    SEM->>KC: Store SE key dataRepresentation
-    SEM->>KC: Store salt
-    SEM->>KC: Store sealed box
-    Note over SEM,KC: Confirm all 3 writes succeed
-    SEM->>SEM: Zeroize privateKeyBytes + symmetric key (only after storage confirmed)
+    SEM->>SEM: Generate software-ephemeral P-256 key
+    SEM->>SEM: ECDH(ephemeral priv × SE pub) → shared secret
+    SEM->>SEM: HKDF(SHA-256, sharedSecret, randomSalt, sharedInfo=CAPKKI binding) → AES-256 key
+    SEM->>SEM: AES-GCM seal(privateKeyBytes, AAD=CAPKAD binding) → CAPKEV1 envelope
+    SEM->>KC: Store the single privkey-envelope row (SE key blob folded in)
+    Note over SEM,KC: Confirm the write succeeds
+    SEM->>SEM: Zeroize privateKeyBytes (only after storage confirmed)
     SEM-->>App: Success
 ```
 
@@ -507,7 +505,7 @@ These pairs must be updated together. A change to one without the other will cau
 | `pgp-mobile/src/error.rs` | `Sources/Services/FFI/PGPErrorMapper.swift` and `Sources/Models/CypherAirError.swift` | Generated `PgpError` variants are normalized only at the FFI mapper boundary into the app-owned `CypherAirError` vocabulary; `CypherAirError.from` preserves already-normalized app errors and applies caller fallbacks |
 | `pgp-mobile/src/keys.rs` external callbacks | `pgp-mobile/src/external_signer.rs` and `Sources/Services/FFI/*` callback bridges | Foreign private-operation callbacks use dedicated generated callback error types and sanitized categories; callback failures must not be carried through Sequoia as free-form strings |
 | `pgp-mobile/src/lib.rs` (public API) | `Sources/Services/FFI/*Adapter.swift` and explicitly documented temporary call sites | Any Rust API change requires Swift adapter or documented temporary call-site updates |
-| `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes 3 Keychain items; unwrapping reads them |
+| `SecureEnclaveManager` | `KeychainManager` | SE wrapping writes the single `privkey-envelope` row; unwrapping reads it |
 | `SecureEnclaveManager` | `AuthenticationManager` | Mode switch re-wraps all keys via SE manager |
 | `DecryptionService` | `AuthenticationManager` | Phase 2 auth policy depends on current auth mode |
 | `PGPKeyOperationAdapter` | `pgp-mobile/src/keys.rs` | Profile → CipherSuite mapping and key-operation result mapping must stay synchronized |
@@ -517,12 +515,8 @@ These pairs must be updated together. A change to one without the other will cau
 ```
 Keychain (kSecClassGenericPassword, data-protection Keychain):
 └── Default account (`com.cypherair`):
-│   ├── com.cypherair.v1.se-key.<fingerprint>         → SE key dataRepresentation
-│   ├── com.cypherair.v1.salt.<fingerprint>           → Random HKDF salt
-│   ├── com.cypherair.v1.sealed-key.<fingerprint>     → AES-GCM sealed private key
-│   ├── com.cypherair.v1.pending-se-key.<fingerprint> → Temporary mode-switch / expiry-recovery row
-│   ├── com.cypherair.v1.pending-salt.<fingerprint>   → Temporary mode-switch / expiry-recovery row
-│   ├── com.cypherair.v1.pending-sealed-key.<fingerprint>
+│   ├── com.cypherair.v1.privkey-envelope.<fingerprint>         → CAPKEV1 private-key envelope (SE key blob + ephemeral pubkey + salt + AES-GCM sealed bytes, one row)
+│   ├── com.cypherair.v1.pending-privkey-envelope.<fingerprint> → Temporary mode-switch / expiry-recovery envelope row
 │   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret v2 envelope
 │   ├── com.cypherair.v1.protected-data.device-binding-key → ProtectedData SE device-binding key representation
 │   ├── com.cypherair.v1.protected-data.domain-key.<domainID>
@@ -564,7 +558,7 @@ App Sandbox:
 - `<domainID>` is the stable `ProtectedDataDomainID` raw value. Domain-key rows use the default account, no per-row biometric access control, and contain only the wrapped-DMK record; the app still needs the post-auth wrapping root key to unwrap a DMK.
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
 - Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Custody generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
-- The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a normal software-ephemeral P-256 ECDH envelope, not the private-key self-ECDH wrapping pattern.
+- The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a software-ephemeral P-256 ECDH envelope (`CAPDSEV2`) that is domain-separated from the per-fingerprint private-key envelope (`CAPKEV1`) by distinct magic and HKDF/AAD prefixes.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, or out-of-app-custody exception.
 - Post-unlock orchestration opens required domains such as `private-key-control`, `key-metadata`, protected settings, and the framework sentinel by reusing the app privacy authentication context without extra Face ID prompts.
 

@@ -123,8 +123,12 @@ final class PrivateKeyAccessService {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
         let handle: any SEKeyHandle
         do {
+            let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
+                from: bundle.envelope,
+                expectedFingerprint: fingerprint
+            )
             handle = try secureEnclave.reconstructKey(
-                from: bundle.seKeyData,
+                from: seKeyData,
                 authenticationContext: authenticationContext.context
             )
             traceStore?.record(

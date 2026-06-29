@@ -12,7 +12,7 @@ final class KeyManagementServiceMetadataTests: KeyManagementServiceTestCase {
         XCTAssertEqual(metadataPersistence.saveCallCount, 1)
         XCTAssertEqual(metadataPersistence.identities, [identity])
         XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.sealedKeyService(fingerprint: identity.fingerprint),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: identity.fingerprint),
             account: KeychainConstants.defaultAccount
         ))
     }

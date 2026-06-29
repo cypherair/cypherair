@@ -161,13 +161,13 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         XCTAssertEqual(authManager.currentMode, .highSecurity)
         XCTAssertEqual(
             try keychain.load(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             ),
-            Data("pending-se-key".utf8)
+            Self.pendingEnvelopeSeed
         )
         XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         ))
 
@@ -287,13 +287,13 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         XCTAssertEqual(authManager.currentMode, .standard)
         XCTAssertEqual(
             try keychain.load(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             ),
-            Data("permanent-se-key".utf8)
+            Self.permanentEnvelopeSeed
         )
         XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         ))
     }
@@ -320,13 +320,13 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         XCTAssertEqual(authManager.currentMode, .highSecurity)
         XCTAssertEqual(
             try keychain.load(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             ),
-            Data("pending-se-key".utf8)
+            Self.pendingEnvelopeSeed
         )
         XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount
         ))
     }
@@ -358,53 +358,24 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         for fingerprint in [pendingOnlyFingerprint, oldAndPendingFingerprint] {
             XCTAssertEqual(
                 try keychain.load(
-                    service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                    service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
                     account: KeychainConstants.defaultAccount
                 ),
-                Data("pending-se-key".utf8)
+                Self.pendingEnvelopeSeed
             )
             XCTAssertFalse(keychain.exists(
-                service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+                service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
                 account: KeychainConstants.defaultAccount
             ))
         }
     }
 
-    func test_rewrapRecovery_commitRequiredPartialPending_keepsJournalAndFailsClosed() throws {
-        let keychain = MockKeychain()
-        let fingerprint = "commit-partial-\(UUID().uuidString)"
-        try savePermanentRecoveryBundle(in: keychain, fingerprint: fingerprint)
-        try savePartialPendingRecoveryBundle(in: keychain, fingerprint: fingerprint)
-
-        let privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
-        try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
-        try privateKeyControlStore.markRewrapCommitRequired()
-        let authManager = makeRecoveryAuthenticationManager(
-            keychain: keychain,
-            privateKeyControlStore: privateKeyControlStore
-        )
-
-        let summary = authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: [fingerprint])
-
-        XCTAssertEqual(summary?.outcomes, [.retryableFailure])
-        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
-        XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapPhase, .commitRequired)
-        XCTAssertNil(authManager.currentMode)
-        XCTAssertThrowsError(try privateKeyControlStore.beginModifyExpiry(fingerprint: "blocked-\(fingerprint)")) { error in
-            XCTAssertEqual(error as? PrivateKeyControlError, .recoveryNeeded)
-        }
-        XCTAssertEqual(
-            try keychain.load(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-                account: KeychainConstants.defaultAccount
-            ),
-            Data("permanent-se-key".utf8)
-        )
-        XCTAssertTrue(keychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: KeychainConstants.defaultAccount
-        ))
-    }
+    // The former `test_rewrapRecovery_commitRequiredPartialPending_keepsJournalAndFailsClosed`
+    // was removed: the single-row private-key envelope makes a partially-written pending
+    // bundle structurally impossible (a row is atomically present or absent), so the
+    // `(.complete, .partial)` commit-required arm it exercised is now unreachable.
+    // Decode-time fail-closed behavior for a corrupt/undecodable envelope row is covered
+    // by `PrivateKeyEnvelopeTests`.
 
     func test_postUnlockRecoveryWarningBuilder_surfacesOnlyUnsafeOutcomes() {
         let retryableWarning = AppContainer.postUnlockRecoveryLoadWarning(
@@ -579,27 +550,17 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         )
     }
 
+    private static let permanentEnvelopeSeed = Data("permanent-envelope".utf8)
+    private static let pendingEnvelopeSeed = Data("pending-envelope".utf8)
+
     private func savePermanentRecoveryBundle(
         in keychain: MockKeychain,
         fingerprint: String
     ) throws {
-        let account = KeychainConstants.defaultAccount
         try keychain.save(
-            Data("permanent-se-key".utf8),
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            Data("permanent-salt".utf8),
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            Data("permanent-sealed".utf8),
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: account,
+            Self.permanentEnvelopeSeed,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
     }
@@ -608,34 +569,9 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         in keychain: MockKeychain,
         fingerprint: String
     ) throws {
-        let account = KeychainConstants.defaultAccount
         try keychain.save(
-            Data("pending-se-key".utf8),
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            Data("pending-salt".utf8),
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            Data("pending-sealed".utf8),
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-    }
-
-    private func savePartialPendingRecoveryBundle(
-        in keychain: MockKeychain,
-        fingerprint: String
-    ) throws {
-        try keychain.save(
-            Data("partial-pending-se-key".utf8),
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
+            Self.pendingEnvelopeSeed,
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )

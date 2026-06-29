@@ -81,7 +81,7 @@ These tests exist in the Swift test target but call through the UniFFI bindings 
 
 ### Layer 4: Device-Only Tests
 
-**Run on:** Physical device only. Cannot run in simulator.
+**Run on:** Real Secure Enclave hardware — **Apple Silicon Macs** (run the whole lane locally with `-destination 'platform=macOS,arch=arm64e'`) or SE-capable iPhones/iPads. **Cannot run in the iOS Simulator** (no Secure Enclave). "Device" here means real SE hardware, not specifically an iPhone; on a Mac, biometric/`LAContext` steps use Touch ID or the system authentication prompt, and biometric-gated tests guard-and-skip when no biometric is enrolled.
 **What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain/Data Protection behavior through authenticated `LAContext` handoff on real hardware. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation, restart and reopen of the v2 root-secret envelope, deletion of the device-binding key producing fail-closed recovery/reset-required state, and proof that the SE unwrap layer does not add a second biometric prompt. Envelope format coverage should remain in the macOS unit lane through mocks.
 
 For Secure Enclave custody, most coverage stays in the macOS unit lane (mocks plus software P-256 keys); the device lane carries only the real-hardware evidence that cannot be mocked: handle creation/load/delete, biometric signing and ECDH private operations, custody generation with a real signing handle, and end-to-end key-agreement decrypt. `DeviceSecureEnclaveCustodyDecryptTests` creates and deletes a single test-owned handle pair, decrypts v4/v6 messages and a mixed-recipient file through a real `.keyAgreement` P-256 handle, and confirms a tampered payload hard-fails with no output under one authenticated `LAContext`. The destructive Reset All Local Data cleanup proof is isolated in `CypherAir-DangerousDeviceTests` because it deletes every app-owned Secure Enclave custody handle for the current app bundle, not only handles created by the test. Secure Enclave custody device tests require Secure Enclave plus enrolled biometrics — available on Apple Silicon / T2 Macs and SE-capable iPhones/iPads — and skip elsewhere; only the `DeviceMIETests` subset additionally requires A19/A19 Pro Hardware Memory Tagging.
@@ -142,7 +142,7 @@ for key usage, and the default mode does not fail for localization warnings.
 
 `TutorialSessionStoreTests` are the canonical unit-level coverage for the guided tutorial contract. They verify sandbox storage and mocks, the seven-module artifact flow, completion-version persistence, onboarding-to-tutorial handoff, replay unlock rules, unsafe-route blocklisting, output interception, production-page configuration seams, and guidance resolver behavior.
 
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on physical device. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
+**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on real Secure Enclave hardware — an Apple Silicon Mac (`-destination 'platform=macOS,arch=arm64e'`, which runs the full lane locally) or a physical iPhone/iPad — but not the iOS Simulator. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
 
 **CypherAir-DangerousDeviceTests.xctestplan** — Manual physical-device lane for destructive device evidence. Currently selects only the Secure Enclave custody Reset All Local Data cleanup proof, which enumerates and deletes all app-owned custody `kSecClassKey` rows for the current bundle. Do not run this plan against a device/install that may contain custody handles worth preserving.
 
@@ -793,18 +793,18 @@ func test_modeSwitch_crashMidway_recoversOnLaunch() throws {
     try XCTSkipUnless(SecureEnclave.isAvailable)
 
     // Simulate interrupted re-wrap by writing the post-unlock recovery journal
-    // and leaving temporary items.
+    // and leaving the temporary pending envelope row.
     try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
     try privateKeyControlStore.markRewrapCommitRequired()
-    try keychain.save(someData, service: "com.cypherair.v1.pending-se-key.abcdef...", ...)
+    try keychain.save(someData, service: "com.cypherair.v1.pending-privkey-envelope.abcdef...", ...)
 
     // Run recovery after app unlock has opened private-key-control.
     authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: ["abcdef..."])
 
-    // Verify: journal cleared, temporary items removed, original keys intact
+    // Verify: journal cleared, pending row removed, original envelope intact
     XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
-    XCTAssertThrowsError(try keychain.load(service: "com.cypherair.v1.pending-se-key.abcdef..."))
-    XCTAssertNoThrow(try keychain.load(service: "com.cypherair.v1.se-key.abcdef..."))
+    XCTAssertThrowsError(try keychain.load(service: "com.cypherair.v1.pending-privkey-envelope.abcdef..."))
+    XCTAssertNoThrow(try keychain.load(service: "com.cypherair.v1.privkey-envelope.abcdef..."))
 }
 ```
 

@@ -13,7 +13,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         try service.deleteKey(fingerprint: fp)
 
         XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fp),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
         XCTAssertTrue(metadataPersistence.identities.isEmpty)
     }
@@ -35,13 +35,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         try service.deleteKey(fingerprint: fp)
 
         XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount))
-        XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.pendingSaltService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount))
-        XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
     }
 
@@ -90,10 +84,10 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         XCTAssertNil(try recoveryJournal().modifyExpiry)
         XCTAssertNil(service.checkAndRecoverFromInterruptedModifyExpiry())
         XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fp),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
         XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
     }
 
@@ -120,7 +114,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         XCTAssertEqual(try recoveryJournal().rewrapTargetMode, .highSecurity)
         XCTAssertEqual(service.keys.map(\.fingerprint), [second.fingerprint])
         XCTAssertFalse(mockKC.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: first.fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: first.fingerprint),
             account: KeychainConstants.defaultAccount))
     }
 

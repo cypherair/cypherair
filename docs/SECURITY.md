@@ -46,9 +46,9 @@ All cryptographic operations use Sequoia PGP 2.3.0. Two profiles with different 
 ```
 Generate (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6)
     │
-    ├──→ SE Wrap (P-256 self-ECDH + HKDF + AES-GCM)
+    ├──→ SE Wrap (P-256 ephemeral-static ECDH + HKDF + AES-GCM, AAD-bound)
     │       │
-    │       └──→ Store private-key material in Keychain (3 protected items per identity)
+    │       └──→ Store private-key material in Keychain (single envelope row per identity)
     │
     ├──→ Store PGPKeyIdentity metadata in ProtectedData `key-metadata`
     │       └──→ Opened after app-session authentication; no private-key material
@@ -59,7 +59,8 @@ Generate (Profile A: Ed25519+X25519 v4 / Profile B: Ed448+X448 v6)
     └──→ Prompt user to back up private key + share public key
 
 Use (decrypt / sign):
-    Keychain retrieve → SE reconstruct (biometric auth) → HKDF → AES-GCM unseal
+    Keychain retrieve → decode envelope → SE reconstruct (biometric auth)
+    → ECDH(SE priv × envelope ephemeral pub) → HKDF → AES-GCM unseal (AAD-checked)
     → Perform PGP operation → Zeroize private key from memory
 
 Export (backup):
@@ -76,12 +77,12 @@ Revocation:
     Export ASCII-armored revocation signature → Distribute to contacts → They import → Key marked revoked
 
 Deletion:
-    Double-confirm → Delete SE key from Keychain → Delete salt + sealed box
+    Double-confirm → Delete the private-key envelope row from Keychain
     → Delete protected key-metadata entry
     → Key permanently inaccessible
 ```
 
-**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data, but it lives in the ProtectedData `key-metadata` domain so key-list loading happens only after app-session authentication opens protected app data. Private-key blobs, salts, and sealed boxes remain in the protected private-key namespace.
+**Metadata storage note:** `PGPKeyIdentity` metadata is non-sensitive indexing data, but it lives in the ProtectedData `key-metadata` domain so key-list loading happens only after app-session authentication opens protected app data. The sealed private-key envelope (which carries the SE key handle, ephemeral public key, salt, and AES-GCM sealed bytes in one row) remains in the protected private-key namespace.
 
 **Revocation storage/export note:** CypherAir stores revocation signatures internally as binary OpenPGP signature packets. Export converts those bytes to ASCII armor on demand. Keys receive key-level revocation material at generation or import; export uses only the stored revocation artifact and fails closed when it is missing.
 
@@ -172,7 +173,7 @@ applies to software-custody keys only (device-bound keys cannot be backed up).
   handle locators, access-control policy, digests, or signatures. Public-key and
   revocation export use stored public artifacts only; a missing revocation artifact
   fails closed and is never regenerated; Secure Enclave private-key backup/export is
-  unsupported and must not touch the legacy `se-key`/`salt`/`sealed-key` bundle.
+  unsupported and must not touch the `privkey-envelope` row.
   Payload authentication is unchanged: v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD hard-fail
   with no partial plaintext, and streaming file decrypt releases output only through
   the success-only `.tmp`-then-rename contract.
@@ -202,12 +203,16 @@ require framework recovery/reset; there is no production fallback that opens v2
 ProtectedData without the SE factor.
 
 The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
-`algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`. It uses a normal
-software-ephemeral P-256 ECDH exchange with the persistent ProtectedData SE
-public key; it must not reuse the existing private-key self-ECDH wrapping
-scheme as its security design. Its HKDF sharedInfo and AES-GCM AAD bind the
-AAD version plus hashes of both persistent SE and ephemeral public keys. The
-envelope is the only supported root-secret payload: any payload that does not
+`algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`. It uses a software-ephemeral
+P-256 ECDH exchange with the persistent ProtectedData SE public key. The
+private-key envelope (`CAPKEV1`) uses the same ephemeral-static ECDH primitive,
+but the two are deliberately domain-separated — distinct `magic` values and
+distinct HKDF/AAD prefixes (`CAPDSEKI`/`CAPDSEAD` vs `CAPKKI`/`CAPKAD`) — and use
+different persistent keys (one singleton device-binding key bound to a shared-right
+identifier; one per-fingerprint SE key bound to the key fingerprint), so neither
+blob can be misread as the other. The root-secret HKDF sharedInfo and AES-GCM AAD
+bind the AAD version plus hashes of both persistent SE and ephemeral public keys.
+The envelope is the only supported root-secret payload: any payload that does not
 decode as a current `CAPDSEV2` envelope fails closed as ordinary undecodable
 input.
 
@@ -218,27 +223,37 @@ registered committed domains, but it must skip pending-mutation, missing
 context, and no-domain states without fetching the root secret or starting a
 second interactive prompt.
 
+The private-key envelope is a binary-plist `CAPKEV1` payload with
+`algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1` (`PrivateKeyEnvelope` /
+`PrivateKeyEnvelopeCodec`). It mirrors the ProtectedData root-secret envelope's
+ephemeral-static ECDH construction but is domain-separated from it (distinct
+`magic`, distinct HKDF/AAD prefixes `CAPKKI` / `CAPKAD`) so neither blob can be
+misread as the other. The per-key Secure Enclave key is the persistent
+key-agreement authority; a fresh software ephemeral P-256 key is generated per
+seal. The SE key `dataRepresentation` is folded into the envelope so a single
+Keychain row reconstructs the handle and reopens the material.
+
 ### Wrapping (on key generation or import)
 
 1. Generate `SecureEnclave.P256.KeyAgreement.PrivateKey()` with access control flags matching the current auth mode.
-2. Self-ECDH: compute shared secret between SE private key and its own public key. This computation happens inside the SE hardware.
-3. Derive AES-256 key: `HKDF<SHA256>.deriveKey(inputKeyMaterial: sharedSecret, salt: randomSalt, info: infoString, outputByteCount: 32)` where `infoString = "CypherAir-SE-Wrap-v1:" + hexFingerprint`.
-4. Seal: `AES.GCM.seal(privateKeyBytes, using: symmetricKey)`.
-5. Store three Keychain items: SE key `dataRepresentation`, random salt, AES-GCM sealed box. **Confirm all three writes succeed.**
-6. Only after successful storage: zeroize the raw private key bytes and symmetric key from memory.
+2. Generate a software-ephemeral `P256.KeyAgreement.PrivateKey()` and compute the shared secret `ECDH(ephemeral private × persistent SE public)`.
+3. Derive AES-256 key: `sharedSecret.hkdfDerivedSymmetricKey(using: SHA256, salt: randomSalt, sharedInfo: bindingData, outputByteCount: 32)`, where `bindingData` (prefix `CAPKKI`) binds the magic, algorithmID, lowercase hex fingerprint, and SHA-256 hashes of the SE key blob, persistent SE public key, and ephemeral public key, plus the plaintext length.
+4. Seal: `AES.GCM.seal(privateKeyBytes, using: symmetricKey, nonce:, authenticating: aad)`, where `aad` is the same binding under prefix `CAPKAD` (domain-separated from the HKDF info).
+5. Store one Keychain item: the encoded `CAPKEV1` envelope (SE key blob, persistent SE + ephemeral public keys, salt, nonce, ciphertext, tag). **Confirm the write succeeds.**
+6. Only after successful storage: zeroize the raw private key bytes from memory (the `SymmetricKey` and `SharedSecret` are opaque CryptoKit values that clear their own storage).
 
-**HKDF info string:** The info parameter includes a version prefix (`v1`) and the key's hex fingerprint to provide domain separation across different keys and future wrapping scheme versions. **This exact string must be constructed identically in `SecureEnclaveManager.swift`. Any mismatch will produce a different derived key and make existing wrapped keys permanently inaccessible.**
+**Public-parameter binding:** The fingerprint and both public keys are bound through HKDF `sharedInfo` and the AES-GCM AAD, so no public field can be substituted without breaking authentication. **The envelope is the only supported private-key payload: any row that does not decode as a current `CAPKEV1` envelope fails closed as ordinary undecodable input.** There is no supported legacy self-ECDH local data to migrate.
 
 **Ordering rationale (steps 5–6):** Storage is performed before zeroization. If storage fails or the process crashes before step 5 completes, the raw key bytes are still in memory and the operation can be retried. If zeroization happened first and storage then failed, the key would be permanently lost.
 
 ### Unwrapping (on decrypt or sign)
 
-1. Retrieve SE key blob, salt, and sealed box from Keychain.
-2. Reconstruct SE key from `dataRepresentation` — this triggers device authentication (Face ID / Touch ID, with or without passcode fallback depending on auth mode).
-3. Re-derive symmetric key: self-ECDH (inside SE) + HKDF with stored salt and same info string (`"CypherAir-SE-Wrap-v1:" + hexFingerprint`).
-4. Open sealed box → raw private key bytes in application memory.
+1. Retrieve the encoded envelope row from Keychain and decode + validate it (magic / version / algorithm / lengths / fingerprint binding; both public keys parse as P-256 points).
+2. Reconstruct the SE key from the envelope's `seKeyData` — this triggers device authentication (Face ID / Touch ID, with or without passcode fallback depending on auth mode).
+3. Fail closed if the envelope's bound SE public key does not match the reconstructed handle, then compute `ECDH(SE private × envelope ephemeral public)` and re-derive the symmetric key + AAD from the envelope's public fields.
+4. `AES.GCM.open` (AAD-checked) → raw private key bytes in application memory; any tamper, wrong binding, or wrong fingerprint aborts here with no plaintext.
 5. Perform the PGP operation.
-6. Zeroize the private key bytes and symmetric key immediately.
+6. Zeroize the private key bytes immediately.
 
 ### Security Properties
 
@@ -303,11 +318,11 @@ When the user changes mode in Settings:
    a. Unwrap using the current SE key.
    b. Generate a new SE key with the **new** access control flags.
    c. Re-wrap the private key with the new SE key.
-   d. Store the new Keychain items under **temporary key names** (e.g., `com.cypherair.v1.pending-se-key.<fingerprint>`).
+   d. Store the new envelope under the **temporary (pending) row** `com.cypherair.v1.pending-privkey-envelope.<fingerprint>`.
    e. Zeroize the raw key bytes from memory.
-5. **Verify all new items are successfully stored.**
-6. Delete the **old** Keychain items (original `com.cypherair.v1.se-key.<fingerprint>` etc.).
-7. Rename the temporary items to their permanent key names.
+5. **Verify all new pending rows are successfully stored.**
+6. Delete the **old** permanent row (`com.cypherair.v1.privkey-envelope.<fingerprint>`).
+7. Promote each pending row to its permanent name.
 8. Persist the new mode to `private-key-control.settings.authMode`.
 9. Clear the `private-key-control.recoveryJournal` rewrap entry.
 
@@ -489,6 +504,8 @@ These hold for every change, independent of which file is touched:
 | File | Reason |
 |------|--------|
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
+| `Sources/Security/PrivateKeyEnvelope.swift` | `CAPKEV1` private-key envelope (ephemeral-static ECDH, HKDF/AAD binding, contract validation). Error = keys lost, tamper accepted, or domain separation broken. |
+| `Sources/Security/KeyBundleStore.swift` | Single-row private-key envelope persistence, pending/permanent promotion, interrupted-rewrap state. Error = key material lost or recovery fails open. |
 | `Sources/Security/SecureEnclaveCustody*` | Secure Enclave custody handle lifecycle, access-control policy, role/public-key binding, and sanitized failure mapping. |
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
