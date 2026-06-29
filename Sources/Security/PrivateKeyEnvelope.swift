@@ -50,10 +50,6 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
     static let expectedP256X963Length = 65
-    /// Sane upper bound for a sealed software secret certificate. A serialized
-    /// ECC/EdDSA transferable secret key is well under 1 KiB; the bound only guards
-    /// against absurd inputs. The exact length is additionally bound in the AAD.
-    static let maxCiphertextLength = 16 * 1024
 
     let magic: String
     let formatVersion: Int
@@ -109,7 +105,11 @@ struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
         guard nonce.count == Self.expectedNonceLength else {
             throw PrivateKeyEnvelopeError.invalidNonceLength(nonce.count)
         }
-        guard ciphertext.count >= 1, ciphertext.count <= Self.maxCiphertextLength else {
+        // No upper bound: the sealed payload is a full transferable secret key whose
+        // size is dominated by user IDs, photo-UID attributes, subkeys, and third-party
+        // certifications. The exact length is authenticated in the HKDF sharedInfo and
+        // the AES-GCM AAD, so integrity does not depend on a policy limit here.
+        guard ciphertext.count >= 1 else {
             throw PrivateKeyEnvelopeError.invalidCiphertextLength(ciphertext.count)
         }
         guard tag.count == Self.expectedAuthenticationTagLength else {
@@ -166,7 +166,7 @@ enum PrivateKeyEnvelopeCodec {
     ) throws -> PrivateKeyEnvelope {
         try SEConstants.validateFingerprint(fingerprint)
         let normalizedFingerprint = fingerprint.lowercased()
-        guard !privateKey.isEmpty, privateKey.count <= PrivateKeyEnvelope.maxCiphertextLength else {
+        guard !privateKey.isEmpty else {
             throw PrivateKeyEnvelopeError.invalidCiphertextLength(privateKey.count)
         }
         guard !seKeyData.isEmpty else {
@@ -321,7 +321,7 @@ enum PrivateKeyEnvelopeCodec {
         data.append(Data(SHA256.hash(data: seKeyPublicKeyX963)))
         data.append(Data(SHA256.hash(data: ephemeralPublicKeyX963)))
         data.append(UInt16(ephemeralPublicKeyX963.count).bigEndianData)
-        data.append(UInt32(plaintextLength).bigEndianData)
+        data.append(UInt64(plaintextLength).bigEndianData)
         return data
     }
 
@@ -359,7 +359,7 @@ private extension UInt16 {
     }
 }
 
-private extension UInt32 {
+private extension UInt64 {
     var bigEndianData: Data {
         withUnsafeBytes(of: bigEndian) { Data($0) }
     }

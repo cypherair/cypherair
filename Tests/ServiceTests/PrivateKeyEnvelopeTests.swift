@@ -67,6 +67,22 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
         XCTAssertNotEqual(first.ciphertext, second.ciphertext)
     }
 
+    func test_envelope_largePayloadPastFormerLimit_roundTrips() throws {
+        // The wrapped payload is a full transferable secret key — a real imported key with a
+        // photo-UID attribute or many third-party certifications can be tens of KiB, far past
+        // the former 16 KiB guard. It must seal, encode, decode, and unwrap cleanly with the
+        // exact length authenticated in the AAD.
+        let largePrivateKey = Data((0..<(64 * 1024)).map { UInt8(truncatingIfNeeded: $0) })
+        let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
+        let bundle = try secureEnclave.wrap(privateKey: largePrivateKey, using: handle, fingerprint: fingerprint)
+
+        let decoded = try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: fingerprint)
+        XCTAssertEqual(decoded.ciphertext.count, largePrivateKey.count)
+
+        let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+        XCTAssertEqual(unwrapped, largePrivateKey)
+    }
+
     // MARK: - Tamper / wrong-binding
 
     func test_envelope_rejectsTamperedAuthenticatedFields() throws {
