@@ -9,21 +9,15 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
     func test_generateKey_profileA_storesKeychainItems() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service)
 
-        // Should store 3 Keychain items: SE key, salt, sealed box. Metadata
-        // persists through the injected metadata persistence, not the Keychain.
-        XCTAssertEqual(mockKC.saveCallCount, 3,
-                       "Profile A key gen should store 3 Keychain items")
+        // Should store a single Keychain item: the private-key envelope row.
+        // Metadata persists through the injected metadata persistence, not the Keychain.
+        XCTAssertEqual(mockKC.saveCallCount, 1,
+                       "Profile A key gen should store one private-key envelope item")
 
-        // Verify items exist
+        // Verify the envelope row exists
         let fp = identity.fingerprint
         XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount))
-        XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.saltService(fingerprint: fp),
-            account: KeychainConstants.defaultAccount))
-        XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.sealedKeyService(fingerprint: fp),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
         XCTAssertEqual(metadataPersistence.identities.map(\.fingerprint), [fp])
     }
@@ -45,11 +39,11 @@ final class KeyManagementServiceGenerationTests: KeyManagementServiceTestCase {
     func test_generateKey_profileB_storesKeychainItems() async throws {
         let identity = try await TestHelpers.generateProfileBKey(service: service)
 
-        XCTAssertEqual(mockKC.saveCallCount, 3)
+        XCTAssertEqual(mockKC.saveCallCount, 1)
 
         let fp = identity.fingerprint
         XCTAssertTrue(mockKC.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fp),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
             account: KeychainConstants.defaultAccount))
     }
 

@@ -200,7 +200,7 @@ current ProtectedData domain until the later issue #540 implementation.
 
 CypherAir's security design centers around several layers of protection:
 
-- **Private Key Storage** — Keys are wrapped by a Secure Enclave P-256 key via self-ECDH + HKDF + AES-GCM, then stored in Keychain. Keys are device-bound and never leave the hardware.
+- **Private Key Storage** — Keys are sealed in an authenticated envelope using ephemeral-static P-256 ECDH against a per-key Secure Enclave key, with HKDF + AES-GCM and public-parameter AAD binding, then stored as a single Keychain row. Keys are device-bound and never leave the hardware.
 - **Protected App Data** — Implemented app-data domains open after app privacy authentication through a shared Keychain root-secret gate plus Secure Enclave device binding. Current protected domains cover private-key control state, key metadata, protected settings schema v2, protected Contacts domain data, and the framework sentinel.
 - **Two-Phase Decryption** — Phase 1 parses the message header and matches recipient keys without authentication. Phase 2 requires biometric/passcode auth before decryption proceeds.
 - **Authentication Modes** — Standard Mode (Face ID / Touch ID with passcode fallback) or High Security Mode (biometric only, inspired by Apple's Stolen Device Protection).

@@ -59,10 +59,12 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
-        XCTAssertFalse(bundle.seKeyData.isEmpty)
-        XCTAssertFalse(bundle.salt.isEmpty)
-        XCTAssertFalse(bundle.sealedBox.isEmpty)
-        XCTAssertEqual(bundle.salt.count, 32, "Salt must be 32 bytes")
+        XCTAssertFalse(bundle.envelope.isEmpty)
+        let decoded = try PrivateKeyEnvelopeCodec.decode(bundle.envelope, expectedFingerprint: fingerprint)
+        XCTAssertEqual(decoded.seKeyData, handle.dataRepresentation, "Envelope must carry the SE key handle")
+        XCTAssertEqual(decoded.hkdfSalt.count, 32, "HKDF salt must be 32 bytes")
+        XCTAssertEqual(decoded.ephemeralPublicKeyX963.count, 65, "Ephemeral key must be a P-256 X9.63 point")
+        XCTAssertEqual(decoded.seKeyPublicKeyX963.count, 65, "SE public key must be a P-256 X9.63 point")
 
         let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
         XCTAssertEqual(unwrapped, fakePrivateKey, "Unwrapped key must match original")
@@ -250,19 +252,16 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
-        // 2. Store all 3 items in real Keychain.
-        try keychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fingerprint), account: account, accessControl: nil)
-        try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+        // 2. Store the single envelope row in the real Keychain.
+        try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
         // 3. Load from Keychain.
-        let loadedSEKey = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-        let loadedSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
-        let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+        let loadedEnvelope = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
 
-        // 4. Reconstruct SE key and unwrap.
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
-        let loadedBundle = WrappedKeyBundle(seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
+        // 4. Extract the SE key handle from the envelope, reconstruct, and unwrap.
+        let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+        let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
+        let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 
         XCTAssertEqual(unwrapped, fakePrivateKey, "Full Keychain round-trip must preserve key data")
@@ -301,31 +300,19 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             fingerprint: fingerprint
         )
 
-        // 4. Store in Keychain (3 items).
-        try keychain.save(bundle.seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.salt,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        // 4. Store the single envelope row in the Keychain.
+        try keychain.save(bundle.envelope,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account, accessControl: nil)
 
         // 5. Load from Keychain and SE unwrap (simulates app restart + decrypt flow).
-        let loadedSEKey = try keychain.load(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account)
-        let loadedSalt = try keychain.load(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account)
-        let loadedSealed = try keychain.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        let loadedEnvelope = try keychain.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account)
 
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
-        let loadedBundle = WrappedKeyBundle(
-            seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
+        let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+        let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
+        let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let recoveredCertData = try secureEnclave.unwrap(
             bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 
@@ -373,31 +360,19 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             fingerprint: fingerprint
         )
 
-        // 4. Store in Keychain.
-        try keychain.save(bundle.seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.salt,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        // 4. Store the single envelope row in the Keychain.
+        try keychain.save(bundle.envelope,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account, accessControl: nil)
 
         // 5. Load from Keychain and SE unwrap.
-        let loadedSEKey = try keychain.load(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account)
-        let loadedSalt = try keychain.load(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account)
-        let loadedSealed = try keychain.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        let loadedEnvelope = try keychain.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account)
 
-        let reconstructed = try secureEnclave.reconstructKey(from: loadedSEKey, authenticationContext: nil)
-        let loadedBundle = WrappedKeyBundle(
-            seKeyData: loadedSEKey, salt: loadedSalt, sealedBox: loadedSealed)
+        let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+        let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
+        let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
         let recoveredCertData = try secureEnclave.unwrap(
             bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 
@@ -417,8 +392,8 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
     // MARK: - C6.5: SE Key Deletion → Unwrap Fails
 
-    /// C6.5: After deleting all 3 Keychain items for an identity,
-    /// attempting to load the SE key data should fail with .itemNotFound.
+    /// C6.5: After deleting the envelope row for an identity,
+    /// attempting to load it should fail with .itemNotFound.
     func test_seKeyDeletion_thenLoadFails_withItemNotFound() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
@@ -426,41 +401,29 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0xDE, count: 32)
 
-        // 1. Generate SE key, wrap, store in Keychain.
+        // 1. Generate SE key, wrap, store the envelope row in the Keychain.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
-        try keychain.save(bundle.seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.salt,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        try keychain.save(bundle.envelope,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account, accessControl: nil)
 
-        // Verify items exist before deletion.
+        // Verify the row exists before deletion.
         XCTAssertTrue(keychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account))
 
-        // 2. Delete all 3 Keychain items (simulates key deletion).
+        // 2. Delete the envelope row (simulates key deletion).
         try keychain.delete(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account)
-        try keychain.delete(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account)
-        try keychain.delete(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account)
 
-        // 3. Attempting to load SE key data should fail with .itemNotFound.
+        // 3. Attempting to load it should fail with .itemNotFound.
         XCTAssertThrowsError(
             try keychain.load(
-                service: KeychainConstants.seKeyService(fingerprint: fingerprint),
+                service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
                 account: account)
         ) { error in
             guard let keychainError = error as? KeychainError,
@@ -469,66 +432,56 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             }
         }
 
-        // 4. Verify all 3 items are gone.
+        // 4. Verify the row is gone.
         XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account), "SE key must not exist after deletion")
-        XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account), "Salt must not exist after deletion")
-        XCTAssertFalse(keychain.exists(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: account), "Sealed box must not exist after deletion")
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            account: account), "Envelope row must not exist after deletion")
     }
 
-    /// C6.5: Partial deletion — sealed box removed but SE key and salt remain.
-    /// Loading the sealed box should fail, blocking the unwrap path.
-    func test_seKeyPartialDeletion_sealedBoxMissing_throwsClearError() throws {
+    /// C6.5: Tampered envelope row — flipping a stored byte must make unwrap fail closed.
+    /// The single-row envelope replaces the former partial-deletion scenario, which is
+    /// structurally impossible now that the bundle is one atomic row.
+    func test_seWrap_tamperedEnvelope_unwrapFailsClosed() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
         let fakePrivateKey = Data(repeating: 0xEF, count: 57)
 
-        // 1. Generate SE key, wrap, store in Keychain.
+        // 1. Generate SE key, wrap, store the envelope row.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(
             privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
-        try keychain.save(bundle.seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.salt,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account, accessControl: nil)
-        try keychain.save(bundle.sealedBox,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        try keychain.save(bundle.envelope,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account, accessControl: nil)
 
-        // 2. Delete ONLY the sealed box (simulates partial data corruption).
-        try keychain.delete(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        // 2. Flip the final byte of the stored envelope (AES-GCM tag region) and re-store.
+        var tampered = try keychain.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            account: account)
+        tampered[tampered.index(before: tampered.endIndex)] ^= 0xFF
+        try keychain.update(tampered,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account)
 
-        // 3. SE key and salt still exist.
-        XCTAssertTrue(keychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account), "SE key should still exist")
-        XCTAssertTrue(keychain.exists(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account), "Salt should still exist")
-
-        // 4. Loading sealed box fails — blocks the unwrap path.
+        // 3. Reconstruct + unwrap must fail closed — either the contract/decoder rejects the
+        //    mutated bytes or AES-GCM authentication fails.
+        let loadedEnvelope = try keychain.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            account: account)
         XCTAssertThrowsError(
-            try keychain.load(
-                service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-                account: account)
-        ) { error in
-            guard let keychainError = error as? KeychainError,
-                  case .itemNotFound = keychainError else {
-                return XCTFail("Expected .itemNotFound for missing sealed box, got \(error)")
-            }
-        }
+            try {
+                let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+                let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
+                _ = try secureEnclave.unwrap(
+                    bundle: WrappedKeyBundle(envelope: loadedEnvelope),
+                    using: reconstructed,
+                    fingerprint: fingerprint)
+            }(),
+            "A tampered envelope must never yield plaintext"
+        )
     }
 
     // MARK: - Keychain Full Lifecycle Loop
@@ -550,30 +503,25 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
             let bundle = try secureEnclave.wrap(privateKey: fakeKey, using: handle, fingerprint: fingerprint)
 
-            // Store 3 items
-            try keychain.save(bundle.seKeyData, service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
-            try keychain.save(bundle.salt, service: KeychainConstants.saltService(fingerprint: fingerprint), account: account, accessControl: nil)
-            try keychain.save(bundle.sealedBox, service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account, accessControl: nil)
+            // Store the single envelope row
+            try keychain.save(bundle.envelope, service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account, accessControl: nil)
 
             // Load, reconstruct, unwrap, verify
-            let loadedSE = try keychain.load(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-            let loadedSalt = try keychain.load(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
-            let loadedSealed = try keychain.load(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+            let loadedEnvelope = try keychain.load(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
 
-            let reconstructed = try secureEnclave.reconstructKey(from: loadedSE, authenticationContext: nil)
-            let loadedBundle = WrappedKeyBundle(seKeyData: loadedSE, salt: loadedSalt, sealedBox: loadedSealed)
+            let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(from: loadedEnvelope, expectedFingerprint: fingerprint)
+            let reconstructed = try secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil)
+            let loadedBundle = WrappedKeyBundle(envelope: loadedEnvelope)
             let unwrapped = try secureEnclave.unwrap(bundle: loadedBundle, using: reconstructed, fingerprint: fingerprint)
 
             XCTAssertEqual(unwrapped, fakeKey, "Iteration \(i): unwrapped key must match original")
 
-            // Delete all 3 items
-            try keychain.delete(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-            try keychain.delete(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
-            try keychain.delete(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
+            // Delete the envelope row
+            try keychain.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
 
             // Verify deletion
-            XCTAssertFalse(keychain.exists(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account),
-                           "Iteration \(i): SE key must be deleted")
+            XCTAssertFalse(keychain.exists(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account),
+                           "Iteration \(i): envelope row must be deleted")
         }
     }
 }

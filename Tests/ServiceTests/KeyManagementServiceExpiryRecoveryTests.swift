@@ -75,27 +75,11 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         }
 
         XCTAssertTrue(localKeychain.exists(
-            service: KeychainConstants.seKeyService(fingerprint: identity.fingerprint),
-            account: account
-        ))
-        XCTAssertTrue(localKeychain.exists(
-            service: KeychainConstants.saltService(fingerprint: identity.fingerprint),
-            account: account
-        ))
-        XCTAssertTrue(localKeychain.exists(
-            service: KeychainConstants.sealedKeyService(fingerprint: identity.fingerprint),
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: identity.fingerprint),
             account: account
         ))
         XCTAssertFalse(localKeychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: identity.fingerprint),
-            account: account
-        ))
-        XCTAssertFalse(localKeychain.exists(
-            service: KeychainConstants.pendingSaltService(fingerprint: identity.fingerprint),
-            account: account
-        ))
-        XCTAssertFalse(localKeychain.exists(
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: identity.fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: identity.fingerprint),
             account: account
         ))
         XCTAssertNil(try failingStore.recoveryJournal().modifyExpiry)
@@ -139,7 +123,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         XCTAssertEqual(localService.keys.first?.publicKeyData, updatedStoredIdentity.publicKeyData)
         XCTAssertEqual(try failingStore.recoveryJournal().modifyExpiry?.fingerprint, identity.fingerprint)
         XCTAssertFalse(localKeychain.exists(
-            service: KeychainConstants.pendingSeKeyService(fingerprint: identity.fingerprint),
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: identity.fingerprint),
             account: KeychainConstants.defaultAccount
         ))
     }
@@ -149,16 +133,12 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        // Simulate interrupted modifyExpiry: write protected journal and store pending items
-        // while old permanent items still exist.
+        // Simulate interrupted modifyExpiry: write protected journal and store the pending
+        // envelope while the old permanent envelope still exists.
         try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
-        let dummyData = Data("pending-data".utf8)
-        try mockKC.save(dummyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(dummyData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(dummyData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+        try mockKC.save(Data("pending-data".utf8),
+                        service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
                         account: account, accessControl: nil)
 
         // Run recovery
@@ -167,49 +147,32 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         XCTAssertEqual(outcome, .cleanedPendingSafe)
         XCTAssertNil(try recoveryJournal().modifyExpiry)
 
-        // Verify: pending items deleted
-        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+        // Verify: pending envelope deleted
+        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
                                      account: account),
-                       "Pending SE key should be deleted")
-        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSaltService(fingerprint: fp),
-                                     account: account),
-                       "Pending salt should be deleted")
-        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
-                                     account: account),
-                       "Pending sealed key should be deleted")
+                       "Pending envelope should be deleted")
 
-        // Verify: original permanent items still intact
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+        // Verify: original permanent envelope still intact
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
                                     account: account),
-                      "Original SE key should remain intact")
+                      "Original private-key envelope should remain intact")
     }
 
     func test_modifyExpiryCrashRecovery_onlyPendingExists_promotesToPermanent() async throws {
-        // Generate a key, export its fingerprint, then manually delete permanent items
-        // to simulate a crash after deletion but before promotion.
+        // Generate a key, then manually move its envelope to the pending row and delete the
+        // permanent row to simulate a crash after deletion but before promotion.
         let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Promote Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        // Copy current permanent data to pending names (simulating what modifyExpiry does)
-        let seKeyData = try mockKC.load(
-            service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
-        let saltData = try mockKC.load(
-            service: KeychainConstants.saltService(fingerprint: fp), account: account)
-        let sealedData = try mockKC.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+        let envelopeData = try mockKC.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account)
 
-        try mockKC.save(seKeyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(saltData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(sealedData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
+        try mockKC.save(envelopeData, service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
                         account: account, accessControl: nil)
 
-        // Delete the permanent items (simulating the crash point)
-        try mockKC.delete(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
-        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
-        try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
+        // Delete the permanent envelope (simulating the crash point)
+        try mockKC.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account)
 
         try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 
@@ -219,16 +182,10 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         XCTAssertEqual(outcome, .promotedPendingSafe)
         XCTAssertNil(try recoveryJournal().modifyExpiry)
 
-        // Verify: permanent items restored from pending
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+        // Verify: permanent envelope restored from pending
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
                                     account: account),
-                      "SE key should be promoted to permanent")
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.saltService(fingerprint: fp),
-                                    account: account),
-                      "Salt should be promoted to permanent")
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.sealedKeyService(fingerprint: fp),
-                                    account: account),
-                      "Sealed key should be promoted to permanent")
+                      "Envelope should be promoted to permanent")
     }
 
     func test_modifyExpiryCrashRecovery_noFlag_doesNothing() async throws {
@@ -252,57 +209,23 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
                        "No Keychain deletes should occur when flag is not set")
 
         // Verify: original key still intact
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp),
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp),
                                     account: account))
     }
 
-    func test_modifyExpiryCrashRecovery_partialPermanentAndCompletePending_replacesPermanent() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Partial Promote Test")
-        let fp = identity.fingerprint
-        let account = KeychainConstants.defaultAccount
-
-        let seKeyData = try mockKC.load(
-            service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
-        let saltData = try mockKC.load(
-            service: KeychainConstants.saltService(fingerprint: fp), account: account)
-        let sealedData = try mockKC.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
-
-        try mockKC.save(seKeyData, service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(saltData, service: KeychainConstants.pendingSaltService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(sealedData, service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
-
-        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
-        try mockKC.delete(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account)
-
-        try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
-
-        let outcome = service.checkAndRecoverFromInterruptedModifyExpiry()
-
-        XCTAssertEqual(outcome, .promotedPendingSafe)
-        XCTAssertNil(try recoveryJournal().modifyExpiry)
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.seKeyService(fingerprint: fp), account: account))
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.saltService(fingerprint: fp), account: account))
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.sealedKeyService(fingerprint: fp), account: account))
-        XCTAssertFalse(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
-    }
+    // The former `_partialPermanentAndCompletePending_replacesPermanent` case was removed:
+    // with the single-row envelope, a partially-present permanent bundle is impossible, so
+    // that scenario collapses to `_onlyPendingExists_promotesToPermanent` above.
 
     func test_modifyExpiryCrashRecovery_retryableFailure_keepsFlags() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Retry Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
+        // Pending envelope present, permanent deleted → recovery must promote pending.
+        try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp),
                         account: account, accessControl: nil)
-        try mockKC.save(Data([0xBB]), service: KeychainConstants.pendingSaltService(fingerprint: fp),
-                        account: account, accessControl: nil)
-        try mockKC.save(Data([0xCC]), service: KeychainConstants.pendingSealedKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
-
-        try mockKC.delete(service: KeychainConstants.seKeyService(fingerprint: fp), account: account)
+        try mockKC.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account)
         mockKC.failOnSaveNumber = mockKC.saveCallCount + 1
 
         try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
@@ -311,7 +234,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
 
         XCTAssertEqual(outcome, .retryableFailure)
         XCTAssertEqual(try recoveryJournal().modifyExpiry?.fingerprint, fp)
-        XCTAssertTrue(mockKC.exists(service: KeychainConstants.pendingSeKeyService(fingerprint: fp), account: account))
+        XCTAssertTrue(mockKC.exists(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fp), account: account))
     }
 
     func test_modifyExpiryCrashRecovery_unrecoverable_clearsFlags() async throws {
@@ -319,9 +242,8 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
-        try mockKC.delete(service: KeychainConstants.saltService(fingerprint: fp), account: account)
-        try mockKC.save(Data([0xAA]), service: KeychainConstants.pendingSeKeyService(fingerprint: fp),
-                        account: account, accessControl: nil)
+        // Neither permanent nor pending envelope present → unrecoverable.
+        try mockKC.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fp), account: account)
 
         try privateKeyControlStore.beginModifyExpiry(fingerprint: fp)
 

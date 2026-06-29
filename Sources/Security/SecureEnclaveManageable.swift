@@ -3,16 +3,14 @@ import LocalAuthentication
 import Security
 
 /// Result of wrapping a private key with the Secure Enclave.
-/// Contains the three Keychain items that must be stored together.
-/// `Sendable`: immutable `Data` fields only; crosses the actor boundary into the
-/// off-main reconstruct/unwrap in `PrivateKeyAccessService`.
+/// Holds the single self-contained `PrivateKeyEnvelope` row (binary plist): it folds
+/// in the SE key `dataRepresentation`, the persistent SE public key, the per-seal
+/// software ephemeral public key, the HKDF salt, and the AES-GCM seal.
+/// `Sendable`: immutable `Data` only; crosses the actor boundary into the off-main
+/// reconstruct/unwrap in `PrivateKeyAccessService`.
 struct WrappedKeyBundle: Sendable {
-    /// SE key dataRepresentation (for Keychain storage).
-    let seKeyData: Data
-    /// Random HKDF salt.
-    let salt: Data
-    /// AES-GCM sealed box containing the encrypted private key.
-    let sealedBox: Data
+    /// Encoded `PrivateKeyEnvelope` — one Keychain row per (fingerprint, namespace).
+    let envelope: Data
 }
 
 /// Handle to a Secure Enclave wrapping key.
@@ -47,22 +45,23 @@ protocol SecureEnclaveManageable: Sendable {
     /// - Returns: A handle to the SE key.
     func generateWrappingKey(accessControl: SecAccessControl?, authenticationContext: LAContext?) throws -> any SEKeyHandle
 
-    /// Wrap a private key using the SE wrapping scheme:
-    /// self-ECDH → HKDF(SHA-256, salt, info="CypherAir-SE-Wrap-v1:"+fingerprint) → AES-GCM seal.
+    /// Wrap a private key into a single `PrivateKeyEnvelope`:
+    /// software-ephemeral × persistent SE-public ECDH → HKDF(SHA-256, salt, domain-bound
+    /// info) → AES-GCM seal with public-parameter AAD.
     ///
     /// - Parameters:
     ///   - privateKey: The raw private key bytes to wrap.
-    ///   - handle: The SE wrapping key handle.
-    ///   - fingerprint: The key's hex fingerprint (lowercase, no spaces) for HKDF info string.
-    /// - Returns: A WrappedKeyBundle containing the three Keychain items.
+    ///   - handle: The SE wrapping key handle (its public key is the persistent ECDH party).
+    ///   - fingerprint: The key's hex fingerprint (lowercase, no spaces); bound into the envelope.
+    /// - Returns: A WrappedKeyBundle holding the single encoded envelope row.
     func wrap(privateKey: Data, using handle: any SEKeyHandle, fingerprint: String) throws -> WrappedKeyBundle
 
     /// Unwrap a private key. Triggers device authentication (Face ID / Touch ID).
     ///
     /// - Parameters:
     ///   - bundle: The WrappedKeyBundle retrieved from Keychain.
-    ///   - handle: The SE wrapping key handle (reconstructed from dataRepresentation).
-    ///   - fingerprint: The key's hex fingerprint for HKDF info string.
+    ///   - handle: The SE wrapping key handle (reconstructed from `seKeyData`).
+    ///   - fingerprint: The key's hex fingerprint; verified against the envelope binding.
     /// - Returns: The raw private key bytes. MUST be zeroized after use.
     func unwrap(bundle: WrappedKeyBundle, using handle: any SEKeyHandle, fingerprint: String) throws -> Data
 
@@ -90,16 +89,10 @@ protocol SecureEnclaveManageable: Sendable {
 // mode-switch re-wrap or modify-expiry rewrap window) or implicit system
 // authentication is intended (`nil`).
 
-/// HKDF info string constant.
-/// CRITICAL: This exact string must be used in both wrapping and unwrapping.
-/// Any mismatch will produce a different derived key and make wrapped keys
-/// permanently inaccessible.
-///
-/// Format: "CypherAir-SE-Wrap-v1:" + lowercase hex fingerprint (no spaces).
-/// The "v1" segment enables future migration if the wrapping scheme changes.
+/// Fingerprint validation shared by the private-key Secure Enclave envelope.
+/// The fingerprint is bound into `PrivateKeyEnvelope` (HKDF `sharedInfo` + AES-GCM AAD)
+/// rather than concatenated into an HKDF info string.
 enum SEConstants {
-    static let hkdfInfoPrefix = "CypherAir-SE-Wrap-v1:"
-
     /// Validate that a fingerprint is non-empty and contains only hex characters.
     /// Does not enforce a specific length — v4 fingerprints are 40 hex chars,
     /// v6 fingerprints are 64 hex chars, and future versions may differ.
@@ -111,13 +104,5 @@ enum SEConstants {
         guard fingerprint.unicodeScalars.allSatisfy({ hexCharacters.contains($0) }) else {
             throw SecureEnclaveError.invalidFingerprint
         }
-    }
-
-    /// Construct the full HKDF info string for a given key fingerprint.
-    /// Throws if the fingerprint is empty or contains non-hex characters.
-    static func hkdfInfo(fingerprint: String) throws -> Data {
-        try validateFingerprint(fingerprint)
-        let infoString = hkdfInfoPrefix + fingerprint.lowercased()
-        return Data(infoString.utf8)
     }
 }

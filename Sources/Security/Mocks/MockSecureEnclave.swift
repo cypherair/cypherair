@@ -84,40 +84,16 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
             throw MockSEError.invalidKeyHandle
         }
 
-        // Self-ECDH: compute shared secret between key and its own public key
-        let sharedSecret = try mockKey.privateKey.sharedSecretFromKeyAgreement(
-            with: mockKey.privateKey.publicKey
-        )
-
-        // Generate random salt
-        var salt = Data(count: 32)
-        let saltStatus = salt.withUnsafeMutableBytes { ptr in
-            SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
-        }
-        guard saltStatus == errSecSuccess else {
-            throw MockSEError.randomGenerationFailed
-        }
-
-        // HKDF derive AES-256 key
-        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: salt,
-            sharedInfo: infoData,
-            outputByteCount: 32
-        )
-
-        // AES-GCM seal
-        let sealedBox = try AES.GCM.seal(privateKey, using: symmetricKey)
-        guard let combined = sealedBox.combined else {
-            throw MockSEError.sealFailed
-        }
-
-        return WrappedKeyBundle(
+        // Same envelope path as production: ephemeral-static ECDH against the mock key's
+        // public key, HKDF + AES-GCM seal with public-parameter AAD. Exercises the full
+        // PrivateKeyEnvelope contract/binding/tamper logic on the macOS unit lane.
+        let envelope = try PrivateKeyEnvelopeCodec.seal(
+            privateKey: privateKey,
+            fingerprint: fingerprint,
             seKeyData: handle.dataRepresentation,
-            salt: salt,
-            sealedBox: combined
+            seKeyPublicKeyX963: mockKey.privateKey.publicKey.x963Representation
         )
+        return WrappedKeyBundle(envelope: try PrivateKeyEnvelopeCodec.encode(envelope))
         #else
         fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
@@ -135,24 +111,24 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
             throw MockSEError.invalidKeyHandle
         }
 
-        // Self-ECDH (same as wrapping)
-        let sharedSecret = try mockKey.privateKey.sharedSecretFromKeyAgreement(
-            with: mockKey.privateKey.publicKey
+        // Mirror production unwrap: decode + validate, fail closed on a bound public-key
+        // mismatch, then open-side ECDH (mock private key x envelope ephemeral public key).
+        let envelope = try PrivateKeyEnvelopeCodec.decode(
+            bundle.envelope,
+            expectedFingerprint: fingerprint
         )
-
-        // HKDF with stored salt and same info string
-        let infoData = try SEConstants.hkdfInfo(fingerprint: fingerprint)
-        let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
-            using: SHA256.self,
-            salt: bundle.salt,
-            sharedInfo: infoData,
-            outputByteCount: 32
+        guard envelope.seKeyPublicKeyX963 == mockKey.privateKey.publicKey.x963Representation else {
+            throw PrivateKeyEnvelopeError.deviceBindingMismatch
+        }
+        let ephemeralPublicKey = try P256.KeyAgreement.PublicKey(
+            x963Representation: envelope.ephemeralPublicKeyX963
         )
-
-        // AES-GCM open
-        let sealedBox = try AES.GCM.SealedBox(combined: bundle.sealedBox)
-        let plaintext = try AES.GCM.open(sealedBox, using: symmetricKey)
-        return plaintext
+        let sharedSecret = try mockKey.privateKey.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
+        return try PrivateKeyEnvelopeCodec.open(
+            envelope: envelope,
+            sharedSecret: sharedSecret,
+            expectedFingerprint: fingerprint
+        )
         #else
         fatalError("CryptoKit is required for MockSecureEnclave. This fallback should never execute on iOS.")
         #endif
@@ -222,6 +198,4 @@ enum MockSEError: Error {
     case invalidKeyHandle
     case keyNotFound
     case authenticationFailed
-    case randomGenerationFailed
-    case sealFailed
 }

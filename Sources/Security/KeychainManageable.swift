@@ -13,7 +13,7 @@ protocol KeychainManageable {
     ///
     /// - Parameters:
     ///   - data: The data to store.
-    ///   - service: The Keychain service identifier (e.g., "com.cypherair.v1.se-key.{fingerprint}").
+    ///   - service: The Keychain service identifier (e.g., "com.cypherair.v1.privkey-envelope.{fingerprint}").
     ///   - account: The Keychain account identifier.
     ///   - accessControl: Optional SecAccessControl for biometric/passcode protection.
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
@@ -84,34 +84,14 @@ enum KeychainConstants {
     /// Prefix for all Keychain items. The "v1" segment enables future migration.
     static let prefix = "com.cypherair.v1"
 
-    /// SE key data representation.
-    static func seKeyService(fingerprint: String) -> String {
-        "\(prefix).se-key.\(fingerprint)"
+    /// Single self-contained private-key envelope row (`PrivateKeyEnvelope`).
+    static func privateKeyEnvelopeService(fingerprint: String) -> String {
+        "\(prefix).privkey-envelope.\(fingerprint)"
     }
 
-    /// HKDF salt.
-    static func saltService(fingerprint: String) -> String {
-        "\(prefix).salt.\(fingerprint)"
-    }
-
-    /// AES-GCM sealed private key.
-    static func sealedKeyService(fingerprint: String) -> String {
-        "\(prefix).sealed-key.\(fingerprint)"
-    }
-
-    /// Temporary SE key during mode switch.
-    static func pendingSeKeyService(fingerprint: String) -> String {
-        "\(prefix).pending-se-key.\(fingerprint)"
-    }
-
-    /// Temporary salt during mode switch.
-    static func pendingSaltService(fingerprint: String) -> String {
-        "\(prefix).pending-salt.\(fingerprint)"
-    }
-
-    /// Temporary sealed key during mode switch.
-    static func pendingSealedKeyService(fingerprint: String) -> String {
-        "\(prefix).pending-sealed-key.\(fingerprint)"
+    /// Temporary private-key envelope row during mode-switch / modify-expiry rewrap.
+    static func pendingPrivateKeyEnvelopeService(fingerprint: String) -> String {
+        "\(prefix).pending-privkey-envelope.\(fingerprint)"
     }
 
     /// ProtectedData Secure Enclave device-binding key representation.

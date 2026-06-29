@@ -190,7 +190,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
                 servicePrefix: KeychainConstants.prefix,
                 account: KeychainConstants.defaultAccount
             ).count,
-            3
+            1
         )
 
         let relockTask = Task { [targetService] in
@@ -412,9 +412,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
         }
 
         let storedBundle = try bundleStore.loadBundle(fingerprint: identity.fingerprint)
-        XCTAssertEqual(storedBundle.seKeyData, originalBundle.seKeyData)
-        XCTAssertEqual(storedBundle.salt, originalBundle.salt)
-        XCTAssertEqual(storedBundle.sealedBox, originalBundle.sealedBox)
+        XCTAssertEqual(storedBundle.envelope, originalBundle.envelope)
         XCTAssertEqual(target.metadataPersistence.saveCallCount, 0)
         XCTAssertEqual(target.metadataPersistence.deleteCallCount, 0)
     }
@@ -517,9 +515,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
         XCTAssertEqual(
             Set(privateKeyServices),
             Set([
-                KeychainConstants.seKeyService(fingerprint: existing.fingerprint),
-                KeychainConstants.saltService(fingerprint: existing.fingerprint),
-                KeychainConstants.sealedKeyService(fingerprint: existing.fingerprint)
+                KeychainConstants.privateKeyEnvelopeService(fingerprint: existing.fingerprint)
             ])
         )
     }

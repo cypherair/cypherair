@@ -497,34 +497,14 @@ class KeyManagementServiceTestCase: XCTestCase {
 
     func copyPermanentBundleToPending(fingerprint: String) throws {
         let account = KeychainConstants.defaultAccount
-        let seKeyData = try mockKC.load(
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account
-        )
-        let saltData = try mockKC.load(
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account
-        )
-        let sealedData = try mockKC.load(
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
+        let envelope = try mockKC.load(
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
             account: account
         )
 
         try mockKC.save(
-            seKeyData,
-            service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try mockKC.save(
-            saltData,
-            service: KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try mockKC.save(
-            sealedData,
-            service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint),
+            envelope,
+            service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint),
             account: account,
             accessControl: nil
         )
@@ -826,14 +806,9 @@ class KeyManagementServiceTestCase: XCTestCase {
         to destination: MockKeychain
     ) throws {
         let account = KeychainConstants.defaultAccount
-        for service in [
-            KeychainConstants.seKeyService(fingerprint: fingerprint),
-            KeychainConstants.saltService(fingerprint: fingerprint),
-            KeychainConstants.sealedKeyService(fingerprint: fingerprint)
-        ] {
-            let data = try source.load(service: service, account: account)
-            try destination.save(data, service: service, account: account, accessControl: nil)
-        }
+        let service = KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint)
+        let data = try source.load(service: service, account: account)
+        try destination.save(data, service: service, account: account, accessControl: nil)
     }
 
     func recoveryJournal() throws -> PrivateKeyControlRecoveryJournal {

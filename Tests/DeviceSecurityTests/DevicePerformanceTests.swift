@@ -148,7 +148,7 @@ final class DevicePerformanceTests: DeviceSecurityTestCase {
 
     /// C10.7: SE wrap/unwrap end-to-end (excluding biometric prompt).
     /// Threshold: < 100ms. Soft-fail: record and document.
-    /// Measures: SE P-256 key gen + self-ECDH + HKDF + AES-GCM seal + unwrap cycle.
+    /// Measures: SE P-256 key gen + ephemeral-static ECDH + HKDF + AES-GCM envelope seal + unwrap cycle.
     func test_perf_seWrapUnwrap_endToEnd_latencyUnder100ms() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 

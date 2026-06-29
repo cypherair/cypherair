@@ -489,12 +489,8 @@ final class KeyMutationService {
 
     private func allPrivateKeychainServices(for fingerprint: String) -> [String] {
         [
-            KeychainConstants.seKeyService(fingerprint: fingerprint),
-            KeychainConstants.saltService(fingerprint: fingerprint),
-            KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            KeychainConstants.pendingSeKeyService(fingerprint: fingerprint),
-            KeychainConstants.pendingSaltService(fingerprint: fingerprint),
-            KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint)
+            KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint)
         ]
     }
 

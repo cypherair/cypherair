@@ -33,14 +33,9 @@ class DeviceSecurityTestCase: XCTestCase {
         // Clean up all Keychain items created during the test.
         let account = KeychainConstants.defaultAccount
         for fingerprint in createdFingerprints {
-            // Permanent items
-            try? keychain.delete(service: KeychainConstants.seKeyService(fingerprint: fingerprint), account: account)
-            try? keychain.delete(service: KeychainConstants.saltService(fingerprint: fingerprint), account: account)
-            try? keychain.delete(service: KeychainConstants.sealedKeyService(fingerprint: fingerprint), account: account)
-            // Pending items (mode switch)
-            try? keychain.delete(service: KeychainConstants.pendingSeKeyService(fingerprint: fingerprint), account: account)
-            try? keychain.delete(service: KeychainConstants.pendingSaltService(fingerprint: fingerprint), account: account)
-            try? keychain.delete(service: KeychainConstants.pendingSealedKeyService(fingerprint: fingerprint), account: account)
+            // Permanent + pending single-row envelopes (mode switch).
+            try? keychain.delete(service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint), account: account)
+            try? keychain.delete(service: KeychainConstants.pendingPrivateKeyEnvelopeService(fingerprint: fingerprint), account: account)
         }
         for entry in createdKeychainServices {
             try? keychain.delete(service: entry.service, account: entry.account)
@@ -90,23 +85,10 @@ class DeviceSecurityTestCase: XCTestCase {
     }
 
     final func storePermanentBundle(_ bundle: WrappedKeyBundle, fingerprint: String) throws {
-        let account = KeychainConstants.defaultAccount
         try keychain.save(
-            bundle.seKeyData,
-            service: KeychainConstants.seKeyService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            bundle.salt,
-            service: KeychainConstants.saltService(fingerprint: fingerprint),
-            account: account,
-            accessControl: nil
-        )
-        try keychain.save(
-            bundle.sealedBox,
-            service: KeychainConstants.sealedKeyService(fingerprint: fingerprint),
-            account: account,
+            bundle.envelope,
+            service: KeychainConstants.privateKeyEnvelopeService(fingerprint: fingerprint),
+            account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
     }

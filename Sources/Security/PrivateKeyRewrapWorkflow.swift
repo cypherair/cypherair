@@ -125,8 +125,12 @@ final class PrivateKeyRewrapWorkflow {
         try await authenticationPromptCoordinator.withOperationPrompt(
             source: "privateKeyProtection.switch.rewrap"
         ) {
+            let existingSeKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
+                from: existingBundle.envelope,
+                expectedFingerprint: fingerprint
+            )
             let existingHandle = try secureEnclave.reconstructKey(
-                from: existingBundle.seKeyData,
+                from: existingSeKeyData,
                 authenticationContext: authenticator.lastEvaluatedContext
             )
 
