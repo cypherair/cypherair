@@ -189,7 +189,7 @@ final class ContactService: @unchecked Sendable {
 
     // MARK: - Remove Contact
 
-    /// Remove a contact and delete their public key file.
+    /// Remove a contact key from the protected contacts snapshot.
     func removeContact(fingerprint: String) throws {
         try requireContactsAvailable()
         try withProtectedRuntimeRollback {

@@ -15,7 +15,7 @@
 
 - [ ] Rust targets compile: `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, `aarch64-apple-visionos`, and `aarch64-apple-visionos-sim`
 - [ ] For Rust / UniFFI-visible behavior changes, the pinned full-sync command (CLAUDE.md Build Commands / [TESTING.md](TESTING.md) Section 2.4) has been run before any Xcode validation
-- [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, the local `CypherAir-UnitTests` plan on `platform=macOS,arch=arm64e`, and the native visionOS build probe pass
+- [ ] `cargo +stable test --manifest-path pgp-mobile/Cargo.toml`, the local `CypherAir-UnitTests` plan on `platform=macOS,arch=arm64e`, and the signed native visionOS build probe pass
 - [ ] If `swift-unit-tests-hosted-preview` is warning-skipped by hosted preflight ([TESTING.md](TESTING.md) Section 2.2), rely on local macOS validation for Swift test signal
 - [ ] No new compiler warnings
 - [ ] No hardcoded user-visible strings (all in String Catalog)

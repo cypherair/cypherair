@@ -69,8 +69,7 @@ xcodebuild test -scheme CypherAir -testPlan CypherAir-MacUITests \
 
 # Run the native visionOS build probe.
 xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS' \
-    CODE_SIGNING_ALLOWED=NO
+    -destination 'generic/platform=visionOS'
 ```
 
 For Rust changes under `pgp-mobile/src` that can affect Swift-visible behavior,

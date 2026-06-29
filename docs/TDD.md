@@ -163,7 +163,7 @@ The App decrypts all supported formats regardless of the user's own key profile:
 
 Targets: `aarch64-apple-ios` (device) + `aarch64-apple-ios-sim` (Apple Silicon sim) + `aarch64-apple-darwin` (macOS Apple Silicon) + `aarch64-apple-visionos` (visionOS device) + `aarch64-apple-visionos-sim` (visionOS simulator). Tier 2 in Rust. `getrandom` uses `SecRandomCopyBytes` on Apple platforms. LTO and strip are **disabled** in the release profile (`lto = false`, `strip = "none"`) — enabling them causes linker failures with vendored OpenSSL. Binary size is managed via `codegen-units = 1` and Xcode dead code elimination. Estimated app binary contribution: ~6–8 MB.
 
-The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, packages all Apple slices into `PgpMobile.xcframework`, and the Xcode project links that XCFramework. The native app path is probed with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS' CODE_SIGNING_ALLOWED=NO`.
+The current release pipeline includes native visionOS support. `build-xcframework.sh` builds and validates the visionOS device and simulator archives, packages all Apple slices into `PgpMobile.xcframework`, and the Xcode project links that XCFramework. The native app path is probed locally with `xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS'`.
 
 To keep vendored OpenSSL reproducible across the current Apple `arm64e`
 build chain, `pgp-mobile/Cargo.toml` patches `openssl-src` through
