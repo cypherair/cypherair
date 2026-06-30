@@ -303,7 +303,7 @@ The stored envelope is decoded and validated, then reconstructing the SE key fro
 | Standard (default) | `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]` | Face ID / Touch ID with passcode fallback. Equivalent to `deviceOwnerAuthentication`. |
 | High Security | `[.privateKeyUsage, .biometryAny]` | Face ID / Touch ID only. No passcode fallback. If biometrics unavailable, private key is inaccessible. |
 
-**Mode switching:** Changing the authentication mode re-wraps all SE-protected private keys with the new access control flags under a single authentication, atomically — original keys stay intact until the complete new bundle is verified, and crash recovery uses the post-unlock `private-key-control.recoveryJournal`. Authoritative procedure, atomicity ordering, and recovery rules: [SECURITY.md](SECURITY.md) Section 4.
+**Mode switching:** Changing the authentication mode re-wraps all SE-protected private keys with the new access control flags under a single authentication, atomically — original keys stay intact until the complete pending envelope row is verified, and crash recovery uses the post-unlock `private-key-control.recoveryJournal`. Authoritative procedure, atomicity ordering, and recovery rules: [SECURITY.md](SECURITY.md) Section 4.
 
 ### 3.5 Keychain Layout
 
@@ -326,7 +326,7 @@ com.cypherair.v1.pending-privkey-envelope.<fingerprint>
 
 ProtectedData uses this device-binding key only to open the app-data
 root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
-It is not part of the private-key bundle model and must fail closed if missing.
+It is not part of the private-key envelope model and must fail closed if missing.
 
 ### 3.6 Security Properties
 
@@ -402,7 +402,7 @@ Migration and exception rules:
 
 - `private-key-control` settings and recovery-journal state are created and mutated only inside the protected payload.
 - Key metadata persists only in the protected `key-metadata` domain.
-- Permanent and pending private-key bundles remain in the existing Keychain / Secure Enclave private-key material domain.
+- Permanent and pending private-key envelope rows remain in the existing Keychain / Secure Enclave private-key material domain.
 - Self-test reports are in-memory export-only data.
 - Temporary/export/tutorial artifacts are centralized through `AppTemporaryArtifactStore`; streaming/decrypted outputs, export handoff files, tutorial sandbox directories, startup cleanup, and reset cleanup keep the ephemeral-with-cleanup behavior classified in the inventory.
 - Contacts production data remains in the protected `contacts` domain. Legacy flat Contacts files under `Documents/contacts` are outside supported app state and are not read, migrated, quarantined, or reset-cleaned.

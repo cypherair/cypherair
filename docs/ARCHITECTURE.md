@@ -193,11 +193,11 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | Component | Responsibility |
 |-----------|---------------|
 | `SecureEnclaveManager` | P-256 key generation in SE, ephemeral-static ECDH + HKDF + AES-GCM (AAD-bound) `CAPKEV1` envelope wrapping/unwrapping, key deletion. Same wrapping scheme for Ed25519/X25519/Ed448/X448. |
-| `KeychainManager` | CRUD for Keychain items (private-key bundle rows and ProtectedData support rows), access control flag configuration |
+| `KeychainManager` | CRUD for Keychain items (private-key envelope rows and ProtectedData support rows), access control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE key re-wrapping, LAContext evaluation, and post-unlock auth-mode crash recovery |
 | `PrivateKeyModeSwitchAuthenticator` | Current-mode authentication gate for private-key mode switching before any rewrap journal or Keychain mutation |
-| `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending bundle creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
-| `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain bundle state and protected `private-key-control` journal state |
+| `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending envelope-row creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
+| `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain envelope-row state and protected `private-key-control` journal state |
 | `ProtectedDataSessionCoordinator` | ProtectedData session state owner for authenticated root-secret access, wrapping-root-key derivation, relock, secret clearing, and `restartRequired` latching for protected app-data domains |
 | `Sources/Security/Mocks/` | Temporary SR-FIX-18 tutorial/UI-test mock boundary. Mock implementations kept here must remain visibly named `Mock*`; production ProtectedData files must not embed mock implementations. |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, Keychain-backed staged/committed wrapped-DMK record storage, and unlocked-domain-key zeroization |
@@ -208,7 +208,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `SecureEnclaveCustodyGenerationRecoveryService` | Custody recovery classifier that compares `PGPKeyIdentity` P-256 Secure Enclave metadata and public certificate bindings with Security handle inventory, producing only sanitized in-memory availability categories consumed at key load and by the key-detail degraded-availability row. |
 | `AppSessionOrchestrator` | App-wide grace-window ownership, content-clear generation, launch/resume privacy-auth sequencing, bootstrap handoff, and protected-data access-gate evaluation |
 | `AuthLifecycleTraceStore` / `AuthTraceMetadata` | Passive authentication, Keychain, Secure Enclave, ProtectedData, startup, UI timing, and local reset trace metadata; never records plaintext, keys, salts, sealed payloads, or fingerprints |
-| `KeyBundleStore` | Shared storage helper for 3-item wrapped key bundles (permanent/pending namespaces, rollback, replace-from-pending semantics) |
+| `KeyBundleStore` | Shared storage helper for single-row private-key envelopes (permanent/pending namespaces, rollback, replace-from-pending semantics) |
 | `KeyMetadataDomainStore` | ProtectedData `key-metadata` schema v2 domain for `PGPKeyIdentity` payloads opened after app privacy authentication |
 | `KeyMigrationCoordinator` | Shared migration state machine for pending/permanent recovery, including safe/retryable/unrecoverable outcomes |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K memory requirements before key import. 75% threshold prevents Jetsam termination. No-op for Profile A (Iterated+Salted S2K). |
@@ -234,7 +234,7 @@ ProtectedData component ownership:
 
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `PrivateKeyControlStore` is the private-key control source of truth; the payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
-- `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key bundle rows
+- `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key envelope rows
 - `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
 - `ProtectedSettingsOrdinarySettingsPersistence` adapts `ProtectedSettingsStore` to the ordinary-settings persistence protocol inside the ProtectedData boundary
 - `ProtectedOrdinarySettingsCoordinator` is the source of truth for ordinary-settings availability and loaded snapshots; production reads/writes only after app privacy authentication has been reduced to app-level ordinary-settings availability
@@ -556,8 +556,8 @@ App Sandbox:
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
 - `<domainID>` is the stable `ProtectedDataDomainID` raw value. Domain-key rows use the default account, no per-row biometric access control, and contain only the wrapped-DMK record; the app still needs the post-auth wrapping root key to unwrap a DMK.
-- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key bundle rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the bundle material.
-- Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password bundle rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Custody generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
+- Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key envelope rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the envelope material.
+- Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password envelope rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Custody generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
 - The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a software-ephemeral P-256 ECDH envelope (`CAPDSEV2`) that is domain-separated from the per-fingerprint private-key envelope (`CAPKEV1`) by distinct magic and HKDF/AAD prefixes.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, or out-of-app-custody exception.
 - Post-unlock orchestration opens required domains such as `private-key-control`, `key-metadata`, protected settings, and the framework sentinel by reusing the app privacy authentication context without extra Face ID prompts.

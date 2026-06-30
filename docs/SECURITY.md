@@ -187,7 +187,7 @@ applies to software-custody keys only (device-bound keys cannot be backed up).
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
-conflated with private-key bundle wrapping. The current ProtectedData v2 model
+conflated with private-key envelope wrapping. The current ProtectedData v2 model
 keeps the Keychain / `SecAccessControl` / authenticated `LAContext` gate, but
 stores the root-secret Keychain payload as a Secure Enclave device-bound
 envelope instead of raw root-secret bytes.
@@ -242,7 +242,7 @@ Keychain row reconstructs the handle and reopens the material.
 5. Store one Keychain item: the encoded `CAPKEV1` envelope (SE key blob, persistent SE + ephemeral public keys, salt, nonce, ciphertext, tag). **Confirm the write succeeds.**
 6. Only after successful storage: zeroize the raw private key bytes from memory (the `SymmetricKey` and `SharedSecret` are opaque CryptoKit values that clear their own storage).
 
-**Public-parameter binding:** The fingerprint and both public keys are bound through HKDF `sharedInfo` and the AES-GCM AAD, so no public field can be substituted without breaking authentication. **The envelope is the only supported private-key payload: any row that does not decode as a current `CAPKEV1` envelope fails closed as ordinary undecodable input.** There is no supported legacy self-ECDH local data to migrate.
+**Public-parameter binding:** The fingerprint and both public keys are bound through HKDF `sharedInfo` and the AES-GCM AAD, so no public field can be substituted without breaking authentication. **The envelope is the only supported private-key payload: any row that does not decode as a current `CAPKEV1` envelope fails closed as ordinary undecodable input.** There is no supported legacy private-key wrapping local data to migrate.
 
 **Ordering rationale (steps 5–6):** Storage is performed before zeroization. If storage fails or the process crashes before step 5 completes, the raw key bytes are still in memory and the operation can be retried. If zeroization happened first and storage then failed, the key would be permanently lost.
 
@@ -329,14 +329,13 @@ When the user changes mode in Settings:
 **Atomicity:** Old Keychain items are kept intact until ALL new items are confirmed stored (step 5). If any step fails before step 6, the original keys are unaffected — delete the temporary items and report the error.
 
 **Crash recovery:** After app-session authentication opens `private-key-control`, check the rewrap recovery journal. If an entry is present:
-- If the permanent bundle is complete and temporary items exist, the permanent bundle is treated as authoritative. Delete the temporary items and keep the original mode.
-- If the permanent bundle is partial but the temporary bundle is complete, the temporary bundle is treated as authoritative. Delete the residual permanent items, then promote the temporary bundle to permanent names.
-- If the permanent bundle is missing and the temporary bundle is complete, promote the temporary bundle to permanent names.
-- If neither namespace contains a complete three-item bundle, recovery is **unrecoverable**. Clear the journal entry, surface a generic post-unlock warning, and require the user to restore from backup if private-key operations fail.
+- If the permanent envelope row exists and a pending row exists, the permanent row is treated as authoritative. Delete the pending row and keep the original mode.
+- If the permanent envelope row is absent or invalid but the pending row is complete, promote the pending row to the permanent service name.
+- If neither namespace contains a complete envelope row, recovery is **unrecoverable**. Clear the journal entry, surface a generic post-unlock warning, and require the user to restore from backup if private-key operations fail.
 - If deletion or promotion fails for a retryable reason (for example, transient Keychain write/delete failure), preserve the recovery journal so the app retries recovery after the next successful unlock.
 - Recovery diagnostics are surfaced through the app's existing post-unlock warning path and must remain generic — never include fingerprints or other key identifiers.
-- Persist the new auth mode only after a full successful promotion of complete pending bundles. Cleaning stale pending items alone must not change auth mode.
-- This ensures the app prefers a complete bundle over a partial one and avoids silently finalizing an inconsistent state.
+- Persist the new auth mode only after a full successful promotion of complete pending envelope rows. Cleaning stale pending rows alone must not change auth mode.
+- This ensures the app prefers an existing permanent row over a pending one and avoids silently finalizing an inconsistent state.
 
 ### LAPolicy Selection
 
@@ -354,7 +353,7 @@ Protected app-data scope and per-surface classification live in [PERSISTED_STATE
 Security invariants for protected app data:
 
 - Protected domains open only after app privacy authentication and the shared ProtectedData authorization path.
-- ProtectedData is separate from the private-key material domain; permanent and pending SE-wrapped private-key bundle rows remain under the Keychain / Secure Enclave private-key-material boundary.
+- ProtectedData is separate from the private-key material domain; permanent and pending SE-wrapped private-key envelope rows remain under the Keychain / Secure Enclave private-key-material boundary.
 - `appSessionAuthenticationPolicy` remains the documented early-readable boot-authentication exception.
 - Legacy flat Contacts files under `Documents/contacts` are outside the supported app-state model. CypherAir no longer reads, migrates, quarantines, or reset-cleans them.
 - Contacts production state stays inside the protected `contacts` domain. Certification-signature export/share is an explicit artifact export boundary, not a Contacts backup, package, or social-graph export.

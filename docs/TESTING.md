@@ -763,11 +763,10 @@ func test_decrypt_highSecurityMode_biometricsUnavailable_throwsAuthError() async
 
 Crash-recovery logic now distinguishes safe cleanup, successful promotion, retryable failure, and unrecoverable states. Tests should cover:
 
-- complete permanent + stale pending -> cleanup only
-- partial permanent + complete pending -> replace permanent from pending
-- missing permanent + complete pending -> promote pending
+- permanent envelope row + stale pending row -> cleanup only
+- missing permanent envelope row + complete pending row -> promote pending
 - delete/write failure during recovery -> retryable failure, keep flags set
-- no complete bundle in either namespace -> unrecoverable, clear flags, surface startup warning
+- no complete envelope row in either namespace -> unrecoverable, clear flags, surface startup warning
 - startup warning text remains generic and does not leak fingerprints
 
 ### Memory Zeroing Test
