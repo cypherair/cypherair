@@ -193,8 +193,9 @@ immutable release, checksum, manifest, asset attestations, and restored static
 framework slices before Xcode builds. The app consumes SQLCipher through Xcode's
 normal Frameworks phase, not slice-specific linker paths. Refreshes must be
 published in `cypherair/sqlcipher-xcframework` first, then re-pinned in
-`third_party/sqlcipher-xcframework.pin.json`. Contacts storage still uses the
-current ProtectedData domain until the later issue #540 implementation.
+`third_party/sqlcipher-xcframework.pin.json`. Contacts storage uses the restored
+SQLCipher artifact as the protected `contacts.sqlite` payload under the existing
+ProtectedData `contacts` domain.
 
 ## Security Model
 

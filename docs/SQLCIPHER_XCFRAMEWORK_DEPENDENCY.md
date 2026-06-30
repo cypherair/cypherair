@@ -6,8 +6,9 @@
 > XCFramework build repository and the restore/validation/release process.
 > Audience: CypherAir maintainers, release owners, and agents working on
 > Contacts persistence, Apple arm64e dependencies, or release compliance.
-> Companion: GitHub issue #540, `cypherair/sqlcipher-xcframework`, and
-> `third_party/sqlcipher-xcframework.pin.json`.
+> Companion: `cypherair/sqlcipher-xcframework`,
+> `third_party/sqlcipher-xcframework.pin.json`, and the current-state storage
+> docs cited below.
 > Last reviewed: 2026-06-27.
 > Update triggers: SQLCipher artifact repository identity, stable release tag,
 > asset contract, pin schema, supported slices, or CypherAir consumer validation
@@ -158,12 +159,14 @@ Contacts-specific database-key custody row, fall back to legacy snapshot
 artifacts, or change the SQLCipher dependency pin/release model as part of
 Contacts persistence work.
 
-Contacts SQLCipher changes remain covered by
-[Contacts SQLCipher Storage Design](CONTACTS_SQLCIPHER_STORAGE_DESIGN.md) and
-must preserve post-unlock opening without a normal-flow second prompt, relock
-connection cleanup, reset cleanup for DB sidecars and obsolete ProtectedData
-artifacts, and fail-closed recovery for corrupt, missing, mismatched key,
-schema, config, or integrity state.
+Durable Contacts SQLCipher rules live in the current-state docs:
+[Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
+[Security](SECURITY.md), [Architecture](ARCHITECTURE.md), [TDD](TDD.md),
+[Testing](TESTING.md), and [Code Review](CODE_REVIEW.md). They preserve
+post-unlock opening without a normal-flow second prompt, relock connection
+cleanup, reset cleanup for DB sidecars and obsolete ProtectedData artifacts,
+and fail-closed recovery for corrupt, missing, mismatched key, schema, config,
+or integrity state.
 
-Private-key wrapping cleanup remains separate issue #540 follow-up work and is
-not part of the SQLCipher dependency contract.
+Private-key envelope storage is documented by the security and persisted-state
+current-state docs. It is not part of the SQLCipher dependency contract.
