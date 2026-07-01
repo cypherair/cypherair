@@ -320,13 +320,16 @@ com.cypherair.v1.pending-privkey-envelope.<fingerprint>
 | SE key `dataRepresentation` | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | Per auth mode |
 | Salt | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | Encrypted private key | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
-| ProtectedData SE device-binding key | Keychain-backed SE key representation | `WhenPasscodeSetThisDeviceOnly` | `.privateKeyUsage` only; no Face ID flags |
 | ProtectedData committed wrapped-DMK record | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 | ProtectedData staged wrapped-DMK record | `kSecClassGenericPassword` | `WhenUnlockedThisDeviceOnly` | None |
 
 ProtectedData uses this device-binding key only to open the app-data
-root-secret envelope after the existing Keychain / `LAContext` gate succeeds.
-It is not part of the private-key envelope model and must fail closed if missing.
+root-secret envelope after the existing Keychain / `LAContext` gate succeeds. Its
+Secure Enclave `dataRepresentation` is folded into that envelope (a single
+self-contained row) and reconstructed at open time; it is not a separate Keychain
+item and is not part of the private-key envelope model. Open fails closed unless
+the Secure Enclave can reconstruct the folded key and its public key matches the
+envelope's bound public key.
 
 ### 3.6 Security Properties
 

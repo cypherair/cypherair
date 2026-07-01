@@ -36,15 +36,11 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
 
     init(
         account: String = KeychainConstants.defaultAccount,
-        supportKeychain: (any KeychainManageable)? = nil,
         deviceBindingProvider: (any ProtectedDataDeviceBindingProvider)? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.account = account
-        let supportKeychain = supportKeychain ?? SystemKeychain(traceStore: traceStore)
         self.deviceBindingProvider = deviceBindingProvider ?? HardwareProtectedDataDeviceBindingProvider(
-            keychain: supportKeychain,
-            account: account,
             traceStore: traceStore
         )
         self.traceStore = traceStore

@@ -14,9 +14,6 @@ protocol ProtectedDataDeviceBindingProvider {
         envelope: ProtectedDataRootSecretEnvelope,
         expectedSharedRightIdentifier: String
     ) throws -> Data
-
-    func bindingKeyExists() -> Bool
-    func deleteBindingKey() throws
 }
 
 enum ProtectedDataDeviceBindingConstants {
@@ -26,17 +23,9 @@ enum ProtectedDataDeviceBindingConstants {
 struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingProvider {
     let keyIdentifier = ProtectedDataDeviceBindingConstants.keyIdentifier
 
-    private let keychain: any KeychainManageable
-    private let account: String
     private let traceStore: AuthLifecycleTraceStore?
 
-    init(
-        keychain: any KeychainManageable = SystemKeychain(),
-        account: String = KeychainConstants.defaultAccount,
-        traceStore: AuthLifecycleTraceStore? = nil
-    ) {
-        self.keychain = keychain
-        self.account = account
+    init(traceStore: AuthLifecycleTraceStore? = nil) {
         self.traceStore = traceStore
     }
 
@@ -128,26 +117,6 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             )
             throw error
         }
-    }
-
-    // Legacy pre-consolidation device-binding key row helpers. The current envelope folds
-    // the Secure Enclave key in (a single self-contained row), so no separate row is
-    // written; these are retained only so a transition/reset can observe or clear a row
-    // left by an earlier build.
-    func bindingKeyExists() -> Bool {
-        keychain.exists(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
-    }
-
-    func deleteBindingKey() throws {
-        try keychain.delete(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
     }
 
     /// Creates a fresh ProtectedData device-binding Secure Enclave key. The key is not

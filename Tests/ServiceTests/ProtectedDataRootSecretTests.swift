@@ -61,7 +61,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         }
     }
 
-    func test_rootSecretEnvelope_aadV3BindsEphemeralPublicKeyAndRejectsAADV1() throws {
+    func test_rootSecretEnvelope_aadBindsEphemeralPublicKeyAndRejectsUnsupportedAADVersion() throws {
         let provider = MockProtectedDataDeviceBindingProvider()
         let rootSecret = Data(repeating: 0x26, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
@@ -100,7 +100,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         let rootSecret = Data(repeating: 0x35, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
 
-        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "CAPDSEV2")))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "INVALID0")))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, hkdfSalt: Data(repeating: 0x00, count: 31))))

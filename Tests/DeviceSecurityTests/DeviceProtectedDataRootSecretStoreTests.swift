@@ -10,7 +10,6 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
-        cleanupSupportKeychainItems()
         rootSecretStore = KeychainProtectedDataRootSecretStore(
             account: "DeviceProtectedDataRootSecretStoreTests"
         )
@@ -18,7 +17,6 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
 
     override func tearDown() async throws {
         try cleanupTrackedRootSecrets()
-        cleanupSupportKeychainItems()
         rootSecretStore = nil
         try await super.tearDown()
     }
@@ -106,41 +104,6 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         XCTAssertEqual(loadedSecret, secret)
     }
 
-    func test_rootSecretRowIsSelfContained_survivesLegacyDeviceBindingKeyRowDeletion() async throws {
-        let identifier = try makeTestRootSecretIdentifier(functionName: #function)
-        let secret = Data(repeating: 0xD7, count: 32)
-        try rootSecretStore.saveRootSecret(secret, identifier: identifier, policy: .userPresence)
-
-        let authenticatedContext = try await authenticateContext(
-            policy: .deviceOwnerAuthentication,
-            reason: "Authenticate to validate CypherAir protected app data access."
-        )
-        authenticatedContext.interactionNotAllowed = true
-        defer {
-            authenticatedContext.invalidate()
-        }
-
-        var initialSecret = try rootSecretStore.loadRootSecret(
-            identifier: identifier,
-            authenticationContext: authenticatedContext
-        )
-        initialSecret.protectedDataZeroize()
-
-        // The Secure Enclave device-binding key is folded into the single self-contained
-        // envelope row, so clearing any separate / legacy device-binding key row must not
-        // affect load — reconstruction comes from the envelope itself.
-        cleanupSupportKeychainItems()
-
-        var reloadedSecret = try rootSecretStore.loadRootSecret(
-            identifier: identifier,
-            authenticationContext: authenticatedContext
-        )
-        defer {
-            reloadedSecret.protectedDataZeroize()
-        }
-        XCTAssertEqual(reloadedSecret, secret)
-    }
-
     private func authenticateContext(policy: LAPolicy, reason: String) async throws -> LAContext {
         let context = LAContext()
         var error: NSError?
@@ -179,19 +142,6 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         }
 
         trackedIdentifiers.removeAll()
-    }
-
-    private func cleanupSupportKeychainItems() {
-        let keychain = SystemKeychain()
-        for service in [
-            KeychainConstants.protectedDataDeviceBindingKeyService
-        ] {
-            try? keychain.delete(
-                service: service,
-                account: "DeviceProtectedDataRootSecretStoreTests",
-                authenticationContext: nil
-            )
-        }
     }
 
     private func settleAuthenticationSession() async throws {

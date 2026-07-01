@@ -6,8 +6,6 @@ final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPr
     let keyIdentifier: String
     var sealError: MockKeychainError?
     var openError: MockKeychainError?
-    var deleteError: MockKeychainError?
-    private var privateKey: P256.KeyAgreement.PrivateKey?
 
     init(keyIdentifier: String = ProtectedDataDeviceBindingConstants.keyIdentifier) {
         self.keyIdentifier = keyIdentifier
@@ -21,7 +19,7 @@ final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPr
             self.sealError = nil
             throw sealError
         }
-        let privateKey = try loadOrCreateKey()
+        let privateKey = P256.KeyAgreement.PrivateKey()
         return try ProtectedDataRootSecretEnvelopeCodec.seal(
             rootSecret: rootSecret,
             sharedRightIdentifier: sharedRightIdentifier,
@@ -59,26 +57,5 @@ final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPr
             sharedSecret: sharedSecret,
             expectedSharedRightIdentifier: expectedSharedRightIdentifier
         )
-    }
-
-    func bindingKeyExists() -> Bool {
-        privateKey != nil
-    }
-
-    func deleteBindingKey() throws {
-        if let deleteError {
-            self.deleteError = nil
-            throw deleteError
-        }
-        privateKey = nil
-    }
-
-    private func loadOrCreateKey() throws -> P256.KeyAgreement.PrivateKey {
-        if let privateKey {
-            return privateKey
-        }
-        let key = P256.KeyAgreement.PrivateKey()
-        privateKey = key
-        return key
     }
 }
