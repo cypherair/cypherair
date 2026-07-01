@@ -208,12 +208,12 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
             generationIdentifier: generationIdentifier,
             domainMasterKey: domainMasterKey
         )
-        let envelopeData = try encoder.encode(envelope)
+        let envelopeData = try ProtectedDomainEnvelopeCodec.encode(envelope)
         let pendingURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
         try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
 
         let validatedData = try storageRoot.readManagedData(at: pendingURL)
-        let decodedEnvelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: validatedData)
+        let decodedEnvelope = try ProtectedDomainEnvelopeCodec.decode(validatedData)
         var validatedPlaintext = try ProtectedDomainEnvelopeCodec.open(
             envelope: decodedEnvelope,
             domainMasterKey: domainMasterKey
@@ -261,7 +261,7 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
 
             do {
                 let data = try storageRoot.readManagedData(at: url)
-                let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+                let envelope = try ProtectedDomainEnvelopeCodec.decode(data)
                 var plaintext = try ProtectedDomainEnvelopeCodec.open(
                     envelope: envelope,
                     domainMasterKey: domainMasterKey

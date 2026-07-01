@@ -201,12 +201,28 @@ final class SensitiveBytesBox: @unchecked Sendable {
     }
 }
 
+/// Self-describing envelope that seals a per-domain payload generation under the
+/// domain master key (AES-256-GCM). Follows the same envelope discipline as the
+/// other CypherAir envelopes: a magic, algorithm identifier, and AAD version are
+/// stored and bound into the AES-GCM AAD alongside the domain / schema / generation
+/// identity, and decoding rejects any unknown or missing field.
+///
+/// Domain-separated by its own magic (`CPDENV2`) and AAD prefix (`CPDENVA2`).
+///
+/// SECURITY-CRITICAL: Changes to this file require human review.
+/// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 1
+    static let magic = "CPDENV2"
+    static let currentFormatVersion = 2
+    static let currentAADVersion = 2
+    static let algorithmID = "aes-256-gcm-v1"
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
 
+    let magic: String
     let formatVersion: Int
+    let algorithmID: String
+    let aadVersion: Int
     let domainID: ProtectedDataDomainID
     let schemaVersion: Int
     let generationIdentifier: Int
@@ -215,10 +231,19 @@ struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
     let tag: Data
 
     func validateContract() throws {
+        guard magic == Self.magic else {
+            throw ProtectedDataError.invalidEnvelope("Unsupported protected-domain envelope magic.")
+        }
         guard formatVersion == Self.currentFormatVersion else {
             throw ProtectedDataError.invalidEnvelope(
                 "Unsupported envelope format version \(formatVersion)."
             )
+        }
+        guard algorithmID == Self.algorithmID else {
+            throw ProtectedDataError.invalidEnvelope("Unsupported protected-domain envelope algorithm.")
+        }
+        guard aadVersion == Self.currentAADVersion else {
+            throw ProtectedDataError.invalidEnvelope("Unsupported protected-domain envelope AAD version \(aadVersion).")
         }
         guard schemaVersion > 0 else {
             throw ProtectedDataError.invalidEnvelope("Schema version must be positive.")
@@ -239,6 +264,33 @@ struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
 }
 
 enum ProtectedDomainEnvelopeCodec {
+    private static let allowedKeys: Set<String> = [
+        "magic",
+        "formatVersion",
+        "algorithmID",
+        "aadVersion",
+        "domainID",
+        "schemaVersion",
+        "generationIdentifier",
+        "nonce",
+        "ciphertext",
+        "tag"
+    ]
+
+    static func encode(_ envelope: ProtectedDomainEnvelope) throws -> Data {
+        try envelope.validateContract()
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        return try encoder.encode(envelope)
+    }
+
+    static func decode(_ data: Data) throws -> ProtectedDomainEnvelope {
+        try validateNoUnsupportedKeys(in: data)
+        let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+        try envelope.validateContract()
+        return envelope
+    }
+
     static func seal(
         plaintext: Data,
         domainID: ProtectedDataDomainID,
@@ -260,7 +312,10 @@ enum ProtectedDomainEnvelopeCodec {
         )
 
         return ProtectedDomainEnvelope(
+            magic: ProtectedDomainEnvelope.magic,
             formatVersion: ProtectedDomainEnvelope.currentFormatVersion,
+            algorithmID: ProtectedDomainEnvelope.algorithmID,
+            aadVersion: ProtectedDomainEnvelope.currentAADVersion,
             domainID: domainID,
             schemaVersion: schemaVersion,
             generationIdentifier: generationIdentifier,
@@ -315,7 +370,9 @@ enum ProtectedDomainEnvelopeCodec {
         schemaVersion: Int,
         generationIdentifier: Int
     ) throws -> Data {
-        guard let domainIDData = domainID.rawValue.data(using: .utf8) else {
+        guard let magicData = ProtectedDomainEnvelope.magic.data(using: .utf8),
+              let algorithmData = ProtectedDomainEnvelope.algorithmID.data(using: .utf8),
+              let domainIDData = domainID.rawValue.data(using: .utf8) else {
             throw ProtectedDataError.internalFailure(
                 String(
                     localized: "error.protectedData.domainIdentifierEncoding",
@@ -324,12 +381,26 @@ enum ProtectedDomainEnvelopeCodec {
             )
         }
 
-        var aad = Data("CPDENVA1".utf8)
-        aad.append(1)
+        var aad = Data("CPDENVA2".utf8)
+        aad.append(UInt8(ProtectedDomainEnvelope.currentFormatVersion))
+        aad.append(UInt8(ProtectedDomainEnvelope.currentAADVersion))
+        aad.append(UInt16(magicData.count).bigEndianData)
+        aad.append(magicData)
+        aad.append(UInt16(algorithmData.count).bigEndianData)
+        aad.append(algorithmData)
         aad.append(UInt16(domainIDData.count).bigEndianData)
         aad.append(domainIDData)
         aad.append(UInt16(schemaVersion).bigEndianData)
         aad.append(UInt32(generationIdentifier).bigEndianData)
         return aad
+    }
+
+    private static func validateNoUnsupportedKeys(in data: Data) throws {
+        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
+            throw ProtectedDataError.invalidEnvelope("Protected-domain envelope is not a dictionary.")
+        }
+        guard keys == allowedKeys else {
+            throw ProtectedDataError.invalidEnvelope("Protected-domain envelope contains unsupported or missing fields.")
+        }
     }
 }
