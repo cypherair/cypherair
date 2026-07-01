@@ -94,7 +94,7 @@ enum KeychainConstants {
         "\(prefix).pending-privkey-envelope.\(fingerprint)"
     }
 
-    /// ProtectedData Secure Enclave device-binding key representation.
+    /// Stable ProtectedData CAPDSEV3 device-binding label; not a persisted Keychain item.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
 
     /// Prefix for ProtectedData wrapped domain master key rows.

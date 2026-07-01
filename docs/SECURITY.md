@@ -200,7 +200,7 @@ The SE layer is a silent second factor that makes copied Keychain payloads and
 ProtectedData files unusable away from the original device. The v3 envelope is a
 single self-contained row: the device-binding key's Secure Enclave
 `dataRepresentation` is folded into the envelope (there is no separate
-device-binding key row), and the handle is reconstructed from that folded blob at
+persisted device-binding key item), and the handle is reconstructed from that folded blob at
 open time — exactly as the private-key envelope folds its own SE key. The folded
 blob is SE-encrypted and useless off-device. If the Secure Enclave cannot
 reconstruct or use the folded key, or the reconstructed public key does not match

@@ -8,7 +8,7 @@ import Security
 /// Self-contained single row: like `PrivateKeyEnvelope` folds `seKeyData`, this folds
 /// the device-binding Secure Enclave key `dataRepresentation` (`deviceBindingKeyData`)
 /// into the envelope so one Keychain row reconstructs the handle and reopens the root
-/// secret — there is no separate device-binding key row. The folded blob is an
+/// secret — there is no separate persisted key item. The folded blob is an
 /// SE-encrypted key that is useless off-device, and its hash is bound into both the
 /// HKDF `sharedInfo` and the AES-GCM AAD.
 ///

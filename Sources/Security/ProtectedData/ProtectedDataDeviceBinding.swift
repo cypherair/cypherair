@@ -83,7 +83,7 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
                 throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
             }
             // Reconstruct the Secure Enclave handle from the folded key material in the
-            // envelope itself — no separate device-binding key row. Fail closed unless the
+            // envelope itself — no separate persisted key item. Fail closed unless the
             // reconstructed public key matches the bound public key before any ECDH.
             let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
                 dataRepresentation: envelope.deviceBindingKeyData
