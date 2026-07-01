@@ -2,10 +2,25 @@ import CryptoKit
 import Foundation
 import Security
 
+/// Authenticated envelope that seals the 32-byte ProtectedData root secret under a
+/// ProtectedData-only Secure Enclave P-256 device-binding key (ephemeral-static ECDH).
+///
+/// Self-contained single row: like `PrivateKeyEnvelope` folds `seKeyData`, this folds
+/// the device-binding Secure Enclave key `dataRepresentation` (`deviceBindingKeyData`)
+/// into the envelope so one Keychain row reconstructs the handle and reopens the root
+/// secret — there is no separate device-binding key row. The folded blob is an
+/// SE-encrypted key that is useless off-device, and its hash is bound into both the
+/// HKDF `sharedInfo` and the AES-GCM AAD.
+///
+/// Domain-separated from the per-key private-key envelope (`CAPKEV1`) by distinct
+/// `magic` (`CAPDSEV3`) and HKDF/AAD prefixes so neither blob can be misread.
+///
+/// SECURITY-CRITICAL: Changes to this file require human review.
+/// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPDSEV2"
-    static let currentFormatVersion = 2
-    static let currentAADVersion = 2
+    static let magic = "CAPDSEV3"
+    static let currentFormatVersion = 3
+    static let currentAADVersion = 3
     static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
     static let expectedRootSecretLength = 32
     static let expectedSaltLength = 32
@@ -19,6 +34,9 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
     let aadVersion: Int
     let sharedRightIdentifier: String
     let deviceBindingKeyIdentifier: String
+    /// ProtectedData device-binding Secure Enclave key `dataRepresentation` — folded in
+    /// so one row reconstructs the handle. SE-encrypted; useless off-device.
+    let deviceBindingKeyData: Data
     let deviceBindingPublicKeyX963: Data
     let ephemeralPublicKeyX963: Data
     let hkdfSalt: Data
@@ -46,6 +64,9 @@ struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
         }
         guard !deviceBindingKeyIdentifier.isEmpty else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier is missing.")
+        }
+        guard !deviceBindingKeyData.isEmpty else {
+            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key data is missing.")
         }
         guard deviceBindingPublicKeyX963.count == Self.expectedP256X963Length else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key has invalid length.")
@@ -79,6 +100,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         "aadVersion",
         "sharedRightIdentifier",
         "deviceBindingKeyIdentifier",
+        "deviceBindingKeyData",
         "deviceBindingPublicKeyX963",
         "ephemeralPublicKeyX963",
         "hkdfSalt",
@@ -105,11 +127,15 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         rootSecret: Data,
         sharedRightIdentifier: String,
         deviceBindingKeyIdentifier: String,
+        deviceBindingKeyData: Data,
         deviceBindingPublicKeyX963: Data,
         ephemeralPrivateKey: P256.KeyAgreement.PrivateKey? = nil
     ) throws -> ProtectedDataRootSecretEnvelope {
         guard rootSecret.count == ProtectedDataRootSecretEnvelope.expectedRootSecretLength else {
             throw ProtectedDataError.invalidDomainMasterKeyLength(rootSecret.count)
+        }
+        guard !deviceBindingKeyData.isEmpty else {
+            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key data is missing.")
         }
 
         let deviceBindingPublicKey = try P256.KeyAgreement.PublicKey(
@@ -125,6 +151,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             salt: salt,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
+            deviceBindingKeyData: deviceBindingKeyData,
             deviceBindingPublicKeyX963: deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             rootSecretLength: rootSecret.count
@@ -132,6 +159,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         let aad = try rootSecretEnvelopeAAD(
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
+            deviceBindingKeyData: deviceBindingKeyData,
             deviceBindingPublicKeyX963: deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             rootSecretLength: rootSecret.count
@@ -150,6 +178,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             aadVersion: ProtectedDataRootSecretEnvelope.currentAADVersion,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
+            deviceBindingKeyData: deviceBindingKeyData,
             deviceBindingPublicKeyX963: deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             hkdfSalt: salt,
@@ -172,6 +201,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             salt: envelope.hkdfSalt,
             sharedRightIdentifier: envelope.sharedRightIdentifier,
             deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingKeyData: envelope.deviceBindingKeyData,
             deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: envelope.ephemeralPublicKeyX963,
             rootSecretLength: envelope.ciphertext.count
@@ -179,6 +209,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         let aad = try rootSecretEnvelopeAAD(
             sharedRightIdentifier: envelope.sharedRightIdentifier,
             deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingKeyData: envelope.deviceBindingKeyData,
             deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: envelope.ephemeralPublicKeyX963,
             rootSecretLength: envelope.ciphertext.count
@@ -198,6 +229,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
     static func rootSecretEnvelopeAAD(
         sharedRightIdentifier: String,
         deviceBindingKeyIdentifier: String,
+        deviceBindingKeyData: Data,
         deviceBindingPublicKeyX963: Data,
         ephemeralPublicKeyX963: Data,
         rootSecretLength: Int
@@ -206,6 +238,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             prefix: "CAPDSEAD",
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
+            deviceBindingKeyData: deviceBindingKeyData,
             deviceBindingPublicKeyX963: deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             rootSecretLength: rootSecretLength
@@ -217,6 +250,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         salt: Data,
         sharedRightIdentifier: String,
         deviceBindingKeyIdentifier: String,
+        deviceBindingKeyData: Data,
         deviceBindingPublicKeyX963: Data,
         ephemeralPublicKeyX963: Data,
         rootSecretLength: Int
@@ -225,6 +259,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             prefix: "CAPDSEKI",
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
+            deviceBindingKeyData: deviceBindingKeyData,
             deviceBindingPublicKeyX963: deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: ephemeralPublicKeyX963,
             rootSecretLength: rootSecretLength
@@ -241,6 +276,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         prefix: String,
         sharedRightIdentifier: String,
         deviceBindingKeyIdentifier: String,
+        deviceBindingKeyData: Data,
         deviceBindingPublicKeyX963: Data,
         ephemeralPublicKeyX963: Data,
         rootSecretLength: Int
@@ -249,7 +285,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
               let magicData = ProtectedDataRootSecretEnvelope.magic.data(using: .utf8),
               let algorithmData = ProtectedDataRootSecretEnvelope.algorithmID.data(using: .utf8),
               let sharedRightData = sharedRightIdentifier.data(using: .utf8),
-              let deviceBindingKeyData = deviceBindingKeyIdentifier.data(using: .utf8) else {
+              let deviceBindingKeyIdentifierData = deviceBindingKeyIdentifier.data(using: .utf8) else {
             throw ProtectedDataError.internalFailure("Root-secret envelope binding data could not be encoded.")
         }
 
@@ -263,8 +299,10 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         data.append(algorithmData)
         data.append(UInt16(sharedRightData.count).bigEndianData)
         data.append(sharedRightData)
-        data.append(UInt16(deviceBindingKeyData.count).bigEndianData)
-        data.append(deviceBindingKeyData)
+        data.append(UInt16(deviceBindingKeyIdentifierData.count).bigEndianData)
+        data.append(deviceBindingKeyIdentifierData)
+        let deviceBindingKeyDataHash = SHA256.hash(data: deviceBindingKeyData)
+        data.append(Data(deviceBindingKeyDataHash))
         let deviceBindingPublicKeyHash = SHA256.hash(data: deviceBindingPublicKeyX963)
         data.append(Data(deviceBindingPublicKeyHash))
         let ephemeralPublicKeyHash = SHA256.hash(data: ephemeralPublicKeyX963)

@@ -26,6 +26,7 @@ final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPr
             rootSecret: rootSecret,
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: keyIdentifier,
+            deviceBindingKeyData: privateKey.rawRepresentation,
             deviceBindingPublicKeyX963: privateKey.publicKey.x963Representation
         )
     }
@@ -38,12 +39,14 @@ final class MockProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPr
             self.openError = nil
             throw openError
         }
-        guard let privateKey else {
-            throw MockKeychainError.itemNotFound
-        }
         guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
         }
+        // Reconstruct the (software) binding key from the folded envelope material,
+        // mirroring the hardware provider's single-row reconstruction.
+        let privateKey = try P256.KeyAgreement.PrivateKey(
+            rawRepresentation: envelope.deviceBindingKeyData
+        )
         guard envelope.deviceBindingPublicKeyX963 == privateKey.publicKey.x963Representation else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
         }

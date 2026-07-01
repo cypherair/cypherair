@@ -27,7 +27,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(decoded.magic, ProtectedDataRootSecretEnvelope.magic)
         XCTAssertEqual(decoded.formatVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
         XCTAssertEqual(decoded.aadVersion, ProtectedDataRootSecretEnvelope.currentAADVersion)
-        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 2)
+        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 3)
         XCTAssertEqual(decoded.algorithmID, ProtectedDataRootSecretEnvelope.algorithmID)
         XCTAssertEqual(decoded.hkdfSalt.count, ProtectedDataRootSecretEnvelope.expectedSaltLength)
         XCTAssertEqual(decoded.nonce.count, ProtectedDataRootSecretEnvelope.expectedNonceLength)
@@ -46,6 +46,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
             replacing(envelope, nonce: flippedFirstByte(envelope.nonce)),
             replacing(envelope, ciphertext: flippedFirstByte(envelope.ciphertext)),
             replacing(envelope, tag: flippedFirstByte(envelope.tag)),
+            replacing(envelope, deviceBindingKeyData: flippedFirstByte(envelope.deviceBindingKeyData)),
             replacing(envelope, deviceBindingPublicKeyX963: flippedFirstByte(envelope.deviceBindingPublicKeyX963)),
             replacing(envelope, ephemeralPublicKeyX963: flippedFirstByte(envelope.ephemeralPublicKeyX963))
         ]
@@ -60,7 +61,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         }
     }
 
-    func test_rootSecretEnvelope_aadV2BindsEphemeralPublicKeyAndRejectsAADV1() throws {
+    func test_rootSecretEnvelope_aadV3BindsEphemeralPublicKeyAndRejectsAADV1() throws {
         let provider = MockProtectedDataDeviceBindingProvider()
         let rootSecret = Data(repeating: 0x26, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
@@ -69,6 +70,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         let originalAAD = try ProtectedDataRootSecretEnvelopeCodec.rootSecretEnvelopeAAD(
             sharedRightIdentifier: envelope.sharedRightIdentifier,
             deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingKeyData: envelope.deviceBindingKeyData,
             deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: envelope.ephemeralPublicKeyX963,
             rootSecretLength: envelope.ciphertext.count
@@ -76,6 +78,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         let substitutedAAD = try ProtectedDataRootSecretEnvelopeCodec.rootSecretEnvelopeAAD(
             sharedRightIdentifier: envelope.sharedRightIdentifier,
             deviceBindingKeyIdentifier: envelope.deviceBindingKeyIdentifier,
+            deviceBindingKeyData: envelope.deviceBindingKeyData,
             deviceBindingPublicKeyX963: envelope.deviceBindingPublicKeyX963,
             ephemeralPublicKeyX963: substituteEphemeralPublicKey,
             rootSecretLength: envelope.ciphertext.count
@@ -97,7 +100,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         let rootSecret = Data(repeating: 0x35, count: ProtectedDataRootSecretEnvelope.expectedRootSecretLength)
         let envelope = try provider.sealRootSecret(rootSecret, sharedRightIdentifier: envelopeTestSharedRight)
 
-        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "CAPDSEV1")))
+        XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, magic: "CAPDSEV2")))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try ProtectedDataRootSecretEnvelopeCodec.encode(replacing(envelope, hkdfSalt: Data(repeating: 0x00, count: 31))))

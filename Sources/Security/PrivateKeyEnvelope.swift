@@ -36,7 +36,7 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// the handle and reopens the material.
 ///
 /// This deliberately does **not** reuse the ProtectedData root-secret envelope:
-/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV2`) and by their
+/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV3`) and by their
 /// HKDF/AAD prefixes so neither blob can be misread as the other.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.

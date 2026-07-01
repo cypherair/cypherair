@@ -50,17 +50,21 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             metadata: ["keyIdentifier": "protectedData"]
         )
         do {
-            let key = try loadOrCreateKey()
+            let key = try createBindingKey()
             let envelope = try ProtectedDataRootSecretEnvelopeCodec.seal(
                 rootSecret: rootSecret,
                 sharedRightIdentifier: sharedRightIdentifier,
                 deviceBindingKeyIdentifier: keyIdentifier,
+                deviceBindingKeyData: key.dataRepresentation,
                 deviceBindingPublicKeyX963: key.publicKey.x963Representation
             )
             traceStore?.record(
                 category: .operation,
                 name: "protectedData.deviceBinding.seal.finish",
-                metadata: ["result": "success", "envelopeVersion": "2"]
+                metadata: [
+                    "result": "success",
+                    "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
+                ]
             )
             return envelope
         } catch {
@@ -83,10 +87,18 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             metadata: ["envelopeVersion": String(envelope.formatVersion)]
         )
         do {
-            let key = try loadKey()
+            guard SecureEnclave.isAvailable else {
+                throw SecureEnclaveError.notAvailable
+            }
             guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
                 throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
             }
+            // Reconstruct the Secure Enclave handle from the folded key material in the
+            // envelope itself — no separate device-binding key row. Fail closed unless the
+            // reconstructed public key matches the bound public key before any ECDH.
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+                dataRepresentation: envelope.deviceBindingKeyData
+            )
             guard envelope.deviceBindingPublicKeyX963 == key.publicKey.x963Representation else {
                 throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
             }
@@ -118,6 +130,10 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
         }
     }
 
+    // Legacy pre-consolidation device-binding key row helpers. The current envelope folds
+    // the Secure Enclave key in (a single self-contained row), so no separate row is
+    // written; these are retained only so a transition/reset can observe or clear a row
+    // left by an earlier build.
     func bindingKeyExists() -> Bool {
         keychain.exists(
             service: KeychainConstants.protectedDataDeviceBindingKeyService,
@@ -134,27 +150,10 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
         )
     }
 
-    private func loadOrCreateKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
-        do {
-            return try loadKey()
-        } catch where KeychainFailureClassifier.isItemNotFound(error) {
-            return try createAndPersistKey()
-        }
-    }
-
-    private func loadKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
-        guard SecureEnclave.isAvailable else {
-            throw SecureEnclaveError.notAvailable
-        }
-        let data = try keychain.load(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
-        return try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: data)
-    }
-
-    private func createAndPersistKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
+    /// Creates a fresh ProtectedData device-binding Secure Enclave key. The key is not
+    /// persisted to its own Keychain row; its `dataRepresentation` is folded into the
+    /// root-secret envelope, which is the single self-contained persisted row.
+    private func createBindingKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
         guard SecureEnclave.isAvailable else {
             throw SecureEnclaveError.notAvailable
         }
@@ -170,20 +169,9 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             }
             throw SecureEnclaveError.accessControlCreationFailed
         }
-        let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+        return try SecureEnclave.P256.KeyAgreement.PrivateKey(
             compactRepresentable: false,
             accessControl: accessControl
         )
-        do {
-            try keychain.save(
-                key.dataRepresentation,
-                service: KeychainConstants.protectedDataDeviceBindingKeyService,
-                account: account,
-                accessControl: nil
-            )
-        } catch where KeychainFailureClassifier.isDuplicateItem(error) {
-            return try loadKey()
-        }
-        return key
     }
 }

@@ -106,7 +106,7 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         XCTAssertEqual(loadedSecret, secret)
     }
 
-    func test_missingDeviceBindingKeyAfterV2Save_failsClosed() async throws {
+    func test_rootSecretRowIsSelfContained_survivesLegacyDeviceBindingKeyRowDeletion() async throws {
         let identifier = try makeTestRootSecretIdentifier(functionName: #function)
         let secret = Data(repeating: 0xD7, count: 32)
         try rootSecretStore.saveRootSecret(secret, identifier: identifier, policy: .userPresence)
@@ -126,14 +126,19 @@ final class DeviceProtectedDataRootSecretStoreTests: XCTestCase {
         )
         initialSecret.protectedDataZeroize()
 
+        // The Secure Enclave device-binding key is folded into the single self-contained
+        // envelope row, so clearing any separate / legacy device-binding key row must not
+        // affect load — reconstruction comes from the envelope itself.
         cleanupSupportKeychainItems()
 
-        XCTAssertThrowsError(
-            try rootSecretStore.loadRootSecret(
-                identifier: identifier,
-                authenticationContext: authenticatedContext
-            )
+        var reloadedSecret = try rootSecretStore.loadRootSecret(
+            identifier: identifier,
+            authenticationContext: authenticatedContext
         )
+        defer {
+            reloadedSecret.protectedDataZeroize()
+        }
+        XCTAssertEqual(reloadedSecret, secret)
     }
 
     private func authenticateContext(policy: LAPolicy, reason: String) async throws -> LAContext {
