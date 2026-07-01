@@ -219,10 +219,10 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 - `ProtectedDataStorageRoot.swift` — resolves the protected app-data storage root, applies file protection, and owns registry/domain metadata paths
 - `ProtectedDataRegistry.swift` / `ProtectedDataRegistryStore.swift` — registry manifest, consistency validation, recovery classification, empty-registry bootstrap, and bootstrap outcome construction
 - `ProtectedDataRootSecretCoordinator.swift` — root-secret save/load/reprotect/delete orchestration and root-secret operation tracing
-- `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key plus mockable provider
-- `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV2` codec, HKDF/AAD binding data, and AES-GCM open/seal validation
-- `KeychainProtectedDataRootSecretStore.swift` — Keychain-backed root-secret store for the `CAPDSEV2` envelope
-- `ProtectedDomainKeyManager.swift` — derives wrapping/domain keys, wraps and unwraps per-domain DMKs, stores wrapped-DMK records in Keychain staged/committed rows, and clears unlocked DMKs on relock
+- `ProtectedDataDeviceBinding.swift` — ProtectedData-only Secure Enclave P-256 device-binding key (folded into the root-secret envelope for single-row reconstruction; no separate row) plus mockable provider
+- `ProtectedDataRootSecretEnvelope.swift` — binary-plist `CAPDSEV3` codec that folds the device-binding SE key `dataRepresentation` for single-row reconstruction, HKDF/AAD binding data, and AES-GCM open/seal validation
+- `KeychainProtectedDataRootSecretStore.swift` — Keychain-backed root-secret store for the `CAPDSEV3` envelope
+- `ProtectedDomainKeyManager.swift` — derives wrapping/domain keys, wraps and unwraps per-domain DMKs via the self-describing `CADMKV2` wrapped-DMK codec, stores those envelopes in Keychain staged/committed rows, and clears unlocked DMKs on relock
 - `ProtectedDomainBootstrapStore.swift` — file-side bootstrap metadata persistence
 - `ProtectedDomainRecoveryCoordinator` / `ProtectedDomainRecoveryHandler` — generic pending-mutation recovery dispatch by `ProtectedDataDomainID`
 - `ProtectedDataPostUnlockCoordinator` — post-app-auth protected-domain opener registry; production registers `private-key-control`, `key-metadata`, `protected-settings`, and `protected-framework-sentinel`, and may run a domain's noninteractive `ensureCommittedIfNeeded` hook inside the same handoff
@@ -245,9 +245,9 @@ ProtectedData component ownership:
 - `ContactsDomainStore` is the Contacts protected-domain persistence owner; it opens the protected `contacts` domain post-auth and keeps `ContactService` as the app/UI facade. First protected-domain creation starts from `ContactsDomainSnapshot.empty()` and creates `contacts.sqlite`.
 - `ContactsSQLCipherDatabase` owns Contacts protected-domain SQLCipher persistence at `Application Support/ProtectedData/contacts/contacts.sqlite`. It keys SQLCipher with the existing `contacts` domain master key through raw-key syntax, validates SQLCipher compile/runtime state plus `application_id`, `user_version`, and integrity, hydrates the in-memory `ContactsDomainSnapshot`, and rewrites relational tables transactionally on snapshot replacement.
 - `AppContainer` assembles the Contacts store, relock participants, and post-unlock call sites only; Contacts availability and mutation policy stay inside `ContactService`.
-- root-secret Keychain payloads use the v2 Secure Enclave device-bound envelope while preserving the existing app-session authentication gate
-- per-domain wrapped-DMK records use app-owned Keychain rows named under `com.cypherair.v1.protected-data.domain-key.*`; protected domain files no longer contain active wrapped-DMK records
-- root-secret payloads that do not decode as a current `CAPDSEV2` envelope fail closed as ordinary undecodable input
+- root-secret Keychain payloads use the single self-contained v3 Secure Enclave device-bound envelope (device-binding key folded in) while preserving the existing app-session authentication gate
+- per-domain wrapped-DMK records use app-owned Keychain rows named under `com.cypherair.v1.protected-data.domain-key.*` and are self-describing `CADMKV2` envelopes; protected domain files no longer contain active wrapped-DMK records
+- root-secret payloads that do not decode as a current `CAPDSEV3` envelope fail closed as ordinary undecodable input
 - cold-start bootstrap results are only an initial handoff; future protected access re-checks current registry/framework state through an explicit gate
 - app privacy unlock now runs a post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible registered committed domains without a second prompt, including `private-key-control` and `key-metadata`; Contacts then joins the authorized session through its dedicated post-auth open path
 - ProtectedData current-state coverage includes ordinary-settings, self-test export-only state, temporary/export/tutorial artifact hardening, and Contacts protected-domain state; Contacts uses the protected `contacts` domain for person-centered Contacts data and no longer reads legacy flat Contacts files
@@ -485,7 +485,7 @@ sequenceDiagram
     App->>Post: open registered domains(context)
     Post->>PDS: beginProtectedDataAuthorization(registry, context)
     PDS->>KC: load root-secret envelope with kSecUseAuthenticationContext
-    KC-->>PDS: CAPDSEV2 envelope
+    KC-->>PDS: CAPDSEV3 envelope
     PDS->>SE: unwrap device-bound root secret
     SE-->>PDS: raw root-secret bytes
     PDS->>PDS: derive wrapping root key, zeroize raw root secret
@@ -517,8 +517,7 @@ Keychain (kSecClassGenericPassword, data-protection Keychain):
 └── Default account (`com.cypherair`):
 │   ├── com.cypherair.v1.privkey-envelope.<fingerprint>         → CAPKEV1 private-key envelope (SE key blob + ephemeral pubkey + salt + AES-GCM sealed bytes, one row)
 │   ├── com.cypherair.v1.pending-privkey-envelope.<fingerprint> → Temporary mode-switch / expiry-recovery envelope row
-│   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret v2 envelope
-│   ├── com.cypherair.v1.protected-data.device-binding-key → ProtectedData SE device-binding key representation
+│   ├── com.cypherair.protected-data.shared-right.v1  → LA-gated shared app-data root-secret v3 envelope (single self-contained row; folds the ProtectedData SE device-binding key)
 │   ├── com.cypherair.v1.protected-data.domain-key.<domainID>
 │   │   → committed wrapped ProtectedData domain master-key record
 │   ├── com.cypherair.v1.protected-data.domain-key.staged.<domainID>
@@ -555,10 +554,10 @@ App Sandbox:
 **Keychain key naming conventions:**
 - All keys prefixed with `com.cypherair.v1.` — the `v1` segment enables future data migration if the wrapping scheme changes.
 - `<fingerprint>` is the full key fingerprint in lowercase hexadecimal, no spaces or separators (e.g., `a1b2c3d4...`).
-- `<domainID>` is the stable `ProtectedDataDomainID` raw value. Domain-key rows use the default account, no per-row biometric access control, and contain only the wrapped-DMK record; the app still needs the post-auth wrapping root key to unwrap a DMK.
+- `<domainID>` is the stable `ProtectedDataDomainID` raw value. Domain-key rows use the default account, no per-row biometric access control, and contain only the self-describing `CADMKV2` wrapped-DMK envelope; the app still needs the post-auth wrapping root key to unwrap a DMK.
 - Temporary keys during mode switch and modify-expiry recovery use `pending-` prefix. Permanent and pending private-key envelope rows remain in the existing Keychain / Secure Enclave private-key material domain; the `private-key-control` recovery journal may reference these rows but must not store the envelope material.
 - Secure Enclave custody handle rows are `kSecClassKey` rows, not generic-password envelope rows. Their random handle-set identifiers are Security-private local locators and are not written into ProtectedData metadata, logs, UI, exported artifacts, or Rust. Custody generation recovery derives expected handles from public certificate bindings rather than a persisted locator. Reset All Local Data inventories and deletes app-owned custody rows through the Security-owned store and reports only sanitized service kind, role/category, and count metadata.
-- The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. It uses a software-ephemeral P-256 ECDH envelope (`CAPDSEV2`) that is domain-separated from the per-fingerprint private-key envelope (`CAPKEV1`) by distinct magic and HKDF/AAD prefixes.
+- The ProtectedData device-binding key is separate from private-key SE keys. It is a P-256 Secure Enclave key with `WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no Face ID flags, and exists only to unwrap the app-data root-secret envelope after the existing Keychain / `LAContext` gate succeeds. Its `dataRepresentation` is folded into the root-secret envelope (no separate Keychain row) and reconstructed at open time. It uses a software-ephemeral P-256 ECDH envelope (`CAPDSEV3`) that is domain-separated from the per-fingerprint private-key envelope (`CAPKEV1`) by distinct magic and HKDF/AAD prefixes.
 - The long-term app-data goal is to move every CypherAir-owned local data surface behind ProtectedData after unlock unless it is a documented boot-authentication, private-key-material, framework-bootstrap, ephemeral-cleanup, test-only, or out-of-app-custody exception.
 - Post-unlock orchestration opens required domains such as `private-key-control`, `key-metadata`, protected settings, and the framework sentinel by reusing the app privacy authentication context without extra Face ID prompts.
 

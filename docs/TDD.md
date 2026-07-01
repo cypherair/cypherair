@@ -381,7 +381,7 @@ Current framework contracts:
 
 - `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, and a single pending create/delete mutation.
 - Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the shared app-data root secret, unwrap any domain master key, or open protected payload generations.
-- The shared app-data root secret is stored in the Keychain as a v2 `CAPDSEV2` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key silently unwraps that envelope under the same app-session gate.
+- The shared app-data root secret is stored in the Keychain as a single self-contained v3 `CAPDSEV3` envelope and is loaded with an authenticated `LAContext` handoff. The ProtectedData-only Secure Enclave device-binding key is folded into that envelope (no separate row) and reconstructed to silently unwrap it under the same app-session gate.
 - `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret, zeroizes the raw root secret, then unwraps per-domain 256-bit domain master keys from Keychain-backed wrapped-DMK records.
 - Protected domain files live under the inventory's protected app-data storage root; registry, bootstrap metadata, scratch writes, and domain payload generations verify explicit file protection where available. Wrapped-DMK records live in Keychain staged/committed rows under `com.cypherair.v1.protected-data.domain-key.*`.
 - Relock clears the wrapping root key, unwrapped DMKs, and registered domain-local decrypted state. A relock participant failure latches runtime-only `restartRequired`.
