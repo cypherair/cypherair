@@ -275,16 +275,9 @@ enum ProtectedDataRootSecretEnvelopeCodec {
     }
 
     private static func validateNoUnsupportedKeys(in data: Data) throws {
-        var format = PropertyListSerialization.PropertyListFormat.binary
-        let propertyList = try PropertyListSerialization.propertyList(
-            from: data,
-            options: [],
-            format: &format
-        )
-        guard let dictionary = propertyList as? [String: Any] else {
+        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope is not a dictionary.")
         }
-        let keys = Set(dictionary.keys)
         guard keys == allowedKeys else {
             throw ProtectedDataError.invalidEnvelope("Root-secret envelope contains unsupported or missing fields.")
         }
@@ -304,11 +297,5 @@ enum ProtectedDataRootSecretEnvelopeCodec {
             )
         }
         return data
-    }
-}
-
-private extension UInt16 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
     }
 }

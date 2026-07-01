@@ -333,15 +333,3 @@ enum ProtectedDomainEnvelopeCodec {
         return aad
     }
 }
-
-private extension UInt32 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
-    }
-}
-
-private extension UInt16 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
-    }
-}

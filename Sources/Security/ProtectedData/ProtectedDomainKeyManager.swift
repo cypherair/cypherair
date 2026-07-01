@@ -323,9 +323,3 @@ final class ProtectedDomainKeyManager {
         return aad
     }
 }
-
-private extension UInt16 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
-    }
-}
