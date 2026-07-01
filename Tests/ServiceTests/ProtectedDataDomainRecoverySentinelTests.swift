@@ -76,23 +76,13 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         defer { try? FileManager.default.removeItem(at: baseDirectory) }
         let account = "com.cypherair.tests.real-components.\(UUID().uuidString)"
         let sharedRightIdentifier = "com.cypherair.tests.real-components.shared-right.\(UUID().uuidString)"
-        let systemKeychain = SystemKeychain()
-        let deviceBindingProvider = HardwareProtectedDataDeviceBindingProvider(
-            keychain: systemKeychain,
-            account: account
-        )
+        let deviceBindingProvider = HardwareProtectedDataDeviceBindingProvider()
         let rootSecretStore = KeychainProtectedDataRootSecretStore(
             account: account,
-            supportKeychain: systemKeychain,
             deviceBindingProvider: deviceBindingProvider
         )
         defer {
             try? rootSecretStore.deleteRootSecret(identifier: sharedRightIdentifier)
-            try? systemKeychain.delete(
-                service: KeychainConstants.protectedDataDeviceBindingKeyService,
-                account: account,
-                authenticationContext: nil
-            )
         }
 
         let storageRoot = ProtectedDataTestAppProtectedDataStorageRoot(baseDirectory: baseDirectory)

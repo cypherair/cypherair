@@ -111,13 +111,6 @@ final class LocalDataResetService {
             failureKey: "keychain.protectedDataRootSecret",
             failures: &failures
         )
-        deletedKeychainItemCount += deleteExactKeychainItem(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: KeychainConstants.defaultAccount,
-            authenticationContext: authenticationContext,
-            failureKey: "keychain.protectedDataDeviceBindingKey",
-            failures: &failures
-        )
         cleanupSecureEnclaveCustodyHandles(
             deletedKeychainItemCount: &deletedKeychainItemCount,
             failures: &failures
@@ -329,11 +322,6 @@ final class LocalDataResetService {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
             let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
             let hasRootSecret = protectedDataRootSecretExists()
-            let hasDeviceBindingKey = keychain.exists(
-                service: KeychainConstants.protectedDataDeviceBindingKeyService,
-                account: KeychainConstants.defaultAccount,
-                authenticationContext: nil
-            )
             let remainingDefaultAccountServices = remainingKeychainServices(
                 account: KeychainConstants.defaultAccount,
                 authenticationContext: authenticationContext,
@@ -346,7 +334,6 @@ final class LocalDataResetService {
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
-                || hasDeviceBindingKey
                 || !remainingDefaultAccountServices.isEmpty
                 || remainingSecureEnclaveCustodyHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
@@ -360,7 +347,6 @@ final class LocalDataResetService {
                     "protectedDataRootExists": rootExists ? "true" : "false",
                     "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
                     "hasProtectedDataRootSecret": hasRootSecret ? "true" : "false",
-                    "hasDeviceBindingKey": hasDeviceBindingKey ? "true" : "false",
                     "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
                     "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
                     "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
@@ -373,9 +359,6 @@ final class LocalDataResetService {
             }
             if hasRootSecret {
                 failures.append("keychain.protectedDataRootSecret.remaining")
-            }
-            if hasDeviceBindingKey {
-                failures.append("keychain.protectedDataDeviceBindingKey.remaining")
             }
             if !remainingDefaultAccountServices.isEmpty {
                 failures.append("keychain.default.remaining.\(remainingDefaultAccountServices.count)")

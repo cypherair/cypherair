@@ -477,12 +477,12 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             generationIdentifier: generationIdentifier,
             domainMasterKey: domainMasterKey
         )
-        let envelopeData = try encoder.encode(envelope)
+        let envelopeData = try ProtectedDomainEnvelopeCodec.encode(envelope)
         let pendingURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
         try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
 
         let validatedData = try storageRoot.readManagedData(at: pendingURL)
-        let decodedEnvelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: validatedData)
+        let decodedEnvelope = try ProtectedDomainEnvelopeCodec.decode(validatedData)
         var validatedPlaintext = try ProtectedDomainEnvelopeCodec.open(
             envelope: decodedEnvelope,
             domainMasterKey: domainMasterKey
@@ -540,7 +540,7 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
             }
 
             do {
-                let envelope = try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
+                let envelope = try ProtectedDomainEnvelopeCodec.decode(data)
                 highestObservedGenerationIdentifier = max(
                     highestObservedGenerationIdentifier ?? envelope.generationIdentifier,
                     envelope.generationIdentifier

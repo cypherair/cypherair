@@ -187,22 +187,28 @@ applies to software-custody keys only (device-bound keys cannot be backed up).
 ### ProtectedData Device-Binding Note
 
 ProtectedData uses a separate app-data root-secret model and must not be
-conflated with private-key envelope wrapping. The current ProtectedData v2 model
+conflated with private-key envelope wrapping. The current ProtectedData v3 model
 keeps the Keychain / `SecAccessControl` / authenticated `LAContext` gate, but
-stores the root-secret Keychain payload as a Secure Enclave device-bound
-envelope instead of raw root-secret bytes.
+stores the root-secret Keychain payload as a single self-contained Secure Enclave
+device-bound envelope instead of raw root-secret bytes.
 
 The device-binding key is a ProtectedData-only P-256 Secure Enclave key with
 `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` and `.privateKeyUsage`. It
 must not include `.userPresence`, `.biometryAny`, or `.devicePasscode`, because
 the user authentication prompt remains the existing app-session Keychain gate.
 The SE layer is a silent second factor that makes copied Keychain payloads and
-ProtectedData files unusable away from the original device. If the SE
-device-binding key is missing or unusable, ProtectedData must fail closed and
-require framework recovery/reset; there is no production fallback that opens v2
-ProtectedData without the SE factor.
+ProtectedData files unusable away from the original device. The v3 envelope is a
+single self-contained row: the device-binding key's Secure Enclave
+`dataRepresentation` is folded into the envelope (there is no separate
+persisted device-binding key item), and the handle is reconstructed from that folded blob at
+open time — exactly as the private-key envelope folds its own SE key. The folded
+blob is SE-encrypted and useless off-device. If the Secure Enclave cannot
+reconstruct or use the folded key, or the reconstructed public key does not match
+the envelope's bound public key, ProtectedData fails closed and requires framework
+recovery/reset; there is no production fallback that opens ProtectedData without
+the SE factor.
 
-The v2 root-secret envelope is a binary-plist `CAPDSEV2` payload with
+The v3 root-secret envelope is a binary-plist `CAPDSEV3` payload with
 `algorithmID = p256-ecdh-hkdf-sha256-aes-gcm-v1`. It uses a software-ephemeral
 P-256 ECDH exchange with the persistent ProtectedData SE public key. The
 private-key envelope (`CAPKEV1`) uses the same ephemeral-static ECDH primitive,
@@ -211,10 +217,10 @@ distinct HKDF/AAD prefixes (`CAPDSEKI`/`CAPDSEAD` vs `CAPKKI`/`CAPKAD`) — and 
 different persistent keys (one singleton device-binding key bound to a shared-right
 identifier; one per-fingerprint SE key bound to the key fingerprint), so neither
 blob can be misread as the other. The root-secret HKDF sharedInfo and AES-GCM AAD
-bind the AAD version plus hashes of both persistent SE and ephemeral public keys.
-The envelope is the only supported root-secret payload: any payload that does not
-decode as a current `CAPDSEV2` envelope fails closed as ordinary undecodable
-input.
+bind the AAD version plus hashes of the folded device-binding key data and both
+persistent SE and ephemeral public keys. The envelope is the only supported
+root-secret payload: any payload that does not decode as a current `CAPDSEV3`
+envelope fails closed as ordinary undecodable input.
 
 ProtectedData domain payloads must open only after the app privacy gate has
 produced an authenticated `LAContext` or an already-authorized ProtectedData
@@ -371,7 +377,7 @@ Protected app-data authorization uses `AppSessionAuthenticationPolicy`, not priv
 
 Key operation failure categories are app-owned sanitized classifications for resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping boundaries. Local-authentication categories are explicitly separate from payload-authentication failure. They must not contain plaintext, private-key material, shared secrets, session keys, KEKs, Keychain locators, stable fingerprints, temporary capability paths, or other secret-bearing values. They do not persist Secure Enclave handle state and do not replace payload-authentication hard-fail behavior.
 
-The shared root secret is not stored as raw bytes in the current format. Keychain stores a v2 `CAPDSEV2` envelope that must also unwrap through the ProtectedData-only Secure Enclave device-binding key described in Section 3. The raw root secret is used only to derive the wrapping root key and is immediately zeroized. Each protected domain has its own random domain master key, persisted only as a Keychain-backed wrapped-DMK record under the derived wrapping root key. Unwrapped domain keys and decrypted payloads are session-local and must be cleared on relock.
+The shared root secret is not stored as raw bytes in the current format. Keychain stores a single self-contained v3 `CAPDSEV3` envelope that reconstructs its folded ProtectedData-only Secure Enclave device-binding key and unwraps through it, as described in Section 3. The raw root secret is used only to derive the wrapping root key and is immediately zeroized. Each protected domain has its own random domain master key, persisted only as a Keychain-backed self-describing `CADMKV2` wrapped-DMK envelope under the derived wrapping root key. Unwrapped domain keys and decrypted payloads are session-local and must be cleared on relock.
 
 Contacts uses the stable `contacts` ProtectedData domain identity with SQLCipher as the authoritative Contacts payload. The unwrapped `contacts` domain master key is handed directly to SQLCipher through raw-key syntax for `contacts.sqlite`; CypherAir does not create a second Contacts database-key Keychain row. The raw-key buffer is short-lived and zeroized after keying, and the open SQLCipher connection is treated as sensitive runtime state that must be closed on relock and before reset/recovery deletion. Legacy Contacts snapshot-envelope artifacts are not a fallback source of truth.
 

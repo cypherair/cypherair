@@ -36,7 +36,7 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// the handle and reopens the material.
 ///
 /// This deliberately does **not** reuse the ProtectedData root-secret envelope:
-/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV2`) and by their
+/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV3`) and by their
 /// HKDF/AAD prefixes so neither blob can be misread as the other.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
@@ -326,16 +326,9 @@ enum PrivateKeyEnvelopeCodec {
     }
 
     private static func validateNoUnsupportedKeys(in data: Data) throws {
-        var format = PropertyListSerialization.PropertyListFormat.binary
-        let propertyList = try PropertyListSerialization.propertyList(
-            from: data,
-            options: [],
-            format: &format
-        )
-        guard let dictionary = propertyList as? [String: Any] else {
+        guard let keys = try EnvelopePlistInspector.topLevelKeys(in: data) else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Private-key envelope is not a dictionary.")
         }
-        let keys = Set(dictionary.keys)
         guard keys == allowedKeys else {
             throw PrivateKeyEnvelopeError.invalidEnvelope("Private-key envelope contains unsupported or missing fields.")
         }
@@ -350,17 +343,5 @@ enum PrivateKeyEnvelopeCodec {
             throw PrivateKeyEnvelopeError.internalFailure("A secure random-number operation failed while sealing a private key.")
         }
         return data
-    }
-}
-
-private extension UInt16 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
-    }
-}
-
-private extension UInt64 {
-    var bigEndianData: Data {
-        withUnsafeBytes(of: bigEndian) { Data($0) }
     }
 }

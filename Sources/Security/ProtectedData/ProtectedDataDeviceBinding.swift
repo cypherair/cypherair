@@ -14,9 +14,6 @@ protocol ProtectedDataDeviceBindingProvider {
         envelope: ProtectedDataRootSecretEnvelope,
         expectedSharedRightIdentifier: String
     ) throws -> Data
-
-    func bindingKeyExists() -> Bool
-    func deleteBindingKey() throws
 }
 
 enum ProtectedDataDeviceBindingConstants {
@@ -26,17 +23,9 @@ enum ProtectedDataDeviceBindingConstants {
 struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingProvider {
     let keyIdentifier = ProtectedDataDeviceBindingConstants.keyIdentifier
 
-    private let keychain: any KeychainManageable
-    private let account: String
     private let traceStore: AuthLifecycleTraceStore?
 
-    init(
-        keychain: any KeychainManageable = SystemKeychain(),
-        account: String = KeychainConstants.defaultAccount,
-        traceStore: AuthLifecycleTraceStore? = nil
-    ) {
-        self.keychain = keychain
-        self.account = account
+    init(traceStore: AuthLifecycleTraceStore? = nil) {
         self.traceStore = traceStore
     }
 
@@ -50,17 +39,21 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             metadata: ["keyIdentifier": "protectedData"]
         )
         do {
-            let key = try loadOrCreateKey()
+            let key = try createBindingKey()
             let envelope = try ProtectedDataRootSecretEnvelopeCodec.seal(
                 rootSecret: rootSecret,
                 sharedRightIdentifier: sharedRightIdentifier,
                 deviceBindingKeyIdentifier: keyIdentifier,
+                deviceBindingKeyData: key.dataRepresentation,
                 deviceBindingPublicKeyX963: key.publicKey.x963Representation
             )
             traceStore?.record(
                 category: .operation,
                 name: "protectedData.deviceBinding.seal.finish",
-                metadata: ["result": "success", "envelopeVersion": "2"]
+                metadata: [
+                    "result": "success",
+                    "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
+                ]
             )
             return envelope
         } catch {
@@ -83,10 +76,18 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             metadata: ["envelopeVersion": String(envelope.formatVersion)]
         )
         do {
-            let key = try loadKey()
+            guard SecureEnclave.isAvailable else {
+                throw SecureEnclaveError.notAvailable
+            }
             guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
                 throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
             }
+            // Reconstruct the Secure Enclave handle from the folded key material in the
+            // envelope itself — no separate persisted key item. Fail closed unless the
+            // reconstructed public key matches the bound public key before any ECDH.
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+                dataRepresentation: envelope.deviceBindingKeyData
+            )
             guard envelope.deviceBindingPublicKeyX963 == key.publicKey.x963Representation else {
                 throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
             }
@@ -118,43 +119,10 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
         }
     }
 
-    func bindingKeyExists() -> Bool {
-        keychain.exists(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
-    }
-
-    func deleteBindingKey() throws {
-        try keychain.delete(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
-    }
-
-    private func loadOrCreateKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
-        do {
-            return try loadKey()
-        } catch where KeychainFailureClassifier.isItemNotFound(error) {
-            return try createAndPersistKey()
-        }
-    }
-
-    private func loadKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
-        guard SecureEnclave.isAvailable else {
-            throw SecureEnclaveError.notAvailable
-        }
-        let data = try keychain.load(
-            service: KeychainConstants.protectedDataDeviceBindingKeyService,
-            account: account,
-            authenticationContext: nil
-        )
-        return try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: data)
-    }
-
-    private func createAndPersistKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
+    /// Creates a fresh ProtectedData device-binding Secure Enclave key. The key is not
+    /// persisted to its own Keychain row; its `dataRepresentation` is folded into the
+    /// root-secret envelope, which is the single self-contained persisted row.
+    private func createBindingKey() throws -> SecureEnclave.P256.KeyAgreement.PrivateKey {
         guard SecureEnclave.isAvailable else {
             throw SecureEnclaveError.notAvailable
         }
@@ -170,20 +138,9 @@ struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingPro
             }
             throw SecureEnclaveError.accessControlCreationFailed
         }
-        let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+        return try SecureEnclave.P256.KeyAgreement.PrivateKey(
             compactRepresentable: false,
             accessControl: accessControl
         )
-        do {
-            try keychain.save(
-                key.dataRepresentation,
-                service: KeychainConstants.protectedDataDeviceBindingKeyService,
-                account: account,
-                accessControl: nil
-            )
-        } catch where KeychainFailureClassifier.isDuplicateItem(error) {
-            return try loadKey()
-        }
-        return key
     }
 }
