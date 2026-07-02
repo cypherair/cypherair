@@ -123,10 +123,11 @@ final class MacUISmokeTests: XCTestCase {
         launchMain()
         generateKey()
 
-        // The Keys tab still shows the post-generation screen; bounce through
-        // Home so the tab lands back on the My Keys list root.
-        element("sidebar.home").tap()
-        element("sidebar.keys").tap()
+        // The Keys tab still shows the post-generation screen; pop back to the
+        // My Keys list root (tab switches preserve the path, so pop for real).
+        popNavigationBack()
+        waitForScreenReady("keygen.ready")
+        popNavigationBack()
         let keyRow = app.staticTexts["UITest Alice"].firstMatch
         XCTAssertTrue(keyRow.waitForExistence(timeout: 10))
         XCTAssertTrue(keyRow.isHittable)
@@ -135,6 +136,22 @@ final class MacUISmokeTests: XCTestCase {
         XCTAssertTrue(app.menuItems["Copy Fingerprint"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.menuItems["Show QR Code"].waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func test_macShell_preservesTabNavigationPathAcrossTabSwitches() throws {
+        launchMain()
+
+        // Push Key Generation onto the Keys tab via the Keys menu shortcut.
+        app.typeKey("n", modifierFlags: .command)
+        waitForScreenReady("keygen.ready")
+
+        element("sidebar.home").tap()
+        XCTAssertTrue(element("home.generate").waitForExistence(timeout: 10))
+
+        element("sidebar.keys").tap()
+
+        // The pushed route survives the tab round-trip.
+        waitForScreenReady("keygen.ready")
     }
 
     func test_tabNavigation_respondsToCommandNumberShortcuts() throws {
@@ -516,6 +533,12 @@ final class MacUISmokeTests: XCTestCase {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .count
+    }
+
+    private func popNavigationBack() {
+        let backButton = app.buttons["Back"].firstMatch
+        XCTAssertTrue(backButton.waitForExistence(timeout: 10), "Expected a navigation Back button.")
+        backButton.tap()
     }
 
     private func tapSettingsRow(_ identifier: String) {

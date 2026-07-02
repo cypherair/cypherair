@@ -38,17 +38,8 @@ struct MacKeyboardCommands: Commands {
     }
 
     private func openOnKeysTab(_ route: AppRoute) {
-        guard navigationState.selectedTab != .keys else {
-            navigationState.setPath([route], for: .keys)
-            return
-        }
         navigationState.selectedTab = .keys
-        // The shared detail NavigationStack writes back an empty path while
-        // its root swaps to the new tab; land the push on the next runloop
-        // turn so it survives the tab switch.
-        Task { @MainActor in
-            navigationState.setPath([route], for: .keys)
-        }
+        navigationState.setPath([route], for: .keys)
     }
 }
 #endif
