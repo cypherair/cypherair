@@ -79,9 +79,9 @@ struct CypherOutputTextBlock: View {
                 .padding(10)
         }
         .frame(minHeight: minHeight, maxHeight: maxHeight)
-        .background(outputTextSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(outputTextSurface, in: RoundedRectangle(cornerRadius: CypherRadius.control, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: CypherRadius.control, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
     }
@@ -173,21 +173,11 @@ extension View {
         self
             .scrollContentBackground(.hidden)
             .padding(8)
-            .background(macTextEditorSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(macTextEditorSurface, in: RoundedRectangle(cornerRadius: CypherRadius.control, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: CypherRadius.control, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             }
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
-    func cypherMacCardSurface(cornerRadius: CGFloat = 8) -> some View {
-        #if os(macOS)
-        self
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         #else
         self
         #endif

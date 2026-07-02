@@ -37,10 +37,10 @@ struct TutorialSpotlightOverlay: View {
                     if let target,
                        let anchor = anchors[target] {
                         let rect = proxy[anchor]
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: CypherRadius.card, style: .continuous)
                             .strokeBorder(Color.accentColor, lineWidth: 3)
                             .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                RoundedRectangle(cornerRadius: CypherRadius.card, style: .continuous)
                                     .fill(Color.accentColor.opacity(0.08))
                             )
                             .frame(width: rect.width + 12, height: rect.height + 12)

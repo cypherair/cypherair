@@ -48,7 +48,7 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                HStack(spacing: 8) {
+                HStack(spacing: CypherSpacing.compact) {
                     ForEach(0..<3, id: \.self) { index in
                         Circle()
                             .fill(index == currentPage ? Color.primary : Color.secondary.opacity(0.3))

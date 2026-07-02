@@ -72,7 +72,7 @@ struct HomeView: View {
 
     private var hasKeysContent: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: CypherSpacing.section) {
                 defaultKeyInfo
 
                 quickActionsGrid
@@ -86,10 +86,11 @@ struct HomeView: View {
         Group {
             if let defaultKey = keyManagement.defaultKey {
                 NavigationLink(value: AppRoute.keyDetail(fingerprint: defaultKey.fingerprint)) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: CypherSpacing.tight) {
+                        VStack(alignment: .leading, spacing: CypherSpacing.compact) {
                             HStack {
                                 Image(systemName: "key.fill")
+                                    .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.tint)
                                     .accessibilityHidden(true)
                                 if let userId = defaultKey.userId {
@@ -126,7 +127,7 @@ struct HomeView: View {
                             .accessibilityHidden(true)
                     }
                     .padding()
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: defaultKeyCornerRadius, style: .continuous))
+                    .cypherSurface(.card)
                 }
                 .buttonStyle(.plain)
                 .cypherPressFeedback()
@@ -138,7 +139,7 @@ struct HomeView: View {
     }
 
     private var quickActionsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: CypherSpacing.standard) {
             actionButton(
                 title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
                 icon: "lock.fill",
@@ -171,9 +172,10 @@ struct HomeView: View {
         anchor: TutorialAnchorID? = nil
     ) -> some View {
         NavigationLink(value: route) {
-            VStack(spacing: 8) {
+            VStack(spacing: CypherSpacing.compact) {
                 Image(systemName: icon)
                     .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
                     .accessibilityHidden(true)
                 Text(title)
                     .font(.subheadline.weight(.medium))
@@ -188,13 +190,5 @@ struct HomeView: View {
         .accessibilityLabel(title)
         .tutorialAnchor(anchor)
         .cypherPressFeedback()
-    }
-
-    private var defaultKeyCornerRadius: CGFloat {
-        #if os(macOS)
-        8
-        #else
-        12
-        #endif
     }
 }

@@ -54,6 +54,9 @@ struct MyKeysView: View {
                 .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .cypherMacReadableContent()
     }
 

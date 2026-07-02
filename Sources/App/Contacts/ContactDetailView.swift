@@ -105,10 +105,12 @@ private struct ContactDetailHostView: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    String(localized: "contactdetail.notFound", defaultValue: "Contact Not Found"),
-                    systemImage: "person.slash"
-                )
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "contactdetail.notFound", defaultValue: "Contact Not Found"),
+                        systemImage: "person.slash"
+                    )
+                }
             }
         }
         #if os(macOS)
@@ -252,6 +254,7 @@ private struct ContactDetailHostView: View {
                 Text(String(localized: "contactdetail.canEncrypt", defaultValue: "Can Encrypt To"))
                 Spacer()
                 Image(systemName: contact.canEncryptTo ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(contact.canEncryptTo ? .green : .red)
             }
             .accessibilityElement(children: .combine)

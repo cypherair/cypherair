@@ -107,6 +107,7 @@ private struct KeyDetailScreenHostView: View {
                                 ))
                             } icon: {
                                 Image(systemName: "exclamationmark.triangle.fill")
+                                    .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.orange)
                             }
                             .font(.callout)
@@ -140,6 +141,7 @@ private struct KeyDetailScreenHostView: View {
                             if key.isExpired {
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle.fill")
+                                        .symbolRenderingMode(.hierarchical)
                                         .foregroundStyle(.red)
                                     Text(String(localized: "keydetail.expiry.expired", defaultValue: "Expired"))
                                         .foregroundStyle(.red)
@@ -216,6 +218,7 @@ private struct KeyDetailScreenHostView: View {
                                 ))
                             } icon: {
                                 Image(systemName: "cpu")
+                                    .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.blue)
                             }
                             .font(.callout)
@@ -290,10 +293,12 @@ private struct KeyDetailScreenHostView: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    String(localized: "keydetail.notFound", defaultValue: "Key Not Found"),
-                    systemImage: "key.slash"
-                )
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "keydetail.notFound", defaultValue: "Key Not Found"),
+                        systemImage: "key.slash"
+                    )
+                }
             }
         }
         #if os(macOS)
