@@ -123,6 +123,16 @@ CypherAir targets iOS 26.5+, iPadOS 26.5+, macOS 26.5+, and visionOS 26.5+. Full
 - Never apply glass to content views (lists, key details, message display).
 - Use `.tint()` on glass only for semantic meaning (blue = primary action, red = destructive). Never decorative tinting.
 
+### Design System
+
+The visual identity is quiet system-native: system accent color everywhere (no app-level `.tint()` override, no brand color), native platform chrome, and hierarchy from typography, whitespace, and consistent surfaces rather than color. The shared primitives live in `Sources/App/DesignSystem/` and are deliberately few:
+
+- `CypherSpacing` (`compact` 8 / `tight` 12 / `standard` 16 / `section` 20 / `loose` 24) and `CypherRadius` (`control` / `card` / `hero`, tighter values on macOS) replace per-view spacing and corner-radius literals. Do not add new tiers without a repeated cross-screen need.
+- `View.cypherSurface(_:)` is the one card/hero surface treatment (`.fill.tertiary` on iOS/visionOS, `.background.secondary` on macOS). Content views keep system backgrounds; glass is never applied here.
+- `CypherToolScreenLayout` (in `Sources/App/Common/`) hosts the Encrypt/Decrypt/Sign/Verify screens: one scrolling `Form` everywhere, splitting into workflow/output panes on macOS when the screen's own width reaches `ToolScreenLayoutPolicy.wideLayoutMinWidth`.
+- Standalone status glyphs (leading icons in custom `Label` icon closures, status marks in rows) use `.symbolRenderingMode(.hierarchical)`; icons inside plain `Label(_:systemImage:)` stay monochrome.
+- There is intentionally no section-header component, no custom `ButtonStyle`, and no empty-state wrapper — system `Form`/`List` headers, system button styles, and `ContentUnavailableView` (three-closure form) already carry the design language. Prefer removing one-off styling over adding new primitives.
+
 ## 3. Concurrency
 
 The project uses Apple Swift 6.3.2 with `SWIFT_VERSION = 6.0` and `SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated`. `SWIFT_VERSION` selects the Swift 6 language mode; it is not the compiler release number.
