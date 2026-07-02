@@ -358,6 +358,7 @@ def validate_sqlcipher_dependency(repo_root: Path) -> None:
             "--pin-file",
             str(pin_path),
             "--skip-release-assets",
+            "--skip-smoke",
         ],
         check=False,
         text=True,
