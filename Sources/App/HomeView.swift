@@ -130,6 +130,10 @@ struct HomeView: View {
                     .cypherSurface(.card)
                 }
                 .buttonStyle(.plain)
+                #if os(iOS) || os(visionOS)
+                // Plain-style links lose the automatic hover/gaze highlight.
+                .hoverEffect(.automatic)
+                #endif
                 .cypherPressFeedback()
                 .accessibilityElement(children: .combine)
                 .accessibilityHint(Text(String(localized: "home.defaultKey.hint", defaultValue: "Opens key details")))
@@ -182,6 +186,8 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 80)
         }
+        // .buttonStyle(.glass) is @available(visionOS, unavailable) in the
+        // visionOS 26.5 SDK; visionOS gets its native prominent chrome.
         #if os(visionOS)
         .buttonStyle(.borderedProminent)
         #else
