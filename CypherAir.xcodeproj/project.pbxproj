@@ -139,6 +139,8 @@
 				App/Decrypt/DecryptScreenModel.swift,
 				App/Decrypt/DecryptView.swift,
 				App/Decrypt/Support/ArmoredTextMessageClassifier.swift,
+				App/DesignSystem/CypherLayout.swift,
+				App/DesignSystem/CypherSurface.swift,
 				App/Encrypt/EncryptInputSections.swift,
 				App/Encrypt/EncryptOptionsSection.swift,
 				App/Encrypt/EncryptRecipientChooser.swift,
