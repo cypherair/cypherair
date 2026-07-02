@@ -3,7 +3,6 @@ import SwiftUI
 /// Home screen with quick-access actions for core operations.
 struct HomeView: View {
     @Environment(KeyManagementService.self) private var keyManagement
-    @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.appRouteNavigator) private var routeNavigator
     var body: some View {
         content
@@ -143,27 +142,23 @@ struct HomeView: View {
             actionButton(
                 title: String(localized: "home.encrypt", defaultValue: "Encrypt"),
                 icon: "lock.fill",
-                tint: protectedOrdinarySettings.colorTheme.actionColors.encrypt,
                 route: .encrypt,
                 anchor: .homeEncryptAction
             )
             actionButton(
                 title: String(localized: "home.decrypt", defaultValue: "Decrypt"),
                 icon: "lock.open.fill",
-                tint: protectedOrdinarySettings.colorTheme.actionColors.decrypt,
                 route: .decrypt,
                 anchor: .homeDecryptAction
             )
             actionButton(
                 title: String(localized: "home.sign", defaultValue: "Sign"),
                 icon: "signature",
-                tint: protectedOrdinarySettings.colorTheme.actionColors.sign,
                 route: .sign
             )
             actionButton(
                 title: String(localized: "home.verify", defaultValue: "Verify"),
                 icon: "checkmark.seal",
-                tint: protectedOrdinarySettings.colorTheme.actionColors.verify,
                 route: .verify
             )
         }
@@ -172,7 +167,6 @@ struct HomeView: View {
     private func actionButton(
         title: String,
         icon: String,
-        tint: Color,
         route: AppRoute,
         anchor: TutorialAnchorID? = nil
     ) -> some View {
@@ -191,7 +185,6 @@ struct HomeView: View {
         #else
         .buttonStyle(.glass)
         #endif
-        .tint(tint)
         .accessibilityLabel(title)
         .tutorialAnchor(anchor)
         .cypherPressFeedback()

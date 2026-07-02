@@ -9,7 +9,6 @@ import UIKit
 enum MacPresentationWidth {
     static let standard: CGFloat = 760
     static let textHeavy: CGFloat = 860
-    static let themeGrid: CGFloat = 640
     static let qrContent: CGFloat = 360
     static let onboarding: CGFloat = 560
 }

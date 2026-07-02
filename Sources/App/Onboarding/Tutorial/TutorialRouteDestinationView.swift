@@ -176,8 +176,6 @@ struct TutorialRouteDestinationView: View {
                     )
                 }
             )
-        case .themePicker:
-            return AnyView(TutorialSurfaceView(tab: definitionTab, route: route) { ThemePickerView() })
         }
     }
 

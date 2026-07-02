@@ -175,7 +175,6 @@ struct TutorialConfigurationFactory {
             },
             isOnboardingEntryEnabled: false,
             isGuidedTutorialEntryEnabled: false,
-            isThemePickerEnabled: true,
             isAppIconEntryEnabled: false,
             navigationEducationFooter: String(
                 localized: "guidedTutorial.settings.restricted.navigation",

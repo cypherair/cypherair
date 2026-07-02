@@ -94,15 +94,6 @@ final class MacUISmokeTests: XCTestCase {
         )
     }
 
-    func test_settingsRoot_opensThemePicker() throws {
-        launchMain()
-        openSettingsTab()
-
-        tapSettingsRow("settings.theme")
-
-        waitForScreenReady("theme.ready")
-    }
-
     func test_settingsRoot_opensSelfTest() throws {
         launchMain()
         openSettingsTab()

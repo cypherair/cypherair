@@ -61,8 +61,6 @@ struct AppRouteDestinationView: View {
             #else
             Text(String(localized: "common.comingSoon", defaultValue: "Coming soon"))
             #endif
-        case .themePicker:
-            ThemePickerView()
         }
     }
 }

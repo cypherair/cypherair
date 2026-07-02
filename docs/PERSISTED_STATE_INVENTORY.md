@@ -45,7 +45,6 @@ Allowed target classes:
 | `authMode` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | `gracePeriod` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `colorTheme` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `encryptToSelf` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `clipboardNotice` | `ProtectedData/protected-settings` | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |

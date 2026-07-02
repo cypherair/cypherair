@@ -395,7 +395,6 @@ struct CypherAirApp: App {
                         appLockController: container.appLockController
                     )
                     .environment(container.appLockController)
-                    .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                     .environment(container.config)
                     .environment(container.protectedOrdinarySettingsCoordinator)
                     .environment(container.keyManagement)
@@ -728,21 +727,6 @@ private extension View {
             }
         } message: { warning in
             Text(warning)
-        }
-    }
-}
-
-// MARK: - Optional Tint
-
-private extension View {
-    /// Apply `.tint()` only when a color is provided; omit entirely for `nil`
-    /// so SwiftUI uses the system `Color.accentColor`.
-    @ViewBuilder
-    func optionalTint(_ color: Color?) -> some View {
-        if let color {
-            self.tint(color)
-        } else {
-            self
         }
     }
 }

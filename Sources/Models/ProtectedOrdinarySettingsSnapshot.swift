@@ -3,7 +3,6 @@ import Foundation
 struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
     var gracePeriod: Int
     var hasCompletedOnboarding: Bool
-    var colorTheme: ColorTheme
     var encryptToSelf: Bool
     var guidedTutorialCompletedVersion: Int
 
@@ -11,7 +10,6 @@ struct ProtectedOrdinarySettingsSnapshot: Codable, Equatable, Sendable {
         ProtectedOrdinarySettingsSnapshot(
             gracePeriod: AuthPreferences.defaultGracePeriod,
             hasCompletedOnboarding: false,
-            colorTheme: .systemDefault,
             encryptToSelf: true,
             guidedTutorialCompletedVersion: 0
         )

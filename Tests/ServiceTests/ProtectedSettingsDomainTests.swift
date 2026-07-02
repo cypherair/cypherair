@@ -252,13 +252,11 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
 
         coordinator.setGracePeriod(300)
         coordinator.setHasCompletedOnboarding(true)
-        coordinator.setColorTheme(.teal)
         coordinator.setEncryptToSelf(false)
         coordinator.markGuidedTutorialCompletedCurrentVersion()
         let expectedSnapshot = ProtectedOrdinarySettingsSnapshot(
             gracePeriod: 300,
             hasCompletedOnboarding: true,
-            colorTheme: .teal,
             encryptToSelf: false,
             guidedTutorialCompletedVersion: GuidedTutorialVersion.current
         )

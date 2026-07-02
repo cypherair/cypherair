@@ -16,7 +16,6 @@ struct SettingsView: View {
         var onAuthModeConfirmationRequested: (@MainActor (AuthModeChangeConfirmationRequest) -> Void)?
         var isOnboardingEntryEnabled = true
         var isGuidedTutorialEntryEnabled = true
-        var isThemePickerEnabled = true
         var isAppIconEntryEnabled = true
         var navigationEducationFooter: String?
         var appearanceEducationFooter: String?

@@ -1117,7 +1117,6 @@ final class TutorialSessionStoreTests: XCTestCase {
 
         XCTAssertFalse(configuration.isOnboardingEntryEnabled)
         XCTAssertFalse(configuration.isGuidedTutorialEntryEnabled)
-        XCTAssertTrue(configuration.isThemePickerEnabled)
         XCTAssertFalse(configuration.isAppIconEntryEnabled)
         XCTAssertNotNil(configuration.navigationEducationFooter)
         XCTAssertNotNil(configuration.appearanceEducationFooter)
