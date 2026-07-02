@@ -66,6 +66,20 @@ def run(command: list[str], *, cwd: Path | None = None) -> str:
     return completed.stdout.strip()
 
 
+def format_error_detail(error: Exception) -> str:
+    if not isinstance(error, subprocess.CalledProcessError):
+        return str(error)
+
+    details = [str(error)]
+    for label, value in (("stdout", error.stdout), ("stderr", error.stderr)):
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", "replace")
+        text = str(value or "").strip()
+        if text:
+            details.append(f"{label}:\n{text}")
+    return "\n".join(details)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -523,7 +537,7 @@ def main() -> int:
         if not args.skip_smoke:
             smoke_test(root)
     except (KeyError, TypeError, ValidationError, subprocess.CalledProcessError, json.JSONDecodeError, plistlib.InvalidFileException) as error:
-        print(f"error: SQLCipher XCFramework validation failed: {error}", file=sys.stderr)
+        print(f"error: SQLCipher XCFramework validation failed: {format_error_detail(error)}", file=sys.stderr)
         return 1
 
     print("SQLCipher XCFramework validation passed")
