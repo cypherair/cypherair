@@ -134,7 +134,7 @@ private struct DecryptScreenHostView: View {
             horizontalSizeClass: horizontalSizeClass
         )
 
-        Form {
+        CypherToolScreenLayout(hasOutput: hasOutput) {
             if !usesToolbarModePicker {
                 Section {
                     CypherModePicker(
@@ -176,6 +176,7 @@ private struct DecryptScreenHostView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(model.decryptButtonDisabled || model.hasPhase1Result)
             }
 
@@ -216,6 +217,7 @@ private struct DecryptScreenHostView: View {
                         )
                     }
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.return, modifiers: .command)
                     .disabled(operation.isRunning)
                 }
 
@@ -226,7 +228,7 @@ private struct DecryptScreenHostView: View {
                     )
                 }
             }
-
+        } output: {
             if model.decryptMode == .text,
                let textDecryptionResult = model.textDecryptionResult {
                 Section {
@@ -251,6 +253,7 @@ private struct DecryptScreenHostView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .keyboardShortcut("s", modifiers: .command)
                     .disabled(!model.configuration.allowsFileResultExport)
                 }
             }
@@ -267,7 +270,6 @@ private struct DecryptScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "decrypt.title", defaultValue: "Decrypt"))
         .toolbar {
             if usesToolbarModePicker {
@@ -425,6 +427,18 @@ private struct DecryptScreenHostView: View {
             } else {
                 Text(String(localized: "fileDecrypt.types", defaultValue: "Supports .gpg, .pgp, and .asc files"))
             }
+        }
+    }
+
+    private var hasOutput: Bool {
+        if model.activeDetailedSignatureVerification != nil {
+            return true
+        }
+        switch model.decryptMode {
+        case .text:
+            return model.textDecryptionResult != nil
+        case .file:
+            return model.fileDecryptionResult != nil
         }
     }
 

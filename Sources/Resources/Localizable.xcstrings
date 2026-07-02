@@ -3713,6 +3713,38 @@
         }
       }
     },
+    "contextMenu.setDefaultKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set as Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u8bbe\u4e3a\u9ed8\u8ba4"
+          }
+        }
+      }
+    },
+    "contextMenu.copyFingerprint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Fingerprint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u62f7\u8d1d\u6307\u7eb9"
+          }
+        }
+      }
+    },
     "decrypt.button" : {
       "localizations" : {
         "en" : {
@@ -10933,6 +10965,38 @@
         }
       }
     },
+    "menu.newKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Key\u2026"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u65b0\u5efa\u5bc6\u94a5\u2026"
+          }
+        }
+      }
+    },
+    "menu.importKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Key\u2026"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u5bfc\u5165\u5bc6\u94a5\u2026"
+          }
+        }
+      }
+    },
     "onboarding.back" : {
       "localizations" : {
         "en" : {
@@ -14785,6 +14849,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要受保护的联系人"
+          }
+        }
+      }
+    },
+    "tool.output.placeholder.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Output Yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u6682\u65e0\u8f93\u51fa"
+          }
+        }
+      }
+    },
+    "tool.output.placeholder.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Results appear here after you run the operation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\u8fd0\u884c\u64cd\u4f5c\u540e\uff0c\u7ed3\u679c\u5c06\u663e\u793a\u5728\u8fd9\u91cc\u3002"
           }
         }
       }

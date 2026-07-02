@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct EncryptResultSections: View {
+struct EncryptActionSections: View {
     let model: EncryptScreenModel
 
     var body: some View {
@@ -19,6 +19,7 @@ struct EncryptResultSections: View {
                 )
             }
             .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
             .disabled(model.encryptButtonDisabled)
         }
 
@@ -28,7 +29,13 @@ struct EncryptResultSections: View {
                 cancel: operation.cancel
             )
         }
+    }
+}
 
+struct EncryptResultSections: View {
+    let model: EncryptScreenModel
+
+    var body: some View {
         if model.encryptMode == .text, let ciphertextString = model.ciphertextString {
             Section {
                 CypherOutputTextBlock(
@@ -54,6 +61,7 @@ struct EncryptResultSections: View {
                         systemImage: "square.and.arrow.down"
                     )
                 }
+                .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.configuration.allowsResultExport)
             } header: {
                 Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
@@ -70,6 +78,7 @@ struct EncryptResultSections: View {
                         systemImage: "square.and.arrow.down"
                     )
                 }
+                .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.configuration.allowsFileResultExport)
             }
         }

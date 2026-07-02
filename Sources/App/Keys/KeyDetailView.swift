@@ -303,6 +303,34 @@ private struct KeyDetailScreenHostView: View {
         }
         #if os(macOS)
         .listStyle(.inset)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let key = model.key {
+                    NavigationLink(
+                        value: AppRoute.qrDisplay(
+                            publicKeyData: key.publicKeyData,
+                            displayName: key.userId ?? key.shortKeyId
+                        )
+                    ) {
+                        Label(
+                            String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
+                            systemImage: "qrcode"
+                        )
+                    }
+                    .accessibilityIdentifier("keydetail.toolbar.qr")
+
+                    if !model.isDeviceBound {
+                        NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {
+                            Label(
+                                String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                        .accessibilityIdentifier("keydetail.toolbar.backup")
+                    }
+                }
+            }
+        }
         #endif
         .cypherMacReadableContent()
         .accessibilityIdentifier("keydetail.root")

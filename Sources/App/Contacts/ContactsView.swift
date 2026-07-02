@@ -119,6 +119,18 @@ private extension ContactsScreenHostView {
                     ContactRowView(contact: contact)
                 }
                 .accessibilityIdentifier("contacts.row")
+                .contextMenu {
+                    if let preferredKey = contact.preferredKey {
+                        Button {
+                            CypherClipboard.copy(preferredKey.fingerprint)
+                        } label: {
+                            Label(
+                                String(localized: "contextMenu.copyFingerprint", defaultValue: "Copy Fingerprint"),
+                                systemImage: "doc.on.doc"
+                            )
+                        }
+                    }
+                }
             }
             .onDelete { indexSet in
                 model.deleteContacts(at: indexSet, from: contacts)

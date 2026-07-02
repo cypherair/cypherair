@@ -8,7 +8,7 @@ struct EncryptScreenFormView: View {
         @Bindable var model = model
         let operation = model.operation
 
-        Form {
+        CypherToolScreenLayout(hasOutput: hasOutput) {
             if showsModePicker {
                 Section {
                     modePicker(
@@ -33,9 +33,20 @@ struct EncryptScreenFormView: View {
             EncryptOptionsSection(model: model)
                 .disabled(operation.isRunning)
 
+            EncryptActionSections(model: model)
+        } output: {
             EncryptResultSections(model: model)
         }
         .screenReady("encrypt.ready")
+    }
+
+    private var hasOutput: Bool {
+        switch model.encryptMode {
+        case .text:
+            model.ciphertextString != nil
+        case .file:
+            model.encryptedFileURL != nil
+        }
     }
 
     private func modePicker(

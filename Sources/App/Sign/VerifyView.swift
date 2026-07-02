@@ -69,7 +69,7 @@ private struct VerifyScreenHostView: View {
             horizontalSizeClass: horizontalSizeClass
         )
 
-        Form {
+        CypherToolScreenLayout(hasOutput: hasOutput) {
             if !usesToolbarModePicker {
                 Section {
                     CypherModePicker(
@@ -107,6 +107,7 @@ private struct VerifyScreenHostView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(model.verifyButtonDisabled)
             }
 
@@ -116,7 +117,7 @@ private struct VerifyScreenHostView: View {
                     cancel: operation.cancel
                 )
             }
-
+        } output: {
             if model.verifyMode == .cleartext, let cleartextOriginalText = model.cleartextOriginalText {
                 Section {
                     CypherOutputTextBlock(
@@ -142,7 +143,6 @@ private struct VerifyScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "verify.title", defaultValue: "Verify"))
         .toolbar {
             if usesToolbarModePicker {
@@ -287,6 +287,13 @@ private struct VerifyScreenHostView: View {
                 Text(detachedFileRestrictionMessage)
             }
         }
+    }
+
+    private var hasOutput: Bool {
+        if model.activeDetailedVerification != nil {
+            return true
+        }
+        return model.verifyMode == .cleartext && model.cleartextOriginalText != nil
     }
 
     private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {

@@ -115,6 +115,29 @@ private struct ContactDetailHostView: View {
         }
         #if os(macOS)
         .listStyle(.inset)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if configuration.showsCertificateSignatureEntry, let contact = model.contact {
+                    NavigationLink(
+                        value: AppRoute.contactCertification(
+                            contactId: contact.contactId,
+                            keyId: contact.preferredKey?.keyId,
+                            intent: .certify
+                        )
+                    ) {
+                        Label(
+                            String(localized: "contactdetail.certifyContact", defaultValue: "Certify This Contact"),
+                            systemImage: "checkmark.seal"
+                        )
+                    }
+                    .disabled(
+                        !configuration.allowsCertificateSignatureLaunch ||
+                            !model.allowsProtectedCertificationPersistence
+                    )
+                    .accessibilityIdentifier("contactdetail.toolbar.certify")
+                }
+            }
+        }
         #endif
         .cypherMacReadableContent()
         .accessibilityIdentifier("contactdetail.root")

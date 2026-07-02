@@ -317,10 +317,9 @@ struct CypherAirApp: App {
         .defaultSize(width: 900, height: 560)
         .windowResizability(.contentMinSize)
         .commands {
-            // Disable File > New Window on macOS.
-            // CypherAir uses a single-window design; multiple windows would create
-            // independent privacy screen states leading to inconsistent security behavior.
-            CommandGroup(replacing: .newItem) { }
+            // File > New Window stays disabled inside MacKeyboardCommands,
+            // which replaces the New group with key actions.
+            MacKeyboardCommands(navigationState: macShellNavigationState)
             // Restore the ⌘, Settings menu item that the standalone Settings scene used to
             // provide automatically; in the single-window design it selects the Settings tab.
             CommandGroup(replacing: .appSettings) {
