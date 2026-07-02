@@ -3713,22 +3713,6 @@
         }
       }
     },
-    "contextMenu.setDefaultKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Set as Default"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "\u8bbe\u4e3a\u9ed8\u8ba4"
-          }
-        }
-      }
-    },
     "contextMenu.copyFingerprint" : {
       "localizations" : {
         "en" : {
@@ -3740,7 +3724,23 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\u62f7\u8d1d\u6307\u7eb9"
+            "value" : "拷贝指纹"
+          }
+        }
+      }
+    },
+    "contextMenu.setDefaultKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set as Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设为默认"
           }
         }
       }
@@ -10965,34 +10965,34 @@
         }
       }
     },
-    "menu.newKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "New Key\u2026"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "\u65b0\u5efa\u5bc6\u94a5\u2026"
-          }
-        }
-      }
-    },
     "menu.importKey" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Import Key\u2026"
+            "value" : "Import Key…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\u5bfc\u5165\u5bc6\u94a5\u2026"
+            "value" : "导入密钥…"
+          }
+        }
+      }
+    },
+    "menu.newKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Key…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建密钥…"
           }
         }
       }
@@ -11649,22 +11649,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先验证身份以查看和更改此偏好设置。"
-          }
-        }
-      }
-    },
-    "protectedSettings.locked.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preferences Locked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "偏好设置已锁定"
           }
         }
       }
@@ -14853,22 +14837,6 @@
         }
       }
     },
-    "tool.output.placeholder.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No Output Yet"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "\u6682\u65e0\u8f93\u51fa"
-          }
-        }
-      }
-    },
     "tool.output.placeholder.message" : {
       "localizations" : {
         "en" : {
@@ -14880,7 +14848,23 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\u8fd0\u884c\u64cd\u4f5c\u540e\uff0c\u7ed3\u679c\u5c06\u663e\u793a\u5728\u8fd9\u91cc\u3002"
+            "value" : "运行操作后，结果将显示在这里。"
+          }
+        }
+      }
+    },
+    "tool.output.placeholder.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Output Yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无输出"
           }
         }
       }
