@@ -71,6 +71,10 @@ private struct QRDisplayHostView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: 280, maxHeight: 280)
+                    #if os(visionOS)
+                    .contentShape(.hoverEffect, .rect(cornerRadius: CypherRadius.card))
+                    .hoverEffect(.lift)
+                    #endif
                     .accessibilityLabel(
                         String(localized: "qr.accessibility", defaultValue: "QR code containing public key")
                     )

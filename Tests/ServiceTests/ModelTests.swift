@@ -3,7 +3,7 @@ import SwiftUI
 @testable import CypherAir
 
 /// Tests for model types: CypherAirError, Contact, PGPKeyIdentity,
-/// PGPKeyProfile, SignatureVerification, and ColorTheme.
+/// PGPKeyProfile, and SignatureVerification.
 final class ModelTests: XCTestCase {
 
     // MARK: - PGPErrorMapper
@@ -892,7 +892,6 @@ final class ModelTests: XCTestCase {
         XCTAssertNil(coordinator.gracePeriodForSession)
         XCTAssertNil(coordinator.hasCompletedOnboarding)
         XCTAssertNil(coordinator.encryptToSelf)
-        XCTAssertEqual(coordinator.colorTheme, .systemDefault)
         XCTAssertEqual(persistence.loadCount, 0)
         XCTAssertEqual(persistence.saveCount, 0)
     }
@@ -902,7 +901,6 @@ final class ModelTests: XCTestCase {
             snapshot: ProtectedOrdinarySettingsSnapshot(
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
-                colorTheme: .teal,
                 encryptToSelf: false,
                 guidedTutorialCompletedVersion: GuidedTutorialVersion.current
             )
@@ -917,7 +915,6 @@ final class ModelTests: XCTestCase {
 
         XCTAssertEqual(coordinator.snapshot?.gracePeriod, 300)
         XCTAssertEqual(coordinator.snapshot?.hasCompletedOnboarding, true)
-        XCTAssertEqual(coordinator.snapshot?.colorTheme, .teal)
         XCTAssertEqual(coordinator.snapshot?.encryptToSelf, false)
         XCTAssertEqual(persistence.loadCount, 1)
     }
@@ -945,7 +942,6 @@ final class ModelTests: XCTestCase {
             snapshot: ProtectedOrdinarySettingsSnapshot(
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
-                colorTheme: .teal,
                 encryptToSelf: false,
                 guidedTutorialCompletedVersion: GuidedTutorialVersion.current
             )
@@ -1099,97 +1095,6 @@ final class ModelTests: XCTestCase {
         }
 
         func removePersistentValues() {}
-    }
-
-    // MARK: - ColorTheme
-
-    func test_colorTheme_allCases_returnValidActionColors() {
-        for theme in ColorTheme.allCases {
-            let colors = theme.actionColors
-            // Verify all 4 named properties are accessible (compilation check + no crashes)
-            _ = colors.encrypt
-            _ = colors.decrypt
-            _ = colors.sign
-            _ = colors.verify
-        }
-    }
-
-    func test_colorTheme_allCases_haveAccentColor() {
-        for theme in ColorTheme.allCases {
-            // Verify accentColor is accessible for every theme
-            _ = theme.accentColor
-        }
-    }
-
-    func test_colorTheme_allCases_havePreviewColors() {
-        for theme in ColorTheme.allCases {
-            XCTAssertFalse(theme.previewColors.isEmpty, "\(theme) has empty previewColors")
-        }
-    }
-
-    func test_colorTheme_allCases_haveDisplayName() {
-        for theme in ColorTheme.allCases {
-            XCTAssertFalse(theme.displayName.isEmpty, "\(theme) has empty displayName")
-        }
-    }
-
-    func test_colorTheme_systemDefault_preservesOriginalColors() {
-        let colors = ColorTheme.systemDefault.actionColors
-        // System default uses the same original hardcoded SwiftUI colors
-        XCTAssertEqual(colors.encrypt, .blue)
-        XCTAssertEqual(colors.decrypt, .green)
-        XCTAssertEqual(colors.sign, .orange)
-        XCTAssertEqual(colors.verify, .purple)
-    }
-
-    func test_colorTheme_systemDefault_hasNilAccentColor() {
-        XCTAssertNil(ColorTheme.systemDefault.accentColor)
-    }
-
-    func test_colorTheme_defaultBlue_hasBlueAccentColor() {
-        XCTAssertEqual(ColorTheme.defaultBlue.accentColor, .blue)
-    }
-
-    func test_colorTheme_defaultBlue_preservesOriginalColors() {
-        let colors = ColorTheme.defaultBlue.actionColors
-        XCTAssertEqual(colors.encrypt, .blue)
-        XCTAssertEqual(colors.decrypt, .green)
-        XCTAssertEqual(colors.sign, .orange)
-        XCTAssertEqual(colors.verify, .purple)
-    }
-
-    func test_colorTheme_multiColorThemes_areIdentified() {
-        XCTAssertTrue(ColorTheme.prideRainbow.isMultiColor)
-        XCTAssertTrue(ColorTheme.transPride.isMultiColor)
-        XCTAssertTrue(ColorTheme.bisexualPride.isMultiColor)
-        XCTAssertTrue(ColorTheme.nonBinary.isMultiColor)
-
-        XCTAssertFalse(ColorTheme.systemDefault.isMultiColor)
-        XCTAssertFalse(ColorTheme.defaultBlue.isMultiColor)
-        XCTAssertFalse(ColorTheme.purple.isMultiColor)
-        XCTAssertFalse(ColorTheme.graphite.isMultiColor)
-    }
-
-    func test_protectedOrdinarySettings_colorTheme_persistsAcrossReload() {
-        let store = InMemoryOrdinarySettingsStore()
-        let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
-        coordinator.setColorTheme(.purple)
-
-        let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
-        XCTAssertEqual(reloaded.colorTheme, .purple)
-    }
-
-    func test_protectedOrdinarySettings_colorTheme_defaultsToSystemDefault() {
-        let coordinator = makeLoadedProtectedOrdinarySettings()
-        XCTAssertEqual(coordinator.colorTheme, .systemDefault)
-    }
-
-    func test_colorTheme_rawValue_roundTrips() {
-        for theme in ColorTheme.allCases {
-            let raw = theme.rawValue
-            let restored = ColorTheme(rawValue: raw)
-            XCTAssertEqual(restored, theme, "Round-trip failed for \(theme)")
-        }
     }
 
     func test_certificateSelectionAdapter_selectorInput_preservesBytesAndOccurrence() {

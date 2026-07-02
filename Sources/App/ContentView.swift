@@ -90,11 +90,19 @@ struct MacAppShellView: View {
 
     @ViewBuilder
     private func detailContent(for tab: AppShellTab) -> some View {
+        // Per-tab identity (.id below) gives each sidebar tab its own
+        // NavigationStack instance, and the binding ignores writes made once
+        // the tab is no longer selected — the outgoing stack clears its path
+        // during teardown, which would otherwise erase the stored per-tab
+        // navigation on every switch.
         AppRouteHost(
             resolver: macRouteResolver(for: tab),
             path: Binding(
                 get: { navigationState.path(for: tab) },
-                set: { navigationState.setPath($0, for: tab) }
+                set: { newPath in
+                    guard navigationState.selectedTab == tab else { return }
+                    navigationState.setPath(newPath, for: tab)
+                }
             )
         ) {
             switch tab {
@@ -116,6 +124,7 @@ struct MacAppShellView: View {
                 VerifyView()
             }
         }
+        .id(tab)
     }
 
     private func macRouteResolver(for tab: AppShellTab) -> AppRouteDestinationResolver {

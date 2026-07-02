@@ -235,7 +235,7 @@ ProtectedData component ownership:
 - the framework exists and is wired into startup/bootstrap and app-session ownership
 - `PrivateKeyControlStore` is the private-key control source of truth; the payload scope is `authMode`, rewrap recovery, and modify-expiry recovery
 - `KeyMetadataDomainStore` is the key metadata source of truth; it is recoverable after unlock but must not be silently rebuilt from private-key envelope rows
-- `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, color theme, encrypt-to-self, and guided tutorial completion
+- `ProtectedSettingsStore` is the first protected-domain adopter; schema v2 preserves `clipboardNotice` and owns the ordinary-settings snapshot for grace period, onboarding completion, encrypt-to-self, and guided tutorial completion
 - `ProtectedSettingsOrdinarySettingsPersistence` adapts `ProtectedSettingsStore` to the ordinary-settings persistence protocol inside the ProtectedData boundary
 - `ProtectedOrdinarySettingsCoordinator` is the source of truth for ordinary-settings availability and loaded snapshots; production reads/writes only after app privacy authentication has been reduced to app-level ordinary-settings availability
 - `ProtectedDataFrameworkSentinelStore` is the second production domain; it contains no user data, telemetry, or UI state, and is created only after another domain is already committed and the shared resource is ready

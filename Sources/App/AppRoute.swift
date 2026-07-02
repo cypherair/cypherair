@@ -39,5 +39,4 @@ enum AppRoute: Hashable {
     case sourceCompliance
     case license
     case appIcon
-    case themePicker
 }

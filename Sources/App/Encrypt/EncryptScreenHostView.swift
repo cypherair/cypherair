@@ -47,7 +47,6 @@ struct EncryptScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "encrypt.title", defaultValue: "Encrypt"))
         .toolbar {
             if usesToolbarModePicker {

@@ -37,10 +37,6 @@ final class ProtectedOrdinarySettingsCoordinator {
         snapshot?.hasCompletedOnboarding
     }
 
-    var colorTheme: ColorTheme {
-        snapshot?.colorTheme ?? .systemDefault
-    }
-
     var encryptToSelf: Bool? {
         snapshot?.encryptToSelf
     }
@@ -96,12 +92,6 @@ final class ProtectedOrdinarySettingsCoordinator {
     func setHasCompletedOnboarding(_ hasCompletedOnboarding: Bool) {
         guard var snapshot else { return }
         snapshot.hasCompletedOnboarding = hasCompletedOnboarding
-        saveLoadedSnapshot(snapshot)
-    }
-
-    func setColorTheme(_ colorTheme: ColorTheme) {
-        guard var snapshot else { return }
-        snapshot.colorTheme = colorTheme
         saveLoadedSnapshot(snapshot)
     }
 

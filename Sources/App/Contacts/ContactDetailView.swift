@@ -105,14 +105,39 @@ private struct ContactDetailHostView: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    String(localized: "contactdetail.notFound", defaultValue: "Contact Not Found"),
-                    systemImage: "person.slash"
-                )
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "contactdetail.notFound", defaultValue: "Contact Not Found"),
+                        systemImage: "person.slash"
+                    )
+                }
             }
         }
         #if os(macOS)
         .listStyle(.inset)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if configuration.showsCertificateSignatureEntry, let contact = model.contact {
+                    NavigationLink(
+                        value: AppRoute.contactCertification(
+                            contactId: contact.contactId,
+                            keyId: contact.preferredKey?.keyId,
+                            intent: .certify
+                        )
+                    ) {
+                        Label(
+                            String(localized: "contactdetail.certifyContact", defaultValue: "Certify This Contact"),
+                            systemImage: "checkmark.seal"
+                        )
+                    }
+                    .disabled(
+                        !configuration.allowsCertificateSignatureLaunch ||
+                            !model.allowsProtectedCertificationPersistence
+                    )
+                    .accessibilityIdentifier("contactdetail.toolbar.certify")
+                }
+            }
+        }
         #endif
         .cypherMacReadableContent()
         .accessibilityIdentifier("contactdetail.root")
@@ -252,6 +277,7 @@ private struct ContactDetailHostView: View {
                 Text(String(localized: "contactdetail.canEncrypt", defaultValue: "Can Encrypt To"))
                 Spacer()
                 Image(systemName: contact.canEncryptTo ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(contact.canEncryptTo ? .green : .red)
             }
             .accessibilityElement(children: .combine)

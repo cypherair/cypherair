@@ -98,7 +98,7 @@ private struct SignScreenHostView: View {
             horizontalSizeClass: horizontalSizeClass
         )
 
-        Form {
+        CypherToolScreenLayout(hasOutput: hasOutput) {
             if !usesToolbarModePicker {
                 Section {
                     CypherModePicker(
@@ -151,6 +151,7 @@ private struct SignScreenHostView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(model.signButtonDisabled)
             }
 
@@ -160,7 +161,7 @@ private struct SignScreenHostView: View {
                     cancel: operation.cancel
                 )
             }
-
+        } output: {
             if model.signMode == .text, let signedMessage = model.signedMessage {
                 Section {
                     CypherOutputTextBlock(
@@ -186,6 +187,7 @@ private struct SignScreenHostView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .keyboardShortcut("s", modifiers: .command)
                     .disabled(!model.configuration.allowsTextResultExport)
                 } header: {
                     Text(String(localized: "sign.result", defaultValue: "Signed Message"))
@@ -206,6 +208,7 @@ private struct SignScreenHostView: View {
                             systemImage: "square.and.arrow.down"
                         )
                     }
+                    .keyboardShortcut("s", modifiers: .command)
                     .disabled(!model.configuration.allowsFileResultExport)
                 } header: {
                     Text(String(localized: "sign.detached.result", defaultValue: "Detached Signature"))
@@ -216,7 +219,6 @@ private struct SignScreenHostView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .cypherMacReadableContent(maxWidth: MacPresentationWidth.textHeavy)
         .navigationTitle(String(localized: "sign.title", defaultValue: "Sign"))
         .toolbar {
             if usesToolbarModePicker {
@@ -340,6 +342,15 @@ private struct SignScreenHostView: View {
             if let fileRestrictionMessage = model.configuration.fileRestrictionMessage {
                 Text(fileRestrictionMessage)
             }
+        }
+    }
+
+    private var hasOutput: Bool {
+        switch model.signMode {
+        case .text:
+            model.signedMessage != nil
+        case .file:
+            model.detachedSignature != nil
         }
     }
 

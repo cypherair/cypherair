@@ -137,10 +137,16 @@ struct TutorialShellTabsView: View {
 
     #if os(macOS)
     private func tabRoot(for tab: AppShellTab) -> AnyView {
-        TutorialShellDefinitionsBuilder(
-            store: tutorialStore,
-            sizeClass: sizeClass
-        ).definitions().first(where: { $0.tab == tab })?.content ?? AnyView(EmptyView())
+        // Per-tab identity for the same reason as MacAppShellView.detailContent:
+        // a shared NavigationStack erases the store's per-tab route paths when
+        // its root swaps tabs.
+        AnyView(
+            (TutorialShellDefinitionsBuilder(
+                store: tutorialStore,
+                sizeClass: sizeClass
+            ).definitions().first(where: { $0.tab == tab })?.content ?? AnyView(EmptyView()))
+            .id(tab)
+        )
     }
     #endif
 

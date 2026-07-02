@@ -317,10 +317,9 @@ struct CypherAirApp: App {
         .defaultSize(width: 900, height: 560)
         .windowResizability(.contentMinSize)
         .commands {
-            // Disable File > New Window on macOS.
-            // CypherAir uses a single-window design; multiple windows would create
-            // independent privacy screen states leading to inconsistent security behavior.
-            CommandGroup(replacing: .newItem) { }
+            // File > New Window stays disabled inside MacKeyboardCommands,
+            // which replaces the New group with key actions.
+            MacKeyboardCommands(navigationState: macShellNavigationState)
             // Restore the ⌘, Settings menu item that the standalone Settings scene used to
             // provide automatically; in the single-window design it selects the Settings tab.
             CommandGroup(replacing: .appSettings) {
@@ -395,7 +394,6 @@ struct CypherAirApp: App {
                         appLockController: container.appLockController
                     )
                     .environment(container.appLockController)
-                    .optionalTint(container.protectedOrdinarySettingsCoordinator.colorTheme.accentColor)
                     .environment(container.config)
                     .environment(container.protectedOrdinarySettingsCoordinator)
                     .environment(container.keyManagement)
@@ -728,21 +726,6 @@ private extension View {
             }
         } message: { warning in
             Text(warning)
-        }
-    }
-}
-
-// MARK: - Optional Tint
-
-private extension View {
-    /// Apply `.tint()` only when a color is provided; omit entirely for `nil`
-    /// so SwiftUI uses the system `Color.accentColor`.
-    @ViewBuilder
-    func optionalTint(_ color: Color?) -> some View {
-        if let color {
-            self.tint(color)
-        } else {
-            self
         }
     }
 }

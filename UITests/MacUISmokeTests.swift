@@ -94,13 +94,85 @@ final class MacUISmokeTests: XCTestCase {
         )
     }
 
-    func test_settingsRoot_opensThemePicker() throws {
+    func test_mainFlow_keyDetail_toolbarShowsQRAndBackupActions() throws {
         launchMain()
-        openSettingsTab()
+        generateKey()
 
-        tapSettingsRow("settings.theme")
+        element("postgen.keyDetail").tap()
+        waitForScreenReady("keydetail.ready")
 
-        waitForScreenReady("theme.ready")
+        XCTAssertTrue(element("keydetail.toolbar.qr").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("keydetail.toolbar.backup").waitForExistence(timeout: 10))
+
+        element("keydetail.toolbar.qr").tap()
+        waitForScreenReady("qr.ready")
+    }
+
+    func test_mainFlow_contactDetail_toolbarShowsCertifyAction() throws {
+        launchMain(preloadContact: true)
+
+        element("sidebar.contacts").tap()
+        XCTAssertTrue(element("contacts.row").waitForExistence(timeout: 10))
+        element("contacts.row").tap()
+        waitForScreenReady("contactdetail.ready")
+
+        XCTAssertTrue(element("contactdetail.toolbar.certify").waitForExistence(timeout: 10))
+    }
+
+    func test_mainFlow_myKeys_rowContextMenuOffersKeyActions() throws {
+        launchMain()
+        generateKey()
+
+        // The Keys tab still shows the post-generation screen; pop back to the
+        // My Keys list root (tab switches preserve the path, so pop for real).
+        popNavigationBack()
+        waitForScreenReady("keygen.ready")
+        popNavigationBack()
+        let keyRow = app.staticTexts["UITest Alice"].firstMatch
+        XCTAssertTrue(keyRow.waitForExistence(timeout: 10))
+        XCTAssertTrue(keyRow.isHittable)
+        keyRow.rightClick()
+
+        XCTAssertTrue(app.menuItems["Copy Fingerprint"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuItems["Show QR Code"].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func test_macShell_preservesTabNavigationPathAcrossTabSwitches() throws {
+        launchMain()
+
+        // Push Key Generation onto the Keys tab via the Keys menu shortcut.
+        app.typeKey("n", modifierFlags: .command)
+        waitForScreenReady("keygen.ready")
+
+        element("sidebar.home").tap()
+        XCTAssertTrue(element("home.generate").waitForExistence(timeout: 10))
+
+        element("sidebar.keys").tap()
+
+        // The pushed route survives the tab round-trip.
+        waitForScreenReady("keygen.ready")
+    }
+
+    func test_tabNavigation_respondsToCommandNumberShortcuts() throws {
+        launchMain()
+
+        app.typeKey("5", modifierFlags: .command)
+        waitForScreenReady("encrypt.ready")
+
+        app.typeKey("4", modifierFlags: .command)
+        waitForScreenReady("settings.ready")
+
+        app.typeKey("1", modifierFlags: .command)
+        XCTAssertTrue(element("home.generate").waitForExistence(timeout: 10))
+    }
+
+    func test_fileMenu_newKeyShortcutOpensKeyGeneration() throws {
+        launchMain()
+
+        app.typeKey("n", modifierFlags: .command)
+
+        waitForScreenReady("keygen.ready")
     }
 
     func test_settingsRoot_opensSelfTest() throws {
@@ -461,6 +533,12 @@ final class MacUISmokeTests: XCTestCase {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .count
+    }
+
+    private func popNavigationBack() {
+        let backButton = app.buttons["Back"].firstMatch
+        XCTAssertTrue(backButton.waitForExistence(timeout: 10), "Expected a navigation Back button.")
+        backButton.tap()
     }
 
     private func tapSettingsRow(_ identifier: String) {

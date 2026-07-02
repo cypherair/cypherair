@@ -107,6 +107,7 @@ private struct KeyDetailScreenHostView: View {
                                 ))
                             } icon: {
                                 Image(systemName: "exclamationmark.triangle.fill")
+                                    .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.orange)
                             }
                             .font(.callout)
@@ -140,6 +141,7 @@ private struct KeyDetailScreenHostView: View {
                             if key.isExpired {
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle.fill")
+                                        .symbolRenderingMode(.hierarchical)
                                         .foregroundStyle(.red)
                                     Text(String(localized: "keydetail.expiry.expired", defaultValue: "Expired"))
                                         .foregroundStyle(.red)
@@ -216,6 +218,7 @@ private struct KeyDetailScreenHostView: View {
                                 ))
                             } icon: {
                                 Image(systemName: "cpu")
+                                    .symbolRenderingMode(.hierarchical)
                                     .foregroundStyle(.blue)
                             }
                             .font(.callout)
@@ -290,14 +293,44 @@ private struct KeyDetailScreenHostView: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    String(localized: "keydetail.notFound", defaultValue: "Key Not Found"),
-                    systemImage: "key.slash"
-                )
+                ContentUnavailableView {
+                    Label(
+                        String(localized: "keydetail.notFound", defaultValue: "Key Not Found"),
+                        systemImage: "key.slash"
+                    )
+                }
             }
         }
         #if os(macOS)
         .listStyle(.inset)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let key = model.key {
+                    NavigationLink(
+                        value: AppRoute.qrDisplay(
+                            publicKeyData: key.publicKeyData,
+                            displayName: key.userId ?? key.shortKeyId
+                        )
+                    ) {
+                        Label(
+                            String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
+                            systemImage: "qrcode"
+                        )
+                    }
+                    .accessibilityIdentifier("keydetail.toolbar.qr")
+
+                    if !model.isDeviceBound {
+                        NavigationLink(value: AppRoute.backupKey(fingerprint: model.fingerprint)) {
+                            Label(
+                                String(localized: "keydetail.exportBackup", defaultValue: "Export Backup"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                        .accessibilityIdentifier("keydetail.toolbar.backup")
+                    }
+                }
+            }
+        }
         #endif
         .cypherMacReadableContent()
         .accessibilityIdentifier("keydetail.root")

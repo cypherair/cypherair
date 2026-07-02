@@ -12,23 +12,21 @@ private struct TutorialCardChromeModifier: ViewModifier {
     func body(content: Content) -> some View {
         switch chrome {
         case .hero:
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 24), style: .continuous))
+            content.cypherSurface(.hero)
         case .standard:
-            #if canImport(UIKit)
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 20), style: .continuous))
-            #else
-            content.background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 20), style: .continuous))
-            #endif
+            content.cypherSurface(.card)
         case .overlay:
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius(fallback: 18), style: .continuous))
+            // Floats over spotlighted live UI, so it keeps its own material
+            // treatment instead of the shared card surface.
+            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: overlayCornerRadius, style: .continuous))
         }
     }
 
-    private func cornerRadius(fallback radius: CGFloat) -> CGFloat {
+    private var overlayCornerRadius: CGFloat {
         #if os(macOS)
-        8
+        CypherRadius.control
         #else
-        radius
+        18
         #endif
     }
 }

@@ -52,9 +52,49 @@ struct MyKeysView: View {
                     KeyRowView(key: key)
                 }
                 .tutorialAnchor(.keyRow(fingerprint: key.fingerprint))
+                .contextMenu {
+                    keyRowContextMenu(for: key)
+                }
             }
         }
+        #if os(macOS)
+        .listStyle(.inset)
+        #endif
         .cypherMacReadableContent()
+    }
+
+    @ViewBuilder
+    private func keyRowContextMenu(for key: PGPKeyIdentity) -> some View {
+        Button {
+            CypherClipboard.copy(key.fingerprint)
+        } label: {
+            Label(
+                String(localized: "contextMenu.copyFingerprint", defaultValue: "Copy Fingerprint"),
+                systemImage: "doc.on.doc"
+            )
+        }
+
+        Button {
+            routeNavigator.open(
+                .qrDisplay(publicKeyData: key.publicKeyData, displayName: key.userId ?? key.shortKeyId)
+            )
+        } label: {
+            Label(
+                String(localized: "keydetail.showQR", defaultValue: "Show QR Code"),
+                systemImage: "qrcode"
+            )
+        }
+
+        if !key.isDefault {
+            Button {
+                try? keyManagement.setDefaultKey(fingerprint: key.fingerprint)
+            } label: {
+                Label(
+                    String(localized: "contextMenu.setDefaultKey", defaultValue: "Set as Default"),
+                    systemImage: "star"
+                )
+            }
+        }
     }
 
     private var actionsMenu: some View {

@@ -306,7 +306,12 @@ final class TutorialSessionStore {
     func routePathBinding(for tab: AppShellTab) -> Binding<[AppRoute]> {
         Binding(
             get: { self.routePath(for: tab) },
-            set: { self.setRoutePath($0, for: tab) }
+            set: { newPath in
+                // Ignore the outgoing stack's teardown write when the shell
+                // switches tabs; it would erase the stored per-tab path.
+                guard self.navigation.selectedTab == tab else { return }
+                self.setRoutePath(newPath, for: tab)
+            }
         )
     }
 
