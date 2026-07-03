@@ -59,6 +59,7 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
+             .classicalComponentFailed,
              .metadataAssociationMismatch,
              .publicCertificateAssociationMismatch,
              .publicMaterialUnavailable,

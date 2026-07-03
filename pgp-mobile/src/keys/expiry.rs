@@ -1,6 +1,7 @@
 use super::*;
+use crate::external_composite_signer::composite_signer_for_provider;
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
-use crate::keys::ExternalP256SigningProvider;
+use crate::keys::{ExternalMlDsa65SigningProvider, ExternalP256SigningProvider};
 use openpgp::packet::signature::SignatureBuilder;
 use openpgp::packet::{key, Key};
 use openpgp::types::{HashAlgorithm, RevocationStatus};
@@ -168,6 +169,61 @@ pub fn modify_expiry_with_external_p256_signer(
         &mut external_signer,
         false,
         ExpirySignatureHashStrategy::Force(HashAlgorithm::SHA256),
+        new_expiry_seconds,
+        reference_time,
+    )
+    .map_err(|error| {
+        map_external_signing_error(error, |reason| PgpError::KeyGenerationFailed { reason })
+    })?;
+    serialize_public_modify_expiry_result(&updated_public)
+}
+
+/// Modify the expiration time of a public-only split-custody composite
+/// certificate through an external signing provider.
+pub fn modify_expiry_with_external_composite_signer(
+    public_cert_data: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    new_expiry_seconds: Option<u64>,
+) -> Result<ModifyExpiryPublicResult, PgpError> {
+    let policy = StandardPolicy::new();
+    let cert =
+        openpgp::Cert::from_bytes(public_cert_data).map_err(|error| PgpError::InvalidKeyData {
+            reason: format!("Invalid external signer public certificate: {error}"),
+        })?;
+    if cert.is_tsk() {
+        return Err(PgpError::InvalidKeyData {
+            reason: "External expiry modification requires a public certificate".to_string(),
+        });
+    }
+
+    let reference_time = SystemTime::now();
+    ensure_external_expiry_signer_is_primary(&cert, signing_key_fingerprint)?;
+    ensure_external_expiry_subkeys_do_not_require_subkey_signers(&cert, &policy, reference_time)
+        .map_err(|error| PgpError::SigningFailed {
+            reason: format!("External expiry modification is not supported: {error}"),
+        })?;
+
+    let signing_public_key = select_external_expiry_primary_signing_key(
+        &cert,
+        signing_key_fingerprint,
+        &policy,
+        reference_time,
+    )?;
+    let mut external_signer =
+        composite_signer_for_provider(signing_public_key, classical_eddsa_secret, signer).map_err(
+            |error| PgpError::SigningFailed {
+                reason: format!("External signer setup failed: {error}"),
+            },
+        )?;
+
+    let updated_public = modify_expiry_with_signer(
+        cert,
+        &policy,
+        &mut external_signer,
+        false,
+        ExpirySignatureHashStrategy::Force(HashAlgorithm::SHA512),
         new_expiry_seconds,
         reference_time,
     )

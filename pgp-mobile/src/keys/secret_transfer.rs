@@ -128,9 +128,7 @@ pub fn export_secret_key(
         let key = ka.key().clone();
         let encrypted = match profile {
             KeyProfile::Universal => key.encrypt_secret(&password),
-            KeyProfile::Advanced | KeyProfile::PostQuantum => {
-                encrypt_key_argon2id(key, &password)
-            }
+            KeyProfile::Advanced | KeyProfile::PostQuantum => encrypt_key_argon2id(key, &password),
         }
         .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt subkey: {e}"),

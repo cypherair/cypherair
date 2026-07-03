@@ -72,6 +72,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
+             .classicalComponentFailed,
              .metadataAssociationMismatch,
              .publicCertificateAssociationMismatch,
              .publicMaterialUnavailable,

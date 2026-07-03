@@ -158,6 +158,28 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    func test_pgpErrorMapper_externalCompositeSigningFailureMapped() {
+        let error = PGPErrorMapper.map(
+            .ExternalCompositeSigningFailed(category: .classicalComponentFailed)
+        )
+        if case .keyOperationUnavailable(let category) = error {
+            XCTAssertEqual(category, .classicalComponentFailed)
+        } else {
+            XCTFail("Expected .keyOperationUnavailable, got \(error)")
+        }
+    }
+
+    func test_pgpErrorMapper_externalCompositeKeyAgreementFailureMapped() {
+        let error = PGPErrorMapper.map(
+            .ExternalCompositeKeyAgreementFailed(category: .localAuthenticationCancelled)
+        )
+        if case .keyOperationUnavailable(let category) = error {
+            XCTAssertEqual(category, .localAuthenticationCancelled)
+        } else {
+            XCTFail("Expected .keyOperationUnavailable, got \(error)")
+        }
+    }
+
     func test_pgpErrorMapper_armorErrorMapped() {
         let error = PGPErrorMapper.map(.ArmorError(reason: "bad format"))
         if case .armorError(let reason) = error {
@@ -540,6 +562,7 @@ final class ModelTests: XCTestCase {
             .privateHandleUnauthorized,
             .privateOperationRoleMismatch,
             .handlePublicKeyBindingMismatch,
+            .classicalComponentFailed,
             .metadataAssociationMismatch,
             .publicCertificateAssociationMismatch,
             .publicMaterialUnavailable,
@@ -573,6 +596,7 @@ final class ModelTests: XCTestCase {
                 "privateHandleUnauthorized",
                 "privateOperationRoleMismatch",
                 "handlePublicKeyBindingMismatch",
+                "classicalComponentFailed",
                 "metadataAssociationMismatch",
                 "publicCertificateAssociationMismatch",
                 "publicMaterialUnavailable",

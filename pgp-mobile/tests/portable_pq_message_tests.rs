@@ -5,8 +5,8 @@
 
 mod common;
 
-use common::format::{detect_pkesk_algorithms, detect_seipd_v2_cipher};
 use common::detect_message_format;
+use common::format::{detect_pkesk_algorithms, detect_seipd_v2_cipher};
 
 use openpgp::crypto::SessionKey;
 use openpgp::parse::stream::{
@@ -232,8 +232,8 @@ fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
     let pq = gen(KeyProfile::PostQuantum, "PQ");
     let v4 = gen(KeyProfile::Universal, "Classic");
 
-    let pq_only = encrypt::encrypt(PLAINTEXT, &[pq.public_key_data.clone()], None, None)
-        .expect("pq only");
+    let pq_only =
+        encrypt::encrypt(PLAINTEXT, &[pq.public_key_data.clone()], None, None).expect("pq only");
     assert_eq!(
         decrypt::message_quantum_safety(&pq_only).expect("classify"),
         MessageQuantumSafety::FullyPostQuantum
@@ -251,8 +251,8 @@ fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
         MessageQuantumSafety::Mixed
     );
 
-    let classical = encrypt::encrypt(PLAINTEXT, &[v4.public_key_data.clone()], None, None)
-        .expect("classical");
+    let classical =
+        encrypt::encrypt(PLAINTEXT, &[v4.public_key_data.clone()], None, None).expect("classical");
     assert_eq!(
         decrypt::message_quantum_safety(&classical).expect("classify"),
         MessageQuantumSafety::NonePostQuantum

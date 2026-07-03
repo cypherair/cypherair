@@ -120,6 +120,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.keyOperationUnavailable.privateOperationRoleMismatch", defaultValue: "This key cannot perform the requested operation.")
         case .handlePublicKeyBindingMismatch:
             String(localized: "error.keyOperationUnavailable.handlePublicKeyBindingMismatch", defaultValue: "This key's device-bound private key does not match its certificate.")
+        case .classicalComponentFailed:
+            String(localized: "error.keyOperationUnavailable.classicalComponentFailed", defaultValue: "This key's software key component is damaged or does not match its certificate.")
         case .metadataAssociationMismatch:
             String(localized: "error.keyOperationUnavailable.metadataAssociationMismatch", defaultValue: "Stored key information does not match this key.")
         case .publicCertificateAssociationMismatch:

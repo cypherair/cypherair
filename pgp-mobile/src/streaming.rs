@@ -30,8 +30,9 @@ use crate::decrypt::{
 };
 use crate::encrypt;
 use crate::error::PgpError;
+use crate::external_composite_signer::composite_signer_for_provider;
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
-use crate::keys::ExternalP256SigningProvider;
+use crate::keys::{ExternalMlDsa65SigningProvider, ExternalP256SigningProvider};
 use crate::sign;
 use crate::signature_details::{
     FileDecryptDetailedResult, FileVerifyDetailedResult, SignatureVerificationState,
@@ -366,6 +367,59 @@ pub fn encrypt_file_with_external_p256_signer(
     )
 }
 
+/// Encrypt a file using a public certificate plus external split-custody
+/// composite signer.
+pub fn encrypt_file_with_external_composite_signer(
+    input_path: &str,
+    output_path: &str,
+    recipient_certs: &[Vec<u8>],
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    encrypt_to_self: Option<&[u8]>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
+) -> Result<(), PgpError> {
+    let policy = StandardPolicy::new();
+
+    let certs = encrypt::collect_recipients(recipient_certs, encrypt_to_self, &policy)?;
+    let recipient_keys = encrypt::build_recipients(&certs, &policy);
+
+    let progress_reader = progress_reader_for_file(input_path, progress)?;
+    let output_file = output_file_for_path(output_path)?;
+
+    let message = Message::new(output_file);
+
+    let message = Encryptor::for_recipients(message, recipient_keys)
+        .build()
+        .map_err(|e| {
+            secure_delete_file(std::path::Path::new(output_path));
+            PgpError::EncryptionFailed {
+                reason: format!("Encryptor setup failed: {e}"),
+            }
+        })?;
+
+    let message = encrypt::setup_external_composite_signer(
+        message,
+        signing_public_cert,
+        signing_key_fingerprint,
+        classical_eddsa_secret,
+        signer,
+        &policy,
+    )
+    .map_err(|error| {
+        secure_delete_file(std::path::Path::new(output_path));
+        error
+    })?;
+
+    write_streaming_encrypted_file(
+        message,
+        progress_reader,
+        output_path,
+        StreamingFinalizeMode::ExternalSigning,
+    )
+}
+
 fn progress_reader_for_file(
     input_path: &str,
     progress: Option<Arc<dyn StreamingProgressReporter>>,
@@ -610,12 +664,35 @@ pub fn sign_detached_file_with_external_p256_signer(
 ) -> Result<Vec<u8>, PgpError> {
     let policy = StandardPolicy::new();
     let signing_public_key =
-        sign::select_external_p256_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+        sign::select_external_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
     let external_signer = signer_for_provider(signing_public_key, signer).map_err(|error| {
         PgpError::SigningFailed {
             reason: format!("External signer setup failed: {error}"),
         }
     })?;
+
+    sign_detached_file_with_signer(input_path, external_signer, progress)
+}
+
+/// Create a detached file signature using a public certificate plus external
+/// split-custody composite signer.
+pub fn sign_detached_file_with_external_composite_signer(
+    input_path: &str,
+    public_cert_data: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    progress: Option<Arc<dyn StreamingProgressReporter>>,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let signing_public_key =
+        sign::select_external_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+    let external_signer =
+        composite_signer_for_provider(signing_public_key, classical_eddsa_secret, signer).map_err(
+            |error| PgpError::SigningFailed {
+                reason: format!("External signer setup failed: {error}"),
+            },
+        )?;
 
     sign_detached_file_with_signer(input_path, external_signer, progress)
 }

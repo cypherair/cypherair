@@ -17,6 +17,7 @@ enum PGPKeyOperationFailureCategory: String, CaseIterable, Codable, Hashable, Se
     case privateHandleUnauthorized
     case privateOperationRoleMismatch
     case handlePublicKeyBindingMismatch
+    case classicalComponentFailed
     case metadataAssociationMismatch
     case publicCertificateAssociationMismatch
     case publicMaterialUnavailable
