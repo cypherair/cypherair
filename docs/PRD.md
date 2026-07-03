@@ -8,7 +8,7 @@
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, acceptance criteria, or roadmap change.<br>
-> **Last reviewed:** 2026-06-12.
+> **Last reviewed:** 2026-07-02.
 
 ## 1. Product Overview
 
@@ -419,7 +419,7 @@ Full details in [TDD](TDD.md). Key decisions:
 
 ### 10.2 v2.0 (Future)
 
-Share Extension. Post-quantum cryptography (pending IETF PQC standard). Interop test-pack.
+Share Extension. Post-quantum cryptography — the IETF standard is published (RFC 9980, June 2026); active campaign: issue #567 and [POST_QUANTUM](POST_QUANTUM.md), which folds in the interop test-pack.
 
 ---
 
