@@ -310,20 +310,48 @@ sync_file_if_changed() {
     echo "synced: $dst"
 }
 
+# sequoia-openpgp >= 2.4.0 pulls in ossl, which enables openssl-sys's
+# `bindgen` feature. bindgen (libclang) does not infer Apple cross-target
+# sysroots the way cc/openssl-src do, so without an explicit sysroot it
+# parses macOS SDK headers for every target; visionOS availability
+# attributes then hard-fail the build. Map each Rust target to its SDK.
+bindgen_clang_args_for_target() {
+    local target="$1"
+    local sdk="" clang_target=""
+    case "$target" in
+        aarch64-apple-ios)          sdk=iphoneos;        clang_target=arm64-apple-ios ;;
+        arm64e-apple-ios)           sdk=iphoneos;        clang_target=arm64e-apple-ios ;;
+        aarch64-apple-ios-sim)      sdk=iphonesimulator; clang_target=arm64-apple-ios-simulator ;;
+        aarch64-apple-darwin)       sdk=macosx;          clang_target=arm64-apple-macosx ;;
+        arm64e-apple-darwin)        sdk=macosx;          clang_target=arm64e-apple-macosx ;;
+        aarch64-apple-visionos)     sdk=xros;            clang_target=arm64-apple-xros ;;
+        arm64e-apple-visionos)      sdk=xros;            clang_target=arm64e-apple-xros ;;
+        aarch64-apple-visionos-sim) sdk=xrsimulator;     clang_target=arm64-apple-xros-simulator ;;
+        *) return 0 ;;
+    esac
+    printf -- '--target=%s -isysroot %s' "$clang_target" "$(xcrun --sdk "$sdk" --show-sdk-path)"
+}
+
 build_rust_artifact() {
     local label="$1"
     local target="$2"
     shift 2
 
+    local bindgen_env_name="BINDGEN_EXTRA_CLANG_ARGS_${target//-/_}"
+    local bindgen_args
+    bindgen_args="$(bindgen_clang_args_for_target "$target")"
+
     log_step "$label" "Building ${target}..."
     if [[ "$target" == arm64e-* ]]; then
         env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
+            "$bindgen_env_name=$bindgen_args" \
             RUSTC="$ARM64E_RUSTC" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     else
         env -u GH_TOKEN -u GITHUB_TOKEN \
             CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
+            "$bindgen_env_name=$bindgen_args" \
             cargo +"$STABLE_TOOLCHAIN" build --locked "${CARGO_FLAGS[@]}" "$@" --target "$target" --manifest-path "$MANIFEST"
     fi
 }
