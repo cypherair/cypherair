@@ -639,6 +639,74 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_quantumSafetyState_reflectsRecipientAndSelfKeys() async throws {
+        // Design doc §5 (campaign #567): the quantum-safe badge only when every
+        // targeted key — recipients and, with encrypt-to-self, the sender's own
+        // key — is post-quantum; a mixed set gets the neutral caption instead.
+        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptQuantumSafety")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let pqOne = try stack.engine.generateKey(
+            name: "PQ One",
+            email: "pq-one@example.invalid",
+            expirySeconds: nil,
+            profile: .postQuantum
+        )
+        let pqTwo = try stack.engine.generateKey(
+            name: "PQ Two",
+            email: "pq-two@example.invalid",
+            expirySeconds: nil,
+            profile: .postQuantum
+        )
+        let classical = try stack.engine.generateKey(
+            name: "Classic Recipient",
+            email: "classic-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: pqOne.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: pqTwo.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: classical.publicKeyData, verificationState: .verified)
+        let pqOneId = try XCTUnwrap(opened.service.contactId(forFingerprint: pqOne.fingerprint))
+        let pqTwoId = try XCTUnwrap(opened.service.contactId(forFingerprint: pqTwo.fingerprint))
+        let classicalId = try XCTUnwrap(opened.service.contactId(forFingerprint: classical.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        model.encryptToSelf = false
+
+        // All-PQ selection: the badge, never the caption.
+        model.selectedRecipients = [pqOneId, pqTwoId]
+        XCTAssertTrue(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // Mixed selection: the caption, never the badge.
+        model.selectedRecipients = [pqOneId, classicalId]
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertTrue(model.showsMixedQuantumSafetyCaption)
+
+        // Classical-only selection: neither.
+        model.selectedRecipients = [classicalId]
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // Encrypt-to-self with a classical own key taints an all-PQ selection.
+        model.selectedRecipients = [pqOneId, pqTwoId]
+        model.encryptToSelf = true
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertTrue(model.showsMixedQuantumSafetyCaption)
+
+        // An unloaded encrypt-to-self setting is conservative: no badge.
+        model.encryptToSelf = nil
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertTrue(model.showsMixedQuantumSafetyCaption)
+    }
+
+    @MainActor
     func test_effectiveRecipientContactIds_dropStaleWhenAvailableAndGateEncryptButton() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptResolvedSelection")

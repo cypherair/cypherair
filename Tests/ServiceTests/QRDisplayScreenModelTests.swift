@@ -82,15 +82,71 @@ final class QRDisplayScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_prepare_postQuantumKey_showsUnavailableStateWithoutError() {
+        // Design doc §5 (campaign #567): PQ certs never render as QR; the
+        // screen shows an explicit not-available state and generation is
+        // never attempted.
+        let model = makeModel(
+            generateQRCodeAction: { _ in
+                XCTFail("QR generation must not run for a post-quantum key")
+                return nil
+            },
+            detectKeyProfileAction: { _ in .postQuantum }
+        )
+
+        model.prepare()
+
+        XCTAssertTrue(model.isUnavailableForKeyType)
+        XCTAssertNil(model.qrCGImage)
+        XCTAssertNil(model.error)
+        XCTAssertFalse(model.showError)
+    }
+
+    @MainActor
+    func test_prepare_classicalKey_rendersNormally() throws {
+        let expectedImage = try Self.makeTestCGImage()
+        let model = makeModel(
+            renderQRCodeImageAction: { _, _ in expectedImage },
+            detectKeyProfileAction: { _ in .universal }
+        )
+
+        model.prepare()
+
+        XCTAssertFalse(model.isUnavailableForKeyType)
+        XCTAssertNotNil(model.qrCGImage)
+    }
+
+    @MainActor
+    func test_prepare_profileDetectionFailure_fallsThroughToGeneration() throws {
+        // A transient parse failure must never block a classical key: the
+        // gate is explicit-only, not a failed-detection fallback.
+        let expectedImage = try Self.makeTestCGImage()
+        let model = makeModel(
+            renderQRCodeImageAction: { _, _ in expectedImage },
+            detectKeyProfileAction: { _ in
+                throw QRDisplayScreenModelTestError(message: "unparseable")
+            }
+        )
+
+        model.prepare()
+
+        XCTAssertFalse(model.isUnavailableForKeyType)
+        XCTAssertNotNil(model.qrCGImage)
+        XCTAssertNil(model.error)
+    }
+
+    @MainActor
     private func makeModel(
         generateQRCodeAction: QRDisplayScreenModel.GenerateQRCodeAction? = nil,
-        renderQRCodeImageAction: QRDisplayScreenModel.RenderQRCodeImageAction? = nil
+        renderQRCodeImageAction: QRDisplayScreenModel.RenderQRCodeImageAction? = nil,
+        detectKeyProfileAction: QRDisplayScreenModel.DetectKeyProfileAction? = nil
     ) -> QRDisplayScreenModel {
         QRDisplayScreenModel(
             publicKeyData: Data("public-key".utf8),
             qrService: QRService(contactImportAdapter: PGPContactImportAdapter(engine: PgpEngine())),
             generateQRCodeAction: generateQRCodeAction ?? { _ in Self.makeTestCIImage() },
-            renderQRCodeImageAction: renderQRCodeImageAction ?? { _, _ in try? Self.makeTestCGImage() }
+            renderQRCodeImageAction: renderQRCodeImageAction ?? { _, _ in try? Self.makeTestCGImage() },
+            detectKeyProfileAction: detectKeyProfileAction
         )
     }
 
