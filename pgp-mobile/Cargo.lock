@@ -1040,6 +1040,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "openssl",
+ "ossl",
  "sequoia-openpgp",
  "tempfile",
  "thiserror 2.0.18",

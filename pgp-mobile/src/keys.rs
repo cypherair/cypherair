@@ -306,6 +306,289 @@ pub struct SecureEnclavePublicBindingInspection {
     pub key_agreement_public_key_x963: Vec<u8>,
 }
 
+/// Fixed-width ML-DSA-65 signature returned by an external private-operation provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MlDsa65Signature {
+    /// 3309-byte FIPS 204 ML-DSA-65 signature.
+    pub raw: Vec<u8>,
+}
+
+/// Sanitized failure categories that may cross the external composite signing callback boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ExternalCompositeSigningFailureCategory {
+    HardwareUnavailable,
+    LocalAuthenticationRequired,
+    LocalAuthenticationCancelled,
+    LocalAuthenticationFailed,
+    LocalAuthenticationUnavailable,
+    LocalAuthenticationLockedOut,
+    PrivateHandleMissing,
+    PrivateHandleInaccessible,
+    PrivateHandleUnauthorized,
+    PrivateOperationRoleMismatch,
+    HandlePublicKeyBindingMismatch,
+    ClassicalComponentFailed,
+    ExternalOperationFailed,
+}
+
+impl ExternalCompositeSigningFailureCategory {
+    pub(crate) fn stable_reason(self) -> &'static str {
+        match self {
+            ExternalCompositeSigningFailureCategory::HardwareUnavailable => "hardwareUnavailable",
+            ExternalCompositeSigningFailureCategory::LocalAuthenticationRequired => {
+                "localAuthenticationRequired"
+            }
+            ExternalCompositeSigningFailureCategory::LocalAuthenticationCancelled => {
+                "localAuthenticationCancelled"
+            }
+            ExternalCompositeSigningFailureCategory::LocalAuthenticationFailed => {
+                "localAuthenticationFailed"
+            }
+            ExternalCompositeSigningFailureCategory::LocalAuthenticationUnavailable => {
+                "localAuthenticationUnavailable"
+            }
+            ExternalCompositeSigningFailureCategory::LocalAuthenticationLockedOut => {
+                "localAuthenticationLockedOut"
+            }
+            ExternalCompositeSigningFailureCategory::PrivateHandleMissing => "privateHandleMissing",
+            ExternalCompositeSigningFailureCategory::PrivateHandleInaccessible => {
+                "privateHandleInaccessible"
+            }
+            ExternalCompositeSigningFailureCategory::PrivateHandleUnauthorized => {
+                "privateHandleUnauthorized"
+            }
+            ExternalCompositeSigningFailureCategory::PrivateOperationRoleMismatch => {
+                "privateOperationRoleMismatch"
+            }
+            ExternalCompositeSigningFailureCategory::HandlePublicKeyBindingMismatch => {
+                "handlePublicKeyBindingMismatch"
+            }
+            ExternalCompositeSigningFailureCategory::ClassicalComponentFailed => {
+                "classicalComponentFailed"
+            }
+            ExternalCompositeSigningFailureCategory::ExternalOperationFailed => {
+                "externalOperationFailed"
+            }
+        }
+    }
+}
+
+/// Expected error returned by the foreign ML-DSA-65 signing callback.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum ExternalCompositeSigningError {
+    /// The callback failed with a sanitized shared operation category.
+    #[error("External composite signing failed: {}", category.stable_reason())]
+    Failed {
+        category: ExternalCompositeSigningFailureCategory,
+    },
+    /// The callback was cancelled before producing a signature.
+    #[error("External composite signing operation cancelled")]
+    OperationCancelled,
+}
+
+/// Foreign ML-DSA-65 signing callback for split-custody composite certificates.
+///
+/// The provider performs exactly the Secure Enclave primitive: a pure FIPS 204
+/// ML-DSA-65 signature over the supplied OpenPGP signature digest. The Ed25519
+/// half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
+/// stay on the Rust side of the boundary.
+#[uniffi::export(with_foreign)]
+pub trait ExternalMlDsa65SigningProvider: Send + Sync {
+    /// Sign an OpenPGP signature digest and return the 3309-byte ML-DSA-65 signature.
+    fn sign_mldsa65_digest(
+        &self,
+        digest: Vec<u8>,
+    ) -> Result<MlDsa65Signature, ExternalCompositeSigningError>;
+}
+
+/// Public material Rust sends to an external ML-KEM-768 decapsulation provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ExternalMlKem768DecapsulationRequest {
+    /// 1184-byte FIPS 203 ML-KEM-768 encapsulation key bound to the recipient subkey.
+    pub recipient_mlkem_public_key: Vec<u8>,
+    /// 1088-byte FIPS 203 ML-KEM-768 ciphertext from the PKESK packet.
+    pub mlkem_ciphertext: Vec<u8>,
+}
+
+/// Raw ML-KEM-768 key share returned by an external provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MlKem768KeyShare {
+    /// 32-byte ML-KEM-768 shared secret. Rust immediately validates and zeroizes it.
+    pub raw: Vec<u8>,
+}
+
+/// Sanitized failure categories that may cross the external ML-KEM-768 decapsulation boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ExternalCompositeKeyAgreementFailureCategory {
+    HardwareUnavailable,
+    LocalAuthenticationRequired,
+    LocalAuthenticationCancelled,
+    LocalAuthenticationFailed,
+    LocalAuthenticationUnavailable,
+    LocalAuthenticationLockedOut,
+    PrivateHandleMissing,
+    PrivateHandleInaccessible,
+    PrivateHandleUnauthorized,
+    PrivateOperationRoleMismatch,
+    HandlePublicKeyBindingMismatch,
+    ClassicalComponentFailed,
+    ExternalOperationInvalidRequest,
+    ExternalOperationInvalidResponse,
+    ExternalOperationFailed,
+}
+
+impl ExternalCompositeKeyAgreementFailureCategory {
+    pub(crate) fn stable_reason(self) -> &'static str {
+        match self {
+            ExternalCompositeKeyAgreementFailureCategory::HardwareUnavailable => {
+                "hardwareUnavailable"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::LocalAuthenticationRequired => {
+                "localAuthenticationRequired"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::LocalAuthenticationCancelled => {
+                "localAuthenticationCancelled"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::LocalAuthenticationFailed => {
+                "localAuthenticationFailed"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::LocalAuthenticationUnavailable => {
+                "localAuthenticationUnavailable"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::LocalAuthenticationLockedOut => {
+                "localAuthenticationLockedOut"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::PrivateHandleMissing => {
+                "privateHandleMissing"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::PrivateHandleInaccessible => {
+                "privateHandleInaccessible"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::PrivateHandleUnauthorized => {
+                "privateHandleUnauthorized"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::PrivateOperationRoleMismatch => {
+                "privateOperationRoleMismatch"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::HandlePublicKeyBindingMismatch => {
+                "handlePublicKeyBindingMismatch"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::ClassicalComponentFailed => {
+                "classicalComponentFailed"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::ExternalOperationInvalidRequest => {
+                "externalOperationInvalidRequest"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::ExternalOperationInvalidResponse => {
+                "externalOperationInvalidResponse"
+            }
+            ExternalCompositeKeyAgreementFailureCategory::ExternalOperationFailed => {
+                "externalOperationFailed"
+            }
+        }
+    }
+}
+
+/// Expected error returned by the foreign ML-KEM-768 decapsulation callback.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum ExternalCompositeKeyAgreementError {
+    /// The callback failed with a sanitized shared operation category.
+    #[error("External composite key agreement failed: {}", category.stable_reason())]
+    Failed {
+        category: ExternalCompositeKeyAgreementFailureCategory,
+    },
+    /// The callback was cancelled before producing a key share.
+    #[error("External composite key agreement operation cancelled")]
+    OperationCancelled,
+}
+
+/// Foreign ML-KEM-768 decapsulation callback for split-custody composite decryption.
+///
+/// The provider performs exactly the Secure Enclave primitive: FIPS 203
+/// ML-KEM-768 decapsulation of the PKESK ciphertext into the 32-byte key
+/// share. The X25519 half, the RFC 9980 KEM combiner, and AES key unwrap
+/// stay on the Rust side of the boundary.
+#[uniffi::export(with_foreign)]
+pub trait ExternalMlKem768DecapsulationProvider: Send + Sync {
+    /// Decapsulate an ML-KEM-768 ciphertext into the raw 32-byte key share.
+    fn decapsulate_mlkem768(
+        &self,
+        request: ExternalMlKem768DecapsulationRequest,
+    ) -> Result<MlKem768KeyShare, ExternalCompositeKeyAgreementError>;
+}
+
+/// Public-only input for split-custody composite OpenPGP certificate construction.
+///
+/// The ML-DSA-65 and ML-KEM-768 component public keys come from Secure Enclave
+/// key generation on the Swift side. The classical Ed25519/X25519 components are
+/// generated inside Rust and returned in the result for enveloping.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclaveCompositePublicCertificateInput {
+    /// Display name for the self-certified User ID.
+    pub name: String,
+    /// Optional email address for the User ID.
+    pub email: Option<String>,
+    /// Validity period from now in seconds. Defaults to two years when omitted.
+    pub expiry_seconds: Option<u64>,
+    /// 1952-byte FIPS 204 ML-DSA-65 verification key for signing/certification.
+    pub mldsa65_signing_public_key: Vec<u8>,
+    /// 1184-byte FIPS 203 ML-KEM-768 encapsulation key for key agreement.
+    pub mlkem768_key_agreement_public_key: Vec<u8>,
+}
+
+/// Split-custody composite certificate generation result.
+///
+/// SECURITY: `classical_eddsa_secret` and `classical_ecdh_secret` contain
+/// unencrypted classical component secrets, so — like `GeneratedKey` — this
+/// record deliberately derives no `Debug`. The Rust side zeroizes its working
+/// copies; the record's own field buffers cross the FFI with the same one-time
+/// lowering exposure as `GeneratedKey.cert_data`. The Swift caller must:
+/// 1. Envelope both component secrets immediately after receiving this struct.
+/// 2. Zeroize both buffers (via `resetBytes(in:)`) after enveloping is confirmed.
+/// Neither component alone can sign or decrypt anything: every composite
+/// operation additionally requires the Secure Enclave-resident ML-DSA/ML-KEM
+/// component. `public_key_data` is not sensitive.
+#[derive(uniffi::Record)]
+pub struct SecureEnclaveCompositeGeneratedCertificate {
+    /// Binary OpenPGP public certificate. This never contains secret key material.
+    pub public_key_data: Vec<u8>,
+    /// Binary key-level revocation signature.
+    pub revocation_cert: Vec<u8>,
+    /// Certificate fingerprint as lowercase hex.
+    pub fingerprint: String,
+    /// OpenPGP key version (always 6).
+    pub key_version: u8,
+    /// Primary signing key fingerprint as lowercase hex.
+    pub signing_key_fingerprint: String,
+    /// Key-agreement subkey fingerprint as lowercase hex.
+    pub key_agreement_subkey_fingerprint: String,
+    /// 32-byte Ed25519 component secret. Envelope, then zeroize.
+    pub classical_eddsa_secret: Vec<u8>,
+    /// 32-byte X25519 component secret. Envelope, then zeroize.
+    pub classical_ecdh_secret: Vec<u8>,
+}
+
+/// Public bindings extracted from a split-custody composite OpenPGP certificate.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclaveCompositeBindingInspection {
+    /// Certificate fingerprint as lowercase hex.
+    pub fingerprint: String,
+    /// OpenPGP key version.
+    pub key_version: u8,
+    /// Primary signing key fingerprint as lowercase hex.
+    pub signing_key_fingerprint: String,
+    /// Key-agreement subkey fingerprint as lowercase hex.
+    pub key_agreement_subkey_fingerprint: String,
+    /// 1952-byte FIPS 204 ML-DSA-65 verification key bound to the primary key.
+    pub mldsa65_signing_public_key: Vec<u8>,
+    /// 1184-byte FIPS 203 ML-KEM-768 encapsulation key bound to the subkey.
+    pub mlkem768_key_agreement_public_key: Vec<u8>,
+    /// 32-byte Ed25519 component public key bound to the primary key.
+    pub eddsa_signing_public_key: Vec<u8>,
+    /// 32-byte X25519 component public key bound to the subkey.
+    pub ecdh_key_agreement_public_key: Vec<u8>,
+}
+
 /// Information extracted from a parsed key.
 #[derive(Debug, uniffi::Record)]
 pub struct KeyInfo {
@@ -426,6 +709,7 @@ struct RawUserIdOccurrence {
     signatures: Vec<Signature>,
 }
 
+mod composite_custody_generation;
 mod expiry;
 mod generation;
 mod key_info;
@@ -437,9 +721,12 @@ mod secret_transfer;
 mod secure_enclave_generation;
 mod selector_discovery;
 
+pub use composite_custody_generation::{
+    generate_secure_enclave_composite_public_certificate, inspect_secure_enclave_composite_bindings,
+};
 pub use expiry::{
-    modify_expiry, modify_expiry_with_external_p256_signer, ModifyExpiryPublicResult,
-    ModifyExpiryResult,
+    modify_expiry, modify_expiry_with_external_composite_signer,
+    modify_expiry_with_external_p256_signer, ModifyExpiryPublicResult, ModifyExpiryResult,
 };
 pub use generation::generate_key_with_profile;
 pub use key_info::parse_key_info;
@@ -447,7 +734,9 @@ pub use profile::{detect_profile, get_key_version};
 pub use public_certificates::{merge_public_certificate_update, validate_public_certificate};
 pub use revocation::{
     generate_key_revocation, generate_subkey_revocation,
+    generate_subkey_revocation_with_external_composite_signer,
     generate_subkey_revocation_with_external_p256_signer, generate_user_id_revocation_by_selector,
+    generate_user_id_revocation_by_selector_with_external_composite_signer,
     generate_user_id_revocation_by_selector_with_external_p256_signer, parse_revocation_cert,
 };
 pub use s2k::{parse_s2k_params, S2kInfo};

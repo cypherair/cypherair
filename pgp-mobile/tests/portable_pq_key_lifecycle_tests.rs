@@ -118,8 +118,9 @@ fn test_detect_profile_classical_fallbacks_unchanged() {
 fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let key = generate_pq();
 
-    let exported = keys::export_secret_key(&key.cert_data, "correct horse", KeyProfile::PostQuantum)
-        .expect("PQ export should succeed");
+    let exported =
+        keys::export_secret_key(&key.cert_data, "correct horse", KeyProfile::PostQuantum)
+            .expect("PQ export should succeed");
 
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
     assert_eq!(
@@ -147,7 +148,10 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
             }
         }
     }
-    assert!(secret_packets >= 3, "primary + both subkeys must be present");
+    assert!(
+        secret_packets >= 3,
+        "primary + both subkeys must be present"
+    );
 
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ import");
     let imported_info = keys::parse_key_info(&imported).expect("info");

@@ -6,9 +6,13 @@
 
 pub mod armor;
 pub mod cert_signature;
+mod composite_classical;
+mod composite_kem;
 pub mod decrypt;
 pub mod encrypt;
 pub mod error;
+mod external_composite_decryptor;
+mod external_composite_signer;
 mod external_decryptor;
 mod external_signer;
 pub mod keys;
@@ -27,15 +31,17 @@ use zeroize::Zeroizing;
 
 use crate::armor::ArmorKind;
 use crate::cert_signature::{CertificateSignatureResult, CertificationKind};
+use crate::decrypt::MessageQuantumSafety;
 use crate::error::PgpError;
 use crate::keys::{
-    CertificateMergeResult, DiscoveredCertificateSelectors, ExternalP256KeyAgreementProvider,
+    CertificateMergeResult, DiscoveredCertificateSelectors, ExternalMlDsa65SigningProvider,
+    ExternalMlKem768DecapsulationProvider, ExternalP256KeyAgreementProvider,
     ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult,
     ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
-    SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicBindingInspection,
-    SecureEnclavePublicCertificateInput, UserIdSelectorInput,
+    SecureEnclaveCompositeBindingInspection, SecureEnclaveCompositeGeneratedCertificate,
+    SecureEnclaveCompositePublicCertificateInput, SecureEnclaveGeneratedPublicCertificate,
+    SecureEnclavePublicBindingInspection, SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
-use crate::decrypt::MessageQuantumSafety;
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
     DecryptDetailedResult, FileDecryptDetailedResult, FileVerifyDetailedResult,
@@ -96,6 +102,33 @@ impl PgpEngine {
         public_key_data: Vec<u8>,
     ) -> Result<SecureEnclavePublicBindingInspection, PgpError> {
         keys::inspect_secure_enclave_public_bindings(&public_key_data)
+    }
+
+    /// Build the Device-Bound Post-Quantum split-custody composite certificate.
+    ///
+    /// The external signer only receives OpenPGP signature digests and returns
+    /// 3309-byte ML-DSA-65 signatures; the Ed25519 halves, packet construction,
+    /// hashing, binding signatures, revocation construction, and composite
+    /// signature verification remain Rust/Sequoia-owned. The returned classical
+    /// component secrets must be enveloped and zeroized by the caller.
+    pub fn generate_secure_enclave_composite_public_certificate(
+        &self,
+        input: SecureEnclaveCompositePublicCertificateInput,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    ) -> Result<SecureEnclaveCompositeGeneratedCertificate, PgpError> {
+        keys::generate_secure_enclave_composite_public_certificate(input, signer)
+    }
+
+    /// Inspect a public-only split-custody composite certificate.
+    ///
+    /// Returns only public OpenPGP identity metadata and the component public
+    /// keys needed to locate Security-owned private-operation handles and to
+    /// integrity-check enveloped classical components.
+    pub fn inspect_secure_enclave_composite_bindings(
+        &self,
+        public_key_data: Vec<u8>,
+    ) -> Result<SecureEnclaveCompositeBindingInspection, PgpError> {
+        keys::inspect_secure_enclave_composite_bindings(&public_key_data)
     }
 
     // ── Key Information ─────────────────────────────────────────────
@@ -185,6 +218,28 @@ impl PgpEngine {
         )
     }
 
+    /// Modify the expiration time of a public-only split-custody composite certificate.
+    ///
+    /// This is for Device-Bound Post-Quantum private operations: it returns only the
+    /// updated public certificate and key metadata, never secret certificate bytes.
+    pub fn modify_expiry_with_external_composite_signer(
+        &self,
+        public_cert_data: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        new_expiry_seconds: Option<u64>,
+    ) -> Result<ModifyExpiryPublicResult, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::modify_expiry_with_external_composite_signer(
+            &public_cert_data,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            new_expiry_seconds,
+        )
+    }
+
     // ── Encryption ──────────────────────────────────────────────────
 
     /// Encrypt plaintext for recipients. Returns ASCII-armored ciphertext.
@@ -224,6 +279,30 @@ impl PgpEngine {
             &recipients,
             &signing_public_cert,
             &signing_key_fingerprint,
+            signer,
+            encrypt_to_self.as_deref(),
+        )
+    }
+
+    /// Encrypt plaintext and sign it using a public certificate plus external
+    /// split-custody composite signer.
+    pub fn encrypt_with_external_composite_signer(
+        &self,
+        plaintext: Vec<u8>,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        encrypt::encrypt_with_external_composite_signer(
+            &plaintext,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
             signer,
             encrypt_to_self.as_deref(),
         )
@@ -324,6 +403,56 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt plaintext with a password and sign it using a public certificate plus
+    /// external split-custody composite signer.
+    pub fn encrypt_with_password_and_external_composite_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        password::encrypt_with_external_composite_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+        )
+    }
+
+    /// Encrypt plaintext with a password, sign with the external split-custody
+    /// composite signer, and return binary ciphertext.
+    pub fn encrypt_binary_with_password_and_external_composite_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        password::encrypt_binary_with_external_composite_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+        )
+    }
+
     // ── Decryption ──────────────────────────────────────────────────
 
     /// Parse recipients of an encrypted message (Phase 1 — no auth needed).
@@ -391,6 +520,33 @@ impl PgpEngine {
         )
     }
 
+    /// Decrypt a message through a public-only split-custody composite recipient
+    /// certificate and external ML-KEM-768 decapsulation provider while
+    /// preserving per-signature details.
+    ///
+    /// The X25519 key share is derived in Rust from the supplied classical
+    /// component secret; the RFC 9980 KEM combiner and AES-256 key unwrap also
+    /// run in Rust. The external callback sees only public material.
+    pub fn decrypt_detailed_with_external_composite_key_agreement(
+        &self,
+        ciphertext: Vec<u8>,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        classical_ecdh_secret: Vec<u8>,
+        decapsulation_provider: Arc<dyn ExternalMlKem768DecapsulationProvider>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<DecryptDetailedResult, PgpError> {
+        let classical_ecdh_secret = Zeroizing::new(classical_ecdh_secret);
+        external_composite_decryptor::decrypt_detailed_with_external_composite_key_agreement(
+            &ciphertext,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            &classical_ecdh_secret,
+            decapsulation_provider,
+            &verification_keys,
+        )
+    }
+
     /// Decrypt a password-encrypted message without falling back to recipient-key decryption.
     pub fn decrypt_with_password(
         &self,
@@ -422,6 +578,26 @@ impl PgpEngine {
             &text,
             &public_cert,
             &signing_key_fingerprint,
+            signer,
+        )
+    }
+
+    /// Create a cleartext signature using a public certificate and an external
+    /// split-custody composite signer.
+    pub fn sign_cleartext_with_external_composite_signer(
+        &self,
+        text: Vec<u8>,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        sign::sign_cleartext_with_external_composite_signer(
+            &text,
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
             signer,
         )
     }
@@ -496,6 +672,30 @@ impl PgpEngine {
         cert_signature::generate_user_id_certification_by_selector_with_external_p256_signer(
             &public_cert,
             &signing_key_fingerprint,
+            signer,
+            &target_cert,
+            &user_id_selector,
+            certification_kind,
+        )
+    }
+
+    /// Generate raw User ID certification-signature bytes from a public-only
+    /// certificate through an external split-custody composite signing provider.
+    pub fn generate_user_id_certification_by_selector_with_external_composite_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        target_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+        certification_kind: CertificationKind,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        cert_signature::generate_user_id_certification_by_selector_with_external_composite_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
             signer,
             &target_cert,
             &user_id_selector,
@@ -579,6 +779,26 @@ impl PgpEngine {
         )
     }
 
+    /// Generate a subkey-specific revocation signature from a public-only
+    /// certificate through an external split-custody composite signing provider.
+    pub fn generate_subkey_revocation_with_external_composite_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        subkey_fingerprint: String,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::generate_subkey_revocation_with_external_composite_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            &subkey_fingerprint,
+        )
+    }
+
     /// Generate a User ID-specific revocation signature using an explicit selector.
     pub fn generate_user_id_revocation_by_selector(
         &self,
@@ -601,6 +821,26 @@ impl PgpEngine {
         keys::generate_user_id_revocation_by_selector_with_external_p256_signer(
             &public_cert,
             &signing_key_fingerprint,
+            signer,
+            &user_id_selector,
+        )
+    }
+
+    /// Generate a User ID-specific revocation signature from a public-only
+    /// certificate through an external split-custody composite signing provider.
+    pub fn generate_user_id_revocation_by_selector_with_external_composite_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        user_id_selector: UserIdSelectorInput,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::generate_user_id_revocation_by_selector_with_external_composite_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
             signer,
             &user_id_selector,
         )
@@ -672,6 +912,34 @@ impl PgpEngine {
         )
     }
 
+    /// Encrypt a file using streaming I/O and sign using a public certificate
+    /// plus external split-custody composite signer.
+    pub fn encrypt_file_with_external_composite_signer(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<(), PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        streaming::encrypt_file_with_external_composite_signer(
+            &input_path,
+            &output_path,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            encrypt_to_self.as_deref(),
+            progress,
+        )
+    }
+
     /// Decrypt a file using streaming I/O and preserve per-signature detailed results.
     pub fn decrypt_file_detailed(
         &self,
@@ -719,6 +987,38 @@ impl PgpEngine {
         )
     }
 
+    /// Decrypt a file using streaming I/O through a public-only split-custody
+    /// composite recipient certificate and external ML-KEM-768 decapsulation
+    /// provider, preserving per-signature details.
+    ///
+    /// The session key is acquired via the classical X25519 component (in Rust)
+    /// plus the external ML-KEM-768 decapsulation callback (no secret certificate
+    /// is unwrapped). Payload authentication and the success-only output contract
+    /// remain Sequoia/streaming responsibilities.
+    pub fn decrypt_file_detailed_with_external_composite_key_agreement(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        classical_ecdh_secret: Vec<u8>,
+        decapsulation_provider: Arc<dyn ExternalMlKem768DecapsulationProvider>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<FileDecryptDetailedResult, PgpError> {
+        let classical_ecdh_secret = Zeroizing::new(classical_ecdh_secret);
+        external_composite_decryptor::decrypt_file_detailed_with_external_composite_key_agreement(
+            &input_path,
+            &output_path,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            &classical_ecdh_secret,
+            decapsulation_provider,
+            &verification_keys,
+            progress,
+        )
+    }
+
     /// Create a detached signature for a file using streaming I/O.
     /// Returns the ASCII-armored signature.
     pub fn sign_detached_file(
@@ -744,6 +1044,28 @@ impl PgpEngine {
             &input_path,
             &public_cert,
             &signing_key_fingerprint,
+            signer,
+            progress,
+        )
+    }
+
+    /// Create a detached file signature using a public certificate and an
+    /// external split-custody composite signer.
+    pub fn sign_detached_file_with_external_composite_signer(
+        &self,
+        input_path: String,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        streaming::sign_detached_file_with_external_composite_signer(
+            &input_path,
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
             signer,
             progress,
         )

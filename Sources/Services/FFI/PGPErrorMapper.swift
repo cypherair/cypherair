@@ -88,6 +88,12 @@ enum PGPErrorMapper {
             return .keyOperationUnavailable(category: externalP256SigningCategory(for: category))
         case .ExternalP256KeyAgreementFailed(let category):
             return .keyOperationUnavailable(category: externalP256KeyAgreementCategory(for: category))
+        case .ExternalCompositeSigningFailed(let category):
+            return .keyOperationUnavailable(category: externalCompositeSigningCategory(for: category))
+        case .ExternalCompositeKeyAgreementFailed(let category):
+            return .keyOperationUnavailable(
+                category: externalCompositeKeyAgreementCategory(for: category)
+            )
         case .ArmorError(let reason):
             return .armorError(reason: reason)
         case .IntegrityCheckFailed:
@@ -168,6 +174,76 @@ enum PGPErrorMapper {
             return .privateOperationRoleMismatch
         case .handlePublicKeyBindingMismatch:
             return .handlePublicKeyBindingMismatch
+        case .externalOperationInvalidRequest:
+            return .externalOperationInvalidRequest
+        case .externalOperationInvalidResponse:
+            return .externalOperationInvalidResponse
+        case .externalOperationFailed:
+            return .externalOperationFailed
+        }
+    }
+
+    private static func externalCompositeSigningCategory(
+        for category: ExternalCompositeSigningFailureCategory
+    ) -> PGPKeyOperationFailureCategory {
+        switch category {
+        case .hardwareUnavailable:
+            return .hardwareUnavailable
+        case .localAuthenticationRequired:
+            return .localAuthenticationRequired
+        case .localAuthenticationCancelled:
+            return .localAuthenticationCancelled
+        case .localAuthenticationFailed:
+            return .localAuthenticationFailed
+        case .localAuthenticationUnavailable:
+            return .localAuthenticationUnavailable
+        case .localAuthenticationLockedOut:
+            return .localAuthenticationLockedOut
+        case .privateHandleMissing:
+            return .privateHandleMissing
+        case .privateHandleInaccessible:
+            return .privateHandleInaccessible
+        case .privateHandleUnauthorized:
+            return .privateHandleUnauthorized
+        case .privateOperationRoleMismatch:
+            return .privateOperationRoleMismatch
+        case .handlePublicKeyBindingMismatch:
+            return .handlePublicKeyBindingMismatch
+        case .classicalComponentFailed:
+            return .classicalComponentFailed
+        case .externalOperationFailed:
+            return .externalOperationFailed
+        }
+    }
+
+    private static func externalCompositeKeyAgreementCategory(
+        for category: ExternalCompositeKeyAgreementFailureCategory
+    ) -> PGPKeyOperationFailureCategory {
+        switch category {
+        case .hardwareUnavailable:
+            return .hardwareUnavailable
+        case .localAuthenticationRequired:
+            return .localAuthenticationRequired
+        case .localAuthenticationCancelled:
+            return .localAuthenticationCancelled
+        case .localAuthenticationFailed:
+            return .localAuthenticationFailed
+        case .localAuthenticationUnavailable:
+            return .localAuthenticationUnavailable
+        case .localAuthenticationLockedOut:
+            return .localAuthenticationLockedOut
+        case .privateHandleMissing:
+            return .privateHandleMissing
+        case .privateHandleInaccessible:
+            return .privateHandleInaccessible
+        case .privateHandleUnauthorized:
+            return .privateHandleUnauthorized
+        case .privateOperationRoleMismatch:
+            return .privateOperationRoleMismatch
+        case .handlePublicKeyBindingMismatch:
+            return .handlePublicKeyBindingMismatch
+        case .classicalComponentFailed:
+            return .classicalComponentFailed
         case .externalOperationInvalidRequest:
             return .externalOperationInvalidRequest
         case .externalOperationInvalidResponse:

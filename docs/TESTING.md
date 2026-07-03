@@ -358,10 +358,9 @@ cargo clean --manifest-path pgp-mobile/Cargo.toml
 
 Target-specific `libpgp_mobile.dylib` files must **not** exist next to those intermediate static archives. They are stale build state from older direct-link flows and can shadow the intended static archive if stale project settings or manual linker flags are used. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
 
-Before submitting Rust or generated-binding work, keep the repository hygiene gates clean:
+Before submitting Rust or generated-binding work, keep the repository hygiene gate clean (`rustfmt` is a local courtesy, not a CI gate):
 
 ```bash
-cargo +stable fmt --manifest-path pgp-mobile/Cargo.toml --all -- --check
 python3 scripts/check_text_hygiene.py
 ```
 

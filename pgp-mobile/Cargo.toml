@@ -30,6 +30,11 @@ sequoia-openpgp = { version = "=2.4.0", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
+# Fake Secure Enclave ML-KEM decapsulation in tests. Version-locked to the same
+# ossl release sequoia-openpgp's crypto-openssl backend already pulls in, with
+# the same feature shape (reuse the openssl-sys build instead of a second
+# OpenSSL source tree).
+ossl = { version = "1.5.2", default-features = false, features = ["openssl-sys"] }
 
 [build-dependencies]
 uniffi = { version = "0.31", features = ["build"] }

@@ -7,8 +7,9 @@ use openpgp::serialize::stream::*;
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
+use crate::external_composite_signer::composite_signer_for_provider;
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
-use crate::keys::ExternalP256SigningProvider;
+use crate::keys::{ExternalMlDsa65SigningProvider, ExternalP256SigningProvider};
 
 // Note: `zeroize` is not explicitly used here because Sequoia's `KeyPair` type manages
 // its own secret key material lifecycle. The `into_keypair()` call extracts the secret
@@ -58,7 +59,7 @@ pub fn sign_cleartext_with_external_p256_signer(
 ) -> Result<Vec<u8>, PgpError> {
     let policy = StandardPolicy::new();
     let signing_public_key =
-        select_external_p256_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+        select_external_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
     let external_signer = signer_for_provider(signing_public_key, signer).map_err(|error| {
         PgpError::SigningFailed {
             reason: format!("External signer setup failed: {error}"),
@@ -68,7 +69,30 @@ pub fn sign_cleartext_with_external_p256_signer(
     sign_cleartext_with_signer(text, external_signer)
 }
 
-pub(crate) fn select_external_p256_signing_key(
+pub fn sign_cleartext_with_external_composite_signer(
+    text: &[u8],
+    public_cert_data: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa65SigningProvider>,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let signing_public_key =
+        select_external_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+    let external_signer =
+        composite_signer_for_provider(signing_public_key, classical_eddsa_secret, signer).map_err(
+            |error| PgpError::SigningFailed {
+                reason: format!("External signer setup failed: {error}"),
+            },
+        )?;
+
+    sign_cleartext_with_signer(text, external_signer)
+}
+
+/// Select a signing-capable public key by fingerprint from a public-only
+/// certificate. Algorithm-agnostic: the algorithm-specific validation happens
+/// when the external signer for the matching custody family is constructed.
+pub(crate) fn select_external_signing_key(
     public_cert_data: &[u8],
     signing_key_fingerprint: &str,
     policy: &StandardPolicy,

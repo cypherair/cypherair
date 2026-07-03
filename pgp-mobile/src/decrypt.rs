@@ -9,6 +9,7 @@ use sequoia_openpgp as openpgp;
 use zeroize::Zeroize;
 
 use crate::error::PgpError;
+use crate::external_composite_decryptor::ExternalCompositeDecryptorError;
 use crate::external_decryptor::ExternalP256DecryptorError;
 use crate::signature_details::{DecryptDetailedResult, SignatureCollector, SummaryFoldMode};
 
@@ -414,6 +415,37 @@ pub(crate) fn classify_decrypt_error(e: openpgp::anyhow::Error) -> PgpError {
                 PgpError::ExternalP256KeyAgreementFailed {
                     category:
                         crate::keys::ExternalP256KeyAgreementFailureCategory::ExternalOperationInvalidResponse,
+                }
+            }
+        };
+    }
+
+    if let Some(external_error) = e.chain().find_map(|cause| {
+        cause
+            .downcast_ref::<ExternalCompositeDecryptorError>()
+            .copied()
+    }) {
+        return match external_error {
+            ExternalCompositeDecryptorError::OperationCancelled => PgpError::OperationCancelled,
+            ExternalCompositeDecryptorError::ExternalFailure(category) => {
+                PgpError::ExternalCompositeKeyAgreementFailed { category }
+            }
+            ExternalCompositeDecryptorError::ClassicalComponentFailure(_) => {
+                PgpError::ExternalCompositeKeyAgreementFailed {
+                    category:
+                        crate::keys::ExternalCompositeKeyAgreementFailureCategory::ClassicalComponentFailed,
+                }
+            }
+            ExternalCompositeDecryptorError::InvalidRequest(_) => {
+                PgpError::ExternalCompositeKeyAgreementFailed {
+                    category:
+                        crate::keys::ExternalCompositeKeyAgreementFailureCategory::ExternalOperationInvalidRequest,
+                }
+            }
+            ExternalCompositeDecryptorError::InvalidResponse(_) => {
+                PgpError::ExternalCompositeKeyAgreementFailed {
+                    category:
+                        crate::keys::ExternalCompositeKeyAgreementFailureCategory::ExternalOperationInvalidResponse,
                 }
             }
         };

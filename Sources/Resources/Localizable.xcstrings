@@ -5157,6 +5157,22 @@
         }
       }
     },
+    "error.keyOperationUnavailable.classicalComponentFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key's software key component is damaged or does not match its certificate."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥的软件密钥组件已损坏或与其证书不匹配。"
+          }
+        }
+      }
+    },
     "error.keyOperationUnavailable.cleanupOrRollbackFailure" : {
       "localizations" : {
         "en" : {

@@ -50,7 +50,7 @@ Phase 0 established that Sequoia's combiner (`multi_key_combine`) is crate-priva
 
 Rules:
 
-- The vendored combiner must be covered by tests against RFC 9980 test vectors and by cross-checks against Sequoia's own encrypt path (encrypt with stock Sequoia → decrypt through the vendored path).
+- The vendored combiner must be covered by cross-checks against Sequoia's own encrypt path (encrypt with stock Sequoia → decrypt through the vendored path). A fixture-based check against the RFC 9980 published sample messages lands with the Phase 4 interop pack, where cross-implementation fixtures live.
 - An upstream request to export `multi_key_combine` (as `ecdh::decrypt_unwrap` already is) is part of the campaign; when Sequoia exposes it, the vendored copy is deleted.
 - The 32-byte ML-KEM share crossing the FFI carries the same zeroize-both-sides obligation as the existing P-256 shared secret (`Zeroizing` carrier in Rust; `resetBytes`/managed lifetime in Swift).
 - **Red line: no OpenPGP wire-format cryptography in Swift.** CryptoKit use is limited to the SE primitives (and the classical component operations only if Phase 3 review explicitly prefers them over the Rust-side implementation — default is Rust-side).
@@ -65,7 +65,7 @@ Rules:
 
 ## 6. Existing hard constraints, restated for PQ
 
-CLAUDE.md hard constraints apply unchanged; the PQ-specific readings: AEAD hard-fail applies to SEIPDv2 PQ messages exactly as today (never partial plaintext); the ML-KEM share, session keys, and classical component secrets are zeroized on both sides of the FFI; all generation entropy comes from the platform sources already in use (`SecRandomCopyBytes` / SE TRNG / `getrandom`); no logging of any key material or shares.
+CLAUDE.md hard constraints apply unchanged; the PQ-specific readings: AEAD hard-fail applies to SEIPDv2 PQ messages exactly as today (never partial plaintext); the ML-KEM share, session keys, and classical component secrets are zeroized on both sides of the FFI (Rust zeroizes every inbound secret and its working copies; the one-time outbound generation record carries the same accepted lowering exposure as `GeneratedKey.cert_data`, and Swift must envelope-then-zeroize immediately on receipt); all generation entropy comes from the platform sources already in use (`SecRandomCopyBytes` / SE TRNG / `getrandom`); no logging of any key material or shares.
 
 ## 7. Phases and gates (tracking lives in issue #567)
 

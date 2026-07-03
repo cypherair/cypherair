@@ -1,5 +1,6 @@
 //! Shared test utilities for pgp-mobile integration tests.
 
+pub mod composite;
 pub mod fixtures;
 pub mod format;
 pub mod gnupg;
