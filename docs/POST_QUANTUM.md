@@ -3,7 +3,7 @@
 > **Status:** Active roadmap — approved campaign design (issue #567). **This document does not describe current shipped behavior**; it defines the invariants and red lines for the post-quantum key families before they exist in the product. As phases ship, the durable facts move into the canonical docs (PRD §3, TDD §1, SECURITY, SECURE_ENCLAVE_CUSTODY) per DOCUMENTATION_GOVERNANCE.md §6, and this document shrinks toward design rationale.<br>
 > **Purpose:** Family model, invariants, and red lines for adding RFC 9980 post-quantum key families to CypherAir.<br>
 > **Audience:** Maintainer, reviewers, and AI coding tools implementing campaign #567.<br>
-> **Companion:** Issue #567 (settled decisions + phase gates) · Phase 0 evidence: `docs/PQC_SPIKE_2026-07.md` on branch `spike/rfc9980-pqc` · [PRD](PRD.md) §10.2 · [TDD](TDD.md) §1 · [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md)<br>
+> **Companion:** Issue #567 (settled decisions + phase gates) · [PQC_SPIKE_2026-07](PQC_SPIKE_2026-07.md) (Phase 0 evidence) · [PRD](PRD.md) §10.2 · [TDD](TDD.md) §1 · [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md)<br>
 > **Last reviewed:** 2026-07-02 (initial).<br>
 > **Update triggers:** Any change to the family model, custody split, seam ownership, format floor, or exchange rules decided in campaign #567 review.
 
@@ -69,7 +69,7 @@ CLAUDE.md hard constraints apply unchanged; the PQ-specific readings: AEAD hard-
 
 ## 7. Phases and gates (tracking lives in issue #567)
 
-- **Phase 0 — done.** Feasibility spike; evidence in `docs/PQC_SPIKE_2026-07.md` (branch `spike/rfc9980-pqc`). Highlights: full Rust suite green on 2.4.0; PQ round-trips through the unmodified engine; CryptoKit↔OpenSSL component byte-compat all-pass including Secure Enclave paths on the maintainer's Mac.
+- **Phase 0 — done.** Feasibility spike; evidence in [PQC_SPIKE_2026-07](PQC_SPIKE_2026-07.md) (groundwork merged to main via PR #570). Highlights: full Rust suite green on 2.4.0; PQ round-trips through the unmodified engine; CryptoKit↔OpenSSL component byte-compat all-pass including Secure Enclave paths on the maintainer's Mac.
 - **Phase 1 — this document** (+ PRD §10.2 pointer update). Gate: maintainer review of the invariants above plus the named open items (§8).
 - **Phase 2 — Portable Post-Quantum.** Sequoia-only: generation, family plumbing, format-floor tests, exchange-surface states, multi-family test matrix. Carries the `sequoia-openpgp = 2.4.0` dependency update (notices already regenerated in the spike). Updates TDD §1 and PRD §3 as canonical facts when it ships.
 - **Phase 3 — Device-Bound Post-Quantum.** Split custody per §3–§4; security-sensitive review (SECURITY.md §10 gates); positive + negative tests; device lane on Apple Silicon; **oldest-supported-iPhone SE probe before any exposure**; SECURE_ENCLAVE_CUSTODY.md language lands here.
