@@ -8,7 +8,7 @@
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, acceptance criteria, or roadmap change.<br>
-> **Last reviewed:** 2026-07-02.
+> **Last reviewed:** 2026-07-03.
 
 ## 1. Product Overview
 
@@ -62,7 +62,7 @@ The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`,
 
 The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody (issue #501, Phase 7): **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), and **Device-Bound Modern** (Secure Enclave custody, P-256 v6). Profile A/B remains the technical vocabulary for the two software configurations; the family vocabulary is the product-facing layer above it. Device-bound families are product-selectable in the shipped key-generation surface (issue #501 Phase 7D); the release gate is satisfied (Phase 9 closeout) and they ship with the next stable release (Section 3.4).
 
-A fifth family, **Portable Post-Quantum** (RFC 9980 software key, [TDD](TDD.md) §1.3), is implemented at the engine and model layers — including contact import/display, message classification, and the encrypt-surface quantum-safety indicator — but is gated out of the key-generation surface until the campaign #567 Phase 4 exposure decision ([POST_QUANTUM](POST_QUANTUM.md)).
+A fifth family, **Portable Post-Quantum** (RFC 9980 software key, [TDD](TDD.md) §1.3), is product-selectable in the key-generation surface (campaign #567 exposure decision, 2026-07-03) — covering generation, contact import/display, message classification, and the encrypt-surface quantum-safety indicator ([POST_QUANTUM](POST_QUANTUM.md)). Like the other RFC 9580-track families it is not compatible with GnuPG, and its public certificates exchange via file, share sheet, or clipboard — never QR (~30 KB armored).
 
 ### 3.1 Profile A: Universal Compatible (Default)
 
@@ -85,6 +85,7 @@ For complete algorithm specifications, see [SECURITY.md](SECURITY.md) Section 1 
 - **Key generation:** User picks a key family from a flat "Key Type" list before generating. Default: Portable Compatible (Profile A).
   - "Portable Compatible" — "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
   - "Portable Modern" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+  - "Portable Post-Quantum" — "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The private key can be exported and backed up."
   - "Device-Bound Compatible" — "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
   - "Device-Bound Modern" — "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
   - Each row has an info button that opens a detail sheet covering algorithms, key version, message format, approximate security level, exportability, GnuPG compatibility, and custody.
@@ -136,7 +137,7 @@ Open App → Onboarding (3 pages) → tutorial decision page
 → Start Guided Tutorial OR Skip Tutorial and Enter App
 → If tutorial starts: isolated sandbox modules → explicit Finish → real app
 → Real app → Keys → Generate Key
-→ Select key type: Portable Compatible (default) / Portable Modern / Device-Bound Compatible / Device-Bound Modern (device-bound rows shown only where the resolver and a wired generation service allow them; commitment sheet before device-bound generation)
+→ Select key type: Portable Compatible (default) / Portable Modern / Portable Post-Quantum / Device-Bound Compatible / Device-Bound Modern (device-bound rows shown only where the resolver and a wired generation service allow them; commitment sheet before device-bound generation)
 → Name (required) + email (optional, recommended) + expiry (default 2y)
 → Done → Prompt: back up private key & share public key
 ```

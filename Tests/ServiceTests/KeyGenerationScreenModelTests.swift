@@ -96,22 +96,30 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
     func test_availableFamilies_productionPolicyExposesDeviceBoundFamiliesWhenServiceWired() {
         // No wired generation service (this test container): device-bound
-        // families stay hidden even under the exposed production policy.
+        // families stay hidden even under the exposed production policy;
+        // all three software families are always offered.
         let defaultModel = makeModel()
         XCTAssertEqual(
             defaultModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6]
+            [.compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6]
         )
 
         // Production policy + wired service (the shipping configuration since
-        // P7D): all four families are offered, in stable order.
+        // P7D; Portable Post-Quantum exposed since campaign #567 Phase 4):
+        // all five families are offered, in stable order.
         let availableServiceModel = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(),
             isSecureEnclaveGenerationAvailable: true
         )
         XCTAssertEqual(
             availableServiceModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .compatibleP256V4, .modernP256V6]
+            [
+                .compatibleSoftwareV4,
+                .modernSoftwareV6,
+                .postQuantumSoftwareV6,
+                .compatibleP256V4,
+                .modernP256V6
+            ]
         )
     }
 
@@ -122,7 +130,13 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
         XCTAssertEqual(
             exposedModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .compatibleP256V4, .modernP256V6]
+            [
+                .compatibleSoftwareV4,
+                .modernSoftwareV6,
+                .postQuantumSoftwareV6,
+                .compatibleP256V4,
+                .modernP256V6
+            ]
         )
 
         // Resolver policy alone is not enough without a wired generation service.
@@ -132,21 +146,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
         XCTAssertEqual(
             unwiredModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6]
-        )
-    }
-
-    func test_availableFamilies_excludePortablePostQuantumUntilExposure() {
-        // Portable Post-Quantum is implemented (campaign #567 Phase 2) but the
-        // generation surface stays gated until the Phase 4 exposure decision
-        // flips it; the family itself must remain in the ordered vocabulary.
-        let model = makeModel(
-            capabilityResolver: PGPKeyCapabilityResolver(),
-            isSecureEnclaveGenerationAvailable: true
-        )
-        XCTAssertFalse(model.availableFamilies.contains(.postQuantumSoftwareV6))
-        XCTAssertTrue(
-            PGPKeyConfiguration.Identity.orderedFamilies.contains(.postQuantumSoftwareV6)
+            [.compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6]
         )
     }
 

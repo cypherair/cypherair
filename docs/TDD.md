@@ -5,7 +5,7 @@
 > **Companion to:** [PRD](PRD.md) v4.4
 > **Audience:** Developers, Security Auditors
 > **Update triggers:** Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
-> **Last reviewed:** 2026-06-10.
+> **Last reviewed:** 2026-07-03.
 
 ## 1. OpenPGP Library: Sequoia PGP
 
@@ -49,7 +49,7 @@ sequoia-openpgp = { version = "2.3", default-features = false, features = [
 
 ### 1.3 Software Profile Configuration
 
-The App uses Sequoia's `Profile` and `CipherSuite` enums to implement three software encryption profiles. The third, Post-Quantum (RFC 9980), is implemented end-to-end at the engine and model layers but stays out of the key-generation surface until the campaign #567 Phase 4 exposure decision ([POST_QUANTUM](POST_QUANTUM.md)).
+The App uses Sequoia's `Profile` and `CipherSuite` enums to implement three software encryption profiles. The third, Post-Quantum (RFC 9980), is implemented end-to-end and product-selectable in the key-generation surface (campaign #567 exposure decision, 2026-07-03; [POST_QUANTUM](POST_QUANTUM.md)).
 
 | Setting | Profile A (Universal) | Profile B (Advanced) | Post-Quantum |
 |---------|----------------------|---------------------|--------------|
