@@ -47,23 +47,25 @@ sequoia-openpgp = { version = "2.3", default-features = false, features = [
 
 **Vendored build:** `openssl-src` compiles OpenSSL from source for target arch. Zero system dependency. Build needs: Xcode C compiler + perl + make. First build ~3–5 min.
 
-### 1.3 Dual Profile Configuration
+### 1.3 Software Profile Configuration
 
-The App uses Sequoia's `Profile` and `CipherSuite` enums to implement two encryption profiles:
+The App uses Sequoia's `Profile` and `CipherSuite` enums to implement three software encryption profiles. The third, Post-Quantum (RFC 9980), is implemented end-to-end at the engine and model layers but stays out of the key-generation surface until the campaign #567 Phase 4 exposure decision ([POST_QUANTUM](POST_QUANTUM.md)).
 
-| Setting | Profile A (Universal) | Profile B (Advanced) |
-|---------|----------------------|---------------------|
-| `Profile` | `Profile::RFC4880` | `Profile::RFC9580` |
-| `CipherSuite` | `CipherSuite::Cv25519` | `CipherSuite::Cv448` |
-| Key version | v4 | v6 |
-| Signing algo | Ed25519 (legacy EdDSA) | Ed448 |
-| Encryption algo | X25519 (legacy ECDH) | X448 |
-| Hash | SHA-512 (accepts SHA-256 for legacy verification) | SHA-512 |
-| Symmetric | AES-256 | AES-256 |
-| Message format | SEIPDv1 (MDC) | SEIPDv2 (AEAD OCB) |
-| S2K (export) | Iterated+Salted (mode 3) | Argon2id (512 MB / p=4 / ~3s) |
-| Compression | DEFLATE (read-only) | DEFLATE (read-only) |
-| Security level | ~128 bit | ~224 bit |
+| Setting | Profile A (Universal) | Profile B (Advanced) | Post-Quantum |
+|---------|----------------------|---------------------|--------------|
+| `Profile` | `Profile::RFC4880` | `Profile::RFC9580` | `Profile::RFC9580` |
+| `CipherSuite` | `CipherSuite::Cv25519` | `CipherSuite::Cv448` | `CipherSuite::MLDSA65_Ed25519` |
+| Key version | v4 | v6 | v6 |
+| Signing algo | Ed25519 (legacy EdDSA) | Ed448 | ML-DSA-65+Ed25519 (composite, algo 30) |
+| Encryption algo | X25519 (legacy ECDH) | X448 | ML-KEM-768+X25519 (composite, algo 35) |
+| Hash | SHA-512 (accepts SHA-256 for legacy verification) | SHA-512 | SHA-512 |
+| Symmetric | AES-256 | AES-256 | AES-256 (RFC 9980 floor) |
+| Message format | SEIPDv1 (MDC) | SEIPDv2 (AEAD OCB) | SEIPDv2 (AEAD OCB) |
+| S2K (export) | Iterated+Salted (mode 3) | Argon2id (512 MB / p=4 / ~3s) | Argon2id (512 MB / p=4 / ~3s) |
+| Compression | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) |
+| Security level | ~128 bit | ~224 bit | ~192 bit, quantum-resistant |
+
+**Profile classification is algorithm-aware, not version-only:** an RFC 9980 composite primary (ML-DSA-65+Ed25519 or ML-DSA-87+Ed448) classifies as Post-Quantum; any other v6 primary is Profile B; v4 is Profile A. SLH-DSA primaries currently fall back to the Profile B bucket (an under-claim, never an over-claim). The rule lives in one shared function (`classify_profile`) used by `detect_profile`, `parse_key_info`, and the export profile-mismatch guard.
 
 *Compression note: `compression-deflate` is enabled for reading compatibility with other OpenPGP implementations that compress messages. Outgoing messages are never compressed. Bzip2 is excluded (extra C dependency).*
 
@@ -137,6 +139,8 @@ When encrypting, the message format is determined by the recipient's key version
 - **Encrypt-to-self** adds the sender's own key. If sender has v6 and recipient has v4, the mixed rule applies → SEIPDv1.
 
 Sequoia handles this automatically when the recipient certificates are passed to the encryption API. The Rust wrapper does not need to implement format selection logic manually.
+
+Post-quantum recipients ride the same version-driven rule (they are v6): PQ-only → SEIPDv2; mixed PQ + v4 → SEIPDv1, in which case the RFC 9980 **AES-256 floor** still holds inside the SEIPDv1 container (verified by decrypt-time cipher assertions in `portable_pq_message_tests.rs`). The engine additionally classifies any produced message's quantum-safety from its PKESK algorithms (`message_quantum_safety`: fully post-quantum / mixed / none) — the compose surface derives its quantum-safe badge from that artifact-level classification, never from the live recipient selection.
 
 ### 1.5 AEAD Preference Subpacket
 
