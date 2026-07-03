@@ -62,6 +62,8 @@ The only `CypherAir-Info.plist` usage description is `NSFaceIDUsageDescription`,
 
 The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody (issue #501, Phase 7): **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), and **Device-Bound Modern** (Secure Enclave custody, P-256 v6). Profile A/B remains the technical vocabulary for the two software configurations; the family vocabulary is the product-facing layer above it. Device-bound families are product-selectable in the shipped key-generation surface (issue #501 Phase 7D); the release gate is satisfied (Phase 9 closeout) and they ship with the next stable release (Section 3.4).
 
+A fifth family, **Portable Post-Quantum** (RFC 9980 software key, [TDD](TDD.md) §1.3), is implemented at the engine and model layers — including contact import/display, message classification, and the encrypt-surface quantum-safety indicator — but is gated out of the key-generation surface until the campaign #567 Phase 4 exposure decision ([POST_QUANTUM](POST_QUANTUM.md)).
+
 ### 3.1 Profile A: Universal Compatible (Default)
 
 Designed for maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security.

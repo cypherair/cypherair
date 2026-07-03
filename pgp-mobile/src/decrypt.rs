@@ -69,6 +69,69 @@ pub fn parse_recipients(ciphertext: &[u8]) -> Result<Vec<String>, PgpError> {
     Ok(recipients)
 }
 
+/// Quantum-safety of a produced message, judged by the artifact itself:
+/// the public-key algorithms of its PKESK packets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum MessageQuantumSafety {
+    /// Every session-key packet targets an RFC 9980 composite KEM.
+    FullyPostQuantum,
+    /// Some, but not all, session-key packets target a composite KEM.
+    Mixed,
+    /// No session-key packet targets a composite KEM.
+    NonePostQuantum,
+}
+
+/// Classify a message's quantum-safety from its PKESK algorithms.
+///
+/// The caller may pass a truncated prefix of a large message (streamed
+/// file output): parsing stops at the first encrypted-container packet,
+/// which follows all PKESKs.
+pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety, PgpError> {
+    use openpgp::types::PublicKeyAlgorithm;
+
+    let mut ppr = openpgp::parse::PacketParser::from_bytes(ciphertext).map_err(|e| {
+        PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        }
+    })?;
+
+    let mut total = 0usize;
+    let mut post_quantum = 0usize;
+
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        match pp.packet {
+            openpgp::Packet::PKESK(ref pkesk) => {
+                total += 1;
+                let algo = match pkesk {
+                    openpgp::packet::PKESK::V3(p) => p.pk_algo(),
+                    openpgp::packet::PKESK::V6(p) => p.pk_algo(),
+                    _ => PublicKeyAlgorithm::Unknown(0),
+                };
+                if matches!(
+                    algo,
+                    PublicKeyAlgorithm::MLKEM768_X25519 | PublicKeyAlgorithm::MLKEM1024_X448
+                ) {
+                    post_quantum += 1;
+                }
+            }
+            openpgp::Packet::SEIP(_) => break,
+            _ => {}
+        }
+        let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
+            reason: format!("Failed to parse message: {e}"),
+        })?;
+        ppr = next;
+    }
+
+    Ok(if total == 0 || post_quantum == 0 {
+        MessageQuantumSafety::NonePostQuantum
+    } else if post_quantum == total {
+        MessageQuantumSafety::FullyPostQuantum
+    } else {
+        MessageQuantumSafety::Mixed
+    })
+}
+
 /// Match PKESK recipients in ciphertext against provided local certificates.
 /// Returns the primary fingerprints of certificates that have a matching encryption subkey.
 /// This is Phase 1 of the two-phase decryption protocol — no secret keys needed.

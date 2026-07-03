@@ -65,7 +65,17 @@ private struct QRDisplayHostView: View {
 
     private var qrContent: some View {
         VStack(spacing: 24) {
-            if let qrCGImage = model.qrCGImage {
+            if model.isUnavailableForKeyType {
+                ContentUnavailableView(
+                    String(localized: "qr.unavailable.title", defaultValue: "QR Not Available"),
+                    systemImage: "qrcode",
+                    description: Text(String(
+                        localized: "qr.unavailable.postQuantum",
+                        defaultValue: "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
+                    ))
+                )
+                .accessibilityIdentifier("qr.unavailableForKeyType")
+            } else if let qrCGImage = model.qrCGImage {
                 Image(decorative: qrCGImage, scale: 1.0)
                     .interpolation(.none)
                     .resizable()
@@ -86,11 +96,13 @@ private struct QRDisplayHostView: View {
             Text(displayName)
                 .font(.headline)
 
-            Text(String(localized: "qr.instruction", defaultValue: "Ask your contact to scan this QR code with their camera."))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+            if !model.isUnavailableForKeyType {
+                Text(String(localized: "qr.instruction", defaultValue: "Ask your contact to scan this QR code with their camera."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
     }
 }

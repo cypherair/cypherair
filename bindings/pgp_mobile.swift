@@ -1222,6 +1222,13 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate: Data) throws  -> CertificateMergeResult
 
     /**
+     * Classify a message's quantum-safety from its PKESK algorithms
+     * (Phase 1 — no auth needed). Accepts a truncated prefix of a large
+     * streamed message: parsing stops at the encrypted container.
+     */
+    func messageQuantumSafety(ciphertext: Data) throws  -> MessageQuantumSafety
+
+    /**
      * Modify the expiration time of an existing certificate.
      * Requires the full certificate (with secret key material) to re-sign binding signatures.
      *
@@ -1950,6 +1957,20 @@ open func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate:
             self.uniffiCloneHandle(),
         FfiConverterData.lower(existingCert),
         FfiConverterData.lower(incomingCertOrUpdate),$0
+    )
+})
+}
+
+    /**
+     * Classify a message's quantum-safety from its PKESK algorithms
+     * (Phase 1 — no auth needed). Accepts a truncated prefix of a large
+     * streamed message: parsing stops at the encrypted container.
+     */
+open func messageQuantumSafety(ciphertext: Data)throws  -> MessageQuantumSafety  {
+    return try  FfiConverterTypeMessageQuantumSafety_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_message_quantum_safety(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),$0
     )
 })
 }
@@ -5449,6 +5470,93 @@ public func FfiConverterTypeKeyProfile_lower(_ value: KeyProfile) -> RustBuffer 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Quantum-safety of a produced message, judged by the artifact itself:
+ * the public-key algorithms of its PKESK packets.
+ */
+
+public enum MessageQuantumSafety: Equatable, Hashable {
+
+    /**
+     * Every session-key packet targets an RFC 9980 composite KEM.
+     */
+    case fullyPostQuantum
+    /**
+     * Some, but not all, session-key packets target a composite KEM.
+     */
+    case mixed
+    /**
+     * No session-key packet targets a composite KEM.
+     */
+    case nonePostQuantum
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension MessageQuantumSafety: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMessageQuantumSafety: FfiConverterRustBuffer {
+    typealias SwiftType = MessageQuantumSafety
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MessageQuantumSafety {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        case 1: return .fullyPostQuantum
+
+        case 2: return .mixed
+
+        case 3: return .nonePostQuantum
+
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MessageQuantumSafety, into buf: inout [UInt8]) {
+        switch value {
+
+
+        case .fullyPostQuantum:
+            writeInt(&buf, Int32(1))
+
+
+        case .mixed:
+            writeInt(&buf, Int32(2))
+
+
+        case .nonePostQuantum:
+            writeInt(&buf, Int32(3))
+
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageQuantumSafety_lift(_ buf: RustBuffer) throws -> MessageQuantumSafety {
+    return try FfiConverterTypeMessageQuantumSafety.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMessageQuantumSafety_lower(_ value: MessageQuantumSafety) -> RustBuffer {
+    return FfiConverterTypeMessageQuantumSafety.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Result status for password-based decryption.
  */
 
@@ -6479,6 +6587,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update() != 44096) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_message_quantum_safety() != 30716) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 31305) {

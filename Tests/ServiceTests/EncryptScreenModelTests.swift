@@ -639,6 +639,99 @@ final class EncryptScreenModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_resultQuantumSafety_derivesFromArtifactAndSurvivesSelectionChanges() async throws {
+        // Design doc §5 (campaign #567): the quantum-safe claim describes the
+        // produced message — its actual PKESK algorithms — never the live
+        // selection, which can change after encryption without re-encrypting.
+        let signer = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let opened = try await makeOpenedProtectedContactService(prefix: "EncryptQuantumSafety")
+        defer {
+            try? FileManager.default.removeItem(
+                at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
+            )
+            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+        }
+        let pqOne = try stack.engine.generateKey(
+            name: "PQ One",
+            email: "pq-one@example.invalid",
+            expirySeconds: nil,
+            profile: .postQuantum
+        )
+        let classical = try stack.engine.generateKey(
+            name: "Classic Recipient",
+            email: "classic-recipient@example.invalid",
+            expirySeconds: nil,
+            profile: .universal
+        )
+        try opened.service.importContact(publicKeyData: pqOne.publicKeyData, verificationState: .verified)
+        try opened.service.importContact(publicKeyData: classical.publicKeyData, verificationState: .verified)
+        let pqOneId = try XCTUnwrap(opened.service.contactId(forFingerprint: pqOne.fingerprint))
+        let classicalId = try XCTUnwrap(opened.service.contactId(forFingerprint: classical.fingerprint))
+
+        let model = makeModel(contactService: opened.service)
+        model.encryptToSelf = false
+        model.signMessage = false
+        model.signerFingerprint = nil
+        model.plaintext = "artifact-derived quantum safety"
+
+        // No result yet: no claim in either direction.
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // PQ-only artifact: the badge, from the real PKESK algorithms.
+        model.selectedRecipients = [pqOneId]
+        model.requestEncrypt()
+        await waitUntil("PQ-only encryption to finish") {
+            model.operation.isRunning == false
+        }
+        XCTAssertNotNil(model.ciphertext)
+        XCTAssertTrue(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // Verifier finding #1 regression: mutating the live selection after
+        // encryption must NOT change the displayed result's claim.
+        model.selectedRecipients = [pqOneId, classicalId]
+        XCTAssertTrue(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // Re-encrypting with the mixed selection reclassifies from the new
+        // artifact: caption, never the badge.
+        model.requestEncrypt()
+        await waitUntil("mixed encryption to finish") {
+            model.operation.isRunning == false
+        }
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertTrue(model.showsMixedQuantumSafetyCaption)
+
+        // Classical-only artifact: neither.
+        model.selectedRecipients = [classicalId]
+        model.requestEncrypt()
+        await waitUntil("classical encryption to finish") {
+            model.operation.isRunning == false
+        }
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+
+        // Encrypt-to-self with a classical own key: the artifact itself
+        // carries a classical self-PKESK, so an all-PQ selection is mixed.
+        model.selectedRecipients = [pqOneId]
+        model.encryptToSelf = true
+        model.encryptToSelfFingerprint = signer.fingerprint
+        model.requestEncrypt()
+        await waitUntil("encrypt-to-self encryption to finish") {
+            model.operation.isRunning == false
+        }
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertTrue(model.showsMixedQuantumSafetyCaption)
+
+        // Clearing the transient input clears the claim with the result.
+        model.clearTransientInput()
+        XCTAssertNil(model.resultQuantumSafety)
+        XCTAssertFalse(model.showsQuantumSafeBadge)
+        XCTAssertFalse(model.showsMixedQuantumSafetyCaption)
+    }
+
+    @MainActor
     func test_effectiveRecipientContactIds_dropStaleWhenAvailableAndGateEncryptButton() async throws {
         _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptResolvedSelection")

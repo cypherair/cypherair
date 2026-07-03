@@ -73,6 +73,27 @@ fn test_detect_profile_classifies_foreign_pq_cert() {
     );
 }
 
+/// The higher RFC 9980 tier (ML-DSA-87+Ed448) also classifies as
+/// Post-Quantum on import, even though CypherAir only generates the
+/// 65/768 tier.
+#[test]
+fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum() {
+    use openpgp::cert::{CertBuilder, CipherSuite};
+    use openpgp::serialize::SerializeInto;
+
+    let (cert, _rev) = CertBuilder::general_purpose(Some("PQ87 <pq87@interop.example>"))
+        .set_cipher_suite(CipherSuite::MLDSA87_Ed448)
+        .set_profile(openpgp::Profile::RFC9580)
+        .expect("set RFC 9580 profile")
+        .generate()
+        .expect("generate 87-tier cert");
+    let pub_armored = cert.armored().to_vec().expect("armor");
+    assert_eq!(
+        keys::detect_profile(&pub_armored).expect("detect"),
+        KeyProfile::PostQuantum
+    );
+}
+
 /// The classical fallbacks must be unchanged by the algorithm-aware rule.
 #[test]
 fn test_detect_profile_classical_fallbacks_unchanged() {
@@ -105,6 +126,28 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
         s2k.s2k_type, "argon2id",
         "Post-Quantum exports must use Argon2id like Profile B"
     );
+
+    // Every secret packet must carry Argon2id individually — parse_s2k_params
+    // reports the strongest S2K, which would mask a subkey silently falling
+    // back to iterated-salted.
+    let exported_cert = openpgp::Cert::from_bytes(&exported).expect("parse exported");
+    let mut secret_packets = 0;
+    for ka in exported_cert.keys().secret() {
+        secret_packets += 1;
+        match ka.key().secret() {
+            openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted) => {
+                assert!(
+                    matches!(encrypted.s2k(), openpgp::crypto::S2K::Argon2 { .. }),
+                    "every PQ secret packet must use Argon2id, got {:?}",
+                    encrypted.s2k()
+                );
+            }
+            openpgp::packet::key::SecretKeyMaterial::Unencrypted(_) => {
+                panic!("exported secret material must be passphrase-protected");
+            }
+        }
+    }
+    assert!(secret_packets >= 3, "primary + both subkeys must be present");
 
     let imported = keys::import_secret_key(&exported, "correct horse").expect("PQ import");
     let imported_info = keys::parse_key_info(&imported).expect("info");

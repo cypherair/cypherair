@@ -31,6 +31,7 @@ final class EncryptScreenModel {
     ) async throws -> TemporaryFileOutput
     typealias ClipboardNoticeDecision = @MainActor () async -> Bool
     typealias ClipboardWriter = @MainActor (String, Bool) -> Void
+    typealias MessageQuantumSafetyAction = @MainActor (Data) throws -> MessageQuantumSafety
 
     private(set) var configuration: EncryptView.Configuration
     let operation: OperationController
@@ -43,6 +44,7 @@ final class EncryptScreenModel {
     private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
+    private let messageQuantumSafetyAction: MessageQuantumSafetyAction
     private let fileEncryptionAction: FileOperationAction<EncryptFileRequest, TemporaryFileOutput>
     private let clipboardNoticeDecision: ClipboardNoticeDecision
     private let clipboardWriter: ClipboardWriter
@@ -76,6 +78,13 @@ final class EncryptScreenModel {
     var showUnverifiedRecipientsWarning = false
     var textInputSectionEpoch = 0
 
+    /// Quantum-safety of the currently displayed result, classified from the
+    /// produced artifact's PKESK algorithms — never from the live selection,
+    /// which can change after encryption (design doc §5: the quantum-safe
+    /// claim is never shown for a mixed message). nil = no result, or the
+    /// artifact could not be classified (no claim either way).
+    var resultQuantumSafety: MessageQuantumSafety?
+
     init(
         encryptionService: EncryptionService,
         keyManagement: KeyManagementService,
@@ -90,7 +99,8 @@ final class EncryptScreenModel {
         textEncryptionAction: TextEncryptionAction? = nil,
         fileEncryptionAction: FileEncryptionAction? = nil,
         clipboardNoticeDecision: ClipboardNoticeDecision? = nil,
-        clipboardWriter: ClipboardWriter? = nil
+        clipboardWriter: ClipboardWriter? = nil,
+        messageQuantumSafetyAction: MessageQuantumSafetyAction? = nil
     ) {
         let operationController = operation
         self.configuration = configuration
@@ -107,6 +117,11 @@ final class EncryptScreenModel {
         }
         self.clipboardWriter = clipboardWriter ?? { string, shouldShowNotice in
             operationController.copyToClipboard(string, shouldShowNotice: shouldShowNotice)
+        }
+        // Public-data packet inspection on an already-produced artifact; the
+        // engine is stateless, so a transient instance needs no custody wiring.
+        self.messageQuantumSafetyAction = messageQuantumSafetyAction ?? { ciphertext in
+            try PgpEngine().messageQuantumSafety(ciphertext: ciphertext)
         }
         self.textEncryptionAction = textEncryptionAction ?? {
             plaintext,
@@ -174,6 +189,18 @@ final class EncryptScreenModel {
             uniqueKeysWithValues: contactService.availableRecipientContacts.map { ($0.contactId, $0) }
         )
         return effectiveRecipientContactIds.compactMap { summariesByContactId[$0] }
+    }
+
+    /// The displayed result is quantum-safe: every session-key packet in the
+    /// produced message targets an RFC 9980 composite KEM.
+    var showsQuantumSafeBadge: Bool {
+        resultQuantumSafety == .fullyPostQuantum
+    }
+
+    /// The displayed result is mixed: some, but not all, of its session-key
+    /// packets target a composite KEM. Never shown together with the badge.
+    var showsMixedQuantumSafetyCaption: Bool {
+        resultQuantumSafety == .mixed
     }
 
     /// True when any recipient is available to choose from — used to tell
@@ -511,6 +538,7 @@ final class EncryptScreenModel {
         let onEncrypted = configuration.onEncrypted
 
         ciphertext = nil
+        resultQuantumSafety = nil
         authLifecycleTraceStore?.record(
             category: .operation,
             name: "encrypt.text.start",
@@ -527,6 +555,7 @@ final class EncryptScreenModel {
             )
             try Task.checkCancellation()
             self.ciphertext = result
+            self.resultQuantumSafety = try? self.messageQuantumSafetyAction(result)
             self.textInputSectionEpoch &+= 1
             onEncrypted?(result)
             self.authLifecycleTraceStore?.record(
@@ -725,6 +754,7 @@ final class EncryptScreenModel {
         selectedRecipients.removeAll()
         recipientTagFilterState.clear()
         ciphertext = nil
+        resultQuantumSafety = nil
         selectedFileURL = nil
         selectedFileName = nil
         showFileImporter = false
@@ -787,12 +817,28 @@ final class EncryptScreenModel {
         cleanupTemporaryEncryptedFile()
         encryptedFileOutput = output
         encryptedFileURL = output.fileURL
+        resultQuantumSafety = classifyEncryptedFileQuantumSafety(at: output.fileURL)
+    }
+
+    /// PKESK packets precede the encrypted container, so a bounded prefix of
+    /// the streamed output is enough to classify the whole file; any read or
+    /// parse failure means no claim (nil), never a wrong one.
+    private func classifyEncryptedFileQuantumSafety(at url: URL) -> MessageQuantumSafety? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return nil
+        }
+        defer { try? handle.close() }
+        guard let prefix = try? handle.read(upToCount: 262_144), !prefix.isEmpty else {
+            return nil
+        }
+        return try? messageQuantumSafetyAction(prefix)
     }
 
     private func cleanupTemporaryEncryptedFile() {
         encryptedFileOutput?.cleanup()
         encryptedFileOutput = nil
         encryptedFileURL = nil
+        resultQuantumSafety = nil
     }
 
     private func applyPrefilledPlaintextIfNeeded(from configuration: EncryptView.Configuration) {

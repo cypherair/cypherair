@@ -226,6 +226,56 @@ fn test_pq_signed_and_encrypted_roundtrip() {
 }
 
 #[test]
+fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
+    use pgp_mobile::decrypt::MessageQuantumSafety;
+
+    let pq = gen(KeyProfile::PostQuantum, "PQ");
+    let v4 = gen(KeyProfile::Universal, "Classic");
+
+    let pq_only = encrypt::encrypt(PLAINTEXT, &[pq.public_key_data.clone()], None, None)
+        .expect("pq only");
+    assert_eq!(
+        decrypt::message_quantum_safety(&pq_only).expect("classify"),
+        MessageQuantumSafety::FullyPostQuantum
+    );
+
+    let mixed = encrypt::encrypt(
+        PLAINTEXT,
+        &[pq.public_key_data.clone(), v4.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("mixed");
+    assert_eq!(
+        decrypt::message_quantum_safety(&mixed).expect("classify"),
+        MessageQuantumSafety::Mixed
+    );
+
+    let classical = encrypt::encrypt(PLAINTEXT, &[v4.public_key_data.clone()], None, None)
+        .expect("classical");
+    assert_eq!(
+        decrypt::message_quantum_safety(&classical).expect("classify"),
+        MessageQuantumSafety::NonePostQuantum
+    );
+
+    // A truncated binary prefix (a streamed file's head) classifies
+    // identically: parsing stops at the encrypted container, after the
+    // PKESKs. The composite PKESK is ~1.2 KB, so 8 KiB safely covers all.
+    let mixed_binary = encrypt::encrypt_binary(
+        PLAINTEXT,
+        &[pq.public_key_data.clone(), v4.public_key_data.clone()],
+        None,
+        None,
+    )
+    .expect("mixed binary");
+    let prefix_len = mixed_binary.len().min(8192);
+    assert_eq!(
+        decrypt::message_quantum_safety(&mixed_binary[..prefix_len]).expect("prefix"),
+        MessageQuantumSafety::Mixed
+    );
+}
+
+#[test]
 fn test_pq_cleartext_sign_verify_roundtrip() {
     let signer = gen(KeyProfile::PostQuantum, "PQ Signer");
     let text = b"post-quantum cleartext".to_vec();
