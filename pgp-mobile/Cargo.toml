@@ -14,7 +14,7 @@ name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
 [dependencies]
-sequoia-openpgp = { version = "2.3", default-features = false, features = [
+sequoia-openpgp = { version = "=2.4.0", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
@@ -26,6 +26,10 @@ thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
+sequoia-openpgp = { version = "=2.4.0", default-features = false, features = [
+    "crypto-openssl",
+    "compression-deflate",
+] }
 
 [build-dependencies]
 uniffi = { version = "0.31", features = ["build"] }

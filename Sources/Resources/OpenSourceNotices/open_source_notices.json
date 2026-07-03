@@ -62,12 +62,12 @@
     ]
   },
   {
-    "id": "anyhow@1.0.102",
+    "id": "anyhow@1.0.103",
     "displayName": "anyhow",
-    "version": "1.0.102",
+    "version": "1.0.103",
     "repositoryURL": "https://github.com/dtolnay/anyhow",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "anyhow-1.0.102.txt",
+    "licenseFileResourceName": "anyhow-1.0.103.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -196,12 +196,12 @@
     ]
   },
   {
-    "id": "bytes@1.11.1",
+    "id": "bytes@1.12.0",
     "displayName": "bytes",
-    "version": "1.11.1",
+    "version": "1.12.0",
     "repositoryURL": "https://github.com/tokio-rs/bytes",
     "licenseName": "MIT",
-    "licenseFileResourceName": "bytes-1.11.1.txt",
+    "licenseFileResourceName": "bytes-1.12.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -210,12 +210,12 @@
     ]
   },
   {
-    "id": "camino@1.2.2",
+    "id": "camino@1.2.4",
     "displayName": "camino",
-    "version": "1.2.2",
+    "version": "1.2.4",
     "repositoryURL": "https://github.com/camino-rs/camino",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "camino-1.2.2.txt",
+    "licenseFileResourceName": "camino-1.2.4.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -754,12 +754,12 @@
     ]
   },
   {
-    "id": "lalrpop-util@0.23.1",
+    "id": "lalrpop-util@0.20.2",
     "displayName": "lalrpop-util",
-    "version": "0.23.1",
+    "version": "0.20.2",
     "repositoryURL": "https://github.com/lalrpop/lalrpop",
     "licenseName": "Apache-2.0 OR MIT",
-    "licenseFileResourceName": "lalrpop-util-0.23.1.txt",
+    "licenseFileResourceName": "lalrpop-util-0.20.2.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -798,12 +798,12 @@
     ]
   },
   {
-    "id": "log@0.4.32",
+    "id": "log@0.4.33",
     "displayName": "log",
-    "version": "0.4.32",
+    "version": "0.4.33",
     "repositoryURL": "https://github.com/rust-lang/log",
     "licenseName": "MIT OR Apache-2.0",
-    "licenseFileResourceName": "log-0.4.32.txt",
+    "licenseFileResourceName": "log-0.4.33.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -941,6 +941,20 @@
     "licenseSourceKind": "cratePackage",
     "licenseSourceItems": [
       "LICENSE-MIT"
+    ]
+  },
+  {
+    "id": "ossl@1.5.2",
+    "displayName": "ossl",
+    "version": "1.5.2",
+    "repositoryURL": "https://github.com/latchset/kryoptic",
+    "licenseName": "Apache-2.0",
+    "licenseFileResourceName": "ossl-1.5.2.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-2.0.txt"
     ]
   },
   {
@@ -1107,12 +1121,12 @@
     ]
   },
   {
-    "id": "sequoia-openpgp@2.3.0",
+    "id": "sequoia-openpgp@2.4.0",
     "displayName": "sequoia-openpgp",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "repositoryURL": "https://gitlab.com/sequoia-pgp/sequoia",
     "licenseName": "LGPL-2.0-or-later",
-    "licenseFileResourceName": "sequoia-openpgp-2.3.0.txt",
+    "licenseFileResourceName": "sequoia-openpgp-2.4.0.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",
