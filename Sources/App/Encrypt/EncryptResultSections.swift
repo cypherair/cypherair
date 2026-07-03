@@ -90,24 +90,79 @@ struct EncryptResultSections: View {
 }
 
 /// Quiet quantum-safety state for the encryption result (design doc §5,
-/// campaign #567): a small badge when every targeted key is post-quantum,
-/// a neutral caption when the set is mixed, nothing otherwise.
+/// campaign #567): a small badge when every session-key packet of the
+/// produced message is post-quantum, a neutral caption when the artifact
+/// is mixed, nothing otherwise — with a help sheet for the fuller story.
 struct EncryptQuantumSafetyFooter: View {
     let model: EncryptScreenModel
+    @State private var showHelp = false
 
     var body: some View {
-        if model.showsQuantumSafeBadge {
-            Label(
-                String(localized: "encrypt.quantumSafe.badge", defaultValue: "Quantum-safe"),
-                systemImage: "checkmark.shield"
-            )
-            .accessibilityIdentifier("encrypt.quantumSafeBadge")
-        } else if model.showsMixedQuantumSafetyCaption {
-            Text(String(
-                localized: "encrypt.quantumSafe.mixedCaption",
-                defaultValue: "Not fully quantum-safe: some recipients use classical keys."
-            ))
-            .accessibilityIdentifier("encrypt.quantumSafeMixedCaption")
+        if model.showsQuantumSafeBadge || model.showsMixedQuantumSafetyCaption {
+            HStack(spacing: 6) {
+                if model.showsQuantumSafeBadge {
+                    Label(
+                        String(localized: "encrypt.quantumSafe.badge", defaultValue: "Quantum-safe"),
+                        systemImage: "checkmark.shield"
+                    )
+                    .accessibilityIdentifier("encrypt.quantumSafeBadge")
+                } else {
+                    Text(String(
+                        localized: "encrypt.quantumSafe.mixedCaption",
+                        defaultValue: "Not fully quantum-safe: some recipients use classical keys."
+                    ))
+                    .accessibilityIdentifier("encrypt.quantumSafeMixedCaption")
+                }
+
+                Button {
+                    showHelp = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(
+                    localized: "encrypt.quantumSafe.helpButton",
+                    defaultValue: "About quantum safety"
+                ))
+                .accessibilityIdentifier("encrypt.quantumSafeHelp")
+            }
+            .sheet(isPresented: $showHelp) {
+                EncryptQuantumSafetyHelpSheet()
+            }
         }
+    }
+}
+
+struct EncryptQuantumSafetyHelpSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(String(
+                        localized: "encrypt.quantumSafe.helpBody1",
+                        defaultValue: "A message is quantum-safe when every key it is encrypted to uses post-quantum algorithms (RFC 9980). Those algorithms are designed to resist attackers with future quantum computers."
+                    ))
+                    Text(String(
+                        localized: "encrypt.quantumSafe.helpBody2",
+                        defaultValue: "When some of the targeted keys are classical, the message can still be read through those keys by such an attacker. For a fully quantum-safe message, every recipient — and your own key, when Encrypt to Self is on — must use a post-quantum key."
+                    ))
+                }
+                .padding()
+            }
+            .navigationTitle(String(
+                localized: "encrypt.quantumSafe.helpTitle",
+                defaultValue: "Quantum Safety"
+            ))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }

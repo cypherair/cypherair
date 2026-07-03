@@ -15348,6 +15348,70 @@
           }
         }
       }
+    },
+    "encrypt.quantumSafe.helpButton" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About quantum safety"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于量子安全"
+          }
+        }
+      }
+    },
+    "encrypt.quantumSafe.helpTitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantum Safety"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "量子安全"
+          }
+        }
+      }
+    },
+    "encrypt.quantumSafe.helpBody1" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A message is quantum-safe when every key it is encrypted to uses post-quantum algorithms (RFC 9980). Those algorithms are designed to resist attackers with future quantum computers."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当消息加密所用的每一把密钥都使用后量子算法（RFC 9980）时，该消息即为量子安全。这些算法旨在抵御拥有未来量子计算机的攻击者。"
+          }
+        }
+      }
+    },
+    "encrypt.quantumSafe.helpBody2" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When some of the targeted keys are classical, the message can still be read through those keys by such an attacker. For a fully quantum-safe message, every recipient — and your own key, when Encrypt to Self is on — must use a post-quantum key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当部分目标密钥为传统密钥时，此类攻击者仍可通过这些密钥读取消息。要使消息完全量子安全，每位接收者——以及开启“加密给自己”时您自己的密钥——都必须使用后量子密钥。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

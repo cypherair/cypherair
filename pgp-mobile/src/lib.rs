@@ -35,6 +35,7 @@ use crate::keys::{
     SecureEnclaveGeneratedPublicCertificate, SecureEnclavePublicBindingInspection,
     SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
+use crate::decrypt::MessageQuantumSafety;
 use crate::password::{PasswordDecryptResult, PasswordMessageFormat};
 use crate::signature_details::{
     DecryptDetailedResult, FileDecryptDetailedResult, FileVerifyDetailedResult,
@@ -332,6 +333,16 @@ impl PgpEngine {
     /// key fingerprints. For matching against local keys, use `match_recipients` instead.
     pub fn parse_recipients(&self, ciphertext: Vec<u8>) -> Result<Vec<String>, PgpError> {
         decrypt::parse_recipients(&ciphertext)
+    }
+
+    /// Classify a message's quantum-safety from its PKESK algorithms
+    /// (Phase 1 — no auth needed). Accepts a truncated prefix of a large
+    /// streamed message: parsing stops at the encrypted container.
+    pub fn message_quantum_safety(
+        &self,
+        ciphertext: Vec<u8>,
+    ) -> Result<MessageQuantumSafety, PgpError> {
+        decrypt::message_quantum_safety(&ciphertext)
     }
 
     /// Match PKESK recipients against local certificates (Phase 1 — no auth needed).
