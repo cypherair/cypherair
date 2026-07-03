@@ -144,11 +144,15 @@ struct PGPKeyCapabilityResolver: Sendable {
         switch (configuration.algorithmSuite, custody) {
         case (.p256, .appleSecureEnclavePrivateOperations),
              (.ed25519X25519, .softwareSecretCertificate),
-             (.ed448X448, .softwareSecretCertificate):
+             (.ed448X448, .softwareSecretCertificate),
+             (.mldsa65Ed25519Mlkem768X25519, .softwareSecretCertificate):
             return true
         case (.p256, .softwareSecretCertificate),
              (.ed25519X25519, .appleSecureEnclavePrivateOperations),
-             (.ed448X448, .appleSecureEnclavePrivateOperations):
+             (.ed448X448, .appleSecureEnclavePrivateOperations),
+             // Device-Bound Post-Quantum (split custody) is campaign #567
+             // Phase 3; until it ships, the composite suite is software-only.
+             (.mldsa65Ed25519Mlkem768X25519, .appleSecureEnclavePrivateOperations):
             return false
         }
     }

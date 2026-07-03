@@ -63,6 +63,11 @@ final class KeyGenerationScreenModel {
     /// wired Secure Enclave generation service and the capability resolver's policy.
     var availableFamilies: [PGPKeyConfiguration.Identity] {
         PGPKeyConfiguration.Identity.orderedFamilies.filter { family in
+            // Portable Post-Quantum is implemented but not yet product-exposed;
+            // the campaign #567 Phase 4 exposure decision flips this.
+            guard family != .postQuantumSoftwareV6 else {
+                return false
+            }
             guard family.isDeviceBoundFamily else {
                 return true
             }

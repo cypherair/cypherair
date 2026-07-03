@@ -15204,6 +15204,86 @@
           }
         }
       }
+    },
+    "keyFamily.portablePostQuantum.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable Post-Quantum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携后量子"
+          }
+        }
+      }
+    },
+    "keyFamily.portablePostQuantum.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The private key can be exported and backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用抗量子加密标准（RFC 9980），可抵御未来量子计算机的攻击。不兼容 GnuPG。私钥可以导出和备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.portablePostQuantum.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~192 bit, quantum-resistant"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~192 位，抗量子"
+          }
+        }
+      }
+    },
+    "keyFamily.portablePostQuantum.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-DSA-65+Ed25519 签名 + ML-KEM-768+X25519 加密"
+          }
+        }
+      }
+    },
+    "contactKey.postQuantum.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-Quantum (RFC 9980)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子（RFC 9980）"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

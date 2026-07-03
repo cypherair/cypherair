@@ -5,6 +5,7 @@ extension PGPKeyConfiguration.Identity {
     static let orderedFamilies: [PGPKeyConfiguration.Identity] = [
         .compatibleSoftwareV4,
         .modernSoftwareV6,
+        .postQuantumSoftwareV6,
         .compatibleP256V4,
         .modernP256V6,
     ]
@@ -12,7 +13,7 @@ extension PGPKeyConfiguration.Identity {
     /// Whether this family's private key is device-bound Secure Enclave custody.
     var isDeviceBoundFamily: Bool {
         switch self {
-        case .compatibleSoftwareV4, .modernSoftwareV6:
+        case .compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6:
             false
         case .compatibleP256V4, .modernP256V6:
             true
@@ -26,6 +27,8 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Compatible")
         case .modernSoftwareV6:
             String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern")
+        case .postQuantumSoftwareV6:
+            String(localized: "keyFamily.portablePostQuantum.name", defaultValue: "Portable Post-Quantum")
         case .compatibleP256V4:
             String(localized: "keyFamily.deviceBoundCompatible.name", defaultValue: "Device-Bound Compatible")
         case .modernP256V6:
@@ -45,6 +48,11 @@ extension PGPKeyConfiguration.Identity {
             String(
                 localized: "keyFamily.portableModern.description",
                 defaultValue: "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+            )
+        case .postQuantumSoftwareV6:
+            String(
+                localized: "keyFamily.portablePostQuantum.description",
+                defaultValue: "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The private key can be exported and backed up."
             )
         case .compatibleP256V4:
             String(
@@ -66,6 +74,8 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.portableCompatible.securityLevel", defaultValue: "~128 bit")
         case .modernSoftwareV6:
             String(localized: "keyFamily.portableModern.securityLevel", defaultValue: "~224 bit")
+        case .postQuantumSoftwareV6:
+            String(localized: "keyFamily.portablePostQuantum.securityLevel", defaultValue: "~192 bit, quantum-resistant")
         case .compatibleP256V4:
             String(localized: "keyFamily.deviceBoundCompatible.securityLevel", defaultValue: "~128 bit")
         case .modernP256V6:
@@ -80,6 +90,11 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.portableCompatible.algorithms", defaultValue: "Ed25519 signing + X25519 encryption")
         case .modernSoftwareV6:
             String(localized: "keyFamily.portableModern.algorithms", defaultValue: "Ed448 signing + X448 encryption")
+        case .postQuantumSoftwareV6:
+            String(
+                localized: "keyFamily.portablePostQuantum.algorithms",
+                defaultValue: "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption"
+            )
         case .compatibleP256V4, .modernP256V6:
             String(localized: "keyFamily.deviceBound.algorithms", defaultValue: "P-256 signing + P-256 key agreement")
         }
@@ -90,7 +105,7 @@ extension PGPKeyConfiguration.Identity {
         switch self {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.version.v4", defaultValue: "v4")
-        case .modernSoftwareV6, .modernP256V6:
+        case .modernSoftwareV6, .postQuantumSoftwareV6, .modernP256V6:
             String(localized: "keyFamily.version.v6", defaultValue: "v6")
         }
     }
@@ -100,7 +115,7 @@ extension PGPKeyConfiguration.Identity {
         switch self {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.messageFormat.seipdv1", defaultValue: "SEIPDv1 (MDC)")
-        case .modernSoftwareV6, .modernP256V6:
+        case .modernSoftwareV6, .postQuantumSoftwareV6, .modernP256V6:
             String(localized: "keyFamily.messageFormat.seipdv2", defaultValue: "SEIPDv2 (AEAD OCB)")
         }
     }
@@ -108,7 +123,7 @@ extension PGPKeyConfiguration.Identity {
     /// Private-key export and backup capability for the key-family detail sheet.
     var familyExportabilityDisplay: String {
         switch self {
-        case .compatibleSoftwareV4, .modernSoftwareV6:
+        case .compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6:
             String(localized: "keyFamily.exportability.portable", defaultValue: "Private key can be exported and backed up")
         case .compatibleP256V4, .modernP256V6:
             String(localized: "keyFamily.exportability.deviceBound", defaultValue: "Private key cannot be exported or backed up")
@@ -120,7 +135,7 @@ extension PGPKeyConfiguration.Identity {
         switch self {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.gnupg.compatible", defaultValue: "Compatible with GnuPG")
-        case .modernSoftwareV6, .modernP256V6:
+        case .modernSoftwareV6, .postQuantumSoftwareV6, .modernP256V6:
             String(localized: "keyFamily.gnupg.notCompatible", defaultValue: "Not compatible with GnuPG")
         }
     }
@@ -128,7 +143,7 @@ extension PGPKeyConfiguration.Identity {
     /// Custody model for the key-family detail sheet.
     var familyCustodyDisplay: String {
         switch self {
-        case .compatibleSoftwareV4, .modernSoftwareV6:
+        case .compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6:
             String(localized: "keyFamily.custody.portable", defaultValue: "Portable software key")
         case .compatibleP256V4, .modernP256V6:
             String(localized: "keyFamily.custody.deviceBound", defaultValue: "Device-bound Secure Enclave custody")

@@ -10,6 +10,8 @@ extension PGPKeyProfile {
             String(localized: "contactKey.compatible.name", defaultValue: "GnuPG Compatible")
         case .advanced:
             String(localized: "contactKey.modern.name", defaultValue: "Modern (RFC 9580)")
+        case .postQuantum:
+            String(localized: "contactKey.postQuantum.name", defaultValue: "Post-Quantum (RFC 9980)")
         }
     }
 }

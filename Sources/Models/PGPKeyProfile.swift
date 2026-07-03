@@ -8,12 +8,13 @@ import Foundation
 enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
     case universal
     case advanced
+    case postQuantum
 
     /// Key version produced by this profile.
     var keyVersion: UInt8 {
         switch self {
         case .universal: 4
-        case .advanced: 6
+        case .advanced, .postQuantum: 6
         }
     }
 
@@ -23,6 +24,8 @@ enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
             .compatibleSoftwareV4
         case .advanced:
             .modernSoftwareV6
+        case .postQuantum:
+            .postQuantumSoftwareV6
         }
     }
 }

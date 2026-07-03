@@ -36,6 +36,7 @@ extension PGPKeyProfile {
         switch self {
         case .universal: .universal
         case .advanced: .advanced
+        case .postQuantum: .postQuantum
         }
     }
 }
@@ -45,6 +46,7 @@ extension KeyProfile {
         switch self {
         case .universal: .universal
         case .advanced: .advanced
+        case .postQuantum: .postQuantum
         }
     }
 }

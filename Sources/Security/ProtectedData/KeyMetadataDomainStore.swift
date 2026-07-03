@@ -52,7 +52,8 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                     "Key metadata cannot use software custody for a P-256 configuration."
                 )
             case (.ed25519X25519, .appleSecureEnclavePrivateOperations),
-                 (.ed448X448, .appleSecureEnclavePrivateOperations):
+                 (.ed448X448, .appleSecureEnclavePrivateOperations),
+                 (.mldsa65Ed25519Mlkem768X25519, .appleSecureEnclavePrivateOperations):
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata cannot use Secure Enclave custody for a non-P-256 configuration."
                 )
