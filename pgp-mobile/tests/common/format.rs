@@ -46,3 +46,45 @@ pub fn detect_pkesk_versions(ciphertext: &[u8]) -> Vec<u8> {
     }
     versions
 }
+
+/// Collect the public-key algorithm of every PKESK packet.
+/// Distinguishes composite RFC 9980 recipients (MLKEM768_X25519) from
+/// classical ECDH/X25519 recipients without decrypting.
+#[allow(dead_code)]
+pub fn detect_pkesk_algorithms(ciphertext: &[u8]) -> Vec<openpgp::types::PublicKeyAlgorithm> {
+    let mut algorithms = Vec::new();
+    let mut ppr =
+        openpgp::parse::PacketParser::from_bytes(ciphertext).expect("Should parse ciphertext");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        match &pp.packet {
+            openpgp::Packet::PKESK(openpgp::packet::PKESK::V3(p)) => algorithms.push(p.pk_algo()),
+            openpgp::Packet::PKESK(openpgp::packet::PKESK::V6(p)) => algorithms.push(p.pk_algo()),
+            _ => {}
+        }
+        let (_, next) = pp.next().expect("Should advance");
+        ppr = next;
+    }
+    algorithms
+}
+
+/// Read the cleartext cipher/AEAD declaration of a SEIPDv2 container.
+/// Returns None for SEIPDv1 messages (v1 carries the cipher inside the
+/// encrypted session-key payload, not in a packet header).
+#[allow(dead_code)]
+pub fn detect_seipd_v2_cipher(
+    ciphertext: &[u8],
+) -> Option<(
+    openpgp::types::SymmetricAlgorithm,
+    openpgp::types::AEADAlgorithm,
+)> {
+    let mut ppr =
+        openpgp::parse::PacketParser::from_bytes(ciphertext).expect("Should parse ciphertext");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        if let openpgp::Packet::SEIP(openpgp::packet::SEIP::V2(seip)) = &pp.packet {
+            return Some((seip.symmetric_algo(), seip.aead()));
+        }
+        let (_, next) = pp.next().expect("Should advance");
+        ppr = next;
+    }
+    None
+}
