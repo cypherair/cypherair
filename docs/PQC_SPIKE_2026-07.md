@@ -1,7 +1,10 @@
 # RFC 9980 Post-Quantum Feasibility Spike — Phase 0 Report
 
-> Issue: #567 (Phase 0). Branch: `spike/rfc9980-pqc` (spike evidence only — never merges).
-> Date: 2026-07-02/03. Executed on the maintainer's Apple Silicon Mac (macOS 26.5 SDK, Xcode 26.5).
+> **Status:** Audit/feasibility snapshot — Phase 0 evidence for campaign #567. Point-in-time; not a canonical current-state document.<br>
+> **Date/Scope:** 2026-07-02, maintainer Apple Silicon Mac (macOS 26.5 SDK, Xcode 26.5); sequoia-openpgp 2.4.0.<br>
+> **Purpose:** Go/no-go evidence for the RFC 9980 post-quantum campaign (issue #567) ahead of the Phase 1 design doc.<br>
+> **Audience:** Maintainer, reviewers, and AI coding tools implementing campaign #567.<br>
+> **Truth sources:** Test runs and probes recorded inline; branch `spike/rfc9980-pqc`, merged to main by maintainer decision (2026-07-02) together with the 2.4.0 dependency groundwork.
 
 ## Verdict summary
 
@@ -19,7 +22,7 @@
 - `sequoia-openpgp 2.4.0` published on crates.io 2026-07-02T20:32Z; NEWS: "adds support for post-quantum cryptography as defined in RFC 9980", supported on the OpenSSL and RustCrypto backends.
 - The spike originally targeted the `2.2.0-pqc.1` preview and found a **hard blocker there**: the preview predates `CipherSuite::Cv448` (added in 2.3.0), so `pgp-mobile` (Profile B = Cv448 + RFC 9580) does not compile against it. The stable release erases this: `=2.4.0` compiles the existing crate unmodified.
 - **Backend change to note:** 2.4.0's `crypto-openssl` moved from the `rust-openssl` bindings to the `ossl` crate (OpenSSL v3 EVP APIs; brings ML-KEM/ML-DSA/SLH-DSA). `ossl 1.5.2` is built with its `openssl-sys` feature, so linkage still flows through `openssl-sys` and therefore through the vendored CypherAir OpenSSL fork (3.6.2). Trade-off recorded in upstream NEWS: `ossl` drops RIPEMD-160 (v3-era legacy hash; CypherAir targets v4/v6 only) and adds CAST5/Blowfish decryption support.
-- Open-source notices regenerated (120 notices): sequoia 2.3.0→2.4.0, new `ossl-1.5.2` (Apache-2.0), transitive refreshes. `pgp-mobile/Cargo.toml` pins `=2.4.0` on this branch; Phase 2 should carry the pin as a normal dependency-update commit.
+- Open-source notices regenerated (120 notices): sequoia 2.3.0→2.4.0, new `ossl-1.5.2` (Apache-2.0), transitive refreshes. `pgp-mobile/Cargo.toml` pins `=2.4.0`; the maintainer chose (2026-07-02) to merge this groundwork to main directly, so Phase 2 builds on it.
 
 ## 2. RFC 9980 round-trip through the real pgp-mobile pipeline
 
