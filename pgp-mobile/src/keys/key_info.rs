@@ -48,12 +48,7 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
         cert.with_policy(&policy, Some(creation_time)).is_ok()
     };
 
-    // Detect profile from key version
-    let profile = if key_version >= 6 {
-        KeyProfile::Advanced
-    } else {
-        KeyProfile::Universal
-    };
+    let profile = super::profile::classify_profile(&cert);
 
     // Extract primary key algorithm name (Display gives human-readable names like "EdDSA", "Ed448")
     let primary_algo = cert.primary_key().key().pk_algo().to_string();
