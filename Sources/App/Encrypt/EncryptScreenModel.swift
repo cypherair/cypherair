@@ -176,6 +176,39 @@ final class EncryptScreenModel {
         return effectiveRecipientContactIds.compactMap { summariesByContactId[$0] }
     }
 
+    /// The message is quantum-safe only when every key it is encrypted to is
+    /// post-quantum (design doc §5, campaign #567) — including the sender's
+    /// own key when encrypt-to-self is on. Conservative by construction: an
+    /// unloaded encrypt-to-self setting means no quantum-safe claim.
+    var showsQuantumSafeBadge: Bool {
+        let summaries = selectedRecipientSummaries
+        guard !summaries.isEmpty,
+              summaries.allSatisfy({ $0.preferredKey.profile == .postQuantum })
+        else {
+            return false
+        }
+        switch encryptToSelf {
+        case .some(false):
+            return true
+        case .some(true):
+            return keyManagement.defaultKey?.profile == .postQuantum
+        case .none:
+            return false
+        }
+    }
+
+    /// A neutral one-line caption for mixed sets: some, but not all, of the
+    /// keys this message targets are post-quantum. Never shown together with
+    /// the badge.
+    var showsMixedQuantumSafetyCaption: Bool {
+        let summaries = selectedRecipientSummaries
+        let postQuantumCount = summaries.filter { $0.preferredKey.profile == .postQuantum }.count
+        guard postQuantumCount > 0 else {
+            return false
+        }
+        return !showsQuantumSafeBadge
+    }
+
     /// True when any recipient is available to choose from — used to tell
     /// "no contacts yet" apart from "no matches for the current filter".
     var hasAvailableRecipients: Bool {

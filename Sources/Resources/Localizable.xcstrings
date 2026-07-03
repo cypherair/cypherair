@@ -15284,6 +15284,70 @@
           }
         }
       }
+    },
+    "encrypt.quantumSafe.badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantum-safe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "量子安全"
+          }
+        }
+      }
+    },
+    "encrypt.quantumSafe.mixedCaption" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not fully quantum-safe: some recipients use classical keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非完全量子安全：部分接收者使用传统密钥。"
+          }
+        }
+      }
+    },
+    "qr.unavailable.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR Not Available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "二维码不可用"
+          }
+        }
+      }
+    },
+    "qr.unavailable.postQuantum" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子密钥太大，无法生成二维码。请以文件方式分享或复制此密钥。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

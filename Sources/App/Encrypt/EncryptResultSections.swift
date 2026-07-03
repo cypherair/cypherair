@@ -65,6 +65,8 @@ struct EncryptResultSections: View {
                 .disabled(!model.configuration.allowsResultExport)
             } header: {
                 Text(String(localized: "encrypt.result", defaultValue: "Encrypted Message"))
+            } footer: {
+                EncryptQuantumSafetyFooter(model: model)
             }
         }
 
@@ -80,7 +82,32 @@ struct EncryptResultSections: View {
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.configuration.allowsFileResultExport)
+            } footer: {
+                EncryptQuantumSafetyFooter(model: model)
             }
+        }
+    }
+}
+
+/// Quiet quantum-safety state for the encryption result (design doc §5,
+/// campaign #567): a small badge when every targeted key is post-quantum,
+/// a neutral caption when the set is mixed, nothing otherwise.
+struct EncryptQuantumSafetyFooter: View {
+    let model: EncryptScreenModel
+
+    var body: some View {
+        if model.showsQuantumSafeBadge {
+            Label(
+                String(localized: "encrypt.quantumSafe.badge", defaultValue: "Quantum-safe"),
+                systemImage: "checkmark.shield"
+            )
+            .accessibilityIdentifier("encrypt.quantumSafeBadge")
+        } else if model.showsMixedQuantumSafetyCaption {
+            Text(String(
+                localized: "encrypt.quantumSafe.mixedCaption",
+                defaultValue: "Not fully quantum-safe: some recipients use classical keys."
+            ))
+            .accessibilityIdentifier("encrypt.quantumSafeMixedCaption")
         }
     }
 }
