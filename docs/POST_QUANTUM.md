@@ -11,12 +11,12 @@
 
 Two new key families, both built on composite algorithms from RFC 9980 (published June 2026, extending RFC 9580):
 
-| Working name | Primary key | Encryption subkey | Custody |
+| Family name (settled 2026-07-02) | Primary key | Encryption subkey | Custody |
 |---|---|---|---|
 | **Portable Post-Quantum** | ML-DSA-65+Ed25519 (algo 30), v6 | ML-KEM-768+X25519 (algo 35), v6 | Software, passphrase-protectable and exportable like today's portable families |
 | **Device-Bound Post-Quantum** | algo 30, v6 | algo 35, v6 | **Split custody** (§3): PQ components Secure Enclave-resident, classical components software-wrapped |
 
-In scope: generation, encryption/decryption, signing/verification, contact import/export of RFC 9980 certificates, the format floor (§4), and the key-exchange UX rules (§5). Final user-facing family names (en + zh-Hans) are a review item; "Portable/Device-Bound Post-Quantum" are working names aligned with the existing four-family vocabulary.
+In scope: generation, encryption/decryption, signing/verification, contact import/export of RFC 9980 certificates, the format floor (§4), and the key-exchange UX rules (§5). The English family names above are settled and extend the existing grid (Portable/Device-Bound × Compatible/Modern/Post-Quantum); zh-Hans follows the same pattern (便携后量子 / 设备绑定后量子 — exact String Catalog strings verified against existing family-name style in Phase 2). Certificates keep the standard family shape — primary plus signing subkey plus encryption subkey (settled: symmetry over the ~9 KB size saving of a primary-signs-only shape).
 
 Out of scope, by decision (issue #567, 2026-07-02): the ML-DSA-87/ML-KEM-1024 tier (CryptoKit provides no X448/Ed448 for its classical halves), SLH-DSA, multi-part QR exchange (rejected), LibrePGP-format PQ of any kind, and any change to Profile A/B semantics. Families remain chosen at generation time and immutable per key; there is no migration or re-wrap of existing classical keys into PQ families.
 
@@ -35,7 +35,7 @@ The Secure Enclave implements ML-KEM-768, ML-KEM-1024, ML-DSA-65, and ML-DSA-87 
 - The **PQ component** (ML-KEM-768 decapsulation key; ML-DSA-65 signing key) is generated in and never leaves the Secure Enclave. Its wrapped `dataRepresentation` blob (~3.6 KB / ~6 KB) is persisted through the existing envelope machinery.
 - The **classical component** (X25519; Ed25519) is a software key wrapped under the existing private-key envelope, exactly like portable key material.
 
-**Custody invariant (proposed wording for SECURE_ENCLAVE_CUSTODY.md, maintainer owns final language):** every composite decapsulation and every composite signature requires an in-enclave operation; no decryption or signing capability exists without the Secure Enclave. The PQ component is non-exportable. The classical component alone decrypts nothing and cannot produce a valid composite signature. This is a *component-precise* restatement of the device-bound promise — unlike Device-Bound Compatible/Modern, where the entire private key is enclave-resident, and the canonical custody doc must say so explicitly when Phase 3 ships.
+**Custody invariant (wording approved by maintainer, 2026-07-02; lands in SECURE_ENCLAVE_CUSTODY.md at Phase 3):** every composite decapsulation and every composite signature requires an in-enclave operation; no decryption or signing capability exists without the Secure Enclave. The PQ component is non-exportable. The classical component alone decrypts nothing and cannot produce a valid composite signature. This is a *component-precise* restatement of the device-bound promise — unlike Device-Bound Compatible/Modern, where the entire private key is enclave-resident, and the canonical custody doc must say so explicitly when Phase 3 ships.
 
 Two structural rules from the Phase 0 seam analysis:
 
@@ -59,7 +59,7 @@ Rules:
 
 **Format selection.** The existing recipient-version-driven rule (TDD §1.4) already produces correct results with PQ recipients — verified empirically in Phase 0: PQ-only → SEIPDv2; PQ + Profile A-faithful v4 → SEIPDv1, both recipients decrypt. The campaign adds one invariant on top, from RFC 9980: **any PQ recipient ⇒ AES-256 floor**, in both SEIPD v1 and v2. Phase 2 encodes this as tests (and an assertion only if Sequoia's own selection is ever observed to violate it). Hard constraint #8 ("never SEIPDv2 to a v4 key holder") is unchanged.
 
-**Quantum-safe indicator.** Mixed PQ/classical recipient sets are allowed (RFC 9980 MAY). The UI marks a message quantum-safe **only when every recipient key is post-quantum**; a mixed message gets a visible not-fully-quantum-safe state. Presentation depth is a Phase 1 review item; the invariant is that the quantum-safe claim is never shown for a mixed message.
+**Quantum-safe indicator.** Mixed PQ/classical recipient sets are allowed (RFC 9980 MAY). The UI marks a message quantum-safe **only when every recipient key is post-quantum**; a mixed message gets a visible not-fully-quantum-safe state. Presentation (settled 2026-07-02): a quiet badge when all recipients are PQ, and for mixed sets a neutral one-line caption ("Not fully quantum-safe: some recipients use classical keys"), with fuller explanation in a help sheet — matching the quiet-native design language. The invariant is that the quantum-safe claim is never shown for a mixed message.
 
 **Key exchange.** Measured in Phase 0: a PQ public certificate armors to ~30 KB — an order of magnitude beyond single-QR capacity, and multi-part QR is rejected by decision. Rules: PQ public keys exchange via file / AirDrop / share sheet / armored clipboard copy; QR key-exchange surfaces show an explicit "not available for this key type" state (never a silent omission); fingerprint QR verification (small payloads) is retained for all families. Message and signature payloads (≈1.8 KB / ≈4.8 KB armored for short texts) remain clipboard-friendly.
 
@@ -73,14 +73,18 @@ CLAUDE.md hard constraints apply unchanged; the PQ-specific readings: AEAD hard-
 - **Phase 1 — this document** (+ PRD §10.2 pointer update). Gate: maintainer review of the invariants above plus the named open items (§8).
 - **Phase 2 — Portable Post-Quantum.** Sequoia-only: generation, family plumbing, format-floor tests, exchange-surface states, multi-family test matrix. Carries the `sequoia-openpgp = 2.4.0` dependency update (notices already regenerated in the spike). Updates TDD §1 and PRD §3 as canonical facts when it ships.
 - **Phase 3 — Device-Bound Post-Quantum.** Split custody per §3–§4; security-sensitive review (SECURITY.md §10 gates); positive + negative tests; device lane on Apple Silicon; **oldest-supported-iPhone SE probe before any exposure**; SECURE_ENCLAVE_CUSTODY.md language lands here.
-- **Phase 4 — exposure & release.** Product exposure decision, `sq` interop pack, localization. visionOS: proposal is to inherit the existing exposed-without-evidence accepted-risk stance; maintainer decides here.
+- **Phase 4 — exposure & release.** Product exposure decision, `sq` interop pack, localization. visionOS (settled 2026-07-02): inherit the existing exposed-without-evidence accepted-risk stance; the app-level visionOS build probe runs under the local Xcode 27 beta environment (release candidates remain on the 26.5 Xcode Cloud environment).
 
 Every phase requires explicit maintainer approval before its PR, per standing process.
 
-## 8. Open items for Phase 1 review
+## 8. Phase 1 review decisions (resolved 2026-07-02)
 
-1. Final family names + Simplified Chinese localization.
-2. Quantum-safe indicator presentation depth (badge vs inline explanation vs both).
-3. Custody-promise wording sign-off (§3) for SECURE_ENCLAVE_CUSTODY.md.
-4. visionOS stance confirmation (§7 Phase 4).
-5. Certificate shape: the default `general_purpose` builder adds a composite signing subkey, which is ~5.4 KB of the ~30 KB cert (subkey + its two composite signatures). Decide whether the PQ families keep the signing-subkey shape (symmetry with existing families) or sign with the primary only (smaller certs). Default proposal: keep symmetry; revisit only if exchange-size feedback demands it.
+All five review items were settled with the maintainer on 2026-07-02:
+
+1. **Family names:** Portable Post-Quantum / Device-Bound Post-Quantum (§1); zh-Hans follows the existing catalog pattern (verified in Phase 2).
+2. **Quantum-safe indicator:** quiet badge + one-line mixed-set caption (§5).
+3. **Custody-promise wording:** approved as drafted (§3).
+4. **visionOS stance:** inherit accepted risk; build probe under Xcode 27 beta (§7).
+5. **Certificate shape:** keep the signing-subkey symmetry with the existing families; revisit only if exchange-size feedback demands it.
+
+Remaining minor follow-ups: verify zh-Hans catalog strings during Phase 2; file the upstream Sequoia request to export `multi_key_combine` (§4).
