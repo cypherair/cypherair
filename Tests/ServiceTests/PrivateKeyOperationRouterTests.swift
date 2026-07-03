@@ -874,6 +874,56 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
+    func test_compositeCustodyBlocksAsUnavailableByPolicyWhenCompositeStoresAreUnwired() async throws {
+        // Fail-closed wiring default: a Device-Bound Post-Quantum identity in a
+        // router without composite dependencies must block — never fall through
+        // to the P-256 branch, never touch the P-256 inspector or handle store.
+        let identity = makeCompositeIdentity()
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        keyStore.failInventory = true
+        let inspector = RecordingPublicBindingInspector()
+        inspector.error = CypherAirError.invalidKeyData(reason: "Unexpected public binding inspection")
+        let router = try makeRouter(
+            identities: [identity],
+            policy: .production,
+            inspector: inspector,
+            keyStore: keyStore
+        )
+
+        for operation: PGPPrivateOperationKind in [.sign, .decrypt] {
+            let route = await router.route(for: PrivateKeyOperationRequest(
+                fingerprint: identity.fingerprint,
+                operation: operation
+            ))
+            guard case .blocked(let resolution) = route else {
+                return XCTFail("Expected blocked route for \(operation)")
+            }
+            XCTAssertEqual(resolution.failureCategory, .operationUnavailableByPolicy)
+        }
+        XCTAssertEqual(inspector.inspectCallCount, 0)
+    }
+
+    private func makeCompositeIdentity() -> PGPKeyIdentity {
+        PGPKeyIdentity(
+            fingerprint: "3333333333333333333333333333333333333333",
+            keyVersion: 6,
+            profile: .postQuantum,
+            userId: "Composite <composite@example.invalid>",
+            hasEncryptionSubkey: true,
+            isRevoked: false,
+            isExpired: false,
+            isDefault: false,
+            isBackedUp: false,
+            publicKeyData: Data([0x31]),
+            revocationCert: Data([0x32]),
+            primaryAlgo: "ML-DSA-65+Ed25519",
+            subkeyAlgo: "ML-KEM-768+X25519",
+            expiryDate: nil,
+            openPGPConfigurationIdentity: .deviceBoundPostQuantumV6,
+            privateKeyCustodyKind: .appleSecureEnclavePrivateOperations
+        )
+    }
+
     private func makeSoftwareIdentity() -> PGPKeyIdentity {
         PGPKeyIdentity(
             fingerprint: "1111111111111111111111111111111111111111",

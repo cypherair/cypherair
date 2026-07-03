@@ -72,7 +72,16 @@ final class SelectiveRevocationService {
                 subkeyFingerprint: validatedSubkeyFingerprint
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            guard let revocationRoutingService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            binaryRevocation = try await revocationRoutingService.generateSecureEnclaveCompositeSubkeyRevocation(
+                route: route,
+                subkeyFingerprint: validatedSubkeyFingerprint
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):
@@ -126,7 +135,16 @@ final class SelectiveRevocationService {
                 selectedUserId: validatedUserIdSelection
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            guard let revocationRoutingService else {
+                throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+            }
+            binaryRevocation = try await revocationRoutingService.generateSecureEnclaveCompositeUserIdRevocation(
+                route: route,
+                selectedUserId: validatedUserIdSelection
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

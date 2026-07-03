@@ -5,6 +5,23 @@ import Security
 struct SecureEnclaveCustodyDeletionContext {
     let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     let handleStore: SecureEnclaveCustodyHandleStore
+    // Device-Bound Post-Quantum split custody; nil until the composition root
+    // wires the composite stores (the classical component envelope itself is
+    // removed by the shared keychain-material path, keyed by fingerprint).
+    let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
+    let compositeHandleStore: SecureEnclaveCompositeHandleStore?
+
+    init(
+        publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
+        handleStore: SecureEnclaveCustodyHandleStore,
+        compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
+        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil
+    ) {
+        self.publicBindingInspector = publicBindingInspector
+        self.handleStore = handleStore
+        self.compositeBindingInspector = compositeBindingInspector
+        self.compositeHandleStore = compositeHandleStore
+    }
 }
 
 /// Owns key mutation workflows and modify-expiry crash recovery behind the facade.
@@ -159,7 +176,13 @@ final class KeyMutationService {
                 newExpirySeconds: newExpirySeconds
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await modifySecureEnclaveCompositeExpiry(
+                route: route,
+                newExpirySeconds: newExpirySeconds
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):
@@ -342,6 +365,27 @@ final class KeyMutationService {
         return updated
     }
 
+    private func modifySecureEnclaveCompositeExpiry(
+        route: SecureEnclaveCompositeSignerRoute,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPKeyIdentity {
+        guard let expiryMutationService else {
+            throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+        }
+
+        let result = try await expiryMutationService.modifySecureEnclaveCompositeExpiry(
+            route: route,
+            newExpirySeconds: newExpirySeconds
+        )
+
+        let updated = try catalogStore.updateExpiry(
+            metadata: result.metadata,
+            publicKeyData: result.publicKeyData
+        )
+
+        return updated
+    }
+
     private func routeModifyExpiry(fingerprint: String) async -> PrivateKeyOperationRoute {
         if let expiryMutationService {
             return await expiryMutationService.routeModifyExpiry(fingerprint: fingerprint)
@@ -424,6 +468,12 @@ final class KeyMutationService {
         guard let secureEnclaveCustodyDeletionContext else {
             return []
         }
+        if identity.openPGPConfiguration.algorithmSuite == .mldsa65Ed25519Mlkem768X25519 {
+            return deleteSecureEnclaveCompositeHandles(
+                for: identity,
+                context: secureEnclaveCustodyDeletionContext
+            )
+        }
 
         do {
             let inspection = try secureEnclaveCustodyDeletionContext.publicBindingInspector.inspectPublicBindings(
@@ -437,6 +487,36 @@ final class KeyMutationService {
             try secureEnclaveCustodyDeletionContext.handleStore.deleteHandlePair(
                 signingPublicKeyX963: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+            )
+            return []
+        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
+            return []
+        } catch {
+            return [error]
+        }
+    }
+
+    private func deleteSecureEnclaveCompositeHandles(
+        for identity: PGPKeyIdentity,
+        context: SecureEnclaveCustodyDeletionContext
+    ) -> [Error] {
+        guard let compositeBindingInspector = context.compositeBindingInspector,
+              let compositeHandleStore = context.compositeHandleStore else {
+            return [CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)]
+        }
+
+        do {
+            let inspection = try compositeBindingInspector.inspectCompositeBindings(
+                publicKeyData: identity.publicKeyData
+            )
+            guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
+                  inspection.keyVersion == identity.keyVersion else {
+                return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
+            }
+
+            try compositeHandleStore.deleteHandles(
+                signingPublicKeyRaw: inspection.mldsa65SigningPublicKey,
+                keyAgreementPublicKeyRaw: inspection.mlkem768KeyAgreementPublicKey
             )
             return []
         } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {

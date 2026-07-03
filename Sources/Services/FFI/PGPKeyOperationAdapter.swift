@@ -150,6 +150,27 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         }
     }
 
+    func modifyExpiryWithExternalCompositeSigner(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        do {
+            return try await Self.performModifyExpiryWithExternalCompositeSigner(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                newExpirySeconds: newExpirySeconds
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
     @concurrent
     private static func performGenerateKey(
         engine: PgpEngine,
@@ -276,6 +297,28 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         let result = try engine.modifyExpiryWithExternalP256Signer(
             publicCertData: publicCert,
             signingKeyFingerprint: signingKeyFingerprint,
+            signer: signingProvider,
+            newExpirySeconds: newExpirySeconds
+        )
+        return PGPPublicModifiedExpiryKeyMaterial(
+            publicKeyData: result.publicKeyData,
+            metadata: PGPKeyMetadataAdapter.metadata(from: result.keyInfo)
+        )
+    }
+
+    @concurrent
+    private static func performModifyExpiryWithExternalCompositeSigner(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        let result = try engine.modifyExpiryWithExternalCompositeSigner(
+            publicCertData: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
             signer: signingProvider,
             newExpirySeconds: newExpirySeconds
         )

@@ -137,22 +137,28 @@ struct PGPKeyCapabilityResolver: Sendable {
         }
     }
 
+    /// The composite suite is the only one legal under BOTH custody kinds
+    /// (Portable Post-Quantum software keys and Device-Bound Post-Quantum
+    /// split custody), so validity is decided per configuration identity,
+    /// not per algorithm suite.
     func isValidConfigurationCustodyPair(
         configuration: PGPKeyConfiguration,
         custody: PGPPrivateKeyCustodyKind
     ) -> Bool {
-        switch (configuration.algorithmSuite, custody) {
-        case (.p256, .appleSecureEnclavePrivateOperations),
-             (.ed25519X25519, .softwareSecretCertificate),
-             (.ed448X448, .softwareSecretCertificate),
-             (.mldsa65Ed25519Mlkem768X25519, .softwareSecretCertificate):
+        switch (configuration.identity, custody) {
+        case (.compatibleSoftwareV4, .softwareSecretCertificate),
+             (.modernSoftwareV6, .softwareSecretCertificate),
+             (.postQuantumSoftwareV6, .softwareSecretCertificate),
+             (.compatibleP256V4, .appleSecureEnclavePrivateOperations),
+             (.modernP256V6, .appleSecureEnclavePrivateOperations),
+             (.deviceBoundPostQuantumV6, .appleSecureEnclavePrivateOperations):
             return true
-        case (.p256, .softwareSecretCertificate),
-             (.ed25519X25519, .appleSecureEnclavePrivateOperations),
-             (.ed448X448, .appleSecureEnclavePrivateOperations),
-             // Device-Bound Post-Quantum (split custody) is campaign #567
-             // Phase 3; until it ships, the composite suite is software-only.
-             (.mldsa65Ed25519Mlkem768X25519, .appleSecureEnclavePrivateOperations):
+        case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
+             (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+             (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
+             (.compatibleP256V4, .softwareSecretCertificate),
+             (.modernP256V6, .softwareSecretCertificate),
+             (.deviceBoundPostQuantumV6, .softwareSecretCertificate):
             return false
         }
     }

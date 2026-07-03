@@ -14,17 +14,20 @@ final class PrivateKeyTextEncryptionService: TextMessageEncrypting, @unchecked S
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let messageAdapter: PGPMessageOperationAdapter
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
+    private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
-        digestSigner: any SecureEnclaveCustodyDigestSigning
+        digestSigner: any SecureEnclaveCustodyDigestSigning,
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.messageAdapter = messageAdapter
         self.digestSigner = digestSigner
+        self.compositeSigner = compositeSigner
     }
 
     func encryptText(
@@ -86,7 +89,21 @@ final class PrivateKeyTextEncryptionService: TextMessageEncrypting, @unchecked S
                 selfKey: selfKey
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await messageAdapter.encryptWithExternalCompositeSigner(
+                plaintext: plaintext,
+                recipientKeys: recipientKeys,
+                signingPublicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                selfKey: selfKey
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

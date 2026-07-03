@@ -30,6 +30,7 @@ final class KeyManagementService: @unchecked Sendable {
     private let commitDrainWaiterRegisteredCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
+    private let compositeCustodyRouterContext: CompositeCustodyRouterContext?
     private let traceStore: AuthLifecycleTraceStore?
     private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
@@ -51,6 +52,7 @@ final class KeyManagementService: @unchecked Sendable {
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
         secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
+        compositeCustodyRouterContext: CompositeCustodyRouterContext? = nil,
         secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil,
         authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: any KeyMetadataPersistence,
@@ -94,6 +96,7 @@ final class KeyManagementService: @unchecked Sendable {
         self.commitDrainWaiterRegisteredCheckpoint = commitDrainWaiterRegisteredCheckpoint
         self.relockInvalidationCheckpoint = relockInvalidationCheckpoint
         self.secureEnclaveCustodyOperationAuthenticator = secureEnclaveCustodyOperationAuthenticator
+        self.compositeCustodyRouterContext = compositeCustodyRouterContext
         self.provisioningService = KeyProvisioningService(
             keyAdapter: keyAdapter,
             secureEnclave: secureEnclave,
@@ -570,6 +573,9 @@ final class KeyManagementService: @unchecked Sendable {
             resolver: resolver,
             publicBindingInspector: publicBindingInspector,
             handleStore: handleStore,
+            compositeBindingInspector: compositeCustodyRouterContext?.bindingInspector,
+            compositeHandleStore: compositeCustodyRouterContext?.handleStore,
+            compositeClassicalComponentStore: compositeCustodyRouterContext?.classicalComponentStore,
             custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )

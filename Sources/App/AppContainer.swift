@@ -728,6 +728,21 @@ final class AppContainer: @unchecked Sendable {
             engine: engine
         )
         let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
+        // Device-Bound Post-Quantum split custody (campaign #567 Phase 3):
+        // composite Secure Enclave blob store, per-identity classical component
+        // envelope, and the composite binding inspector, shared by routing,
+        // generation, and deletion.
+        let secureEnclaveCompositeHandleStore = SecureEnclaveCompositeHandleStore(
+            keyStore: SystemSecureEnclaveCompositeKeyStore()
+        )
+        let secureEnclaveCompositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(
+            engine: engine
+        )
+        let secureEnclaveCompositeClassicalComponentStore = SecureEnclaveCompositeClassicalComponentStore(
+            secureEnclave: secureEnclave,
+            bundleStore: KeyBundleStore(keychain: keychain)
+        )
+        let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
             handleStore: secureEnclaveCustodyHandleStore
@@ -758,9 +773,16 @@ final class AppContainer: @unchecked Sendable {
             // authentication bypass must not drive real LocalAuthentication).
             expiryAuthenticator: Self.productionExpiryAuthenticator,
             secureEnclaveCustodyOperationAuthenticator: Self.productionSecureEnclaveCustodyOperationAuthenticator,
+            compositeCustodyRouterContext: CompositeCustodyRouterContext(
+                bindingInspector: secureEnclaveCompositeBindingInspector,
+                handleStore: secureEnclaveCompositeHandleStore,
+                classicalComponentStore: secureEnclaveCompositeClassicalComponentStore
+            ),
             secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
                 publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
-                handleStore: secureEnclaveCustodyHandleStore
+                handleStore: secureEnclaveCustodyHandleStore,
+                compositeBindingInspector: secureEnclaveCompositeBindingInspector,
+                compositeHandleStore: secureEnclaveCompositeHandleStore
             ),
             authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
@@ -775,6 +797,10 @@ final class AppContainer: @unchecked Sendable {
                         certificateBuilder: PGPSecureEnclaveCustodyGenerationAdapter(engine: engine),
                         handleStore: secureEnclaveCustodyHandleStore,
                         digestSigner: secureEnclaveCustodyDigestSigner,
+                        compositeCertificateBuilder: PGPSecureEnclaveCompositeGenerationAdapter(engine: engine),
+                        compositeHandleStore: secureEnclaveCompositeHandleStore,
+                        compositeSigner: secureEnclaveCompositeOperations,
+                        compositeClassicalComponentStore: secureEnclaveCompositeClassicalComponentStore,
                         catalogStore: catalogStore,
                         resolver: PGPKeyCapabilityResolver(),
                         invalidationGate: invalidationGate,

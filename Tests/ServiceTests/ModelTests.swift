@@ -1165,6 +1165,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumSoftwareV6.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.compatibleP256V4.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.modernP256V6.isDeviceBoundFamily)
+        XCTAssertTrue(PGPKeyConfiguration.Identity.deviceBoundPostQuantumV6.isDeviceBoundFamily)
 
         // Device-bound flag agrees with the resolver's valid configuration/custody pairs.
         let resolver = PGPKeyCapabilityResolver()
@@ -1253,6 +1254,15 @@ final class ModelTests: XCTestCase {
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~128 bit",
+                "Private key cannot be exported or backed up",
+                "Not compatible with GnuPG",
+                "Device-bound Secure Enclave custody"
+            ),
+            .deviceBoundPostQuantumV6: (
+                "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~192 bit, quantum-resistant",
                 "Private key cannot be exported or backed up",
                 "Not compatible with GnuPG",
                 "Device-bound Secure Enclave custody"

@@ -15,17 +15,20 @@ final class PrivateKeyPasswordMessageEncryptionService: PasswordMessageEncryptin
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let messageAdapter: PGPMessageOperationAdapter
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
+    private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
-        digestSigner: any SecureEnclaveCustodyDigestSigning
+        digestSigner: any SecureEnclaveCustodyDigestSigning,
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.messageAdapter = messageAdapter
         self.digestSigner = digestSigner
+        self.compositeSigner = compositeSigner
     }
 
     func encrypt(
@@ -89,7 +92,22 @@ final class PrivateKeyPasswordMessageEncryptionService: PasswordMessageEncryptin
                 binary: binary
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await messageAdapter.encryptWithPasswordAndExternalCompositeSigner(
+                plaintext: plaintext,
+                password: password,
+                format: format,
+                signingPublicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                binary: binary
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

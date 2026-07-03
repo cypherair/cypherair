@@ -18,17 +18,20 @@ final class PrivateKeyCleartextSigningService: CleartextMessageSigning, @uncheck
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let messageAdapter: PGPMessageOperationAdapter
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
+    private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
-        digestSigner: any SecureEnclaveCustodyDigestSigning
+        digestSigner: any SecureEnclaveCustodyDigestSigning,
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.messageAdapter = messageAdapter
         self.digestSigner = digestSigner
+        self.compositeSigner = compositeSigner
     }
 
     func signCleartext(
@@ -73,7 +76,19 @@ final class PrivateKeyCleartextSigningService: CleartextMessageSigning, @uncheck
                 )
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await messageAdapter.signCleartextWithExternalCompositeSigner(
+                text: text,
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                )
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

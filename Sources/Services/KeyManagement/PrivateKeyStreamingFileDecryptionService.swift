@@ -24,17 +24,21 @@ final class PrivateKeyStreamingFileDecryptionService: StreamingFileDecrypting, @
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let messageAdapter: PGPMessageOperationAdapter
     private let keyAgreement: any SecureEnclaveCustodyKeyAgreement
+    private let compositeDecapsulator: any SecureEnclaveCompositeDecapsulating
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement,
+        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating =
+            SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.messageAdapter = messageAdapter
         self.keyAgreement = keyAgreement
+        self.compositeDecapsulator = compositeDecapsulator
     }
 
     func decryptFile(
@@ -88,7 +92,22 @@ final class PrivateKeyStreamingFileDecryptionService: StreamingFileDecrypting, @
                 progress: progress
             )
 
-        case .secureEnclaveSigner:
+        case .secureEnclaveCompositeKeyAgreement(let route):
+            return try await messageAdapter.decryptFileWithExternalCompositeKeyAgreement(
+                inputPath: inputPath,
+                outputPath: outputPath,
+                recipientPublicCert: route.identity.publicKeyData,
+                keyAgreementSubkeyFingerprint: route.compositeBindingInspection.keyAgreementSubkeyFingerprint,
+                classicalEcdhSecret: route.classicalComponent.ecdhSecret,
+                decapsulationProvider: PGPExternalMlKem768DecapsulationProviderBridge(
+                    handle: route.keyAgreementHandle,
+                    decapsulator: compositeDecapsulator
+                ),
+                verificationContext: verificationContext,
+                progress: progress
+            )
+
+        case .secureEnclaveSigner, .secureEnclaveCompositeSigner:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

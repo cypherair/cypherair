@@ -771,6 +771,13 @@ private final class SuspendedExpiryMutationService: PrivateKeyExpiryMutationRout
         await gate.suspend()
         return material
     }
+
+    func modifySecureEnclaveCompositeExpiry(
+        route: SecureEnclaveCompositeSignerRoute,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        throw CypherAirError.keyOperationUnavailable(category: .operationNotImplementedForCustody)
+    }
 }
 
 private enum ExpectedExpiryError {

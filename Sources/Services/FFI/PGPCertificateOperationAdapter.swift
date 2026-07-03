@@ -292,6 +292,137 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         )
     }
 
+    // MARK: - Device-Bound Post-Quantum split-custody twins
+
+    func generateUserIdCertificationWithExternalCompositeSigner(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        certificationKind: OpenPGPCertificationKind
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateUserIdCertificationWithExternalCompositeSigner(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                targetCert: targetCert,
+                selectedUserId: selectedUserId,
+                certificationKind: certificationKind.ffiValue
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func generateSubkeyRevocationWithExternalCompositeSigner(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        subkeyFingerprint: String
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateSubkeyRevocationWithExternalCompositeSigner(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                subkeyFingerprint: subkeyFingerprint
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func generateUserIdRevocationWithExternalCompositeSigner(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        selectedUserId: UserIdSelectionOption
+    ) async throws -> Data {
+        do {
+            return try await Self.performGenerateUserIdRevocationWithExternalCompositeSigner(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                selectedUserId: selectedUserId
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    @concurrent
+    private static func performGenerateUserIdCertificationWithExternalCompositeSigner(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        targetCert: Data,
+        selectedUserId: UserIdSelectionOption,
+        certificationKind: CertificationKind
+    ) async throws -> Data {
+        try engine.generateUserIdCertificationBySelectorWithExternalCompositeSigner(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            targetCert: targetCert,
+            userIdSelector: PGPCertificateSelectionAdapter.userIdSelectorInput(
+                for: selectedUserId
+            ),
+            certificationKind: certificationKind
+        )
+    }
+
+    @concurrent
+    private static func performGenerateSubkeyRevocationWithExternalCompositeSigner(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        subkeyFingerprint: String
+    ) async throws -> Data {
+        try engine.generateSubkeyRevocationWithExternalCompositeSigner(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            subkeyFingerprint: subkeyFingerprint
+        )
+    }
+
+    @concurrent
+    private static func performGenerateUserIdRevocationWithExternalCompositeSigner(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa65SigningProvider,
+        selectedUserId: UserIdSelectionOption
+    ) async throws -> Data {
+        try engine.generateUserIdRevocationBySelectorWithExternalCompositeSigner(
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            userIdSelector: PGPCertificateSelectionAdapter.userIdSelectorInput(
+                for: selectedUserId
+            )
+        )
+    }
+
     @concurrent
     private static func performGenerateSubkeyRevocationWithExternalP256Signer(
         engine: PgpEngine,
