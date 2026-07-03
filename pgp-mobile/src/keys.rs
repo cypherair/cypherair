@@ -539,13 +539,16 @@ pub struct SecureEnclaveCompositePublicCertificateInput {
 /// Split-custody composite certificate generation result.
 ///
 /// SECURITY: `classical_eddsa_secret` and `classical_ecdh_secret` contain
-/// unencrypted classical component secrets. The Swift caller must:
+/// unencrypted classical component secrets, so — like `GeneratedKey` — this
+/// record deliberately derives no `Debug`. The Rust side zeroizes its working
+/// copies; the record's own field buffers cross the FFI with the same one-time
+/// lowering exposure as `GeneratedKey.cert_data`. The Swift caller must:
 /// 1. Envelope both component secrets immediately after receiving this struct.
 /// 2. Zeroize both buffers (via `resetBytes(in:)`) after enveloping is confirmed.
 /// Neither component alone can sign or decrypt anything: every composite
 /// operation additionally requires the Secure Enclave-resident ML-DSA/ML-KEM
 /// component. `public_key_data` is not sensitive.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+#[derive(uniffi::Record)]
 pub struct SecureEnclaveCompositeGeneratedCertificate {
     /// Binary OpenPGP public certificate. This never contains secret key material.
     pub public_key_data: Vec<u8>,

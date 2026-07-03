@@ -203,7 +203,8 @@ fn generation_fails_closed_when_provider_key_does_not_match_public() {
         Err(PgpError::KeyGenerationFailed { reason }) => {
             assert!(reason.contains("unverified"), "reason: {reason}")
         }
-        other => panic!("expected KeyGenerationFailed, got {other:?}"),
+        Err(other) => panic!("expected KeyGenerationFailed, got {other:?}"),
+        Ok(_) => panic!("expected KeyGenerationFailed, got a generated certificate"),
     }
 }
 

@@ -18,7 +18,7 @@ use common::format::{detect_pkesk_algorithms, detect_seipd_v2_cipher};
 
 use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
-use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message};
+use openpgp::serialize::stream::{Encryptor, LiteralWriter, Message, Recipient};
 use openpgp::types::{AEADAlgorithm, PublicKeyAlgorithm, SymmetricAlgorithm};
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
@@ -60,6 +60,110 @@ fn foreign_stock_encrypt(recipient_cert_data: &[u8], plaintext: &[u8]) -> Vec<u8
     literal.write_all(plaintext).expect("write plaintext");
     literal.finalize().expect("finalize");
     sink
+}
+
+/// Encrypt with hidden (wildcard) recipient key IDs, preserving the given
+/// recipient order, so PKESK-skip semantics can be exercised end to end.
+fn encrypt_hidden_recipients(recipient_cert_data: &[&[u8]], plaintext: &[u8]) -> Vec<u8> {
+    let policy = StandardPolicy::new();
+    let certs: Vec<openpgp::Cert> = recipient_cert_data
+        .iter()
+        .map(|bytes| openpgp::Cert::from_bytes(bytes).expect("recipient cert parses"))
+        .collect();
+
+    let mut recipients: Vec<Recipient> = Vec::new();
+    for cert in &certs {
+        for ka in cert
+            .keys()
+            .with_policy(&policy, None)
+            .supported()
+            .alive()
+            .revoked(false)
+            .for_transport_encryption()
+        {
+            let recipient: Recipient = ka.into();
+            let hidden = recipient
+                .set_key_handle(None)
+                .expect("hide recipient keyid");
+            recipients.push(hidden);
+        }
+    }
+
+    let mut sink = Vec::new();
+    let message = Message::new(&mut sink);
+    let message = Encryptor::for_recipients(message, recipients)
+        .build()
+        .expect("encryptor builds");
+    let mut literal = LiteralWriter::new(message).build().expect("literal builds");
+    literal.write_all(plaintext).expect("write plaintext");
+    literal.finalize().expect("finalize");
+    sink
+}
+
+#[test]
+fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
+    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let profile_a = keys::generate_key_with_profile(
+        "Hidden Universal Peer".to_string(),
+        None,
+        None,
+        KeyProfile::Universal,
+    )
+    .expect("profile A generates");
+
+    // Hidden (wildcard) recipients; the non-composite X25519 PKESK is emitted
+    // before the composite PKESK. A wildcard recipient speculatively matches
+    // our key, so the foreign packet reaches prepare_request and is rejected as
+    // a non-match: it must be skipped, not treated as a definitive failure.
+    let ciphertext = encrypt_hidden_recipients(
+        &[
+            profile_a.public_key_data.as_slice(),
+            material.public_key_data.as_slice(),
+        ],
+        PLAINTEXT,
+    );
+
+    let result = engine()
+        .decrypt_detailed_with_external_composite_key_agreement(
+            ciphertext,
+            material.public_key_data.clone(),
+            material.key_agreement_subkey_fingerprint.clone(),
+            material.classical_ecdh_secret.clone(),
+            material.decapsulation_provider(),
+            vec![],
+        )
+        .expect("non-composite wildcard PKESK must be skipped and ours decrypted");
+    assert_eq!(result.plaintext, PLAINTEXT);
+}
+
+#[test]
+fn wildcard_other_composite_recipient_pkesk_is_skipped_via_unwrap_failure() {
+    let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
+    let other = SoftwareCompositeMaterial::generate(None).expect("other generation succeeds");
+
+    // Hidden (wildcard) recipients; a different composite recipient's PKESK is
+    // emitted first. Decapsulating it with our key yields an implicit-rejection
+    // share, so the session-key unwrap fails without recording a definitive
+    // error, and decryption must continue to our own PKESK.
+    let ciphertext = encrypt_hidden_recipients(
+        &[
+            other.public_key_data.as_slice(),
+            material.public_key_data.as_slice(),
+        ],
+        PLAINTEXT,
+    );
+
+    let result = engine()
+        .decrypt_detailed_with_external_composite_key_agreement(
+            ciphertext,
+            material.public_key_data.clone(),
+            material.key_agreement_subkey_fingerprint.clone(),
+            material.classical_ecdh_secret.clone(),
+            material.decapsulation_provider(),
+            vec![],
+        )
+        .expect("the other recipient's wildcard PKESK must be skipped and ours decrypted");
+    assert_eq!(result.plaintext, PLAINTEXT);
 }
 
 #[test]
