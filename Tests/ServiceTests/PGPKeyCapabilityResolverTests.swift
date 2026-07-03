@@ -38,6 +38,8 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         let invalidPairs: [(PGPKeyConfiguration, PGPPrivateKeyCustodyKind)] = [
             (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
             (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+            // Device-Bound Post-Quantum split custody is campaign #567 Phase 3.
+            (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
             (.compatibleP256V4, .softwareSecretCertificate),
             (.modernP256V6, .softwareSecretCertificate)
         ]
