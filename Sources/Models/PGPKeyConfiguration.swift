@@ -5,6 +5,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
     enum Identity: String, CaseIterable, Codable, Hashable, Sendable {
         case compatibleSoftwareV4
         case modernSoftwareV6
+        case postQuantumSoftwareV6
         case compatibleP256V4
         case modernP256V6
 
@@ -14,6 +15,8 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
                 .compatibleSoftwareV4
             case .modernSoftwareV6:
                 .modernSoftwareV6
+            case .postQuantumSoftwareV6:
+                .postQuantumSoftwareV6
             case .compatibleP256V4:
                 .compatibleP256V4
             case .modernP256V6:
@@ -25,6 +28,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
     enum AlgorithmSuite: String, CaseIterable, Codable, Hashable, Sendable {
         case ed25519X25519
         case ed448X448
+        case mldsa65Ed25519Mlkem768X25519
         case p256
     }
 
@@ -69,6 +73,15 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         softwareExportProtection: .argon2idS2K
     )
 
+    static let postQuantumSoftwareV6 = PGPKeyConfiguration(
+        identity: .postQuantumSoftwareV6,
+        keyVersion: 6,
+        algorithmSuite: .mldsa65Ed25519Mlkem768X25519,
+        compatibilityTarget: .rfc9580Oriented,
+        messageFormatPreference: .seipdV2Aead,
+        softwareExportProtection: .argon2idS2K
+    )
+
     static let compatibleP256V4 = PGPKeyConfiguration(
         identity: .compatibleP256V4,
         keyVersion: 4,
@@ -97,6 +110,8 @@ extension PGPKeyConfiguration.Identity {
             .universal
         case .modernSoftwareV6:
             .advanced
+        case .postQuantumSoftwareV6:
+            .postQuantum
         case .compatibleP256V4, .modernP256V6:
             nil
         }

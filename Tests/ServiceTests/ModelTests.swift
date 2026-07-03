@@ -1138,6 +1138,7 @@ final class ModelTests: XCTestCase {
     func test_keyFamily_deviceBoundFlagsMatchCustodyValidity() {
         XCTAssertFalse(PGPKeyConfiguration.Identity.compatibleSoftwareV4.isDeviceBoundFamily)
         XCTAssertFalse(PGPKeyConfiguration.Identity.modernSoftwareV6.isDeviceBoundFamily)
+        XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumSoftwareV6.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.compatibleP256V4.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.modernP256V6.isDeviceBoundFamily)
 
@@ -1201,6 +1202,15 @@ final class ModelTests: XCTestCase {
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~224 bit",
+                "Private key can be exported and backed up",
+                "Not compatible with GnuPG",
+                "Portable software key"
+            ),
+            .postQuantumSoftwareV6: (
+                "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~192 bit, quantum-resistant",
                 "Private key can be exported and backed up",
                 "Not compatible with GnuPG",
                 "Portable software key"

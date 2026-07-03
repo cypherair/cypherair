@@ -3,6 +3,7 @@
 pub mod fixtures;
 pub mod format;
 pub mod gnupg;
+pub mod pq;
 pub mod secure_enclave;
 pub mod tamper;
 

@@ -70,8 +70,14 @@ final class SelfTestServiceTests: XCTestCase {
             return
         }
 
-        // Verify all 11 results present (5 per profile + 1 QR)
-        XCTAssertEqual(results.count, 11, "Should have 11 total test results")
+        // Verify all results present (5 per software profile + 1 QR),
+        // derived from the profile vocabulary so new families are covered.
+        let expectedCount = PGPKeyProfile.allCases.count * 5 + 1
+        XCTAssertEqual(
+            results.count,
+            expectedCount,
+            "Should have \(expectedCount) total test results"
+        )
 
         let report = try XCTUnwrap(selfTestService.latestReport)
         XCTAssertTrue(
@@ -82,7 +88,10 @@ final class SelfTestServiceTests: XCTestCase {
 
         let reportString = String(data: report.data, encoding: .utf8)
         XCTAssertNotNil(reportString, "Report should be UTF-8 text in memory")
-        XCTAssertTrue(reportString?.contains("11") == true, "Report should reference 11 tests")
+        XCTAssertTrue(
+            reportString?.contains("\(expectedCount)") == true,
+            "Report should reference \(expectedCount) tests"
+        )
         XCTAssertTrue(
             reportString?.contains("CypherAir X Self-Test Report") == true,
             "Report should include the report title"

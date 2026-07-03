@@ -5362,6 +5362,8 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
  * Encryption profile selection.
  * Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
  * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
+ * Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
+ * ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
  */
 
 public enum KeyProfile: Equatable, Hashable {
@@ -5374,6 +5376,10 @@ public enum KeyProfile: Equatable, Hashable {
      * Profile B: Advanced security. v6 keys, RFC 9580.
      */
     case advanced
+    /**
+     * Post-Quantum: RFC 9980 composite algorithms on v6 keys. Not GnuPG compatible.
+     */
+    case postQuantum
 
 
 
@@ -5399,6 +5405,8 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
 
         case 2: return .advanced
 
+        case 3: return .postQuantum
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -5413,6 +5421,10 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
 
         case .advanced:
             writeInt(&buf, Int32(2))
+
+
+        case .postQuantum:
+            writeInt(&buf, Int32(3))
 
         }
     }

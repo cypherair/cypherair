@@ -405,6 +405,8 @@ final class SelfTestService {
             String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Compatible")
         case .advanced:
             String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern")
+        case .postQuantum:
+            String(localized: "keyFamily.portablePostQuantum.name", defaultValue: "Portable Post-Quantum")
         }
     }
 }

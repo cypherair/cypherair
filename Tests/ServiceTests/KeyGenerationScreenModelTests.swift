@@ -136,6 +136,20 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
     }
 
+    func test_availableFamilies_excludePortablePostQuantumUntilExposure() {
+        // Portable Post-Quantum is implemented (campaign #567 Phase 2) but the
+        // generation surface stays gated until the Phase 4 exposure decision
+        // flips it; the family itself must remain in the ordered vocabulary.
+        let model = makeModel(
+            capabilityResolver: PGPKeyCapabilityResolver(),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        XCTAssertFalse(model.availableFamilies.contains(.postQuantumSoftwareV6))
+        XCTAssertTrue(
+            PGPKeyConfiguration.Identity.orderedFamilies.contains(.postQuantumSoftwareV6)
+        )
+    }
+
     func test_generate_deviceBoundFamilyRequiresCommitmentConfirmation() async {
         let identity = makeKeyRouteTestIdentity(fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
         var capturedFamily: PGPKeyConfiguration.Identity?
