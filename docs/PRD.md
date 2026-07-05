@@ -6,7 +6,7 @@
 > **Version:** v4.4<br>
 > **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+<br>
 > **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
-> **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md) · [POC](archive/POC.md) (archived)<br>
+> **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, acceptance criteria, or roadmap change.<br>
 > **Last reviewed:** 2026-07-03.
 

@@ -5,9 +5,8 @@ CypherAir is an offline OpenPGP encryption app for Apple platforms.
 This file is the Codex-facing agent guide. `CLAUDE.md` is maintained separately
 for Claude-facing sessions; keep shared project constraints semantically
 aligned, but do not force the two files to be identical. Canonical project docs
-live under `docs/`; archived docs under `docs/archive/` are historical context
-only. `docs/ARM64E_STATUS.md` owns Apple arm64e support and pinned stage1
-toolchain policy.
+live under `docs/`. `docs/ARM64E_STATUS.md` owns Apple arm64e support and pinned
+stage1 toolchain policy.
 
 ## Project Snapshot
 
