@@ -21,7 +21,7 @@
 > Companion current-state docs: [Architecture](ARCHITECTURE.md),
 > [Security](SECURITY.md), [PRD](PRD.md),
 > [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
-> [Testing](TESTING.md), [Code Review](WORKFLOW.md).
+> [Testing](TESTING.md), [Workflow](WORKFLOW.md).
 
 ## 1. Overview
 
@@ -48,9 +48,9 @@ Secure Enclave custody is **implemented and production-exposed since issue #501
 Phase 7D** (PR #509): the production capability-resolver policy supports
 device-bound generation, signing-class, and key-agreement operations, and the
 production container wires the generation service where Secure Enclave hardware
-is present. The **release gate is satisfied (Phase 9 closeout, 2026-06-14, §7)**;
-the families ship to users with the next tag-first stable release
-([App Release Process](RELEASE.md)).
+is present. The **release gate is satisfied (Phase 9 closeout, 2026-06-14, §7)** and the
+families are shipped to users in the tag-first stable releases
+([Release](RELEASE.md)).
 
 Product semantics (families, generation UX, commitment sheet, key-detail
 surfaces, compatibility copy) are owned by [PRD](PRD.md) §3.
@@ -258,7 +258,7 @@ closed.
 2026-06-14.
 
 The formal stable release and App Store candidate work is a separate,
-maintainer-initiated step that follows [App Release Process](RELEASE.md).
+maintainer-initiated step that follows [Release](RELEASE.md).
 
 ## 8. Evidence record
 

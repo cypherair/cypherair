@@ -2,7 +2,7 @@ name: Stable Release Attestation
 
 # The stable GitHub Release is created and published by Xcode Cloud (the
 # "PgpMobile XCFramework" + "CypherAir Release" workflows; see
-# docs/XCODE_CLOUD_RELEASE.md). This job restores verifiable build provenance for
+# docs/RELEASE.md). This job restores verifiable build provenance for
 # the published SDK/compliance assets so `gh attestation verify` keeps working.
 #
 # It runs *after* publication, so it is an integrity witness and tamper alarm,

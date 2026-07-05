@@ -8,8 +8,8 @@ This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately
 
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
-- **OpenPGP:** Sequoia PGP 2.3.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
-- **Key families:** Key generation uses four families — Portable Compatible (Profile A software key, GnuPG-compatible), Portable Modern (Profile B software key, RFC 9580), Device-Bound Compatible (Secure Enclave custody, P-256 v4, non-exportable), and Device-Bound Modern (Secure Enclave custody, P-256 v6, non-exportable). Profile A/B remains the technical vocabulary for the software configurations. Current product exposure and release status live in docs/PRD.md Section 3 and docs/SECURE_ENCLAVE_CUSTODY.md.
+- **OpenPGP:** Sequoia PGP 2.4.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
+- **Key families:** Key generation uses six families — Portable Compatible (Profile A software key, GnuPG-compatible), Portable Modern (Profile B software key, RFC 9580), Portable Post-Quantum (RFC 9980 software key), Device-Bound Compatible (Secure Enclave custody, P-256 v4, non-exportable), Device-Bound Modern (Secure Enclave custody, P-256 v6, non-exportable), and Device-Bound Post-Quantum (RFC 9980 split custody, non-exportable). Profile A/B remains the technical vocabulary for the classical software configurations. Product exposure: docs/PRD.md Section 3; custody: docs/SECURE_ENCLAVE_CUSTODY.md; post-quantum design: docs/POST_QUANTUM.md.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** Xcode 26.5, Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
@@ -121,7 +121,7 @@ Standard Swift/SwiftUI idiom applies (use the Xcode MCP `DocumentationSearch` fo
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - Docs-only PRs may use the documentation consistency path in docs/TESTING.md Section 2 instead of Rust/Xcode runs.
-- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review checklist: docs/WORKFLOW.md.
+- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review gates: docs/WORKFLOW.md.
 
 ## Releases & Versioning
 

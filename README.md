@@ -46,7 +46,7 @@ Compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82
 |-------|------------|
 | Platform | iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+, minimum 8 GB RAM |
 | Language | Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
-| OpenPGP Engine | Sequoia PGP 2.3.0 (Rust), `crypto-openssl` backend (vendored) |
+| OpenPGP Engine | Sequoia PGP 2.4.0 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
 | SQLCipher | Formal pinned external `SQLCipher.xcframework` 4.16.0 static library from `cypherair/sqlcipher-xcframework`; restored as an ignored artifact and linked by the app target |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |

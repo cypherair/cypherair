@@ -11,7 +11,7 @@
 
 ## 1. Encryption Scheme
 
-All cryptographic operations use Sequoia PGP 2.3.0. Two profiles with different algorithm suites:
+All cryptographic operations use Sequoia PGP 2.4.0. Three software profiles with different algorithm suites (the composite Post-Quantum suite also backs the Device-Bound Post-Quantum split-custody family):
 
 ### Profile A (Universal Compatible)
 
@@ -39,7 +39,20 @@ All cryptographic operations use Sequoia PGP 2.3.0. Two profiles with different 
 | Compression | DEFLATE (read-only) | Enabled for reading compatibility; outgoing messages must not use compression |
 | Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
 
-**Interoperability:** Profile A output compatible with GnuPG 2.1+ and all PGP tools. Profile B output compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+. The App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) read-only for compatibility; outgoing messages never compressed. Bzip2 excluded (extra C dependency).
+### Post-Quantum (RFC 9980)
+
+| Purpose | Algorithm | Notes |
+|---------|-----------|-------|
+| Primary key (sign/certify) | ML-DSA-65+Ed25519 (composite, algo 30) | v6 key format; ~192-bit, quantum-resistant |
+| Encryption subkey | ML-KEM-768+X25519 (composite, algo 35) | v6 key format; AES-256 floor for any PQ recipient |
+| Symmetric encryption | AES-256 | RFC 9980 floor |
+| AEAD | OCB | SEIPDv2 |
+| Hash | SHA-512 | |
+| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Portable family only; device-bound is never exportable |
+
+Full profile table and classification rule: [TDD](TDD.md) Section 1.3. Split custody for the device-bound variant: [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md) Section 4.1.
+
+**Interoperability:** Profile A output compatible with GnuPG 2.1+ and all PGP tools. Profile B output compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+. Post-quantum certificates/messages interoperate with RFC 9980 implementations (Sequoia 2.4+); not compatible with GnuPG. The App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) read-only for compatibility; outgoing messages never compressed. Bzip2 excluded (extra C dependency).
 
 ## 2. Key Lifecycle
 
@@ -395,7 +408,7 @@ Tutorial isolation boundaries:
 
 - `TutorialSandboxContainer` uses the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite and a temporary contacts directory with verified complete file protection instead of the app's real preferences and real Contacts storage. The product flow owns a single active tutorial sandbox at a time; container creation and current tutorial cleanup clear the fixed suite and directory, and startup and Reset All Local Data also remove the fixed suite plist.
 - Tutorial key management, encryption, decryption, signing, certificate, QR, and self-test services are constructed against tutorial-local storage and the same Rust engine API shape used by the real app.
-- Tutorial private-key protection currently uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows. This is temporary SR-FIX-18 debt: tutorial/UI-test mocks must remain visibly named `Mock*`, stay under `Sources/Security/Mocks`, and keep mock-owned errors instead of impersonating production `KeychainError`.
+- Tutorial private-key protection currently uses mock Secure Enclave and mock Keychain primitives behind a real `AuthenticationManager` instance, so auth-mode behavior is exercised without touching real Secure Enclave-wrapped private keys or real Keychain rows. This is temporary accepted debt: tutorial/UI-test mocks must remain visibly named `Mock*`, stay under `Sources/Security/Mocks`, and keep mock-owned errors instead of impersonating production `KeychainError`.
 - `OutputInterceptionPolicy` and page-level configuration must block or intercept real file import/export, clipboard writes, share-sheet export, URL handoff, app icon changes, onboarding management actions, and other real-workspace side effects.
 - Tutorial completion state is the only tutorial fact that persists across app restarts. Tutorial keys, contacts, messages, settings, and unfinished module progress are ephemeral and are cleaned up when the tutorial is reset or finished.
 

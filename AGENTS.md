@@ -14,11 +14,12 @@ stage1 toolchain policy.
   device: 8 GB RAM.
 - **Language:** Apple Swift 6.3.2, SwiftUI, and Rust stable. `SWIFT_VERSION =
   6.0` is the Swift language mode, not the compiler release.
-- **OpenPGP:** Sequoia PGP 2.3.0 through the Rust `pgp-mobile` wrapper and
+- **OpenPGP:** Sequoia PGP 2.4.0 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
-- **Key families:** Portable Compatible, Portable Modern, Device-Bound
-  Compatible, and Device-Bound Modern. Profile A/B remains the technical
-  vocabulary for software-key configurations.
+- **Key families:** Portable Compatible, Portable Modern, Portable
+  Post-Quantum, Device-Bound Compatible, Device-Bound Modern, and Device-Bound
+  Post-Quantum (RFC 9980 split custody). Profile A/B remains the technical
+  vocabulary for the classical software-key configurations.
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.

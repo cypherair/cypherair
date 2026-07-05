@@ -196,7 +196,7 @@ Current Contacts validation expectations:
 
 Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
 
-**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers. SR-FIX-18 changes to tutorial/UI-test mock wiring or launch gating require this full Mac UI test plan.
+**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers. Changes to the tutorial/UI-test mock wiring or launch gating require this full Mac UI test plan.
 
 There is currently no dedicated visionOS XCTest plan. Native visionOS validation uses a generic build probe together with the existing Rust, macOS-local, and iOS-device validation paths.
 
@@ -491,7 +491,6 @@ stable public-only contract end to end:
 - the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
 - Swift maps that stable token to the explicit contact-import public-certificate error
 
-Sections 2.5-2.8 below are the canonical family-level Rust / FFI validation minima after archival of the former Rust/FFI rollout documents.
 
 ## 3. Profile Test Matrix
 
@@ -792,7 +791,7 @@ Run on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enab
 - For new PgpError variants: test that the error is thrown and maps correctly to Swift.
 - For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
 - For screen ownership, launch, routing, or tutorial-host refactors: run the `CypherAir-MacUITests` plan (Section 2) or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
-- For SR-FIX-18 mock-boundary or UI-test launch-gating changes: run the full `CypherAir-MacUITests` plan plus Release and `AppStore Candidate Release` macOS build probes to prove `UITEST_*` app-container paths are ignored outside Debug.
+- For tutorial/UI-test mock-boundary or launch-gating changes: run the full `CypherAir-MacUITests` plan plus Release and `AppStore Candidate Release` macOS build probes to prove `UITEST_*` app-container paths are ignored outside Debug.
 - For guided tutorial product, sandbox, output-interception, or completion-state changes: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS,arch=arm64e' -only-testing:CypherAirTests/TutorialSessionStoreTests`, then add the Mac UI plan above when the change affects tutorial launch, routing, or visible tutorial surfaces.
 
 Documentation-only PRs that do not touch code, generated files, project files, entitlements, release metadata, or build settings may use the documentation-only validation path in Section 2 instead of Rust/Xcode test runs.

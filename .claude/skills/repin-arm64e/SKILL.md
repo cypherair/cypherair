@@ -14,4 +14,3 @@ docs/TESTING.md Section 2.4C — per the current list in ARM64E_STATUS.md).
 - `rg <new-tag>` → exactly the locations ARM64E_STATUS.md enumerates.
 - One pinned rebuild (`./build-xcframework.sh --release` with the new tag)
   completes and the macOS unit lane passes against the produced artifact.
-- Bump `Last reviewed` on touched docs.
