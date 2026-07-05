@@ -18,11 +18,15 @@ pub fn parse_key_info(key_data: &[u8]) -> Result<KeyInfo, PgpError> {
     // primary-selection rules as closely as possible.
     let user_id = select_display_user_id(&cert, &policy, now);
 
-    // Check for valid encryption subkey
+    // Check for valid encryption subkey. `.revoked(false)` keeps this capability
+    // signal aligned with encrypt.rs recipient selection, which also filters out
+    // revoked encryption subkeys (e.g. a live primary key with a KeyCompromised
+    // subkey must report as not-encryptable here and be rejected there).
     let has_encryption_subkey = cert
         .keys()
         .with_policy(&policy, Some(now))
         .supported()
+        .revoked(false)
         .for_transport_encryption()
         .next()
         .is_some();

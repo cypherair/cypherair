@@ -234,6 +234,170 @@ fn test_encrypt_empty_recipients_but_encrypt_to_self_succeeds() {
     );
 }
 
+/// A cert whose ONLY encryption subkey carries a hard revocation (KeyCompromised)
+/// must be rejected: `.alive()` checks expiry only, so recipient selection also
+/// filters revoked subkeys via `.revoked(false)` (WCR-01). The primary key is
+/// live, so this isolates subkey revocation from key-level revocation.
+#[test]
+fn test_encrypt_rejects_cert_with_only_revoked_encryption_subkey() {
+    use openpgp::cert::prelude::*;
+    use openpgp::serialize::Serialize;
+    use openpgp::types::ReasonForRevocation;
+    use sequoia_openpgp as openpgp;
+
+    let (cert, _rev) = CertBuilder::new()
+        .add_userid("RevokedSubkey <revoked-subkey@example.com>")
+        .add_transport_encryption_subkey()
+        .generate()
+        .expect("Cert gen should succeed");
+
+    // Hard-revoke the sole encryption subkey (KeyCompromised).
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let subkey = cert
+        .keys()
+        .subkeys()
+        .next()
+        .expect("encryption subkey should exist");
+    let revocation = SubkeyRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyCompromised, b"compromised")
+        .expect("revocation reason should configure")
+        .build(&mut signer, &cert, subkey.key(), None)
+        .expect("subkey revocation should build");
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![openpgp::Packet::from(revocation)])
+        .expect("revocation packet should insert");
+
+    let mut pubkey_data = Vec::new();
+    revoked_cert
+        .serialize(&mut pubkey_data)
+        .expect("Serialize should succeed");
+
+    let result = encrypt::encrypt(b"Should fail", &[pubkey_data], None, None);
+    assert!(
+        result.is_err(),
+        "encrypt must reject a cert whose only encryption subkey is revoked (KeyCompromised)"
+    );
+}
+
+/// A cert with a revoked encryption subkey PLUS a second live encryption subkey
+/// must still encrypt: the filter skips the revoked subkey rather than rejecting
+/// the whole cert (WCR-01 positive case).
+#[test]
+fn test_encrypt_skips_revoked_subkey_but_uses_live_subkey() {
+    use openpgp::cert::prelude::*;
+    use openpgp::serialize::Serialize;
+    use openpgp::types::ReasonForRevocation;
+    use sequoia_openpgp as openpgp;
+
+    let (cert, _rev) = CertBuilder::new()
+        .add_userid("MixedSubkeys <mixed-subkeys@example.com>")
+        .add_transport_encryption_subkey()
+        .add_transport_encryption_subkey()
+        .generate()
+        .expect("Cert gen should succeed");
+
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    // Revoke exactly one of the two encryption subkeys.
+    let target_subkey = cert
+        .keys()
+        .subkeys()
+        .next()
+        .expect("first encryption subkey should exist");
+    let revocation = SubkeyRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyCompromised, b"compromised")
+        .expect("revocation reason should configure")
+        .build(&mut signer, &cert, target_subkey.key(), None)
+        .expect("subkey revocation should build");
+    let (mixed_cert, _) = cert
+        .insert_packets(vec![openpgp::Packet::from(revocation)])
+        .expect("revocation packet should insert");
+
+    let mut pubkey_data = Vec::new();
+    mixed_cert
+        .serialize(&mut pubkey_data)
+        .expect("Serialize should succeed");
+
+    let ciphertext = encrypt::encrypt(b"Should succeed", &[pubkey_data], None, None)
+        .expect("encrypt must succeed when a live encryption subkey remains");
+
+    // Exactly one PKESK must be built — for the live subkey only, not the revoked one.
+    let recipients =
+        decrypt::parse_recipients(&ciphertext).expect("parse_recipients should succeed");
+    assert_eq!(
+        recipients.len(),
+        1,
+        "exactly one PKESK expected (the live subkey), not the revoked one; got {recipients:?}"
+    );
+}
+
+/// The key_info capability mirror must agree with the engine: a cert whose only
+/// encryption subkey is hard-revoked reports `has_encryption_subkey == false`
+/// (WCR-01 UI-mirror case, matching test_encrypt_rejects_cert_with_only_revoked_encryption_subkey).
+#[test]
+fn test_key_info_reports_not_encryptable_for_revoked_only_subkey() {
+    use openpgp::cert::prelude::*;
+    use openpgp::serialize::Serialize;
+    use openpgp::types::ReasonForRevocation;
+    use sequoia_openpgp as openpgp;
+
+    let (cert, _rev) = CertBuilder::new()
+        .add_userid("RevokedSubkeyInfo <revoked-subkey-info@example.com>")
+        .add_transport_encryption_subkey()
+        .generate()
+        .expect("Cert gen should succeed");
+
+    let mut signer = cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("primary key should have secret parts")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let subkey = cert
+        .keys()
+        .subkeys()
+        .next()
+        .expect("encryption subkey should exist");
+    let revocation = SubkeyRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyCompromised, b"compromised")
+        .expect("revocation reason should configure")
+        .build(&mut signer, &cert, subkey.key(), None)
+        .expect("subkey revocation should build");
+    let (revoked_cert, _) = cert
+        .insert_packets(vec![openpgp::Packet::from(revocation)])
+        .expect("revocation packet should insert");
+
+    let mut pubkey_data = Vec::new();
+    revoked_cert
+        .serialize(&mut pubkey_data)
+        .expect("Serialize should succeed");
+
+    let info = keys::parse_key_info(&pubkey_data).expect("parse_key_info should succeed");
+    assert!(
+        !info.has_encryption_subkey,
+        "key_info must report not-encryptable when the only encryption subkey is revoked"
+    );
+    assert!(
+        !info.is_revoked,
+        "primary key is live, so cert-level is_revoked must remain false"
+    );
+}
+
 /// Encrypting to a signing-only cert (no encryption subkey) must fail (Profile B / v6).
 /// Complements test_encrypt_binary_rejects_no_encryption_subkey (Profile A) in
 /// profile_a_message_tests.rs.

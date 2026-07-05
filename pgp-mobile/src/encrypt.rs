@@ -68,6 +68,7 @@ pub(crate) fn collect_recipients(
             .with_policy(policy, None)
             .supported()
             .alive()
+            .revoked(false)
             .for_transport_encryption()
             .next()
             .is_some();
@@ -97,6 +98,7 @@ pub(crate) fn build_recipients<'a>(
             .with_policy(policy, None)
             .supported()
             .alive()
+            .revoked(false)
             .for_transport_encryption()
         {
             recipient_keys.push(ka.into());
