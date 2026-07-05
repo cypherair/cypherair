@@ -11,13 +11,13 @@
 
 ### 1.1 Selection
 
-sequoia-openpgp 2.3.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
+sequoia-openpgp 2.4.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
 
 Current stable app-build release ordering and the shared source/compliance asset contract are documented in [RELEASE.md](RELEASE.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
 
 | Library | Lang | RFC 9580 | Argon2id | iOS | Decision |
 |---------|------|----------|----------|-----|----------|
-| Sequoia 2.3.0 | Rust | Full | Native | Excellent | **SELECTED** |
+| Sequoia 2.4.0 | Rust | Full | Native | Excellent | **SELECTED** |
 | OpenPGP.js | JS | Partial | Yes | Uncertain | Rejected |
 | PGPainless | Java/Kotlin | Partial | Bouncy Castle | KMP bridge | Rejected |
 | rPGP | Rust | No | No | Excellent | Rejected |
@@ -86,7 +86,7 @@ let (cert, rev) = CertBuilder::general_purpose(Some(user_id))
     .generate()?;
 ```
 
-**Profile A `set_features` rationale:** Sequoia 2.3.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
+**Profile A `set_features` rationale:** Sequoia 2.4.0 defaults to advertising SEIPDv2 support in the Features subpacket (because the library itself supports it). For Profile A (GnuPG-compatible), we must explicitly set `Features::empty().set_seipdv1()` so that other implementations send SEIPDv1 messages to this key. Without this, a GnuPG sender would see SEIPDv2 advertised and attempt to send an AEAD-encrypted message, which GnuPG cannot produce correctly — resulting in interoperability failure. `set_profile(Profile::RFC4880)` is also set explicitly rather than relying on defaults, for clarity and forward-compatibility.
 
 **Swift key metadata vocabulary:** ProtectedData `key-metadata` schema v2 stores each `PGPKeyIdentity` with an app-owned OpenPGP configuration identity and private-key custody kind. Profile A/B identities normalize to software custody; P-256 Secure Enclave custody identities persist the device-bound custody kind. Committed key metadata opens fail closed unless the readable `current.plist` generation matches the per-domain bootstrap `expectedCurrentGenerationIdentifier`. Key operation resolution adds non-persistent sanitized failure categories so resolver, future router, Security, Rust/UniFFI, workflow-service, and UI mapping plans can distinguish unsupported, unavailable, not-yet-implemented, local-authentication, handle, binding, OpenPGP semantic, payload-authentication, migration/recovery, fallback, and cleanup failures without storing private-operation state.
 
@@ -290,7 +290,7 @@ All current app-surface workflows continue to call Swift service owners rather t
 
 ### 3.1 Constraint
 
-SE supports P-256 only. Ed25519/X25519/Ed448/X448 keys all require indirect wrapping. The wrapping scheme is identical for both profiles — the SE protects the raw private key bytes regardless of the key algorithm.
+The Secure Enclave natively holds only some key types (P-256, and on current OS versions ML-KEM / ML-DSA) — not the classical curves the software profiles use (Ed25519/X25519/Ed448/X448), which therefore require indirect wrapping. The wrapping scheme is identical for all software profiles — the SE protects the raw private key bytes regardless of the key algorithm. Device-bound families are different: their private operations run inside the enclave ([SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md)).
 
 ### 3.2 Wrapping Flow
 
@@ -337,7 +337,7 @@ envelope's bound public key.
 
 ### 3.6 Security Properties
 
-See [SECURITY.md](SECURITY.md) Section 3 ("Security Properties"): Keychain extraction without the SE hardware yields a useless encrypted blob, and the raw private key exists in application memory only briefly during use — an inherent tradeoff of the P-256-only SE constraint.
+See [SECURITY.md](SECURITY.md) Section 3 ("Security Properties"): Keychain extraction without the SE hardware yields a useless encrypted blob, and the raw private key exists in application memory only briefly during use — an inherent tradeoff of the software profiles' algorithms not being Secure Enclave-resident.
 
 ### 3.7 Key Loss & Recovery
 

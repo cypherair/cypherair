@@ -14,11 +14,12 @@ stage1 toolchain policy.
   device: 8 GB RAM.
 - **Language:** Apple Swift 6.3.2, SwiftUI, and Rust stable. `SWIFT_VERSION =
   6.0` is the Swift language mode, not the compiler release.
-- **OpenPGP:** Sequoia PGP 2.3.0 through the Rust `pgp-mobile` wrapper and
+- **OpenPGP:** Sequoia PGP 2.4.0 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
-- **Key families:** Portable Compatible, Portable Modern, Device-Bound
-  Compatible, and Device-Bound Modern. Profile A/B remains the technical
-  vocabulary for software-key configurations.
+- **Key families:** Portable Compatible, Portable Modern, Portable
+  Post-Quantum, Device-Bound Compatible, Device-Bound Modern, and Device-Bound
+  Post-Quantum (RFC 9980 split custody). Profile A/B remains the technical
+  vocabulary for the classical software-key configurations.
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.
@@ -37,7 +38,7 @@ Sources/
 ├── PgpMobile/        # Generated UniFFI Swift bindings; do not hand-edit
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate
-docs/                 # PRD, TDD, architecture, security, testing, conventions
+docs/                 # PRD, TDD, architecture, security, testing, workflow, release
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -135,16 +136,24 @@ especially Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope
 
-- Follow Swift API Design Guidelines; prefer `guard let` over force unwrap.
-- Use `async/await` over Combine and `@Observable` for state.
-- Use `NavigationStack` with typed paths; do not use `NavigationView`.
-- Use iOS 26 Liquid Glass conventions where applicable and native platform
-  SwiftUI chrome elsewhere.
-- Keep one type per file, group by feature, and put all user-visible strings in
-  String Catalog.
+Standard Swift/SwiftUI idiom applies (use live Apple documentation for current
+API and Liquid Glass specifics). The project-specific rules — not inferable from
+the code alone:
+
+- Errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
+  normalized at the `Services/FFI/` adapter boundary before app/service code.
+- Never edit generated `Sources/PgpMobile/pgp_mobile.swift`; where strict
+  concurrency trips on it, `@preconcurrency import PgpMobile` at call sites.
+- Views stay thin; workflow-heavy screens move async orchestration, cleanup, and
+  transient state into an owning `@Observable` ScreenModel (`SignView` +
+  `SignScreenModel` baseline).
+- Design identity is quiet and system-native — system accent only, no brand
+  tint. Reuse the `Sources/App/DesignSystem/` primitives instead of per-view
+  literals.
+- One type per file, grouped by feature; mocks under `Security/Mocks/`; all user
+  strings in the String Catalog.
 - Prefer architecturally correct fixes while keeping scope limited to the user
   request. Do not normalize, revert, or clean up unrelated local changes.
-- Full conventions: `docs/CONVENTIONS.md`.
 
 ## Releases, Git, And Workflow
 

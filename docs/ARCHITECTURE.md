@@ -27,14 +27,14 @@ graph TB
     end
 
     subgraph "Rust Engine"
-        PGP["pgp-mobile crate<br/>Sequoia 2.3.0 + crypto-openssl"]
+        PGP["pgp-mobile crate<br/>Sequoia 2.4.0 + crypto-openssl"]
     end
 
     UI --> SVC
     SVC --> SEC
     SVC --> ADAPT
     ADAPT --> BIND
-    SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 Hardware"]
+    SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 + ML-KEM/ML-DSA"]
     SEC --> |Security.framework| KC["Keychain"]
     BIND --> PGP
     SVC --> MOD
@@ -105,7 +105,7 @@ The guided tutorial is a host-driven sandbox that teaches the real app workflow 
 
 `TutorialSandboxContainer` builds a separate dependency graph for the tutorial using the fixed `com.cypherair.tutorial.sandbox` `UserDefaults` suite, a temporary contacts directory with verified complete file protection, real app services, and mock Secure Enclave / Keychain primitives behind a real `AuthenticationManager`. The product flow owns a single active tutorial sandbox at a time; creating the container first clears the fixed suite. Current tutorial cleanup removes the fixed suite and directory, and startup/reset cleanup removes the fixed suite plist and tutorial temp directories. The tutorial reuses production pages through `TutorialConfigurationFactory`, `TutorialRouteDestinationView`, and `TutorialShellDefinitionsBuilder`; tutorial behavior is injected through generic page configuration instead of pervasive page-level tutorial branches.
 
-The tutorial's mock security primitives are temporary SR-FIX-18 debt, not production security primitives — the naming and containment rules live in the Security Layer table below and [SECURITY.md](SECURITY.md) Section 6. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
+The tutorial's mock security primitives are temporary accepted debt, not production security primitives — the naming and containment rules live in the Security Layer table below and [SECURITY.md](SECURITY.md) Section 6. The long-term direction is to move the tutorial to tutorial-specific isolated Protected Data domains and real hardware-backed processing that never touches user security assets.
 
 Safety is enforced by narrow host boundaries:
 
@@ -147,7 +147,7 @@ Wrap processing, session-key handling, payload decryption, and signature
 verification. Key metadata models algorithm/profile and private-key custody as
 separate app-owned dimensions, with a capability resolver exposing only supported
 combinations.
-Sequoia 2.3's `Signer` and `Decryptor` traits are the Rust-side seam for this
+Sequoia 2.4's `Signer` and `Decryptor` traits are the Rust-side seam for this
 external private-key custody model. The full custody reference (model, contract,
 operation surface, evidence) lives in
 [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md).
@@ -199,7 +199,7 @@ Manages all hardware-backed security operations. This is the most sensitive modu
 | `PrivateKeyRewrapWorkflow` | Phase-A and phase-B private-key rewrap workflow: pending envelope-row creation/verification, commit-required marking, permanent deletion, pending promotion, cleanup, and final auth-mode commit |
 | `PrivateKeyRewrapRecoveryCoordinator` | Phase-aware interrupted private-key rewrap recovery using permanent/pending Keychain envelope-row state and protected `private-key-control` journal state |
 | `ProtectedDataSessionCoordinator` | ProtectedData session state owner for authenticated root-secret access, wrapping-root-key derivation, relock, secret clearing, and `restartRequired` latching for protected app-data domains |
-| `Sources/Security/Mocks/` | Temporary SR-FIX-18 tutorial/UI-test mock boundary. Mock implementations kept here must remain visibly named `Mock*`; production ProtectedData files must not embed mock implementations. |
+| `Sources/Security/Mocks/` | Temporary tutorial/UI-test mock boundary (accepted debt). Mock implementations kept here must remain visibly named `Mock*`; production ProtectedData files must not embed mock implementations. |
 | `ProtectedDomainKeyManager` | Per-domain DMK wrapping/unwrapping, Keychain-backed staged/committed wrapped-DMK record storage, and unlocked-domain-key zeroization |
 | `PrivateKeyControlStore` | ProtectedData `private-key-control` domain for `authMode` and private-key rewrap / modify-expiry recovery journal state. Private-key material remains in the existing Keychain / Secure Enclave domain. |
 | ProtectedData device-binding layer | Secure Enclave device-bound root-secret envelope layer. It adds a silent P-256 SE factor under the existing Keychain / `LAContext` app-data gate and does not replace app privacy authentication. |

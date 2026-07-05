@@ -11,7 +11,7 @@ enum CypherSurfaceStyle {
 extension View {
     /// Applies the shared surface treatment with platform-appropriate fill and
     /// corner radius. For grouped content cards only — content views keep their
-    /// system backgrounds, and glass is never applied here (docs/CONVENTIONS.md,
+    /// system backgrounds, and glass is never applied here (CLAUDE.md Code Style,
     /// Liquid Glass).
     @ViewBuilder
     func cypherSurface(_ style: CypherSurfaceStyle = .card) -> some View {

@@ -21,14 +21,16 @@
 > Companion current-state docs: [Architecture](ARCHITECTURE.md),
 > [Security](SECURITY.md), [PRD](PRD.md),
 > [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
-> [Testing](TESTING.md), [Code Review](WORKFLOW.md).
+> [Testing](TESTING.md), [Workflow](WORKFLOW.md).
 
 ## 1. Overview
 
 Secure Enclave custody is a device-bound private-key custody model in which
-long-term P-256 signing and key-agreement private operations stay bound to the
-current device's Secure Enclave. It sits alongside — and does not replace — the
-portable software-key model. It is presented in the product as three of the six
+long-term signing and key-agreement private operations stay bound to the
+current device's Secure Enclave — P-256 for the classical device-bound families,
+and RFC 9980 split custody for Device-Bound Post-Quantum (§4.1). It sits
+alongside — and does not replace — the portable software-key model. It is
+presented in the product as three of the six
 key families:
 
 - **Device-Bound Compatible** — Secure Enclave custody, P-256, v4 certificate.
@@ -46,9 +48,9 @@ Secure Enclave custody is **implemented and production-exposed since issue #501
 Phase 7D** (PR #509): the production capability-resolver policy supports
 device-bound generation, signing-class, and key-agreement operations, and the
 production container wires the generation service where Secure Enclave hardware
-is present. The **release gate is satisfied (Phase 9 closeout, 2026-06-14, §7)**;
-the families ship to users with the next tag-first stable release
-([App Release Process](RELEASE.md)).
+is present. The **release gate is satisfied (Phase 9 closeout, 2026-06-14, §7)** and the
+families are shipped to users in the tag-first stable releases
+([Release](RELEASE.md)).
 
 Product semantics (families, generation UX, commitment sheet, key-detail
 surfaces, compatibility copy) are owned by [PRD](PRD.md) §3.
@@ -256,7 +258,7 @@ closed.
 2026-06-14.
 
 The formal stable release and App Store candidate work is a separate,
-maintainer-initiated step that follows [App Release Process](RELEASE.md).
+maintainer-initiated step that follows [Release](RELEASE.md).
 
 ## 8. Evidence record
 
