@@ -371,7 +371,7 @@ final class SettingsScreenModelTests: XCTestCase {
             "Portable Key Protection"
         )
         let footer = String(localized: "settings.authMode.footer", defaultValue: "")
-        XCTAssertTrue(footer.contains("portable keys"))
+        XCTAssertTrue(footer.contains("portable software keys"))
         XCTAssertTrue(footer.contains("Device-bound keys"))
         XCTAssertTrue(footer.contains("not affected"))
     }
