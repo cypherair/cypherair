@@ -49,7 +49,7 @@ sequoia-openpgp = { version = "2.3", default-features = false, features = [
 
 ### 1.3 Software Profile Configuration
 
-The App uses Sequoia's `Profile` and `CipherSuite` enums to implement three software encryption profiles. The third, Post-Quantum (RFC 9980), is implemented end-to-end and product-selectable in the key-generation surface (campaign #567 exposure decision, 2026-07-03; [POST_QUANTUM](POST_QUANTUM.md)).
+The App uses Sequoia's `Profile` and `CipherSuite` enums to implement three software encryption profiles. The third, Post-Quantum (RFC 9980), is implemented end-to-end and product-selectable in the key-generation surface (campaign #567; [POST_QUANTUM](POST_QUANTUM.md)). The same composite suite backs two key families: the **Portable Post-Quantum** software key described by the table below, and **Device-Bound Post-Quantum** split custody (the PQ components in the Secure Enclave, the classical Ed25519/X25519 components under the fixed-access envelope) — see [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md) §4.1.
 
 | Setting | Profile A (Universal) | Profile B (Advanced) | Post-Quantum |
 |---------|----------------------|---------------------|--------------|

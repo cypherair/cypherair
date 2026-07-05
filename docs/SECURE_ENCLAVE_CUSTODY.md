@@ -28,16 +28,19 @@
 Secure Enclave custody is a device-bound private-key custody model in which
 long-term P-256 signing and key-agreement private operations stay bound to the
 current device's Secure Enclave. It sits alongside — and does not replace — the
-portable software-key model. It is presented in the product as two of the four
+portable software-key model. It is presented in the product as three of the six
 key families:
 
 - **Device-Bound Compatible** — Secure Enclave custody, P-256, v4 certificate.
 - **Device-Bound Modern** — Secure Enclave custody, P-256, v6 (RFC 9580)
   certificate.
+- **Device-Bound Post-Quantum** — RFC 9980 composite split custody, v6
+  certificate (campaign #567 Phase 3; §4.1).
 
-(The portable software families are **Portable Compatible** = Profile A and
-**Portable Modern** = Profile B; Profile A/B remain the technical vocabulary for
-the software configurations.)
+(The portable software families are **Portable Compatible** = Profile A,
+**Portable Modern** = Profile B, and **Portable Post-Quantum** = the RFC 9980
+software configuration; Profile A/B remain the technical vocabulary for the
+classical software configurations.)
 
 Secure Enclave custody is **implemented and production-exposed since issue #501
 Phase 7D** (PR #509): the production capability-resolver policy supports
@@ -160,6 +163,45 @@ Resolved by `PGPKeyCapabilityResolver` and routed by `PrivateKeyOperationRouter`
 Signing and key agreement are routed to **distinct** Secure Enclave handles by
 the operation's required role; a wrong-role or wrong-public-binding request fails
 closed.
+
+### 4.1 Device-Bound Post-Quantum (split custody)
+
+Device-Bound Post-Quantum applies the same custody model to RFC 9980 composite
+keys (ML-DSA-65+Ed25519 signing, ML-KEM-768+X25519 encryption), with the same
+operation surface as the P-256 families. Because CryptoKit's Secure Enclave
+offers ML-DSA/ML-KEM but no Ed25519/X25519, custody is **split**:
+
+- **Post-quantum components** are generated and held in the Secure Enclave as
+  CryptoKit `dataRepresentation` blobs (`kSecClassGenericPassword` rows in the
+  data-protection keychain, this-device-only; the blob is useless off-device).
+  Use is gated by the same fixed `privateKeyUsage` + `biometryAny` access
+  control baked into the key at creation.
+- **Classical components** (one 32-byte Ed25519 seed + one 32-byte X25519
+  scalar, generated inside Rust) are sealed as a single payload under a
+  dedicated fixed-access Secure Enclave envelope (the CAPKEV1 construction),
+  stored per fingerprint. The fixed policy — never the mode-dependent app
+  wrapping policy — keeps every device-bound key exempt from Standard/High
+  Security mode-switch re-wrap.
+
+Invariants (docs/POST_QUANTUM.md §3): every composite signature or decryption
+requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone
+can neither sign nor decrypt; the private key is never exportable (the same
+red lines as the P-256 families apply). The Rust engine owns all OpenPGP
+derivation — the RFC 9980 KEM combiner, AES-256 key unwrap, packet assembly,
+and composite self-verification before any signature is released — while Swift
+performs exactly the enclave primitive (an ML-DSA-65 digest signature or an
+ML-KEM-768 decapsulation) through the external provider seam, mirroring the
+external P-256 seam.
+
+Routing mirrors the P-256 flow: non-prompting handle lookup by the
+certificate's component public keys, then one authenticated biometric window
+covering the enclave-handle load and the classical-component unwrap. Deletion
+removes the enclave blobs (by composite binding inspection) and the classical
+envelope (via the shared fingerprint-keyed keychain-material path); Reset All
+Local Data cleans all composite rows. Real-hardware evidence:
+`DeviceSecureEnclaveCompositeCustodyTests` (generation, decrypt through the
+vendored RFC 9980 combiner, cleartext sign/verify, wrong-classical-component
+fail-closed) — one biometric approval per run.
 
 ## 5. Compatibility language
 

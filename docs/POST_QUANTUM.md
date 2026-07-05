@@ -1,9 +1,9 @@
 # Post-Quantum OpenPGP (RFC 9980) — Design
 
-> **Status:** Active roadmap — approved campaign design (issue #567). **This document does not describe current shipped behavior**; it defines the invariants and red lines for the post-quantum key families before they exist in the product. As phases ship, the durable facts move into the canonical docs (PRD §3, TDD §1, SECURITY, SECURE_ENCLAVE_CUSTODY) per DOCUMENTATION_GOVERNANCE.md §6, and this document shrinks toward design rationale.<br>
+> **Status:** Campaign design + rationale (issue #567). Phases 0–3 have **shipped**: both post-quantum families (Portable and Device-Bound) are implemented end-to-end and product-selectable, and the durable facts now live in the canonical docs (PRD §3, TDD §1, SECURE_ENCLAVE_CUSTODY §4.1, PERSISTED_STATE_INVENTORY). This document is retained for the design invariants, the split-custody seam rationale, and the remaining Phase 4 interop/release scope; it shrinks toward rationale as Phase 4 closes.<br>
 > **Purpose:** Family model, invariants, and red lines for adding RFC 9980 post-quantum key families to CypherAir.<br>
 > **Audience:** Maintainer, reviewers, and AI coding tools implementing campaign #567.<br>
-> **Companion:** Issue #567 (settled decisions + phase gates) · [PQC_SPIKE_2026-07](PQC_SPIKE_2026-07.md) (Phase 0 evidence) · [PRD](PRD.md) §10.2 · [TDD](TDD.md) §1 · [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md)<br>
+> **Companion:** Issue #567 (settled decisions + phase gates) · [PRD](PRD.md) §10.2 · [TDD](TDD.md) §1 · [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md)<br>
 > **Last reviewed:** 2026-07-02 (initial).<br>
 > **Update triggers:** Any change to the family model, custody split, seam ownership, format floor, or exchange rules decided in campaign #567 review.
 
@@ -46,7 +46,7 @@ Two structural rules from the Phase 0 seam analysis:
 
 **Seam invariant (settled 2026-07-02):** Swift custody providers perform *exactly* the enclave-resident primitive and nothing more — ML-KEM decapsulation returns the 32-byte key share; ML-DSA signing returns the 3,309-byte signature. All OpenPGP-standardized derivation — the RFC 9980 KEM combiner, AES key-wrap, packet assembly, format selection — stays in the Rust engine. The FFI is not a trust boundary (same process); this rule exists to keep wire-format cryptography single-sourced and vector-testable in Rust.
 
-Phase 0 established that Sequoia's combiner (`multi_key_combine`) is crate-private, so `pgp-mobile` vendors the construction (≈10 lines, byte-verified against 2.4.0 source; full extraction in the spike report): `SHA3-256( mlkemShare ‖ ecdhShare ‖ ecdhCiphertext ‖ ecdhRecipientPublic ‖ algId ‖ "OpenPGPCompositeKDFv1" ‖ 0x15 )` → 32-byte AES-256 KEK → public `ecdh::aes_key_unwrap`. Composite signing needs no vendored crypto (two independent signatures over the same digest, assembled into a public-field `mpi::Signature` variant).
+Phase 0 established that Sequoia's combiner (`multi_key_combine`) is crate-private, so `pgp-mobile` vendors the construction (≈10 lines, byte-verified against 2.4.0 source; the vendored copy lives in `pgp-mobile/src/composite_kem.rs`): `SHA3-256( mlkemShare ‖ ecdhShare ‖ ecdhCiphertext ‖ ecdhRecipientPublic ‖ algId ‖ "OpenPGPCompositeKDFv1" ‖ 0x15 )` → 32-byte AES-256 KEK → public `ecdh::aes_key_unwrap`. Composite signing needs no vendored crypto (two independent signatures over the same digest, assembled into a public-field `mpi::Signature` variant).
 
 Rules:
 
@@ -69,11 +69,11 @@ CLAUDE.md hard constraints apply unchanged; the PQ-specific readings: AEAD hard-
 
 ## 7. Phases and gates (tracking lives in issue #567)
 
-- **Phase 0 — done.** Feasibility spike; evidence in [PQC_SPIKE_2026-07](PQC_SPIKE_2026-07.md) (groundwork merged to main via PR #570). Highlights: full Rust suite green on 2.4.0; PQ round-trips through the unmodified engine; CryptoKit↔OpenSSL component byte-compat all-pass including Secure Enclave paths on the maintainer's Mac.
+- **Phase 0 — done.** Feasibility spike (groundwork merged to main via PR #570; spike report retired after the campaign shipped). Highlights: full Rust suite green on 2.4.0; PQ round-trips through the unmodified engine; CryptoKit↔OpenSSL component byte-compat all-pass including Secure Enclave paths on the maintainer's Mac.
 - **Phase 1 — this document** (+ PRD §10.2 pointer update). Gate: maintainer review of the invariants above plus the named open items (§8).
 - **Phase 2 — Portable Post-Quantum.** Sequoia-only: generation, family plumbing, format-floor tests, exchange-surface states, multi-family test matrix. Carries the `sequoia-openpgp = 2.4.0` dependency update (notices already regenerated in the spike). Updates TDD §1 and PRD §3 as canonical facts when it ships.
-- **Phase 3 — Device-Bound Post-Quantum.** Split custody per §3–§4; security-sensitive review (SECURITY.md §10 gates); positive + negative tests; device lane on Apple Silicon; **oldest-supported-iPhone SE probe before any exposure**; SECURE_ENCLAVE_CUSTODY.md language lands here.
-- **Phase 4 — exposure & release.** Generation-surface exposure DECIDED 2026-07-03 (maintainer): the Portable Post-Quantum family is selectable on main — the tag-first release flow already gates what ships, so main carries it un-hidden. Remaining Phase 4 scope: `sq` interop pack and any final localization polish. visionOS (settled 2026-07-02): inherit the existing exposed-without-evidence accepted-risk stance; the app-level visionOS build probe runs under the local Xcode 27 beta environment (release candidates remain on the 26.5 Xcode Cloud environment).
+- **Phase 3 — Device-Bound Post-Quantum — SHIPPED** (PR-3A engine #574, PR-3B surface #575, both stage-verified — verdict tables on #567). Split custody per §3–§4; vendored combiner proven byte-exact against stock Sequoia; real-Secure-Enclave device evidence passing; canonical language landed in SECURE_ENCLAVE_CUSTODY.md §4.1. Follow-up: oldest-supported-iPhone SE probe on maintainer hardware.
+- **Phase 4 — exposure & release — IN PROGRESS.** Both families are exposed on main (the tag-first release flow gates what ships); all six families shipped in the **1.5.0 (build 15000)** stable release. Remaining Phase 4 scope: the `sq` interop pack (cross-implementation RFC 9980 round-trip fixtures, including the vendored-combiner KAT) and any final localization polish. visionOS: inherit the existing exposed-without-evidence accepted-risk stance.
 
 Every phase requires explicit maintainer approval before its PR, per standing process.
 
