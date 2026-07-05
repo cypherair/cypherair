@@ -124,9 +124,13 @@ final class MacUISmokeTests: XCTestCase {
         generateKey()
 
         // Generation is pushed onto the Home tab's path, so the My Keys list
-        // root is reached by opening the Keys tab, not by popping back.
+        // root is reached by opening the Keys tab, not by popping back. The
+        // macOS List collapses each row into one accessibility Button whose
+        // label starts with the user ID, so match the row by label prefix.
         element("sidebar.keys").tap()
-        let keyRow = app.staticTexts["UITest Alice"].firstMatch
+        let keyRow = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "UITest Alice")
+        ).firstMatch
         XCTAssertTrue(keyRow.waitForExistence(timeout: 10))
         XCTAssertTrue(keyRow.isHittable)
         keyRow.rightClick()
@@ -150,6 +154,20 @@ final class MacUISmokeTests: XCTestCase {
 
         // The pushed route survives the tab round-trip.
         waitForScreenReady("keygen.ready")
+    }
+
+    func test_macShell_menuAbout_opensAboutInMainWindow() throws {
+        launchMain()
+
+        let appMenu = app.menuBarItems["CypherAir X"]
+        XCTAssertTrue(appMenu.waitForExistence(timeout: 10))
+        appMenu.tap()
+
+        let aboutItem = app.menuItems["About CypherAir X"].firstMatch
+        XCTAssertTrue(aboutItem.waitForExistence(timeout: 5))
+        aboutItem.tap()
+
+        waitForScreenReady("about.ready")
     }
 
     func test_tabNavigation_respondsToCommandNumberShortcuts() throws {
