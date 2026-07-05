@@ -37,7 +37,7 @@ Sources/
 ├── PgpMobile/        # Generated UniFFI Swift bindings; do not hand-edit
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate
-docs/                 # PRD, TDD, architecture, security, testing, conventions
+docs/                 # PRD, TDD, architecture, security, testing, workflow, release
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -135,16 +135,26 @@ especially Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope
 
-- Follow Swift API Design Guidelines; prefer `guard let` over force unwrap.
-- Use `async/await` over Combine and `@Observable` for state.
-- Use `NavigationStack` with typed paths; do not use `NavigationView`.
-- Use iOS 26 Liquid Glass conventions where applicable and native platform
-  SwiftUI chrome elsewhere.
-- Keep one type per file, group by feature, and put all user-visible strings in
-  String Catalog.
+- Swift API Design Guidelines; `guard let` over force unwrap (no `!` in
+  production); `async/await`, never Combine; value types by default.
+- Typed errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
+  normalized at the `Services/FFI/` adapter boundary before app/service code.
+- State/UI: `@Observable class` + `@State`/`@Bindable`/`@Environment` (not the
+  old `ObservableObject`/`@Published`/`@StateObject`); `NavigationStack` with a
+  typed path, never `NavigationView`; thin views, workflow logic in an owning
+  `@Observable` ScreenModel.
+- Concurrency: `@MainActor` on UI-bound models, `@concurrent` for CPU-heavy PGP
+  work off the main actor, `Sendable` across actor boundaries;
+  `@preconcurrency import PgpMobile` for generated bindings — never edit the
+  generated `pgp_mobile.swift`.
+- Liquid Glass: standard iOS/iPadOS components get glass automatically (do not
+  override backgrounds); macOS/visionOS use native chrome; `.glassEffect()`
+  only as the last modifier on custom floating controls, never on content.
+  Reuse the `Sources/App/DesignSystem/` primitives instead of per-view literals.
+- One type per file, group by feature, all user-visible strings in the String
+  Catalog.
 - Prefer architecturally correct fixes while keeping scope limited to the user
   request. Do not normalize, revert, or clean up unrelated local changes.
-- Full conventions: `docs/CONVENTIONS.md`.
 
 ## Releases, Git, And Workflow
 

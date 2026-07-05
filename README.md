@@ -231,7 +231,6 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
 | [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, and the documentation contract |
 | [RELEASE](docs/RELEASE.md) | Stable app releases, the Xcode Cloud flow, the asset contract, and XCFramework SDK channels |
-| [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
 | [SQLCIPHER_XCFRAMEWORK_DEPENDENCY](docs/SQLCIPHER_XCFRAMEWORK_DEPENDENCY.md) | Formal pinned external SQLCipher XCFramework dependency and refresh flow |
 
 ## License

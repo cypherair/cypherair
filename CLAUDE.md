@@ -29,7 +29,7 @@ Sources/
 ├── PgpMobile/        # Generated UniFFI Swift bindings (do not hand-edit)
 └── Resources/        # Assets, String Catalog
 pgp-mobile/           # Rust wrapper crate (Sequoia + UniFFI)
-docs/                 # PRD, TDD, architecture, security, testing, conventions
+docs/                 # PRD, TDD, architecture, security, testing, workflow, release
 CypherAir-Info.plist  # Root-level app Info.plist source
 ```
 
@@ -105,13 +105,15 @@ The authoritative per-file rationale, function-level review list, and coding inv
 
 Profiles are selected at key generation and immutable per key; multiple keys of different profiles are allowed, and message format is auto-selected by recipient key version (docs/TDD.md Section 1.4). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all SE-protected keys. Details: docs/PRD.md Section 3 and docs/SECURITY.md Sections 1 and 4.
 
-## Code Style (Summary)
+## Code Style
 
-- Swift API Design Guidelines. `guard let` over force-unwrap. `async/await` over Combine.
-- `@Observable` for state. `NavigationStack` with typed paths. No `NavigationView`.
-- Use iOS 26 Liquid Glass conventions where applicable, and prefer platform-native SwiftUI chrome on macOS and visionOS. Custom controls use `.glassEffect()` only when the API is available and matches platform conventions.
-- One type per file. Group by feature. All user strings in String Catalog.
-- Full conventions: docs/CONVENTIONS.md
+Swift API Design Guidelines; `guard let` over force-unwrap (no `!` in production); `async/await`, never Combine or completion handlers; value types by default, restrictive access. Typed errors: the app vocabulary is `CypherAirError`, and generated `PgpError` is normalized at the `Services/FFI/` adapter boundary before reaching Models/ScreenModels/Views. One type per file; group by feature; `Security/Mocks/` holds mocks with visible `Mock*` names. All user-facing strings live in the String Catalog (`String(localized:)`); when a key goes `stale`, remove it if unreferenced — never just unmark it.
+
+**State & UI (Swift 6.3.2 / Xcode 26.5).** Use `@Observable class` + `@State` (owning) / `@Bindable` / `@Environment` — not `ObservableObject`/`@Published`/`@StateObject`/`@ObservedObject`. `NavigationStack` with a typed path; never `NavigationView`. Views are thin (no crypto, Keychain, or business logic in `body`); workflow-heavy screens move async orchestration, importer/exporter, cleanup, and transient state into an owning `@Observable` ScreenModel (baseline: `SignView` + `SignScreenModel`), which does not read `@Environment` directly.
+
+**Concurrency.** `SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated`: annotate UI-bound models `@MainActor`; run CPU-heavy PGP work (`@concurrent`) off the main actor and return to a main-actor model for display; types crossing actor boundaries are `Sendable`. For UniFFI-generated bindings that trip strict concurrency, `@preconcurrency import PgpMobile` at call sites — never edit generated `pgp_mobile.swift`.
+
+**Liquid Glass & Design System.** iOS/iPadOS standard components (TabView, NavigationStack, toolbars, sheets) get Liquid Glass automatically — do not override their backgrounds; macOS/visionOS prefer native SwiftUI chrome. `.glassEffect()` only as the last modifier on custom floating controls where the API is available and matches conventions — never on content views (lists, key details, message display). Quiet system-native identity: system accent only, no brand tint (`.tint()` only for semantic primary/destructive meaning). Reuse the `Sources/App/DesignSystem/` primitives (`CypherSpacing`, `CypherRadius`, `View.cypherSurface(_:)`, `CypherToolScreenLayout`) instead of per-view literals; prefer removing one-off styling over adding new tiers.
 
 ## Testing
 
@@ -129,7 +131,7 @@ Profiles are selected at key generation and immutable per key; multiple keys of 
 ## Git & Workflow
 
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
-- Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/CONVENTIONS.md "Engineering Principle".
+- Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/WORKFLOW.md "The development loop".
 - Prefer small, reviewable diffs. Maintain existing user-visible behavior unless the task explicitly changes it.
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.

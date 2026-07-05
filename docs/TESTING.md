@@ -118,8 +118,8 @@ The workspace currently includes five Xcode Test Plans:
 Architecture constraints are maintained through implementation practice, human
 review, behavior tests, and the architecture/security documents rather than
 source-text XCTest assertions. Review architecture-sensitive changes against
-`ARCHITECTURE.md`, `SECURITY.md`, `CONVENTIONS.md`, and the relevant roadmap or
-audit document, then add focused behavior coverage for the changed contract.
+`ARCHITECTURE.md`, `SECURITY.md`, and the relevant roadmap document, then add
+focused behavior coverage for the changed contract.
 
 FFI error-mapping tests should distinguish operation-specific policy from
 general generated-error normalization. Recipient matching maps only generated
@@ -492,73 +492,6 @@ stable public-only contract end to end:
 - Swift maps that stable token to the explicit contact-import public-certificate error
 
 Sections 2.5-2.8 below are the canonical family-level Rust / FFI validation minima after archival of the former Rust/FFI rollout documents.
-
-## 2.5 Revocation Construction Coverage
-
-When changing revocation-construction behavior, validation must cover:
-
-- key-level generation for both profiles
-- subkey and User ID revocation construction on the Rust / FFI surface
-- if Swift FFI tests reuse armored secret-key fixtures, dearmor them first so the tests exercise the documented `binary-only` revocation-construction contract
-- case-insensitive subkey fingerprint acceptance plus selector-miss rejection for subkey fingerprint and `userIdData + occurrenceIndex` selector inputs
-- duplicate same-bytes User ID discovery preserving per-occurrence `primary` / `revoked` state
-- public-only / unusable-secret rejection returning `InvalidKeyData`
-- imported-key availability parity: import immediately stores a key-level revocation signature
-- missing revocation artifacts fail closed without private-key unwrap or metadata rewrite
-- export of existing revocation without Secure Enclave unwrap
-- ASCII-armored revocation export matching the stored binary signature after `dearmor`
-- Secure Enclave custody revocation export using only the stored revocation artifact
-- selective revocation remaining export-on-demand: subkey and User ID revocation export must not mutate `PGPKeyIdentity.revocationCert` or assume a new persisted selective-revocation store
-
-## 2.6 Password / SKESK Coverage
-
-When changing password-message behavior, validation must cover:
-
-- armored and binary round-trip coverage for `seipdv1` and `seipdv2`
-- signed and unsigned password-message round-trips
-- `noSkesk` classification for recipient-only messages
-- deterministic `passwordRejected` coverage only for `SKESK6` / `SEIPDv2`; do not freeze `SKESK4` wrong-password behavior into a cross-layer contract
-- mixed `PKESK + SKESK` decrypt through the password path
-- packet assertions for `AES-256`, `AEADAlgorithm::OCB` on `seipdv2`, and the pinned `S2K::default()` baseline
-- targeted auth/integrity tamper coverage that flips bytes in the encrypted payload/tag area
-- generic bit-flip coverage may still return `CorruptData` / `NoMatchingKey`; keep those expectations separate from the targeted auth/integrity tests
-
-## 2.7 Certification / Binding Verification Coverage
-
-When changing certificate-signature verification or User ID certification behavior, validation must cover:
-
-- direct-key verification with `Valid`, `Invalid`, and `SignerMissing` outcomes
-- User ID binding verification with `Valid`, `Invalid`, and `SignerMissing` outcomes
-- issuer-guided success plus a missing-issuer fallback success path
-- parse/type/precondition failure returning `Err(...)` instead of a family-local invalid result
-- third-party certification generation followed by successful crypto verification
-- contact-scoped screen-model coverage for selector loading, retry/cancel behavior, export orchestration, and result presentation
-- app-level coverage that the contact-scoped workflow accepts both `.asc` and `.sig` signature files and that generated armored certification output can be verified through the same workflow
-- all four OpenPGP certification kinds: `Generic`, `Persona`, `Casual`, and `Positive`
-- selector-based User ID operations using `userIdData + occurrenceIndex`, including out-of-range and bytes-mismatch rejection
-- verify-result `certificationKind` matching the signature type for User ID certification signatures
-- signer fingerprint contract coverage:
-- `Valid` + primary signer path returns the signer certificate primary fingerprint and no subkey fingerprint
-- `Valid` + certification-subkey signer path returns the signer certificate primary fingerprint plus the selected subkey fingerprint
-- `Invalid` clears both fingerprint fields
-- `SignerMissing` clears both fingerprint fields
-- public-only certification input rejection and secret-cert-with-no-usable-certifier rejection
-- generated certification output being treated as exported artifact bytes, not as an implicit contact mutation or trust-state update
-
-## 2.8 Richer Signature Result Coverage
-
-When changing the richer-signature-result family, validation must cover:
-
-- detailed `verify_*_detailed`, `decrypt_detailed`, and detailed file APIs as
-  the primary verification/decrypt surface
-- collector preservation of every observed signature result in global parser order, including repeated signers
-- mixed `valid + unknown`, `expired + bad`, and `expired + unknown` fold behavior
-- `UnknownSigner` detailed entries carrying no fingerprint
-- unsigned coverage on detailed APIs that support unsigned input (`decrypt_detailed` / `decrypt_file_detailed`)
-- detached verify setup-failure and payload-failure paths, including `signatures = []` when no per-signature result was observed
-- `verify_detached_file_detailed` cancellation returning `OperationCancelled`
-- fixed multi-signer Swift FFI fixtures for UniFFI array/record mapping and exact fixture payload expectations
-- password-message regression coverage because password decrypt reuses the fixed-session-key decrypt path
 
 ## 3. Profile Test Matrix
 
