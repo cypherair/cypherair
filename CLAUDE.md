@@ -103,10 +103,10 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 ## Testing
 
-- Every functional PR must include tests. Security changes require both positive and negative tests. Crypto tests run for **both profiles**.
+- Every functional PR must include tests. Security changes require both positive and negative tests. Crypto tests cover **every profile/family the change touches** (docs/TESTING.md Section 3).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
-- Docs-only PRs may use the documentation consistency path in docs/TESTING.md Section 2 instead of Rust/Xcode runs.
+- Docs-only PRs may use the documentation path in docs/WORKFLOW.md Section 2 instead of Rust/Xcode runs.
 - Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review gates: docs/WORKFLOW.md.
 
 ## Releases & Versioning

@@ -1,152 +1,88 @@
 # Testing Guide
 
 > Status: Canonical current-state.
-> Purpose: Test strategy, how to run and write tests, and expectations for AI-assisted development.
+> Purpose: Test layers, test plans, CI lanes, and the build/validation workflows that connect Rust artifacts to Swift testing.
 > Audience: Human developers and AI coding tools.
-> Source of truth: validation commands, Rust artifact refresh, and UniFFI/bindings sync for the current workspace.
-> Last reviewed: 2026-06-13.
+> Update triggers: Test plans, CI lanes, validation commands, or the Rust↔Xcode artifact contract change.
+> Last reviewed: 2026-07-05.
 
 ## 1. Test Layers
 
-CypherAir has four test layers, each with different runtime requirements.
+Four layers, distinguished by what they can run on.
 
-### Layer 1: Rust Unit Tests
+### Layer 1: Rust unit and integration tests
 
-**Run on:** macOS (host), CI.
-**What they cover:** Sequoia PGP operations in isolation — key generation (both profiles), recipient-key encrypt/decrypt, password/SKESK encrypt/decrypt, sign/verify, armor encode/decode, error mapping, and S2K (Iterated+Salted and Argon2id) export/import. They also cover the Secure Enclave custody Rust boundary: the external P-256 signer and ECDH/session-key proofs plus the runtime signer and key-agreement API matrices. These exercise public-only v4/v6 certificate and revocation construction; cleartext, sign-plus-encrypt, detached, expiry-mutation, selective-revocation, and certification signing; recipient-key message and streaming file decrypt; and a negative matrix that fails closed on secret-certificate input, wrong fingerprint/role/digest/public-binding/shared-secret, malformed or zero callback responses, callback cancellation/category propagation, tampered SEIPDv1/MDC and SEIPDv2/AEAD payloads, and any secret-certificate fallback.
-**No device needed.** These test the `pgp-mobile` crate without any iOS dependency.
+No Apple dependency — they exercise the `pgp-mobile` engine directly: per-family key lifecycle and message suites (`profile_a_*`, `profile_b_*`, `portable_pq_*`, `composite_custody_*`), cross-profile format selection, password/SKESK, streaming, revocation/certification, QR URL validation, the external signer/decryptor seams, and the security policy suites. The files under `pgp-mobile/tests/` are the source of truth for current coverage.
 
 ```bash
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ```
 
-The local default command above skips tests marked `#[ignore = "slow"]`, including
-`profile_b_slow_tests` and `large_payload_tests`.
-
-The blocking automation lanes and the XCFramework edge-release workflow run the default suite plus the slow Rust targets explicitly:
+The default run skips tests marked `#[ignore = "slow"]`. CI's blocking lanes add them explicitly:
 
 ```bash
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 ```
 
-Fixture-dependent ignored tests in `gnupg_fixture_regression_tests.rs` remain manual and
-are not part of the standard GitHub workflows.
+`gnupg_fixture_regression_tests.rs` is fixture-dependent and manual-only.
 
-### Rust Dependency Audit
-
-Run the RustSec audit whenever `pgp-mobile/Cargo.lock` changes and before
-formal release validation:
+**Dependency audit.** Run whenever `pgp-mobile/Cargo.lock` changes and before release validation:
 
 ```bash
 cargo +stable install cargo-audit --version 0.22.2 --locked
 cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
 ```
 
-The GitHub PR, nightly, and edge XCFramework workflows pin `cargo-audit` to
-`0.22.2` in an independent `rust-dependency-audit` job, and the Xcode Cloud
-`PgpMobile XCFramework` workflow runs the same `cargo audit --deny warnings`
-gate in `ci_post_clone`. A failed audit makes the workflow/check fail. PR and
-nightly asset generation can still run for diagnostic signal, but release
-publication is gated: edge/drill publishing depends on `rust-dependency-audit`,
-and the Xcode Cloud stable build stops before the XCFramework build if the WF1
-audit fails.
+The PR, nightly, and edge workflows pin the same `cargo-audit` version in an independent `rust-dependency-audit` job, and the Xcode Cloud XCFramework workflow runs the audit in `ci_post_clone`. Edge/drill publication and the stable build are gated on a passing audit.
 
-### Layer 2: Swift Unit Tests
+### Layer 2: Swift unit tests
 
-**Run on:** macOS local validation, iOS Simulator (Apple Silicon), CI.
-**What they cover:** Services layer logic, model validation, key operation failure-category vocabulary, error message mapping, QR URL parsing/generation, UserDefaults handling, memory zeroing utility, profile selection logic, dedicated password-message service behavior, ordinary-settings coordinator gating plus protected-settings schema v2 coverage, temporary/export/tutorial artifact cleanup, and ProtectedData framework coverage such as registry bootstrap/classification, wrapped-DMK contract checks, session relock behavior, startup seam validation, bootstrap outcome shaping, protected-data access-gate decisions, storage-root containment, explicit file-protection verification, fail-closed unsupported-volume handling, local-data reset, post-unlock key-metadata domain schema v2 creation/recovery, key custody capability resolver matrix and failure-category resolution coverage, Secure Enclave custody routing through mocks and software P-256 keys — resolver gating, router routing/blocking/failure-mapping and signing/key-agreement handle lookup, custody generation and public-binding/recovery classification, the signer-route and key-agreement message/file decrypt consumers, software custody unchanged, blocking-policy fail-closed coverage, no software fallback, sanitized failure mapping, adapter-boundary behavior, protected-settings handoff-only auto-open behavior, private-key-control recovery behavior, and the root-secret SE device-binding envelope through protocol-based mocks. Uses protocol-based mocks for Keychain and SE. v3 `CAPDSEV3` coverage belongs here first: seal/open round trip, field-length validation, HKDF sharedInfo mismatch, AAD mismatch, AAD-version rejection, ephemeral public-key binding, folded device-binding-key and ciphertext/tag/nonce/salt/public-key tampering, undecodable-payload fail-closed behavior, and single self-contained row reconstruction from folded CAPDSEV3 device-binding key material. The `CADMKV2` wrapped-DMK and `CPDENV2` protected-domain envelope codecs carry the same magic/algorithm/AAD-version and strict-field coverage.
+Run on macOS — the unit lane's only working host: the iOS Simulator compiles but the unit-test host app currently fatal-errors at launch under the ProtectedData fail-closed volume probe, so iOS-only behavior is verified through the macOS lane plus real devices. The lane covers the Services layer, Models, and the Security layer through protocol-based mocks — including the ProtectedData framework, the envelope codecs (`CAPKEV1`/`CAPDSEV3`/`CADMKV2`/`CPDENV2`), Secure Enclave custody routing driven by mocks and software P-256 keys, and Contacts SQLCipher persistence. The test files are the source of truth for what is asserted; this document does not maintain prose copies of their coverage.
 
-The Secure Enclave custody decrypt consumers (`PrivateKeyMessageDecryptionService`, `PrivateKeyStreamingFileDecryptionService`) prove software/Secure Enclave dispatch, v4/v6 round-trip, signed-message folding, mixed-recipient and repeated decrypt, and recipient-mismatch/tamper fail-closed-without-partial-plaintext through mocks and software P-256 keys; the existing `DecryptionServiceTests` software round-trip, tamper, and Phase 1/Phase 2 boundary coverage stays green through the router delegation.
+One mapping rule that is easy to get wrong: recipient matching maps only the generated `NoMatchingKey` error to `CypherAirError.noMatchingKey`. File I/O, cancellation, corrupt data, unsupported algorithms, and other infrastructure failures keep their ordinary app-owned error categories.
 
 ```bash
-# Practical local path used in this repository
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
-
-# Simulator path (also valid when the host/runtime supports it)
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-### Layer 3: FFI Integration Tests
+Localization catalog health is reported outside XCTest. When touching `Sources/Resources/*.xcstrings`, run `python3 scripts/report_localization_catalog.py --github-annotations` or read the PR/nightly Step Summary. It reads `Localizable.xcstrings` and `InfoPlist.xcstrings` and flags stale entries, missing `en`/`zh-Hans` localizations, untranslated units, and incomplete plural categories.
 
-**Run on:** macOS local validation, iOS Simulator when the host/runtime supports it, and physical device when included in the selected test plan.
-**What they cover:** Round-trips across the Rust-Swift boundary (both profiles) — generate key in Rust, pass to Swift, pass back, verify identical. Unicode strings (Chinese, emoji) survive round-trip. Each `PgpError` variant maps to the correct Swift enum case. `KeyProfile`, password-message format/status enums, and password decrypt result records cross the FFI boundary.
+### Layer 3: FFI integration tests
 
-These tests exist in the Swift test target but call through the UniFFI bindings into Rust.
+Swift tests that call through the generated UniFFI bindings into real Rust: round-trips across the boundary for the software families, Unicode survival (Chinese, emoji), and 1:1 `PgpError` → Swift error mapping. Memory-leak spot checks (100 encrypt/decrypt cycles under Instruments' Allocations) are manual — Instruments cannot run in CI.
 
-**Memory leak detection:** Run 100 encrypt/decrypt cycles and monitor with Xcode Instruments (Allocations instrument). This is a **manual** test step — Instruments cannot be automated in CI. Document results in the test report.
+### Layer 4: Device-only tests
 
-### Layer 4: Device-Only Tests
+Require real Secure Enclave hardware. An Apple Silicon Mac runs the entire lane locally (`-destination 'platform=macOS,arch=arm64e'` — the Mac host has a Secure Enclave); SE-capable iPhones/iPads work too; the iOS Simulator cannot. Biometric steps use Touch ID or the system authentication prompt, and biometric-gated tests guard-and-skip when nothing is enrolled.
 
-**Run on:** Real Secure Enclave hardware — **Apple Silicon Macs** (run the whole lane locally with `-destination 'platform=macOS,arch=arm64e'`) or SE-capable iPhones/iPads. **Cannot run in the iOS Simulator** (no Secure Enclave). "Device" here means real SE hardware, not specifically an iPhone; on a Mac, biometric/`LAContext` steps use Touch ID or the system authentication prompt, and biometric-gated tests guard-and-skip when no biometric is enrolled.
-**What they cover:** Secure Enclave operations (both profiles), biometric authentication, auth mode switching, crash recovery, MIE hardware memory tagging, and protected-data root-secret Keychain/Data Protection behavior through authenticated `LAContext` handoff on real hardware. The ProtectedData SE device-binding layer keeps hardware-specific coverage here: real SE key creation and restart-and-reopen of the single self-contained `CAPDSEV3` root-secret envelope, whose folded device-binding key is reconstructed from the envelope itself, plus proof that the SE unwrap layer does not add a second biometric prompt. Envelope format coverage should remain in the macOS unit lane through mocks.
-
-For Secure Enclave custody, most coverage stays in the macOS unit lane (mocks plus software P-256 keys); the device lane carries only the real-hardware evidence that cannot be mocked: handle creation/load/delete, biometric signing and ECDH private operations, custody generation with a real signing handle, and end-to-end key-agreement decrypt. `DeviceSecureEnclaveCustodyDecryptTests` creates and deletes a single test-owned handle pair, decrypts v4/v6 messages and a mixed-recipient file through a real `.keyAgreement` P-256 handle, and confirms a tampered payload hard-fails with no output under one authenticated `LAContext`. The destructive Reset All Local Data cleanup proof is isolated in `CypherAir-DangerousDeviceTests` because it deletes every app-owned Secure Enclave custody handle for the current app bundle, not only handles created by the test. Secure Enclave custody device tests require Secure Enclave plus enrolled biometrics — available on Apple Silicon / T2 Macs and SE-capable iPhones/iPads — and skip elsewhere; only the `DeviceMIETests` subset additionally requires A19/A19 Pro Hardware Memory Tagging.
+The lane carries only what mocks cannot prove: SE wrap/unwrap, custody handle lifecycle, biometric signing and ECDH private operations, custody generation with real handles, end-to-end key-agreement and split-custody composite decrypt, auth-mode switching and crash recovery, the ProtectedData root-secret envelope on real hardware, and MIE. Only the `DeviceMIETests` subset additionally requires A19/A19 Pro-class Hardware Memory Tagging.
 
 ```bash
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
-    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
+    -destination 'platform=macOS,arch=arm64e'    # or a physical iPhone/iPad
 ```
 
-Dangerous custody reset-cleanup evidence is manual-only and must run only on a disposable install or device state:
+Guard every SE-dependent test:
 
-```bash
-xcodebuild test -scheme CypherAir -testPlan CypherAir-DangerousDeviceTests \
-    -destination 'platform=<PLATFORM>,name=<DEVICE_NAME>'
-```
-
-Guard all SE-dependent tests:
 ```swift
 try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available on this device")
 ```
 
-Guard MIE tests for supported hardware:
-```swift
-// MIE tests only meaningful on hardware that supports Hardware Memory Tagging.
-// Run on supported A19/A19 Pro-or-newer devices with Xcode diagnostics enabled.
-```
-
 ## 2. Test Plans
 
-The workspace currently includes five Xcode Test Plans:
+Five Xcode test plans. All test invocations — CLAUDE.md, CI configuration, local runs — use explicit `-testPlan` for consistent scope.
 
-**CypherAir-UnitTests.xctestplan** — Layers 2–3 (Swift unit tests + FFI integration tests). Runs in macOS local validation, simulator, and CI. macOS local validation does not execute iOS-only device classes, and any hardware-dependent test that is visible on another destination must guard and skip at runtime. Layer 1 (Rust unit tests) runs independently via `cargo +stable test` as a separate CI step. This is the default test plan bound to the `CypherAir` scheme.
+- **CypherAir-UnitTests** — Layers 2–3; the default plan on the `CypherAir` scheme. Its `skippedTests` array is a skip-list of `Device*` classes: **every new `Device*` test class must be added there, or it will run — and prompt for biometrics — in the unit lane.**
+- **CypherAir-DeviceTests** — Layer 4, selected tests only. Non-destructive.
+- **CypherAir-DangerousDeviceTests** — manual, destructive: its Reset All Local Data cleanup proof deletes every app-owned Secure Enclave custody handle for the current bundle, not just test-created ones. Run only against a disposable install or device state.
+- **CypherAir-InteropEvidenceTests** — manual macOS-only real-SE↔GnuPG evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`); needs real Secure Enclave hardware, biometric approval, and a local `gpg`. Captured evidence: [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
+- **CypherAir-MacUITests** — targeted macOS UI smoke coverage: routes, settings, and tutorial launch/lifecycle flows.
 
-Architecture constraints are maintained through implementation practice, human
-review, behavior tests, and the architecture/security documents rather than
-source-text XCTest assertions. Review architecture-sensitive changes against
-`ARCHITECTURE.md`, `SECURITY.md`, and the relevant roadmap document, then add
-focused behavior coverage for the changed contract.
+There is no dedicated visionOS test plan; native visionOS validation is the build probe in §2.4.
 
-FFI error-mapping tests should distinguish operation-specific policy from
-general generated-error normalization. Recipient matching maps only generated
-`NoMatchingKey` to `CypherAirError.noMatchingKey`; file I/O, cancellation,
-corrupt data, unsupported algorithms, and other infrastructure errors must
-remain their ordinary app-owned error categories.
-
-Localization catalog health is reported outside XCTest. Run the non-blocking
-catalog report locally when touching `Sources/Resources/*.xcstrings`, or read
-the PR/nightly Step Summary:
-
-```bash
-python3 scripts/report_localization_catalog.py --github-annotations
-```
-
-The report reads only `Localizable.xcstrings` and `InfoPlist.xcstrings`. It
-flags stale entries, missing `en` / `zh-Hans` localizations, untranslated
-string units, and incomplete plural categories. It does not scan Swift source
-for key usage, and the default mode does not fail for localization warnings.
-
-`TutorialSessionStoreTests` are the canonical unit-level coverage for the guided tutorial contract. They verify sandbox storage and mocks, the seven-module artifact flow, completion-version persistence, onboarding-to-tutorial handoff, replay unlock rules, unsafe-route blocklisting, output interception, production-page configuration seams, and guidance resolver behavior.
-
-**CypherAir-DeviceTests.xctestplan** — Layer 4 only. Runs on real Secure Enclave hardware — an Apple Silicon Mac (`-destination 'platform=macOS,arch=arm64e'`, which runs the full lane locally) or a physical iPhone/iPad — but not the iOS Simulator. Includes SE wrapping/unwrapping, non-destructive Secure Enclave custody handle-store and generation evidence, biometric auth modes, mode switching, crash recovery, MIE validation, and protected-data root-secret handoff validation.
-
-**CypherAir-DangerousDeviceTests.xctestplan** — Manual physical-device lane for destructive device evidence. Currently selects only the Secure Enclave custody Reset All Local Data cleanup proof, which enumerates and deletes all app-owned custody `kSecClassKey` rows for the current bundle. Do not run this plan against a device/install that may contain custody handles worth preserving.
-
-**CypherAir-InteropEvidenceTests.xctestplan** — Manual macOS-only lane for the real-Secure-Enclave↔GnuPG bidirectional interop evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`). Requires real Secure Enclave hardware, biometric approval, and a local `gpg` binary; it is out of default CI (GnuPG cannot run on iOS/iPadOS). See [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.3.
+Tutorial-focused changes: `TutorialSessionStoreTests` is the canonical unit coverage (run it directly with `-only-testing:CypherAirTests/TutorialSessionStoreTests` on the unit plan). Tutorial/UI-test mock-boundary or launch-gating changes additionally need the full Mac UI plan plus Release and `AppStore Candidate Release` macOS build probes, to prove `UITEST_*` app-container paths stay Debug-only.
 
 ProtectedData device-test isolation rules:
 
@@ -155,231 +91,55 @@ ProtectedData device-test isolation rules:
 - clean up by identifier before and after each device test
 - do not call `removeAllRightsWithCompletion()`
 
-Current ProtectedData unit-test expectations for the implemented AppData and Contacts protected-domain security surface:
+Docs-only changes skip Rust/Xcode runs entirely — the documentation path in [WORKFLOW.md](WORKFLOW.md) §2 (text hygiene, link validity) is sufficient.
 
-- verify that pre-auth bootstrap never touches the root-secret store
-- verify that pre-auth bootstrap does not load key metadata or enumerate private-key Keychain rows
-- verify that bootstrap can return framework recovery without a trusted registry object
-- verify that `.continuePendingMutation` is preserved as an explicit bootstrap outcome
-- verify that the access gate distinguishes authorization-required, already-authorized, pending-mutation-recovery, framework-recovery, and no-protected-domain states
-- verify that generic pending-mutation recovery dispatches by domain handler and refuses target mismatches as framework recovery
-- verify that abandoning a first-domain create cleans a provisioned shared resource based on post-removal membership and fails closed if cleanup fails
-- verify that post-unlock orchestration opens only committed registered domains with an authenticated `LAContext`, skips pending mutation recovery, and never authorizes without a context
-- verify that `private-key-control` creates its first domain with standard defaults and an empty recovery journal, keeps private-key material out of ProtectedData, participates in relock, and runs private-key recovery checks only after the domain opens
-- verify that key metadata loading starts as locked/loading before app unlock, completes from `key-metadata` after post-unlock orchestration, and does not regress to pre-auth metadata reads or visible empty-key-list flashes
-- verify that protected-settings refresh auto-opens with a valid handoff context and stays locked without starting interactive authorization when the handoff is absent or disappears
-- verify that ordinary settings stay locked before app authentication, load/save only from `protected-settings` schema v2 after an unlocked post-auth protected-settings handoff, enter recovery without resetting to defaults when the protected payload is corrupt, persist updates through the coordinator, clear snapshots on relock, and fail closed for resume grace while unavailable
-- verify that onboarding, guided tutorial entry/completion, Settings controls, and encrypt-to-self behavior consume `ProtectedOrdinarySettingsCoordinator` state rather than `AppConfiguration` or `ProtectedSettingsHost`
-- verify that Contacts creates an empty protected `contacts` domain after authorized unlock, treats corrupt or missing protected Contacts state or wrapped-DMK Keychain rows as recovery, persists protected mutations across reopen, fails closed on unsupported Contacts schema versions by routing the domain to recovery, and clears Contacts runtime state on relock or framework reset
-- verify that ProtectedData domain-key custody writes staged and committed Keychain rows with the default account and no access control, validates staged rows before promotion, deletes stale staged rows, updates duplicate committed rows, ignores legacy file-backed wrapped-DMK artifacts, and fails closed for missing or corrupt committed rows
-- verify that Reset All Local Data deletes default-account CypherAir Keychain items, including staged and committed ProtectedData domain-key rows, plus app-owned Secure Enclave custody `kSecClassKey` rows; treats missing items as success; clears in-memory state; validates no remaining custody handles; and exposes only sanitized cleanup categories/counts on failure
+## 2.1 GitHub Actions Lanes
 
-Current ProtectedData file-protection expectations:
+PR Checks and the nightly run are the blocking release-readiness signal. Jobs:
 
-- verify that default and UI-test ProtectedData roots remain inside `Application Support`
-- verify that registry, bootstrap metadata, scratch writes, and domain payload generations read back with explicit `NSFileProtectionComplete`
-- verify that protected-file promotion preserves explicit file protection on the committed path
-- verify that macOS ProtectedData bootstrap fails closed when the storage root is outside `Application Support` or when the volume-capability probe reports that file protection is unavailable
-- verify that fresh-install/reset validation uses the nearest existing parent for volume capability probing when `ProtectedData` does not yet exist, without creating the root during validation
-- keep lock-state readability semantics as manual/device validation; do not treat repository automation as proof of locked-device behavior
+- `rust-dependency-audit` — `cargo audit --deny warnings` against `pgp-mobile/Cargo.lock`, as an independent failure signal.
+- `rust-full-tests` — the default Rust suite plus the slow targets.
+- `rust-gnupg-interop` — installs gpg, asserts the `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs `secure_enclave_gnupg_interop_tests` plus `gnupg_binary_tests` under `CYPHERAIR_REQUIRE_GPG=1`, so a missing gpg fails the lane instead of skipping. Runs parallel to `rust-full-tests`; needs no XCFramework.
+- `xcframework-package` — checks OpenSSL carry-chain freshness, downloads the pinned arm64e stage1 toolchain in a token-free pre-build step, runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days.
+- `apple-platform-probes` — restores the XCFramework artifact and the pinned SQLCipher dependency (attestation-verified), then runs unsigned `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted Xcode 26.5 install is healthy. Hosted runners intentionally carry no CypherAir signing material; signed app builds stay local and on Xcode Cloud.
+- `swift-unit-tests-hosted-preview` — hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` after a readiness preflight; hosted-environment mismatches warn-skip (§2.2), while real build/link/test failures fail the job.
 
-Current non-Contacts ProtectedData validation expectations:
+`XCFramework Edge Release` (main pushes and manual dispatch) audits, rebuilds, probes, then publishes a unique `pgpmobile-edge-*` prerelease; non-main manual runs must use `pgpmobile-drill-*` prefixes. The stable release path runs on Xcode Cloud and is owned by [RELEASE.md](RELEASE.md); `.github/workflows/stable-release-attest.yml` re-verifies the signed tag, checksums, and SQLCipher record on `release.published` and attests the SDK/compliance assets.
 
-- Self-test coverage proves export-only report state.
-- Temporary/export/tutorial coverage proves per-operation streaming/decrypted owner directories, owner cleanup, startup cleanup, Reset All Local Data cleanup, verified complete file protection, export handoff ownership, and fixed tutorial defaults cleanup.
+arm64e toolchain consumption: CI force-downloads the pinned `cypherair/rust` stage1 prerelease (tag, slice policy, and toolchain contract owned by [ARM64E_STATUS.md](ARM64E_STATUS.md)) via direct release-asset URLs with token variables scrubbed; `latest` is never allowed. Two TESTING-specific rules on top:
 
-Current Contacts validation expectations:
-
-- Contacts validation should prove person-centered merge/preferred/additional/historical key behavior, per-key verification/certification preservation, certification projection and artifact persistence/revalidation, search ranking, tag normalization, unsupported-schema fail-closed behavior, locked/opening/recovery/framework-unavailable route states, relock cleanup, and Encrypt tag batch selection over the protected `contacts` domain without reactivating legacy Contacts files or weakening the implemented protected-domain security lifecycle.
-- Phase 3 Contacts contract validation should also cover `ContactService.importContact(...)` added/duplicate/updated/candidate outcomes, the absence of legacy key-replacement runtime outcomes, `ContactsVerificationContext` with historical signer keys, import/tutorial/URL workflows receiving summaries rather than flat `Contact`, and signature/decryption/password-message/certificate-signature signer resolution through `ContactKeyRecord`.
-- Contacts package exchange is not active; any future complete Contacts backup must be covered by a separate mandatory encrypted design and test plan.
-
-Docs-only documentation authority or archive PRs do not require Rust or Xcode test runs unless they touch code, generated files, project files, entitlements, release metadata, or build settings. They should still run documentation consistency checks, link checks for active platform references, and `git diff --check`.
-
-**CypherAir-MacUITests.xctestplan** — Runs the `CypherAirMacUITests` target for targeted macOS UI automation and smoke validation. In the current repo, this lane is complemented by service-level routing and screen-model coverage such as `MacPresentationRoutingTests`, `SelectiveRevocationScreenModelTests`, and `ContactCertificateSignaturesScreenModelTests`. The macOS smoke suite also covers tutorial launch paths for generating Alice's sandbox key, opening key-detail follow-up surfaces, opening sandbox QR / backup surfaces, confirming that tutorial-disabled certificate and selective-revocation routes remain visible but unavailable, and tutorial lifecycle coverage for first-run start/skip, leave confirmation, completion finish, Settings replay, and auth-mode helper-modal automation markers. Changes to the tutorial/UI-test mock wiring or launch gating require this full Mac UI test plan.
-
-There is currently no dedicated visionOS XCTest plan. Native visionOS validation uses a generic build probe together with the existing Rust, macOS-local, and iOS-device validation paths.
-
-**All test commands in CLAUDE.md and CI configuration must use `-testPlan` to ensure consistent scope.**
-
-## 2.1 Current GitHub Actions Lanes
-
-The repository currently treats PR Checks as blocking release-readiness signal
-in GitHub Actions.
-
-These jobs must pass on pull requests and nightly validation:
-
-- `rust-dependency-audit` audits `pgp-mobile/Cargo.lock` with `cargo-audit --deny warnings` as an independent failure signal
-- `rust-full-tests` runs the Rust default suite plus `profile_b_slow_tests` and `large_payload_tests`
-- `rust-gnupg-interop` installs gpg (`brew install gnupg`), asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the Secure Enclave v4 + Profile A GnuPG interop lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1` so a missing gpg fails the lane; it runs parallel to `rust-full-tests` and needs no XCFramework
-- `xcframework-package` checks the arm64e OpenSSL carry-chain freshness, downloads the arm64e stage1 toolchain in a token-free pre-build step, runs the `./build-xcframework.sh --release` entrypoint without GitHub token variables in the build environment, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days
-- `apple-platform-probes` downloads the uploaded XCFramework artifact, restores the pinned SQLCipher formal external dependency with mandatory GitHub attestation verification, and validates the packaged output with unsigned `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted runner has a healthy Xcode 26.5 platform/runtime install; GitHub-hosted runners intentionally do not carry CypherAir signing material, so local and Xcode Cloud validation remain the signed app-build paths. During GitHub image rollouts, incomplete Xcode/SDK/runtime installs emit an explicit warning and skip this app-side probe job without changing the XCFramework packaging signal, while project or scheme destination failures still fail the job
-- `swift-unit-tests-hosted-preview` checks hosted macOS/Xcode/macOS SDK readiness, requires an `arm64e` macOS test destination, downloads the `pgpmobile-xcframework` artifact, restores `PgpMobile.xcframework`, restores the pinned SQLCipher formal external dependency with mandatory GitHub attestation verification, and runs hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` when the runner can launch the test bundle; hosted environment mismatches emit an explicit warning and skip this preview without changing the XCFramework packaging signal, while project, signing profile, build, link, or test failures after readiness still fail the job
-
-The repository also publishes unique edge XCFramework prereleases:
-
-- `XCFramework Edge Release` runs on `main` pushes and `workflow_dispatch`, starts the independent Rust dependency audit, rebuilds and validates the XCFramework in a read-scoped build job, conditionally runs hosted Apple platform probes when Xcode 26.5 is healthy, then publishes a unique `pgpmobile-edge-` prerelease only after the audit passes; non-main manual runs must use `pgpmobile-drill-*` prefixes, and drill verification commands quote the exact source ref for safe shell copy/paste
-- The arm64e XCFramework path consumes the pinned `cypherair/rust`
-  `rust-arm64e-stage1-stable196-*` prerelease recorded in
-  `docs/ARM64E_STATUS.md` and the GitHub Actions workflow env. CI downloads
-  that public toolchain before invoking the build script, then passes
-  `ARM64E_STAGE1_DIR` and `ARM64E_RUST_STAGE1_MANIFEST` to the build with token
-  variables scrubbed. Stage1 downloads use direct GitHub release asset URLs for
-  the pinned tag without `GH_TOKEN`, `GITHUB_TOKEN`, or anonymous releases API
-  discovery, including PR validation, manual dry-runs, edge/drill builds,
-  nightly builds, and stable asset generation. Stable `arm64` slices are still
-  built with official stable Rust, while `arm64e` slices use stable Cargo with
-  `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt
-  std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
-- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, restores the pinned SQLCipher formal external dependency for app link validation with mandatory attestation checks, creates the draft stable release, and starts WF2, which restores the same SQLCipher dependency before archiving iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts without clobbering existing assets, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag, XCFramework checksum, and SQLCipher external dependency record before attesting the SDK/compliance assets (publication-witness provenance). SQLCipher is recorded in compliance metadata, but its assets and upstream source are not mirrored into the CypherAir stable release.
-
-Toolchain contract:
-
-- `stable` means the official Rust stable channel, not a CypherAir release channel or Rust fork branch.
-- The repository root intentionally has no custom `rust-toolchain.toml` override. Use explicit `cargo +stable` / `rustc +stable` for ordinary Rust validation and metadata.
-- App-side Rust or UniFFI changes do not require waiting for a new GitHub Rust
-  stage1 prerelease beyond the currently pinned one. Local full packaging should
-  force-download the pinned attested Rust fork stage1 prerelease to match
-  GitHub-hosted release jobs; use a linked `stage1-arm64e-patch` only when
-  deliberately testing a local compiler build.
-- Only changes to the Rust compiler fork itself require rebuilding the local stage1 or publishing a new Rust fork stage1 prerelease before app-side arm64e packaging can consume the new compiler.
-- GitHub-hosted Rust and XCFramework jobs intentionally do not use Cargo
-  cache actions. The arm64e path can consume a newer Rust fork stage1 while
-  `Cargo.lock` and official stable Rust remain unchanged; restoring old
-  `target/` artifacts can mix compiler generations and break proc-macro
-  builds. Prefer slower clean CI builds over cached Rust artifacts for release
-  correctness.
+- Rust/XCFramework jobs deliberately use no Cargo cache actions: restored `target/` artifacts can mix compiler generations and break proc-macro builds. Prefer slower clean CI builds.
+- App-side Rust or UniFFI changes never wait for a new stage1 prerelease; only changes to the Rust compiler fork itself do.
 
 ## 2.2 GitHub Actions Hosted macOS Limitation
 
-The repository workflows target `macos-26`, but GitHub's hosted runner image may still lag the app's minimum deployment target or expose an Xcode build before all matching Apple platform runtimes are installed.
-
-Known hosted-image states that the workflows preflight:
-
-- Project deployment target: **macOS 26.5**
-- Hosted GitHub runner images can still report **macOS 26.3** or expose Xcode 26.5 before the matching iOS/visionOS 26.5 platform probes are usable
-
-Impact:
-
-- Rust CI remains valid.
-- The hosted Swift unit-test preview uses `scripts/ci_xcode_platform_preflight.sh macos-unit-test-preflight` to detect when the runner OS, selected Xcode, or macOS SDK cannot launch the app/test deployment target; those hosted-image mismatches emit a warning and skip the preview.
-- When the hosted Swift unit-test preview passes readiness and starts `xcodebuild test`, build, link, and test failures remain code or project failure signals. Local macOS validation remains the Swift source of truth while GitHub's hosted image catches up.
-- PR, nightly, edge, and stable Apple platform probes use `scripts/ci_xcode_platform_preflight.sh` to detect incomplete Xcode 26.5 hosted platform installs and skip those app probes with a warning while keeping the XCFramework packaging and stable asset-generation signals clean; `xcodebuild -showdestinations` project failures or missing generic iOS/visionOS destinations are treated as configuration regressions and fail the workflow.
-- Formal stable release notes record whether hosted app-side probes passed or were skipped. A skipped hosted probe does not stand in for release validation; local App Store candidate validation remains the source of truth while GitHub's hosted image catches up.
-- Continue using local macOS validation until GitHub's hosted image catches up or a self-hosted macOS runner is used.
+The workflows target `macos-26`, but GitHub's hosted image can lag the project's macOS 26.5 deployment target (e.g. report 26.3) or expose Xcode 26.5 before matching platform runtimes are installed. `scripts/ci_xcode_platform_preflight.sh` detects this: hosted-image mismatches emit an explicit warning and skip the affected probe/preview without degrading the XCFramework packaging signal, while project-configuration or missing-destination failures still fail the workflow. Stable release notes record whether hosted probes ran or were skipped; a skipped probe never stands in for release validation. Local macOS validation is the Swift source of truth either way.
 
 ## 2.3 Release Flows
 
-CypherAir distinguishes between:
-
-- internal / experimental TestFlight builds
-- formal App Store candidate builds
-
-The release steps and candidate gating rules live in [RELEASE.md](RELEASE.md).
-
-- Use the standard `CypherAir` scheme for internal or experimental TestFlight uploads.
-- Use `CypherAir AppStore Candidate` only for the formal App Store candidate path.
-- The candidate path now rejects tracked worktree or index changes and requires `HEAD` to match the remote stable tag commit exactly.
+Internal/experimental TestFlight uploads use the standard `CypherAir` scheme. The formal App Store candidate path uses `CypherAir AppStore Candidate`, which rejects tracked worktree or index changes and requires `HEAD` to match the remote stable tag commit exactly. Release ordering, gating, and the compliance-asset contract live in [RELEASE.md](RELEASE.md).
 
 ## 2.4 Rust Artifacts, UniFFI Outputs, and Xcode Validation
 
-Rust changes under `pgp-mobile/src` do **not** automatically refresh the build products that Xcode uses for Swift and FFI validation.
+Rust changes under `pgp-mobile/src` do **not** automatically refresh what Xcode links. The project consumes:
 
-Today, the Xcode project consumes:
+- `PgpMobile.xcframework` (git-ignored, locally generated) plus `PgpMobile.arm64e-build-manifest.json`
+- `bindings/module.modulemap` plus the generated `Sources/PgpMobile/pgp_mobile.swift`
+- `SQLCipher.xcframework` (git-ignored, restored from the pinned external release) plus its manifest, privacy file, and release record
 
-- `PgpMobile.xcframework`
-- `PgpMobile.arm64e-build-manifest.json`
-- `bindings/module.modulemap`
-- `Sources/PgpMobile/pgp_mobile.swift`
-- `SQLCipher.xcframework` restored from the pinned external stable release
-- `SQLCipher.arm64e-build-manifest.json`
-- `SQLCipher-PrivacyInfo.xcprivacy`
-- `SQLCipher.xcframework.release.json`
-
-`PgpMobile.xcframework` is a local generated artifact. It is ignored by git and must be refreshed with the full sync path below after Rust or UniFFI changes that can affect Swift-visible behavior. The build also emits `PgpMobile.arm64e-build-manifest.json`, which records the Rust stage1 prerelease provenance, the OpenSSL carry-chain commits, and the verified XCFramework slice layout. The shared scheme and app target both check for the XCFramework artifact and fail with a clear error if it is missing.
-
-`SQLCipher.xcframework` is also ignored by git, but it is not built in this
-repository. Restore it from the pinned `cypherair/sqlcipher-xcframework`
-stable release before Xcode builds:
-
-```bash
-scripts/restore_sqlcipher_xcframework.sh
-```
-
-CI, GitHub-hosted app probes, and Xcode Cloud require release and asset
-attestations:
-
-```bash
-scripts/restore_sqlcipher_xcframework.sh --require-attestation
-```
-
-The restore script reads `third_party/sqlcipher-xcframework.pin.json`, rejects
-`latest` and non-stable pins, verifies the pinned zip checksum before
-extraction, validates immutable release metadata, upstream SQLCipher `v4.16.0`
-source commit `e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc`, expected slices,
-headers, modulemap, crypto-provider flags, privacy manifest, and macOS raw-key
-smoke behavior through `sqlite3_key_v2` with good-key read/write plus wrong-key
-rejection.
-The app target consumes a static framework-shaped `SQLCipher.xcframework`
-through the normal Frameworks build phase. The artifact keeps each module map
-inside `SQLCipher.framework/Modules`, so the app project does not carry
-slice-specific SQLCipher linker or modulemap paths. Contacts storage now uses
-SQLCipher as the authoritative protected-domain payload at
-`Application Support/ProtectedData/contacts/contacts.sqlite`.
-
-Contacts SQLCipher changes should keep focused XCTest coverage for raw-key
-syntax, artifact preflight, fresh create, relock/reopen persistence, wrong-key
-and corrupt-DB recovery, missing committed DB authority, schema/application-id
-mismatch, integrity failure, reset deletion of DB sidecars and obsolete
-snapshot-envelope artifacts, and absence of any legacy snapshot fallback.
-
-To refresh SQLCipher, publish a new stable immutable release from
-`cypherair/sqlcipher-xcframework` first. Then update
-`third_party/sqlcipher-xcframework.pin.json`, docs, and tests in this
-repository. Do not commit the downloaded SQLCipher assets or extracted
-XCFramework directory.
-
-Treat `pgp-mobile/Cargo.lock` updates as Rust artifact inputs. Even when a
-lockfile-only dependency update does not change Rust source or UniFFI surface,
-run the dependency audit, Rust tests, and the full XCFramework sync before
-Swift / FFI validation so local generated artifacts are built from the same
-lockfile that will be submitted. Do not submit the ignored
-`PgpMobile.xcframework` directory itself.
-
-Xcode user-script sandboxing is enabled for app and test targets. Local `xcodebuild` validation must not depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`. When adding or modifying a Run Script phase, declare every file the script reads in `inputPaths` or an `inputFileListPaths` file, and declare every generated or modified build product in `outputPaths` or an `outputFileListPaths` file. A parent directory input is not a substitute for recursive child-file access under the sandbox. This includes generated bundle resources such as `Settings.bundle/Root.plist`, fixture manifests, and repository metadata such as `.git/HEAD` plus `.git/logs/HEAD` for the source-compliance fallback. The app's `Settings.bundle` is copied and version-stamped by its script phase rather than by the Resources phase so the sandboxed script owns the generated bundle output. When adding fixture resources, update the matching fixture xcfilelist manifests in the same change.
-
-GitHub Actions package jobs archive the generated `PgpMobile.xcframework` as the `pgpmobile-xcframework` artifact so downstream jobs can restore the exact build product on a clean runner.
-
-The Rust static archives under `pgp-mobile/target/.../release` are intermediate inputs used to create the XCFramework, not Xcode link inputs. After a successful `./build-xcframework.sh --release`, you may reclaim Cargo target space with:
-
-```bash
-cargo clean --manifest-path pgp-mobile/Cargo.toml
-```
-
-Target-specific `libpgp_mobile.dylib` files must **not** exist next to those intermediate static archives. They are stale build state from older direct-link flows and can shadow the intended static archive if stale project settings or manual linker flags are used. The build script treats the host dylib used for UniFFI bindgen as a temporary artifact and removes it before exiting.
-
-Before submitting Rust or generated-binding work, keep the repository hygiene gate clean (`rustfmt` is a local courtesy, not a CI gate):
-
-```bash
-python3 scripts/check_text_hygiene.py
-```
-
-This means there are three distinct workflows:
+Treat `pgp-mobile/Cargo.lock` updates as artifact inputs too: even a lockfile-only bump needs the audit, Rust tests, and a full sync before Swift validation, so local artifacts are built from the lockfile being submitted. Never commit the ignored XCFramework directories.
 
 ### A. Rust behavior validation only
-
-Use this when you want to validate Rust logic in isolation.
 
 ```bash
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 ```
 
-This is the default local path and skips `#[ignore = "slow"]` Rust tests.
-It does **not** refresh the release archives or generated UniFFI outputs that Xcode consumes.
+Validates Rust logic in isolation; refreshes nothing that Xcode consumes.
 
 ### B. Build Rust release archives only
 
-Use this only when you want to refresh or inspect the platform-specific Rust release archives directly. This does **not** refresh the XCFramework artifact that Xcode consumes.
+Per-target release archives, for direct inspection; still no XCFramework refresh:
 
 ```bash
 cargo +stable build --release --target aarch64-apple-ios --manifest-path pgp-mobile/Cargo.toml
@@ -391,9 +151,7 @@ cargo +stable build --release --target aarch64-apple-visionos-sim --manifest-pat
 
 ### C. Full UniFFI / bindings / XCFramework sync
 
-Use this when Rust implementation, the UniFFI surface, generated bindings, headers, or packaged XCFramework artifacts changed, or whenever you want the safest full refresh before Swift / FFI validation.
-
-Recommended path:
+Run after any Rust or UniFFI change that can affect Swift-visible behavior (decision choreography: `.claude/skills/rust-sync`):
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
@@ -401,26 +159,9 @@ ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-
     ./build-xcframework.sh --release
 ```
 
-Prefer this path after Rust or UniFFI changes because it refreshes the stable `arm64` static archives, builds patched `arm64e` static archives with stable Cargo plus explicit `RUSTC` and prebuilt std payloads, regenerates bindings from an `arm64e-apple-darwin` host dylib, recreates `PgpMobile.xcframework`, writes `PgpMobile.arm64e-build-manifest.json`, and enforces the dylib cleanup/validation that keeps Xcode linking deterministic.
+Force-download matches GitHub Actions: it consumes the pinned `cypherair/rust` stage1 prerelease instead of trusting local rustup state, refreshes the stable `arm64` archives, builds `arm64e` archives with the stage1 compiler, regenerates bindings from an `arm64e-apple-darwin` host dylib (whitespace-normalized — never hand-edit generated bindings; rerun the sync), recreates `PgpMobile.xcframework`, and writes the build manifest. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; pin rotation follows the re-pin rule in [ARM64E_STATUS.md](ARM64E_STATUS.md) (agent checklist: `.claude/skills/repin-arm64e`). `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate compiler testing only.
 
-The sync script normalizes generated Swift bindings, C headers, and modulemaps by stripping trailing whitespace before copying them into `bindings/` and `Sources/PgpMobile/`. Do not hand-edit generated binding whitespace; rerun the sync path instead.
-
-For local packaging, prefer the same force-download mode used by GitHub Actions.
-It downloads the pinned `cypherair/rust` `rust-arm64e-stage1-stable196-*`
-prerelease into `pgp-mobile/target/apple-arm64e-stage1/`, selects the
-`rust-stage1-for-arm64e-<host-triple>.*` asset set for the current build host,
-verifies the packaged checksum, validates the stable196 prebuilt-std manifest,
-and avoids depending on stale or incomplete local `stage1-arm64e-patch` rustup
-state. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; when a new Rust fork stage1
-prerelease becomes the official input, follow the re-pin rule in
-`docs/ARM64E_STATUS.md`, which enumerates every pinned location (agent
-checklist: `.claude/skills/repin-arm64e`).
-`ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and the locally linked
-`stage1-arm64e-patch` toolchain remain supported for Rust-fork development and
-diagnostics, but release-candidate app artifact refreshes should use the
-force-download path unless you are deliberately testing a local compiler build.
-
-If you must run the underlying bindgen step manually, run it from `pgp-mobile/`, not from the repo root:
+Manual bindgen must run from `pgp-mobile/` — the repo root has no `Cargo.toml`:
 
 ```bash
 cd pgp-mobile
@@ -429,384 +170,91 @@ cargo +stable run --release --bin uniffi-bindgen generate \
     --language swift --out-dir ../bindings
 ```
 
-The repo-root form of this command is not valid in the current workspace because the root directory does not contain a `Cargo.toml`.
+After a successful sync you may reclaim space with `cargo clean --manifest-path pgp-mobile/Cargo.toml`; the per-target release static archives are intermediates, not Xcode link inputs. Target-specific `libpgp_mobile.dylib` files must not linger next to them — stale dylibs from older direct-link flows can shadow the intended static archives.
+
+### SQLCipher restore
+
+```bash
+scripts/restore_sqlcipher_xcframework.sh                        # local
+scripts/restore_sqlcipher_xcframework.sh --require-attestation  # CI / Xcode Cloud
+```
+
+The script reads `third_party/sqlcipher-xcframework.pin.json`, rejects `latest` and non-stable pins, verifies the zip checksum, release metadata, expected slices/headers/flags, and smoke-tests raw-key good-key read/write plus wrong-key rejection (`scripts/validate_sqlcipher_xcframework.py`). To refresh SQLCipher, publish a new stable immutable release from `cypherair/sqlcipher-xcframework` first, then update the pin file, docs, and tests here.
 
 ### Local Xcode validation
 
-After refreshing the artifacts that apply to your change, validate Swift / FFI behavior locally with:
-
 ```bash
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=macOS,arch=arm64e'
-```
-
-Treat this macOS-local arm64e path as the source of truth for Swift validation until GitHub's hosted macOS image catches up to the project's deployment target and has the project provisioning profiles required for signed Keychain/ProtectedData coverage.
-
-For native visionOS validation, use a build probe rather than a dedicated XCTest plan:
-
-```bash
-xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS'
-```
-
-Treat this as signed local build/linkage and platform-availability validation, not as a substitute for the existing Rust, macOS-local, and iOS-device test matrix.
-
-Recommended flow — run the numbered steps that apply to your change type:
-
-```bash
-# 1. Dependency audit (when pgp-mobile/Cargo.lock changed)
-cargo +stable audit --file pgp-mobile/Cargo.lock --deny warnings
-
-# 2. Rust tests
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml
-
-# 3. Full XCFramework sync — the pinned force-download command in C above
-
-# 4. Swift / FFI validation
+# Swift/FFI source of truth
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
 
-# 5. visionOS build probe
-xcodebuild build -scheme CypherAir \
-    -destination 'generic/platform=visionOS'
+# Native visionOS build probe (linkage + availability, not a test substitute)
+xcodebuild build -scheme CypherAir -destination 'generic/platform=visionOS'
 ```
 
-| Change type | Steps |
-|------------|-------|
-| `Cargo.lock` dependency update | 1, 2, 3, 4 |
-| Rust-backed behavior change | 2, 3, 4, 5 |
-| UniFFI surface / bindings / packaged artifact change | 2, 3, 4, 5 |
-
-Typical stale-artifact symptoms:
-
-- Rust tests reflect the new behavior, but Swift unit tests or FFI integration tests still show the old behavior.
-- The app links against an older `PgpMobile.xcframework`, but new UniFFI symbols or generated Swift types are missing.
-
-If that happens, first suspect a stale `PgpMobile.xcframework` or generated UniFFI output rather than stale Swift source.
-
-If a Rust / UniFFI change affects contact import validation, validation must also prove the
-stable public-only contract end to end:
-
-- secret-bearing contact-import input is rejected before inspection and persistence
-- the Rust surface returns `InvalidKeyData` with the stable contact-import reason token
-- Swift maps that stable token to the explicit contact-import public-certificate error
-
-
-## 3. Profile Test Matrix
-
-**Every crypto test must run for both profiles unless explicitly scoped.**
-
-| Test Category | Profile A | Profile B | Notes |
-|--------------|-----------|-----------|-------|
-| Key generation | v4 Ed25519+X25519 | v6 Ed448+X448 | Verify key version + algo |
-| Encrypt/decrypt round-trip | SEIPDv1 | SEIPDv2 OCB | |
-| Password/SKESK round-trip | SEIPDv1 | SEIPDv2 OCB | Includes armored + binary coverage |
-| Sign/verify | v4 sigs | v6 sigs | |
-| Tamper (1-bit flip) | Both | Both | |
-| Targeted password-message auth/integrity tamper | MDC fatal | AEAD/integrity fatal | Use targeted payload/tag-area mutations, not arbitrary bit-flips |
-| Cross-profile encrypt | A→B recipient | B→A recipient | Format auto-selection |
-| Mixed recipients | — | v4+v6 → SEIPDv1 | |
-| Key export/import | Iterated+Salted | Argon2id | |
-| Key revocation construction | Yes | Yes | Key-level for both profiles; selector tests where applicable |
-| GnuPG interop | Profile A only | N/A | |
-| Argon2id memory guard | N/A | Profile B only | |
-| SE wrap/unwrap | Both | Both | Same wrapping scheme |
-
-## 4. Mock Patterns
-
-### Keychain Mock (Protocol-Based)
-
-Define a protocol that captures Keychain operations. Inject the real or mock implementation.
-
-```swift
-protocol KeychainManageable {
-    func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
-    func load(service: String, account: String) throws -> Data
-    func update(_ data: Data, service: String, account: String) throws
-    func delete(service: String, account: String) throws
-}
-
-// Production implementation: calls Security.framework
-struct SystemKeychain: KeychainManageable { ... }
-
-// Test implementation: in-memory dictionary
-class MockKeychain: KeychainManageable {
-    var storage: [String: Data] = [:]
-    var saveCalled = false
-    var deleteCalled = false
-    // ... record calls for verification
-}
-```
-
-**Current repository note:** `MockKeychain` also supports deterministic failure injection for delete operations so crash-recovery retry semantics can be tested (`retryableFailure` vs `unrecoverable`).
-
-### Secure Enclave Mock
-
-SE operations cannot run in the simulator. Use a protocol with a software fallback for testing.
-
-```swift
-protocol SecureEnclaveManageable {
-    func generateWrappingKey(accessControl: SecAccessControl) throws -> SEKeyHandle
-    func wrap(privateKey: Data, using handle: SEKeyHandle) throws -> WrappedKeyBundle
-    func unwrap(bundle: WrappedKeyBundle, using handle: SEKeyHandle) throws -> Data
-    func deleteKey(_ handle: SEKeyHandle) throws
-}
-
-// Production: CryptoKit SecureEnclave APIs
-struct HardwareSecureEnclave: SecureEnclaveManageable { ... }
-
-// Test: software P-256 + AES-GCM (same algorithm, no hardware binding)
-class MockSecureEnclave: SecureEnclaveManageable { ... }
-```
-
-### Authentication Mock
-
-```swift
-protocol AuthenticationEvaluable {
-    func canEvaluate(policy: LAPolicy) -> Bool
-    func evaluate(policy: LAPolicy, reason: String) async throws -> Bool
-}
-
-class MockAuthenticator: AuthenticationEvaluable {
-    var shouldSucceed = true
-    var biometricsAvailable = true
-    // Control behavior in tests
-}
-```
-
-## 5. Test Naming Convention
-
-```
-test_<unitOfWork>_<scenario>_<expectedResult>
-```
-
-Examples:
-```swift
-// Profile-aware naming (preferred for crypto tests)
-func test_encrypt_profileA_v4Recipient_producesSEIPDv1()
-func test_encrypt_profileB_v6Recipient_producesSEIPDv2()
-func test_encrypt_mixedRecipients_v4AndV6_producesSEIPDv1()
-func test_decrypt_profileB_aeadTampered_throwsAEADFailure()
-func test_generateKey_profileA_producesV4Ed25519()
-func test_generateKey_profileB_producesV6Ed448()
-func test_export_profileA_usesIteratedSaltedS2K()
-func test_export_profileB_usesArgon2idS2K()
-
-// General naming
-func test_seWrap_ed448Key_thenUnwrap_returnsIdentical()
-func test_decrypt_withWrongKey_throwsNoMatchingKeyError()
-func test_modeSwitch_standardToHighSecurity_rewrapsAllKeys()
-func test_modeSwitch_crashMidway_recoversOnLaunch()
-func test_argon2idGuard_exceeds75Percent_refusesWithError()
-func test_unicodeRoundTrip_chineseAndEmoji_preservedAcrossFFI()
-func test_urlSchemeParse_malformedBase64_returnsInvalidQRError()
-```
-
-## 6. Crypto Test Patterns
-
-### Round-Trip Test (per profile)
-
-Every crypto operation must have a round-trip test proving reversibility.
-
-```swift
-func test_encryptDecrypt_profileA_roundTrip_returnsOriginalPlaintext() throws {
-    let plaintext = "Hello, 你好, 🔐"
-    let keyPair = try pgpMobile.generateKeyPair(name: "Test", email: nil, expiry: nil, profile: .universal)
-
-    let ciphertext = try pgpMobile.encrypt(
-        plaintext: Data(plaintext.utf8),
-        recipients: [keyPair.publicKey],
-        signingKey: keyPair.privateKey
-    )
-
-    let decrypted = try pgpMobile.decrypt(
-        ciphertext: ciphertext,
-        privateKey: keyPair.privateKey
-    )
-
-    XCTAssertEqual(String(data: decrypted.plaintext, encoding: .utf8), plaintext)
-}
-
-func test_encryptDecrypt_profileB_roundTrip() throws {
-    let keyPair = try pgpMobile.generateKeyPair(name: "Test", profile: .advanced)
-    let ciphertext = try pgpMobile.encrypt(plaintext: Data("Hello".utf8), recipients: [keyPair.publicKey])
-    let decrypted = try pgpMobile.decrypt(ciphertext: ciphertext, privateKey: keyPair.privateKey)
-    XCTAssertEqual(String(data: decrypted.plaintext, encoding: .utf8), "Hello")
-}
-```
-
-### Cross-Profile Test
-
-```swift
-func test_encrypt_profileBSender_toProfileARecipient_producesSEIPDv1() throws {
-    let senderB = try pgpMobile.generateKeyPair(name: "Sender", profile: .advanced)
-    let recipientA = try pgpMobile.generateKeyPair(name: "Recipient", profile: .universal)
-    let ciphertext = try pgpMobile.encrypt(
-        plaintext: Data("Cross".utf8),
-        recipients: [recipientA.publicKey],
-        signingKey: senderB.privateKey)
-    // Verify: recipient A can decrypt; message format is SEIPDv1
-    let result = try pgpMobile.decrypt(ciphertext: ciphertext, privateKey: recipientA.privateKey)
-    XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Cross")
-}
-```
-
-### Tamper Test (1-Bit Flip)
-
-Proves integrity checking works (AEAD for Profile B, MDC for Profile A).
-
-```swift
-func test_decrypt_withTamperedCiphertext_throwsAEADError() throws {
-    let keyPair = try pgpMobile.generateKeyPair(name: "Test", email: nil, expiry: nil, profile: .advanced)
-    var ciphertext = try pgpMobile.encrypt(
-        plaintext: Data("secret".utf8),
-        recipients: [keyPair.publicKey],
-        signingKey: nil
-    )
-
-    // Flip one bit near the middle of the ciphertext
-    let midpoint = ciphertext.count / 2
-    ciphertext[midpoint] ^= 0x01
-
-    XCTAssertThrowsError(try pgpMobile.decrypt(ciphertext: ciphertext, privateKey: keyPair.privateKey)) { error in
-        guard let pgpError = error as? PgpError else { return XCTFail("Wrong error type") }
-        XCTAssertEqual(pgpError, .AeadAuthenticationFailed)
-    }
-}
-```
-
-### Negative Auth Test
-
-```swift
-func test_decrypt_highSecurityMode_biometricsUnavailable_throwsAuthError() async throws {
-    let mockAuth = MockAuthenticator()
-    mockAuth.biometricsAvailable = false
-
-    let service = DecryptionService(authenticator: mockAuth, ...)
-
-    await XCTAssertThrowsError(try await service.decrypt(ciphertext: someCiphertext)) { error in
-        // Should fail without attempting decryption
-    }
-}
-```
-
-### Recovery-Specific Tests
-
-Crash-recovery logic now distinguishes safe cleanup, successful promotion, retryable failure, and unrecoverable states. Tests should cover:
-
-- permanent envelope row + stale pending row -> cleanup only
-- missing permanent envelope row + complete pending row -> promote pending
-- delete/write failure during recovery -> retryable failure, keep flags set
-- no complete envelope row in either namespace -> unrecoverable, clear flags, surface startup warning
-- startup warning text remains generic and does not leak fingerprints
-
-### Memory Zeroing Test
-
-```swift
-func test_privateKeyBytes_zeroedAfterDecrypt() throws {
-    var keyBytes = try loadTestPrivateKey()
-    let originalCount = keyBytes.count
-
-    // Perform operation that should zeroize
-    _ = try decryptionService.decryptAndZeroize(using: &keyBytes)
-
-    // Verify all bytes are zero
-    XCTAssertTrue(keyBytes.allSatisfy { $0 == 0 }, "Key bytes not zeroed")
-    XCTAssertEqual(keyBytes.count, originalCount, "Buffer should not be deallocated, just zeroed")
-}
-```
-
-### Mode Switch Journal Recovery Test (Device Only)
-
-```swift
-func test_modeSwitch_crashMidway_recoversOnLaunch() throws {
-    try XCTSkipUnless(SecureEnclave.isAvailable)
-
-    // Simulate interrupted re-wrap by writing the post-unlock recovery journal
-    // and leaving the temporary pending envelope row.
-    try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
-    try privateKeyControlStore.markRewrapCommitRequired()
-    try keychain.save(someData, service: "com.cypherair.v1.pending-privkey-envelope.abcdef...", ...)
-
-    // Run recovery after app unlock has opened private-key-control.
-    authManager.checkAndRecoverFromInterruptedRewrap(fingerprints: ["abcdef..."])
-
-    // Verify: journal cleared, pending row removed, original envelope intact
-    XCTAssertNil(try privateKeyControlStore.recoveryJournal().rewrapTargetMode)
-    XCTAssertThrowsError(try keychain.load(service: "com.cypherair.v1.pending-privkey-envelope.abcdef..."))
-    XCTAssertNoThrow(try keychain.load(service: "com.cypherair.v1.privkey-envelope.abcdef..."))
-}
-```
-
-## 7. GnuPG Interoperability Tests
-
-These tests verify bidirectional compatibility with GnuPG for the software Profile A keys and the device-bound *compatible* (v4) Secure Enclave custody family. **Profile B (software v6) and device-bound *modern* (v6) output is expected to be rejected by GnuPG** — GnuPG does not support v6 keys, and v6 carries no GnuPG interop gate. Verify v6 rejection in POC test C3.8 and `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey`. Secure Enclave custody interop and hardware evidence are recorded in [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.
-
-**Execution model:** GnuPG (`gpg`) runs on macOS only — it cannot run on iOS. These tests use one of two approaches:
-
-**Approach A (preferred): Pre-generated fixtures.** Use `gpg` on macOS to generate test data (encrypted messages, signatures, exported keys) and commit them as test fixtures in the Xcode project. The iOS/simulator tests then verify that the App correctly processes these fixtures. This approach is deterministic and works in CI.
-
-**Approach B (Rust layer): Sequoia-to-fixture comparison.** Run interoperability tests entirely in the Rust `pgp-mobile` test suite (Layer 1), comparing Sequoia output against known-good fixtures generated by `gpg`. This avoids any iOS dependency.
-
-| Test | Description |
-|------|-------------|
-| App encrypt → fixture: `gpg --decrypt` | gpg successfully decrypts App output (verified during fixture generation) |
-| App sign → fixture: `gpg --verify` | gpg reports "Good signature" (verified during fixture generation) |
-| Fixture: `gpg` encrypt → App decrypt | App successfully decrypts gpg-generated fixture |
-| Fixture: `gpg` sign → App verify | App reports valid signature for gpg-generated fixture |
-| Tamper App ciphertext → `gpg --decrypt` | gpg reports decryption failure (verified during fixture generation) |
-| Import gpg pubkey fixture → App encrypt → verify | Full round-trip across implementations |
-
-**Regenerate fixtures** when: Sequoia version changes, algorithm selection changes, or GnuPG releases a major version.
-
-### 7.1 Secure Enclave custody interop lanes
-
-Beyond the fixture approaches above, live lanes exercise the `gpg` binary directly (macOS only). They share `pgp-mobile/tests/common/gnupg.rs` and the `require_gpg_or_skip()` skip-forbidden gate: with `CYPHERAIR_REQUIRE_GPG=1` a missing gpg **fails** the lane instead of skipping silently.
-
-- `pgp-mobile/tests/gnupg_binary_tests.rs` — Profile A (software) Sequoia→gpg, live binary.
-- `pgp-mobile/tests/secure_enclave_gnupg_interop_tests.rs` — device-bound compatible (v4) SE-shaped certificate ↔ gpg, bidirectional, through the production external-signer / key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
-- `pgp-mobile/tests/secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) RFC 9580 / SEIPDv2 AEAD correctness through the production seam (no gpg).
-
-The `rust-gnupg-interop` CI job (pr-checks + nightly) installs gpg, asserts a `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs the SE-v4 and Profile A lanes mandatory under `CYPHERAIR_REQUIRE_GPG=1`. The v6 lane needs no gpg and runs in the default `rust-full-tests` lane.
-
-Real-SE↔gpg bidirectional evidence is the operator-run macOS manual plan `CypherAir-InteropEvidenceTests` (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`), out of default CI; iPhone/iPad gpg interop is a documented manual cross-device procedure. See [Secure Enclave Custody](SECURE_ENCLAVE_CUSTODY.md) §8.3.
-
-## 8. MIE Validation Tests
-
-Run on supported A19/A19 Pro-or-newer hardware with Hardware Memory Tagging enabled in Xcode diagnostics. Current examples include iPhone 17 and iPhone Air devices that expose the diagnostic. Test both profiles.
-
-| Test | Pass Criteria |
-|------|--------------|
-| Full workflow (keygen, encrypt, decrypt, sign, verify) — both profiles | Zero tag mismatch crashes |
-| 100 encrypt/decrypt cycles — both profiles | Zero intermittent tag violations |
-| OpenSSL operations (AES-256, SHA-512, Ed25519, X25519, Ed448, X448, Argon2id) | All succeed without memory tagging violations |
-| Check Console.app + crash logs | No `EXC_GUARD` or `GUARD_EXC_MTE_SYNC_FAULT` entries |
-
-## 9. AI Coding Expectations
-
-### Functional PRs Must Include
-
-- Tests for all new or changed functionality, covering **both profiles unless explicitly scoped to one**.
-- For security changes: both positive and negative tests (see Section 6).
-- For new PgpError variants: test that the error is thrown and maps correctly to Swift.
-- For UI changes: at minimum, verify the view compiles and renders (snapshot or manual).
-- For screen ownership, launch, routing, or tutorial-host refactors: run the `CypherAir-MacUITests` plan (Section 2) or an equivalent targeted macOS smoke/routing subset together with the relevant screen-model or routing tests.
-- For tutorial/UI-test mock-boundary or launch-gating changes: run the full `CypherAir-MacUITests` plan plus Release and `AppStore Candidate Release` macOS build probes to prove `UITEST_*` app-container paths are ignored outside Debug.
-- For guided tutorial product, sandbox, output-interception, or completion-state changes: run `xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests -destination 'platform=macOS,arch=arm64e' -only-testing:CypherAirTests/TutorialSessionStoreTests`, then add the Mac UI plan above when the change affects tutorial launch, routing, or visible tutorial surfaces.
-
-Documentation-only PRs that do not touch code, generated files, project files, entitlements, release metadata, or build settings may use the documentation-only validation path in Section 2 instead of Rust/Xcode test runs.
-
-### Coverage Goals
-
-- `pgp-mobile` Rust crate: every public function has at least one positive and one negative test, covering both profiles.
-- `Sources/Services/`: each service method has a round-trip or behavior test.
-- `Sources/Security/`: every code path (success, each error case) is covered.
-- Views (`Sources/App/`): not required to have unit tests, but must not contain business logic.
-
-### When Writing Tests
-
-- Use descriptive names following the convention in Section 5.
-- Prefer real Sequoia operations in Rust tests. Prefer mocks for Swift service tests.
-- Never hardcode key material or ciphertexts. Generate fresh keys in test setup.
-- Clean up Keychain entries in `tearDown` to avoid test pollution.
-- Mark device-only tests clearly with `XCTSkipUnless(SecureEnclave.isAvailable)`.
+| Change type | Run |
+|---|---|
+| `Cargo.lock` dependency update | audit → Rust tests → sync C → unit plan |
+| Rust-backed behavior change | Rust tests → sync C → unit plan → visionOS probe |
+| UniFFI surface / bindings / packaging change | Rust tests → sync C → unit plan → visionOS probe |
+
+Stale-artifact symptoms: Rust tests show the new behavior but Swift/FFI tests still show the old one, or new UniFFI symbols are missing at link time. Suspect a stale `PgpMobile.xcframework` or generated bindings before suspecting Swift source.
+
+Two repo-specific gotchas:
+
+- **Script sandboxing.** Xcode user-script sandboxing is enabled for app and test targets; local validation must not depend on `ENABLE_USER_SCRIPT_SANDBOXING=NO`. A Run Script phase must declare every file it reads in `inputPaths`/`inputFileListPaths` and every product in `outputPaths`/`outputFileListPaths` — a parent directory is not recursive access. This covers the script-owned, version-stamped `Settings.bundle/Root.plist`, fixture manifests (update the fixture xcfilelists when adding fixtures), and `.git/HEAD` + `.git/logs/HEAD` for the source-compliance fallback.
+- **Contact-import contract.** If a Rust/UniFFI change touches contact-import validation, prove the public-only contract end to end: secret-bearing input is rejected before inspection or persistence, the Rust surface returns `InvalidKeyData` with the stable contact-import reason token, and Swift maps it to the explicit contact-import public-certificate error.
+
+Keep the hygiene gate clean before submitting: `python3 scripts/check_text_hygiene.py` (`rustfmt` is a local courtesy, not a CI gate).
+
+## 3. Family Test Matrix
+
+Crypto tests cover every family the change touches. The software profiles are what most suites parameterize over; the device-bound families get equivalent coverage through the custody unit suites (mocks + software P-256) plus the Layer 4 device lane.
+
+| Test category | Profile A | Profile B | Post-Quantum |
+|---|---|---|---|
+| Key generation | v4 Ed25519+X25519 | v6 Ed448+X448 | v6 ML-DSA-65+Ed25519 / ML-KEM-768+X25519 |
+| Encrypt/decrypt round-trip | SEIPDv1 | SEIPDv2 OCB | SEIPDv2 OCB, AES-256 floor |
+| Sign/verify | v4 sigs | v6 sigs | v6 composite sigs |
+| Tamper | MDC fatal | AEAD fatal | AEAD fatal |
+| Cross-profile encrypt | A→B recipient | B→A recipient | PQ+v4 mixed → SEIPDv1 with AES-256 floor |
+| Key export/import S2K | Iterated+Salted | Argon2id | Argon2id |
+| GnuPG interop | Yes | Expected rejection | No claim (LibrePGP divergence) |
+| Argon2id memory guard | N/A | Yes | Yes |
+| SE software-custody wrap | Yes | Yes | Yes (portable family) |
+
+Password/SKESK round-trips (armored + binary) are recipient-key-independent and covered per message format. Tamper tests for password messages use targeted payload/tag-area mutations, not arbitrary bit flips.
+
+## 4. Writing Tests
+
+- Name tests `test_<unitOfWork>_<scenario>_<expectedResult>`.
+- Swift service/security tests use protocol-based mocks (`MockKeychain`, `MockSecureEnclave`, `MockAuthenticator` under `Sources/Security/Mocks/`); Rust tests prefer real Sequoia operations. `MockKeychain` supports deterministic delete-failure injection (`deleteError`, `failOnDeleteNumber`) for crash-recovery tests.
+- Assert behavior, not source text: no source-scanning XCTest assertions — architecture conformance is review's job, not a test's.
+- Every crypto operation needs a round-trip test per family it supports, a targeted tamper test proving hard-fail with no partial output, and format assertions where the format rule applies (SEIPDv1/v2 selection, AES-256 floor).
+- Crash-recovery coverage exercises all four outcomes of the crash-recovery invariant ([SECURITY.md](SECURITY.md) §4): cleanup-only, promote-pending, retryable (keeps flags set), unrecoverable (generic startup warning, no fingerprints).
+- Never hardcode key material or ciphertexts; generate fresh keys in setup. Clean up Keychain entries in `tearDown`. Guard device-only tests with `XCTSkipUnless(SecureEnclave.isAvailable)`.
+
+## 5. GnuPG Interoperability
+
+Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) custody family. **v6 output — Profile B and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
+
+`gpg` runs on macOS only. Two mechanisms:
+
+- **Fixtures** — `gpg`-generated messages/signatures/keys committed as test data; deterministic and CI-safe. Regenerate when the Sequoia version, algorithm selection, or GnuPG major version changes (`gnupg_fixture_regression_tests.rs`, manual).
+- **Live lanes** — drive the `gpg` binary through `pgp-mobile/tests/common/gnupg.rs` and its `require_gpg_or_skip()` gate: under `CYPHERAIR_REQUIRE_GPG=1` a missing gpg fails instead of skipping.
+  - `gnupg_binary_tests.rs` — Profile A Sequoia↔gpg.
+  - `secure_enclave_gnupg_interop_tests.rs` — device-bound compatible (v4) SE-shaped certificates ↔ gpg, bidirectional, through the production external-signer/key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
+  - `secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) SEIPDv2 AEAD correctness through the production seam (no gpg; runs in `rust-full-tests`).
+
+The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; captured evidence lives in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
+
+## 6. MIE Validation
+
+Run on hardware with Hardware Memory Tagging (A19/A19 Pro class — e.g. iPhone 17, iPhone Air) with the Xcode diagnostic enabled.
+
+| Test | Pass criteria |
+|---|---|
+| Full workflow (keygen, encrypt, decrypt, sign, verify) across families | Zero tag-mismatch crashes |
+| 100 encrypt/decrypt cycles | Zero intermittent tag violations |
+| OpenSSL primitives (AES-256, SHA-512, Ed25519/X25519, Ed448/X448, Argon2id) | No memory-tagging violations |
+| Console.app + crash logs | No `EXC_GUARD` / `GUARD_EXC_MTE_SYNC_FAULT` entries |

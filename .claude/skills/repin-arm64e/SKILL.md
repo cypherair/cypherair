@@ -4,9 +4,7 @@ description: Rotate the pinned arm64e stage1 Rust toolchain tag everywhere it is
 ---
 
 docs/ARM64E_STATUS.md owns the pin and enumerates every pinned location —
-follow its re-pin rule. Update ALL locations in one commit (CI workflow env,
-script default, hardening tests, ARM64E_STATUS.md, CLAUDE.md Build Commands,
-docs/TESTING.md Section 2.4C — per the current list in ARM64E_STATUS.md).
+follow its re-pin rule and update ALL locations it lists in one commit.
 
 **Verify:**
 
