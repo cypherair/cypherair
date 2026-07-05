@@ -162,7 +162,7 @@ Contacts persistence work.
 Durable Contacts SQLCipher rules live in the current-state docs:
 [Persisted State Inventory](PERSISTED_STATE_INVENTORY.md),
 [Security](SECURITY.md), [Architecture](ARCHITECTURE.md), [TDD](TDD.md),
-[Testing](TESTING.md), and [Code Review](CODE_REVIEW.md). They preserve
+[Testing](TESTING.md), and [Code Review](WORKFLOW.md). They preserve
 post-unlock opening without a normal-flow second prompt, relock connection
 cleanup, reset cleanup for DB sidecars and obsolete ProtectedData artifacts,
 and fail-closed recovery for corrupt, missing, mismatched key, schema, config,

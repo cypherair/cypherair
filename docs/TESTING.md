@@ -231,7 +231,7 @@ The repository also publishes unique edge XCFramework prereleases:
   built with official stable Rust, while `arm64e` slices use stable Cargo with
   `RUSTC` pointing at the downloaded stable196 stage1 compiler and its prebuilt
   std payloads. The official path does not use nightly Cargo or `-Zbuild-std`.
-- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/XCODE_CLOUD_RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, restores the pinned SQLCipher formal external dependency for app link validation with mandatory attestation checks, creates the draft stable release, and starts WF2, which restores the same SQLCipher dependency before archiving iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts without clobbering existing assets, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag, XCFramework checksum, and SQLCipher external dependency record before attesting the SDK/compliance assets (publication-witness provenance). SQLCipher is recorded in compliance metadata, but its assets and upstream source are not mirrored into the CypherAir stable release.
+- The stable release runs on Xcode Cloud (`PgpMobile XCFramework` → `CypherAir Release`; see docs/RELEASE.md): WF1 audits Rust dependencies, builds the XCFramework plus the six compliance assets, restores the pinned SQLCipher formal external dependency for app link validation with mandatory attestation checks, creates the draft stable release, and starts WF2, which restores the same SQLCipher dependency before archiving iOS/macOS/visionOS, delivers to TestFlight, attaches the App Store upload artifacts without clobbering existing assets, and publishes the release. `.github/workflows/stable-release-attest.yml` then runs on `release.published` to re-verify the SSH-signed tag, XCFramework checksum, and SQLCipher external dependency record before attesting the SDK/compliance assets (publication-witness provenance). SQLCipher is recorded in compliance metadata, but its assets and upstream source are not mirrored into the CypherAir stable release.
 
 Toolchain contract:
 
@@ -275,7 +275,7 @@ CypherAir distinguishes between:
 - internal / experimental TestFlight builds
 - formal App Store candidate builds
 
-The release steps and candidate gating rules live in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md).
+The release steps and candidate gating rules live in [RELEASE.md](RELEASE.md).
 
 - Use the standard `CypherAir` scheme for internal or experimental TestFlight uploads.
 - Use `CypherAir AppStore Candidate` only for the formal App Store candidate path.
