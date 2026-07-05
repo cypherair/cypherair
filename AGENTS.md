@@ -135,24 +135,22 @@ especially Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope
 
-- Swift API Design Guidelines; `guard let` over force unwrap (no `!` in
-  production); `async/await`, never Combine; value types by default.
-- Typed errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
+Standard Swift/SwiftUI idiom applies (use live Apple documentation for current
+API and Liquid Glass specifics). The project-specific rules — not inferable from
+the code alone:
+
+- Errors: `CypherAirError` is the app vocabulary; generated `PgpError` is
   normalized at the `Services/FFI/` adapter boundary before app/service code.
-- State/UI: `@Observable class` + `@State`/`@Bindable`/`@Environment` (not the
-  old `ObservableObject`/`@Published`/`@StateObject`); `NavigationStack` with a
-  typed path, never `NavigationView`; thin views, workflow logic in an owning
-  `@Observable` ScreenModel.
-- Concurrency: `@MainActor` on UI-bound models, `@concurrent` for CPU-heavy PGP
-  work off the main actor, `Sendable` across actor boundaries;
-  `@preconcurrency import PgpMobile` for generated bindings — never edit the
-  generated `pgp_mobile.swift`.
-- Liquid Glass: standard iOS/iPadOS components get glass automatically (do not
-  override backgrounds); macOS/visionOS use native chrome; `.glassEffect()`
-  only as the last modifier on custom floating controls, never on content.
-  Reuse the `Sources/App/DesignSystem/` primitives instead of per-view literals.
-- One type per file, group by feature, all user-visible strings in the String
-  Catalog.
+- Never edit generated `Sources/PgpMobile/pgp_mobile.swift`; where strict
+  concurrency trips on it, `@preconcurrency import PgpMobile` at call sites.
+- Views stay thin; workflow-heavy screens move async orchestration, cleanup, and
+  transient state into an owning `@Observable` ScreenModel (`SignView` +
+  `SignScreenModel` baseline).
+- Design identity is quiet and system-native — system accent only, no brand
+  tint. Reuse the `Sources/App/DesignSystem/` primitives instead of per-view
+  literals.
+- One type per file, grouped by feature; mocks under `Security/Mocks/`; all user
+  strings in the String Catalog.
 - Prefer architecturally correct fixes while keeping scope limited to the user
   request. Do not normalize, revert, or clean up unrelated local changes.
 

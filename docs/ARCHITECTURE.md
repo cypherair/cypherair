@@ -34,7 +34,7 @@ graph TB
     SVC --> SEC
     SVC --> ADAPT
     ADAPT --> BIND
-    SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 Hardware"]
+    SEC --> |CryptoKit| SE["Secure Enclave<br/>P-256 + ML-KEM/ML-DSA"]
     SEC --> |Security.framework| KC["Keychain"]
     BIND --> PGP
     SVC --> MOD

@@ -97,7 +97,7 @@ Deletion:
 
 ## 3. Secure Enclave Wrapping Scheme
 
-The Secure Enclave supports only P-256. Private keys (Ed25519, X25519, Ed448, or X448) are protected via an indirect wrapping scheme. The wrapping scheme is identical for all key algorithms — the SE wraps raw private key bytes regardless of algorithm.
+The Secure Enclave natively holds only some key types (P-256, and on current OS versions ML-KEM / ML-DSA), not the classical curves the software key families use (Ed25519, X25519, Ed448, X448). Software-key private keys of those algorithms are therefore protected via an indirect wrapping scheme. The wrapping scheme is identical for all software-key algorithms — the SE wraps raw private key bytes regardless of algorithm. (Device-bound families take a different path: their private operations run inside the Secure Enclave rather than being wrapped — P-256 for the classical device-bound families, and split custody for Device-Bound Post-Quantum; see [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md).)
 
 ### Secure Enclave Custody (device-bound private-key model)
 
@@ -265,7 +265,7 @@ Keychain row reconstructs the handle and reopens the material.
 
 - Keychain data extraction without the SE hardware yields an encrypted blob that cannot be decrypted.
 - The SE key's `dataRepresentation` is bound to the SoC UID (fused at manufacturing, never exposed to software).
-- The raw private key exists in application memory briefly during use. This is an inherent tradeoff of the P-256-only SE constraint.
+- The raw private key exists in application memory briefly during use. This is an inherent tradeoff of the software key families' algorithms not being Secure Enclave-resident (device-bound families avoid it — their private operations happen inside the enclave).
 - SE ECDH latency: ~2–5ms. Imperceptible to users.
 
 ## 4. Authentication Modes

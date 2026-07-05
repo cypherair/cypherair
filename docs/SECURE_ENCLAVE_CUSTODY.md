@@ -26,9 +26,11 @@
 ## 1. Overview
 
 Secure Enclave custody is a device-bound private-key custody model in which
-long-term P-256 signing and key-agreement private operations stay bound to the
-current device's Secure Enclave. It sits alongside — and does not replace — the
-portable software-key model. It is presented in the product as three of the six
+long-term signing and key-agreement private operations stay bound to the
+current device's Secure Enclave — P-256 for the classical device-bound families,
+and RFC 9980 split custody for Device-Bound Post-Quantum (§4.1). It sits
+alongside — and does not replace — the portable software-key model. It is
+presented in the product as three of the six
 key families:
 
 - **Device-Bound Compatible** — Secure Enclave custody, P-256, v4 certificate.
