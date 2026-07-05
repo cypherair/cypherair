@@ -90,7 +90,7 @@ fn test_decrypt_wrong_key_no_plaintext_leak() {
 }
 
 /// Decryption must reject legacy SEIPD (Symmetrically Encrypted Data, tag 9)
-/// which lacks integrity protection (no MDC). Per TDD Section 1.6, this is
+/// which lacks integrity protection (no MDC). Per TDD Section 1.4, this is
 /// rejected per security policy.
 #[test]
 fn test_decrypt_legacy_seipd_no_mdc_rejected() {

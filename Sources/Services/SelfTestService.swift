@@ -1,6 +1,6 @@
 import Foundation
 
-/// One-tap self-diagnostic covering both profiles:
+/// One-tap self-diagnostic covering all software profiles:
 /// key generation → encrypt/decrypt → sign/verify → tamper detection → QR round-trip.
 ///
 /// Results are kept as an in-memory export-only report.
@@ -50,7 +50,7 @@ final class SelfTestService {
 
     // MARK: - Run Self-Test
 
-    /// Run the complete self-test suite for both profiles.
+    /// Run the complete self-test suite for all software profiles.
     /// Heavy crypto work is delegated to FFI adapters so progress
     /// updates remain responsive while crypto stays off the main actor.
     func runAllTests() async {

@@ -214,7 +214,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(detectedProfile, .advanced, "detectProfile must return .advanced for v6 key")
     }
 
-    /// C5.5: Both profiles generate keys with all expected components.
+    /// C5.5: The classical software profiles (A and B) generate keys with all expected components.
     func test_keyProfileEnum_bothProfiles_generateCompleteKeys() throws {
         for profile in [KeyProfile.universal, KeyProfile.advanced] {
             let key = try engine.generateKey(

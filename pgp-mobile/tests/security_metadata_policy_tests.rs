@@ -71,7 +71,7 @@ fn test_armor_decode_known_kinds_not_unknown() {
     );
 }
 
-/// Encrypt/decrypt round-trip with Unicode plaintext (Chinese + emoji) for both profiles.
+/// Encrypt/decrypt round-trip with Unicode plaintext (Chinese + emoji) for Profile A and Profile B.
 #[test]
 fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
     let unicode_plaintext = "Hello, 你好, 🔐 — encrypted message with CJK and emoji.";
