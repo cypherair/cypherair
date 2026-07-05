@@ -64,11 +64,26 @@ For day-to-day and exploratory uploads that are **not** the formal App Store can
 
 The `PgpMobile.xcframework` binary is published on three channels for downstream SDK consumers:
 
-- **Edge** — every push to `main` via `xcframework-edge-release.yml`, tag `pgpmobile-edge-<timestamp>-<sha>-<run>-a<attempt>`. Continuous, unsigned-provenance validation channel; discovered by timestamp/sha.
+- **Edge** — every push to `main` via `xcframework-edge-release.yml`, tag `pgpmobile-edge-<timestamp>-<sha>-<run>-a<attempt>`. Continuous validation channel; discovered by timestamp/sha.
+- **Drill** — manual `workflow_dispatch` validation runs from non-`main` refs, tag prefix `pgpmobile-drill-*`. Never discovered or consumed as if it were edge.
 - **Stable** — the `PgpMobile.xcframework.zip` + `.sha256` attached to each app stable release (§3), built by WF1 from the tagged commit. This is the release-grade binary.
-- CI caches the edge artifact (`pgpmobile-xcframework`) within a run so downstream jobs restore the exact build product on a clean runner.
 
-**Verification** (any channel): download `PgpMobile.xcframework.zip` and its `.sha256`, confirm `shasum -a 256 -c`, then verify provenance with `gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair --signer-workflow .github/workflows/stable-release-attest.yml`. SQLCipher is verified separately by `scripts/restore_sqlcipher_xcframework.sh --require-attestation` against `third_party/sqlcipher-xcframework.pin.json`.
+CI caches the edge artifact (`pgpmobile-xcframework`) within a run so downstream jobs restore the exact build product on a clean runner.
+
+**Verification** — download `PgpMobile.xcframework.zip` and its `.sha256`, confirm `shasum -a 256 -c`, then verify provenance against the workflow that attested the channel:
+
+```bash
+# Edge (attested in-run by the edge workflow):
+gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair \
+    --signer-workflow cypherair/cypherair/.github/workflows/xcframework-edge-release.yml \
+    --source-ref refs/heads/main
+
+# Stable (attested on release.published):
+gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair \
+    --signer-workflow cypherair/cypherair/.github/workflows/stable-release-attest.yml
+```
+
+The same commands verify `PgpMobile.arm64e-build-manifest.json`. SQLCipher is verified separately by `scripts/restore_sqlcipher_xcframework.sh --require-attestation` against `third_party/sqlcipher-xcframework.pin.json`.
 
 ## 6. Candidate verification checklist
 

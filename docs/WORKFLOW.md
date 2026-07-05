@@ -25,7 +25,7 @@ Before considering a code task complete:
 - Rust compiles for all targets (`aarch64-apple-ios`, `-ios-sim`, `-darwin`, `-visionos`, `-visionos-sim`) and `cargo +stable test --manifest-path pgp-mobile/Cargo.toml` passes.
 - The relevant Swift lane passes locally — `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` is the source of truth for Swift validation (the hosted preview lane can warning-skip; rely on the local run). Device/SE-hardware behavior runs under `CypherAir-DeviceTests` on Apple Silicon or a physical device.
 - **rust-sync when needed.** Rust changes under `pgp-mobile/src`, `Cargo.toml`/`Cargo.lock`, or the UniFFI interface do **not** auto-refresh the `PgpMobile.xcframework` and generated bindings that Xcode links. When Swift-visible behavior can change, run the full pinned sync **before** Swift validation (`.claude/skills/rust-sync`). Rust-only test changes, comments, and docs do not need it.
-- Every functional change carries tests. New `Tests/` files need only `git add`; a new `Sources/` file needs its pbxproj test-target membership exception (`.claude/skills` / the adding-source-files note). New `Device*` test classes must be added to the unit plan's `skippedTests` or they will run — and prompt for biometrics — in the unit lane.
+- Every functional change carries tests. New `Tests/` files need only `git add`; a new `Sources/` file needs its pbxproj test-target membership exception. New `Device*` test classes must be added to the unit plan's `skippedTests` or they will run — and prompt for biometrics — in the unit lane.
 - No new compiler warnings; no force-unwrap (`!`) in production; all user-facing strings in the String Catalog.
 - Commits are SSH-signed with a conventional prefix (`feat:`/`fix:`/`refactor:`/`test:`/`docs:`). Load the signing key with `ssh-add --apple-load-keychain` if the agent has no identity. Never create an unsigned commit.
 
@@ -41,7 +41,7 @@ A change is **security-critical** when it touches the areas listed in [SECURITY.
 - Include **both positive and negative tests** (crypto tests cover the relevant profiles/families).
 - Human review is required before merge.
 
-The independent Codex security review and the per-phase stage-verify are the backstops; this gate is what the authoring session owes them.
+The maintainer's independent Codex security review (run outside this repository, tracked via CSV + issues) and the per-phase stage-verify are the backstops; this gate is what the authoring session owes them.
 
 ## 4. Documentation contract
 
