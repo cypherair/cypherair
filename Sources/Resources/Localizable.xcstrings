@@ -13002,13 +13002,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Applies to portable keys. Device-bound keys always use biometric access and are not affected."
+            "value" : "Portable Key Protection applies to portable software keys. Device-bound keys always use biometric access and are not affected."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅适用于便携密钥。设备绑定密钥始终使用生物识别访问，不受此设置影响。"
+            "value" : "便携密钥保护仅适用于便携软件密钥。设备绑定密钥始终使用生物识别访问，不受影响。"
           }
         }
       }
