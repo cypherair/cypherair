@@ -26,6 +26,15 @@ struct PrivateKeyOperationRequest: Equatable, Sendable {
     let operation: PGPPrivateOperationKind
 }
 
+/// The Device-Bound Post-Quantum dependencies the router needs to produce
+/// composite routes. Wired once at the composition root; nil leaves the
+/// composite branch blocked (`operationUnavailableByPolicy`).
+struct CompositeCustodyRouterContext {
+    let bindingInspector: any SecureEnclaveCompositeBindingInspecting
+    let handleStore: SecureEnclaveCompositeHandleStore
+    let classicalComponentStore: SecureEnclaveCompositeClassicalComponentStore
+}
+
 struct SoftwareSecretCertificateRoute {
     let identity: PGPKeyIdentity
     let operation: PGPPrivateOperationKind
@@ -79,20 +88,88 @@ struct SecureEnclaveKeyAgreementRoute {
     }
 }
 
+/// Device-Bound Post-Quantum split-custody signing route: the enclave-resident
+/// ML-DSA-65 signing handle plus the unwrapped Ed25519 classical component the
+/// engine needs for the same signature. The classical component's shared buffer
+/// is zeroized when the operation window ends.
+struct SecureEnclaveCompositeSignerRoute {
+    let identity: PGPKeyIdentity
+    let operation: PGPPrivateOperationKind
+    let compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection
+    let signingHandle: SecureEnclaveCompositeLoadedHandle
+    let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
+    let operationAuthorization: SecureEnclaveCustodyOperationAuthorization?
+
+    init(
+        identity: PGPKeyIdentity,
+        operation: PGPPrivateOperationKind,
+        compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection,
+        signingHandle: SecureEnclaveCompositeLoadedHandle,
+        classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent,
+        operationAuthorization: SecureEnclaveCustodyOperationAuthorization? = nil
+    ) {
+        self.identity = identity
+        self.operation = operation
+        self.compositeBindingInspection = compositeBindingInspection
+        self.signingHandle = signingHandle
+        self.classicalComponent = classicalComponent
+        self.operationAuthorization = operationAuthorization
+    }
+}
+
+/// Device-Bound Post-Quantum split-custody key-agreement route: the
+/// enclave-resident ML-KEM-768 handle plus the unwrapped X25519 classical
+/// component. The classical component's shared buffer is zeroized when the
+/// operation window ends.
+struct SecureEnclaveCompositeKeyAgreementRoute {
+    let identity: PGPKeyIdentity
+    let operation: PGPPrivateOperationKind
+    let compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection
+    let keyAgreementHandle: SecureEnclaveCompositeLoadedHandle
+    let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
+    let operationAuthorization: SecureEnclaveCustodyOperationAuthorization?
+
+    init(
+        identity: PGPKeyIdentity,
+        operation: PGPPrivateOperationKind,
+        compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection,
+        keyAgreementHandle: SecureEnclaveCompositeLoadedHandle,
+        classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent,
+        operationAuthorization: SecureEnclaveCustodyOperationAuthorization? = nil
+    ) {
+        self.identity = identity
+        self.operation = operation
+        self.compositeBindingInspection = compositeBindingInspection
+        self.keyAgreementHandle = keyAgreementHandle
+        self.classicalComponent = classicalComponent
+        self.operationAuthorization = operationAuthorization
+    }
+}
+
 enum PrivateKeyOperationRoute {
     case softwareSecretCertificate(SoftwareSecretCertificateRoute)
     case secureEnclaveSigner(SecureEnclaveSignerRoute)
     case secureEnclaveKeyAgreement(SecureEnclaveKeyAgreementRoute)
+    case secureEnclaveCompositeSigner(SecureEnclaveCompositeSignerRoute)
+    case secureEnclaveCompositeKeyAgreement(SecureEnclaveCompositeKeyAgreementRoute)
     case blocked(PGPKeyOperationResolution)
 }
 
 extension PrivateKeyOperationRoute {
-    /// Call from `defer` immediately after obtaining a route.
+    /// Call from `defer` immediately after obtaining a route. Ends the
+    /// operation-prompt authorization and zeroizes any unwrapped classical
+    /// component secret carried by the route.
     func endAuthorizedOperation() {
         switch self {
         case .secureEnclaveSigner(let route):
             route.operationAuthorization?.end()
         case .secureEnclaveKeyAgreement(let route):
+            route.operationAuthorization?.end()
+        case .secureEnclaveCompositeSigner(let route):
+            route.classicalComponent.zeroize()
+            route.operationAuthorization?.end()
+        case .secureEnclaveCompositeKeyAgreement(let route):
+            route.classicalComponent.zeroize()
             route.operationAuthorization?.end()
         case .softwareSecretCertificate, .blocked:
             break

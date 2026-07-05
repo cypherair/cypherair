@@ -13,17 +13,20 @@ final class PrivateKeyDetachedFileSigningService: DetachedFileSigning, @unchecke
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let messageAdapter: PGPMessageOperationAdapter
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
+    private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
-        digestSigner: any SecureEnclaveCustodyDigestSigning
+        digestSigner: any SecureEnclaveCustodyDigestSigning,
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.messageAdapter = messageAdapter
         self.digestSigner = digestSigner
+        self.compositeSigner = compositeSigner
     }
 
     func signDetachedFile(
@@ -71,7 +74,20 @@ final class PrivateKeyDetachedFileSigningService: DetachedFileSigning, @unchecke
                 progress: progress
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await messageAdapter.signDetachedFileWithExternalCompositeSigner(
+                inputPath: inputPath,
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                progress: progress
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

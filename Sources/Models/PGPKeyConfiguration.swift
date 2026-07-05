@@ -8,6 +8,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         case postQuantumSoftwareV6
         case compatibleP256V4
         case modernP256V6
+        case deviceBoundPostQuantumV6
 
         var configuration: PGPKeyConfiguration {
             switch self {
@@ -21,6 +22,8 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
                 .compatibleP256V4
             case .modernP256V6:
                 .modernP256V6
+            case .deviceBoundPostQuantumV6:
+                .deviceBoundPostQuantumV6
             }
         }
     }
@@ -99,11 +102,24 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         messageFormatPreference: .seipdV2Aead,
         softwareExportProtection: .notAvailable
     )
+
+    /// Device-Bound Post-Quantum: the RFC 9980 composite suite under split
+    /// custody. The ML-DSA/ML-KEM components live in the Secure Enclave, the
+    /// classical components under the fixed-access envelope; the private key
+    /// is never exportable (docs/POST_QUANTUM.md Section 3).
+    static let deviceBoundPostQuantumV6 = PGPKeyConfiguration(
+        identity: .deviceBoundPostQuantumV6,
+        keyVersion: 6,
+        algorithmSuite: .mldsa65Ed25519Mlkem768X25519,
+        compatibilityTarget: .rfc9580Oriented,
+        messageFormatPreference: .seipdV2Aead,
+        softwareExportProtection: .notAvailable
+    )
 }
 
 extension PGPKeyConfiguration.Identity {
     /// The historical software profile this configuration identity maps onto,
-    /// or nil for Secure Enclave custody (P-256) configurations.
+    /// or nil for Secure Enclave custody configurations.
     var equivalentSoftwareProfile: PGPKeyProfile? {
         switch self {
         case .compatibleSoftwareV4:
@@ -112,7 +128,7 @@ extension PGPKeyConfiguration.Identity {
             .advanced
         case .postQuantumSoftwareV6:
             .postQuantum
-        case .compatibleP256V4, .modernP256V6:
+        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
             nil
         }
     }

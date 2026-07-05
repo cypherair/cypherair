@@ -60,6 +60,39 @@ enum PGPErrorMapper {
         return map(pgpError)
     }
 
+    static func mapExternalCompositeSigning(_ error: Error) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        }
+        guard let pgpError = error as? PgpError else {
+            return .signingFailed(reason: error.localizedDescription)
+        }
+
+        switch pgpError {
+        case .OperationCancelled:
+            return .operationCancelled
+        case .ExternalCompositeSigningFailed(let category):
+            return .keyOperationUnavailable(
+                category: externalCompositeSigningCategory(for: category)
+            )
+        default:
+            return map(pgpError)
+        }
+    }
+
+    static func mapExternalCompositeKeyAgreement(_ error: Error) -> CypherAirError {
+        if let cypherAirError = error as? CypherAirError {
+            return cypherAirError
+        }
+        guard let pgpError = error as? PgpError else {
+            return .corruptData(reason: error.localizedDescription)
+        }
+        // `map` already handles .OperationCancelled and
+        // .ExternalCompositeKeyAgreementFailed identically; this wrapper only
+        // differs by its non-PgpError fallback above.
+        return map(pgpError)
+    }
+
     static func map(_ pgpError: PgpError) -> CypherAirError {
         switch pgpError {
         case .AeadAuthenticationFailed:

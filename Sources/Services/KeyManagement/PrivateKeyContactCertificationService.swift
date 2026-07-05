@@ -14,17 +14,20 @@ final class PrivateKeyContactCertificationService: ContactCertificationSigning, 
     private let softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping
     private let certificateAdapter: PGPCertificateOperationAdapter
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
+    private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
         router: any PrivateKeyOperationRouting,
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         certificateAdapter: PGPCertificateOperationAdapter,
-        digestSigner: any SecureEnclaveCustodyDigestSigning
+        digestSigner: any SecureEnclaveCustodyDigestSigning,
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess
         self.certificateAdapter = certificateAdapter
         self.digestSigner = digestSigner
+        self.compositeSigner = compositeSigner
     }
 
     func generateUserIdCertification(
@@ -75,7 +78,21 @@ final class PrivateKeyContactCertificationService: ContactCertificationSigning, 
                 certificationKind: certificationKind
             )
 
-        case .secureEnclaveKeyAgreement:
+        case .secureEnclaveCompositeSigner(let route):
+            return try await certificateAdapter.generateUserIdCertificationWithExternalCompositeSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                targetCert: targetCert,
+                selectedUserId: selectedUserId,
+                certificationKind: certificationKind
+            )
+
+        case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)
 
         case .blocked(let resolution):

@@ -38,8 +38,11 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         let invalidPairs: [(PGPKeyConfiguration, PGPPrivateKeyCustodyKind)] = [
             (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
             (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
-            // Device-Bound Post-Quantum split custody is campaign #567 Phase 3.
+            // The composite suite is legal under both custody kinds, but only
+            // through its matching identity: the portable identity stays
+            // software-only and the device-bound identity stays enclave-only.
             (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
+            (.deviceBoundPostQuantumV6, .softwareSecretCertificate),
             (.compatibleP256V4, .softwareSecretCertificate),
             (.modernP256V6, .softwareSecretCertificate)
         ]
@@ -73,7 +76,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
     func test_productionPolicySupportsImplementedSecureEnclaveOperations() {
         let resolver = PGPKeyCapabilityResolver()
 
-        for configuration in [PGPKeyConfiguration.compatibleP256V4, .modernP256V6] {
+        for configuration in [PGPKeyConfiguration.compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6] {
             XCTAssertTrue(resolver.isValidConfigurationCustodyPair(
                 configuration: configuration,
                 custody: .appleSecureEnclavePrivateOperations

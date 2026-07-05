@@ -46,16 +46,21 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 )
             }
 
-            switch (configuration.algorithmSuite, identity.privateKeyCustodyKind) {
-            case (.p256, .softwareSecretCertificate):
+            // Custody validity is identity-level: the composite suite is legal
+            // under both custody kinds (portable software vs device-bound
+            // split custody), so the suite alone cannot decide.
+            switch (configuration.identity, identity.privateKeyCustodyKind) {
+            case (.compatibleP256V4, .softwareSecretCertificate),
+                 (.modernP256V6, .softwareSecretCertificate),
+                 (.deviceBoundPostQuantumV6, .softwareSecretCertificate):
                 throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use software custody for a P-256 configuration."
+                    "Key metadata cannot use software custody for a device-bound configuration."
                 )
-            case (.ed25519X25519, .appleSecureEnclavePrivateOperations),
-                 (.ed448X448, .appleSecureEnclavePrivateOperations),
-                 (.mldsa65Ed25519Mlkem768X25519, .appleSecureEnclavePrivateOperations):
+            case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
+                 (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+                 (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations):
                 throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata cannot use Secure Enclave custody for a non-P-256 configuration."
+                    "Key metadata cannot use Secure Enclave custody for a software configuration."
                 )
             default:
                 return

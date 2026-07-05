@@ -9765,6 +9765,54 @@
         }
       }
     },
+    "keyFamily.deviceBoundPostQuantum.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The post-quantum private key lives in this device's Secure Enclave and cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用抗量子加密标准（RFC 9980），可抵御未来量子计算机的攻击。不兼容 GnuPG。后量子私钥保存在本设备的安全隔区中，无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantum.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Post-Quantum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定后量子"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantum.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~192 bit, quantum-resistant"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~192 位，抗量子"
+          }
+        }
+      }
+    },
     "keyFamily.exportability.deviceBound" : {
       "localizations" : {
         "en" : {
