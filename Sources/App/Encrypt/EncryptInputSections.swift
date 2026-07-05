@@ -9,25 +9,13 @@ struct EncryptTextInputSection: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.plaintext,
-                mode: .prose
-            )
-            .frame(
-                minHeight: editorHeightRange.min,
-                idealHeight: editorHeightRange.ideal,
-                maxHeight: editorHeightRange.max
+                mode: .prose,
+                title: String(localized: "encrypt.plaintext", defaultValue: "Message")
             )
         } header: {
             Text(String(localized: "encrypt.plaintext", defaultValue: "Message"))
         }
         .id(model.textInputSectionEpoch)
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (120, 170, 240)
-        #endif
     }
 }
 

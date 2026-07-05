@@ -304,12 +304,8 @@ private struct SignScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.text,
-                mode: .prose
-            )
-            .frame(
-                minHeight: editorHeightRange.min,
-                idealHeight: editorHeightRange.ideal,
-                maxHeight: editorHeightRange.max
+                mode: .prose,
+                title: String(localized: "sign.input", defaultValue: "Message to Sign")
             )
         } header: {
             Text(String(localized: "sign.input", defaultValue: "Message to Sign"))
@@ -352,13 +348,5 @@ private struct SignScreenHostView: View {
         case .file:
             model.detachedSignature != nil
         }
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (120, 170, 240)
-        #endif
     }
 }

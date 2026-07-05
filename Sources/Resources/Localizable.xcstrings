@@ -161,6 +161,22 @@
         }
       }
     },
+    "addcontact.editor.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥"
+          }
+        }
+      }
+    },
     "addcontact.file.header" : {
       "localizations" : {
         "en" : {
@@ -8453,6 +8469,22 @@
         }
       }
     },
+    "import.editor.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Key"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私钥"
+          }
+        }
+      }
+    },
     "import.error.alertTitle" : {
       "localizations" : {
         "en" : {
@@ -11105,6 +11137,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建密钥…"
+          }
+        }
+      }
+    },
+    "multilineInput.placeholder.machine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to paste…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点粘贴…"
+          }
+        }
+      }
+    },
+    "multilineInput.placeholder.prose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to write or paste…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点输入或粘贴…"
           }
         }
       }

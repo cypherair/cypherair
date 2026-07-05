@@ -257,12 +257,8 @@ private struct AddContactScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: $model.armoredText,
-                mode: .machineText
-            )
-            .frame(
-                minHeight: pasteEditorHeightRange.min,
-                idealHeight: pasteEditorHeightRange.ideal,
-                maxHeight: pasteEditorHeightRange.max
+                mode: .machineText,
+                title: String(localized: "addcontact.editor.title", defaultValue: "Public Key")
             )
         } header: {
             Text(String(localized: "addcontact.paste.header", defaultValue: "Paste public key (armored or binary)"))
@@ -344,13 +340,5 @@ private struct AddContactScreenHostView: View {
 
     private var runtimeSyncKey: AddContactView.RuntimeSyncKey {
         AddContactView.RuntimeSyncKey(configuration: configuration)
-    }
-
-    private var pasteEditorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (160, 220, 280)
-        #endif
     }
 }
