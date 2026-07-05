@@ -82,7 +82,7 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
         // as an immutable CFData bridged to Data. `resetBytes` triggers Data's
         // copy-on-write, so it may zero a fresh copy while the original CFData
         // backing lingers until ARC releases it. The SecKey-backed custody handle
-        // leaves no zeroizable alternative here (cf. SECURITY.md §9.1 on String);
+        // leaves no zeroizable alternative here (cf. SECURITY.md §9 on String);
         // exposure is bounded by the short lifetime, ASLR, and MIE. The validated
         // SecureEnclaveP256RawSharedSecret copy below is the carrier; this defer is
         // best-effort scrubbing of the transient bridged buffer.

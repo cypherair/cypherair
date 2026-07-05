@@ -1,13 +1,11 @@
-//! GnuPG message interoperability tests.
-//!
-//! Covers POC test cases C3.1–C3.8 and C2A.9/C2B.10 (DEFLATE compressed messages).
+//! GnuPG message interoperability tests, including DEFLATE compressed messages.
 //!
 //! These tests use pre-generated GnuPG fixtures (see `fixtures/generate_gpg_fixtures.sh`).
 //! The fixtures were generated with GnuPG 2.5.18 using Ed25519+Cv25519 keys.
 //!
-//! Test strategy (per TESTING.md Section 7):
-//! - Approach B (Rust layer): Sequoia-to-fixture comparison in the Rust test suite.
-//! - GnuPG cannot run on iOS, so all interop validation happens here.
+//! Test strategy (per TESTING.md §5, fixtures mechanism): Sequoia-to-fixture
+//! comparison in the Rust test suite — GnuPG cannot run on iOS, so fixture-based
+//! interop validation happens here.
 
 use pgp_mobile::armor;
 use pgp_mobile::decrypt;

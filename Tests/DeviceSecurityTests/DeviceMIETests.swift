@@ -52,7 +52,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    // MARK: - C8.2: Full PGP Workflow Under MIE (Both Profiles)
+    // MARK: - C8.2: Full PGP Workflow Under MIE (Profile A + Profile B)
 
     /// C8.2: Complete Profile A (v4, Ed25519+X25519, SEIPDv1) workflow on device.
     /// Exercises OpenSSL: AES-256, X25519 key agreement, Ed25519 signing, SHA-512 hashing.
@@ -345,7 +345,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let engine = PgpEngine()
         let plaintext = Data("C8.3 OpenSSL paths MIE validation".utf8)
 
-        // --- Generate keys for both profiles ---
+        // --- Generate keys for Profile A and Profile B ---
         let keyA = try engine.generateKey(
             name: "OpenSSL A", email: nil, expirySeconds: nil, profile: .universal
         )
@@ -368,7 +368,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(resultA.plaintext, plaintext, "AES-256 SEIPDv1 round-trip failed")
 
-        // 2. SHA-512 via signing (both profiles).
+        // 2. SHA-512 via signing (Profile A and Profile B).
         //    OpenSSL path: SHA-512 hash for signature computation.
         let signedA = try engine.signCleartext(text: plaintext, signerCert: keyA.certData)
         let verifyA = try engine.verifyCleartextDetailed(
@@ -561,7 +561,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    /// C8.4: 100 sign/verify cycles for both profiles under MIE.
+    /// C8.4: 100 sign/verify cycles for Profile A and Profile B under MIE.
     /// Exercises Ed25519 + Ed448 + SHA-512 hashing 200 times total.
     /// Pass: zero tag violations across all cycles.
     func test_mie_100xSignVerifyCycles_bothProfiles_noIntermittentCrashes() throws {
