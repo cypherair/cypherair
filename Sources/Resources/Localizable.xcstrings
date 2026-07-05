@@ -15525,6 +15525,38 @@
         }
       }
     },
+    "qr.unavailable.tooLarge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key contains too much data for a QR code. Share this key as a file or copy it instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥数据过多，无法生成二维码。请以文件方式分享或复制此密钥。"
+          }
+        }
+      }
+    },
+    "qr.unavailable.generic" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A QR code could not be generated for this key. Share this key as a file or copy it instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法为此密钥生成二维码。请以文件方式分享或复制此密钥。"
+          }
+        }
+      }
+    },
     "encrypt.quantumSafe.helpButton" : {
       "localizations" : {
         "en" : {
