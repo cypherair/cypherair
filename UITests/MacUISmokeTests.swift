@@ -124,9 +124,13 @@ final class MacUISmokeTests: XCTestCase {
         generateKey()
 
         // Generation is pushed onto the Home tab's path, so the My Keys list
-        // root is reached by opening the Keys tab, not by popping back.
+        // root is reached by opening the Keys tab, not by popping back. The
+        // macOS List collapses each row into one accessibility Button whose
+        // label starts with the user ID, so match the row by label prefix.
         element("sidebar.keys").tap()
-        let keyRow = app.staticTexts["UITest Alice"].firstMatch
+        let keyRow = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "UITest Alice")
+        ).firstMatch
         XCTAssertTrue(keyRow.waitForExistence(timeout: 10))
         XCTAssertTrue(keyRow.isHittable)
         keyRow.rightClick()
