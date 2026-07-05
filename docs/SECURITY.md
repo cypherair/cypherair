@@ -494,7 +494,7 @@ The Enhanced Security capability is additive. It never breaks compatibility with
 
 ## 10. AI Coding Red Lines
 
-The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, must include the testing requirements at the end of this section, and requires human review before merge (see [CODE_REVIEW.md](CODE_REVIEW.md)). Never merge such a change autonomously.
+The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, must include the testing requirements at the end of this section, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)). Never merge such a change autonomously.
 
 ### Absolute Coding Invariants
 

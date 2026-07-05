@@ -180,7 +180,7 @@ The GitHub Actions workflows in this repository currently target `macos-26`, but
 
 ### XCFramework Prerelease
 
-CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and the current stable-release channel contract, see [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
+CypherAir publishes unique edge prerelease XCFrameworks for the current `main` branch using `pgpmobile-edge-` release tags. For discovery, asset names, download commands, verification steps, and the current stable-release channel contract, see [docs/RELEASE.md](docs/RELEASE.md).
 
 ### SQLCipher External Dependency
 
@@ -229,11 +229,9 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Module breakdown, data flows, storage layout |
 | [SECURITY](docs/SECURITY.md) | Encryption scheme, key lifecycle, threat model |
 | [TESTING](docs/TESTING.md) | Test strategy and coverage |
-| [APP_RELEASE_PROCESS](docs/APP_RELEASE_PROCESS.md) | Current app-build release modes, stable asset contract, and App Store candidate ordering |
-| [DOCUMENTATION_GOVERNANCE](docs/DOCUMENTATION_GOVERNANCE.md) | Documentation classes, metadata rules, archive rules, and update triggers |
+| [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, and the documentation contract |
+| [RELEASE](docs/RELEASE.md) | Stable app releases, the Xcode Cloud flow, the asset contract, and XCFramework SDK channels |
 | [CONVENTIONS](docs/CONVENTIONS.md) | Swift coding standards, SwiftUI patterns, and current Liquid Glass rules |
-| [CODE_REVIEW](docs/CODE_REVIEW.md) | Code review checklist by change type |
-| [XCFRAMEWORK_RELEASES](docs/XCFRAMEWORK_RELEASES.md) | Current edge, drill, and stable XCFramework release channels and verification |
 | [SQLCIPHER_XCFRAMEWORK_DEPENDENCY](docs/SQLCIPHER_XCFRAMEWORK_DEPENDENCY.md) | Formal pinned external SQLCipher XCFramework dependency and refresh flow |
 
 ## License
@@ -255,4 +253,4 @@ Third-party components remain under their own licenses. See the bundled notices
 and repository documentation for third-party license details and distribution
 compliance materials.
 
-Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/APP_RELEASE_PROCESS.md](docs/APP_RELEASE_PROCESS.md) and [docs/XCFRAMEWORK_RELEASES.md](docs/XCFRAMEWORK_RELEASES.md).
+Current stable app-build release ordering and exact source/compliance asset expectations are documented in [docs/RELEASE.md](docs/RELEASE.md).

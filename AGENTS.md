@@ -131,7 +131,7 @@ areas include:
   `CypherAir-Info.plist`, and Xcode project files
 
 Authoritative security rationale and invariants live in `docs/SECURITY.md`,
-especially Section 10. Review gates live in `docs/CODE_REVIEW.md`.
+especially Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope
 
@@ -148,11 +148,12 @@ especially Section 10. Review gates live in `docs/CODE_REVIEW.md`.
 
 ## Releases, Git, And Workflow
 
-- Stable releases are tag-first per `docs/APP_RELEASE_PROCESS.md`. Never treat
+- Stable releases are tag-first per `docs/RELEASE.md`. Never treat
   `workflow_dispatch` alone as a substitute for the stable tag. Ask before
   publishing any release or tag.
-- Xcode release metadata (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`) is
-  user-owned. Read it from the project; never invent, increment, or reset it.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope
+  part of preparing a release (`docs/RELEASE.md` Section 1); confirm the
+  intended version with the maintainer before creating the release tag.
 - Work on a topic branch and submit a PR. Do not commit directly to `main`
   unless the user explicitly asks.
 - Do not set `autoResolutionMs` on `request_user_input` and wait for an

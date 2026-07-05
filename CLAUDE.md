@@ -2,13 +2,13 @@
 
 Offline OpenPGP encryption tool for iOS, iPadOS, macOS, and visionOS. `GPL-3.0-or-later OR MPL-2.0` for first-party code. Zero network access. Minimal permissions (Face ID / Touch ID usage description only).
 
-This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/DOCUMENTATION_GOVERNANCE.md.
+This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately for Codex; keep shared project constraints semantically aligned, but do not force the two files to be identical. Agent skills under `.claude/skills/` carry workflow choreography and defer to the canonical documents they cite. `docs/ARM64E_STATUS.md` is the source of truth for Apple arm64e support. Documentation classes and precedence are defined in docs/WORKFLOW.md.
 
 ## Tech Stack
 
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift 6.3.2, SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
-- **OpenPGP:** Sequoia PGP 2.3.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering and the current source/compliance asset contract are documented in docs/APP_RELEASE_PROCESS.md and docs/XCFRAMEWORK_RELEASES.md.
+- **OpenPGP:** Sequoia PGP 2.3.0 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
 - **Key families:** Key generation uses four families — Portable Compatible (Profile A software key, GnuPG-compatible), Portable Modern (Profile B software key, RFC 9580), Device-Bound Compatible (Secure Enclave custody, P-256 v4, non-exportable), and Device-Bound Modern (Secure Enclave custody, P-256 v6, non-exportable). Profile A/B remains the technical vocabulary for the software configurations. Current product exposure and release status live in docs/PRD.md Section 3 and docs/SECURE_ENCLAVE_CUSTODY.md.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
@@ -89,7 +89,7 @@ Xcode's MCP server (`xcrun mcpbridge`, Xcode 26.3+) provides Apple Developer Doc
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, must include both positive and negative tests, and receives human review before merge (docs/CODE_REVIEW.md). Security-critical areas:
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, must include both positive and negative tests, and receives human review before merge (docs/WORKFLOW.md). Security-critical areas:
 
 - `Sources/Security/` — SE wrapping, Keychain access control, auth modes, ProtectedData, custody boundaries
 - `Sources/Services/DecryptionService.swift` — Phase 1/Phase 2 authentication boundary
@@ -119,12 +119,12 @@ Profiles are selected at key generation and immutable per key; multiple keys of 
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - Docs-only PRs may use the documentation consistency path in docs/TESTING.md Section 2 instead of Rust/Xcode runs.
-- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review checklist: docs/CODE_REVIEW.md.
+- Test plans, CI lanes, the hosted-runner caveat, and the full guide: docs/TESTING.md. Review checklist: docs/WORKFLOW.md.
 
 ## Releases & Versioning
 
-- Stable releases are tag-first per docs/APP_RELEASE_PROCESS.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Ask before publishing any release or tag.
-- Xcode release metadata (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`) is user-owned: read it from the project, and never invent, increment, or reset it. If the user changed it, treat that change as in-scope work, not something to revert.
+- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Ask before publishing any release or tag.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/RELEASE.md §1). Confirm the intended version with the maintainer before creating the release tag, since publishing is outward-facing.
 
 ## Git & Workflow
 
