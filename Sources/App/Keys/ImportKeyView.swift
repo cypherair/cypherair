@@ -51,12 +51,8 @@ private struct ImportKeyScreenHostView: View {
                 } else {
                     CypherMultilineTextInput(
                         text: $model.armoredText,
-                        mode: .machineText
-                    )
-                    .frame(
-                        minHeight: editorHeightRange.min,
-                        idealHeight: editorHeightRange.ideal,
-                        maxHeight: editorHeightRange.max
+                        mode: .machineText,
+                        title: String(localized: "import.editor.title", defaultValue: "Private Key")
                     )
                 }
             } header: {
@@ -139,13 +135,5 @@ private struct ImportKeyScreenHostView: View {
         .onChange(of: appSessionOrchestrator.contentClearGeneration) {
             model.handleContentClearGenerationChange()
         }
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        return (120, 170, 250)
-        #else
-        return (120, 170, 240)
-        #endif
     }
 }

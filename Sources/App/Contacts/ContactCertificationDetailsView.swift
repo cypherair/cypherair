@@ -420,9 +420,9 @@ private struct ContactCertificationDetailsHostView: View {
                     get: { model.signatureInput },
                     set: { model.setSignatureInput($0) }
                 ),
-                mode: .machineText
+                mode: .machineText,
+                title: String(localized: "contactcertsig.signature", defaultValue: "Signature")
             )
-            .frame(minHeight: 100, idealHeight: 140, maxHeight: 220)
             .disabled(model.isOperationLocked)
 
             Button {

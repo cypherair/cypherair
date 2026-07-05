@@ -8,37 +8,147 @@ enum CypherMultilineTextInputMode {
     case machineText
 }
 
+/// Shared multi-line text input for the tool screens.
+///
+/// On UIKit platforms the Form row is a tap target that opens a dedicated
+/// full-height editor sheet. The editor must not live inline in the Form row:
+/// SwiftUI's Form sizes a `UITextView`-backed row to the text view's own
+/// content height and ignores every cap short of a definite frame, so a long
+/// paste balloons the row into a blank unscrollable area (issue #513, PR #510).
+/// macOS keeps the inline `TextEditor`, which is unaffected.
 struct CypherMultilineTextInput: View {
     @Binding var text: String
     let mode: CypherMultilineTextInputMode
+    let title: String
 
     var body: some View {
         #if canImport(UIKit)
-        CypherMultilineTextInputRepresentable(
+        CypherMultilineInputRow(
             text: $text,
-            mode: mode
+            mode: mode,
+            title: title
         )
-        .privacySensitive()
         #else
         TextEditor(text: $text)
-            .font(font)
+            .font(mode.editorFont)
             .applyMacWritingToolsPolicy()
             .privacySensitive()
             .cypherMacTextEditorChrome()
+            .frame(minHeight: 120, idealHeight: 170, maxHeight: 240)
+            .accessibilityLabel(title)
         #endif
     }
+}
 
-    private var font: Font {
-        switch mode {
+private extension CypherMultilineTextInputMode {
+    var editorFont: Font {
+        switch self {
         case .prose:
             .body
         case .machineText:
             .system(.body, design: .monospaced)
         }
     }
+
+    var placeholder: String {
+        switch self {
+        case .prose:
+            String(localized: "multilineInput.placeholder.prose", defaultValue: "Tap to write or paste…")
+        case .machineText:
+            String(localized: "multilineInput.placeholder.machine", defaultValue: "Tap to paste…")
+        }
+    }
 }
 
 #if canImport(UIKit)
+private struct CypherMultilineInputRow: View {
+    @Binding var text: String
+    let mode: CypherMultilineTextInputMode
+    let title: String
+
+    @State private var isEditorPresented = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator: AppSessionOrchestrator?
+
+    var body: some View {
+        Button {
+            isEditorPresented = true
+        } label: {
+            HStack(alignment: .top, spacing: CypherSpacing.tight) {
+                previewText
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "square.and.pencil")
+                    .foregroundStyle(isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .sheet(isPresented: $isEditorPresented) {
+            CypherMultilineEditorSheet(
+                text: $text,
+                mode: mode,
+                title: title
+            )
+        }
+        // The relock signal (docs/SECURITY.md session model): the sheet is
+        // window-level and floats above the in-hierarchy lock surface, so it
+        // must dismiss itself when content clears.
+        .onChange(of: appSessionOrchestrator?.contentClearGeneration) { _, _ in
+            isEditorPresented = false
+        }
+    }
+
+    @ViewBuilder
+    private var previewText: some View {
+        if text.isEmpty {
+            Text(mode.placeholder)
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+        } else {
+            // Cap what Text has to lay out; five body lines never need more
+            // than a few hundred characters, and pastes can be megabytes.
+            Text(String(text.prefix(400)))
+                .font(mode.editorFont)
+                .lineLimit(5)
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .privacySensitive()
+        }
+    }
+}
+
+private struct CypherMultilineEditorSheet: View {
+    @Binding var text: String
+    let mode: CypherMultilineTextInputMode
+    let title: String
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppLockController.self) private var appLockController: AppLockController?
+
+    var body: some View {
+        NavigationStack {
+            CypherMultilineTextInputRepresentable(
+                text: $text,
+                mode: mode
+            )
+            .privacySensitive()
+            .navigationTitle(title)
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "common.done", defaultValue: "Done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        // The sheet escapes the main window content's cosmetic cover, so it
+        // carries its own (docs/SECURITY.md: sensitive content never appears
+        // in the app-switcher snapshot).
+        .cosmeticPrivacyCover(isCovered: !(appLockController?.isForegroundActive ?? true))
+    }
+}
+
 private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
     @Binding var text: String
     let mode: CypherMultilineTextInputMode
@@ -53,8 +163,17 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
         textView.backgroundColor = .clear
         textView.isEditable = true
         textView.isSelectable = true
+        textView.isScrollEnabled = true
+        textView.alwaysBounceVertical = true
+        textView.textContainerInset = UIEdgeInsets(
+            top: CypherSpacing.tight,
+            left: CypherSpacing.tight,
+            bottom: CypherSpacing.tight,
+            right: CypherSpacing.tight
+        )
         textView.adjustsFontForContentSizeCategory = true
         textView.inputModeProfile = mode
+        textView.autoFocusesOnWindowAttach = true
         textView.text = text
         applyTraits(to: textView)
         return textView
@@ -154,9 +273,17 @@ private struct CypherMultilineTextInputRepresentable: UIViewRepresentable {
             }
         }
 
+        var autoFocusesOnWindowAttach = false
+
         override func didMoveToWindow() {
             super.didMoveToWindow()
             applyInteractionRestrictions()
+            if window != nil, autoFocusesOnWindowAttach {
+                autoFocusesOnWindowAttach = false
+                Task { @MainActor [weak self] in
+                    _ = self?.becomeFirstResponder()
+                }
+            }
         }
 
         override func becomeFirstResponder() -> Bool {

@@ -200,12 +200,8 @@ private struct VerifyScreenHostView: View {
                     get: { model.signedInput },
                     set: { model.setSignedInput($0) }
                 ),
-                mode: .machineText
-            )
-                .frame(
-                    minHeight: editorHeightRange.min,
-                    idealHeight: editorHeightRange.ideal,
-                    maxHeight: editorHeightRange.max
+                mode: .machineText,
+                title: String(localized: "verify.input", defaultValue: "Signed Message")
             )
 
             Button {
@@ -294,13 +290,5 @@ private struct VerifyScreenHostView: View {
             return true
         }
         return model.verifyMode == .cleartext && model.cleartextOriginalText != nil
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        return (110, 160, 240)
-        #else
-        return (120, 170, 240)
-        #endif
     }
 }

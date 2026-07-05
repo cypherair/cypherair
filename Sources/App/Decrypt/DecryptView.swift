@@ -360,13 +360,9 @@ private struct DecryptScreenHostView: View {
         Section {
             CypherMultilineTextInput(
                 text: ciphertextBinding,
-                mode: .machineText
+                mode: .machineText,
+                title: String(localized: "decrypt.input", defaultValue: "Encrypted Message")
             )
-                .frame(
-                    minHeight: editorHeightRange.min,
-                    idealHeight: editorHeightRange.ideal,
-                    maxHeight: editorHeightRange.max
-                )
 
             Button {
                 model.requestTextCiphertextImport()
@@ -440,14 +436,6 @@ private struct DecryptScreenHostView: View {
         case .file:
             return model.fileDecryptionResult != nil
         }
-    }
-
-    private var editorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (120, 170, 240)
-        #endif
     }
 
     private var allowedImportContentTypes: [UTType] {

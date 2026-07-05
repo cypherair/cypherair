@@ -274,12 +274,8 @@ private struct ContactCertificateSignaturesHostView: View {
                     get: { model.signatureInput },
                     set: { model.setSignatureInput($0) }
                 ),
-                mode: .machineText
-            )
-            .frame(
-                minHeight: signatureEditorHeightRange.min,
-                idealHeight: signatureEditorHeightRange.ideal,
-                maxHeight: signatureEditorHeightRange.max
+                mode: .machineText,
+                title: String(localized: "contactcertsig.signature", defaultValue: "Signature")
             )
             .disabled(model.isOperationLocked)
 
@@ -502,14 +498,6 @@ private struct ContactCertificateSignaturesHostView: View {
         case .certifyUserId:
             !model.canCertifyUserId
         }
-    }
-
-    private var signatureEditorHeightRange: (min: CGFloat, ideal: CGFloat, max: CGFloat) {
-        #if canImport(UIKit)
-        (110, 160, 240)
-        #else
-        (120, 170, 240)
-        #endif
     }
 
     private var actionTitle: String {
