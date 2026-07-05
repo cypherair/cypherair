@@ -90,7 +90,7 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - never silently reset unreadable converted state to empty data
 - make corrupted committed protected state a recovery surface
 - document cleanup or quarantine behavior explicitly
-- update this inventory and the companion canonical docs per [DOCUMENTATION_GOVERNANCE](DOCUMENTATION_GOVERNANCE.md) Section 6 in the same change
+- update this inventory and the companion canonical docs per the [WORKFLOW](WORKFLOW.md) documentation contract in the same change
 
 For protected ordinary settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
 

@@ -13,7 +13,7 @@
 
 sequoia-openpgp 2.3.0. Rust. RFC 9580 + RFC 4880 complete. Licensed under LGPL-2.0-or-later.
 
-Current stable app-build release ordering and the shared source/compliance asset contract are documented in [APP_RELEASE_PROCESS.md](APP_RELEASE_PROCESS.md) and [XCFRAMEWORK_RELEASES.md](XCFRAMEWORK_RELEASES.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
+Current stable app-build release ordering and the shared source/compliance asset contract are documented in [RELEASE.md](RELEASE.md). This section records the current technical library selection, not a final legal conclusion about distribution compatibility.
 
 | Library | Lang | RFC 9580 | Argon2id | iOS | Decision |
 |---------|------|----------|----------|-----|----------|
@@ -417,7 +417,7 @@ Migration and exception rules:
 - Future protected-domain migrations must preserve readable source state until the protected destination is created/opened and verified through the normal post-auth path.
 - Unsupported legacy flat Contacts files must not become fallback sources of truth.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary settings boot-authentication exception.
-- Documentation updates for storage or migration changes follow the update triggers in [DOCUMENTATION_GOVERNANCE.md](DOCUMENTATION_GOVERNANCE.md) Section 6, with [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md) as the row-level inventory.
+- Documentation updates for storage or migration changes follow the documentation contract in [WORKFLOW.md](WORKFLOW.md), with [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md) as the row-level inventory.
 
 ---
 
