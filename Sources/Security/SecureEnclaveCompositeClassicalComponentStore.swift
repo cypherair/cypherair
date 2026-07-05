@@ -104,34 +104,31 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             )
         }
 
-        let eddsaSecret = concatenated.prefix(Self.componentSecretLength)
-        let ecdhSecret = concatenated.suffix(Self.componentSecretLength)
-        return ClassicalComponent(
-            eddsaSecret: Data(eddsaSecret),
-            ecdhSecret: Data(ecdhSecret)
-        )
+        // Copy each half into freshly allocated storage that does not alias
+        // `concatenated`, so the `defer` above zeroizes the real 64-byte
+        // plaintext buffer in place instead of copy-on-writing a fresh copy
+        // and leaving the original intact.
+        var eddsaSecret = Data(count: Self.componentSecretLength)
+        var ecdhSecret = Data(count: Self.componentSecretLength)
+        concatenated.withUnsafeBytes { raw in
+            eddsaSecret.withUnsafeMutableBytes { destination in
+                destination.copyBytes(from: raw[0..<Self.componentSecretLength])
+            }
+            ecdhSecret.withUnsafeMutableBytes { destination in
+                destination.copyBytes(
+                    from: raw[Self.componentSecretLength..<Self.concatenatedLength]
+                )
+            }
+        }
+        return ClassicalComponent(eddsaSecret: eddsaSecret, ecdhSecret: ecdhSecret)
     }
 
-    func delete(fingerprint: String) throws {
-        let seKeyData: Data
-        do {
-            let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
-            seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
-                from: bundle.envelope,
-                expectedFingerprint: fingerprint
-            )
-        } catch {
-            if KeychainFailureClassifier.isItemNotFound(error) {
-                return
-            }
-            throw error
-        }
-        // Best-effort wrapping-key teardown, then remove the envelope row.
-        if let handle = try? secureEnclave.reconstructKey(from: seKeyData, authenticationContext: nil) {
-            try? secureEnclave.deleteKey(handle)
-        }
-        try bundleStore.deleteBundle(fingerprint: fingerprint)
-    }
+    // Deletion of a committed classical component is handled by the shared
+    // identity-deletion keychain-material path, which removes the envelope row
+    // by the same `privateKeyEnvelopeService(fingerprint:)` key this store
+    // writes to (KeyMutationService.deleteAllPrivateKeychainMaterial). The
+    // wrapping key lives only as `dataRepresentation` inside that envelope, so
+    // removing the row destroys it — there is no separate teardown to perform.
 
     func rollback(_ receipt: KeyBundleWriteReceipt) {
         bundleStore.rollback(receipt)

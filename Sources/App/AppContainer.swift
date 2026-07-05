@@ -986,6 +986,7 @@ final class AppContainer: @unchecked Sendable {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveCompositeHandleStore: secureEnclaveCompositeHandleStore,
             traceStore: authLifecycleTraceStore
         )
 

@@ -253,6 +253,19 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 handlePair: handlePair,
                 compositeSigner: compositeSigner
             )
+            // Zeroize the raw classical component secrets on every exit from
+            // this scope. `store` also zeroizes them (idempotent), but a
+            // cancellation/invalidation throw between receipt and seal must not
+            // free them intact. The commit closure below reads only public
+            // metadata, so the secrets stay valid until it returns.
+            defer {
+                generated.classicalEddsaSecret.resetBytes(
+                    in: 0..<generated.classicalEddsaSecret.count
+                )
+                generated.classicalEcdhSecret.resetBytes(
+                    in: 0..<generated.classicalEcdhSecret.count
+                )
+            }
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
