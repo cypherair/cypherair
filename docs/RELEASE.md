@@ -37,7 +37,7 @@ Releases are **tag-first**: pushing the SSH-signed stable tag is the trigger. Tw
 6. **`stable-release-attest.yml`** runs on `release.published`: re-verifies the signed tag and the XCFramework checksum, then generates the provenance attestation over the published assets.
 7. Confirm the release page, assets, and TestFlight builds; submit for App Store review manually in App Store Connect when ready.
 
-The Xcode Cloud scripts branch on `$CI_WORKFLOW`, so the workflow names must match exactly (`PgpMobile XCFramework`, `CypherAir Release`) or be overridden via `XCFRAMEWORK_WORKFLOW_NAME` / `RELEASE_WORKFLOW_NAME`. Setup/credential details for standing up the two workflows live in the workflow Environment configuration in App Store Connect (fine-grained `GITHUB_PAT`, the `ASC_*` App Store Connect API key, and `XCODE_CLOUD_RELEASE_WORKFLOW_ID`); the arm64e stage1 pin stays repo-controlled via `DEFAULT_ARM64E_STAGE1_RELEASE_TAG` in `scripts/build_apple_arm64e_xcframework.sh`, not an env var.
+The Xcode Cloud scripts branch on `$CI_WORKFLOW`, so the workflow names must match exactly (`PgpMobile XCFramework`, `CypherAir Release`) or be overridden via `XCFRAMEWORK_WORKFLOW_NAME` / `RELEASE_WORKFLOW_NAME`. The workflows are configured in App Store Connect; the arm64e stage1 pin stays repo-controlled via `DEFAULT_ARM64E_STAGE1_RELEASE_TAG` in `scripts/build_apple_arm64e_xcframework.sh`, not an env var.
 
 **Break-glass (Xcode Cloud unavailable):** after a stable release for the tag exists, archive `CypherAir AppStore Candidate` locally on a non-beta macOS and upload via Transporter. The scheme's local pre-action enforces the same candidate validation (`scripts/validate_app_store_candidate_release.py`): current branch `main`, clean worktree/index, the GitHub stable release exists, `PgpMobile.arm64e-build-manifest.json` validates, and the restored SQLCipher matches `third_party/sqlcipher-xcframework.pin.json`. Do not archive before the stable release exists.
 
@@ -83,7 +83,7 @@ gh attestation verify PgpMobile.xcframework.zip -R cypherair/cypherair \
     --signer-workflow cypherair/cypherair/.github/workflows/stable-release-attest.yml
 ```
 
-The same commands verify `PgpMobile.arm64e-build-manifest.json`. SQLCipher is verified separately by `scripts/restore_sqlcipher_xcframework.sh --require-attestation` against `third_party/sqlcipher-xcframework.pin.json`.
+The same commands verify `PgpMobile.arm64e-build-manifest.json`. SQLCipher is verified separately by `scripts/restore_sqlcipher_xcframework.sh --require-attestation` against `third_party/sqlcipher-xcframework.pin.json`; refreshing that dependency means publishing a new `cypherair/sqlcipher-xcframework` release first, then re-pinning it in the pin file.
 
 ## 6. Candidate verification checklist
 
