@@ -459,7 +459,7 @@ final class MacUISmokeTests: XCTestCase {
             return
         }
 
-        for _ in 0..<2 where !element("onboarding.tutorialDecision.ready").exists {
+        for _ in 0..<3 where !element("onboarding.tutorialDecision.ready").exists {
             XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
             app.buttons["Next"].tap()
         }

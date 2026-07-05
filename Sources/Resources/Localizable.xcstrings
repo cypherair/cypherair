@@ -11189,6 +11189,38 @@
         }
       }
     },
+    "onboarding.keyFamilies.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Six key families to choose from. Device-Bound keys keep private keys inside this device’s Secure Enclave — they can never leave. Post-Quantum keys are designed to resist future quantum computers. Classical portable keys remain for full GnuPG compatibility."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "六个密钥家族可供选择。设备绑定密钥的私钥保存在本机安全隔区中，永不离开设备；后量子密钥旨在抵御未来的量子计算机；经典便携密钥依旧提供完整的 GnuPG 兼容性。"
+          }
+        }
+      }
+    },
+    "onboarding.keyFamilies.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure Enclave & Post-Quantum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区与后量子"
+          }
+        }
+      }
+    },
     "onboarding.next" : {
       "localizations" : {
         "en" : {
