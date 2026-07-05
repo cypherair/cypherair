@@ -23,10 +23,8 @@ enum PGPErrorMapper {
         guard let pgpError = error as? PgpError else {
             return .internalError(reason: error.localizedDescription)
         }
-
-        if case .NoMatchingKey = pgpError {
-            return .noMatchingKey
-        }
+        // `map` already sends .NoMatchingKey to .noMatchingKey; this wrapper
+        // only differs by its non-PgpError fallback above.
         return map(pgpError)
     }
 
@@ -37,15 +35,9 @@ enum PGPErrorMapper {
         guard let pgpError = error as? PgpError else {
             return .signingFailed(reason: error.localizedDescription)
         }
-
-        switch pgpError {
-        case .OperationCancelled:
-            return .operationCancelled
-        case .ExternalP256SigningFailed(let category):
-            return .keyOperationUnavailable(category: externalP256SigningCategory(for: category))
-        default:
-            return map(pgpError)
-        }
+        // `map` already handles .OperationCancelled and .ExternalP256SigningFailed
+        // identically; this wrapper only differs by its non-PgpError fallback above.
+        return map(pgpError)
     }
 
     static func mapExternalP256KeyAgreement(_ error: Error) -> CypherAirError {
@@ -67,17 +59,10 @@ enum PGPErrorMapper {
         guard let pgpError = error as? PgpError else {
             return .signingFailed(reason: error.localizedDescription)
         }
-
-        switch pgpError {
-        case .OperationCancelled:
-            return .operationCancelled
-        case .ExternalCompositeSigningFailed(let category):
-            return .keyOperationUnavailable(
-                category: externalCompositeSigningCategory(for: category)
-            )
-        default:
-            return map(pgpError)
-        }
+        // `map` already handles .OperationCancelled and
+        // .ExternalCompositeSigningFailed identically; this wrapper only
+        // differs by its non-PgpError fallback above.
+        return map(pgpError)
     }
 
     static func mapExternalCompositeKeyAgreement(_ error: Error) -> CypherAirError {
