@@ -118,21 +118,9 @@ documentation lookup for API behavior instead of relying on memory.
 
 You may edit security-critical areas directly, but the summary and PR description
 must call out the file, what changed, and why. Security changes need both
-positive and negative tests and human review before merge. Security-critical
-areas include:
-
-- `Sources/Security/`
-- `Sources/Services/DecryptionService.swift`
-- `Sources/Services/QRService.swift`
-- `Sources/Extensions/Data+Zeroing.swift`
-- `Sources/Security/MemoryZeroingUtility.swift`
-- `Sources/Services/DiskSpaceChecker.swift`
-- `pgp-mobile/src/`
-- `CypherAir.entitlements`, `CypherAirMacOS.entitlements`,
-  `CypherAir-Info.plist`, and Xcode project files
-
-Authoritative security rationale and invariants live in `docs/SECURITY.md`,
-especially Section 10. Review gates live in `docs/WORKFLOW.md`.
+positive and negative tests and human review before merge. The authoritative
+security-critical file list, rationale, and invariants live in
+`docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 
 ## Code Style And Scope
 

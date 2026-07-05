@@ -4,7 +4,6 @@
 > Purpose: Maintain the row-level classification and migration status for CypherAir-owned persisted and local state.
 > Audience: Human developers, security reviewers, QA, and AI coding tools.
 > Source of truth: Current code, with `ARCHITECTURE.md`, `SECURITY.md`, `TDD.md`, and `TESTING.md` as companion current-state documents. This file owns the exhaustive row-level inventory.
-> Last reviewed: 2026-06-30.
 > Update triggers: Any ProtectedData domain migration, storage/defaults/temp-path change, persistent-state classification change, Contacts protected-domain gate change, or storage/relock/recovery behavior change.
 
 ## 1. Scope
@@ -19,8 +18,6 @@ Every in-scope row must carry:
 - a domain or explicit exception
 - a current status
 - migration-readiness detail
-
-`Migration readiness` answers whether the row can move now. `Current status` records whether it has actually moved. A row can be target-classified correctly while still being pending.
 
 ## 2. Target Classes
 
@@ -92,8 +89,4 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - document cleanup or quarantine behavior explicitly
 - update this inventory and the companion canonical docs per the [WORKFLOW](WORKFLOW.md) documentation contract in the same change
 
-For protected ordinary settings, no shadow copy may be introduced to preserve pre-unlock behavior. If a setting still controls launch authentication, startup routing, or pre-unlock UI before ProtectedData opens, the implementation must first redesign that read path or keep the setting as an explicit boot exception. The only ordinary-settings boot-auth exception is `appSessionAuthenticationPolicy`.
-
-For Contacts protected-domain state, legacy plaintext sources must remain inactive after cutover and must not be treated as a fallback source of truth. Current production code does not read, migrate, quarantine, reset-clean, or proactively delete unsupported legacy Contacts files.
-
-For Contacts protected-domain state, this inventory is the authoritative persisted-state classification. SQLCipher `contacts.sqlite` is the only production Contacts payload authority; legacy snapshot-envelope artifacts must not be read as fallback. Search indexes, screen filters, and recipient selections are runtime state only; they must not become a second persisted source of truth outside the protected `contacts` payload.
+The settings shadow-copy prohibition, Contacts legacy-inactive rule, and Contacts runtime-only-state rule are owned by [TDD](TDD.md) Section 6; this inventory's rows are the authoritative classification they apply to.

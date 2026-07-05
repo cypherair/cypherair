@@ -16,7 +16,7 @@ Most work follows one loop: **discuss the goal → investigate → design → im
 - **Implement** at the right altitude: architecturally correct for long-term maintainability over the smallest patch. This sets the *depth* of a change, not its *scope* — keep the work focused on the request; do not fold in unrelated cleanup, and do not hide new behavior in the wrong place to shrink a diff. Shared components live in their own files in the right area, with Xcode file-system sync, target membership, and test-target exclusions reflecting that structure.
 - **Verify** before calling it done (§2).
 - **Multi-phase work.** When a feature lands as several PR-sized stages against a written plan, run a fresh-context adversarial verification after each stage (`.claude/skills/stage-verify`) and resolve its findings before the next stage builds on the seam. The RFC 9980 campaign (#567) is the worked example.
-- **PR and merge.** One logical change per PR; topic branch, never a direct commit to `main` unless asked; regular merge commit (no squash/rebase merge unless requested). The maintainer makes the merge decision.
+- **PR and merge.** Git mechanics live in CLAUDE.md (topic branch, regular merge commit, signed conventional commits); the maintainer makes the merge decision.
 
 ## 2. What "done" requires
 
@@ -26,7 +26,6 @@ Before considering a code task complete:
 - The relevant Swift lane passes locally — `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` is the source of truth for Swift validation (the hosted preview lane can warning-skip; rely on the local run). Device/SE-hardware behavior runs under `CypherAir-DeviceTests` on Apple Silicon or a physical device.
 - **rust-sync when needed.** Rust changes under `pgp-mobile/src`, `Cargo.toml`/`Cargo.lock`, or the UniFFI interface do **not** auto-refresh the `PgpMobile.xcframework` and generated bindings that Xcode links. When Swift-visible behavior can change, run the full pinned sync **before** Swift validation (`.claude/skills/rust-sync`). Rust-only test changes, comments, and docs do not need it.
 - Every functional change carries tests. New `Tests/` files need only `git add`; a new `Sources/` file needs its pbxproj test-target membership exception. New `Device*` test classes must be added to the unit plan's `skippedTests` or they will run — and prompt for biometrics — in the unit lane.
-- No new compiler warnings; no force-unwrap (`!`) in production; all user-facing strings in the String Catalog.
 - Commits are SSH-signed with a conventional prefix (`feat:`/`fix:`/`refactor:`/`test:`/`docs:`). Load the signing key with `ssh-add --apple-load-keychain` if the agent has no identity. Never create an unsigned commit.
 
 Docs-only changes that touch no code, generated files, project files, entitlements, release metadata, or build settings skip the Rust/Xcode runs — just keep the text-hygiene check clean (`python3 scripts/check_text_hygiene.py`) and links valid.
