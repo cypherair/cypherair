@@ -2,9 +2,27 @@ import SwiftUI
 
 /// Pre-generation commitment sheet for device-bound Secure Enclave custody keys.
 /// The user must understand the portability consequence before the key exists.
+/// The custody row is family-aware: split-custody families disclose that only
+/// the post-quantum half is enclave-resident.
 struct DeviceBoundKeyCommitmentSheet: View {
+    let family: PGPKeyConfiguration.Identity
     let onConfirm: () -> Void
     let onCancel: () -> Void
+
+    private var custodyText: String {
+        switch family {
+        case .deviceBoundPostQuantumV6:
+            String(
+                localized: "keygen.deviceBound.confirm.custodySplit",
+                defaultValue: "The post-quantum half of this key is created inside this device's Secure Enclave; the classical half is sealed to this device. Every signature and decryption requires the Secure Enclave."
+            )
+        default:
+            String(
+                localized: "keygen.deviceBound.confirm.custody",
+                defaultValue: "The private key is created inside this device's Secure Enclave and never leaves this device."
+            )
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -12,10 +30,7 @@ struct DeviceBoundKeyCommitmentSheet: View {
                 Section {
                     commitmentRow(
                         systemImage: "cpu",
-                        text: String(
-                            localized: "keygen.deviceBound.confirm.custody",
-                            defaultValue: "The private key is created inside this device's Secure Enclave and never leaves this device."
-                        )
+                        text: custodyText
                     )
                     commitmentRow(
                         systemImage: "square.and.arrow.up.badge.clock",

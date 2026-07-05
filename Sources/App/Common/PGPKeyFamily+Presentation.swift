@@ -70,7 +70,7 @@ extension PGPKeyConfiguration.Identity {
         case .deviceBoundPostQuantumV6:
             String(
                 localized: "keyFamily.deviceBoundPostQuantum.description",
-                defaultValue: "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The post-quantum private key lives in this device's Secure Enclave and cannot be exported or backed up."
+                defaultValue: "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
             )
         }
     }
@@ -160,8 +160,13 @@ extension PGPKeyConfiguration.Identity {
         switch self {
         case .compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6:
             String(localized: "keyFamily.custody.portable", defaultValue: "Portable software key")
-        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
+        case .compatibleP256V4, .modernP256V6:
             String(localized: "keyFamily.custody.deviceBound", defaultValue: "Device-bound Secure Enclave custody")
+        case .deviceBoundPostQuantumV6:
+            String(
+                localized: "keyFamily.custody.deviceBoundSplit",
+                defaultValue: "Device-bound split custody: post-quantum in the Secure Enclave, classical sealed to this device"
+            )
         }
     }
 

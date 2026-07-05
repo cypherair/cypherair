@@ -180,6 +180,7 @@ private struct KeyGenerationScreenHostView: View {
             set: { if !$0 { model.cancelDeviceBoundCommitment() } }
         )) {
             DeviceBoundKeyCommitmentSheet(
+                family: model.selectedFamily,
                 onConfirm: { model.confirmDeviceBoundGeneration() },
                 onCancel: { model.cancelDeviceBoundCommitment() }
             )

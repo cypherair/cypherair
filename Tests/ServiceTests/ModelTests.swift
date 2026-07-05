@@ -1265,7 +1265,7 @@ final class ModelTests: XCTestCase {
                 "~192 bit, quantum-resistant",
                 "Private key cannot be exported or backed up",
                 "Not compatible with GnuPG",
-                "Device-bound Secure Enclave custody"
+                "Device-bound split custody: post-quantum in the Secure Enclave, classical sealed to this device"
             ),
         ]
 
