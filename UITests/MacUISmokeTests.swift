@@ -152,6 +152,20 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("keygen.ready")
     }
 
+    func test_macShell_menuAbout_opensAboutInMainWindow() throws {
+        launchMain()
+
+        let appMenu = app.menuBarItems["CypherAir X"]
+        XCTAssertTrue(appMenu.waitForExistence(timeout: 10))
+        appMenu.tap()
+
+        let aboutItem = app.menuItems["About CypherAir X"].firstMatch
+        XCTAssertTrue(aboutItem.waitForExistence(timeout: 5))
+        aboutItem.tap()
+
+        waitForScreenReady("about.ready")
+    }
+
     func test_tabNavigation_respondsToCommandNumberShortcuts() throws {
         launchMain()
 

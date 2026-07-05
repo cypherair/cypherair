@@ -1,8 +1,8 @@
 #if os(macOS)
 import SwiftUI
 
-/// macOS menu commands: key actions in the File menu and sidebar tab
-/// selection (⌘1–⌘8) in the View menu.
+/// macOS menu commands: the in-window About item, key actions in the Keys
+/// menu, and sidebar tab selection (⌘1–⌘8) in the View menu.
 struct MacKeyboardCommands: Commands {
     let navigationState: MacShellNavigationState
 
@@ -11,6 +11,19 @@ struct MacKeyboardCommands: Commands {
         // design; multiple windows would create independent privacy screen
         // states leading to inconsistent security behavior.
         CommandGroup(replacing: .newItem) { }
+
+        // The standard About panel would open a second window; the
+        // single-window design routes About into the main window instead,
+        // matching how ⌘, selects the Settings tab.
+        CommandGroup(replacing: .appInfo) {
+            Button(String(
+                localized: "menu.about",
+                defaultValue: "About \(AppProductIdentity.localizedDisplayName)"
+            )) {
+                navigationState.selectedTab = .settings
+                navigationState.setPath([.about], for: .settings)
+            }
+        }
 
         // Key actions live in their own menu; the single-window design leaves
         // no default File > New group to host them.
