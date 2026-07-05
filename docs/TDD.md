@@ -4,7 +4,7 @@
 > Purpose: Exact technical values and project-specific contracts — profiles, format selection, FFI rules, key wrapping values, storage contracts.
 > Audience: Developers, security auditors, and AI coding tools.
 > Update triggers: Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
-> Last reviewed: 2026-07-04.
+> Last reviewed: 2026-07-05.
 
 ## 1. OpenPGP Engine
 
@@ -14,7 +14,7 @@
 
 ### 1.2 Backend: crypto-openssl (vendored)
 
-`crypto-openssl`, vendored via `openssl-src`: battle-tested, constant-time, no experimental opt-in flags, PQC-capable. The `openssl-src` override for the arm64e chain must stay explicit — the checked-in fork branch plus `Cargo.lock`, never a machine-local `path` dependency ([ARM64E_STATUS.md](ARM64E_STATUS.md)). Feature set: `compression-deflate` is enabled for **reading** compressed messages only; outgoing messages are never compressed; bzip2 is excluded.
+`crypto-openssl`, vendored via `openssl-src`: battle-tested, constant-time, no experimental opt-in flags, PQC-capable. The `openssl-src` override for the arm64e chain must stay explicit — the checked-in fork branch plus `Cargo.lock`, never a machine-local `path` dependency ([ARM64E_STATUS.md](ARM64E_STATUS.md)). Feature set: `compression-deflate` is enabled for **reading** compressed messages only; outgoing messages are never compressed; bzip2 is excluded. Release-profile gotcha: LTO and strip stay **disabled** (`lto = false`, `strip = "none"`) — enabling either causes linker failures with vendored OpenSSL; binary size is managed via `codegen-units = 1` and Xcode dead-code elimination instead.
 
 ### 1.3 Software Profile Configuration
 
@@ -145,7 +145,6 @@ Migration and exception rules:
 - Future protected-domain migrations preserve readable source state until the protected destination is created, opened, and verified through the normal post-auth path.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary-settings boot-authentication exception.
 - Contacts package exchange is not implemented; any future complete Contacts backup must be designed separately as mandatory encrypted export/import.
-- Storage or migration changes update [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md) and the companion docs per the [WORKFLOW.md](WORKFLOW.md) documentation contract.
 
 ## 7. Memory Integrity Enforcement (MIE)
 

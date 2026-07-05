@@ -5,7 +5,7 @@
 > Audience: Security reviewers, release owners, Swift/Rust implementers, test owners, and AI coding tools.
 > Source of truth: This document, the code under `Sources/Security/SecureEnclaveCustody*` / `Sources/Security/SecureEnclaveComposite*` / `Sources/Services/KeyManagement/` / `pgp-mobile/src/`, and the companion canonical docs cited below.
 > Update triggers: Any change to the custody model, access-control policy, red lines, operation surface, persisted-state classification, Rust/UniFFI boundary, or evidence matrix.
-> Last reviewed: 2026-07-04.
+> Last reviewed: 2026-07-05.
 
 ## 1. Overview
 
@@ -33,26 +33,22 @@ Persisted state: protected `key-metadata` schema v2 stores only the non-secret `
 
 ## 3. Security contract
 
-The authoritative custody red lines — handles and access control, the external operation boundary, dispatch and fail-closed, sanitized failure mapping, storage/export/hard-fail, reset and recovery — live in [SECURITY.md](SECURITY.md) §3 and are enforced in code and test-pinned.
+The authoritative custody red lines — handles and access control, the external operation boundary, dispatch and fail-closed (including no software fallback on a Secure Enclave route, with failures surfacing only as sanitized `PGPKeyOperationFailureCategory` values), sanitized failure mapping, storage/export/hard-fail, reset and recovery — live in [SECURITY.md](SECURITY.md) §3 and are enforced in code and test-pinned.
 
 ### 3.1 Access-control policy
 
-Secure Enclave private-operation keys are created with `privateKeyUsage` + `biometryAny` and **no** device-passcode fallback. `biometryAny` keeps the key usable when the enrolled biometric set changes while still requiring biometric authentication for every use. `biometryCurrentSet` must **not** be exposed as a user-selectable option (for a non-exportable key it creates a high permanent-loss risk). Secure Enclave custody must **not** use the Standard/High-Security in-place rewrap to change access policy — that rewrap model remains software-custody only.
+The fixed creation policy (`privateKeyUsage` + `biometryAny`, no passcode fallback — [SECURITY.md](SECURITY.md) §3) carries two custody-specific product rules: `biometryAny` keeps the key usable when the enrolled biometric set changes, and `biometryCurrentSet` must **not** be exposed as a user-selectable option (for a non-exportable key it creates a high permanent-loss risk). Secure Enclave custody must **not** use the Standard/High-Security in-place rewrap to change access policy — that rewrap model remains software-custody only.
 
 ### 3.2 Custody-specific stop conditions
 
-Beyond the SECURITY.md §3 red lines, return to security review before any of the following:
+Beyond the SECURITY.md §3 red lines, return to security review before either of the following:
 
-- importing an existing OpenPGP private key into Secure Enclave custody (not an operation, by design);
 - treating a Keychain handle, public key, or locator as a recoverable private-key backup;
-- weakening current portable software-key behavior to make custody integration easier;
-- adding network, telemetry, or new permissions as part of custody work.
-
-A failure to load, authenticate, validate, or bind a required handle fails closed through a sanitized `PGPKeyOperationFailureCategory`; there is no software fallback on a Secure Enclave route.
+- weakening current portable software-key behavior to make custody integration easier.
 
 ### 3.3 Payload hard-fail
 
-Custody preserves the OpenPGP authentication contract: v4 SEIPDv1/MDC and v6 SEIPDv2/AEAD tampering fail closed; file decrypt writes only through the success-only `.tmp`-then-rename output contract; cancellation and authentication errors never expose partial plaintext. The private-operation route may recover a session key, but final plaintext release stays gated by Sequoia payload authentication and the read-to-completion contract.
+The private-operation route may recover a session key, but final plaintext release stays gated by Sequoia payload authentication and the read-to-completion contract (the MDC/AEAD hard-fail and `.tmp`-then-rename rules are SECURITY.md §3 red lines).
 
 ## 4. Supported operation surface
 
@@ -118,11 +114,11 @@ Real SE private operations via `CypherAir-DeviceTests` (and the destructive `Cyp
 | payload tamper hard-fail (no partial plaintext) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
 | local-reset cleanup (dangerous plan) | ✅ captured | deferred | deferred | exposed, no evidence |
 | interaction-not-allowed proxy (fail-closed) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| split-custody composite (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests`, 2026-07) | — | — | exposed, no evidence |
+| split-custody composite (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests`, 2026-07) | deferred | deferred | exposed, no evidence |
 
 Capture notes:
 
-- **macOS** (arm64e, real Secure Enclave, gpg 2.5.19, 2026-06-13): all eleven P-256 rows captured — non-interactive scenarios, biometric scenarios (Touch ID approved at the sensor), and the destructive local-reset proof. Split-custody composite evidence captured on real SE hardware during the Phase 3 campaign (2026-07).
+- **macOS** (arm64e, real Secure Enclave, gpg 2.5.19, 2026-06-13): all eleven P-256 rows captured — non-interactive scenarios, biometric scenarios (Touch ID approved at the sensor), and the destructive local-reset proof.
 - **iPhone** (iOS 27.0 developer beta, real Secure Enclave, 2026-06-14): the ten non-destructive P-256 rows captured; the local-reset row is covered on macOS.
 - **iPad** — deferred. iPad runs the same iOS Secure Enclave substrate and LocalAuthentication stack as iPhone; dedicated capture is recommended before any iPad-specific custody claim.
 - **visionOS** — exposed without dedicated evidence (accepted risk, §9).

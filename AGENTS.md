@@ -86,8 +86,9 @@ validation rules live in `docs/TESTING.md`. The pinned
 with each stage1 re-pin.
 
 Every functional PR needs tests. Security changes require positive and negative
-tests. Crypto behavior must be covered for both profiles. Secure Enclave and
-biometric code must guard with `SecureEnclave.isAvailable` and skip in simulator.
+tests. Crypto behavior must be covered for every profile/family the change
+touches (`docs/TESTING.md` Section 3). Secure Enclave and biometric code must
+guard with `SecureEnclave.isAvailable` and skip in simulator.
 
 When Xcode MCP or Apple documentation tools are available, prefer live Apple
 documentation lookup for API behavior instead of relying on memory.

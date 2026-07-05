@@ -3,8 +3,8 @@
 > Status: Canonical current-state — source of truth for Apple arm64e support.
 > Purpose: The pinned arm64e Rust stage1 toolchain, the packaging policy, and the external SQLCipher pin.
 > Audience: Human developers, release owners, and AI coding tools.
-> Update triggers: See "Update Rules" at the end of this file.
-> Last reviewed: 2026-07-04.
+> Update triggers: The pinned stage1 tag or its source ref/commit, the stage1 consumption policy, the `openssl-src` patch target or the OpenSSL forks' role, the dual-arch packaging policy or build-manifest contract, or the SQLCipher wrapper pin.
+> Last reviewed: 2026-07-05.
 
 ## Packaging Policy
 
@@ -15,7 +15,7 @@
 
 ## Pinned Rust stage1 Toolchain
 
-- Fork repository: `cypherair/rust`; stable base `1.96.0` (`ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`).
+- Fork repository: `cypherair/rust`; stable base `1.96.0` (`ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`). New stage1 prereleases are published by that fork's `arm64e-stage1-prerelease.yml` workflow.
 - **Pinned prerelease tag:** `rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1`
 - Pinned source ref/commit: `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96` @ `abeb8459f2b459704c1d698c01d8b8c0df8ffffd` (workflow run `27765229620`).
 - The prerelease publishes host-specific `rust-stage1-for-arm64e-<host-triple>.*` asset sets (`aarch64-apple-darwin` and `x86_64-apple-darwin`); downloaders select the asset matching the build host and verify the packaged checksum and manifest (`requiresBuildStd: false`, arm64e std targets for Darwin, iOS, tvOS, visionOS).
@@ -43,12 +43,3 @@ After rotating: the old tag greps to zero hits, the new tag greps to exactly the
 - Zip SHA-256: `3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e`; consumer pin file: `third_party/sqlcipher-xcframework.pin.json`.
 - Release shape: SSH-signed annotated tag on a non-prerelease immutable GitHub Release, verified with `gh release verify`, `gh release verify-asset`, and `gh attestation verify`. Slices mirror the app policy (device `arm64`+`arm64e`, simulator `arm64`), each a static `SQLCipher.framework`.
 - Restore/validation mechanics: [TESTING.md](TESTING.md) §2.4. Refreshes publish a new stable immutable wrapper release first, then re-pin here; never commit the restored artifact or downloaded assets.
-
-## Update Rules
-
-Update this file whenever any of the following changes:
-
-- the pinned stage1 tag, its source ref/commit, or the stage1 consumption policy
-- the `openssl-src` patch target or the role of the OpenSSL forks in the chain
-- the dual-arch packaging policy or the build-manifest contract
-- the SQLCipher wrapper pin (tag, commits, checksum, pin file)

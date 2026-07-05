@@ -4,7 +4,7 @@
 > Purpose: The encryption scheme, key lifecycle, wrapping and authentication contracts, security invariants, and the AI coding red lines.
 > Audience: Human developers, security auditors, and AI coding tools.
 > Update triggers: Changes to crypto/profile behavior, key lifecycle, Secure Enclave wrapping, authentication modes, the ProtectedData model, tutorial isolation, MIE posture, or the Section 10 red lines.
-> Last reviewed: 2026-07-04.
+> Last reviewed: 2026-07-05.
 
 ## 1. Encryption Scheme
 
@@ -49,7 +49,7 @@ All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). T
 
 Full profile table and classification rule: [TDD.md](TDD.md) §1.3. Split custody for the device-bound variant: [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1.
 
-**Interoperability:** Profile A output is compatible with GnuPG 2.1+ and all PGP tools. Profile B output is compatible with Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+. Post-quantum certificates/messages interoperate with RFC 9980 implementations (Sequoia 2.4+); not with GnuPG. The App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) is read-only for compatibility; outgoing messages are never compressed. Bzip2 is excluded (extra C dependency).
+**Interoperability:** per-profile compatibility exposure (which external tools each family works with) is product canon in [PRD.md](PRD.md) §3. The security-owned read-support contract: the App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) is read-only for compatibility; outgoing messages are never compressed. Bzip2 is excluded (extra C dependency).
 
 ## 2. Key Lifecycle
 
@@ -83,7 +83,7 @@ Deletion:          Double-confirm → delete the envelope row and the protected 
 - **Revocation storage/export:** Revocation signatures are stored as binary OpenPGP packets and armored on demand at export. Export uses only the stored artifact and fails closed when it is missing.
 - **Selective revocation:** Subkey and User ID revocations are generated and exported on demand; they do not write back into `PGPKeyIdentity.revocationCert` and create no persisted selective-revocation history.
 - **Certification workflow:** Generated User ID certification signatures are saved to the protected `contacts` domain only when the user explicitly certifies and the signature verifies against the selected key and exact selector. Saved artifacts are canonical binary signature bytes, armored only for explicit export. Certification persistence never inserts signatures into a stored contact certificate, never changes manual verification state, and introduces no web-of-trust semantics.
-- **Profile-specific generation:** Profile A → `CipherSuite::Cv25519` + `Profile::RFC4880`; Profile B → `CipherSuite::Cv448` + `Profile::RFC9580`; Post-Quantum → `CipherSuite::MLDSA65_Ed25519`. Message format is determined by recipient key version, not sender profile ([TDD.md](TDD.md) §1.4).
+- **Format selection:** message format is determined by recipient key version, never sender profile ([TDD.md](TDD.md) §1.4); the exact per-profile `CipherSuite`/`Profile` values are TDD.md §1.3's table.
 
 ## 3. Secure Enclave Wrapping Scheme
 
@@ -115,6 +115,7 @@ The Secure Enclave natively holds only some key types (P-256, and on current OS 
 
 - Keychain extraction without the SE hardware yields an encrypted blob that cannot be decrypted; the SE key's `dataRepresentation` is bound to the SoC UID.
 - The raw private key exists in app memory briefly during use — the inherent tradeoff of non-SE-resident algorithms. Device-bound families avoid it entirely (operations run inside the enclave).
+- SE ECDH latency is ~2–5 ms — imperceptible to users.
 
 ### Secure Enclave Custody (device-bound families) — red lines
 
@@ -122,7 +123,7 @@ A second, implemented custody model — the Device-Bound key families — perfor
 
 The durable red lines below bind all code under `Sources/Security/SecureEnclaveCustody*`, `Sources/Security/SecureEnclaveComposite*`, and `pgp-mobile`:
 
-- **Handles & access control.** Two distinct role-tagged SE P-256 `SecKey` rows per identity (`.signing`, `.keyAgreement`), created with `kSecAttrTokenIDSecureEnclave` and access control `WhenUnlockedThisDeviceOnly + .privateKeyUsage + .biometryAny` — no `.devicePasscode`, no `.or`, and never the mode-dependent app helper. Application tags are a random handle-set id plus role, never a fingerprint. Load/inspect fail closed unless the stored role and the 65-byte X9.63 public key both match.
+- **Handles & access control.** For the classical device-bound families: two distinct role-tagged SE P-256 `SecKey` rows per identity (`.signing`, `.keyAgreement`), created with `kSecAttrTokenIDSecureEnclave` and access control `WhenUnlockedThisDeviceOnly + .privateKeyUsage + .biometryAny` — no `.devicePasscode`, no `.or`, and never the mode-dependent app helper. Creation sets no `kSecAttrCanSign`/`kSecAttrCanDerive` usage flags — role trust comes only from the role tag, public-key binding, and router policy. Application tags are a random handle-set id plus role, never a fingerprint. Load/inspect fail closed unless the stored role and the 65-byte X9.63 public key both match. (Composite custody uses a different handle shape under the same fixed access policy — [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1.)
 - **External operation boundary.** Rust/Sequoia owns all OpenPGP semantics; the enclave performs only the private scalar operation through a narrow callback. Signing: public key + SHA-256 digest in, ECDSA `r/s` out, verified by Rust against that key and digest. Key agreement: recipient + ephemeral public keys in, raw 32-byte shared secret out; Rust owns the ECDH KDF, AES Key Wrap, session-key validation, payload authentication, and verification folding. Swift zeroizes the shared-secret buffers it owns; Rust hard-aborts a malformed or zero shared secret. The callback never carries secret certificate material.
 - **Dispatch & fail-closed.** `PGPKeyCapabilityResolver` gates generation, signing-class, and key-agreement operations independently; `PrivateKeyOperationRouter` returns a Secure Enclave route only after the stored public certificate, fingerprint, key version, role, and public-key bindings agree with the Security-owned handles. A Secure Enclave route **never falls back** to software secret-certificate material. The decrypt Phase 1/Phase 2 boundary is preserved: Phase 1 recipient parsing is unauthenticated and the matched-key guard runs before any private-key access.
 - **Sanitized failure mapping.** All custody error paths expose only stable app-owned categories. Logs, errors, UI, ProtectedData, and Rust never carry fingerprints, application tags, handle-set identifiers, public-binding bytes, Keychain locators, plaintext, private material, shared secrets, session keys, KEKs, digests, or signatures.
@@ -179,7 +180,7 @@ Protected app data is a separate security domain for CypherAir-owned local state
 - Protected domains open only after app privacy authentication through the shared ProtectedData authorization path. `appSessionAuthenticationPolicy` remains the documented early-readable boot exception; UserDefaults is otherwise allowed only for documented boot/test/tutorial exceptions.
 - Authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppLockController` owns lock state and the away/grace lifecycle; `AppSessionOrchestrator` owns the authentication record and hands the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the root secret with `kSecUseAuthenticationContext`. Post-unlock domain openers reuse that handoff so committed domains open without a second prompt.
 - The raw root secret exists only to derive the wrapping root key and is immediately zeroized. Each domain has its own random master key, persisted only as a Keychain-backed `CADMKV2` wrapped-DMK envelope under the wrapping root key. Unwrapped DMKs and decrypted payloads are session-local.
-- `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability, loading grace period, onboarding completion, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 only after an unlocked handoff. Missing or corrupt payloads enter recovery instead of resetting to defaults; while the snapshot is unavailable, resume grace fails closed to immediate authentication and encryption never silently uses a default encrypt-to-self value.
+- `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability, loading grace period, onboarding completion, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 only after an unlocked handoff. Missing or corrupt payloads enter recovery instead of resetting to defaults; while the snapshot is unavailable, resume grace fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption never silently uses a default encrypt-to-self value.
 - `KeyMetadataDomainStore` stores schema v2 `PGPKeyIdentity` records (configuration identity + custody kind) and stays metadata-only — no handle locators, access-control policy, salts, sealed boxes, or secret bytes. Corrupt or bootstrap-mismatched committed metadata enters recovery.
 - Key-operation failure categories are sanitized app-owned classifications; local-authentication categories stay separate from payload-authentication failure, and none may contain plaintext, key material, shared secrets, session keys, KEKs, locators, stable fingerprints, or capability paths.
 - Contacts production state lives in the protected `contacts` domain with SQLCipher as the authoritative payload: the unwrapped `contacts` domain master key is handed directly to SQLCipher via raw-key syntax (no second database-key Keychain row), the raw-key buffer is zeroized after keying, and the open connection is closed on relock and before reset/recovery deletion. Legacy flat Contacts files under `Documents/contacts` are outside supported app state (not read, migrated, quarantined, or reset-cleaned); legacy snapshot artifacts are never a fallback source of truth. Manual verification is a local fingerprint assertion, not OpenPGP certification; certification-signature export is an explicit artifact boundary, not a Contacts backup; any future Contacts package exchange must be mandatory encrypted.
@@ -199,15 +200,9 @@ Changes to tutorial isolation get the same review care as other auth/local-data 
 
 ## 7. Argon2id Parameters
 
-Used for private-key export and for importing passphrase-protected key files with Argon2id S2K (Profile B and Portable Post-Quantum). Not used for routine decrypt/sign, and not used by Profile A (Iterated+Salted, mode 3).
+Used for private-key export and for importing passphrase-protected key files with Argon2id S2K (Profile B and Portable Post-Quantum). Not used for routine decrypt/sign, and not used by Profile A (Iterated+Salted, mode 3). The exact parameter set (512 MB / p=4 / t=3, with RFC 9580 encodings) is [TDD.md](TDD.md) §4's table.
 
-| Parameter | Value | RFC 9580 encoding |
-|-----------|-------|-------------------|
-| Memory | 512 MB (524,288 KiB) | `encoded_m = 19` |
-| Parallelism | 4 lanes | `p = 4` |
-| Time | 3 passes (~3s target) | `t = 3` |
-
-**Memory-safety guard (import/unlock only):** parse the S2K specifier, compute `2^encoded_m` KiB, query `os_proc_available_memory()`, and refuse above 75% of available memory with _"This key uses memory-intensive protection that exceeds this device's capacity."_ — before derivation begins. This prevents iOS Jetsam termination.
+**Memory-safety guard (import/unlock only):** parse the S2K specifier, compute `2^encoded_m` KiB, query available memory (`os_proc_available_memory()` on iOS/iPadOS/visionOS; total physical memory on macOS, which has no Jetsam), and refuse above the 75% threshold with _"This key uses memory-intensive protection that exceeds this device's capacity."_ — before derivation begins. This prevents iOS Jetsam termination.
 
 ## 8. Memory Integrity Enforcement (MIE)
 
@@ -273,6 +268,7 @@ These hold for every change, independent of which file is touched:
 | `pgp-mobile/src/error.rs` | `PgpError` enum. Must stay 1:1 with Swift. |
 | `Sources/Services/DiskSpaceChecker.swift` | Disk-space threshold. Wrong threshold = Jetsam termination during file operations. |
 | `CypherAir.entitlements` / `CypherAirMacOS.entitlements` | MIE / Enhanced Security entitlements. |
+| `CypherAir.xcodeproj/project.pbxproj` | Build settings (`ENABLE_ENHANCED_SECURITY`), script phases, target membership. |
 | `CypherAir-Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
 
 ### Functions Requiring Human Review

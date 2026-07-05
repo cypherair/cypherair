@@ -3,11 +3,9 @@
 > **Status:** Canonical current-state.<br>
 > **Purpose:** Product scope, key families, user workflows, and product-level security behavior for CypherAir.<br>
 > **Audience:** Human developers, product reviewers, and AI coding tools.<br>
-> **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+<br>
-> **License:** `GPL-3.0-or-later OR MPL-2.0` for first-party code<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, or roadmap change.<br>
-> **Last reviewed:** 2026-07-04.
+> **Last reviewed:** 2026-07-05.
 
 ## 1. Product Overview
 
@@ -18,7 +16,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 ### 1.2 Core Value Proposition
 
 - **Truly Offline:** Zero network access; data leakage eliminated at the architectural level.
-- **Minimal Permissions:** The only usage-description key is `NSFaceIDUsageDescription` (biometric authentication). No camera, photo library, contacts, or network permissions. All I/O via system pickers and Share Sheet.
+- **Minimal Permissions:** A single usage-description key and system-picker I/O only (the hard requirement is §2).
 - **Standards-Compliant:** Compatible with GnuPG (Profile A), RFC 9580 (Profile B), and post-quantum RFC 9980.
 - **Usable by Anyone:** No cryptographic knowledge required.
 
@@ -103,13 +101,13 @@ Open App → Onboarding (3 pages) → tutorial decision page
 → Done → Prompt: back up private key & share public key
 ```
 
-- The guided tutorial is a sandboxed learning path, not a key-generation prerequisite. Tutorial keys, contacts, messages, settings, and outputs never touch the real workspace ([SECURITY.md](SECURITY.md) §6). It can be skipped without being marked complete, replayed from Settings, and completion is recorded only on explicit Finish.
-- Revocation certificate auto-generated at key creation; user prompted to export it separately.
+- The guided tutorial is a sandboxed learning path, not a key-generation prerequisite. Tutorial keys, contacts, messages, settings, and outputs never touch the real workspace ([SECURITY.md](SECURITY.md) §6). It can be skipped without being marked complete, and completion is recorded only on explicit Finish. Both onboarding and the tutorial are replayable from Settings.
+- Revocation certificate auto-generated at key creation; exportable from the key detail page. The post-generation prompt makes revocation export the primary action for device-bound keys (no backup exists for them); for software keys it prompts backup and public-key sharing.
 - **Key detail page:** full fingerprint, short key ID (de-emphasized), Key Type row (family name; device-bound keys drill into a custody explainer), backup status badge for software keys (device-bound keys show the non-exportable statement, no backup flow), expiry modification, key-level revocation export, and selective revocation launchers (subkey / User ID).
 
 ### 4.2 Public Key Exchange
 
-- **QR via system Camera (recommended, classical families):** `cypherair://import/v1/<base64url binary, no padding>`. Alice shows the QR, Bob scans with the system Camera → "Open in CypherAir" → confirm → added. Fallback: QR from photo (PHPicker + CIDetector). Post-quantum certificates are too large for QR and exchange via file/share/clipboard; QR surfaces show an explicit unavailable state.
+- **QR via system Camera (recommended, classical families):** `cypherair://import/v1/<base64url binary, no padding>`. Alice shows the QR, Bob scans with the system Camera → "Open in CypherAir" → confirm → added. Fallback: QR from photo (PHPicker + CIDetector). Post-quantum certificates exchange via the non-QR methods, with an explicit unavailable state on QR surfaces (§3).
 - **File:** share `.asc` via Share Sheet. **Clipboard:** copy ASCII armor; recipient pastes.
 - **Unified import:** Contacts → Add Friend's Key → QR Photo | File | Paste, with a fingerprint-verification reminder. URL-scheme import always requires user confirmation before adding a key.
 - **Public key update:** same User ID + same fingerprint absorbs new public material (revocations, refreshed bindings, added User IDs/subkeys); exact duplicates are a no-op. Same User ID + different fingerprint means the key was regenerated — warn and ask the user to verify with the contact before accepting.
@@ -143,19 +141,22 @@ Text: cleartext signature. File: detached `.sig`. Signatures auto-verify during 
 
 ### 4.7 Error Messages
 
-| Error | User message |
-|-------|-------------|
-| AEAD failure | ❌ May have been tampered with. |
-| No matching key | ❌ Not addressed to your identities. |
-| Unsupported algo | ❌ Method not supported. |
-| Key expired | ⚠️ Ask sender to update. |
-| Bad signature | ❌ Content may have been modified. |
-| Unknown signer | ⚠️ Signer not in Contacts. |
-| Corrupt data | ❌ Damaged. Ask sender to resend. |
-| Wrong passphrase | ❌ Re-enter backup passphrase. |
-| Invalid QR | ❌ Not a valid CypherAir key. |
-| Unsupported QR ver | ⚠️ Update the App. |
-| Profile incompatible | ⚠️ This message uses a format your recipient's tool may not support. The message was encrypted using a compatible format instead. |
+Every failure produces a user-understandable message; the exact copy is owned by the String Catalog. The semantic contract:
+
+| Error | Severity | Meaning conveyed to the user |
+|-------|----------|------------------------------|
+| AEAD/MDC failure | ❌ hard error | Content may have been tampered with; nothing shown |
+| No matching key | ❌ hard error | Message is not addressed to the user's identities |
+| Unsupported algorithm | ❌ hard error | Method not supported |
+| Corrupt data | ❌ hard error | Damaged input; ask the sender to resend |
+| Wrong passphrase | ❌ hard error | Re-enter the backup passphrase |
+| Invalid QR payload | ❌ hard error | Not a valid CypherAir public key |
+| Bad signature | ❌ hard error | Content may have been modified |
+| Key expired | ⚠️ warning | Ask the sender to update their key |
+| Unknown signer | ⚠️ warning | Signer not in Contacts |
+| Unsupported QR version | ⚠️ warning | A newer app version is required |
+
+Format-downgrade situations are surfaced *before* encryption as a compatibility rating in the recipient chooser (§4.3), not as a post-hoc error.
 
 ### 4.8 Contacts
 
@@ -169,7 +170,7 @@ Text: cleartext signature. File: detached `.sig`. Signatures auto-verify during 
 **Privacy cover and app lock** — two separate layers (cover ≠ lock):
 
 - **Cosmetic privacy cover:** a content-obscuring overlay whenever the app is not foreground-active (multitasking snapshot, shoulder-surfing). No coupling to authentication.
-- **App lock:** an explicit lock state. Leaving the foreground *covers* immediately; the app *locks* — clears decrypted content and requires re-authentication — only after the grace period elapses following a genuine away event (iOS/iPadOS/visionOS: entering background; macOS: app resign ∪ screen lock ∪ explicit "Lock Now"), or on the away event itself at grace = Immediately. A biometric prompt's own transient deactivation is never an away event. While locked, an opaque lock surface (app name + caption) auto-invokes system authentication and hosts retry/lockout messaging.
+- **App lock:** an explicit lock state. Leaving the foreground *covers* immediately; the app *locks* — clears decrypted content and requires re-authentication — after the grace period elapses following a genuine away event (iOS/iPadOS/visionOS: the app entering the background; macOS: app resign), or on the away event itself at grace = Immediately. macOS screen lock is different: it locks the app immediately, regardless of the grace setting. A biometric prompt's own transient deactivation is never an away event. While locked, an opaque lock surface (app name + caption) auto-invokes system authentication and hosts retry/lockout messaging.
 - **Grace period:** Immediately / 1 min / 3 min (default) / 5 min. Within grace: resume normally, content retained (covered while away). Beyond grace: re-authentication required, content cleared, protected app data relocked.
 - App-level auth is independent of per-operation Keychain auth. Each operation prompt runs inside a short operation-prompt session covering the prompt plus the immediately following Keychain/Secure Enclave work, so the sheet's lifecycle noise never locks the app mid-prompt while genuine away events under grace = 0 still relock promptly ([SECURITY.md](SECURITY.md) §4).
 
@@ -180,11 +181,11 @@ Text: cleartext signature. File: detached `.sig`. Signatures auto-verify during 
 - **Standard Mode (default):** biometrics with device-passcode fallback.
 - **High Security Mode:** biometrics only; no passcode fallback for private-key operations. While biometrics are unavailable (sensor damage, lockout), decrypt/sign/export stay blocked.
 
-Activation safeguards for High Security: a warning ("if Face ID / Touch ID becomes unavailable, you will be unable to access your private keys — ensure you have a current backup"), a backup check over software-custody keys (stronger warning + explicit acknowledgment when none is backed up; device-bound keys carry no backup obligation), and a biometric confirmation of the change. Device-bound keys always require biometrics — the enforcement is fixed and unaffected by this setting. Flag-level detail: [TDD](TDD.md) §3, [SECURITY](SECURITY.md) §4.
+Activation safeguards for High Security: a warning that losing biometric access means losing private-key access and that a current backup is needed (exact copy in the String Catalog), a backup check over software-custody keys (stronger warning + explicit acknowledgment when none is backed up; device-bound keys carry no backup obligation), and a biometric confirmation of the change. Device-bound keys always require biometrics — the enforcement is fixed and unaffected by this setting. Flag-level detail: [TDD](TDD.md) §3, [SECURITY](SECURITY.md) §4.
 
 ### 4.10 Self-Test
 
-One-tap diagnostic: key generation, encrypt/decrypt, sign/verify, tamper (1-bit flip), QR encode/decode — run for each software profile (Profile A, Profile B, Post-Quantum). Shareable report; report data is export-only and never persisted.
+One-tap diagnostic: key generation, encrypt/decrypt, sign/verify, tamper, and key export/import round-trip run for each software profile (Profile A, Profile B, Post-Quantum), plus one profile-agnostic QR round-trip. Shareable report; report data is export-only and never persisted.
 
 ## 5. Technical Architecture (Summary)
 

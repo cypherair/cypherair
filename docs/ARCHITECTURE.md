@@ -4,7 +4,7 @@
 > Purpose: Module breakdown, dependency relationships, and data flow for CypherAir.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Module ownership, the FFI adapter surface, data flows, tightly-coupled pairs, or storage layout change.
-> Last reviewed: 2026-07-04.
+> Last reviewed: 2026-07-05.
 
 ## 1. Layer Overview
 
@@ -43,7 +43,7 @@ graph TB
 
 ### App Layer (`Sources/App/`)
 
-SwiftUI views, navigation, onboarding, and application composition. Views stay thin and call the Services layer for all operations; workflow-heavy screens move orchestration into `@Observable` ScreenModels. Styling reuses the `DesignSystem/` primitives (`CypherLayout`, `CypherSurface`) — system-native, no brand tint.
+SwiftUI views, navigation, onboarding, and application composition. Views stay thin and call the Services layer for all operations; workflow-heavy screens move orchestration into `@Observable` ScreenModels; styling reuses the `DesignSystem/` primitives (`CypherSpacing`, `CypherRadius`, `View.cypherSurface(_:)` — style rules: CLAUDE.md Code Style).
 
 Composition and infrastructure files at the top level: `CypherAirApp` (entry point, scene wiring), `AppContainer` (centralized dependency construction, shared default/UI-test graph helpers), `AppStartupCoordinator` (synchronous pre-auth bootstrap, cold-start loading, crash recovery, temp-file cleanup, startup warnings), `AppRoute` + `AppShellComposition` + `Shell/` (route model and per-platform shells: iOS tabs, macOS split-view presentation, keyboard commands), `AppLaunchConfiguration` (launch/UI-test environment parsing), `AppLoadWarningCoordinator`, `ContentView`/`HomeView`. Feature surfaces live in `Encrypt/`, `Decrypt/`, `Sign/`, `Keys/`, `Contacts/` (including `Import/AppSceneIncomingURLRouter` for scene-level URL handoff), `Settings/` (including `LocalDataResetService`, `ProtectedSettingsAccessCoordinator`, `ProtectedSettingsHost`), and `Onboarding/`.
 
@@ -60,7 +60,7 @@ Shared presentation infrastructure in `Common/`:
 
 ### Guided Tutorial (`Sources/App/Onboarding/`)
 
-A host-driven sandbox (`TutorialView`, `TutorialSessionStore`, `TutorialSandboxContainer`) that teaches the real workflow against a separate dependency graph — fixed `com.cypherair.tutorial.sandbox` defaults suite, temporary contacts directory, real services over mock Secure Enclave/Keychain primitives. Route blocklisting and output interception keep the sandbox isolated; the mock primitives are accepted debt whose naming/containment rules live in [SECURITY.md](SECURITY.md) §6. Unit coverage: `TutorialSessionStoreTests` ([TESTING.md](TESTING.md) §2).
+A host-driven sandbox (`TutorialView`, `TutorialSessionStore`, `TutorialSandboxContainer`) that teaches the real workflow against a separate dependency graph — fixed `com.cypherair.tutorial.sandbox` defaults suite, temporary contacts directory, real services over mock Secure Enclave/Keychain primitives. Route blocklisting and output interception keep the sandbox isolated; the mock primitives are accepted debt whose naming/containment rules live in [SECURITY.md](SECURITY.md) §6.
 
 ### Services Layer (`Sources/Services/`)
 
@@ -86,15 +86,15 @@ Orchestrates user-facing operations by coordinating the Security layer, Models, 
 
 ### FFI Adapters (`Sources/Services/FFI/`)
 
-The adapter layer contains every generated-API call site, generated-error normalization (`PGPErrorMapper` → `CypherAirError`), progress bridging, and result mapping. The convention is one adapter per operation domain; the directory listing is the source of truth. Current groups:
+The adapter layer contains the generated-API call sites used by the Services layer, generated-error normalization (`PGPErrorMapper` → `CypherAirError`), progress bridging, and result mapping. (One deliberate exception: `EncryptScreenModel` calls the stateless generated engine directly for quantum-safety classification — see the coupled-pairs table.) The convention is one adapter per operation domain; the directory listing is the source of truth. Current groups:
 
-- **Operation adapters** — `PGPKeyOperationAdapter`, `PGPCertificateOperationAdapter`, `PGPCertificateSelectionAdapter`, `PGPKeyMetadataAdapter`, `PGPMessageOperationAdapter` (+ `PGPMessageResultMapper`), `PGPContactImportAdapter`, `PGPSelfTestOperationAdapter`.
-- **External-provider bridges** — Swift implementations of the Rust private-operation seams: `PGPExternalP256SigningProviderBridge`, `PGPExternalP256KeyAgreementProviderBridge`, `PGPExternalMlDsa65SigningProviderBridge`, `PGPExternalMlKem768DecapsulationProviderBridge`.
-- **Custody generation/inspection** — `PGPSecureEnclaveCustodyGenerationAdapter` + `PGPSecureEnclaveCustodyPublicBindingInspector` (P-256 families), `PGPSecureEnclaveCompositeGenerationAdapter` + `PGPSecureEnclaveCompositeBindingInspector` (split-custody post-quantum family).
+- **Operation adapters** — one per domain: key, certificate, certificate-selection, key-metadata, message (+ result mapper), contact-import, self-test.
+- **External-provider bridges** — Swift implementations of the Rust private-operation seams: P-256 signing and key agreement, ML-DSA-65 signing, ML-KEM-768 decapsulation.
+- **Custody generation/inspection** — custody generation adapters and public-binding inspectors for the P-256 families and the split-custody post-quantum family.
 
 ### Secure Enclave Custody Boundary
 
-Device-bound families keep private-key operations inside the Secure Enclave instead of wrapping software secret certificates. Ownership is split across three layers — the Rust `Signer`/`Decryptor` seam (Rust keeps all OpenPGP packet construction and derivation; callbacks return only signatures/shared secrets/key shares), the Security-layer custody stores, and capability-resolver + router dispatch. For Device-Bound Post-Quantum, custody itself is split: ML-DSA/ML-KEM components are enclave-resident while the classical components live in a fixed-access software envelope. The full contract, red lines, operation surface, and hardware evidence live in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) (§2, §3, §4); this document only places the boundary in the module map.
+Device-bound families keep private-key operations inside the Secure Enclave instead of wrapping software secret certificates. Ownership is split across three layers — the Rust `Signer`/`Decryptor` seam (Rust keeps all OpenPGP packet construction and derivation; callbacks return only signatures/shared secrets/key shares), the Security-layer custody stores, and capability-resolver + router dispatch. For Device-Bound Post-Quantum, custody itself is split: ML-DSA/ML-KEM components are enclave-resident while the classical components live in a fixed-access software envelope. The full contract, red lines, and operation surface live in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §2–§4, the hardware evidence in its §8; this document only places the boundary in the module map.
 
 ### Security Layer (`Sources/Security/`)
 
@@ -120,13 +120,11 @@ All hardware-backed security operations. The most sensitive module — see [SECU
 
 The protected app-data framework: registry and storage root (`ProtectedDataRegistry`/`ProtectedDataRegistryStore`, `ProtectedDataStorageRoot`), root-secret custody (`ProtectedDataRootSecretCoordinator`, `ProtectedDataRootSecretEnvelope` — the `CAPDSEV3` codec with the folded SE device-binding key, `KeychainProtectedDataRootSecretStore`, `ProtectedDataDeviceBinding`), session ownership (`ProtectedDataSessionCoordinator`, `AppSessionOrchestrator`, `AppLockController`, relock coordination), per-domain key custody (`ProtectedDomainKeyManager` with the `CADMKV2` wrapped-DMK codec), recovery (`ProtectedDomainRecoveryCoordinator`/handlers), the post-unlock opener (`ProtectedDataPostUnlockCoordinator`), and the domain stores (`PrivateKeyControlStore`, `KeyMetadataDomainStore`, `ProtectedSettingsStore` + ordinary-settings adapters, `ContactsDomainStore` + `ContactsSQLCipherDatabase`, `ProtectedDataFrameworkSentinelStore`).
 
-Invariants the file names don't show:
+Ownership facts the file names don't show (security invariants live in [SECURITY.md](SECURITY.md) §3 and §5):
 
-- Pre-auth startup may classify the registry and bootstrap metadata only — it must not read the root secret, unwrap a domain master key, or open protected payloads.
 - App privacy unlock runs one post-unlock opener pass that reuses the authenticated `LAContext` to open all eligible committed domains (`private-key-control`, `key-metadata`, `protected-settings`, sentinel) without a second prompt; Contacts joins the session through its dedicated post-auth open path.
 - Settings refresh may auto-open protected settings only by consuming an existing app-session `LAContext` handoff — the handoff-only path never starts a new interactive prompt.
-- `KeyMetadataDomainStore` is the key-metadata source of truth; it is recoverable after unlock but never silently rebuilt from private-key envelope rows, and it stores no Apple handle locators, access-control policy, or private material.
-- Root-secret payloads that do not decode as a current `CAPDSEV3` envelope fail closed as ordinary undecodable input.
+- `KeyMetadataDomainStore` is the key-metadata source of truth; it is recoverable after unlock but never silently rebuilt from private-key envelope rows.
 
 The canonical row-level classification and migration-readiness table is [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md); this section names component owners, not rows.
 
@@ -154,9 +152,10 @@ pgp-mobile/src/
 ├── external_composite_decryptor.rs + /    # ML-KEM-768+X25519 composite decrypt seam
 ├── composite_classical.rs / composite_kem.rs  # classical component handling; vendored RFC 9980 KEM combiner
 ├── streaming.rs                # File-path streaming I/O with progress + cancellation
-├── qr_url.rs / armor.rs / error.rs
-└── uniffi-bindgen.rs           # bindgen entrypoint used by the build script
+└── qr_url.rs / armor.rs / error.rs
 ```
+
+(`pgp-mobile/uniffi-bindgen.rs`, at the crate root, is the bindgen entrypoint used by the build script.)
 
 ## 3. Data Flows
 
@@ -272,10 +271,10 @@ App Sandbox:
 
 Naming and custody rules:
 
-- Everything is prefixed `com.cypherair.v1.` (the `v1` segment enables future migration); `<fingerprint>` is full lowercase hex; temporary rows use the `pending-` prefix.
+- Private-key, domain-key, custody, and composite rows are prefixed `com.cypherair.v1.` (the `v1` segment enables future migration); the root-secret row (`com.cypherair.protected-data.shared-right.v1`) and the Preferences keys are the exceptions. `<fingerprint>` is full lowercase hex; temporary rows use the `pending-` prefix.
 - Custody handle tags and composite handle-set ids are Security-private local locators — never written to ProtectedData metadata, logs, UI, exports, or Rust. Recovery derives expected handles from public certificate bindings.
 - Domain-key rows carry no per-row biometric access control; unwrapping still requires the post-auth wrapping root key.
-- The ProtectedData device-binding key is separate from private-key SE keys (`WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`, no biometric flags) and exists only inside the folded `CAPDSEV3` envelope; `CAPDSEV3` and `CAPKEV1` are domain-separated by distinct magic and HKDF/AAD prefixes.
+- The ProtectedData device-binding key is a separate SE key that exists only inside the folded `CAPDSEV3` envelope — flags and domain separation: [SECURITY.md](SECURITY.md) §3 "ProtectedData Device-Binding Note".
 
 Row-level classification, status, and migration readiness: [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md).
 

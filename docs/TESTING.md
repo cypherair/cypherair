@@ -4,7 +4,7 @@
 > Purpose: Test layers, test plans, CI lanes, and the build/validation workflows that connect Rust artifacts to Swift testing.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Test plans, CI lanes, validation commands, or the Rust↔Xcode artifact contract change.
-> Last reviewed: 2026-07-04.
+> Last reviewed: 2026-07-05.
 
 ## 1. Test Layers
 
@@ -38,18 +38,13 @@ The PR, nightly, and edge workflows pin the same `cargo-audit` version in an ind
 
 ### Layer 2: Swift unit tests
 
-Run on macOS (the practical local path) and the iOS Simulator. They cover the Services layer, Models, and the Security layer through protocol-based mocks — including the ProtectedData framework, the envelope codecs (`CAPKEV1`/`CAPDSEV3`/`CADMKV2`/`CPDENV2`), Secure Enclave custody routing driven by mocks and software P-256 keys, and Contacts SQLCipher persistence. The test files are the source of truth for what is asserted; this document does not maintain prose copies of their coverage.
+Run on macOS — the unit lane's only working host: the iOS Simulator compiles but the unit-test host app currently fatal-errors at launch under the ProtectedData fail-closed volume probe, so iOS-only behavior is verified through the macOS lane plus real devices. The lane covers the Services layer, Models, and the Security layer through protocol-based mocks — including the ProtectedData framework, the envelope codecs (`CAPKEV1`/`CAPDSEV3`/`CADMKV2`/`CPDENV2`), Secure Enclave custody routing driven by mocks and software P-256 keys, and Contacts SQLCipher persistence. The test files are the source of truth for what is asserted; this document does not maintain prose copies of their coverage.
 
 One mapping rule that is easy to get wrong: recipient matching maps only the generated `NoMatchingKey` error to `CypherAirError.noMatchingKey`. File I/O, cancellation, corrupt data, unsupported algorithms, and other infrastructure failures keep their ordinary app-owned error categories.
 
 ```bash
-# Practical local path
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
-
-# Simulator variant, when the host/runtime supports it
-xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
-    -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
 Localization catalog health is reported outside XCTest. When touching `Sources/Resources/*.xcstrings`, run `python3 scripts/report_localization_catalog.py --github-annotations` or read the PR/nightly Step Summary. It reads `Localizable.xcstrings` and `InfoPlist.xcstrings` and flags stale entries, missing `en`/`zh-Hans` localizations, untranslated units, and incomplete plural categories.
@@ -83,7 +78,7 @@ Five Xcode test plans. All test invocations — CLAUDE.md, CI configuration, loc
 - **CypherAir-DeviceTests** — Layer 4, selected tests only. Non-destructive.
 - **CypherAir-DangerousDeviceTests** — manual, destructive: its Reset All Local Data cleanup proof deletes every app-owned Secure Enclave custody handle for the current bundle, not just test-created ones. Run only against a disposable install or device state.
 - **CypherAir-InteropEvidenceTests** — manual macOS-only real-SE↔GnuPG evidence harness (`DeviceSecureEnclaveGnuPGInteropEvidenceTests`); needs real Secure Enclave hardware, biometric approval, and a local `gpg`. Captured evidence: [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
-- **CypherAir-MacUITests** — targeted macOS UI smoke coverage: routes, settings, and tutorial launch/lifecycle flows. Screen-model suites such as `SelectiveRevocationScreenModelTests` and `ContactCertificateSignaturesScreenModelTests` complement it from the unit lane.
+- **CypherAir-MacUITests** — targeted macOS UI smoke coverage: routes, settings, and tutorial launch/lifecycle flows.
 
 There is no dedicated visionOS test plan; native visionOS validation is the build probe in §2.4.
 
@@ -96,7 +91,7 @@ ProtectedData device-test isolation rules:
 - clean up by identifier before and after each device test
 - do not call `removeAllRightsWithCompletion()`
 
-Docs-only changes skip Rust/Xcode runs entirely — the documentation path in [WORKFLOW.md](WORKFLOW.md) §2 (text hygiene, link validity, `git diff --check`) is sufficient.
+Docs-only changes skip Rust/Xcode runs entirely — the documentation path in [WORKFLOW.md](WORKFLOW.md) §2 (text hygiene, link validity) is sufficient.
 
 ## 2.1 GitHub Actions Lanes
 
@@ -111,11 +106,8 @@ PR Checks and the nightly run are the blocking release-readiness signal. Jobs:
 
 `XCFramework Edge Release` (main pushes and manual dispatch) audits, rebuilds, probes, then publishes a unique `pgpmobile-edge-*` prerelease; non-main manual runs must use `pgpmobile-drill-*` prefixes. The stable release path runs on Xcode Cloud and is owned by [RELEASE.md](RELEASE.md); `.github/workflows/stable-release-attest.yml` re-verifies the signed tag, checksums, and SQLCipher record on `release.published` and attests the SDK/compliance assets.
 
-arm64e toolchain consumption: CI force-downloads the pinned `cypherair/rust` stage1 prerelease (tag owned by [ARM64E_STATUS.md](ARM64E_STATUS.md), mirrored in the workflow env) via direct release-asset URLs with token variables scrubbed; `latest` is never allowed. `arm64` slices build with official stable Rust; `arm64e` slices use stable Cargo with `RUSTC` pointing at the downloaded stage1 compiler and its prebuilt std payloads — no nightly Cargo, no `-Zbuild-std`.
+arm64e toolchain consumption: CI force-downloads the pinned `cypherair/rust` stage1 prerelease (tag, slice policy, and toolchain contract owned by [ARM64E_STATUS.md](ARM64E_STATUS.md)) via direct release-asset URLs with token variables scrubbed; `latest` is never allowed. Two TESTING-specific rules on top:
 
-Toolchain contract:
-
-- `stable` means the official Rust stable channel. The repo root intentionally has no `rust-toolchain.toml` override; use explicit `cargo +stable` / `rustc +stable`.
 - Rust/XCFramework jobs deliberately use no Cargo cache actions: restored `target/` artifacts can mix compiler generations and break proc-macro builds. Prefer slower clean CI builds.
 - App-side Rust or UniFFI changes never wait for a new stage1 prerelease; only changes to the Rust compiler fork itself do.
 
@@ -236,9 +228,10 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 ## 4. Writing Tests
 
 - Name tests `test_<unitOfWork>_<scenario>_<expectedResult>`.
-- Swift service/security tests use protocol-based mocks (`MockKeychain`, `MockSecureEnclave`, `MockAuthenticator` under `Sources/Security/Mocks/`); Rust tests prefer real Sequoia operations. `MockKeychain` supports deterministic delete-failure injection (`retryableFailure` vs `unrecoverable`) for crash-recovery tests.
+- Swift service/security tests use protocol-based mocks (`MockKeychain`, `MockSecureEnclave`, `MockAuthenticator` under `Sources/Security/Mocks/`); Rust tests prefer real Sequoia operations. `MockKeychain` supports deterministic delete-failure injection (`deleteError`, `failOnDeleteNumber`) for crash-recovery tests.
+- Assert behavior, not source text: no source-scanning XCTest assertions — architecture conformance is review's job, not a test's.
 - Every crypto operation needs a round-trip test per family it supports, a targeted tamper test proving hard-fail with no partial output, and format assertions where the format rule applies (SEIPDv1/v2 selection, AES-256 floor).
-- Crash-recovery coverage distinguishes the four recovery outcomes: cleanup-only (permanent row + stale pending row), promote-pending (missing permanent + complete pending), retryable failure (delete/write failure keeps flags set), and unrecoverable (no complete row anywhere → clear flags, surface a generic startup warning that leaks no fingerprints).
+- Crash-recovery coverage exercises all four outcomes of the crash-recovery invariant ([SECURITY.md](SECURITY.md) §4): cleanup-only, promote-pending, retryable (keeps flags set), unrecoverable (generic startup warning, no fingerprints).
 - Never hardcode key material or ciphertexts; generate fresh keys in setup. Clean up Keychain entries in `tearDown`. Guard device-only tests with `XCTSkipUnless(SecureEnclave.isAvailable)`.
 
 ## 5. GnuPG Interoperability
