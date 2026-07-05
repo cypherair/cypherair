@@ -24,11 +24,7 @@ struct SettingsSecuritySection: View {
             }
             .accessibilityIdentifier("settings.appAccessPolicy")
             .disabled(model.isSwitchingAppAccessPolicy)
-        } header: {
-            Text(String(localized: "settings.security", defaultValue: "Security"))
-        }
 
-        Section {
             Picker(
                 String(localized: "settings.authMode", defaultValue: "Portable Key Protection"),
                 selection: Binding(
@@ -48,14 +44,7 @@ struct SettingsSecuritySection: View {
             .accessibilityIdentifier("settings.authMode")
             .tutorialAnchor(.settingsAuthModePicker)
             .disabled(model.isSwitching || appConfiguration.authModeIfUnlocked == nil)
-        } footer: {
-            Text(String(
-                localized: "settings.authMode.footer",
-                defaultValue: "Applies to portable keys. Device-bound keys always use biometric access and are not affected."
-            ))
-        }
 
-        Section {
             Picker(
                 String(localized: "settings.gracePeriod", defaultValue: "Re-authentication"),
                 selection: Binding(
@@ -72,6 +61,13 @@ struct SettingsSecuritySection: View {
             if model.shouldShowClipboardNoticeRow {
                 SettingsProtectedClipboardNoticeRow(model: model)
             }
+        } header: {
+            Text(String(localized: "settings.security", defaultValue: "Security"))
+        } footer: {
+            Text(String(
+                localized: "settings.authMode.footer",
+                defaultValue: "Portable Key Protection applies to portable software keys. Device-bound keys always use biometric access and are not affected."
+            ))
         }
     }
 }

@@ -1,20 +1,18 @@
 import Foundation
 
 enum AppProductIdentity {
-    enum ProductLine {
-        case cypherAir
-        case cypherAirX
-    }
+    /// Canonical first-party repository, shown and copied on the About page.
+    static let repositoryURLString = "https://github.com/cypherair/cypherair"
 
     private static let displayNameFallback = "CypherAir X"
-    private static let productLine: ProductLine = .cypherAirX
+    private static let copyrightFallback = "© 2026 CypherAir"
 
     static var localizedDisplayName: String {
         bundleString(forKey: "CFBundleDisplayName") ?? displayNameFallback
     }
 
-    static var showsProductLineAboutContext: Bool {
-        productLine == .cypherAirX
+    static var localizedCopyright: String {
+        bundleString(forKey: "NSHumanReadableCopyright") ?? copyrightFallback
     }
 
     private static func bundleString(forKey key: String, in bundle: Bundle = .main) -> String? {

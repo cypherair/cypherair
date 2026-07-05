@@ -17,50 +17,18 @@
         }
       }
     },
-    "about.app" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "应用"
-          }
-        }
-      }
-    },
     "about.cypherAirX.description" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X is CypherAir’s exploratory product line for new directions still under evaluation, such as new encryption options, visual design updates, and interaction improvements. These explorations do not change CypherAir’s fully offline, no-network privacy model."
+            "value" : "CypherAir X is the enhanced edition of CypherAir — a fully offline OpenPGP encryption tool with zero network access and minimal permissions. Beyond CypherAir’s Portable Compatible and Portable Modern keys, it adds four more key families: Device-Bound Compatible, Device-Bound Modern, and Device-Bound Post-Quantum keys kept in this device’s Secure Enclave, plus Portable Post-Quantum keys that resist future quantum computers. CypherAir X remains fully open source on GitHub."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X 是 CypherAir 的探索产品线，用来承载仍在评估中的新方向，例如新的加密方式、外观和交互改进。这些探索不会改变 CypherAir 完全离线、无网络访问的隐私模型。"
-          }
-        }
-      }
-    },
-    "about.description" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fully offline OpenPGP encryption tool. Zero network access. Minimal permissions."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完全离线的 OpenPGP 加密工具。零网络访问。最小权限。"
+            "value" : "CypherAir X 是 CypherAir 的增强版——完全离线的 OpenPGP 加密工具，零网络访问，最小权限。在 CypherAir 的便携兼容与便携现代密钥之外，新增四个密钥家族：私钥由本机安全隔区保管的设备绑定兼容、设备绑定现代与设备绑定后量子密钥，以及可抵御未来量子计算机的便携后量子密钥。CypherAir X 在 GitHub 上保持完全开源。"
           }
         }
       }
@@ -113,18 +81,18 @@
         }
       }
     },
-    "about.version" : {
+    "about.version.caption" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Version"
+            "value" : "Version %1$@ (%2$@)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "版本"
+            "value" : "版本 %1$@（%2$@）"
           }
         }
       }
@@ -11189,6 +11157,38 @@
         }
       }
     },
+    "onboarding.keyFamilies.body" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Six key families to choose from. Device-Bound keys keep private keys inside this device’s Secure Enclave — they can never leave. Post-Quantum keys are designed to resist future quantum computers. Classical portable keys remain for full GnuPG compatibility."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "六个密钥家族可供选择。设备绑定密钥的私钥保存在本机安全隔区中，永不离开设备；后量子密钥旨在抵御未来的量子计算机；经典便携密钥依旧提供完整的 GnuPG 兼容性。"
+          }
+        }
+      }
+    },
+    "onboarding.keyFamilies.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure Enclave & Post-Quantum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全隔区与后量子"
+          }
+        }
+      }
+    },
     "onboarding.next" : {
       "localizations" : {
         "en" : {
@@ -12970,13 +12970,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Applies to portable keys. Device-bound keys always use biometric access and are not affected."
+            "value" : "Portable Key Protection applies to portable software keys. Device-bound keys always use biometric access and are not affected."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅适用于便携密钥。设备绑定密钥始终使用生物识别访问，不受此设置影响。"
+            "value" : "便携密钥保护仅适用于便携软件密钥。设备绑定密钥始终使用生物识别访问，不受影响。"
           }
         }
       }
@@ -15521,6 +15521,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "后量子密钥太大，无法生成二维码。请以文件方式分享或复制此密钥。"
+          }
+        }
+      }
+    },
+    "qr.unavailable.tooLarge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This key contains too much data for a QR code. Share this key as a file or copy it instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此密钥数据过多，无法生成二维码。请以文件方式分享或复制此密钥。"
+          }
+        }
+      }
+    },
+    "qr.unavailable.generic" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A QR code could not be generated for this key. Share this key as a file or copy it instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法为此密钥生成二维码。请以文件方式分享或复制此密钥。"
           }
         }
       }

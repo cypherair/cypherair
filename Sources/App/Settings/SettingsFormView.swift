@@ -7,13 +7,12 @@ struct SettingsFormView: View {
         Form {
             SettingsSecuritySection(model: model)
             SettingsEncryptionSection(model: model)
+            SettingsAppearanceSection(model: model)
+            SettingsNavigationSection(model: model)
 
             if model.shouldShowLocalDataResetSection {
                 SettingsLocalDataResetSection(model: model)
             }
-
-            SettingsAppearanceSection(model: model)
-            SettingsNavigationSection(model: model)
         }
     }
 }

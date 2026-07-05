@@ -121,13 +121,27 @@ struct SettingsProtectedClipboardNoticeRow: View {
             )
             .foregroundStyle(.secondary)
         case .tutorialSandbox:
-            Text(
-                String(
-                    localized: "protectedSettings.tutorial.message",
-                    defaultValue: "The tutorial sandbox never reads or writes your real Clipboard Safety Notice."
+            // Mirror the real control so the sandbox settings card looks like
+            // the main app; the toggle is inert and never touches real state.
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(
+                    String(
+                        localized: "settings.clipboardNotice",
+                        defaultValue: "Clipboard Safety Notice"
+                    ),
+                    isOn: .constant(true)
                 )
-            )
-            .foregroundStyle(.secondary)
+                .disabled(true)
+
+                Text(
+                    String(
+                        localized: "protectedSettings.tutorial.message",
+                        defaultValue: "The tutorial sandbox never reads or writes your real Clipboard Safety Notice."
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 }

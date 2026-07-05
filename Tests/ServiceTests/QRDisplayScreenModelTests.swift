@@ -32,32 +32,31 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.qrCGImage?.width, expectedImage.width)
         XCTAssertEqual(model.qrCGImage?.height, expectedImage.height)
-        XCTAssertNil(model.error)
-        XCTAssertFalse(model.showError)
+        XCTAssertNil(model.unavailability)
     }
 
     @MainActor
-    func test_prepare_whenQRCodeGenerationReturnsNil_presentsCorruptDataError() {
+    func test_prepare_whenQRCodeGenerationReturnsNil_showsGenerationFailedState() {
         let model = makeModel(generateQRCodeAction: { _ in nil })
 
         model.prepare()
 
-        assertCorruptData(model.error, reason: "QR code generation returned no image")
-        XCTAssertTrue(model.showError)
+        XCTAssertEqual(model.unavailability, .generationFailed)
+        XCTAssertNil(model.qrCGImage)
     }
 
     @MainActor
-    func test_prepare_whenRenderReturnsNil_presentsCorruptDataError() {
+    func test_prepare_whenRenderReturnsNil_showsGenerationFailedState() {
         let model = makeModel(renderQRCodeImageAction: { _, _ in nil })
 
         model.prepare()
 
-        assertCorruptData(model.error, reason: "Failed to render QR code image")
-        XCTAssertTrue(model.showError)
+        XCTAssertEqual(model.unavailability, .generationFailed)
+        XCTAssertNil(model.qrCGImage)
     }
 
     @MainActor
-    func test_prepare_whenGenerationThrows_normalizesError() {
+    func test_prepare_whenGenerationThrows_showsGenerationFailedState() {
         let model = makeModel(
             generateQRCodeAction: { _ in
                 throw QRDisplayScreenModelTestError(message: "generation failed")
@@ -66,23 +65,28 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
         model.prepare()
 
-        assertCorruptData(model.error, reason: "generation failed")
-        XCTAssertTrue(model.showError)
+        XCTAssertEqual(model.unavailability, .generationFailed)
+        XCTAssertNil(model.qrCGImage)
     }
 
     @MainActor
-    func test_dismissError_clearsPresentedError() {
-        let model = makeModel(generateQRCodeAction: { _ in nil })
+    func test_prepare_whenKeyExceedsQRCapacity_showsKeyTooLargeState() {
+        // An oversized classical key gets the same full-page not-available
+        // treatment as the post-quantum gate — never an alert over a spinner.
+        let model = makeModel(
+            generateQRCodeAction: { _ in
+                throw CypherAirError.keyTooLargeForQr
+            }
+        )
+
         model.prepare()
 
-        model.dismissError()
-
-        XCTAssertNil(model.error)
-        XCTAssertFalse(model.showError)
+        XCTAssertEqual(model.unavailability, .keyTooLarge)
+        XCTAssertNil(model.qrCGImage)
     }
 
     @MainActor
-    func test_prepare_postQuantumKey_showsUnavailableStateWithoutError() {
+    func test_prepare_postQuantumKey_showsUnavailableStateWithoutGeneration() {
         // Design doc §5 (campaign #567): PQ certs never render as QR; the
         // screen shows an explicit not-available state and generation is
         // never attempted.
@@ -96,10 +100,8 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
         model.prepare()
 
-        XCTAssertTrue(model.isUnavailableForKeyType)
+        XCTAssertEqual(model.unavailability, .postQuantumKey)
         XCTAssertNil(model.qrCGImage)
-        XCTAssertNil(model.error)
-        XCTAssertFalse(model.showError)
     }
 
     @MainActor
@@ -112,7 +114,7 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
         model.prepare()
 
-        XCTAssertFalse(model.isUnavailableForKeyType)
+        XCTAssertNil(model.unavailability)
         XCTAssertNotNil(model.qrCGImage)
     }
 
@@ -130,9 +132,8 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
         model.prepare()
 
-        XCTAssertFalse(model.isUnavailableForKeyType)
+        XCTAssertNil(model.unavailability)
         XCTAssertNotNil(model.qrCGImage)
-        XCTAssertNil(model.error)
     }
 
     @MainActor
@@ -171,17 +172,5 @@ final class QRDisplayScreenModelTests: XCTestCase {
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
         return try XCTUnwrap(context.makeImage())
-    }
-
-    private func assertCorruptData(
-        _ error: CypherAirError?,
-        reason expectedReason: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard case .corruptData(let reason)? = error else {
-            return XCTFail("Expected corruptData, got \(String(describing: error))", file: file, line: line)
-        }
-        XCTAssertEqual(reason, expectedReason, file: file, line: line)
     }
 }

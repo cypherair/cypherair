@@ -9,6 +9,20 @@ final class QRDisplayScreenModel {
     typealias RenderQRCodeImageAction = @MainActor (CIImage, CGSize) -> CGImage?
     typealias DetectKeyProfileAction = @MainActor (Data) throws -> PGPKeyProfile
 
+    /// Why no QR code can be shown for this key. Every failure resolves to a
+    /// full-page not-available state — the screen never surfaces alerts or
+    /// leaves a spinner running behind one.
+    enum Unavailability: Equatable {
+        /// Post-quantum certificates (~30 KB armored) exceed QR capacity by an
+        /// order of magnitude; the design (docs/POST_QUANTUM.md §5) requires an
+        /// explicit not-available state instead of a generation failure.
+        case postQuantumKey
+        /// The encoder rejected the payload as beyond QR capacity.
+        case keyTooLarge
+        /// Any other generation or rendering failure.
+        case generationFailed
+    }
+
     private let publicKeyData: Data
     private let generateQRCodeAction: GenerateQRCodeAction
     private let renderQRCodeImageAction: RenderQRCodeImageAction
@@ -16,12 +30,7 @@ final class QRDisplayScreenModel {
     private var hasPrepared = false
 
     var qrCGImage: CGImage?
-    var error: CypherAirError?
-    var showError = false
-    /// Post-quantum certificates (~30 KB armored) exceed QR capacity by an
-    /// order of magnitude; the design (docs/POST_QUANTUM.md §5) requires an
-    /// explicit not-available state instead of a generation failure.
-    var isUnavailableForKeyType = false
+    var unavailability: Unavailability?
 
     init(
         publicKeyData: Data,
@@ -49,39 +58,34 @@ final class QRDisplayScreenModel {
         generateQR()
     }
 
-    func dismissError() {
-        error = nil
-        showError = false
-    }
-
     private func generateQR() {
         // The gate must be explicit, not a failed-generation fallback: a
         // detection error falls through to the normal path so classical keys
         // are never blocked by a transient parse problem.
         if let profile = try? detectKeyProfileAction(publicKeyData), profile == .postQuantum {
-            isUnavailableForKeyType = true
+            unavailability = .postQuantumKey
             return
         }
         do {
             guard let ciImage = try generateQRCodeAction(publicKeyData) else {
-                presentError(.corruptData(reason: "QR code generation returned no image"))
+                unavailability = .generationFailed
                 return
             }
 
             guard let cgImage = renderQRCodeImageAction(ciImage, CGSize(width: 1024, height: 1024)) else {
-                presentError(.corruptData(reason: "Failed to render QR code image"))
+                unavailability = .generationFailed
                 return
             }
 
             qrCGImage = cgImage
         } catch {
-            presentError(CypherAirError.from(error) { .corruptData(reason: $0) })
+            let normalized = CypherAirError.from(error) { .corruptData(reason: $0) }
+            if case .keyTooLargeForQr = normalized {
+                unavailability = .keyTooLarge
+            } else {
+                unavailability = .generationFailed
+            }
         }
-    }
-
-    private func presentError(_ error: CypherAirError) {
-        self.error = error
-        showError = true
     }
 
     private static func renderQRCodeImage(_ ciImage: CIImage, size: CGSize) -> CGImage? {

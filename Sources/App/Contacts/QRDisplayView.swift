@@ -49,32 +49,17 @@ private struct QRDisplayHostView: View {
             .task {
                 model.prepare()
             }
-            .alert(
-                String(localized: "error.title", defaultValue: "Error"),
-                isPresented: Binding(
-                    get: { model.showError },
-                    set: { if !$0 { model.dismissError() } }
-                ),
-                presenting: model.error
-            ) { _ in
-                Button(String(localized: "error.ok", defaultValue: "OK")) {}
-            } message: { err in
-                Text(err.localizedDescription)
-            }
     }
 
     private var qrContent: some View {
         VStack(spacing: 24) {
-            if model.isUnavailableForKeyType {
+            if let unavailability = model.unavailability {
                 ContentUnavailableView(
                     String(localized: "qr.unavailable.title", defaultValue: "QR Not Available"),
                     systemImage: "qrcode",
-                    description: Text(String(
-                        localized: "qr.unavailable.postQuantum",
-                        defaultValue: "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
-                    ))
+                    description: Text(Self.unavailabilityDescription(unavailability))
                 )
-                .accessibilityIdentifier("qr.unavailableForKeyType")
+                .accessibilityIdentifier("qr.unavailable")
             } else if let qrCGImage = model.qrCGImage {
                 Image(decorative: qrCGImage, scale: 1.0)
                     .interpolation(.none)
@@ -96,13 +81,35 @@ private struct QRDisplayHostView: View {
             Text(displayName)
                 .font(.headline)
 
-            if !model.isUnavailableForKeyType {
+            if model.unavailability == nil {
                 Text(String(localized: "qr.instruction", defaultValue: "Ask your contact to scan this QR code with their camera."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
+        }
+    }
+
+    private static func unavailabilityDescription(
+        _ unavailability: QRDisplayScreenModel.Unavailability
+    ) -> String {
+        switch unavailability {
+        case .postQuantumKey:
+            String(
+                localized: "qr.unavailable.postQuantum",
+                defaultValue: "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
+            )
+        case .keyTooLarge:
+            String(
+                localized: "qr.unavailable.tooLarge",
+                defaultValue: "This key contains too much data for a QR code. Share this key as a file or copy it instead."
+            )
+        case .generationFailed:
+            String(
+                localized: "qr.unavailable.generic",
+                defaultValue: "A QR code could not be generated for this key. Share this key as a file or copy it instead."
+            )
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Three-page onboarding flow shown on first launch.
+/// Four-page onboarding flow shown on first launch.
 /// Can be re-viewed from Settings.
 struct OnboardingView: View {
     let presentationContext: OnboardingPresentationContext
@@ -11,20 +11,23 @@ struct OnboardingView: View {
         presentationContext: OnboardingPresentationContext = .firstRun
     ) {
         self.presentationContext = presentationContext
-        _currentPage = State(initialValue: min(max(initialPage, 0), 2))
+        _currentPage = State(initialValue: min(max(initialPage, 0), 3))
     }
 
     var body: some View {
         #if canImport(UIKit)
         TabView(selection: $currentPage) {
-            OnboardingPageOne()
+            OnboardingOfflinePage()
                 .tag(0)
 
-            OnboardingPageTwo()
+            OnboardingStandardPage()
                 .tag(1)
 
-            OnboardingPageThree(presentationContext: presentationContext)
+            OnboardingKeyFamiliesPage()
                 .tag(2)
+
+            OnboardingTutorialPage(presentationContext: presentationContext)
+                .tag(3)
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))
@@ -32,10 +35,11 @@ struct OnboardingView: View {
         VStack {
             Group {
                 switch currentPage {
-                case 0: OnboardingPageOne()
-                case 1: OnboardingPageTwo()
-                case 2: OnboardingPageThree(presentationContext: presentationContext)
-                default: OnboardingPageOne()
+                case 0: OnboardingOfflinePage()
+                case 1: OnboardingStandardPage()
+                case 2: OnboardingKeyFamiliesPage()
+                case 3: OnboardingTutorialPage(presentationContext: presentationContext)
+                default: OnboardingOfflinePage()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -49,7 +53,7 @@ struct OnboardingView: View {
                 Spacer()
 
                 HStack(spacing: CypherSpacing.compact) {
-                    ForEach(0..<3, id: \.self) { index in
+                    ForEach(0..<4, id: \.self) { index in
                         Circle()
                             .fill(index == currentPage ? Color.primary : Color.secondary.opacity(0.3))
                             .frame(width: 8, height: 8)
@@ -61,7 +65,7 @@ struct OnboardingView: View {
                 Button(String(localized: "onboarding.next", defaultValue: "Next")) {
                     withAnimation { currentPage += 1 }
                 }
-                .disabled(currentPage >= 2)
+                .disabled(currentPage >= 3)
             }
             .padding()
         }
@@ -70,7 +74,7 @@ struct OnboardingView: View {
 }
 
 /// Page 1: Offline Security
-struct OnboardingPageOne: View {
+struct OnboardingOfflinePage: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -101,7 +105,7 @@ struct OnboardingPageOne: View {
 }
 
 /// Page 2: PGP Introduction
-struct OnboardingPageTwo: View {
+struct OnboardingStandardPage: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -131,8 +135,39 @@ struct OnboardingPageTwo: View {
     }
 }
 
-/// Page 3: Generate Key CTA
-struct OnboardingPageThree: View {
+/// Page 3: Key families — Secure Enclave custody and post-quantum options.
+struct OnboardingKeyFamiliesPage: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "cpu")
+                .font(.system(size: 72, weight: .light))
+                .foregroundStyle(.purple)
+                .accessibilityHidden(true)
+
+            Text(String(localized: "onboarding.keyFamilies.title", defaultValue: "Secure Enclave & Post-Quantum"))
+                .font(.title.bold())
+
+            Text(String(localized: "onboarding.keyFamilies.body", defaultValue: "Six key families to choose from. Device-Bound keys keep private keys inside this device’s Secure Enclave — they can never leave. Post-Quantum keys are designed to resist future quantum computers. Classical portable keys remain for full GnuPG compatibility."))
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Spacer()
+            Spacer()
+        }
+        .cypherMacReadableContent(
+            maxWidth: MacPresentationWidth.onboarding,
+            alignment: .center,
+            outerAlignment: .center
+        )
+    }
+}
+
+/// Page 4: Generate Key CTA
+struct OnboardingTutorialPage: View {
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.iosPresentationController) private var iosPresentationController

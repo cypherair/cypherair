@@ -6,13 +6,11 @@ import UIKit
 struct AppIconPickerView: View {
     @State private var currentIconName: String? = UIApplication.shared.alternateIconName
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 20), count: 4)
-
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 20) {
+        List {
+            Section {
                 ForEach(AppIconOption.allCases) { option in
-                    AppIconCell(
+                    AppIconRow(
                         option: option,
                         isSelected: AppIconOption.current(from: currentIconName) == option
                     ) {
@@ -20,7 +18,6 @@ struct AppIconPickerView: View {
                     }
                 }
             }
-            .padding()
         }
         .navigationTitle(String(localized: "settings.appIcon", defaultValue: "App Icon"))
         .navigationBarTitleDisplayMode(.inline)
@@ -99,42 +96,36 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Cell View
+// MARK: - Row View
 
-/// A single icon thumbnail cell with label and selection indicator.
-private struct AppIconCell: View {
+/// A single icon list row: thumbnail, name, and a trailing selection checkmark.
+/// Rows grow vertically with Dynamic Type, so long names never break alignment.
+private struct AppIconRow: View {
     let option: AppIconOption
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack(alignment: .bottomTrailing) {
-                    iconImage
-                        .frame(width: 68, height: 68)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2.5)
-                        )
-
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white, .blue)
-                            .accessibilityHidden(true)
-                            .offset(x: 4, y: 4)
-                    }
-                }
+            HStack(spacing: 12) {
+                iconImage
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Text(option.displayName)
-                    .font(.caption)
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: 30, alignment: .top)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                }
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(option.displayName)
@@ -150,11 +141,11 @@ private struct AppIconCell: View {
                 .aspectRatio(contentMode: .fill)
         } else {
             // Fallback: placeholder with icon name
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(.quaternary)
                 .overlay {
                     Text(option.displayName.prefix(1))
-                        .font(.title2.bold())
+                        .font(.title3.bold())
                         .foregroundStyle(.secondary)
                 }
         }

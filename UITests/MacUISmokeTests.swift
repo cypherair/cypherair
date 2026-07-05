@@ -123,11 +123,9 @@ final class MacUISmokeTests: XCTestCase {
         launchMain()
         generateKey()
 
-        // The Keys tab still shows the post-generation screen; pop back to the
-        // My Keys list root (tab switches preserve the path, so pop for real).
-        popNavigationBack()
-        waitForScreenReady("keygen.ready")
-        popNavigationBack()
+        // Generation is pushed onto the Home tab's path, so the My Keys list
+        // root is reached by opening the Keys tab, not by popping back.
+        element("sidebar.keys").tap()
         let keyRow = app.staticTexts["UITest Alice"].firstMatch
         XCTAssertTrue(keyRow.waitForExistence(timeout: 10))
         XCTAssertTrue(keyRow.isHittable)
@@ -459,7 +457,7 @@ final class MacUISmokeTests: XCTestCase {
             return
         }
 
-        for _ in 0..<2 where !element("onboarding.tutorialDecision.ready").exists {
+        for _ in 0..<3 where !element("onboarding.tutorialDecision.ready").exists {
             XCTAssertTrue(app.buttons["Next"].waitForExistence(timeout: 5))
             app.buttons["Next"].tap()
         }
@@ -533,12 +531,6 @@ final class MacUISmokeTests: XCTestCase {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .count
-    }
-
-    private func popNavigationBack() {
-        let backButton = app.buttons["Back"].firstMatch
-        XCTAssertTrue(backButton.waitForExistence(timeout: 10), "Expected a navigation Back button.")
-        backButton.tap()
     }
 
     private func tapSettingsRow(_ identifier: String) {
