@@ -61,8 +61,14 @@ final class KeyGenerationScreenModel {
     /// Families the generation form offers, in stable presentation order.
     /// Software families are always offered; device-bound families require both a
     /// wired Secure Enclave generation service and the capability resolver's policy.
+    /// A locked configuration (tutorial sandbox) is display-only — selection is
+    /// fixed and generation never leaves the locked family — so the full catalog
+    /// shows with rows disabled rather than hiding what this container can't build.
     var availableFamilies: [PGPKeyConfiguration.Identity] {
-        PGPKeyConfiguration.Identity.orderedFamilies.filter { family in
+        guard configuration.lockedFamily == nil else {
+            return PGPKeyConfiguration.Identity.orderedFamilies
+        }
+        return PGPKeyConfiguration.Identity.orderedFamilies.filter { family in
             guard family.isDeviceBoundFamily else {
                 return true
             }

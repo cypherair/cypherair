@@ -153,6 +153,21 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
     }
 
+    func test_availableFamilies_lockedConfigurationShowsFullCatalogWithoutWiredService() {
+        // Locked mode (tutorial sandbox) is display-only: the full six-family
+        // catalog is listed even though this container has no wired Secure
+        // Enclave generation service, because every row renders disabled and
+        // generation never leaves the locked family.
+        let lockedModel = makeModel(
+            configuration: KeyGenerationView.Configuration(lockedFamily: .modernSoftwareV6),
+            isSecureEnclaveGenerationAvailable: false
+        )
+        XCTAssertEqual(
+            lockedModel.availableFamilies,
+            PGPKeyConfiguration.Identity.orderedFamilies
+        )
+    }
+
     func test_generate_deviceBoundFamilyRequiresCommitmentConfirmation() async {
         let identity = makeKeyRouteTestIdentity(fingerprint: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
         var capturedFamily: PGPKeyConfiguration.Identity?
