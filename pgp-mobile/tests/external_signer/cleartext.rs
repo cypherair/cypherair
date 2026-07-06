@@ -78,6 +78,36 @@ fn test_external_signer_runtime_cleartext_sanitizes_callback_failures() {
 }
 
 #[test]
+fn test_external_signer_runtime_cleartext_rejects_revoked_signing_key_before_callback() {
+    // A revoked public signing certificate must fail key selection
+    // (`select_external_signing_key`, shared by the P-256 and composite
+    // external paths) before the runtime signing callback is ever invoked:
+    // the provider panics if called.
+    for version in CandidateVersion::all() {
+        let material = build_candidate(version).expect("candidate should build");
+        let revoked_public_cert =
+            insert_key_revocation(&material.public_cert, &material.revocation_cert);
+
+        let result = sign::sign_cleartext_with_external_p256_signer(
+            b"revoked external signing key",
+            &revoked_public_cert,
+            &signing_key_fingerprint(&material),
+            Arc::new(UnexpectedRuntimeSigningProvider),
+        );
+
+        assert!(
+            matches!(
+                &result,
+                Err(PgpError::SigningFailed { reason })
+                    if reason.contains("No matching external signing key")
+            ),
+            "revoked signing key must fail selection before the callback ({}): {result:?}",
+            version.label()
+        );
+    }
+}
+
+#[test]
 fn test_external_signer_runtime_cleartext_rejects_invalid_responses() {
     let material = build_candidate(CandidateVersion::V4).expect("candidate should build");
     let signing_key_fingerprint = signing_key_fingerprint(&material);
