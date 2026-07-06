@@ -122,14 +122,6 @@ struct SecureEnclaveCompositeHandleReference: Hashable, Sendable {
     static func isValidHandleSetIdentifier(_ identifier: String) -> Bool {
         !identifier.isEmpty && identifier.allSatisfy { $0.isHexDigit }
     }
-
-    static func role(forServiceString service: String) -> PGPPrivateOperationRole? {
-        let prefix = "\(servicePrefix)."
-        guard service.hasPrefix(prefix) else {
-            return nil
-        }
-        return PGPPrivateOperationRole(rawValue: String(service.dropFirst(prefix.count)))
-    }
 }
 
 /// Public binding of one composite handle: the FIPS 204/203 raw public key the
