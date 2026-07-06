@@ -66,11 +66,11 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
             isSecureEnclaveGenerationAvailable: true
         )
-        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
 
         model.presentFamilyDetail(.modernP256V6)
 
-        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
         XCTAssertEqual(model.presentedFamilyDetail, .modernP256V6)
 
         model.dismissFamilyDetail()
@@ -355,6 +355,102 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertTrue(model.showError)
         XCTAssertNotNil(model.error)
         XCTAssertFalse(model.isGenerating)
+    }
+
+    func test_defaultSelection_isRecommendedPortablePostQuantum() {
+        let model = makeModel()
+
+        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
+        XCTAssertEqual(model.selectedFamily, PGPKeyConfiguration.Identity.recommendedDefault)
+        XCTAssertTrue(model.selectedFamily.isRecommended)
+        XCTAssertEqual(model.selectedCustody, .portable)
+        XCTAssertNil(model.detailFamily)
+    }
+
+    func test_continueToDetails_pushesSelectedFamilyAndDismissClears() {
+        let model = makeModel()
+        model.selectFamily(.modernSoftwareV6)
+
+        model.continueToDetails()
+        XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
+
+        model.dismissDetails()
+        XCTAssertNil(model.detailFamily)
+    }
+
+    func test_continueToDetails_clearsStaleGenerationFlags() {
+        let model = makeModel()
+        model.selectFamily(.modernSoftwareV6)
+        model.deviceBoundCommitmentPending = true
+        model.generatedIdentity = makeKeyRouteTestIdentity(
+            fingerprint: "1111111111111111111111111111111111111111"
+        )
+
+        model.continueToDetails()
+
+        XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
+        XCTAssertFalse(model.deviceBoundCommitmentPending)
+        XCTAssertNil(model.generatedIdentity)
+    }
+
+    func test_selectCustody_landsOnRecommendedOrFirstFamilyInCustody() {
+        let model = makeModel(
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        XCTAssertEqual(model.selectedCustody, .portable)
+
+        // Device-bound has no recommended family, so it lands on the first offered.
+        model.selectCustody(.deviceBound)
+        XCTAssertEqual(model.selectedFamily, .compatibleP256V4)
+        XCTAssertEqual(model.selectedCustody, .deviceBound)
+
+        // Portable has a recommended family (Portable Post-Quantum).
+        model.selectCustody(.portable)
+        XCTAssertEqual(model.selectedFamily, .postQuantumSoftwareV6)
+    }
+
+    func test_selectCustody_isNoOpForSameCustodyOrWhenLocked() {
+        let model = makeModel(
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        model.selectFamily(.compatibleSoftwareV4)
+        model.selectCustody(.portable) // already portable
+        XCTAssertEqual(model.selectedFamily, .compatibleSoftwareV4)
+
+        let lockedModel = makeModel(
+            configuration: KeyGenerationView.Configuration(lockedFamily: .modernSoftwareV6),
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        lockedModel.handleAppear()
+        lockedModel.selectCustody(.deviceBound)
+        XCTAssertEqual(lockedModel.selectedFamily, .modernSoftwareV6)
+    }
+
+    func test_availableCustodies_reflectOfferedFamilies() {
+        let softwareModel = makeModel()
+        XCTAssertEqual(softwareModel.availableCustodies, [.portable])
+
+        let fullModel = makeModel(
+            capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
+            isSecureEnclaveGenerationAvailable: true
+        )
+        XCTAssertEqual(fullModel.availableCustodies, [.portable, .deviceBound])
+        XCTAssertEqual(
+            fullModel.families(for: .deviceBound),
+            [.compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6]
+        )
+    }
+
+    func test_handleContentClear_dismissesDetailStep() {
+        let model = makeModel()
+        model.continueToDetails()
+        XCTAssertNotNil(model.detailFamily)
+
+        model.handleContentClearGenerationChange()
+        XCTAssertNil(model.detailFamily)
     }
 
     private func makeModel(

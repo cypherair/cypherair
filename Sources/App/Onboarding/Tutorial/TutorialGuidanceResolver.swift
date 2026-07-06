@@ -33,7 +33,7 @@ struct TutorialGuidanceResolver {
             }
             return payload(
                 module,
-                body: String(localized: "guidedTutorial.keys.form", defaultValue: "Review the prefilled Alice identity and generate the key."),
+                body: String(localized: "guidedTutorial.keys.form", defaultValue: "Keep the suggested key type, then review the prefilled Alice identity and generate the key."),
                 target: nil
             )
 

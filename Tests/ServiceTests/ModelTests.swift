@@ -1214,7 +1214,7 @@ final class ModelTests: XCTestCase {
             )
         ] = [
             .compatibleSoftwareV4: (
-                "Ed25519 signing + X25519 encryption",
+                "EdDSALegacy (22, Ed25519Legacy) signing + ECDH (18, Curve25519) encryption",
                 "v4",
                 "SEIPDv1 (MDC)",
                 "~128 bit",
@@ -1223,7 +1223,7 @@ final class ModelTests: XCTestCase {
                 "Portable software key"
             ),
             .modernSoftwareV6: (
-                "Ed448 signing + X448 encryption",
+                "Ed448 (28) signing + X448 (26) encryption",
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~224 bit",
@@ -1232,7 +1232,7 @@ final class ModelTests: XCTestCase {
                 "Portable software key"
             ),
             .postQuantumSoftwareV6: (
-                "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption",
+                "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption",
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~192 bit, quantum-resistant",
@@ -1241,7 +1241,7 @@ final class ModelTests: XCTestCase {
                 "Portable software key"
             ),
             .compatibleP256V4: (
-                "P-256 signing + P-256 key agreement",
+                "ECDSA (19, NIST P-256) signing + ECDH (18, NIST P-256) key agreement",
                 "v4",
                 "SEIPDv1 (MDC)",
                 "~128 bit",
@@ -1250,7 +1250,7 @@ final class ModelTests: XCTestCase {
                 "Device-bound Secure Enclave custody"
             ),
             .modernP256V6: (
-                "P-256 signing + P-256 key agreement",
+                "ECDSA (19, NIST P-256) signing + ECDH (18, NIST P-256) key agreement",
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~128 bit",
@@ -1259,7 +1259,7 @@ final class ModelTests: XCTestCase {
                 "Device-bound Secure Enclave custody"
             ),
             .deviceBoundPostQuantumV6: (
-                "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption",
+                "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption",
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~192 bit, quantum-resistant",

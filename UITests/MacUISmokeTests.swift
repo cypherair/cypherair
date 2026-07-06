@@ -390,6 +390,7 @@ final class MacUISmokeTests: XCTestCase {
 
         element("keys.generate").tap()
         waitForScreenReady("keygen.ready")
+        continueToKeyDetails()
         app.buttons["Generate Key"].tap()
         waitForScreenReady("postgen.ready", timeout: 15)
         XCTAssertTrue(element("tutorial.completionPrompt.primary").waitForExistence(timeout: 5))
@@ -492,11 +493,21 @@ final class MacUISmokeTests: XCTestCase {
         waitForScreenReady("settings.ready")
     }
 
+    /// Advance from the key-family picker (step 1) to the identity/expiry
+    /// details step (step 2), where Name and Generate live.
+    private func continueToKeyDetails() {
+        let continueButton = element("keygen.continue")
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 10))
+        continueButton.tap()
+        waitForScreenReady("keygen.details.ready")
+    }
+
     private func generateKey() {
         XCTAssertTrue(element("home.generate").waitForExistence(timeout: 10))
         element("home.generate").tap()
 
         waitForScreenReady("keygen.ready")
+        continueToKeyDetails()
         let nameField = element("keygen.name")
         nameField.tap()
         nameField.typeText("UITest Alice")
@@ -520,6 +531,7 @@ final class MacUISmokeTests: XCTestCase {
         element("keys.generate").tap()
 
         waitForScreenReady("keygen.ready")
+        continueToKeyDetails()
         app.buttons["Generate Key"].tap()
 
         waitForScreenReady("postgen.ready", timeout: 15)

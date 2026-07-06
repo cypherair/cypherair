@@ -18,7 +18,8 @@ final class KeyGenerationScreenModel {
 
     var name = ""
     var email = ""
-    var selectedFamily: PGPKeyConfiguration.Identity = .compatibleSoftwareV4
+    var selectedFamily: PGPKeyConfiguration.Identity = .recommendedDefault
+    var detailFamily: PGPKeyConfiguration.Identity?
     var expiryMonths = 24
     var isGenerating = false
     var deviceBoundCommitmentPending = false
@@ -107,6 +108,51 @@ final class KeyGenerationScreenModel {
             return
         }
         selectedFamily = family
+    }
+
+    /// Custody columns present in the offered catalog, in stable order.
+    var availableCustodies: [PGPKeyConfiguration.Identity.Custody] {
+        PGPKeyConfiguration.Identity.Custody.allCases.filter { custody in
+            availableFamilies.contains { $0.custody == custody }
+        }
+    }
+
+    /// Custody of the currently selected family; drives the compact segmented control.
+    var selectedCustody: PGPKeyConfiguration.Identity.Custody {
+        selectedFamily.custody
+    }
+
+    /// Offered families within a custody, in stable presentation order.
+    func families(for custody: PGPKeyConfiguration.Identity.Custody) -> [PGPKeyConfiguration.Identity] {
+        PGPKeyConfiguration.Identity.families(custody: custody, in: availableFamilies)
+    }
+
+    /// Switch the compact picker to another custody, landing on that custody's
+    /// recommended family (or its first offering). A no-op when the family is
+    /// locked (tutorial sandbox) or already in the requested custody.
+    func selectCustody(_ custody: PGPKeyConfiguration.Identity.Custody) {
+        guard configuration.lockedFamily == nil, selectedFamily.custody != custody else {
+            return
+        }
+        let candidates = families(for: custody)
+        if let recommended = candidates.first(where: { $0.isRecommended }) {
+            selectedFamily = recommended
+        } else if let first = candidates.first {
+            selectedFamily = first
+        }
+    }
+
+    /// Advance from the family picker to the identity/expiry details step. Any
+    /// transient generation flags are cleared first so a re-entered details step
+    /// can never inherit a stale pending commitment or generated identity.
+    func continueToDetails() {
+        deviceBoundCommitmentPending = false
+        generatedIdentity = nil
+        detailFamily = selectedFamily
+    }
+
+    func dismissDetails() {
+        detailFamily = nil
     }
 
     func presentFamilyDetail(_ family: PGPKeyConfiguration.Identity) {
@@ -226,6 +272,7 @@ final class KeyGenerationScreenModel {
         isGenerating = false
         deviceBoundCommitmentPending = false
         presentedFamilyDetail = nil
+        detailFamily = nil
         clearTransientInput()
     }
 
