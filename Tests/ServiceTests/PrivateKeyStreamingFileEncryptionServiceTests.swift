@@ -662,7 +662,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: keyInfo.keyVersion == 6 ? .modernSoftwareV6 : .compatibleSoftwareV4,
+            openPGPConfigurationIdentity: keyInfo.keyVersion == 6 ? .modernHighSoftwareV6 : .compatibleSoftwareV4,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }

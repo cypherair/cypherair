@@ -457,13 +457,29 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(universal.messageFormatPreference, .seipdV1)
         XCTAssertEqual(universal.softwareExportProtection, .iteratedSaltedS2K)
 
+        let modern = PGPKeyProfile.modern.openPGPConfiguration
+        XCTAssertEqual(modern.identity, .modernSoftwareV6)
+        XCTAssertEqual(modern.keyVersion, 6)
+        XCTAssertEqual(modern.algorithmSuite, .ed25519X25519)
+        XCTAssertEqual(modern.compatibilityTarget, .rfc9580Oriented)
+        XCTAssertEqual(modern.messageFormatPreference, .seipdV2Aead)
+        XCTAssertEqual(modern.softwareExportProtection, .argon2idS2K)
+
         let advanced = PGPKeyProfile.advanced.openPGPConfiguration
-        XCTAssertEqual(advanced.identity, .modernSoftwareV6)
+        XCTAssertEqual(advanced.identity, .modernHighSoftwareV6)
         XCTAssertEqual(advanced.keyVersion, 6)
         XCTAssertEqual(advanced.algorithmSuite, .ed448X448)
         XCTAssertEqual(advanced.compatibilityTarget, .rfc9580Oriented)
         XCTAssertEqual(advanced.messageFormatPreference, .seipdV2Aead)
         XCTAssertEqual(advanced.softwareExportProtection, .argon2idS2K)
+
+        let postQuantumHigh = PGPKeyProfile.postQuantumHigh.openPGPConfiguration
+        XCTAssertEqual(postQuantumHigh.identity, .postQuantumHighSoftwareV6)
+        XCTAssertEqual(postQuantumHigh.keyVersion, 6)
+        XCTAssertEqual(postQuantumHigh.algorithmSuite, .mldsa87Ed448Mlkem1024X448)
+        XCTAssertEqual(postQuantumHigh.compatibilityTarget, .rfc9580Oriented)
+        XCTAssertEqual(postQuantumHigh.messageFormatPreference, .seipdV2Aead)
+        XCTAssertEqual(postQuantumHigh.softwareExportProtection, .argon2idS2K)
     }
 
     func test_pgpKeyIdentity_persistsSuccessorVocabulary() throws {
@@ -1139,7 +1155,9 @@ final class ModelTests: XCTestCase {
 
     func test_keyFamily_equivalentSoftwareProfile_isTotalAndCorrect() {
         XCTAssertEqual(PGPKeyConfiguration.Identity.compatibleSoftwareV4.equivalentSoftwareProfile, .universal)
-        XCTAssertEqual(PGPKeyConfiguration.Identity.modernSoftwareV6.equivalentSoftwareProfile, .advanced)
+        XCTAssertEqual(PGPKeyConfiguration.Identity.modernSoftwareV6.equivalentSoftwareProfile, .modern)
+        XCTAssertEqual(PGPKeyConfiguration.Identity.modernHighSoftwareV6.equivalentSoftwareProfile, .advanced)
+        XCTAssertEqual(PGPKeyConfiguration.Identity.postQuantumHighSoftwareV6.equivalentSoftwareProfile, .postQuantumHigh)
         XCTAssertNil(PGPKeyConfiguration.Identity.compatibleP256V4.equivalentSoftwareProfile)
         XCTAssertNil(PGPKeyConfiguration.Identity.modernP256V6.equivalentSoftwareProfile)
 
@@ -1162,7 +1180,9 @@ final class ModelTests: XCTestCase {
     func test_keyFamily_deviceBoundFlagsMatchCustodyValidity() {
         XCTAssertFalse(PGPKeyConfiguration.Identity.compatibleSoftwareV4.isDeviceBoundFamily)
         XCTAssertFalse(PGPKeyConfiguration.Identity.modernSoftwareV6.isDeviceBoundFamily)
+        XCTAssertFalse(PGPKeyConfiguration.Identity.modernHighSoftwareV6.isDeviceBoundFamily)
         XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumSoftwareV6.isDeviceBoundFamily)
+        XCTAssertFalse(PGPKeyConfiguration.Identity.postQuantumHighSoftwareV6.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.compatibleP256V4.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.modernP256V6.isDeviceBoundFamily)
         XCTAssertTrue(PGPKeyConfiguration.Identity.deviceBoundPostQuantumV6.isDeviceBoundFamily)
@@ -1223,10 +1243,28 @@ final class ModelTests: XCTestCase {
                 "Portable software key"
             ),
             .modernSoftwareV6: (
+                "Ed25519 (27) signing + X25519 (25) encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~128 bit",
+                "Private key can be exported and backed up",
+                "Not compatible with GnuPG",
+                "Portable software key"
+            ),
+            .modernHighSoftwareV6: (
                 "Ed448 (28) signing + X448 (26) encryption",
                 "v6",
                 "SEIPDv2 (AEAD OCB)",
                 "~224 bit",
+                "Private key can be exported and backed up",
+                "Not compatible with GnuPG",
+                "Portable software key"
+            ),
+            .postQuantumHighSoftwareV6: (
+                "ML-DSA-87+Ed448 (31) signing + ML-KEM-1024+X448 (36) encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~256 bit, quantum-resistant",
                 "Private key can be exported and backed up",
                 "Not compatible with GnuPG",
                 "Portable software key"

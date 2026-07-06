@@ -148,14 +148,18 @@ struct PGPKeyCapabilityResolver: Sendable {
         switch (configuration.identity, custody) {
         case (.compatibleSoftwareV4, .softwareSecretCertificate),
              (.modernSoftwareV6, .softwareSecretCertificate),
+             (.modernHighSoftwareV6, .softwareSecretCertificate),
              (.postQuantumSoftwareV6, .softwareSecretCertificate),
+             (.postQuantumHighSoftwareV6, .softwareSecretCertificate),
              (.compatibleP256V4, .appleSecureEnclavePrivateOperations),
              (.modernP256V6, .appleSecureEnclavePrivateOperations),
              (.deviceBoundPostQuantumV6, .appleSecureEnclavePrivateOperations):
             return true
         case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
              (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+             (.modernHighSoftwareV6, .appleSecureEnclavePrivateOperations),
              (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
+             (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations),
              (.compatibleP256V4, .softwareSecretCertificate),
              (.modernP256V6, .softwareSecretCertificate),
              (.deviceBoundPostQuantumV6, .softwareSecretCertificate):

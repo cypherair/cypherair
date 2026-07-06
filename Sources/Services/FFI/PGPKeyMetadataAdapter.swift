@@ -35,8 +35,10 @@ extension PGPKeyProfile {
     var ffiValue: KeyProfile {
         switch self {
         case .universal: .universal
+        case .modern: .modern
         case .advanced: .advanced
         case .postQuantum: .postQuantum
+        case .postQuantumHigh: .postQuantumHigh
         }
     }
 }
@@ -45,8 +47,10 @@ extension KeyProfile {
     var appProfile: PGPKeyProfile {
         switch self {
         case .universal: .universal
+        case .modern: .modern
         case .advanced: .advanced
         case .postQuantum: .postQuantum
+        case .postQuantumHigh: .postQuantumHigh
         }
     }
 }

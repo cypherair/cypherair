@@ -58,7 +58,9 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 )
             case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
                  (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
-                 (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations):
+                 (.modernHighSoftwareV6, .appleSecureEnclavePrivateOperations),
+                 (.postQuantumSoftwareV6, .appleSecureEnclavePrivateOperations),
+                 (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations):
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata cannot use Secure Enclave custody for a software configuration."
                 )

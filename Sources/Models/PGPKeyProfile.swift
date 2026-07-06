@@ -7,14 +7,16 @@ import Foundation
 /// remain schema-compatible.
 enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
     case universal
+    case modern
     case advanced
     case postQuantum
+    case postQuantumHigh
 
     /// Key version produced by this profile.
     var keyVersion: UInt8 {
         switch self {
         case .universal: 4
-        case .advanced, .postQuantum: 6
+        case .modern, .advanced, .postQuantum, .postQuantumHigh: 6
         }
     }
 
@@ -22,10 +24,15 @@ enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
         switch self {
         case .universal:
             .compatibleSoftwareV4
-        case .advanced:
+        case .modern:
             .modernSoftwareV6
+        case .advanced:
+            // `advanced` is the Ed448/X448 tier, presented as "Modern · High".
+            .modernHighSoftwareV6
         case .postQuantum:
             .postQuantumSoftwareV6
+        case .postQuantumHigh:
+            .postQuantumHighSoftwareV6
         }
     }
 }

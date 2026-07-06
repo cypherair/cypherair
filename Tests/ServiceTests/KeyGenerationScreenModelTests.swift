@@ -97,16 +97,16 @@ final class KeyGenerationScreenModelTests: XCTestCase {
     func test_availableFamilies_productionPolicyExposesDeviceBoundFamiliesWhenServiceWired() {
         // No wired generation service (this test container): device-bound
         // families stay hidden even under the exposed production policy;
-        // all three software families are always offered.
+        // all five software families are always offered.
         let defaultModel = makeModel()
         XCTAssertEqual(
             defaultModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6]
+            [.compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6, .postQuantumHighSoftwareV6]
         )
 
         // Production policy + wired service (the shipping configuration since
         // P7D; Portable Post-Quantum exposed since campaign #567 Phase 4 and
-        // Device-Bound Post-Quantum since Phase 3): all six families are
+        // Device-Bound Post-Quantum since Phase 3): all eight families are
         // offered, in stable order.
         let availableServiceModel = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(),
@@ -117,7 +117,9 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             [
                 .compatibleSoftwareV4,
                 .modernSoftwareV6,
+                .modernHighSoftwareV6,
                 .postQuantumSoftwareV6,
+                .postQuantumHighSoftwareV6,
                 .compatibleP256V4,
                 .modernP256V6,
                 .deviceBoundPostQuantumV6
@@ -135,7 +137,9 @@ final class KeyGenerationScreenModelTests: XCTestCase {
             [
                 .compatibleSoftwareV4,
                 .modernSoftwareV6,
+                .modernHighSoftwareV6,
                 .postQuantumSoftwareV6,
+                .postQuantumHighSoftwareV6,
                 .compatibleP256V4,
                 .modernP256V6,
                 .deviceBoundPostQuantumV6
@@ -149,12 +153,12 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         )
         XCTAssertEqual(
             unwiredModel.availableFamilies,
-            [.compatibleSoftwareV4, .modernSoftwareV6, .postQuantumSoftwareV6]
+            [.compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6, .postQuantumHighSoftwareV6]
         )
     }
 
     func test_availableFamilies_lockedConfigurationShowsFullCatalogWithoutWiredService() {
-        // Locked mode (tutorial sandbox) is display-only: the full six-family
+        // Locked mode (tutorial sandbox) is display-only: the full eight-family
         // catalog is listed even though this container has no wired Secure
         // Enclave generation service, because every row renders disabled and
         // generation never leaves the locked family.
@@ -489,7 +493,7 @@ func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
         primaryAlgo: "Ed448",
         subkeyAlgo: "X448",
         expiryDate: nil,
-        openPGPConfigurationIdentity: .modernSoftwareV6,
+        openPGPConfigurationIdentity: .modernHighSoftwareV6,
         privateKeyCustodyKind: .softwareSecretCertificate
     )
 }

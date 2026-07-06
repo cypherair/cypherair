@@ -400,13 +400,8 @@ final class SelfTestService {
     }
 
     private static func localizedProfileName(for profile: PGPKeyProfile) -> String {
-        switch profile {
-        case .universal:
-            String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Legacy")
-        case .advanced:
-            String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern · High")
-        case .postQuantum:
-            String(localized: "keyFamily.portablePostQuantum.name", defaultValue: "Portable Post-Quantum")
-        }
+        // Derive from the family vocabulary so new profiles are covered
+        // automatically and the report name never drifts from the picker.
+        profile.openPGPConfiguration.identity.familyDisplayName
     }
 }

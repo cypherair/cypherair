@@ -4,8 +4,17 @@ import Foundation
 struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
     enum Identity: String, CaseIterable, Codable, Hashable, Sendable {
         case compatibleSoftwareV4
+        /// Portable Modern: v6 Ed25519+X25519 (RFC 9580). The baseline v6
+        /// classical family — the plain "Modern" tier.
         case modernSoftwareV6
+        /// Portable Modern · High: v6 Ed448+X448 (RFC 9580). Historically named
+        /// `modernSoftwareV6`; re-keyed in issue #591 Phase 2 when the baseline
+        /// Ed25519 Modern family took that name.
+        case modernHighSoftwareV6
         case postQuantumSoftwareV6
+        /// Portable Post-Quantum · High: v6 RFC 9980 composite ML-DSA-87+Ed448 /
+        /// ML-KEM-1024+X448 (NIST level 5).
+        case postQuantumHighSoftwareV6
         case compatibleP256V4
         case modernP256V6
         case deviceBoundPostQuantumV6
@@ -16,8 +25,12 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
                 .compatibleSoftwareV4
             case .modernSoftwareV6:
                 .modernSoftwareV6
+            case .modernHighSoftwareV6:
+                .modernHighSoftwareV6
             case .postQuantumSoftwareV6:
                 .postQuantumSoftwareV6
+            case .postQuantumHighSoftwareV6:
+                .postQuantumHighSoftwareV6
             case .compatibleP256V4:
                 .compatibleP256V4
             case .modernP256V6:
@@ -32,6 +45,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         case ed25519X25519
         case ed448X448
         case mldsa65Ed25519Mlkem768X25519
+        case mldsa87Ed448Mlkem1024X448
         case p256
     }
 
@@ -67,8 +81,21 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         softwareExportProtection: .iteratedSaltedS2K
     )
 
+    /// Portable Modern: v6 Ed25519+X25519 (RFC 9580). Same Curve25519 family as
+    /// the v4 Legacy configuration, but the dedicated v6 algorithm ids
+    /// (Ed25519 / X25519) under the modern format.
     static let modernSoftwareV6 = PGPKeyConfiguration(
         identity: .modernSoftwareV6,
+        keyVersion: 6,
+        algorithmSuite: .ed25519X25519,
+        compatibilityTarget: .rfc9580Oriented,
+        messageFormatPreference: .seipdV2Aead,
+        softwareExportProtection: .argon2idS2K
+    )
+
+    /// Portable Modern · High: v6 Ed448+X448 (RFC 9580).
+    static let modernHighSoftwareV6 = PGPKeyConfiguration(
+        identity: .modernHighSoftwareV6,
         keyVersion: 6,
         algorithmSuite: .ed448X448,
         compatibilityTarget: .rfc9580Oriented,
@@ -80,6 +107,18 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         identity: .postQuantumSoftwareV6,
         keyVersion: 6,
         algorithmSuite: .mldsa65Ed25519Mlkem768X25519,
+        compatibilityTarget: .rfc9580Oriented,
+        messageFormatPreference: .seipdV2Aead,
+        softwareExportProtection: .argon2idS2K
+    )
+
+    /// Portable Post-Quantum · High: the higher RFC 9980 composite tier
+    /// (ML-DSA-87+Ed448 / ML-KEM-1024+X448, NIST level 5). Portable software
+    /// key; the private key can be exported and backed up.
+    static let postQuantumHighSoftwareV6 = PGPKeyConfiguration(
+        identity: .postQuantumHighSoftwareV6,
+        keyVersion: 6,
+        algorithmSuite: .mldsa87Ed448Mlkem1024X448,
         compatibilityTarget: .rfc9580Oriented,
         messageFormatPreference: .seipdV2Aead,
         softwareExportProtection: .argon2idS2K
@@ -125,9 +164,13 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4:
             .universal
         case .modernSoftwareV6:
+            .modern
+        case .modernHighSoftwareV6:
             .advanced
         case .postQuantumSoftwareV6:
             .postQuantum
+        case .postQuantumHighSoftwareV6:
+            .postQuantumHigh
         case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
             nil
         }

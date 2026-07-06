@@ -17,17 +17,28 @@ use crate::error::PgpError;
 
 /// Encryption profile selection.
 /// Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
+/// Modern: v6, Ed25519+X25519, SEIPDv2 AEAD OCB, Argon2id S2K.
 /// Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
 /// Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
 /// ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
+/// Post-Quantum · High: v6, RFC 9980 composite ML-DSA-87+Ed448 signing and
+/// ML-KEM-1024+X448 encryption, SEIPDv2, Argon2id S2K.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum KeyProfile {
     /// Profile A: Universal compatible. v4 keys, GnuPG compatible.
     Universal,
-    /// Profile B: Advanced security. v6 keys, RFC 9580.
+    /// Profile B: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
+    /// the user as "Modern · High"; the baseline v6 classical tier is `Modern`.
     Advanced,
+    /// Modern: v6 Ed25519+X25519 keys, RFC 9580. The baseline v6 classical
+    /// profile — Curve25519 under RFC 9580, i.e. Ed25519 (27) + X25519 (25).
+    /// Not GnuPG compatible (v6 format).
+    Modern,
     /// Post-Quantum: RFC 9980 composite algorithms on v6 keys. Not GnuPG compatible.
     PostQuantum,
+    /// Post-Quantum · High: RFC 9980 composite ML-DSA-87+Ed448 signing and
+    /// ML-KEM-1024+X448 encryption on v6 keys (NIST level 5). Not GnuPG compatible.
+    PostQuantumHigh,
 }
 
 /// Result of key generation, containing the key pair and revocation certificate.

@@ -42,11 +42,33 @@ pub fn generate_key_with_profile(
                     reason: format!("Failed to set profile: {e}"),
                 })?;
         }
+        KeyProfile::Modern => {
+            // Baseline v6 classical suite: Curve25519 under RFC 9580 yields
+            // Ed25519 (27) signing + X25519 (25) encryption — the dedicated v6
+            // algorithms, not the deprecated v4 EdDSALegacy/ECDH that the same
+            // Cv25519 suite produces under RFC 4880 (KeyProfile::Universal).
+            builder = builder
+                .set_cipher_suite(CipherSuite::Cv25519)
+                .set_profile(openpgp::Profile::RFC9580)
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set profile: {e}"),
+                })?;
+        }
         KeyProfile::PostQuantum => {
             // RFC 9980 composite suite: ML-DSA-65+Ed25519 primary/signing,
             // ML-KEM-768+X25519 encryption subkey. v6-only, like Advanced.
             builder = builder
                 .set_cipher_suite(CipherSuite::MLDSA65_Ed25519)
+                .set_profile(openpgp::Profile::RFC9580)
+                .map_err(|e| PgpError::KeyGenerationFailed {
+                    reason: format!("Failed to set profile: {e}"),
+                })?;
+        }
+        KeyProfile::PostQuantumHigh => {
+            // RFC 9980 composite high tier: ML-DSA-87+Ed448 primary/signing,
+            // ML-KEM-1024+X448 encryption subkey (NIST level 5). v6-only.
+            builder = builder
+                .set_cipher_suite(CipherSuite::MLDSA87_Ed448)
                 .set_profile(openpgp::Profile::RFC9580)
                 .map_err(|e| PgpError::KeyGenerationFailed {
                     reason: format!("Failed to set profile: {e}"),
