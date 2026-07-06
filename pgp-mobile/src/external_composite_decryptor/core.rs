@@ -9,13 +9,18 @@ use openpgp::types::PublicKeyAlgorithm;
 use crate::composite_classical;
 use crate::composite_kem;
 use crate::keys::{
-    ExternalCompositeKeyAgreementFailureCategory, ExternalMlKem768DecapsulationRequest,
+    ExternalCompositeKeyAgreementFailureCategory, ExternalMlKem1024DecapsulationRequest,
+    ExternalMlKem768DecapsulationRequest,
 };
 
 #[cfg(test)]
 pub(crate) const MLKEM768_PUBLIC_KEY_LENGTH: usize = 1184;
 #[cfg(test)]
 pub(crate) const MLKEM768_CIPHERTEXT_LENGTH: usize = 1088;
+#[cfg(test)]
+pub(crate) const MLKEM1024_PUBLIC_KEY_LENGTH: usize = 1568;
+#[cfg(test)]
+pub(crate) const MLKEM1024_CIPHERTEXT_LENGTH: usize = 1568;
 
 /// Validate that `public_key` is an RFC 9980 ML-KEM-768 + X25519 composite
 /// key-agreement key. Shared by `ExternalCompositeDecryptor::new` and the
@@ -285,6 +290,237 @@ where
         // Sequoia composite path: `PKESK::decrypt` maps them to a non-match and
         // the message fails closed with "no key to decrypt".
         let kek = composite_kem::multi_key_combine_mlkem768_x25519(
+            &mlkem_key_share.raw,
+            &ecdh_key_share,
+            &ecdh_ciphertext,
+            &ecdh_public,
+        )?;
+        composite_kem::unwrap_session_key(&kek, &wrapped_session_key)
+    }
+}
+
+/// Validate that `public_key` is an RFC 9980 ML-KEM-1024 + X448 composite
+/// key-agreement key (· High tier). Shared by `ExternalCompositeHighDecryptor::new`
+/// and the key-agreement subkey selector so both validate identically.
+pub(crate) fn validate_composite_high_key_agreement_public_key(
+    public_key: &Key<key::PublicParts, key::UnspecifiedRole>,
+) -> Result<(), ExternalCompositeDecryptorError> {
+    match (public_key.pk_algo(), public_key.mpis()) {
+        (PublicKeyAlgorithm::MLKEM1024_X448, mpi::PublicKey::MLKEM1024_X448 { .. }) => Ok(()),
+        _ => Err(ExternalCompositeDecryptorError::InvalidRequest(
+            "external composite decryptor requires an ML-KEM-1024+X448 public key",
+        )),
+    }
+}
+
+impl ExternalMlKem1024DecapsulationRequest {
+    pub(crate) fn new(recipient_mlkem_public_key: Vec<u8>, mlkem_ciphertext: Vec<u8>) -> Self {
+        Self {
+            recipient_mlkem_public_key,
+            mlkem_ciphertext,
+        }
+    }
+}
+
+pub(crate) struct ExternalMlKem1024Share {
+    raw: Zeroizing<Vec<u8>>,
+}
+
+impl ExternalMlKem1024Share {
+    pub(crate) fn new(raw: Vec<u8>) -> Self {
+        Self {
+            raw: Zeroizing::new(raw),
+        }
+    }
+}
+
+/// RFC 9980 composite ML-KEM-1024 + X448 decryptor with split custody (· High tier).
+///
+/// The X448 key share is derived inside Rust from the supplied classical
+/// component secret; the ML-KEM-1024 decapsulation is delegated to the external
+/// (Secure Enclave) callback. The vendored RFC 9980 KEM combiner and the
+/// AES-256 key unwrap both stay on the Rust side, so the callback sees only
+/// public material and returns only the 32-byte ML-KEM key share.
+pub(crate) struct ExternalCompositeHighDecryptor<F>
+where
+    F: FnMut(
+        ExternalMlKem1024DecapsulationRequest,
+    ) -> Result<ExternalMlKem1024Share, ExternalCompositeDecryptorError>,
+{
+    public_key: Key<key::PublicParts, key::UnspecifiedRole>,
+    classical_ecdh_secret: Protected,
+    decapsulation_operation: F,
+    last_error: Option<ExternalCompositeDecryptorError>,
+}
+
+impl<F> ExternalCompositeHighDecryptor<F>
+where
+    F: FnMut(
+        ExternalMlKem1024DecapsulationRequest,
+    ) -> Result<ExternalMlKem1024Share, ExternalCompositeDecryptorError>,
+{
+    /// Build a · High composite decryptor after validating that the classical
+    /// component secret matches the X448 half bound into the certificate. A
+    /// mismatched envelope payload fails closed here instead of deriving key
+    /// shares that can never unwrap the session key.
+    pub(crate) fn new(
+        public_key: Key<key::PublicParts, key::UnspecifiedRole>,
+        classical_ecdh_secret: &[u8],
+        decapsulation_operation: F,
+    ) -> openpgp::Result<Self> {
+        validate_composite_high_key_agreement_public_key(&public_key)?;
+        let expected_ecdh_public = match public_key.mpis() {
+            mpi::PublicKey::MLKEM1024_X448 { ecdh, .. } => **ecdh,
+            _ => unreachable!("validated above"),
+        };
+
+        let derived_ecdh_public = composite_classical::x448_public_key(classical_ecdh_secret)
+            .map_err(|error| {
+                openpgp::Error::InvalidOperation(format!(
+                    "external composite decryptor rejected the classical component: {error}"
+                ))
+            })?;
+        if derived_ecdh_public != expected_ecdh_public {
+            return Err(openpgp::Error::InvalidOperation(
+                "external composite decryptor classical component does not match the certificate"
+                    .to_string(),
+            )
+            .into());
+        }
+
+        Ok(Self {
+            public_key,
+            classical_ecdh_secret: Protected::from(classical_ecdh_secret),
+            decapsulation_operation,
+            last_error: None,
+        })
+    }
+
+    pub(crate) fn take_last_error(&mut self) -> Option<ExternalCompositeDecryptorError> {
+        self.last_error.take()
+    }
+
+    fn prepare_request(
+        &self,
+        ciphertext: &mpi::Ciphertext,
+    ) -> Result<ExternalMlKem1024DecapsulationRequest, ExternalCompositeDecryptorError> {
+        let mlkem_ciphertext = match ciphertext {
+            mpi::Ciphertext::MLKEM1024_X448 { mlkem, .. } => mlkem.to_vec(),
+            _ => {
+                return Err(ExternalCompositeDecryptorError::InvalidRequest(
+                    "external composite decryptor supports ML-KEM-1024+X448 ciphertext only",
+                ))
+            }
+        };
+
+        let recipient_mlkem_public_key = match self.public_key.mpis() {
+            mpi::PublicKey::MLKEM1024_X448 { mlkem, .. } => mlkem.to_vec(),
+            _ => {
+                return Err(ExternalCompositeDecryptorError::InvalidRequest(
+                    "external composite decryptor requires an ML-KEM-1024+X448 public key",
+                ))
+            }
+        };
+
+        Ok(ExternalMlKem1024DecapsulationRequest::new(
+            recipient_mlkem_public_key,
+            mlkem_ciphertext,
+        ))
+    }
+
+    fn record(&mut self, error: ExternalCompositeDecryptorError) -> openpgp::anyhow::Error {
+        self.last_error = Some(error);
+        error.into()
+    }
+
+    fn validate_key_share(
+        key_share: &ExternalMlKem1024Share,
+    ) -> Result<(), ExternalCompositeDecryptorError> {
+        if key_share.raw.len() != composite_kem::MLKEM1024_KEY_SHARE_LENGTH {
+            return Err(ExternalCompositeDecryptorError::InvalidResponse(
+                "external composite decryptor returned an invalid key share shape",
+            ));
+        }
+
+        if key_share.raw.iter().all(|byte| *byte == 0) {
+            return Err(ExternalCompositeDecryptorError::InvalidResponse(
+                "external composite decryptor returned an invalid zero key share",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+impl<F> Decryptor for ExternalCompositeHighDecryptor<F>
+where
+    F: FnMut(
+            ExternalMlKem1024DecapsulationRequest,
+        ) -> Result<ExternalMlKem1024Share, ExternalCompositeDecryptorError>
+        + Send
+        + Sync,
+{
+    fn public(&self) -> &Key<key::PublicParts, key::UnspecifiedRole> {
+        &self.public_key
+    }
+
+    fn decrypt(
+        &mut self,
+        ciphertext: &mpi::Ciphertext,
+        _plaintext_len: Option<usize>,
+    ) -> openpgp::Result<SessionKey> {
+        let request = match self.prepare_request(ciphertext) {
+            Ok(request) => request,
+            Err(error) => return Err(self.record(error)),
+        };
+
+        let (ecdh_ciphertext, ecdh_public, wrapped_session_key) =
+            match (self.public_key.mpis(), ciphertext) {
+                (
+                    mpi::PublicKey::MLKEM1024_X448 {
+                        ecdh: ecdh_public, ..
+                    },
+                    mpi::Ciphertext::MLKEM1024_X448 {
+                        ecdh: ecdh_ciphertext,
+                        esk,
+                        ..
+                    },
+                ) => (**ecdh_ciphertext, **ecdh_public, esk.to_vec()),
+                _ => {
+                    return Err(self.record(ExternalCompositeDecryptorError::InvalidRequest(
+                        "external composite decryptor supports ML-KEM-1024+X448 ciphertext only",
+                    )))
+                }
+            };
+
+        // Classical half first: it is cheap, deterministic, and failing here
+        // avoids a user-visible Secure Enclave operation for broken key material.
+        let ecdh_key_share = match composite_classical::x448_shared_secret(
+            &self.classical_ecdh_secret,
+            &ecdh_ciphertext,
+        ) {
+            Ok(share) => share,
+            Err(_) => {
+                return Err(self.record(
+                    ExternalCompositeDecryptorError::ClassicalComponentFailure(
+                        "external composite decryptor classical key agreement failed",
+                    ),
+                ))
+            }
+        };
+
+        let mlkem_key_share = match (self.decapsulation_operation)(request) {
+            Ok(share) => share,
+            Err(error) => return Err(self.record(error)),
+        };
+        if let Err(error) = Self::validate_key_share(&mlkem_key_share) {
+            return Err(self.record(error));
+        }
+
+        // Combiner and unwrap failures are returned raw, matching the native
+        // Sequoia composite path: `PKESK::decrypt` maps them to a non-match and
+        // the message fails closed with "no key to decrypt".
+        let kek = composite_kem::multi_key_combine_mlkem1024_x448(
             &mlkem_key_share.raw,
             &ecdh_key_share,
             &ecdh_ciphertext,

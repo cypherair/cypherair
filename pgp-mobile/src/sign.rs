@@ -7,9 +7,13 @@ use openpgp::serialize::stream::*;
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
-use crate::external_composite_signer::composite_signer_for_provider;
+use crate::external_composite_signer::{
+    composite_high_signer_for_provider, composite_signer_for_provider,
+};
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
-use crate::keys::{ExternalMlDsa65SigningProvider, ExternalP256SigningProvider};
+use crate::keys::{
+    ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider, ExternalP256SigningProvider,
+};
 
 // Note: `zeroize` is not explicitly used here because Sequoia's `KeyPair` type manages
 // its own secret key material lifecycle. The `into_keypair()` call extracts the secret
@@ -91,6 +95,27 @@ pub fn sign_cleartext_with_external_composite_signer(
                 reason: format!("External signer setup failed: {error}"),
             },
         )?;
+
+    sign_cleartext_with_signer(text, external_signer)
+}
+
+/// Device-Bound Post-Quantum · High analog of
+/// `sign_cleartext_with_external_composite_signer` (ML-DSA-87 + Ed448).
+pub fn sign_cleartext_with_external_composite_high_signer(
+    text: &[u8],
+    public_cert_data: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let signing_public_key =
+        select_external_signing_key(public_cert_data, signing_key_fingerprint, &policy)?;
+    let external_signer =
+        composite_high_signer_for_provider(signing_public_key, classical_eddsa_secret, signer)
+            .map_err(|error| PgpError::SigningFailed {
+                reason: format!("External signer setup failed: {error}"),
+            })?;
 
     sign_cleartext_with_signer(text, external_signer)
 }

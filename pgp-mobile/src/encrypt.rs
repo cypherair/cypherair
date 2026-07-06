@@ -8,9 +8,13 @@ use openpgp::types::RevocationStatus;
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
-use crate::external_composite_signer::composite_signer_for_provider;
+use crate::external_composite_signer::{
+    composite_high_signer_for_provider, composite_signer_for_provider,
+};
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
-use crate::keys::{ExternalMlDsa65SigningProvider, ExternalP256SigningProvider};
+use crate::keys::{
+    ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider, ExternalP256SigningProvider,
+};
 use crate::sign::select_external_signing_key;
 
 /// Parse recipient certificates, validate each has at least one encryption-capable
@@ -196,6 +200,32 @@ pub(crate) fn setup_external_composite_signer<'a>(
                 reason: format!("External signer setup failed: {error}"),
             },
         )?;
+
+    Signer::new(message, external_signer)
+        .map_err(|e| PgpError::SigningFailed {
+            reason: format!("Signer setup failed: {e}"),
+        })?
+        .build()
+        .map_err(|error| map_external_signing_error(error, signer_error("Signer setup failed")))
+}
+
+/// Device-Bound Post-Quantum · High analog of `setup_external_composite_signer`
+/// (ML-DSA-87 + Ed448).
+pub(crate) fn setup_external_composite_high_signer<'a>(
+    message: Message<'a>,
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    policy: &StandardPolicy,
+) -> Result<Message<'a>, PgpError> {
+    let signing_public_key =
+        select_external_signing_key(signing_public_cert, signing_key_fingerprint, policy)?;
+    let external_signer =
+        composite_high_signer_for_provider(signing_public_key, classical_eddsa_secret, signer)
+            .map_err(|error| PgpError::SigningFailed {
+                reason: format!("External signer setup failed: {error}"),
+            })?;
 
     Signer::new(message, external_signer)
         .map_err(|e| PgpError::SigningFailed {
@@ -391,6 +421,51 @@ pub fn encrypt_with_external_composite_signer(
         })?;
 
     let message = setup_external_composite_signer(
+        message,
+        signing_public_cert,
+        signing_key_fingerprint,
+        classical_eddsa_secret,
+        signer,
+        &policy,
+    )?;
+
+    write_and_finalize_external_signing(message, plaintext)?;
+
+    Ok(sink)
+}
+
+/// Device-Bound Post-Quantum · High analog of
+/// `encrypt_with_external_composite_signer` (ML-DSA-87 + Ed448 signer).
+pub fn encrypt_with_external_composite_high_signer(
+    plaintext: &[u8],
+    recipient_certs: &[Vec<u8>],
+    signing_public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    encrypt_to_self: Option<&[u8]>,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let certs = collect_recipients(recipient_certs, encrypt_to_self, &policy)?;
+    let recipient_keys = build_recipients(&certs, &policy);
+
+    let mut sink = Vec::new();
+    let message = Message::new(&mut sink);
+
+    let message = Armorer::new(message)
+        .kind(openpgp::armor::Kind::Message)
+        .build()
+        .map_err(|e| PgpError::EncryptionFailed {
+            reason: format!("Armor setup failed: {e}"),
+        })?;
+
+    let message = Encryptor::for_recipients(message, recipient_keys)
+        .build()
+        .map_err(|e| PgpError::EncryptionFailed {
+            reason: format!("Encryptor setup failed: {e}"),
+        })?;
+
+    let message = setup_external_composite_high_signer(
         message,
         signing_public_cert,
         signing_key_fingerprint,

@@ -35,10 +35,12 @@ use crate::decrypt::MessageQuantumSafety;
 use crate::error::PgpError;
 use crate::keys::{
     CertificateMergeResult, DiscoveredCertificateSelectors, ExternalMlDsa65SigningProvider,
+    ExternalMlDsa87SigningProvider, ExternalMlKem1024DecapsulationProvider,
     ExternalMlKem768DecapsulationProvider, ExternalP256KeyAgreementProvider,
     ExternalP256SigningProvider, GeneratedKey, KeyInfo, KeyProfile, ModifyExpiryPublicResult,
     ModifyExpiryResult, PublicCertificateValidationResult, S2kInfo,
     SecureEnclaveCompositeBindingInspection, SecureEnclaveCompositeGeneratedCertificate,
+    SecureEnclaveCompositeHighBindingInspection, SecureEnclaveCompositeHighPublicCertificateInput,
     SecureEnclaveCompositePublicCertificateInput, SecureEnclaveGeneratedPublicCertificate,
     SecureEnclavePublicBindingInspection, SecureEnclavePublicCertificateInput, UserIdSelectorInput,
 };
@@ -129,6 +131,300 @@ impl PgpEngine {
         public_key_data: Vec<u8>,
     ) -> Result<SecureEnclaveCompositeBindingInspection, PgpError> {
         keys::inspect_secure_enclave_composite_bindings(&public_key_data)
+    }
+
+    // ── Device-Bound Post-Quantum · High operations ─────────────────
+    //
+    // ML-DSA-87 + Ed448 / ML-KEM-1024 + X448 split custody. Each method is the
+    // High-tier analog of an `..._external_composite_..._signer` /
+    // `..._external_composite_key_agreement` method above: the external callback
+    // performs only the Secure Enclave ML-DSA-87 signature or ML-KEM-1024
+    // decapsulation; the Ed448/X448 classical halves, the RFC 9980 combiner,
+    // packet assembly, and composite-signature verification remain Rust-owned.
+
+    /// Build the Device-Bound Post-Quantum · High split-custody composite certificate.
+    pub fn generate_secure_enclave_composite_high_public_certificate(
+        &self,
+        input: SecureEnclaveCompositeHighPublicCertificateInput,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    ) -> Result<SecureEnclaveCompositeGeneratedCertificate, PgpError> {
+        keys::generate_secure_enclave_composite_high_public_certificate(input, signer)
+    }
+
+    /// Inspect a public-only Device-Bound Post-Quantum · High composite certificate.
+    pub fn inspect_secure_enclave_composite_high_bindings(
+        &self,
+        public_key_data: Vec<u8>,
+    ) -> Result<SecureEnclaveCompositeHighBindingInspection, PgpError> {
+        keys::inspect_secure_enclave_composite_high_bindings(&public_key_data)
+    }
+
+    /// Modify the expiration time of a public-only · High composite certificate.
+    pub fn modify_expiry_with_external_composite_high_signer(
+        &self,
+        public_cert_data: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        new_expiry_seconds: Option<u64>,
+    ) -> Result<ModifyExpiryPublicResult, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::modify_expiry_with_external_composite_high_signer(
+            &public_cert_data,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            new_expiry_seconds,
+        )
+    }
+
+    /// Encrypt plaintext and sign it with the external · High composite signer.
+    pub fn encrypt_with_external_composite_high_signer(
+        &self,
+        plaintext: Vec<u8>,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        encrypt::encrypt_with_external_composite_high_signer(
+            &plaintext,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            encrypt_to_self.as_deref(),
+        )
+    }
+
+    /// Encrypt with a password and sign with the external · High composite signer.
+    pub fn encrypt_with_password_and_external_composite_high_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        password::encrypt_with_external_composite_high_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+        )
+    }
+
+    /// Encrypt with a password, sign with the external · High composite signer,
+    /// and return binary ciphertext.
+    pub fn encrypt_binary_with_password_and_external_composite_high_signer(
+        &self,
+        plaintext: Vec<u8>,
+        password: String,
+        format: PasswordMessageFormat,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let password = Password::from(password);
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        password::encrypt_binary_with_external_composite_high_signer(
+            &plaintext,
+            &password,
+            format,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+        )
+    }
+
+    /// Decrypt through a public-only · High composite recipient and external
+    /// ML-KEM-1024 decapsulation provider, preserving per-signature details.
+    pub fn decrypt_detailed_with_external_composite_high_key_agreement(
+        &self,
+        ciphertext: Vec<u8>,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        classical_ecdh_secret: Vec<u8>,
+        decapsulation_provider: Arc<dyn ExternalMlKem1024DecapsulationProvider>,
+        verification_keys: Vec<Vec<u8>>,
+    ) -> Result<DecryptDetailedResult, PgpError> {
+        let classical_ecdh_secret = Zeroizing::new(classical_ecdh_secret);
+        external_composite_decryptor::decrypt_detailed_with_external_composite_high_key_agreement(
+            &ciphertext,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            &classical_ecdh_secret,
+            decapsulation_provider,
+            &verification_keys,
+        )
+    }
+
+    /// Create a cleartext signature with the external · High composite signer.
+    pub fn sign_cleartext_with_external_composite_high_signer(
+        &self,
+        text: Vec<u8>,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        sign::sign_cleartext_with_external_composite_high_signer(
+            &text,
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+        )
+    }
+
+    /// Generate raw User ID certification bytes through the external · High
+    /// composite signing provider.
+    pub fn generate_user_id_certification_by_selector_with_external_composite_high_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        target_cert: Vec<u8>,
+        user_id_selector: UserIdSelectorInput,
+        certification_kind: CertificationKind,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        cert_signature::generate_user_id_certification_by_selector_with_external_composite_high_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            &target_cert,
+            &user_id_selector,
+            certification_kind,
+        )
+    }
+
+    /// Generate a subkey revocation through the external · High composite signer.
+    pub fn generate_subkey_revocation_with_external_composite_high_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        subkey_fingerprint: String,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::generate_subkey_revocation_with_external_composite_high_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            &subkey_fingerprint,
+        )
+    }
+
+    /// Generate a User ID revocation through the external · High composite signer.
+    pub fn generate_user_id_revocation_by_selector_with_external_composite_high_signer(
+        &self,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        user_id_selector: UserIdSelectorInput,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        keys::generate_user_id_revocation_by_selector_with_external_composite_high_signer(
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            &user_id_selector,
+        )
+    }
+
+    /// Encrypt a file (streaming I/O) and sign with the external · High composite signer.
+    pub fn encrypt_file_with_external_composite_high_signer(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipients: Vec<Vec<u8>>,
+        signing_public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        encrypt_to_self: Option<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<(), PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        streaming::encrypt_file_with_external_composite_high_signer(
+            &input_path,
+            &output_path,
+            &recipients,
+            &signing_public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            encrypt_to_self.as_deref(),
+            progress,
+        )
+    }
+
+    /// Decrypt a file (streaming I/O) through a public-only · High composite
+    /// recipient and external ML-KEM-1024 decapsulation provider.
+    pub fn decrypt_file_detailed_with_external_composite_high_key_agreement(
+        &self,
+        input_path: String,
+        output_path: String,
+        recipient_public_cert: Vec<u8>,
+        key_agreement_subkey_fingerprint: String,
+        classical_ecdh_secret: Vec<u8>,
+        decapsulation_provider: Arc<dyn ExternalMlKem1024DecapsulationProvider>,
+        verification_keys: Vec<Vec<u8>>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<FileDecryptDetailedResult, PgpError> {
+        let classical_ecdh_secret = Zeroizing::new(classical_ecdh_secret);
+        external_composite_decryptor::decrypt_file_detailed_with_external_composite_high_key_agreement(
+            &input_path,
+            &output_path,
+            &recipient_public_cert,
+            &key_agreement_subkey_fingerprint,
+            &classical_ecdh_secret,
+            decapsulation_provider,
+            &verification_keys,
+            progress,
+        )
+    }
+
+    /// Create a detached file signature with the external · High composite signer.
+    pub fn sign_detached_file_with_external_composite_high_signer(
+        &self,
+        input_path: String,
+        public_cert: Vec<u8>,
+        signing_key_fingerprint: String,
+        classical_eddsa_secret: Vec<u8>,
+        signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+        progress: Option<Arc<dyn streaming::StreamingProgressReporter>>,
+    ) -> Result<Vec<u8>, PgpError> {
+        let classical_eddsa_secret = Zeroizing::new(classical_eddsa_secret);
+        streaming::sign_detached_file_with_external_composite_high_signer(
+            &input_path,
+            &public_cert,
+            &signing_key_fingerprint,
+            &classical_eddsa_secret,
+            signer,
+            progress,
+        )
     }
 
     // ── Key Information ─────────────────────────────────────────────
