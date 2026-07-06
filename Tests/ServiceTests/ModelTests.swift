@@ -1214,7 +1214,7 @@ final class ModelTests: XCTestCase {
             )
         ] = [
             .compatibleSoftwareV4: (
-                "EdDSALegacy (Ed25519Legacy) signing + ECDH (Curve25519) encryption",
+                "EdDSALegacy (22, Ed25519Legacy) signing + ECDH (18, Curve25519) encryption",
                 "v4",
                 "SEIPDv1 (MDC)",
                 "~128 bit",

@@ -47,7 +47,6 @@ struct KeyGenerationView: View {
 }
 
 private struct KeyGenerationScreenHostView: View {
-    let keyManagement: KeyManagementService
     let appSessionOrchestrator: AppSessionOrchestrator
 
     @State private var model: KeyGenerationScreenModel
@@ -58,7 +57,6 @@ private struct KeyGenerationScreenHostView: View {
         routeNavigator: AppRouteNavigator,
         configuration: KeyGenerationView.Configuration
     ) {
-        self.keyManagement = keyManagement
         self.appSessionOrchestrator = appSessionOrchestrator
 
         let postGenerationPromptAction: KeyGenerationScreenModel.PostGenerationPromptAction?
@@ -89,30 +87,6 @@ private struct KeyGenerationScreenHostView: View {
             .navigationDestination(item: $model.detailFamily) { family in
                 KeyGenerationDetailsView(model: model, family: family)
             }
-            .alert(
-                String(localized: "error.title", defaultValue: "Error"),
-                isPresented: Binding(
-                    get: { model.showError },
-                    set: { if !$0 { model.dismissError() } }
-                ),
-                presenting: model.error
-            ) { _ in
-                Button(String(localized: "error.ok", defaultValue: "OK")) {
-                    model.dismissError()
-                }
-            } message: { err in
-                Text(err.localizedDescription)
-            }
-            .sheet(isPresented: Binding(
-                get: { model.deviceBoundCommitmentPending },
-                set: { if !$0 { model.cancelDeviceBoundCommitment() } }
-            )) {
-                DeviceBoundKeyCommitmentSheet(
-                    family: model.selectedFamily,
-                    onConfirm: { model.confirmDeviceBoundGeneration() },
-                    onCancel: { model.cancelDeviceBoundCommitment() }
-                )
-            }
             .sheet(isPresented: Binding(
                 get: { model.presentedFamilyDetail != nil },
                 set: { if !$0 { model.dismissFamilyDetail() } }
@@ -122,19 +96,6 @@ private struct KeyGenerationScreenHostView: View {
                         family: family,
                         onDismiss: { model.dismissFamilyDetail() }
                     )
-                }
-            }
-            .sheet(item: Binding(
-                get: { model.generatedIdentity },
-                set: { if $0 == nil { model.dismissGeneratedIdentity() } }
-            )) { identity in
-                AppRouteHost(
-                    resolver: .production,
-                    macSheetSizing: .routedModal
-                ) {
-                    PostGenerationPromptView(identity: identity)
-                        .environment(keyManagement)
-                        .interactiveDismissDisabled(false)
                 }
             }
             .onAppear {

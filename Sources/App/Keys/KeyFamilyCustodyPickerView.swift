@@ -7,24 +7,41 @@ import SwiftUI
 struct KeyFamilyCustodyPickerView: View {
     let model: KeyGenerationScreenModel
 
+    @State private var availableWidth: CGFloat = 0
+
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    private var isRegularWidth: Bool { horizontalSizeClass == .regular }
-    #else
-    private var isRegularWidth: Bool { true }
     #endif
 
     private var isSelectionLocked: Bool {
         model.configuration.lockedFamily != nil
     }
 
+    /// Side-by-side custody columns need real width; below the tool-screen wide
+    /// threshold we fall back to the single column so long labels never wrap
+    /// character-by-character — e.g. the guided-tutorial surface on macOS, whose
+    /// horizontal space is much tighter than a normal window.
+    private var usesColumns: Bool {
+        guard availableWidth >= ToolScreenLayoutPolicy.wideLayoutMinWidth else {
+            return false
+        }
+        #if os(iOS)
+        return horizontalSizeClass == .regular
+        #else
+        return true
+        #endif
+    }
+
     var body: some View {
         Group {
-            if isRegularWidth {
+            if usesColumns {
                 regularLayout
             } else {
                 compactLayout
             }
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            availableWidth = width
         }
         .accessibilityIdentifier("keygen.familyPicker")
     }
@@ -54,6 +71,10 @@ struct KeyFamilyCustodyPickerView: View {
             }
         }
         .scrollDismissesKeyboardInteractivelyIfAvailable()
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
+        .cypherMacReadableContent()
     }
 
     private var custodyPicker: some View {

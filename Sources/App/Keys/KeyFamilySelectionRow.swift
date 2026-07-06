@@ -35,11 +35,13 @@ struct KeyFamilySelectionRow: View {
                     Text(family.tierDisplayName)
                         .font(.body)
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
                     if family.isRecommended {
                         CypherStatusBadge(
                             title: String(localized: "keyFamily.recommended", defaultValue: "Recommended"),
                             color: .accentColor
                         )
+                        .fixedSize(horizontal: true, vertical: false)
                     }
                 }
                 Text(family.familyAlgorithmSubtitle)

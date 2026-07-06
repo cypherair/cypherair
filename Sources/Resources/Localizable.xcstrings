@@ -6858,13 +6858,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Review the prefilled Alice identity and generate the key."
+            "value" : "Keep the suggested key type, then review the prefilled Alice identity and generate the key."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查预填的 Alice 身份信息并生成密钥。"
+            "value" : "保持建议的密钥类型，然后查看预填的 Alice 身份信息并生成密钥。"
           }
         }
       }
@@ -10122,13 +10122,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "EdDSALegacy (Ed25519Legacy) signing + ECDH (Curve25519) encryption"
+            "value" : "EdDSALegacy (22, Ed25519Legacy) signing + ECDH (18, Curve25519) encryption"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "EdDSALegacy (Ed25519Legacy) 签名 + ECDH (Curve25519) 加密"
+            "value" : "EdDSALegacy (22, Ed25519Legacy) 签名 + ECDH (18, Curve25519) 加密"
           }
         }
       }

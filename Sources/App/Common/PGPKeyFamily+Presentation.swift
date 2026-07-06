@@ -186,7 +186,7 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4:
             String(
                 localized: "keyFamily.portableCompatible.algorithms",
-                defaultValue: "EdDSALegacy (Ed25519Legacy) signing + ECDH (Curve25519) encryption"
+                defaultValue: "EdDSALegacy (22, Ed25519Legacy) signing + ECDH (18, Curve25519) encryption"
             )
         case .modernSoftwareV6:
             String(
@@ -344,13 +344,16 @@ extension PGPKeyConfiguration.Identity {
         tier.displayName
     }
 
-    /// Families of a given custody within the supplied catalog, in stable
-    /// presentation (tier) order.
+    /// Families of a given custody within the supplied catalog, sorted by
+    /// ascending tier so the picker's row order stays stable no matter how new
+    /// families are later appended to `orderedFamilies`.
     static func families(
         custody: Custody,
         in families: [PGPKeyConfiguration.Identity]
     ) -> [PGPKeyConfiguration.Identity] {
-        families.filter { $0.custody == custody }
+        families
+            .filter { $0.custody == custody }
+            .sorted { $0.tier.rawValue < $1.tier.rawValue }
     }
 
     /// The family pre-selected when the generation picker opens.

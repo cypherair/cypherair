@@ -7,7 +7,9 @@ struct KeyGenerationDetailsView: View {
     let model: KeyGenerationScreenModel
     let family: PGPKeyConfiguration.Identity
 
+    @Environment(KeyManagementService.self) private var keyManagement
     @FocusState private var focusedField: KeyGenerationView.Field?
+    @State private var showsTechnicalDetail = false
 
     var body: some View {
         @Bindable var model = model
@@ -71,6 +73,49 @@ struct KeyGenerationDetailsView: View {
         #if !os(macOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .alert(
+            String(localized: "error.title", defaultValue: "Error"),
+            isPresented: Binding(
+                get: { model.showError },
+                set: { if !$0 { model.dismissError() } }
+            ),
+            presenting: model.error
+        ) { _ in
+            Button(String(localized: "error.ok", defaultValue: "OK")) {
+                model.dismissError()
+            }
+        } message: { err in
+            Text(err.localizedDescription)
+        }
+        .sheet(isPresented: Binding(
+            get: { model.deviceBoundCommitmentPending },
+            set: { if !$0 { model.cancelDeviceBoundCommitment() } }
+        )) {
+            DeviceBoundKeyCommitmentSheet(
+                family: family,
+                onConfirm: { model.confirmDeviceBoundGeneration() },
+                onCancel: { model.cancelDeviceBoundCommitment() }
+            )
+        }
+        .sheet(isPresented: $showsTechnicalDetail) {
+            KeyFamilyDetailSheet(
+                family: family,
+                onDismiss: { showsTechnicalDetail = false }
+            )
+        }
+        .sheet(item: Binding(
+            get: { model.generatedIdentity },
+            set: { if $0 == nil { model.dismissGeneratedIdentity() } }
+        )) { identity in
+            AppRouteHost(
+                resolver: .production,
+                macSheetSizing: .routedModal
+            ) {
+                PostGenerationPromptView(identity: identity)
+                    .environment(keyManagement)
+                    .interactiveDismissDisabled(false)
+            }
+        }
     }
 
     private var summaryHeader: some View {
@@ -95,7 +140,7 @@ struct KeyGenerationDetailsView: View {
             }
 
             Button {
-                model.presentFamilyDetail(family)
+                showsTechnicalDetail = true
             } label: {
                 Text(String(localized: "keygen.viewDetails", defaultValue: "View technical details"))
                     .font(.caption)
