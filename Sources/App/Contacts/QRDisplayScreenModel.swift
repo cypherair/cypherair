@@ -61,8 +61,10 @@ final class QRDisplayScreenModel {
     private func generateQR() {
         // The gate must be explicit, not a failed-generation fallback: a
         // detection error falls through to the normal path so classical keys
-        // are never blocked by a transient parse problem.
-        if let profile = try? detectKeyProfileAction(publicKeyData), profile == .postQuantum {
+        // are never blocked by a transient parse problem. `isPostQuantum` covers
+        // every PQ tier (65/768 and 87/1024), so the higher tier is not silently
+        // routed to the generic failure state.
+        if let profile = try? detectKeyProfileAction(publicKeyData), profile.isPostQuantum {
             unavailability = .postQuantumKey
             return
         }

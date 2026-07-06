@@ -35,4 +35,15 @@ enum PGPKeyProfile: String, CaseIterable, Codable, Hashable, Sendable {
             .postQuantumHighSoftwareV6
         }
     }
+
+    /// Whether this is an RFC 9980 post-quantum composite profile (any tier).
+    /// Use this instead of `== .postQuantum` so a new PQ tier can never be
+    /// silently missed — the exhaustive switch forces every future profile to
+    /// be classified here.
+    var isPostQuantum: Bool {
+        switch self {
+        case .postQuantum, .postQuantumHigh: true
+        case .universal, .modern, .advanced: false
+        }
+    }
 }
