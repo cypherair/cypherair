@@ -9,11 +9,13 @@ use openpgp::types::{HashAlgorithm, RevocationStatus, SignatureType};
 use sequoia_openpgp as openpgp;
 
 use crate::error::PgpError;
-use crate::external_composite_signer::composite_signer_for_provider;
+use crate::external_composite_signer::{
+    composite_high_signer_for_provider, composite_signer_for_provider,
+};
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
 use crate::keys::{
-    find_user_id_by_selector, ExternalMlDsa65SigningProvider, ExternalP256SigningProvider,
-    UserIdSelectorInput,
+    find_user_id_by_selector, ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider,
+    ExternalP256SigningProvider, UserIdSelectorInput,
 };
 
 /// OpenPGP certification signature kinds preserved across the FFI boundary.
@@ -205,6 +207,53 @@ pub fn generate_user_id_certification_by_selector_with_external_composite_signer
                 reason: format!("External certification signer setup failed: {error}"),
             },
         )?;
+    let certification = user_id
+        .certify(
+            &mut external_signer,
+            &target_cert,
+            certification_kind.signature_type(),
+            Some(HashAlgorithm::SHA512),
+            None,
+        )
+        .map_err(|error| {
+            map_external_signing_error(error, |reason| PgpError::SigningFailed {
+                reason: format!("Failed to generate User ID certification: {reason}"),
+            })
+        })?;
+
+    serialize_user_id_certification(certification)
+}
+
+/// Device-Bound Post-Quantum · High analog of
+/// `generate_user_id_certification_by_selector_with_external_composite_signer`.
+pub fn generate_user_id_certification_by_selector_with_external_composite_high_signer(
+    public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    target_cert: &[u8],
+    user_id_selector: &UserIdSelectorInput,
+    certification_kind: CertificationKind,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+    let signer_cert = parse_public_cert_for_external_certification(public_cert)?;
+    ensure_external_certification_certificate_not_revoked(&signer_cert, &policy, reference_time)?;
+    let signing_public_key = select_external_certification_primary_signing_key(
+        &signer_cert,
+        signing_key_fingerprint,
+        &policy,
+        reference_time,
+    )?;
+
+    let target_cert_data = target_cert;
+    let target_cert = parse_cert(target_cert_data, "Invalid target certificate")?;
+    let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
+    let mut external_signer =
+        composite_high_signer_for_provider(signing_public_key, classical_eddsa_secret, signer)
+            .map_err(|error| PgpError::SigningFailed {
+                reason: format!("External certification signer setup failed: {error}"),
+            })?;
     let certification = user_id
         .certify(
             &mut external_signer,

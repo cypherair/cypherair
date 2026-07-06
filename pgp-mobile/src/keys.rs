@@ -573,9 +573,11 @@ pub struct SecureEnclaveCompositeGeneratedCertificate {
     pub signing_key_fingerprint: String,
     /// Key-agreement subkey fingerprint as lowercase hex.
     pub key_agreement_subkey_fingerprint: String,
-    /// 32-byte Ed25519 component secret. Envelope, then zeroize.
+    /// EdDSA component secret (32-byte Ed25519, or 57-byte Ed448 for the · High
+    /// tier). Envelope, then zeroize.
     pub classical_eddsa_secret: Vec<u8>,
-    /// 32-byte X25519 component secret. Envelope, then zeroize.
+    /// ECDH component secret (32-byte X25519, or 56-byte X448 for the · High
+    /// tier). Envelope, then zeroize.
     pub classical_ecdh_secret: Vec<u8>,
 }
 
@@ -597,6 +599,108 @@ pub struct SecureEnclaveCompositeBindingInspection {
     /// 32-byte Ed25519 component public key bound to the primary key.
     pub eddsa_signing_public_key: Vec<u8>,
     /// 32-byte X25519 component public key bound to the subkey.
+    pub ecdh_key_agreement_public_key: Vec<u8>,
+}
+
+// Device-Bound Post-Quantum · High (ML-DSA-87 + Ed448 / ML-KEM-1024 + X448)
+// FFI surface. Parallel to the 65/768 tier above: the failure-category and
+// error enums are tier-agnostic and shared, only the algorithm-specialized
+// callbacks, carriers, and public-key inputs differ.
+
+/// Raw ML-DSA-87 signature returned by an external provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MlDsa87Signature {
+    /// 4627-byte FIPS 204 ML-DSA-87 signature.
+    pub raw: Vec<u8>,
+}
+
+/// Foreign ML-DSA-87 signing callback for split-custody composite · High
+/// certificates.
+///
+/// The provider performs exactly the Secure Enclave primitive: a pure FIPS 204
+/// ML-DSA-87 signature over the supplied OpenPGP signature digest. The Ed448
+/// half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
+/// stay on the Rust side of the boundary.
+#[uniffi::export(with_foreign)]
+pub trait ExternalMlDsa87SigningProvider: Send + Sync {
+    /// Sign an OpenPGP signature digest and return the 4627-byte ML-DSA-87 signature.
+    fn sign_mldsa87_digest(
+        &self,
+        digest: Vec<u8>,
+    ) -> Result<MlDsa87Signature, ExternalCompositeSigningError>;
+}
+
+/// Public material Rust sends to an external ML-KEM-1024 decapsulation provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ExternalMlKem1024DecapsulationRequest {
+    /// 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the recipient subkey.
+    pub recipient_mlkem_public_key: Vec<u8>,
+    /// 1568-byte FIPS 203 ML-KEM-1024 ciphertext from the PKESK packet.
+    pub mlkem_ciphertext: Vec<u8>,
+}
+
+/// Raw ML-KEM-1024 key share returned by an external provider.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MlKem1024KeyShare {
+    /// 32-byte ML-KEM-1024 shared secret. Rust immediately validates and zeroizes it.
+    pub raw: Vec<u8>,
+}
+
+/// Foreign ML-KEM-1024 decapsulation callback for split-custody composite · High
+/// decryption.
+///
+/// The provider performs exactly the Secure Enclave primitive: FIPS 203
+/// ML-KEM-1024 decapsulation of the PKESK ciphertext into the 32-byte key
+/// share. The X448 half, the RFC 9980 KEM combiner, and AES key unwrap stay on
+/// the Rust side of the boundary.
+#[uniffi::export(with_foreign)]
+pub trait ExternalMlKem1024DecapsulationProvider: Send + Sync {
+    /// Decapsulate an ML-KEM-1024 ciphertext into the raw 32-byte key share.
+    fn decapsulate_mlkem1024(
+        &self,
+        request: ExternalMlKem1024DecapsulationRequest,
+    ) -> Result<MlKem1024KeyShare, ExternalCompositeKeyAgreementError>;
+}
+
+/// Public-only input for split-custody composite · High OpenPGP certificate
+/// construction.
+///
+/// The ML-DSA-87 and ML-KEM-1024 component public keys come from Secure Enclave
+/// key generation on the Swift side. The classical Ed448/X448 components are
+/// generated inside Rust and returned in the result for enveloping.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclaveCompositeHighPublicCertificateInput {
+    /// Display name for the self-certified User ID.
+    pub name: String,
+    /// Optional email address for the User ID.
+    pub email: Option<String>,
+    /// Validity period from now in seconds. Defaults to two years when omitted.
+    pub expiry_seconds: Option<u64>,
+    /// 2592-byte FIPS 204 ML-DSA-87 verification key for signing/certification.
+    pub mldsa87_signing_public_key: Vec<u8>,
+    /// 1568-byte FIPS 203 ML-KEM-1024 encapsulation key for key agreement.
+    pub mlkem1024_key_agreement_public_key: Vec<u8>,
+}
+
+/// Public bindings extracted from a split-custody composite · High OpenPGP
+/// certificate.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SecureEnclaveCompositeHighBindingInspection {
+    /// Certificate fingerprint as lowercase hex.
+    pub fingerprint: String,
+    /// OpenPGP key version.
+    pub key_version: u8,
+    /// Primary signing key fingerprint as lowercase hex.
+    pub signing_key_fingerprint: String,
+    /// Key-agreement subkey fingerprint as lowercase hex.
+    pub key_agreement_subkey_fingerprint: String,
+    /// 2592-byte FIPS 204 ML-DSA-87 verification key bound to the primary key.
+    pub mldsa87_signing_public_key: Vec<u8>,
+    /// 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the subkey.
+    pub mlkem1024_key_agreement_public_key: Vec<u8>,
+    /// 57-byte Ed448 component public key bound to the primary key.
+    pub eddsa_signing_public_key: Vec<u8>,
+    /// 56-byte X448 component public key bound to the subkey.
     pub ecdh_key_agreement_public_key: Vec<u8>,
 }
 
@@ -733,11 +837,14 @@ mod secure_enclave_generation;
 mod selector_discovery;
 
 pub use composite_custody_generation::{
-    generate_secure_enclave_composite_public_certificate, inspect_secure_enclave_composite_bindings,
+    generate_secure_enclave_composite_high_public_certificate,
+    generate_secure_enclave_composite_public_certificate,
+    inspect_secure_enclave_composite_bindings, inspect_secure_enclave_composite_high_bindings,
 };
 pub use expiry::{
-    modify_expiry, modify_expiry_with_external_composite_signer,
-    modify_expiry_with_external_p256_signer, ModifyExpiryPublicResult, ModifyExpiryResult,
+    modify_expiry, modify_expiry_with_external_composite_high_signer,
+    modify_expiry_with_external_composite_signer, modify_expiry_with_external_p256_signer,
+    ModifyExpiryPublicResult, ModifyExpiryResult,
 };
 pub use generation::generate_key_with_profile;
 pub use key_info::parse_key_info;
@@ -745,8 +852,10 @@ pub use profile::{detect_profile, get_key_version};
 pub use public_certificates::{merge_public_certificate_update, validate_public_certificate};
 pub use revocation::{
     generate_key_revocation, generate_subkey_revocation,
+    generate_subkey_revocation_with_external_composite_high_signer,
     generate_subkey_revocation_with_external_composite_signer,
     generate_subkey_revocation_with_external_p256_signer, generate_user_id_revocation_by_selector,
+    generate_user_id_revocation_by_selector_with_external_composite_high_signer,
     generate_user_id_revocation_by_selector_with_external_composite_signer,
     generate_user_id_revocation_by_selector_with_external_p256_signer, parse_revocation_cert,
 };

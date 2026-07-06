@@ -29,9 +29,11 @@ use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{
     self, ExternalCompositeKeyAgreementError, ExternalCompositeKeyAgreementFailureCategory,
     ExternalCompositeSigningError, ExternalCompositeSigningFailureCategory,
-    ExternalMlDsa65SigningProvider, ExternalMlKem768DecapsulationProvider,
-    ExternalMlKem768DecapsulationRequest, MlDsa65Signature, MlKem768KeyShare,
-    SecureEnclaveCompositePublicCertificateInput,
+    ExternalMlDsa65SigningProvider, ExternalMlDsa87SigningProvider,
+    ExternalMlKem1024DecapsulationProvider, ExternalMlKem1024DecapsulationRequest,
+    ExternalMlKem768DecapsulationProvider, ExternalMlKem768DecapsulationRequest, MlDsa65Signature,
+    MlDsa87Signature, MlKem1024KeyShare, MlKem768KeyShare,
+    SecureEnclaveCompositeHighPublicCertificateInput, SecureEnclaveCompositePublicCertificateInput,
 };
 use sequoia_openpgp as openpgp;
 
@@ -276,6 +278,197 @@ impl ExternalMlKem768DecapsulationProvider for WrongShareMlKem768DecapsulationPr
     ) -> Result<MlKem768KeyShare, ExternalCompositeKeyAgreementError> {
         Ok(MlKem768KeyShare {
             raw: vec![0x5Au8; 32],
+        })
+    }
+}
+
+// ── Device-Bound Post-Quantum · High (ML-DSA-87 + Ed448 / ML-KEM-1024 + X448) ──
+
+pub const MLDSA87_PUBLIC_KEY_LENGTH: usize = 2592;
+pub const MLKEM1024_PUBLIC_KEY_LENGTH: usize = 1568;
+pub const MLKEM1024_SECRET_SEED_LENGTH: usize = 64;
+
+/// A software ML-DSA-87 signing provider over a Sequoia composite `KeyPair`,
+/// standing in for the Secure Enclave external signer. Signs with the full
+/// composite key and returns only the ML-DSA-87 half.
+pub struct OracleMlDsa87SigningProvider {
+    keypair: Arc<Mutex<openpgp::crypto::KeyPair>>,
+}
+
+impl OracleMlDsa87SigningProvider {
+    pub fn new(keypair: Arc<Mutex<openpgp::crypto::KeyPair>>) -> Self {
+        Self { keypair }
+    }
+}
+
+impl ExternalMlDsa87SigningProvider for OracleMlDsa87SigningProvider {
+    fn sign_mldsa87_digest(
+        &self,
+        digest: Vec<u8>,
+    ) -> Result<MlDsa87Signature, ExternalCompositeSigningError> {
+        let mut keypair = self.keypair.lock().map_err(|_| external_signing_failed())?;
+        match keypair.sign(HashAlgorithm::SHA512, &digest) {
+            Ok(mpi::Signature::MLDSA87_Ed448 { mldsa, .. }) => Ok(MlDsa87Signature {
+                raw: mldsa.to_vec(),
+            }),
+            _ => Err(external_signing_failed()),
+        }
+    }
+}
+
+/// A software ML-KEM-1024 decapsulation provider over the 64-byte FIPS 203
+/// secret seed, standing in for the Secure Enclave external provider.
+pub struct SoftwareMlKem1024DecapsulationProvider {
+    secret_seed: Vec<u8>,
+}
+
+impl SoftwareMlKem1024DecapsulationProvider {
+    pub fn new(secret_seed: Vec<u8>) -> Self {
+        Self { secret_seed }
+    }
+}
+
+impl ExternalMlKem1024DecapsulationProvider for SoftwareMlKem1024DecapsulationProvider {
+    fn decapsulate_mlkem1024(
+        &self,
+        request: ExternalMlKem1024DecapsulationRequest,
+    ) -> Result<MlKem1024KeyShare, ExternalCompositeKeyAgreementError> {
+        decapsulate_mlkem1024_with_ossl(&self.secret_seed, &request.mlkem_ciphertext)
+            .map(|raw| MlKem1024KeyShare { raw })
+            .map_err(|_| ExternalCompositeKeyAgreementError::Failed {
+                category: ExternalCompositeKeyAgreementFailureCategory::ExternalOperationFailed,
+            })
+    }
+}
+
+/// Real FIPS 203 ML-KEM-1024 decapsulation from the 64-byte secret seed.
+pub fn decapsulate_mlkem1024_with_ossl(
+    secret_seed: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, ossl::Error> {
+    let ctx = OsslContext::new_lib_ctx();
+    let mut key = EvpPkey::import(
+        &ctx,
+        EvpPkeyType::MlKem1024,
+        PkeyData::Mlkey(MlkeyData {
+            pubkey: None,
+            prikey: None,
+            seed: Some(OsslSecret::from_slice(secret_seed)),
+        }),
+    )?;
+    let mut decapsulator = OsslAsymcipher::new(&ctx, EncOp::Decapsulate, &mut key, None)?;
+    decapsulator.decapsulate(ciphertext)
+}
+
+/// Device-Bound Post-Quantum · High analog of `SoftwareCompositeMaterial`.
+pub struct SoftwareCompositeHighMaterial {
+    pub public_key_data: Vec<u8>,
+    pub revocation_cert: Vec<u8>,
+    pub fingerprint: String,
+    pub signing_key_fingerprint: String,
+    pub key_agreement_subkey_fingerprint: String,
+    pub classical_eddsa_secret: Vec<u8>,
+    pub classical_ecdh_secret: Vec<u8>,
+    pub mldsa87_signing_public_key: Vec<u8>,
+    pub mlkem1024_key_agreement_public_key: Vec<u8>,
+    signing_keypair: Arc<Mutex<openpgp::crypto::KeyPair>>,
+    mlkem_secret_seed: Vec<u8>,
+}
+
+impl SoftwareCompositeHighMaterial {
+    pub fn generate(expiry_seconds: Option<u64>) -> Result<Self, PgpError> {
+        Self::generate_with_identity(
+            "Software Composite High",
+            Some("software-composite-high@example.test"),
+            expiry_seconds,
+        )
+    }
+
+    pub fn generate_with_identity(
+        name: &str,
+        email: Option<&str>,
+        expiry_seconds: Option<u64>,
+    ) -> Result<Self, PgpError> {
+        let (donor, _rev) = CertBuilder::new()
+            .set_cipher_suite(CipherSuite::MLDSA87_Ed448)
+            .set_profile(openpgp::Profile::RFC9580)
+            .expect("set RFC 9580 profile")
+            .add_userid("PQ Component Donor <donor@composite.test>")
+            .add_transport_encryption_subkey()
+            .generate()
+            .expect("generate software composite high donor");
+
+        let primary = donor.primary_key().key().clone();
+        let mldsa87_signing_public_key = match primary.mpis() {
+            mpi::PublicKey::MLDSA87_Ed448 { mldsa, .. } => mldsa.to_vec(),
+            _ => panic!("expected composite high primary key"),
+        };
+        let signing_keypair = Arc::new(Mutex::new(
+            primary
+                .parts_into_secret()
+                .expect("donor primary secret parts")
+                .role_into_unspecified()
+                .into_keypair()
+                .expect("donor signing keypair"),
+        ));
+
+        let ka_donor = donor
+            .keys()
+            .subkeys()
+            .next()
+            .expect("donor encryption subkey")
+            .key()
+            .clone();
+        let mlkem1024_key_agreement_public_key = match ka_donor.mpis() {
+            mpi::PublicKey::MLKEM1024_X448 { mlkem, .. } => mlkem.to_vec(),
+            _ => panic!("expected composite high KA subkey"),
+        };
+        let mlkem_secret_seed = match ka_donor.optional_secret() {
+            Some(SecretKeyMaterial::Unencrypted(secret)) => secret.map(|mpis| match mpis {
+                mpi::SecretKeyMaterial::MLKEM1024_X448 { mlkem, .. } => mlkem.to_vec(),
+                _ => panic!("expected composite high KA secret material"),
+            }),
+            _ => panic!("expected unencrypted KA secret material"),
+        };
+        assert_eq!(mlkem_secret_seed.len(), MLKEM1024_SECRET_SEED_LENGTH);
+
+        let generated = keys::generate_secure_enclave_composite_high_public_certificate(
+            SecureEnclaveCompositeHighPublicCertificateInput {
+                name: name.to_string(),
+                email: email.map(str::to_string),
+                expiry_seconds,
+                mldsa87_signing_public_key: mldsa87_signing_public_key.clone(),
+                mlkem1024_key_agreement_public_key: mlkem1024_key_agreement_public_key.clone(),
+            },
+            Arc::new(OracleMlDsa87SigningProvider {
+                keypair: signing_keypair.clone(),
+            }),
+        )?;
+
+        Ok(Self {
+            public_key_data: generated.public_key_data,
+            revocation_cert: generated.revocation_cert,
+            fingerprint: generated.fingerprint,
+            signing_key_fingerprint: generated.signing_key_fingerprint,
+            key_agreement_subkey_fingerprint: generated.key_agreement_subkey_fingerprint,
+            classical_eddsa_secret: generated.classical_eddsa_secret,
+            classical_ecdh_secret: generated.classical_ecdh_secret,
+            mldsa87_signing_public_key,
+            mlkem1024_key_agreement_public_key,
+            signing_keypair,
+            mlkem_secret_seed,
+        })
+    }
+
+    pub fn signing_provider(&self) -> Arc<dyn ExternalMlDsa87SigningProvider> {
+        Arc::new(OracleMlDsa87SigningProvider {
+            keypair: self.signing_keypair.clone(),
+        })
+    }
+
+    pub fn decapsulation_provider(&self) -> Arc<dyn ExternalMlKem1024DecapsulationProvider> {
+        Arc::new(SoftwareMlKem1024DecapsulationProvider {
+            secret_seed: self.mlkem_secret_seed.clone(),
         })
     }
 }

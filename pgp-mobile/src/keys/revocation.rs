@@ -1,7 +1,9 @@
 use super::*;
 use std::sync::Arc;
 
-use crate::external_composite_signer::composite_signer_for_provider;
+use crate::external_composite_signer::{
+    composite_high_signer_for_provider, composite_signer_for_provider,
+};
 use crate::external_signer::{map_external_signing_error, signer_for_provider};
 
 fn parse_cert_for_revocation(secret_cert: &[u8]) -> Result<openpgp::Cert, PgpError> {
@@ -364,6 +366,106 @@ pub fn generate_user_id_revocation_by_selector_with_external_composite_signer(
                 reason: format!("External signer setup failed: {error}"),
             },
         )?;
+    let user_id = find_user_id_by_selector(public_cert, user_id_selector)?;
+
+    let sig = UserIDRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::UIDRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to configure User ID revocation: {e}"),
+        })?
+        .build(
+            &mut external_signer,
+            &cert,
+            &user_id,
+            Some(openpgp::types::HashAlgorithm::SHA512),
+        )
+        .map_err(|error| {
+            map_external_signing_error(error, |reason| PgpError::RevocationError {
+                reason: format!("Failed to generate User ID revocation: {reason}"),
+            })
+        })?;
+
+    serialize_revocation_signature(sig)
+}
+
+/// Device-Bound Post-Quantum · High analog of
+/// `generate_subkey_revocation_with_external_composite_signer`.
+pub fn generate_subkey_revocation_with_external_composite_high_signer(
+    public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    subkey_fingerprint: &str,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+    let cert = parse_public_cert_for_external_revocation(public_cert)?;
+    ensure_external_revocation_certificate_not_revoked(&cert, &policy, reference_time)?;
+    let signing_public_key = select_external_revocation_primary_signing_key(
+        &cert,
+        signing_key_fingerprint,
+        &policy,
+        reference_time,
+    )?;
+    let mut external_signer =
+        composite_high_signer_for_provider(signing_public_key, classical_eddsa_secret, signer)
+            .map_err(|error| PgpError::RevocationError {
+                reason: format!("External signer setup failed: {error}"),
+            })?;
+
+    let normalized_subkey_fingerprint = subkey_fingerprint.to_lowercase();
+    let subkey = cert
+        .keys()
+        .subkeys()
+        .find(|ka| ka.key().fingerprint().to_hex().to_lowercase() == normalized_subkey_fingerprint)
+        .ok_or_else(|| PgpError::InvalidKeyData {
+            reason: "Subkey fingerprint not found in certificate".to_string(),
+        })?;
+
+    let sig = SubkeyRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyRetired, b"")
+        .map_err(|e| PgpError::RevocationError {
+            reason: format!("Failed to configure subkey revocation: {e}"),
+        })?
+        .build(
+            &mut external_signer,
+            &cert,
+            subkey.key(),
+            Some(openpgp::types::HashAlgorithm::SHA512),
+        )
+        .map_err(|error| {
+            map_external_signing_error(error, |reason| PgpError::RevocationError {
+                reason: format!("Failed to generate subkey revocation: {reason}"),
+            })
+        })?;
+
+    serialize_revocation_signature(sig)
+}
+
+/// Device-Bound Post-Quantum · High analog of
+/// `generate_user_id_revocation_by_selector_with_external_composite_signer`.
+pub fn generate_user_id_revocation_by_selector_with_external_composite_high_signer(
+    public_cert: &[u8],
+    signing_key_fingerprint: &str,
+    classical_eddsa_secret: &[u8],
+    signer: Arc<dyn ExternalMlDsa87SigningProvider>,
+    user_id_selector: &UserIdSelectorInput,
+) -> Result<Vec<u8>, PgpError> {
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+    let cert = parse_public_cert_for_external_revocation(public_cert)?;
+    ensure_external_revocation_certificate_not_revoked(&cert, &policy, reference_time)?;
+    let signing_public_key = select_external_revocation_primary_signing_key(
+        &cert,
+        signing_key_fingerprint,
+        &policy,
+        reference_time,
+    )?;
+    let mut external_signer =
+        composite_high_signer_for_provider(signing_public_key, classical_eddsa_secret, signer)
+            .map_err(|error| PgpError::RevocationError {
+                reason: format!("External signer setup failed: {error}"),
+            })?;
     let user_id = find_user_id_by_selector(public_cert, user_id_selector)?;
 
     let sig = UserIDRevocationBuilder::new()

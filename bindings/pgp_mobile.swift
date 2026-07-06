@@ -783,6 +783,452 @@ public func FfiConverterTypeExternalMlDsa65SigningProvider_lower(_ value: Extern
 
 
 /**
+ * Foreign ML-DSA-87 signing callback for split-custody composite · High
+ * certificates.
+ *
+ * The provider performs exactly the Secure Enclave primitive: a pure FIPS 204
+ * ML-DSA-87 signature over the supplied OpenPGP signature digest. The Ed448
+ * half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
+ * stay on the Rust side of the boundary.
+ */
+public protocol ExternalMlDsa87SigningProvider: AnyObject, Sendable {
+
+    /**
+     * Sign an OpenPGP signature digest and return the 4627-byte ML-DSA-87 signature.
+     */
+    func signMldsa87Digest(digest: Data) throws  -> MlDsa87Signature
+
+}
+/**
+ * Foreign ML-DSA-87 signing callback for split-custody composite · High
+ * certificates.
+ *
+ * The provider performs exactly the Secure Enclave primitive: a pure FIPS 204
+ * ML-DSA-87 signature over the supplied OpenPGP signature digest. The Ed448
+ * half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
+ * stay on the Rust side of the boundary.
+ */
+open class ExternalMlDsa87SigningProviderImpl: ExternalMlDsa87SigningProvider, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_externalmldsa87signingprovider(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_pgp_mobile_fn_free_externalmldsa87signingprovider(handle, $0) }
+    }
+
+
+
+
+    /**
+     * Sign an OpenPGP signature digest and return the 4627-byte ML-DSA-87 signature.
+     */
+open func signMldsa87Digest(digest: Data)throws  -> MlDsa87Signature  {
+    return try  FfiConverterTypeMlDsa87Signature_lift(try rustCallWithError(FfiConverterTypeExternalCompositeSigningError_lift) {
+    uniffi_pgp_mobile_fn_method_externalmldsa87signingprovider_sign_mldsa87_digest(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(digest),$0
+    )
+})
+}
+
+
+
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceExternalMlDsa87SigningProvider {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceExternalMlDsa87SigningProvider = UniffiVTableCallbackInterfaceExternalMlDsa87SigningProvider(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeExternalMlDsa87SigningProvider.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ExternalMlDsa87SigningProvider: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeExternalMlDsa87SigningProvider.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ExternalMlDsa87SigningProvider: handle missing in uniffiClone")
+            }
+        },
+        signMldsa87Digest: { (
+            uniffiHandle: UInt64,
+            digest: RustBuffer,
+            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> MlDsa87Signature in
+                guard let uniffiObj = try? FfiConverterTypeExternalMlDsa87SigningProvider.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try uniffiObj.signMldsa87Digest(
+                     digest: try FfiConverterData.lift(digest)
+                )
+            }
+
+
+            let writeReturn = { uniffiOutReturn.pointee = FfiConverterTypeMlDsa87Signature_lower($0) }
+            uniffiTraitInterfaceCallWithError(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn,
+                lowerError: FfiConverterTypeExternalCompositeSigningError_lower
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceExternalMlDsa87SigningProvider> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceExternalMlDsa87SigningProvider>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitExternalMlDsa87SigningProvider() {
+    uniffi_pgp_mobile_fn_init_callback_vtable_externalmldsa87signingprovider(UniffiCallbackInterfaceExternalMlDsa87SigningProvider.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalMlDsa87SigningProvider: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<ExternalMlDsa87SigningProvider>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = ExternalMlDsa87SigningProvider
+
+    public static func lift(_ handle: UInt64) throws -> ExternalMlDsa87SigningProvider {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExternalMlDsa87SigningProviderImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: ExternalMlDsa87SigningProvider) -> UInt64 {
+         if let rustImpl = value as? ExternalMlDsa87SigningProviderImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalMlDsa87SigningProvider {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExternalMlDsa87SigningProvider, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlDsa87SigningProvider_lift(_ handle: UInt64) throws -> ExternalMlDsa87SigningProvider {
+    return try FfiConverterTypeExternalMlDsa87SigningProvider.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlDsa87SigningProvider_lower(_ value: ExternalMlDsa87SigningProvider) -> UInt64 {
+    return FfiConverterTypeExternalMlDsa87SigningProvider.lower(value)
+}
+
+
+
+
+
+
+/**
+ * Foreign ML-KEM-1024 decapsulation callback for split-custody composite · High
+ * decryption.
+ *
+ * The provider performs exactly the Secure Enclave primitive: FIPS 203
+ * ML-KEM-1024 decapsulation of the PKESK ciphertext into the 32-byte key
+ * share. The X448 half, the RFC 9980 KEM combiner, and AES key unwrap stay on
+ * the Rust side of the boundary.
+ */
+public protocol ExternalMlKem1024DecapsulationProvider: AnyObject, Sendable {
+
+    /**
+     * Decapsulate an ML-KEM-1024 ciphertext into the raw 32-byte key share.
+     */
+    func decapsulateMlkem1024(request: ExternalMlKem1024DecapsulationRequest) throws  -> MlKem1024KeyShare
+
+}
+/**
+ * Foreign ML-KEM-1024 decapsulation callback for split-custody composite · High
+ * decryption.
+ *
+ * The provider performs exactly the Secure Enclave primitive: FIPS 203
+ * ML-KEM-1024 decapsulation of the PKESK ciphertext into the 32-byte key
+ * share. The X448 half, the RFC 9980 KEM combiner, and AES key unwrap stay on
+ * the Rust side of the boundary.
+ */
+open class ExternalMlKem1024DecapsulationProviderImpl: ExternalMlKem1024DecapsulationProvider, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_pgp_mobile_fn_clone_externalmlkem1024decapsulationprovider(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_pgp_mobile_fn_free_externalmlkem1024decapsulationprovider(handle, $0) }
+    }
+
+
+
+
+    /**
+     * Decapsulate an ML-KEM-1024 ciphertext into the raw 32-byte key share.
+     */
+open func decapsulateMlkem1024(request: ExternalMlKem1024DecapsulationRequest)throws  -> MlKem1024KeyShare  {
+    return try  FfiConverterTypeMlKem1024KeyShare_lift(try rustCallWithError(FfiConverterTypeExternalCompositeKeyAgreementError_lift) {
+    uniffi_pgp_mobile_fn_method_externalmlkem1024decapsulationprovider_decapsulate_mlkem1024(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeExternalMlKem1024DecapsulationRequest_lower(request),$0
+    )
+})
+}
+
+
+
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceExternalMlKem1024DecapsulationProvider {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceExternalMlKem1024DecapsulationProvider = UniffiVTableCallbackInterfaceExternalMlKem1024DecapsulationProvider(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeExternalMlKem1024DecapsulationProvider.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface ExternalMlKem1024DecapsulationProvider: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeExternalMlKem1024DecapsulationProvider.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface ExternalMlKem1024DecapsulationProvider: handle missing in uniffiClone")
+            }
+        },
+        decapsulateMlkem1024: { (
+            uniffiHandle: UInt64,
+            request: RustBuffer,
+            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> MlKem1024KeyShare in
+                guard let uniffiObj = try? FfiConverterTypeExternalMlKem1024DecapsulationProvider.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try uniffiObj.decapsulateMlkem1024(
+                     request: try FfiConverterTypeExternalMlKem1024DecapsulationRequest_lift(request)
+                )
+            }
+
+
+            let writeReturn = { uniffiOutReturn.pointee = FfiConverterTypeMlKem1024KeyShare_lower($0) }
+            uniffiTraitInterfaceCallWithError(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn,
+                lowerError: FfiConverterTypeExternalCompositeKeyAgreementError_lower
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceExternalMlKem1024DecapsulationProvider> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceExternalMlKem1024DecapsulationProvider>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitExternalMlKem1024DecapsulationProvider() {
+    uniffi_pgp_mobile_fn_init_callback_vtable_externalmlkem1024decapsulationprovider(UniffiCallbackInterfaceExternalMlKem1024DecapsulationProvider.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalMlKem1024DecapsulationProvider: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<ExternalMlKem1024DecapsulationProvider>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = ExternalMlKem1024DecapsulationProvider
+
+    public static func lift(_ handle: UInt64) throws -> ExternalMlKem1024DecapsulationProvider {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return ExternalMlKem1024DecapsulationProviderImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: ExternalMlKem1024DecapsulationProvider) -> UInt64 {
+         if let rustImpl = value as? ExternalMlKem1024DecapsulationProviderImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalMlKem1024DecapsulationProvider {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: ExternalMlKem1024DecapsulationProvider, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlKem1024DecapsulationProvider_lift(_ handle: UInt64) throws -> ExternalMlKem1024DecapsulationProvider {
+    return try FfiConverterTypeExternalMlKem1024DecapsulationProvider.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlKem1024DecapsulationProvider_lower(_ value: ExternalMlKem1024DecapsulationProvider) -> UInt64 {
+    return FfiConverterTypeExternalMlKem1024DecapsulationProvider.lower(value)
+}
+
+
+
+
+
+
+/**
  * Foreign ML-KEM-768 decapsulation callback for split-custody composite decryption.
  *
  * The provider performs exactly the Secure Enclave primitive: FIPS 203
@@ -1460,6 +1906,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data]) throws  -> DecryptDetailedResult
 
     /**
+     * Decrypt through a public-only · High composite recipient and external
+     * ML-KEM-1024 decapsulation provider, preserving per-signature details.
+     */
+    func decryptDetailedWithExternalCompositeHighKeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data]) throws  -> DecryptDetailedResult
+
+    /**
      * Decrypt a message through a public-only split-custody composite recipient
      * certificate and external ML-KEM-768 decapsulation provider while
      * preserving per-signature details.
@@ -1480,6 +1932,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Decrypt a file using streaming I/O and preserve per-signature detailed results.
      */
     func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: StreamingProgressReporter?) throws  -> FileDecryptDetailedResult
+
+    /**
+     * Decrypt a file (streaming I/O) through a public-only · High composite
+     * recipient and external ML-KEM-1024 decapsulation provider.
+     */
+    func decryptFileDetailedWithExternalCompositeHighKeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data], progress: StreamingProgressReporter?) throws  -> FileDecryptDetailedResult
 
     /**
      * Decrypt a file using streaming I/O through a public-only split-custody
@@ -1550,6 +2008,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
 
     /**
+     * Encrypt with a password, sign with the external · High composite signer,
+     * and return binary ciphertext.
+     */
+    func encryptBinaryWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider) throws  -> Data
+
+    /**
      * Encrypt plaintext with a password, sign with the external split-custody
      * composite signer, and return binary ciphertext.
      */
@@ -1567,6 +2031,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
 
     /**
+     * Encrypt a file (streaming I/O) and sign with the external · High composite signer.
+     */
+    func encryptFileWithExternalCompositeHighSigner(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
+
+    /**
      * Encrypt a file using streaming I/O and sign using a public certificate
      * plus external split-custody composite signer.
      */
@@ -1576,6 +2045,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
      */
     func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?) throws
+
+    /**
+     * Encrypt plaintext and sign it with the external · High composite signer.
+     */
+    func encryptWithExternalCompositeHighSigner(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?) throws  -> Data
 
     /**
      * Encrypt plaintext and sign it using a public certificate plus external
@@ -1592,6 +2066,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Encrypt plaintext with a password and return ASCII-armored ciphertext.
      */
     func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?) throws  -> Data
+
+    /**
+     * Encrypt with a password and sign with the external · High composite signer.
+     */
+    func encryptWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider) throws  -> Data
 
     /**
      * Encrypt plaintext with a password and sign it using a public certificate plus
@@ -1624,6 +2103,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateKeyRevocation(secretCert: Data) throws  -> Data
 
     /**
+     * Build the Device-Bound Post-Quantum · High split-custody composite certificate.
+     */
+    func generateSecureEnclaveCompositeHighPublicCertificate(input: SecureEnclaveCompositeHighPublicCertificateInput, signer: ExternalMlDsa87SigningProvider) throws  -> SecureEnclaveCompositeGeneratedCertificate
+
+    /**
      * Build the Device-Bound Post-Quantum split-custody composite certificate.
      *
      * The external signer only receives OpenPGP signature digests and returns
@@ -1649,6 +2133,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String) throws  -> Data
 
     /**
+     * Generate a subkey revocation through the external · High composite signer.
+     */
+    func generateSubkeyRevocationWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, subkeyFingerprint: String) throws  -> Data
+
+    /**
      * Generate a subkey-specific revocation signature from a public-only
      * certificate through an external split-custody composite signing provider.
      */
@@ -1666,6 +2155,12 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
 
     /**
+     * Generate raw User ID certification bytes through the external · High
+     * composite signing provider.
+     */
+    func generateUserIdCertificationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind) throws  -> Data
+
+    /**
      * Generate raw User ID certification-signature bytes from a public-only
      * certificate through an external split-custody composite signing provider.
      */
@@ -1681,6 +2176,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Generate a User ID-specific revocation signature using an explicit selector.
      */
     func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput) throws  -> Data
+
+    /**
+     * Generate a User ID revocation through the external · High composite signer.
+     */
+    func generateUserIdRevocationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, userIdSelector: UserIdSelectorInput) throws  -> Data
 
     /**
      * Generate a User ID-specific revocation signature from a public-only
@@ -1713,6 +2213,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * integrity-check enveloped classical components.
      */
     func inspectSecureEnclaveCompositeBindings(publicKeyData: Data) throws  -> SecureEnclaveCompositeBindingInspection
+
+    /**
+     * Inspect a public-only Device-Bound Post-Quantum · High composite certificate.
+     */
+    func inspectSecureEnclaveCompositeHighBindings(publicKeyData: Data) throws  -> SecureEnclaveCompositeHighBindingInspection
 
     /**
      * Inspect a public-only P-256 Secure Enclave custody certificate.
@@ -1765,6 +2270,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func modifyExpiry(certData: Data, newExpirySeconds: UInt64?) throws  -> ModifyExpiryResult
 
     /**
+     * Modify the expiration time of a public-only · High composite certificate.
+     */
+    func modifyExpiryWithExternalCompositeHighSigner(publicCertData: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, newExpirySeconds: UInt64?) throws  -> ModifyExpiryPublicResult
+
+    /**
      * Modify the expiration time of a public-only split-custody composite certificate.
      *
      * This is for Device-Bound Post-Quantum private operations: it returns only the
@@ -1813,6 +2323,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     func signCleartext(text: Data, signerCert: Data) throws  -> Data
 
     /**
+     * Create a cleartext signature with the external · High composite signer.
+     */
+    func signCleartextWithExternalCompositeHighSigner(text: Data, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider) throws  -> Data
+
+    /**
      * Create a cleartext signature using a public certificate and an external
      * split-custody composite signer.
      */
@@ -1828,6 +2343,11 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
      * Returns the ASCII-armored signature.
      */
     func signDetachedFile(inputPath: String, signerCert: Data, progress: StreamingProgressReporter?) throws  -> Data
+
+    /**
+     * Create a detached file signature with the external · High composite signer.
+     */
+    func signDetachedFileWithExternalCompositeHighSigner(inputPath: String, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, progress: StreamingProgressReporter?) throws  -> Data
 
     /**
      * Create a detached file signature using a public certificate and an
@@ -2002,6 +2522,24 @@ open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys
 }
 
     /**
+     * Decrypt through a public-only · High composite recipient and external
+     * ML-KEM-1024 decapsulation provider, preserving per-signature details.
+     */
+open func decryptDetailedWithExternalCompositeHighKeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data])throws  -> DecryptDetailedResult  {
+    return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed_with_external_composite_high_key_agreement(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(ciphertext),
+        FfiConverterData.lower(recipientPublicCert),
+        FfiConverterString.lower(keyAgreementSubkeyFingerprint),
+        FfiConverterData.lower(classicalEcdhSecret),
+        FfiConverterTypeExternalMlKem1024DecapsulationProvider_lower(decapsulationProvider),
+        FfiConverterSequenceData.lower(verificationKeys),$0
+    )
+})
+}
+
+    /**
      * Decrypt a message through a public-only split-custody composite recipient
      * certificate and external ML-KEM-768 decapsulation provider while
      * preserving per-signature details.
@@ -2051,6 +2589,26 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
         FfiConverterString.lower(inputPath),
         FfiConverterString.lower(outputPath),
         FfiConverterSequenceData.lower(secretKeys),
+        FfiConverterSequenceData.lower(verificationKeys),
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+    )
+})
+}
+
+    /**
+     * Decrypt a file (streaming I/O) through a public-only · High composite
+     * recipient and external ML-KEM-1024 decapsulation provider.
+     */
+open func decryptFileDetailedWithExternalCompositeHighKeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
+    return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_composite_high_key_agreement(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterString.lower(outputPath),
+        FfiConverterData.lower(recipientPublicCert),
+        FfiConverterString.lower(keyAgreementSubkeyFingerprint),
+        FfiConverterData.lower(classicalEcdhSecret),
+        FfiConverterTypeExternalMlKem1024DecapsulationProvider_lower(decapsulationProvider),
         FfiConverterSequenceData.lower(verificationKeys),
         FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
@@ -2213,6 +2771,25 @@ open func encryptBinaryWithPassword(plaintext: Data, password: String, format: P
 }
 
     /**
+     * Encrypt with a password, sign with the external · High composite signer,
+     * and return binary ciphertext.
+     */
+open func encryptBinaryWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password_and_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+    )
+})
+}
+
+    /**
      * Encrypt plaintext with a password, sign with the external split-custody
      * composite signer, and return binary ciphertext.
      */
@@ -2266,6 +2843,25 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
 }
 
     /**
+     * Encrypt a file (streaming I/O) and sign with the external · High composite signer.
+     */
+open func encryptFileWithExternalCompositeHighSigner(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterString.lower(outputPath),
+        FfiConverterSequenceData.lower(recipients),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
+        FfiConverterOptionData.lower(encryptToSelf),
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+    )
+}
+}
+
+    /**
      * Encrypt a file using streaming I/O and sign using a public certificate
      * plus external split-custody composite signer.
      */
@@ -2301,6 +2897,24 @@ open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: Strin
         FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 }
+}
+
+    /**
+     * Encrypt plaintext and sign it with the external · High composite signer.
+     */
+open func encryptWithExternalCompositeHighSigner(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterSequenceData.lower(recipients),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
+        FfiConverterOptionData.lower(encryptToSelf),$0
+    )
+})
 }
 
     /**
@@ -2350,6 +2964,24 @@ open func encryptWithPassword(plaintext: Data, password: String, format: Passwor
         FfiConverterString.lower(password),
         FfiConverterTypePasswordMessageFormat_lower(format),
         FfiConverterOptionData.lower(signingKey),$0
+    )
+})
+}
+
+    /**
+     * Encrypt with a password and sign with the external · High composite signer.
+     */
+open func encryptWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password_and_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(plaintext),
+        FfiConverterString.lower(password),
+        FfiConverterTypePasswordMessageFormat_lower(format),
+        FfiConverterData.lower(signingPublicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
     )
 })
 }
@@ -2436,6 +3068,19 @@ open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
 }
 
     /**
+     * Build the Device-Bound Post-Quantum · High split-custody composite certificate.
+     */
+open func generateSecureEnclaveCompositeHighPublicCertificate(input: SecureEnclaveCompositeHighPublicCertificateInput, signer: ExternalMlDsa87SigningProvider)throws  -> SecureEnclaveCompositeGeneratedCertificate  {
+    return try  FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_secure_enclave_composite_high_public_certificate(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput_lower(input),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+    )
+})
+}
+
+    /**
      * Build the Device-Bound Post-Quantum split-custody composite certificate.
      *
      * The external signer only receives OpenPGP signature digests and returns
@@ -2479,6 +3124,22 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
     uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
+        FfiConverterString.lower(subkeyFingerprint),$0
+    )
+})
+}
+
+    /**
+     * Generate a subkey revocation through the external · High composite signer.
+     */
+open func generateSubkeyRevocationWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, subkeyFingerprint: String)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterString.lower(subkeyFingerprint),$0
     )
 })
@@ -2533,6 +3194,25 @@ open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCe
 }
 
     /**
+     * Generate raw User ID certification bytes through the external · High
+     * composite signing provider.
+     */
+open func generateUserIdCertificationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
+        FfiConverterData.lower(targetCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
+        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+    )
+})
+}
+
+    /**
      * Generate raw User ID certification-signature bytes from a public-only
      * certificate through an external split-custody composite signing provider.
      */
@@ -2577,6 +3257,22 @@ open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: U
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+    )
+})
+}
+
+    /**
+     * Generate a User ID revocation through the external · High composite signer.
+     */
+open func generateUserIdRevocationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, userIdSelector: UserIdSelectorInput)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
     )
 })
@@ -2651,6 +3347,18 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
 open func inspectSecureEnclaveCompositeBindings(publicKeyData: Data)throws  -> SecureEnclaveCompositeBindingInspection  {
     return try  FfiConverterTypeSecureEnclaveCompositeBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
     uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_composite_bindings(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicKeyData),$0
+    )
+})
+}
+
+    /**
+     * Inspect a public-only Device-Bound Post-Quantum · High composite certificate.
+     */
+open func inspectSecureEnclaveCompositeHighBindings(publicKeyData: Data)throws  -> SecureEnclaveCompositeHighBindingInspection  {
+    return try  FfiConverterTypeSecureEnclaveCompositeHighBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_composite_high_bindings(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicKeyData),$0
     )
@@ -2748,6 +3456,22 @@ open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> Modi
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
+        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+    )
+})
+}
+
+    /**
+     * Modify the expiration time of a public-only · High composite certificate.
+     */
+open func modifyExpiryWithExternalCompositeHighSigner(publicCertData: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, newExpirySeconds: UInt64?)throws  -> ModifyExpiryPublicResult  {
+    return try  FfiConverterTypeModifyExpiryPublicResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(publicCertData),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterOptionUInt64.lower(newExpirySeconds),$0
     )
 })
@@ -2860,6 +3584,22 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
 }
 
     /**
+     * Create a cleartext signature with the external · High composite signer.
+     */
+open func signCleartextWithExternalCompositeHighSigner(text: Data, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(text),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+    )
+})
+}
+
+    /**
      * Create a cleartext signature using a public certificate and an external
      * split-custody composite signer.
      */
@@ -2901,6 +3641,23 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Stream
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(signerCert),
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+    )
+})
+}
+
+    /**
+     * Create a detached file signature with the external · High composite signer.
+     */
+open func signDetachedFileWithExternalCompositeHighSigner(inputPath: String, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, progress: StreamingProgressReporter?)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+    uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_composite_high_signer(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(inputPath),
+        FfiConverterData.lower(publicCert),
+        FfiConverterString.lower(signingKeyFingerprint),
+        FfiConverterData.lower(classicalEddsaSecret),
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
     )
 })
@@ -3862,6 +4619,75 @@ public func FfiConverterTypeDiscoveredUserId_lower(_ value: DiscoveredUserId) ->
 
 
 /**
+ * Public material Rust sends to an external ML-KEM-1024 decapsulation provider.
+ */
+public struct ExternalMlKem1024DecapsulationRequest: Equatable, Hashable {
+    /**
+     * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the recipient subkey.
+     */
+    public var recipientMlkemPublicKey: Data
+    /**
+     * 1568-byte FIPS 203 ML-KEM-1024 ciphertext from the PKESK packet.
+     */
+    public var mlkemCiphertext: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the recipient subkey.
+         */recipientMlkemPublicKey: Data,
+        /**
+         * 1568-byte FIPS 203 ML-KEM-1024 ciphertext from the PKESK packet.
+         */mlkemCiphertext: Data) {
+        self.recipientMlkemPublicKey = recipientMlkemPublicKey
+        self.mlkemCiphertext = mlkemCiphertext
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExternalMlKem1024DecapsulationRequest: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalMlKem1024DecapsulationRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExternalMlKem1024DecapsulationRequest {
+        return
+            try ExternalMlKem1024DecapsulationRequest(
+                recipientMlkemPublicKey: FfiConverterData.read(from: &buf),
+                mlkemCiphertext: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ExternalMlKem1024DecapsulationRequest, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.recipientMlkemPublicKey, into: &buf)
+        FfiConverterData.write(value.mlkemCiphertext, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlKem1024DecapsulationRequest_lift(_ buf: RustBuffer) throws -> ExternalMlKem1024DecapsulationRequest {
+    return try FfiConverterTypeExternalMlKem1024DecapsulationRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalMlKem1024DecapsulationRequest_lower(_ value: ExternalMlKem1024DecapsulationRequest) -> RustBuffer {
+    return FfiConverterTypeExternalMlKem1024DecapsulationRequest.lower(value)
+}
+
+
+/**
  * Public material Rust sends to an external ML-KEM-768 decapsulation provider.
  */
 public struct ExternalMlKem768DecapsulationRequest: Equatable, Hashable {
@@ -4445,6 +5271,124 @@ public func FfiConverterTypeMlDsa65Signature_lift(_ buf: RustBuffer) throws -> M
 #endif
 public func FfiConverterTypeMlDsa65Signature_lower(_ value: MlDsa65Signature) -> RustBuffer {
     return FfiConverterTypeMlDsa65Signature.lower(value)
+}
+
+
+/**
+ * Raw ML-DSA-87 signature returned by an external provider.
+ */
+public struct MlDsa87Signature: Equatable, Hashable {
+    /**
+     * 4627-byte FIPS 204 ML-DSA-87 signature.
+     */
+    public var raw: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 4627-byte FIPS 204 ML-DSA-87 signature.
+         */raw: Data) {
+        self.raw = raw
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension MlDsa87Signature: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMlDsa87Signature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MlDsa87Signature {
+        return
+            try MlDsa87Signature(
+                raw: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MlDsa87Signature, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.raw, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMlDsa87Signature_lift(_ buf: RustBuffer) throws -> MlDsa87Signature {
+    return try FfiConverterTypeMlDsa87Signature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMlDsa87Signature_lower(_ value: MlDsa87Signature) -> RustBuffer {
+    return FfiConverterTypeMlDsa87Signature.lower(value)
+}
+
+
+/**
+ * Raw ML-KEM-1024 key share returned by an external provider.
+ */
+public struct MlKem1024KeyShare: Equatable, Hashable {
+    /**
+     * 32-byte ML-KEM-1024 shared secret. Rust immediately validates and zeroizes it.
+     */
+    public var raw: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * 32-byte ML-KEM-1024 shared secret. Rust immediately validates and zeroizes it.
+         */raw: Data) {
+        self.raw = raw
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension MlKem1024KeyShare: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMlKem1024KeyShare: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MlKem1024KeyShare {
+        return
+            try MlKem1024KeyShare(
+                raw: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MlKem1024KeyShare, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.raw, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMlKem1024KeyShare_lift(_ buf: RustBuffer) throws -> MlKem1024KeyShare {
+    return try FfiConverterTypeMlKem1024KeyShare.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMlKem1024KeyShare_lower(_ value: MlKem1024KeyShare) -> RustBuffer {
+    return FfiConverterTypeMlKem1024KeyShare.lower(value)
 }
 
 
@@ -5200,11 +6144,13 @@ public struct SecureEnclaveCompositeGeneratedCertificate: Equatable, Hashable {
      */
     public var keyAgreementSubkeyFingerprint: String
     /**
-     * 32-byte Ed25519 component secret. Envelope, then zeroize.
+     * EdDSA component secret (32-byte Ed25519, or 57-byte Ed448 for the · High
+     * tier). Envelope, then zeroize.
      */
     public var classicalEddsaSecret: Data
     /**
-     * 32-byte X25519 component secret. Envelope, then zeroize.
+     * ECDH component secret (32-byte X25519, or 56-byte X448 for the · High
+     * tier). Envelope, then zeroize.
      */
     public var classicalEcdhSecret: Data
 
@@ -5230,10 +6176,12 @@ public struct SecureEnclaveCompositeGeneratedCertificate: Equatable, Hashable {
          * Key-agreement subkey fingerprint as lowercase hex.
          */keyAgreementSubkeyFingerprint: String,
         /**
-         * 32-byte Ed25519 component secret. Envelope, then zeroize.
+         * EdDSA component secret (32-byte Ed25519, or 57-byte Ed448 for the · High
+         * tier). Envelope, then zeroize.
          */classicalEddsaSecret: Data,
         /**
-         * 32-byte X25519 component secret. Envelope, then zeroize.
+         * ECDH component secret (32-byte X25519, or 56-byte X448 for the · High
+         * tier). Envelope, then zeroize.
          */classicalEcdhSecret: Data) {
         self.publicKeyData = publicKeyData
         self.revocationCert = revocationCert
@@ -5297,6 +6245,240 @@ public func FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate_lift(_ bu
 #endif
 public func FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate_lower(_ value: SecureEnclaveCompositeGeneratedCertificate) -> RustBuffer {
     return FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate.lower(value)
+}
+
+
+/**
+ * Public bindings extracted from a split-custody composite · High OpenPGP
+ * certificate.
+ */
+public struct SecureEnclaveCompositeHighBindingInspection: Equatable, Hashable {
+    /**
+     * Certificate fingerprint as lowercase hex.
+     */
+    public var fingerprint: String
+    /**
+     * OpenPGP key version.
+     */
+    public var keyVersion: UInt8
+    /**
+     * Primary signing key fingerprint as lowercase hex.
+     */
+    public var signingKeyFingerprint: String
+    /**
+     * Key-agreement subkey fingerprint as lowercase hex.
+     */
+    public var keyAgreementSubkeyFingerprint: String
+    /**
+     * 2592-byte FIPS 204 ML-DSA-87 verification key bound to the primary key.
+     */
+    public var mldsa87SigningPublicKey: Data
+    /**
+     * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the subkey.
+     */
+    public var mlkem1024KeyAgreementPublicKey: Data
+    /**
+     * 57-byte Ed448 component public key bound to the primary key.
+     */
+    public var eddsaSigningPublicKey: Data
+    /**
+     * 56-byte X448 component public key bound to the subkey.
+     */
+    public var ecdhKeyAgreementPublicKey: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Certificate fingerprint as lowercase hex.
+         */fingerprint: String,
+        /**
+         * OpenPGP key version.
+         */keyVersion: UInt8,
+        /**
+         * Primary signing key fingerprint as lowercase hex.
+         */signingKeyFingerprint: String,
+        /**
+         * Key-agreement subkey fingerprint as lowercase hex.
+         */keyAgreementSubkeyFingerprint: String,
+        /**
+         * 2592-byte FIPS 204 ML-DSA-87 verification key bound to the primary key.
+         */mldsa87SigningPublicKey: Data,
+        /**
+         * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key bound to the subkey.
+         */mlkem1024KeyAgreementPublicKey: Data,
+        /**
+         * 57-byte Ed448 component public key bound to the primary key.
+         */eddsaSigningPublicKey: Data,
+        /**
+         * 56-byte X448 component public key bound to the subkey.
+         */ecdhKeyAgreementPublicKey: Data) {
+        self.fingerprint = fingerprint
+        self.keyVersion = keyVersion
+        self.signingKeyFingerprint = signingKeyFingerprint
+        self.keyAgreementSubkeyFingerprint = keyAgreementSubkeyFingerprint
+        self.mldsa87SigningPublicKey = mldsa87SigningPublicKey
+        self.mlkem1024KeyAgreementPublicKey = mlkem1024KeyAgreementPublicKey
+        self.eddsaSigningPublicKey = eddsaSigningPublicKey
+        self.ecdhKeyAgreementPublicKey = ecdhKeyAgreementPublicKey
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclaveCompositeHighBindingInspection: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclaveCompositeHighBindingInspection: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclaveCompositeHighBindingInspection {
+        return
+            try SecureEnclaveCompositeHighBindingInspection(
+                fingerprint: FfiConverterString.read(from: &buf),
+                keyVersion: FfiConverterUInt8.read(from: &buf),
+                signingKeyFingerprint: FfiConverterString.read(from: &buf),
+                keyAgreementSubkeyFingerprint: FfiConverterString.read(from: &buf),
+                mldsa87SigningPublicKey: FfiConverterData.read(from: &buf),
+                mlkem1024KeyAgreementPublicKey: FfiConverterData.read(from: &buf),
+                eddsaSigningPublicKey: FfiConverterData.read(from: &buf),
+                ecdhKeyAgreementPublicKey: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SecureEnclaveCompositeHighBindingInspection, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.fingerprint, into: &buf)
+        FfiConverterUInt8.write(value.keyVersion, into: &buf)
+        FfiConverterString.write(value.signingKeyFingerprint, into: &buf)
+        FfiConverterString.write(value.keyAgreementSubkeyFingerprint, into: &buf)
+        FfiConverterData.write(value.mldsa87SigningPublicKey, into: &buf)
+        FfiConverterData.write(value.mlkem1024KeyAgreementPublicKey, into: &buf)
+        FfiConverterData.write(value.eddsaSigningPublicKey, into: &buf)
+        FfiConverterData.write(value.ecdhKeyAgreementPublicKey, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCompositeHighBindingInspection_lift(_ buf: RustBuffer) throws -> SecureEnclaveCompositeHighBindingInspection {
+    return try FfiConverterTypeSecureEnclaveCompositeHighBindingInspection.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCompositeHighBindingInspection_lower(_ value: SecureEnclaveCompositeHighBindingInspection) -> RustBuffer {
+    return FfiConverterTypeSecureEnclaveCompositeHighBindingInspection.lower(value)
+}
+
+
+/**
+ * Public-only input for split-custody composite · High OpenPGP certificate
+ * construction.
+ *
+ * The ML-DSA-87 and ML-KEM-1024 component public keys come from Secure Enclave
+ * key generation on the Swift side. The classical Ed448/X448 components are
+ * generated inside Rust and returned in the result for enveloping.
+ */
+public struct SecureEnclaveCompositeHighPublicCertificateInput: Equatable, Hashable {
+    /**
+     * Display name for the self-certified User ID.
+     */
+    public var name: String
+    /**
+     * Optional email address for the User ID.
+     */
+    public var email: String?
+    /**
+     * Validity period from now in seconds. Defaults to two years when omitted.
+     */
+    public var expirySeconds: UInt64?
+    /**
+     * 2592-byte FIPS 204 ML-DSA-87 verification key for signing/certification.
+     */
+    public var mldsa87SigningPublicKey: Data
+    /**
+     * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key for key agreement.
+     */
+    public var mlkem1024KeyAgreementPublicKey: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Display name for the self-certified User ID.
+         */name: String,
+        /**
+         * Optional email address for the User ID.
+         */email: String?,
+        /**
+         * Validity period from now in seconds. Defaults to two years when omitted.
+         */expirySeconds: UInt64?,
+        /**
+         * 2592-byte FIPS 204 ML-DSA-87 verification key for signing/certification.
+         */mldsa87SigningPublicKey: Data,
+        /**
+         * 1568-byte FIPS 203 ML-KEM-1024 encapsulation key for key agreement.
+         */mlkem1024KeyAgreementPublicKey: Data) {
+        self.name = name
+        self.email = email
+        self.expirySeconds = expirySeconds
+        self.mldsa87SigningPublicKey = mldsa87SigningPublicKey
+        self.mlkem1024KeyAgreementPublicKey = mlkem1024KeyAgreementPublicKey
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SecureEnclaveCompositeHighPublicCertificateInput: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SecureEnclaveCompositeHighPublicCertificateInput {
+        return
+            try SecureEnclaveCompositeHighPublicCertificateInput(
+                name: FfiConverterString.read(from: &buf),
+                email: FfiConverterOptionString.read(from: &buf),
+                expirySeconds: FfiConverterOptionUInt64.read(from: &buf),
+                mldsa87SigningPublicKey: FfiConverterData.read(from: &buf),
+                mlkem1024KeyAgreementPublicKey: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SecureEnclaveCompositeHighPublicCertificateInput, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.email, into: &buf)
+        FfiConverterOptionUInt64.write(value.expirySeconds, into: &buf)
+        FfiConverterData.write(value.mldsa87SigningPublicKey, into: &buf)
+        FfiConverterData.write(value.mlkem1024KeyAgreementPublicKey, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput_lift(_ buf: RustBuffer) throws -> SecureEnclaveCompositeHighPublicCertificateInput {
+    return try FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput_lower(_ value: SecureEnclaveCompositeHighPublicCertificateInput) -> RustBuffer {
+    return FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput.lower(value)
 }
 
 
@@ -8406,6 +9588,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed() != 61958) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_high_key_agreement() != 57854) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_key_agreement() != 58990) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8413,6 +9598,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 1210) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_high_key_agreement() != 11919) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_key_agreement() != 57563) {
@@ -8442,6 +9630,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password() != 45737) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_high_signer() != 24046) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_signer() != 21309) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8451,10 +9642,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 42541) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_high_signer() != 41227) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_signer() != 59001) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 16230) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_high_signer() != 64632) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_signer() != 2597) {
@@ -8464,6 +9661,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 3472) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_high_signer() != 19101) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_signer() != 61792) {
@@ -8481,6 +9681,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_high_public_certificate() != 11777) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_public_certificate() != 35435) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8488,6 +9691,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_high_signer() != 25650) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_signer() != 29724) {
@@ -8499,6 +9705,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 9110) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_high_signer() != 34634) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_signer() != 43782) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8506,6 +9715,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 3390) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_high_signer() != 4796) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_signer() != 48974) {
@@ -8521,6 +9733,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_bindings() != 45311) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_high_bindings() != 64852) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_public_bindings() != 48954) {
@@ -8539,6 +9754,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 31305) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_high_signer() != 37100) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_signer() != 63206) {
@@ -8562,6 +9780,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_high_signer() != 59394) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_signer() != 15052) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8569,6 +9790,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 22541) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_high_signer() != 53476) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_signer() != 20999) {
@@ -8595,6 +9819,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_externalmldsa65signingprovider_sign_mldsa65_digest() != 10555) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_pgp_mobile_checksum_method_externalmldsa87signingprovider_sign_mldsa87_digest() != 61443) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_pgp_mobile_checksum_method_externalmlkem1024decapsulationprovider_decapsulate_mlkem1024() != 29620) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_pgp_mobile_checksum_method_externalmlkem768decapsulationprovider_decapsulate_mlkem768() != 40553) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -8612,6 +9842,8 @@ private let initializationResult: InitializationResult = {
     }
 
     uniffiCallbackInitExternalMlDsa65SigningProvider()
+    uniffiCallbackInitExternalMlDsa87SigningProvider()
+    uniffiCallbackInitExternalMlKem1024DecapsulationProvider()
     uniffiCallbackInitExternalMlKem768DecapsulationProvider()
     uniffiCallbackInitExternalP256KeyAgreementProvider()
     uniffiCallbackInitExternalP256SigningProvider()
