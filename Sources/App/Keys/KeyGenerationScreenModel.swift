@@ -142,8 +142,12 @@ final class KeyGenerationScreenModel {
         }
     }
 
-    /// Advance from the family picker to the identity/expiry details step.
+    /// Advance from the family picker to the identity/expiry details step. Any
+    /// transient generation flags are cleared first so a re-entered details step
+    /// can never inherit a stale pending commitment or generated identity.
     func continueToDetails() {
+        deviceBoundCommitmentPending = false
+        generatedIdentity = nil
         detailFamily = selectedFamily
     }
 

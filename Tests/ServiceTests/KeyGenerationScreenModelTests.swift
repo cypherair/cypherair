@@ -378,6 +378,21 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertNil(model.detailFamily)
     }
 
+    func test_continueToDetails_clearsStaleGenerationFlags() {
+        let model = makeModel()
+        model.selectFamily(.modernSoftwareV6)
+        model.deviceBoundCommitmentPending = true
+        model.generatedIdentity = makeKeyRouteTestIdentity(
+            fingerprint: "1111111111111111111111111111111111111111"
+        )
+
+        model.continueToDetails()
+
+        XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
+        XCTAssertFalse(model.deviceBoundCommitmentPending)
+        XCTAssertNil(model.generatedIdentity)
+    }
+
     func test_selectCustody_landsOnRecommendedOrFirstFamilyInCustody() {
         let model = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveGeneration),
