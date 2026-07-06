@@ -11,6 +11,8 @@ struct KeyFamilySelectionRow: View {
     let onSelect: () -> Void
     let onInfo: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         HStack(alignment: .top, spacing: CypherSpacing.tight) {
             Button(action: onSelect) {
@@ -31,19 +33,7 @@ struct KeyFamilySelectionRow: View {
     private var content: some View {
         HStack(alignment: .top, spacing: CypherSpacing.compact) {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: CypherSpacing.compact) {
-                    Text(family.tierDisplayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if family.isRecommended {
-                        CypherStatusBadge(
-                            title: String(localized: "keyFamily.recommended", defaultValue: "Recommended"),
-                            color: .accentColor
-                        )
-                        .fixedSize(horizontal: true, vertical: false)
-                    }
-                }
+                titleAndRecommendation
                 Text(family.familyAlgorithmSubtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -62,6 +52,44 @@ struct KeyFamilySelectionRow: View {
             }
         }
         .contentShape(Rectangle())
+    }
+
+    /// Tier title plus the optional "Recommended" badge. At accessibility Dynamic
+    /// Type sizes the badge stacks under the title so the fixed-width badge can't
+    /// squeeze the (now-wrapping) title into truncation; below that it stays inline.
+    @ViewBuilder
+    private var titleAndRecommendation: some View {
+        if family.isRecommended {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: CypherSpacing.tight) {
+                    titleText
+                    recommendedBadge
+                }
+            } else {
+                HStack(spacing: CypherSpacing.compact) {
+                    titleText
+                    recommendedBadge
+                }
+            }
+        } else {
+            titleText
+        }
+    }
+
+    /// The tier title. Intentionally carries no line limit: at large Dynamic Type
+    /// sizes it must wrap to show the full name, never tail-truncate.
+    private var titleText: some View {
+        Text(family.tierDisplayName)
+            .font(.body)
+            .foregroundStyle(.primary)
+    }
+
+    private var recommendedBadge: some View {
+        CypherStatusBadge(
+            title: String(localized: "keyFamily.recommended", defaultValue: "Recommended"),
+            color: .accentColor
+        )
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var infoButton: some View {
