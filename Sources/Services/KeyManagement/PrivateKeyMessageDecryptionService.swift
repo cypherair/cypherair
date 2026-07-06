@@ -83,17 +83,32 @@ final class PrivateKeyMessageDecryptionService: RecipientMessageDecrypting, @unc
             )
 
         case .secureEnclaveCompositeKeyAgreement(let route):
-            return try await messageAdapter.decryptDetailedWithExternalCompositeKeyAgreement(
-                ciphertext: ciphertext,
-                recipientPublicCert: route.identity.publicKeyData,
-                keyAgreementSubkeyFingerprint: route.compositeBindingInspection.keyAgreementSubkeyFingerprint,
-                classicalEcdhSecret: route.classicalComponent.ecdhSecret,
-                decapsulationProvider: PGPExternalMlKem768DecapsulationProviderBridge(
-                    handle: route.keyAgreementHandle,
-                    decapsulator: compositeDecapsulator
-                ),
-                verificationContext: verificationContext
-            )
+            switch route.keyAgreementHandle.reference.tier {
+            case .postQuantum:
+                return try await messageAdapter.decryptDetailedWithExternalCompositeKeyAgreement(
+                    ciphertext: ciphertext,
+                    recipientPublicCert: route.identity.publicKeyData,
+                    keyAgreementSubkeyFingerprint: route.compositeBindingInspection.keyAgreementSubkeyFingerprint,
+                    classicalEcdhSecret: route.classicalComponent.ecdhSecret,
+                    decapsulationProvider: PGPExternalMlKem768DecapsulationProviderBridge(
+                        handle: route.keyAgreementHandle,
+                        decapsulator: compositeDecapsulator
+                    ),
+                    verificationContext: verificationContext
+                )
+            case .postQuantumHigh:
+                return try await messageAdapter.decryptDetailedWithExternalCompositeHighKeyAgreement(
+                    ciphertext: ciphertext,
+                    recipientPublicCert: route.identity.publicKeyData,
+                    keyAgreementSubkeyFingerprint: route.compositeBindingInspection.keyAgreementSubkeyFingerprint,
+                    classicalEcdhSecret: route.classicalComponent.ecdhSecret,
+                    decapsulationProvider: PGPExternalMlKem1024DecapsulationProviderBridge(
+                        handle: route.keyAgreementHandle,
+                        decapsulator: compositeDecapsulator
+                    ),
+                    verificationContext: verificationContext
+                )
+            }
 
         case .secureEnclaveSigner, .secureEnclaveCompositeSigner:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)

@@ -85,31 +85,59 @@ final class PrivateKeySelectiveRevocationService: PrivateKeySelectiveRevocationR
         route: SecureEnclaveCompositeSignerRoute,
         subkeyFingerprint: String
     ) async throws -> Data {
-        try await certificateAdapter.generateSubkeyRevocationWithExternalCompositeSigner(
-            publicCert: route.identity.publicKeyData,
-            signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-            classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-            signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                handle: route.signingHandle,
-                compositeSigner: compositeSigner
-            ),
-            subkeyFingerprint: subkeyFingerprint
-        )
+        switch route.signingHandle.reference.tier {
+        case .postQuantum:
+            return try await certificateAdapter.generateSubkeyRevocationWithExternalCompositeSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                subkeyFingerprint: subkeyFingerprint
+            )
+        case .postQuantumHigh:
+            return try await certificateAdapter.generateSubkeyRevocationWithExternalCompositeHighSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                subkeyFingerprint: subkeyFingerprint
+            )
+        }
     }
 
     func generateSecureEnclaveCompositeUserIdRevocation(
         route: SecureEnclaveCompositeSignerRoute,
         selectedUserId: UserIdSelectionOption
     ) async throws -> Data {
-        try await certificateAdapter.generateUserIdRevocationWithExternalCompositeSigner(
-            publicCert: route.identity.publicKeyData,
-            signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-            classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-            signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                handle: route.signingHandle,
-                compositeSigner: compositeSigner
-            ),
-            selectedUserId: selectedUserId
-        )
+        switch route.signingHandle.reference.tier {
+        case .postQuantum:
+            return try await certificateAdapter.generateUserIdRevocationWithExternalCompositeSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                selectedUserId: selectedUserId
+            )
+        case .postQuantumHigh:
+            return try await certificateAdapter.generateUserIdRevocationWithExternalCompositeHighSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                selectedUserId: selectedUserId
+            )
+        }
     }
 }

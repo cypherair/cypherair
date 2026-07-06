@@ -16,7 +16,7 @@ struct DeviceBoundKeyExplainerView: View {
     /// classical half is device-sealed rather than enclave-resident.
     private var custodyText: String {
         switch key?.openPGPConfigurationIdentity {
-        case .deviceBoundPostQuantumV6:
+        case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6:
             String(
                 localized: "keydetail.deviceBound.explainer.custodySplit",
                 defaultValue: "This key uses split custody. The post-quantum half lives in this device's Secure Enclave; the classical half is sealed to this device and used briefly in app memory during operations. Every signature and decryption requires the Secure Enclave — neither half works alone."

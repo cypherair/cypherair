@@ -1,19 +1,26 @@
 import Foundation
 
+/// Component public keys parsed from a Device-Bound Post-Quantum certificate,
+/// used to locate and verify the split-custody handles. `signingComponentPublicKey`
+/// and `keyAgreementComponentPublicKey` carry the post-quantum component keys
+/// whose byte length is tier-dependent (ML-DSA-65 / ML-KEM-768 for `.postQuantum`,
+/// ML-DSA-87 / ML-KEM-1024 for `.postQuantumHigh`); the enclave handle store
+/// validates their shape against the tier.
 struct PGPSecureEnclaveCompositeBindingInspection: Equatable, Sendable {
     let fingerprint: String
     let keyVersion: UInt8
     let signingKeyFingerprint: String
     let keyAgreementSubkeyFingerprint: String
-    let mldsa65SigningPublicKey: Data
-    let mlkem768KeyAgreementPublicKey: Data
+    let signingComponentPublicKey: Data
+    let keyAgreementComponentPublicKey: Data
     let eddsaSigningPublicKey: Data
     let ecdhKeyAgreementPublicKey: Data
 }
 
 protocol SecureEnclaveCompositeBindingInspecting: Sendable {
     func inspectCompositeBindings(
-        publicKeyData: Data
+        publicKeyData: Data,
+        tier: SecureEnclaveCompositeTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection
 }
 
@@ -26,13 +33,22 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
     }
 
     func inspectCompositeBindings(
-        publicKeyData: Data
+        publicKeyData: Data,
+        tier: SecureEnclaveCompositeTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection {
         do {
-            return try Self.performInspect(
-                engine: engine,
-                publicKeyData: publicKeyData
-            )
+            switch tier {
+            case .postQuantum:
+                return try Self.performInspect(
+                    engine: engine,
+                    publicKeyData: publicKeyData
+                )
+            case .postQuantumHigh:
+                return try Self.performInspectHigh(
+                    engine: engine,
+                    publicKeyData: publicKeyData
+                )
+            }
         } catch {
             throw PGPErrorMapper.map(error) { .invalidKeyData(reason: $0) }
         }
@@ -50,8 +66,27 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
             keyVersion: UInt8(inspection.keyVersion),
             signingKeyFingerprint: inspection.signingKeyFingerprint,
             keyAgreementSubkeyFingerprint: inspection.keyAgreementSubkeyFingerprint,
-            mldsa65SigningPublicKey: inspection.mldsa65SigningPublicKey,
-            mlkem768KeyAgreementPublicKey: inspection.mlkem768KeyAgreementPublicKey,
+            signingComponentPublicKey: inspection.mldsa65SigningPublicKey,
+            keyAgreementComponentPublicKey: inspection.mlkem768KeyAgreementPublicKey,
+            eddsaSigningPublicKey: inspection.eddsaSigningPublicKey,
+            ecdhKeyAgreementPublicKey: inspection.ecdhKeyAgreementPublicKey
+        )
+    }
+
+    private static func performInspectHigh(
+        engine: PgpEngine,
+        publicKeyData: Data
+    ) throws -> PGPSecureEnclaveCompositeBindingInspection {
+        let inspection = try engine.inspectSecureEnclaveCompositeHighBindings(
+            publicKeyData: publicKeyData
+        )
+        return PGPSecureEnclaveCompositeBindingInspection(
+            fingerprint: inspection.fingerprint,
+            keyVersion: UInt8(inspection.keyVersion),
+            signingKeyFingerprint: inspection.signingKeyFingerprint,
+            keyAgreementSubkeyFingerprint: inspection.keyAgreementSubkeyFingerprint,
+            signingComponentPublicKey: inspection.mldsa87SigningPublicKey,
+            keyAgreementComponentPublicKey: inspection.mlkem1024KeyAgreementPublicKey,
             eddsaSigningPublicKey: inspection.eddsaSigningPublicKey,
             ecdhKeyAgreementPublicKey: inspection.ecdhKeyAgreementPublicKey
         )

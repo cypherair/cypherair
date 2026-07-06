@@ -468,10 +468,11 @@ final class KeyMutationService {
         guard let secureEnclaveCustodyDeletionContext else {
             return []
         }
-        if identity.openPGPConfiguration.algorithmSuite == .mldsa65Ed25519Mlkem768X25519 {
+        if let compositeTier = identity.openPGPConfiguration.identity.deviceBoundCompositeTier {
             return deleteSecureEnclaveCompositeHandles(
                 for: identity,
-                context: secureEnclaveCustodyDeletionContext
+                context: secureEnclaveCustodyDeletionContext,
+                tier: compositeTier
             )
         }
 
@@ -498,7 +499,8 @@ final class KeyMutationService {
 
     private func deleteSecureEnclaveCompositeHandles(
         for identity: PGPKeyIdentity,
-        context: SecureEnclaveCustodyDeletionContext
+        context: SecureEnclaveCustodyDeletionContext,
+        tier: SecureEnclaveCompositeTier
     ) -> [Error] {
         guard let compositeBindingInspector = context.compositeBindingInspector,
               let compositeHandleStore = context.compositeHandleStore else {
@@ -507,16 +509,20 @@ final class KeyMutationService {
 
         do {
             let inspection = try compositeBindingInspector.inspectCompositeBindings(
-                publicKeyData: identity.publicKeyData
+                publicKeyData: identity.publicKeyData,
+                tier: tier
             )
             guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
                   inspection.keyVersion == identity.keyVersion else {
                 return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
             }
 
+            // Deletion matches handles by raw public-key bytes across the shared
+            // key store's full (tier-spanning) inventory, so a single composite
+            // handle store deletes either tier's handles.
             try compositeHandleStore.deleteHandles(
-                signingPublicKeyRaw: inspection.mldsa65SigningPublicKey,
-                keyAgreementPublicKeyRaw: inspection.mlkem768KeyAgreementPublicKey
+                signingPublicKeyRaw: inspection.signingComponentPublicKey,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementComponentPublicKey
             )
             return []
         } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {

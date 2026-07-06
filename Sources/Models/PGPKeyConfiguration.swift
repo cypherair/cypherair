@@ -18,6 +18,11 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         case compatibleP256V4
         case modernP256V6
         case deviceBoundPostQuantumV6
+        /// Device-Bound Post-Quantum · High: v6 RFC 9980 composite
+        /// ML-DSA-87+Ed448 / ML-KEM-1024+X448 under split custody. The ML-DSA/ML-KEM
+        /// halves live in the Secure Enclave, the Ed448/X448 classical halves under
+        /// the fixed-access envelope; the private key is never exportable.
+        case deviceBoundPostQuantumHighV6
 
         var configuration: PGPKeyConfiguration {
             switch self {
@@ -37,6 +42,8 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
                 .modernP256V6
             case .deviceBoundPostQuantumV6:
                 .deviceBoundPostQuantumV6
+            case .deviceBoundPostQuantumHighV6:
+                .deviceBoundPostQuantumHighV6
             }
         }
     }
@@ -154,6 +161,20 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
         messageFormatPreference: .seipdV2Aead,
         softwareExportProtection: .notAvailable
     )
+
+    /// Device-Bound Post-Quantum · High: the higher RFC 9980 composite tier
+    /// (ML-DSA-87+Ed448 / ML-KEM-1024+X448, NIST level 5) under split custody.
+    /// The ML-DSA/ML-KEM components live in the Secure Enclave, the classical
+    /// components under the fixed-access envelope; the private key is never
+    /// exportable (docs/POST_QUANTUM.md Section 3).
+    static let deviceBoundPostQuantumHighV6 = PGPKeyConfiguration(
+        identity: .deviceBoundPostQuantumHighV6,
+        keyVersion: 6,
+        algorithmSuite: .mldsa87Ed448Mlkem1024X448,
+        compatibilityTarget: .rfc9580Oriented,
+        messageFormatPreference: .seipdV2Aead,
+        softwareExportProtection: .notAvailable
+    )
 }
 
 extension PGPKeyConfiguration.Identity {
@@ -171,7 +192,8 @@ extension PGPKeyConfiguration.Identity {
             .postQuantum
         case .postQuantumHighSoftwareV6:
             .postQuantumHigh
-        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
+        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             nil
         }
     }

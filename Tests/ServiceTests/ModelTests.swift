@@ -1305,6 +1305,15 @@ final class ModelTests: XCTestCase {
                 "Not compatible with GnuPG",
                 "Device-bound split custody: post-quantum in the Secure Enclave, classical sealed to this device"
             ),
+            .deviceBoundPostQuantumHighV6: (
+                "ML-DSA-87+Ed448 (31) signing + ML-KEM-1024+X448 (36) encryption",
+                "v6",
+                "SEIPDv2 (AEAD OCB)",
+                "~256 bit, quantum-resistant",
+                "Private key cannot be exported or backed up",
+                "Not compatible with GnuPG",
+                "Device-bound split custody: post-quantum in the Secure Enclave, classical sealed to this device"
+            ),
         ]
 
         for identity in PGPKeyConfiguration.Identity.allCases {

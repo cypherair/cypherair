@@ -398,6 +398,8 @@
 				Services/FFI/PGPContactImportAdapter.swift,
 				Services/FFI/PGPErrorMapper.swift,
 				Services/FFI/PGPExternalMlDsa65SigningProviderBridge.swift,
+				Services/FFI/PGPExternalMlDsa87SigningProviderBridge.swift,
+				Services/FFI/PGPExternalMlKem1024DecapsulationProviderBridge.swift,
 				Services/FFI/PGPExternalMlKem768DecapsulationProviderBridge.swift,
 				Services/FFI/PGPExternalP256KeyAgreementProviderBridge.swift,
 				Services/FFI/PGPExternalP256SigningProviderBridge.swift,

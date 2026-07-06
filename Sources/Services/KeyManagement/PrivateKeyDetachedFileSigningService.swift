@@ -75,17 +75,32 @@ final class PrivateKeyDetachedFileSigningService: DetachedFileSigning, @unchecke
             )
 
         case .secureEnclaveCompositeSigner(let route):
-            return try await messageAdapter.signDetachedFileWithExternalCompositeSigner(
-                inputPath: inputPath,
-                publicCert: route.identity.publicKeyData,
-                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                    handle: route.signingHandle,
-                    compositeSigner: compositeSigner
-                ),
-                progress: progress
-            )
+            switch route.signingHandle.reference.tier {
+            case .postQuantum:
+                return try await messageAdapter.signDetachedFileWithExternalCompositeSigner(
+                    inputPath: inputPath,
+                    publicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    ),
+                    progress: progress
+                )
+            case .postQuantumHigh:
+                return try await messageAdapter.signDetachedFileWithExternalCompositeHighSigner(
+                    inputPath: inputPath,
+                    publicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    ),
+                    progress: progress
+                )
+            }
 
         case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)

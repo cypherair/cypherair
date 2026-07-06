@@ -60,15 +60,29 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
         route: SecureEnclaveCompositeSignerRoute,
         newExpirySeconds: UInt64?
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
-        try await keyAdapter.modifyExpiryWithExternalCompositeSigner(
-            publicCert: route.identity.publicKeyData,
-            signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-            classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-            signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                handle: route.signingHandle,
-                compositeSigner: compositeSigner
-            ),
-            newExpirySeconds: newExpirySeconds
-        )
+        switch route.signingHandle.reference.tier {
+        case .postQuantum:
+            return try await keyAdapter.modifyExpiryWithExternalCompositeSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                newExpirySeconds: newExpirySeconds
+            )
+        case .postQuantumHigh:
+            return try await keyAdapter.modifyExpiryWithExternalCompositeHighSigner(
+                publicCert: route.identity.publicKeyData,
+                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                    handle: route.signingHandle,
+                    compositeSigner: compositeSigner
+                ),
+                newExpirySeconds: newExpirySeconds
+            )
+        }
     }
 }

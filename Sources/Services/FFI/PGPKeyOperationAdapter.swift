@@ -327,4 +327,49 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
             metadata: PGPKeyMetadataAdapter.metadata(from: result.keyInfo)
         )
     }
+
+    // MARK: - Device-Bound Post-Quantum · High twin (ML-DSA-87 + Ed448)
+
+    func modifyExpiryWithExternalCompositeHighSigner(
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        do {
+            return try await Self.performModifyExpiryWithExternalCompositeHighSigner(
+                engine: engine,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                newExpirySeconds: newExpirySeconds
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    @concurrent
+    private static func performModifyExpiryWithExternalCompositeHighSigner(
+        engine: PgpEngine,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        newExpirySeconds: UInt64?
+    ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
+        let result = try engine.modifyExpiryWithExternalCompositeHighSigner(
+            publicCertData: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            newExpirySeconds: newExpirySeconds
+        )
+        return PGPPublicModifiedExpiryKeyMaterial(
+            publicKeyData: result.publicKeyData,
+            metadata: PGPKeyMetadataAdapter.metadata(from: result.keyInfo)
+        )
+    }
 }

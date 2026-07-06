@@ -31,6 +31,10 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         self.engine = engine
     }
 
+    /// Build the composite self-certificate for the tier of the supplied handle
+    /// pair. The signing component public key and the external ML-DSA signer are
+    /// tier-specific; the classical (Ed25519/X25519 or Ed448/X448) halves are
+    /// generated inside Rust and returned for the caller to seal.
     func generateCompositeCertificate(
         name: String,
         email: String?,
@@ -39,18 +43,34 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
         do {
-            return try await Self.performGenerateCompositeCertificate(
-                engine: engine,
-                name: name,
-                email: email,
-                expirySeconds: expirySeconds,
-                mldsa65SigningPublicKey: handlePair.signing.binding.publicKeyRaw,
-                mlkem768KeyAgreementPublicKey: handlePair.keyAgreement.binding.publicKeyRaw,
-                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                    handle: handlePair.signing,
-                    compositeSigner: compositeSigner
+            switch handlePair.signing.reference.tier {
+            case .postQuantum:
+                return try await Self.performGenerateCompositeCertificate(
+                    engine: engine,
+                    name: name,
+                    email: email,
+                    expirySeconds: expirySeconds,
+                    mldsa65SigningPublicKey: handlePair.signing.binding.publicKeyRaw,
+                    mlkem768KeyAgreementPublicKey: handlePair.keyAgreement.binding.publicKeyRaw,
+                    signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                        handle: handlePair.signing,
+                        compositeSigner: compositeSigner
+                    )
                 )
-            )
+            case .postQuantumHigh:
+                return try await Self.performGenerateCompositeHighCertificate(
+                    engine: engine,
+                    name: name,
+                    email: email,
+                    expirySeconds: expirySeconds,
+                    mldsa87SigningPublicKey: handlePair.signing.binding.publicKeyRaw,
+                    mlkem1024KeyAgreementPublicKey: handlePair.keyAgreement.binding.publicKeyRaw,
+                    signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                        handle: handlePair.signing,
+                        compositeSigner: compositeSigner
+                    )
+                )
+            }
         } catch {
             throw PGPErrorMapper.map(error) { .keyGenerationFailed(reason: $0) }
         }
@@ -77,11 +97,42 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
             input: input,
             signer: signingProvider
         )
-        // The engine classifies the composite certificate as post-quantum;
-        // `keyInfo.profile` is authoritative, no override needed.
+        return try material(from: generated, engine: engine)
+    }
+
+    @concurrent
+    private static func performGenerateCompositeHighCertificate(
+        engine: PgpEngine,
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        mldsa87SigningPublicKey: Data,
+        mlkem1024KeyAgreementPublicKey: Data,
+        signingProvider: ExternalMlDsa87SigningProvider
+    ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
+        let input = SecureEnclaveCompositeHighPublicCertificateInput(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            mldsa87SigningPublicKey: mldsa87SigningPublicKey,
+            mlkem1024KeyAgreementPublicKey: mlkem1024KeyAgreementPublicKey
+        )
+        let generated = try engine.generateSecureEnclaveCompositeHighPublicCertificate(
+            input: input,
+            signer: signingProvider
+        )
+        return try material(from: generated, engine: engine)
+    }
+
+    /// Both tiers return the same `SecureEnclaveCompositeGeneratedCertificate`;
+    /// the engine classifies the certificate as post-quantum, so `keyInfo.profile`
+    /// is authoritative and no override is needed.
+    private static func material(
+        from generated: SecureEnclaveCompositeGeneratedCertificate,
+        engine: PgpEngine
+    ) throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
         let metadata = PGPKeyMetadataAdapter.metadata(from: keyInfo)
-
         return PGPSecureEnclaveCompositeGeneratedMaterial(
             publicKeyData: generated.publicKeyData,
             revocationCert: generated.revocationCert,
