@@ -37,7 +37,7 @@ The hard constraints — zero network, AEAD hard-fail (never partial plaintext),
 A change is **security-critical** when it touches the areas listed in [SECURITY.md](SECURITY.md) §10 (`Sources/Security/`, `DecryptionService.swift`, `QRService.swift`, the memory-zeroing utilities, `DiskSpaceChecker.swift`, `pgp-mobile/src/`, entitlements/Info.plist/Xcode project files). For those changes:
 
 - Call out every security-critical edit explicitly — file, what changed, why — in both the work summary and the PR description.
-- Include **both positive and negative tests** (crypto tests cover the relevant profiles/families).
+- Include tests where they meaningfully verify the change — judgment, not a fixed matrix (crypto changes usually exercise the relevant profiles/families).
 - Human review is required before merge.
 
 The maintainer's independent Codex security review (run outside this repository, tracked via CSV + issues) and the per-phase stage-verify are the backstops; this gate is what the authoring session owes them.

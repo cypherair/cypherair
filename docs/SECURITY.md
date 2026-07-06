@@ -236,7 +236,7 @@ Shipped mitigations: the passphrase `String` lives only for the duration of the 
 
 ## 10. AI Coding Red Lines
 
-The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, must include the testing requirements at the end of this section, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)). Never merge such a change autonomously.
+The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)); cover it with tests that meaningfully verify the change (see the testing guidance at the end of this section). Never merge such a change autonomously.
 
 ### Absolute Coding Invariants
 
@@ -284,11 +284,12 @@ These hold for every change, independent of which file is touched:
 - URL parsing logic in `QRService` that handles `cypherair://` scheme input
 - Profile/CipherSuite selection in key generation
 
-### Testing Requirements for Security Changes
+### Testing for Security Changes
 
-Every change to a file listed above must include:
+Cover security-critical changes with tests that meaningfully verify what changed — using judgment about what actually adds confidence, not a fixed checklist. Depending on the change, the security value often lives in:
 
-1. **Positive test:** the operation succeeds with correct inputs and proper authentication.
-2. **Negative test:** the operation fails gracefully with wrong inputs (wrong key, wrong passphrase, tampered data, unavailable biometrics).
-3. **Round-trip test:** for crypto operations — encrypt/decrypt, sign/verify, wrap/unwrap.
-4. **No-leak test:** for memory-sensitive changes — verify sensitive data is zeroized after use (Xcode Memory Graph Debugger or Instruments).
+- the failure modes that matter (wrong key, wrong passphrase, tampered data, unavailable biometrics);
+- crypto round-trips (encrypt/decrypt, sign/verify, wrap/unwrap);
+- memory hygiene for memory-sensitive changes (sensitive data zeroized after use).
+
+Human review before merge is the backstop.

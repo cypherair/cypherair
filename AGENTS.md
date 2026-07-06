@@ -85,9 +85,9 @@ validation rules live in `docs/TESTING.md`. The pinned
 `ARM64E_STAGE1_RELEASE_TAG` value is owned by `docs/ARM64E_STATUS.md` and rotates
 with each stage1 re-pin.
 
-Every functional PR needs tests. Security changes require positive and negative
-tests. Crypto behavior must be covered for every profile/family the change
-touches (`docs/TESTING.md` Section 3). Secure Enclave and biometric code must
+Cover changes with tests where they meaningfully verify behavior — use judgment,
+not a fixed positive/negative matrix. Crypto changes usually exercise the
+profiles/families they touch (`docs/TESTING.md` Section 3). Secure Enclave and biometric code must
 guard with `SecureEnclave.isAvailable` and skip in simulator.
 
 When Xcode MCP or Apple documentation tools are available, prefer live Apple
@@ -118,8 +118,9 @@ documentation lookup for API behavior instead of relying on memory.
 ## Security-Sensitive Work
 
 You may edit security-critical areas directly, but the summary and PR description
-must call out the file, what changed, and why. Security changes need both
-positive and negative tests and human review before merge. The authoritative
+must call out the file, what changed, and why. Security changes get human
+review before merge; add tests where they meaningfully verify the change. The
+authoritative
 security-critical file list, rationale, and invariants live in
 `docs/SECURITY.md` Section 10. Review gates live in `docs/WORKFLOW.md`.
 

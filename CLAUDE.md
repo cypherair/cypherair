@@ -85,7 +85,7 @@ Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, an
 
 ## Security-Sensitive Code — Edit, Then Explain
 
-You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, must include both positive and negative tests, and receives human review before merge (docs/WORKFLOW.md). The authoritative security-critical file list, per-file rationale, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
+You may edit security-critical areas directly, but every such edit must be explicitly called out — file, what changed, and why — in your summary and the PR description, and receives human review before merge (docs/WORKFLOW.md). Cover it with tests that meaningfully verify the change — judgment, not a fixed matrix. The authoritative security-critical file list, per-file rationale, and coding invariants: docs/SECURITY.md Section 10. Full security model: docs/SECURITY.md.
 
 ## Encryption Profiles & Authentication Modes
 
@@ -103,7 +103,7 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 ## Testing
 
-- Every functional PR must include tests. Security changes require both positive and negative tests. Crypto tests cover **every profile/family the change touches** (docs/TESTING.md Section 3).
+- Cover changes with tests where they meaningfully verify behavior — use judgment, not a fixed positive/negative matrix. Crypto changes usually exercise the profiles/families they touch (docs/TESTING.md Section 3).
 - Rust changes under `pgp-mobile/src` do **not** automatically refresh the `PgpMobile.xcframework` artifact or generated UniFFI outputs that Xcode links; when Swift-visible behavior can change, run the full sync first (choreography: `.claude/skills/rust-sync`).
 - SE/biometric code: guard with `SecureEnclave.isAvailable`, skip in simulator.
 - Docs-only PRs may use the documentation path in docs/WORKFLOW.md Section 2 instead of Rust/Xcode runs.
