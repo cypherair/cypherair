@@ -463,7 +463,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryDate: keyInfo.expiryTimestamp.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            openPGPConfigurationIdentity: .modernSoftwareV6,
+            openPGPConfigurationIdentity: .modernHighSoftwareV6,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
     }

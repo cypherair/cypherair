@@ -73,11 +73,10 @@ fn test_detect_profile_classifies_foreign_pq_cert() {
     );
 }
 
-/// The higher RFC 9980 tier (ML-DSA-87+Ed448) also classifies as
-/// Post-Quantum on import, even though CypherAir only generates the
-/// 65/768 tier.
+/// The higher RFC 9980 tier (ML-DSA-87+Ed448) classifies as its own
+/// Post-Quantum · High profile — distinct from the 65/768 Post-Quantum tier.
 #[test]
-fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum() {
+fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum_high() {
     use openpgp::cert::{CertBuilder, CipherSuite};
     use openpgp::serialize::SerializeInto;
 
@@ -90,7 +89,7 @@ fn test_detect_profile_classifies_mldsa87_tier_as_post_quantum() {
     let pub_armored = cert.armored().to_vec().expect("armor");
     assert_eq!(
         keys::detect_profile(&pub_armored).expect("detect"),
-        KeyProfile::PostQuantum
+        KeyProfile::PostQuantumHigh
     );
 }
 

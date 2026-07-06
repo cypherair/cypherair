@@ -72,7 +72,9 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
             version = .v6
         case .compatibleSoftwareV4,
              .modernSoftwareV6,
+             .modernHighSoftwareV6,
              .postQuantumSoftwareV6,
+             .postQuantumHighSoftwareV6,
              .deviceBoundPostQuantumV6:
             throw CypherAirError.invalidKeyData(
                 reason: "Secure Enclave custody generation requires a P-256 configuration."

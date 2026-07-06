@@ -11,7 +11,10 @@ struct TutorialConfigurationFactory {
                 defaultValue: "Alice Demo"
             ),
             prefilledEmail: "alice@demo.invalid",
-            lockedFamily: .modernSoftwareV6,
+            // Preserve the tutorial's historical demo key type (Ed448/X448),
+            // which was `.modernSoftwareV6` before that name moved to the new
+            // baseline Ed25519 Modern family in issue #591 Phase 2.
+            lockedFamily: .modernHighSoftwareV6,
             lockedExpiryMonths: 24,
             postGenerationBehavior: .suppressPrompt
         )

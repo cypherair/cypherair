@@ -8,9 +8,9 @@ extension PGPKeyProfile {
         switch self {
         case .universal:
             String(localized: "contactKey.compatible.name", defaultValue: "GnuPG Compatible")
-        case .advanced:
+        case .modern, .advanced:
             String(localized: "contactKey.modern.name", defaultValue: "Modern (RFC 9580)")
-        case .postQuantum:
+        case .postQuantum, .postQuantumHigh:
             String(localized: "contactKey.postQuantum.name", defaultValue: "Post-Quantum (RFC 9980)")
         }
     }

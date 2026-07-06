@@ -7242,9 +7242,12 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
 /**
  * Encryption profile selection.
  * Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
+ * Modern: v6, Ed25519+X25519, SEIPDv2 AEAD OCB, Argon2id S2K.
  * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
  * Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
  * ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
+ * Post-Quantum · High: v6, RFC 9980 composite ML-DSA-87+Ed448 signing and
+ * ML-KEM-1024+X448 encryption, SEIPDv2, Argon2id S2K.
  */
 
 public enum KeyProfile: Equatable, Hashable {
@@ -7254,13 +7257,25 @@ public enum KeyProfile: Equatable, Hashable {
      */
     case universal
     /**
-     * Profile B: Advanced security. v6 keys, RFC 9580.
+     * Profile B: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
+     * the user as "Modern · High"; the baseline v6 classical tier is `Modern`.
      */
     case advanced
+    /**
+     * Modern: v6 Ed25519+X25519 keys, RFC 9580. The baseline v6 classical
+     * profile — Curve25519 under RFC 9580, i.e. Ed25519 (27) + X25519 (25).
+     * Not GnuPG compatible (v6 format).
+     */
+    case modern
     /**
      * Post-Quantum: RFC 9980 composite algorithms on v6 keys. Not GnuPG compatible.
      */
     case postQuantum
+    /**
+     * Post-Quantum · High: RFC 9980 composite ML-DSA-87+Ed448 signing and
+     * ML-KEM-1024+X448 encryption on v6 keys (NIST level 5). Not GnuPG compatible.
+     */
+    case postQuantumHigh
 
 
 
@@ -7286,7 +7301,11 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
 
         case 2: return .advanced
 
-        case 3: return .postQuantum
+        case 3: return .modern
+
+        case 4: return .postQuantum
+
+        case 5: return .postQuantumHigh
 
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -7304,8 +7323,16 @@ public struct FfiConverterTypeKeyProfile: FfiConverterRustBuffer {
             writeInt(&buf, Int32(2))
 
 
-        case .postQuantum:
+        case .modern:
             writeInt(&buf, Int32(3))
+
+
+        case .postQuantum:
+            writeInt(&buf, Int32(4))
+
+
+        case .postQuantumHigh:
+            writeInt(&buf, Int32(5))
 
         }
     }

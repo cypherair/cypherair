@@ -38,6 +38,8 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         let invalidPairs: [(PGPKeyConfiguration, PGPPrivateKeyCustodyKind)] = [
             (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
             (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
+            (.modernHighSoftwareV6, .appleSecureEnclavePrivateOperations),
+            (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations),
             // The composite suite is legal under both custody kinds, but only
             // through its matching identity: the portable identity stays
             // software-only and the device-bound identity stays enclave-only.

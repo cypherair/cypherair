@@ -10,16 +10,21 @@ pub fn get_key_version(cert_data: &[u8]) -> Result<u8, PgpError> {
 
 /// Classify a parsed certificate into its key profile.
 ///
-/// RFC 9980 composite primaries are Post-Quantum regardless of version
-/// (they only exist on v6); any other v6 primary is Profile B; v4 is
-/// Profile A. A bare key version is not enough: a v6 PQ certificate
-/// must not be classified as Profile B.
+/// Classification is by primary-key algorithm, because a bare key version is
+/// ambiguous: v6 carries the baseline classical (Ed25519 → Modern), the high
+/// classical (Ed448 → Advanced), and both RFC 9980 composite tiers. The
+/// composite primaries (ML-DSA-65+Ed25519, ML-DSA-87+Ed448) only exist on v6
+/// and each map to their own post-quantum tier. v4 Curve25519 signs with
+/// EdDSALegacy and falls through to Universal.
 pub(crate) fn classify_profile(cert: &openpgp::Cert) -> KeyProfile {
     use openpgp::types::PublicKeyAlgorithm;
     match cert.primary_key().key().pk_algo() {
-        PublicKeyAlgorithm::MLDSA65_Ed25519 | PublicKeyAlgorithm::MLDSA87_Ed448 => {
-            KeyProfile::PostQuantum
-        }
+        PublicKeyAlgorithm::MLDSA65_Ed25519 => KeyProfile::PostQuantum,
+        PublicKeyAlgorithm::MLDSA87_Ed448 => KeyProfile::PostQuantumHigh,
+        PublicKeyAlgorithm::Ed25519 => KeyProfile::Modern,
+        PublicKeyAlgorithm::Ed448 => KeyProfile::Advanced,
+        // Defensive: any other v6 primary is treated as the high classical
+        // tier; anything else (v4 EdDSALegacy, etc.) is Universal.
         _ if cert.primary_key().key().version() >= 6 => KeyProfile::Advanced,
         _ => KeyProfile::Universal,
     }

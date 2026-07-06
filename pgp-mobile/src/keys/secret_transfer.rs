@@ -62,8 +62,8 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
 
 /// Export a secret key protected with a passphrase.
 /// - Profile A (Universal): Iterated+Salted S2K (mode 3) — GnuPG compatible.
-/// - Profile B (Advanced): Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
-/// - Post-Quantum: Argon2id S2K, same as Profile B (both are v6/RFC 9580).
+/// - Every v6 profile (Modern, Advanced, Post-Quantum, Post-Quantum · High):
+///   Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
 ///
 /// Returns ASCII-armored key data with passphrase-encrypted secret key material.
 pub fn export_secret_key(
@@ -113,9 +113,10 @@ pub fn export_secret_key(
             })?;
         let encrypted = match profile {
             KeyProfile::Universal => primary.encrypt_secret(&password),
-            KeyProfile::Advanced | KeyProfile::PostQuantum => {
-                encrypt_key_argon2id(primary, &password)
-            }
+            KeyProfile::Advanced
+            | KeyProfile::Modern
+            | KeyProfile::PostQuantum
+            | KeyProfile::PostQuantumHigh => encrypt_key_argon2id(primary, &password),
         }
         .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt primary key: {e}"),
@@ -128,7 +129,10 @@ pub fn export_secret_key(
         let key = ka.key().clone();
         let encrypted = match profile {
             KeyProfile::Universal => key.encrypt_secret(&password),
-            KeyProfile::Advanced | KeyProfile::PostQuantum => encrypt_key_argon2id(key, &password),
+            KeyProfile::Advanced
+            | KeyProfile::Modern
+            | KeyProfile::PostQuantum
+            | KeyProfile::PostQuantumHigh => encrypt_key_argon2id(key, &password),
         }
         .map_err(|e| PgpError::S2kError {
             reason: format!("Failed to encrypt subkey: {e}"),
