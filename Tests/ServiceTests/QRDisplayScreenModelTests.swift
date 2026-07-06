@@ -71,8 +71,8 @@ final class QRDisplayScreenModelTests: XCTestCase {
 
     @MainActor
     func test_prepare_whenKeyExceedsQRCapacity_showsKeyTooLargeState() {
-        // An oversized classical key gets the same full-page not-available
-        // treatment as the post-quantum gate — never an alert over a spinner.
+        // An oversized key gets a full-page not-available state, never an alert
+        // over a spinner. Post-quantum certs (~30 KB) always land here too.
         let model = makeModel(
             generateQRCodeAction: { _ in
                 throw CypherAirError.keyTooLargeForQr
@@ -86,48 +86,10 @@ final class QRDisplayScreenModelTests: XCTestCase {
     }
 
     @MainActor
-    func test_prepare_postQuantumKey_showsUnavailableStateWithoutGeneration() {
-        // Design doc §5 (campaign #567): PQ certs never render as QR; the
-        // screen shows an explicit not-available state and generation is
-        // never attempted.
-        let model = makeModel(
-            generateQRCodeAction: { _ in
-                XCTFail("QR generation must not run for a post-quantum key")
-                return nil
-            },
-            detectKeyProfileAction: { _ in .postQuantum }
-        )
-
-        model.prepare()
-
-        XCTAssertEqual(model.unavailability, .postQuantumKey)
-        XCTAssertNil(model.qrCGImage)
-    }
-
-    @MainActor
-    func test_prepare_classicalKey_rendersNormally() throws {
+    func test_prepare_normalKey_rendersNormally() throws {
         let expectedImage = try Self.makeTestCGImage()
         let model = makeModel(
-            renderQRCodeImageAction: { _, _ in expectedImage },
-            detectKeyProfileAction: { _ in .universal }
-        )
-
-        model.prepare()
-
-        XCTAssertNil(model.unavailability)
-        XCTAssertNotNil(model.qrCGImage)
-    }
-
-    @MainActor
-    func test_prepare_profileDetectionFailure_fallsThroughToGeneration() throws {
-        // A transient parse failure must never block a classical key: the
-        // gate is explicit-only, not a failed-detection fallback.
-        let expectedImage = try Self.makeTestCGImage()
-        let model = makeModel(
-            renderQRCodeImageAction: { _, _ in expectedImage },
-            detectKeyProfileAction: { _ in
-                throw QRDisplayScreenModelTestError(message: "unparseable")
-            }
+            renderQRCodeImageAction: { _, _ in expectedImage }
         )
 
         model.prepare()
@@ -139,15 +101,13 @@ final class QRDisplayScreenModelTests: XCTestCase {
     @MainActor
     private func makeModel(
         generateQRCodeAction: QRDisplayScreenModel.GenerateQRCodeAction? = nil,
-        renderQRCodeImageAction: QRDisplayScreenModel.RenderQRCodeImageAction? = nil,
-        detectKeyProfileAction: QRDisplayScreenModel.DetectKeyProfileAction? = nil
+        renderQRCodeImageAction: QRDisplayScreenModel.RenderQRCodeImageAction? = nil
     ) -> QRDisplayScreenModel {
         QRDisplayScreenModel(
             publicKeyData: Data("public-key".utf8),
             qrService: QRService(contactImportAdapter: PGPContactImportAdapter(engine: PgpEngine())),
             generateQRCodeAction: generateQRCodeAction ?? { _ in Self.makeTestCIImage() },
-            renderQRCodeImageAction: renderQRCodeImageAction ?? { _, _ in try? Self.makeTestCGImage() },
-            detectKeyProfileAction: detectKeyProfileAction
+            renderQRCodeImageAction: renderQRCodeImageAction ?? { _, _ in try? Self.makeTestCGImage() }
         )
     }
 

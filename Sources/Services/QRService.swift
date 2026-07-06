@@ -99,11 +99,6 @@ final class QRService {
         try inspectImportablePublicCertificate(keyData: keyData).metadata
     }
 
-    /// Detect the encryption profile of a public key.
-    func detectKeyProfile(keyData: Data) throws -> PGPKeyProfile {
-        try inspectImportablePublicCertificate(keyData: keyData).metadata.profile
-    }
-
     // MARK: - QR Decoding from Image
 
     /// Decode QR codes from a CIImage (e.g., from PHPicker selection).
