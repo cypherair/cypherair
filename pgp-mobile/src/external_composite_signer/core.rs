@@ -44,6 +44,9 @@ pub(crate) trait CompositeSignerTier {
     type SignatureBytes;
     /// FIPS 204 ML-DSA signature length for this parameter set.
     const MLDSA_SIGNATURE_LENGTH: usize;
+    /// Error detail when `new` is handed a public key that is not this tier's
+    /// composite signing key.
+    const REQUIRED_PUBLIC_KEY_DESCRIPTION: &'static str;
     /// Raw ML-DSA signature bytes from the carrier.
     fn signature_raw(signature: Self::SignatureBytes) -> Vec<u8>;
     /// The classical EdDSA public key bound into `public_key`, or `None` if it
@@ -69,6 +72,8 @@ pub(crate) enum CompositeSigner65Tier {}
 impl CompositeSignerTier for CompositeSigner65Tier {
     type SignatureBytes = ExternalMlDsa65SignatureBytes;
     const MLDSA_SIGNATURE_LENGTH: usize = MLDSA65_SIGNATURE_LENGTH;
+    const REQUIRED_PUBLIC_KEY_DESCRIPTION: &'static str =
+        "external composite signer requires an ML-DSA-65+Ed25519 public key";
 
     fn signature_raw(signature: Self::SignatureBytes) -> Vec<u8> {
         signature.raw
@@ -112,6 +117,8 @@ pub(crate) enum CompositeSigner87Tier {}
 impl CompositeSignerTier for CompositeSigner87Tier {
     type SignatureBytes = ExternalMlDsa87SignatureBytes;
     const MLDSA_SIGNATURE_LENGTH: usize = MLDSA87_SIGNATURE_LENGTH;
+    const REQUIRED_PUBLIC_KEY_DESCRIPTION: &'static str =
+        "external composite signer requires an ML-DSA-87+Ed448 public key";
 
     fn signature_raw(signature: Self::SignatureBytes) -> Vec<u8> {
         signature.raw
@@ -182,10 +189,7 @@ where
         sign_operation: F,
     ) -> openpgp::Result<Self> {
         let expected_eddsa_public = T::expected_eddsa_public(&public_key).ok_or_else(|| {
-            openpgp::Error::InvalidOperation(
-                "external composite signer requires a matching ML-DSA + EdDSA public key"
-                    .to_string(),
-            )
+            openpgp::Error::InvalidOperation(T::REQUIRED_PUBLIC_KEY_DESCRIPTION.to_string())
         })?;
 
         let derived_eddsa_public =
