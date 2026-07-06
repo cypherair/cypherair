@@ -236,7 +236,7 @@ Shipped mitigations: the passphrase `String` lives only for the duration of the 
 
 ## 10. AI Coding Red Lines
 
-The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, must include the testing requirements at the end of this section, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)). Never merge such a change autonomously.
+The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)); for tests, see the guidance at the end of this section. Never merge such a change autonomously.
 
 ### Absolute Coding Invariants
 
@@ -284,11 +284,6 @@ These hold for every change, independent of which file is touched:
 - URL parsing logic in `QRService` that handles `cypherair://` scheme input
 - Profile/CipherSuite selection in key generation
 
-### Testing Requirements for Security Changes
+### Testing for Security Changes
 
-Every change to a file listed above must include:
-
-1. **Positive test:** the operation succeeds with correct inputs and proper authentication.
-2. **Negative test:** the operation fails gracefully with wrong inputs (wrong key, wrong passphrase, tampered data, unavailable biometrics).
-3. **Round-trip test:** for crypto operations — encrypt/decrypt, sign/verify, wrap/unwrap.
-4. **No-leak test:** for memory-sensitive changes — verify sensitive data is zeroized after use (Xcode Memory Graph Debugger or Instruments).
+Same judgment, and security-critical code is where a test most often pays off: a good one guards an invariant a later edit could quietly drop — decryption aborting on a bad tag, a revoked key refused, memory zeroed — and aims at that guarantee, not the happy path. Write those without hesitation; skip the ones that only exercise the code or chase coverage. Human review before merge is the backstop either way.
