@@ -22,13 +22,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X is the enhanced edition of CypherAir — a fully offline OpenPGP encryption tool with zero network access and minimal permissions. Beyond CypherAir’s Portable Compatible and Portable Modern keys, it adds four more key families: Device-Bound Compatible, Device-Bound Modern, and Device-Bound Post-Quantum keys kept in this device’s Secure Enclave, plus Portable Post-Quantum keys that resist future quantum computers. CypherAir X remains fully open source on GitHub."
+            "value" : "CypherAir X is the enhanced edition of CypherAir — a fully offline OpenPGP encryption tool with zero network access and minimal permissions. Beyond CypherAir’s Portable Legacy and Portable Modern · High keys, it adds four more key families: Device-Bound Legacy, Device-Bound Modern, and Device-Bound Post-Quantum keys kept in this device’s Secure Enclave, plus Portable Post-Quantum keys that resist future quantum computers. CypherAir X remains fully open source on GitHub."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CypherAir X 是 CypherAir 的增强版——完全离线的 OpenPGP 加密工具，零网络访问，最小权限。在 CypherAir 的便携兼容与便携现代密钥之外，新增四个密钥家族：私钥由本机安全隔区保管的设备绑定兼容、设备绑定现代与设备绑定后量子密钥，以及可抵御未来量子计算机的便携后量子密钥。CypherAir X 在 GitHub 上保持完全开源。"
+            "value" : "CypherAir X 是 CypherAir 的增强版——完全离线的 OpenPGP 加密工具，零网络访问，最小权限。在 CypherAir 的便携旧版与便携现代 · 高强度密钥之外，新增四个密钥家族：私钥由本机安全隔区保管的设备绑定旧版、设备绑定现代与设备绑定后量子密钥，以及可抵御未来量子计算机的便携后量子密钥。CypherAir X 在 GitHub 上保持完全开源。"
           }
         }
       }
@@ -9541,6 +9541,38 @@
         }
       }
     },
+    "keyFamily.custodyOption.deviceBound" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定"
+          }
+        }
+      }
+    },
+    "keyFamily.custodyOption.portable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "便携"
+          }
+        }
+      }
+    },
     "keyFamily.detail.algorithms" : {
       "localizations" : {
         "en" : {
@@ -9621,6 +9653,22 @@
         }
       }
     },
+    "keyFamily.detail.interop" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interoperability"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "互操作性"
+          }
+        }
+      }
+    },
     "keyFamily.detail.messageFormat" : {
       "localizations" : {
         "en" : {
@@ -9653,6 +9701,22 @@
         }
       }
     },
+    "keyFamily.detail.sizes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sizes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大小"
+          }
+        }
+      }
+    },
     "keyFamily.detail.version" : {
       "localizations" : {
         "en" : {
@@ -9674,13 +9738,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "P-256 signing + P-256 key agreement"
+            "value" : "ECDSA (19, NIST P-256) signing + ECDH (18, NIST P-256) key agreement"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "P-256 签名 + P-256 密钥协商"
+            "value" : "ECDSA (19, NIST P-256) 签名 + ECDH (18, NIST P-256) 密钥协商"
           }
         }
       }
@@ -9722,13 +9786,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Device-Bound Compatible"
+            "value" : "Device-Bound Legacy"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设备绑定兼容"
+            "value" : "设备绑定旧版"
           }
         }
       }
@@ -9745,6 +9809,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "~128 位"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundCompatible.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NIST P-256 · OpenPGP v4"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NIST P-256 · OpenPGP v4"
           }
         }
       }
@@ -9797,6 +9877,22 @@
         }
       }
     },
+    "keyFamily.deviceBoundModern.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NIST P-256 · OpenPGP v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NIST P-256 · OpenPGP v6"
+          }
+        }
+      }
+    },
     "keyFamily.deviceBoundPostQuantum.description" : {
       "localizations" : {
         "en" : {
@@ -9841,6 +9937,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "~192 位，抗量子"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantum.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-768 + X25519 · OpenPGP v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-768 + X25519 · OpenPGP v6"
           }
         }
       }
@@ -9909,6 +10021,70 @@
         }
       }
     },
+    "keyFamily.interop.broad" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broad compatibility, including GnuPG and older OpenPGP tools."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广泛兼容，包括 GnuPG 及旧版 OpenPGP 工具。"
+          }
+        }
+      }
+    },
+    "keyFamily.interop.ed448.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires modern OpenPGP tools; some do not yet support Ed448/X448."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要现代 OpenPGP 工具；部分工具尚不支持 Ed448/X448。"
+          }
+        }
+      }
+    },
+    "keyFamily.interop.modernV6.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses OpenPGP v6; not readable by GnuPG or older tools."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 OpenPGP v6；GnuPG 及旧版工具无法读取。"
+          }
+        }
+      }
+    },
+    "keyFamily.interop.postQuantum.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-quantum keys work only with modern OpenPGP tools (RFC 9580/9980), not GnuPG or older software."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子密钥仅适用于现代 OpenPGP 工具（RFC 9580/9980），不兼容 GnuPG 或旧版软件。"
+          }
+        }
+      }
+    },
     "keyFamily.messageFormat.seipdv1" : {
       "localizations" : {
         "en" : {
@@ -9946,13 +10122,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ed25519 signing + X25519 encryption"
+            "value" : "EdDSALegacy (Ed25519Legacy) signing + ECDH (Curve25519) encryption"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ed25519 签名 + X25519 加密"
+            "value" : "EdDSALegacy (Ed25519Legacy) 签名 + ECDH (Curve25519) 加密"
           }
         }
       }
@@ -9978,13 +10154,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Portable Compatible"
+            "value" : "Portable Legacy"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "便携兼容"
+            "value" : "便携旧版"
           }
         }
       }
@@ -10005,18 +10181,34 @@
         }
       }
     },
-    "keyFamily.portableModern.algorithms" : {
+    "keyFamily.portableCompatible.subtitle" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ed448 signing + X448 encryption"
+            "value" : "Curve25519 · OpenPGP v4"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ed448 签名 + X448 加密"
+            "value" : "Curve25519 · OpenPGP v4"
+          }
+        }
+      }
+    },
+    "keyFamily.portableModern.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 (28) signing + X448 (26) encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ed448 (28) 签名 + X448 (26) 加密"
           }
         }
       }
@@ -10042,13 +10234,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Portable Modern"
+            "value" : "Portable Modern · High"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "便携现代"
+            "value" : "便携现代 · 高强度"
           }
         }
       }
@@ -10065,6 +10257,166 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "~224 位"
+          }
+        }
+      }
+    },
+    "keyFamily.portablePostQuantum.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-768 + X25519 · OpenPGP v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-768 + X25519 · OpenPGP v6"
+          }
+        }
+      }
+    },
+    "keyFamily.recommended" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推荐"
+          }
+        }
+      }
+    },
+    "keyFamily.size.compact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compact public key and signatures."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥与签名体积紧凑。"
+          }
+        }
+      }
+    },
+    "keyFamily.size.postQuantum" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large public key and signatures; the public key may not fit in a single QR code."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公钥与签名体积较大；公钥可能无法容纳于单个二维码中。"
+          }
+        }
+      }
+    },
+    "keyFamily.tagline.legacy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG & older tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GnuPG 及旧版工具"
+          }
+        }
+      }
+    },
+    "keyFamily.tier.legacy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legacy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旧版"
+          }
+        }
+      }
+    },
+    "keyFamily.tier.modern" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modern"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现代"
+          }
+        }
+      }
+    },
+    "keyFamily.tier.modernHigh" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modern · High"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现代 · 高强度"
+          }
+        }
+      }
+    },
+    "keyFamily.tier.postQuantum" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-Quantum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子"
+          }
+        }
+      }
+    },
+    "keyFamily.tier.postQuantumHigh" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post-Quantum · High"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后量子 · 高强度"
           }
         }
       }
@@ -10101,6 +10453,22 @@
         }
       }
     },
+    "keygen.continue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续"
+          }
+        }
+      }
+    },
     "keygen.custody.auth.reason" : {
       "localizations" : {
         "en" : {
@@ -10113,6 +10481,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "创建你的设备绑定密钥需要进行身份认证。"
+          }
+        }
+      }
+    },
+    "keygen.custody.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custody"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "托管方式"
           }
         }
       }
@@ -10385,6 +10769,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成密钥"
+          }
+        }
+      }
+    },
+    "keygen.viewDetails" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View technical details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看技术详情"
           }
         }
       }
@@ -15445,18 +15845,34 @@
         }
       }
     },
-    "keyFamily.portablePostQuantum.algorithms" : {
+    "keyFamily.portableModern.subtitle" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption"
+            "value" : "Ed448 · OpenPGP v6"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ML-DSA-65+Ed25519 签名 + ML-KEM-768+X25519 加密"
+            "value" : "Ed448 · OpenPGP v6"
+          }
+        }
+      }
+    },
+    "keyFamily.portablePostQuantum.algorithms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-DSA-65+Ed25519 (30) 签名 + ML-KEM-768+X25519 (35) 加密"
           }
         }
       }

@@ -25,13 +25,13 @@ extension PGPKeyConfiguration.Identity {
     var familyDisplayName: String {
         switch self {
         case .compatibleSoftwareV4:
-            String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Compatible")
+            String(localized: "keyFamily.portableCompatible.name", defaultValue: "Portable Legacy")
         case .modernSoftwareV6:
-            String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern")
+            String(localized: "keyFamily.portableModern.name", defaultValue: "Portable Modern · High")
         case .postQuantumSoftwareV6:
             String(localized: "keyFamily.portablePostQuantum.name", defaultValue: "Portable Post-Quantum")
         case .compatibleP256V4:
-            String(localized: "keyFamily.deviceBoundCompatible.name", defaultValue: "Device-Bound Compatible")
+            String(localized: "keyFamily.deviceBoundCompatible.name", defaultValue: "Device-Bound Legacy")
         case .modernP256V6:
             String(localized: "keyFamily.deviceBoundModern.name", defaultValue: "Device-Bound Modern")
         case .deviceBoundPostQuantumV6:
@@ -75,6 +75,91 @@ extension PGPKeyConfiguration.Identity {
         }
     }
 
+    /// Concise algorithm line (curve + format) shown as the picker row subtitle.
+    var familyAlgorithmSubtitle: String {
+        switch self {
+        case .compatibleSoftwareV4:
+            String(localized: "keyFamily.portableCompatible.subtitle", defaultValue: "Curve25519 · OpenPGP v4")
+        case .modernSoftwareV6:
+            String(localized: "keyFamily.portableModern.subtitle", defaultValue: "Ed448 · OpenPGP v6")
+        case .postQuantumSoftwareV6:
+            String(localized: "keyFamily.portablePostQuantum.subtitle", defaultValue: "ML-KEM-768 + X25519 · OpenPGP v6")
+        case .compatibleP256V4:
+            String(localized: "keyFamily.deviceBoundCompatible.subtitle", defaultValue: "NIST P-256 · OpenPGP v4")
+        case .modernP256V6:
+            String(localized: "keyFamily.deviceBoundModern.subtitle", defaultValue: "NIST P-256 · OpenPGP v6")
+        case .deviceBoundPostQuantumV6:
+            String(localized: "keyFamily.deviceBoundPostQuantum.subtitle", defaultValue: "ML-KEM-768 + X25519 · OpenPGP v6")
+        }
+    }
+
+    /// Short positioning tagline shown in the picker (the Legacy families own the
+    /// GnuPG/older-tools story; the modern families are compatible too, so they
+    /// carry none). Returns nil when there is nothing distinctive to surface.
+    var familyPositioningTagline: String? {
+        switch self {
+        case .compatibleSoftwareV4, .compatibleP256V4:
+            String(localized: "keyFamily.tagline.legacy", defaultValue: "GnuPG & older tools")
+        case .modernSoftwareV6, .postQuantumSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6:
+            nil
+        }
+    }
+
+    /// Whether this family is the recommended default selection.
+    var isRecommended: Bool {
+        self == .postQuantumSoftwareV6
+    }
+
+    /// In-flow interoperability warning surfaced during selection. Nil for the v4
+    /// Legacy families, which are broadly compatible and need no caution.
+    var familyInteropWarning: String? {
+        switch self {
+        case .compatibleSoftwareV4, .compatibleP256V4:
+            nil
+        case .modernSoftwareV6:
+            String(
+                localized: "keyFamily.interop.ed448.warning",
+                defaultValue: "Requires modern OpenPGP tools; some do not yet support Ed448/X448."
+            )
+        case .modernP256V6:
+            String(
+                localized: "keyFamily.interop.modernV6.warning",
+                defaultValue: "Uses OpenPGP v6; not readable by GnuPG or older tools."
+            )
+        case .postQuantumSoftwareV6, .deviceBoundPostQuantumV6:
+            String(
+                localized: "keyFamily.interop.postQuantum.warning",
+                defaultValue: "Post-quantum keys work only with modern OpenPGP tools (RFC 9580/9980), not GnuPG or older software."
+            )
+        }
+    }
+
+    /// Interoperability statement for the (i) detail sheet — the in-flow warning
+    /// when one applies, otherwise the positive broad-compatibility statement.
+    var familyInteropDisplay: String {
+        familyInteropWarning ?? String(
+            localized: "keyFamily.interop.broad",
+            defaultValue: "Broad compatibility, including GnuPG and older OpenPGP tools."
+        )
+    }
+
+    /// Key/signature size guidance for the (i) detail sheet. Post-quantum material
+    /// is large enough to matter for QR export; classical material is compact.
+    var familySizeNote: String {
+        switch self {
+        case .postQuantumSoftwareV6, .deviceBoundPostQuantumV6:
+            String(
+                localized: "keyFamily.size.postQuantum",
+                defaultValue: "Large public key and signatures; the public key may not fit in a single QR code."
+            )
+        case .compatibleSoftwareV4, .modernSoftwareV6, .compatibleP256V4, .modernP256V6:
+            String(
+                localized: "keyFamily.size.compact",
+                defaultValue: "Compact public key and signatures."
+            )
+        }
+    }
+
     /// Approximate security level for key-detail display.
     var familySecurityLevel: String {
         switch self {
@@ -93,24 +178,35 @@ extension PGPKeyConfiguration.Identity {
         }
     }
 
-    /// Algorithm details for the key-family detail sheet.
+    /// Algorithm details for the key-family detail sheet. Component names follow
+    /// the RFC 9580 / RFC 9980 registry display names (e.g. `EdDSALegacy` for the
+    /// deprecated v4 signing algorithm id 22, not Sequoia's `EdDSA`).
     var familyAlgorithmSummary: String {
         switch self {
         case .compatibleSoftwareV4:
-            String(localized: "keyFamily.portableCompatible.algorithms", defaultValue: "Ed25519 signing + X25519 encryption")
+            String(
+                localized: "keyFamily.portableCompatible.algorithms",
+                defaultValue: "EdDSALegacy (Ed25519Legacy) signing + ECDH (Curve25519) encryption"
+            )
         case .modernSoftwareV6:
-            String(localized: "keyFamily.portableModern.algorithms", defaultValue: "Ed448 signing + X448 encryption")
+            String(
+                localized: "keyFamily.portableModern.algorithms",
+                defaultValue: "Ed448 (28) signing + X448 (26) encryption"
+            )
         case .postQuantumSoftwareV6:
             String(
                 localized: "keyFamily.portablePostQuantum.algorithms",
-                defaultValue: "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption"
+                defaultValue: "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption"
             )
         case .compatibleP256V4, .modernP256V6:
-            String(localized: "keyFamily.deviceBound.algorithms", defaultValue: "P-256 signing + P-256 key agreement")
+            String(
+                localized: "keyFamily.deviceBound.algorithms",
+                defaultValue: "ECDSA (19, NIST P-256) signing + ECDH (18, NIST P-256) key agreement"
+            )
         case .deviceBoundPostQuantumV6:
             String(
                 localized: "keyFamily.portablePostQuantum.algorithms",
-                defaultValue: "ML-DSA-65+Ed25519 signing + ML-KEM-768+X25519 encryption"
+                defaultValue: "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption"
             )
         }
     }
@@ -176,5 +272,89 @@ extension PGPKeyConfiguration.Identity {
             localized: "keyFamily.deviceBound.biometricRequirement",
             defaultValue: "Device-bound keys always require biometric authentication. For security, this enforcement is fixed and cannot be changed."
         )
+    }
+}
+
+// MARK: - Generation picker taxonomy
+
+extension PGPKeyConfiguration.Identity {
+    /// Top-level axis of the generation picker: where the private key lives.
+    enum Custody: String, CaseIterable, Hashable, Sendable {
+        case portable
+        case deviceBound
+
+        var displayName: String {
+            switch self {
+            case .portable:
+                String(localized: "keyFamily.custodyOption.portable", defaultValue: "Portable")
+            case .deviceBound:
+                String(localized: "keyFamily.custodyOption.deviceBound", defaultValue: "Device-Bound")
+            }
+        }
+    }
+
+    /// Security tier within a custody column, ordered by ascending capability so
+    /// the grid and compact list read consistently. Not every tier exists in
+    /// every custody (the Secure Enclave has no Ed448/X448, so Modern · High is
+    /// portable-only), which is why the picker is data-driven over the family
+    /// list rather than a fixed matrix.
+    enum Tier: Int, CaseIterable, Hashable, Sendable {
+        case legacy
+        case modern
+        case modernHigh
+        case postQuantum
+        case postQuantumHigh
+
+        var displayName: String {
+            switch self {
+            case .legacy:
+                String(localized: "keyFamily.tier.legacy", defaultValue: "Legacy")
+            case .modern:
+                String(localized: "keyFamily.tier.modern", defaultValue: "Modern")
+            case .modernHigh:
+                String(localized: "keyFamily.tier.modernHigh", defaultValue: "Modern · High")
+            case .postQuantum:
+                String(localized: "keyFamily.tier.postQuantum", defaultValue: "Post-Quantum")
+            case .postQuantumHigh:
+                String(localized: "keyFamily.tier.postQuantumHigh", defaultValue: "Post-Quantum · High")
+            }
+        }
+    }
+
+    var custody: Custody {
+        isDeviceBoundFamily ? .deviceBound : .portable
+    }
+
+    var tier: Tier {
+        switch self {
+        case .compatibleSoftwareV4, .compatibleP256V4:
+            .legacy
+        case .modernP256V6:
+            .modern
+        case .modernSoftwareV6:
+            .modernHigh
+        case .postQuantumSoftwareV6, .deviceBoundPostQuantumV6:
+            .postQuantum
+        }
+    }
+
+    /// Short tier label for picker cells; custody is conveyed by the column or
+    /// segmented control, so the cell needs only the tier.
+    var tierDisplayName: String {
+        tier.displayName
+    }
+
+    /// Families of a given custody within the supplied catalog, in stable
+    /// presentation (tier) order.
+    static func families(
+        custody: Custody,
+        in families: [PGPKeyConfiguration.Identity]
+    ) -> [PGPKeyConfiguration.Identity] {
+        families.filter { $0.custody == custody }
+    }
+
+    /// The family pre-selected when the generation picker opens.
+    static var recommendedDefault: PGPKeyConfiguration.Identity {
+        orderedFamilies.first(where: { $0.isRecommended }) ?? orderedFamilies[0]
     }
 }

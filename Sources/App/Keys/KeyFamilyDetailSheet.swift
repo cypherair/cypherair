@@ -31,12 +31,20 @@ struct KeyFamilyDetailSheet: View {
                         value: family.familySecurityLevel
                     )
                     LabeledContent(
+                        String(localized: "keyFamily.detail.sizes", defaultValue: "Sizes"),
+                        value: family.familySizeNote
+                    )
+                    LabeledContent(
                         String(localized: "keyFamily.detail.exportability", defaultValue: "Exportability"),
                         value: family.familyExportabilityDisplay
                     )
                     LabeledContent(
                         String(localized: "keyFamily.detail.gnupg", defaultValue: "GnuPG Compatibility"),
                         value: family.familyGnuPGCompatibilityDisplay
+                    )
+                    LabeledContent(
+                        String(localized: "keyFamily.detail.interop", defaultValue: "Interoperability"),
+                        value: family.familyInteropDisplay
                     )
                     LabeledContent(
                         String(localized: "keyFamily.detail.custody", defaultValue: "Custody"),

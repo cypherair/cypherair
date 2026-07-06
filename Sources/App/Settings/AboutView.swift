@@ -22,7 +22,7 @@ struct AboutView: View {
             Section {
                 Text(String(
                     localized: "about.cypherAirX.description",
-                    defaultValue: "CypherAir X is the enhanced edition of CypherAir — a fully offline OpenPGP encryption tool with zero network access and minimal permissions. Beyond CypherAir’s Portable Compatible and Portable Modern keys, it adds four more key families: Device-Bound Compatible, Device-Bound Modern, and Device-Bound Post-Quantum keys kept in this device’s Secure Enclave, plus Portable Post-Quantum keys that resist future quantum computers. CypherAir X remains fully open source on GitHub."
+                    defaultValue: "CypherAir X is the enhanced edition of CypherAir — a fully offline OpenPGP encryption tool with zero network access and minimal permissions. Beyond CypherAir’s Portable Legacy and Portable Modern · High keys, it adds four more key families: Device-Bound Legacy, Device-Bound Modern, and Device-Bound Post-Quantum keys kept in this device’s Secure Enclave, plus Portable Post-Quantum keys that resist future quantum computers. CypherAir X remains fully open source on GitHub."
                 ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
