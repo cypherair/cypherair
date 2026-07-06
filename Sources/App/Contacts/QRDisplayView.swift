@@ -95,11 +95,6 @@ private struct QRDisplayHostView: View {
         _ unavailability: QRDisplayScreenModel.Unavailability
     ) -> String {
         switch unavailability {
-        case .postQuantumKey:
-            String(
-                localized: "qr.unavailable.postQuantum",
-                defaultValue: "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
-            )
         case .keyTooLarge:
             String(
                 localized: "qr.unavailable.tooLarge",

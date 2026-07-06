@@ -16101,22 +16101,6 @@
         }
       }
     },
-    "qr.unavailable.postQuantum" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Post-quantum keys are too large for a QR code. Share this key as a file or copy it instead."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后量子密钥太大，无法生成二维码。请以文件方式分享或复制此密钥。"
-          }
-        }
-      }
-    },
     "qr.unavailable.tooLarge" : {
       "localizations" : {
         "en" : {
