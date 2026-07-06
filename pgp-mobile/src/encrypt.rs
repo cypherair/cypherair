@@ -119,10 +119,16 @@ pub(crate) fn setup_signer<'a>(
                 reason: format!("Invalid signing key: {e}"),
             })?;
 
+        // `.revoked(false)` skips a revoked signing subkey, mirroring recipient
+        // selection above (WCR-01): a cert with a live primary but a hard-revoked
+        // signing subkey must not sign the message. If another live, unrevoked
+        // signing key remains it is used; only when none does the
+        // no-valid-signing-key error fire.
         let signing_keypair = signer_cert
             .keys()
             .with_policy(policy, None)
             .supported()
+            .revoked(false)
             .secret()
             .for_signing()
             .next()
