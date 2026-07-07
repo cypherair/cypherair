@@ -1,0 +1,4604 @@
+[
+  {
+    "attributes" : [
+
+    ],
+    "name" : "secureEnclave",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppContainer.swift:8:9",
+    "ids" : [
+      "s:9CypherAir12AppContainerC13secureEnclaveAA06SecureF10Manageable_pvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "name" : "protectedDataRegistryStore",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir12AppContainerC26protectedDataRegistryStoreAA09ProtectedfgH0Cvp"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppContainer.swift:14:9"
+  },
+  {
+    "ids" : [
+      "s:9CypherAir12AppContainerC34protectedDataPostUnlockCoordinatorAA09ProtectedfghI0Vvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "name" : "protectedDataPostUnlockCoordinator",
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppContainer.swift:23:9",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "name" : "passwordMessageService",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppContainer.swift:30:9",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir12AppContainerC22passwordMessageServiceAA08PasswordfG0Cvp"
+    ]
+  },
+  {
+    "kind" : "function.method.static",
+    "name" : "content(for:resolver:rootDecorator:)",
+    "modifiers" : [
+      "static"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir19AppShellCompositionO7content3for8resolver13rootDecorator7SwiftUI7AnyViewVAA0cD3TabO_AA0C24RouteDestinationResolverVAjL_AJtXEtFZ"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppShellComposition.swift:139:17"
+  },
+  {
+    "name" : "normalizedSelection(_:sizeClass:)",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppShellComposition.swift:200:17",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir19AppShellCompositionO19normalizedSelection_9sizeClassAA0cD3TabOAG_7SwiftUI017UserInterfaceSizeI0OSgtFZ"
+    ],
+    "kind" : "function.method.static",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir19AppShellCompositionO11definitions8resolver13rootDecoratorSayAA0cD13TabDefinitionVGAA0C24RouteDestinationResolverV_7SwiftUI7AnyViewVAA0cdJ0O_ANtXEtFZ"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppShellComposition.swift:214:17",
+    "name" : "definitions(resolver:rootDecorator:)",
+    "modifiers" : [
+      "static"
+    ],
+    "kind" : "function.method.static",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "name" : "Result",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "kind" : "struct",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir21AppStartupCoordinatorV6ResultV"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppStartupCoordinator.swift:5:12"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir21AppStartupCoordinatorV07performD05usingAC6ResultVAA0C9ContainerC_tF"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/AppStartupCoordinator.swift:15:10",
+    "name" : "performStartup(using:)",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "scenePhase",
+    "ids" : [
+      "s:9CypherAir28AppLifecycleObserverModifierV10scenePhase33_11BC1108D68FB2D56C81BBA8FCD2219ALL7SwiftUI05SceneH0Ovp"
+    ],
+    "kind" : "var.instance",
+    "accessibility" : "private",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Common/AppLifecycleObserver.swift:23:44",
+    "attributes" : [
+      "Environment(\\.scenePhase)"
+    ],
+    "modifiers" : [
+      "private"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "placeholder",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Common/CypherMultilineTextInput.swift:53:9",
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "private",
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir0A22MultilineTextInputModeO11placeholder33_08C81836AA1AEB840AA25479F884CE8ALLSSvp"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "name" : "generation",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Common/FileImportRequestGate.swift:6:25",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+      "fileprivate"
+    ],
+    "ids" : [
+      "s:9CypherAir21FileImportRequestGateV5TokenV10generation33_9EC0C5A06009BDD1ABE37606FCF6B05ELLs6UInt64Vvp"
+    ],
+    "accessibility" : "fileprivate",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir18OutputArtifactKindO6backupyA2CmF"
+    ],
+    "name" : "backup",
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "enumelement",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Common/OutputHandling.swift:7:10",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "name" : "prefilledArmoredText",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir14AddContactViewV14RuntimeSyncKeyV20prefilledArmoredTextSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/AddContactView.swift:24:13"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir24AddContactScreenHostView33_DE0CF898BAA7ECABB8C58C2DA14F6F64LLV14importWorkflowAA0d6ImportR0Vvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "importWorkflow",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/AddContactView.swift:81:9"
+  },
+  {
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift:56:17",
+    "ids" : [
+      "s:9CypherAir39ContactCertificateSignaturesScreenModelC27certificateSignatureService33_6C57691D28A223464F7A60DAA669BE3FLLAA0diJ0Cvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "certificateSignatureService",
+    "modifiers" : [
+      "private"
+    ],
+    "accessibility" : "private"
+  },
+  {
+    "kind" : "var.instance",
+    "name" : "initialKeyId",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:69:9",
+    "ids" : [
+      "s:9CypherAir38ContactCertificationDetailsScreenModelC12initialKeyIdSSSgvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:70:9",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir38ContactCertificationDetailsScreenModelC6intentAA0cD11RouteIntentOvp"
+    ],
+    "name" : "intent",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:76:17",
+    "accessibility" : "private",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "certificateSignatureService",
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir38ContactCertificationDetailsScreenModelC27certificateSignatureService33_FC708573872403067D0EAFB02CCF190ALLAA011CertificateiJ0Cvp"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactsAvailability+Presentation.swift:38:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir20ContactsAvailabilityO22unavailableSystemImageSSvp"
+    ],
+    "name" : "unavailableSystemImage"
+  },
+  {
+    "kind" : "function.method.instance",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "isTagFilterSelected(_:)",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ContactsScreenModel.swift:67:10",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir19ContactsScreenModelC19isTagFilterSelectedySbSSF"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "function.method.instance",
+    "name" : "loadFromQRPhoto(_:)",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir21PublicKeyImportLoaderV15loadFromQRPhotoyAA0cdE10InspectionV015_PhotosUI_SwiftL00K10PickerItemVYaKF"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/Import/PublicKeyImportLoader.swift:58:10"
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Contacts/ImportConfirmationCoordinator.swift:6:9",
+    "name" : "keyData",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir25ImportConfirmationRequestV7keyData10Foundation0G0Vvp"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "kind" : "struct",
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/ContentView.swift:5:8",
+    "name" : "ContentView",
+    "ids" : [
+      "s:9CypherAir11ContentViewV"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "recipientKeyIds",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir10Phase1Seed33_CFE73A02E1FF82976FD78050B6BAA686LLV15recipientKeyIdsSaySSGvp"
+    ],
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptScreenModel.swift:637:9"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptScreenModel.swift:638:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "matchedKeyFingerprint",
+    "ids" : [
+      "s:9CypherAir10Phase1Seed33_CFE73A02E1FF82976FD78050B6BAA686LLV21matchedKeyFingerprintSSSgvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance"
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptScreenModel.swift:639:9",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir10Phase1Seed33_CFE73A02E1FF82976FD78050B6BAA686LLV10ciphertext10Foundation4DataVvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "ciphertext",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV17InitialPhase1SeedV09recipientG3IdsSaySSGvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:26:17",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "recipientKeyIds",
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "ciphertext",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV17InitialPhase1SeedV10ciphertext10Foundation4DataVvp"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:28:17",
+    "accessibility" : "internal"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "prefilledCiphertext",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:37:13",
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV19prefilledCiphertextSSSgvp"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV20allowsTextFileImportSbvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:39:13",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "allowsTextFileImport",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "name" : "allowsFileInput",
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV15allowsFileInputSbvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:40:13"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "name" : "allowsFileResultExport",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:41:13",
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV22allowsFileResultExportSbvp"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:42:13",
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV26textFileRestrictionMessageSSSgvp"
+    ],
+    "name" : "textFileRestrictionMessage",
+    "kind" : "var.instance"
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV22fileRestrictionMessageSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:43:13",
+    "name" : "fileRestrictionMessage"
+  },
+  {
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "hasFileExportInterceptor",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Decrypt/DecryptView.swift:44:13",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir11DecryptViewV14RuntimeSyncKeyV24hasFileExportInterceptorSbvp"
+    ]
+  },
+  {
+    "kind" : "var.static",
+    "ids" : [
+      "s:9CypherAir0A7SpacingO5loose14CoreFoundation7CGFloatVvpZ"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "loose",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/DesignSystem/CypherLayout.swift:19:16"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir34InitialRecipientSelectionSignature33_BEA8E75DE48F064021D900A3D13812AALLV10contactIdsSaySSGvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptScreenModel.swift:4:9",
+    "name" : "contactIds",
+    "accessibility" : "internal"
+  },
+  {
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV18prefilledPlaintextSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:54:13",
+    "name" : "prefilledPlaintext",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV24initialSignerFingerprintSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:56:13",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "initialSignerFingerprint",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance"
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "name" : "signingPolicy",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV13signingPolicyAC13ConfigurationV06ToggleI0Ovp"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:57:13",
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV19encryptToSelfPolicyAC13ConfigurationV06ToggleK0Ovp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:58:13",
+    "name" : "encryptToSelfPolicy"
+  },
+  {
+    "kind" : "var.instance",
+    "name" : "allowsClipboardWrite",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV20allowsClipboardWriteSbvp"
+    ],
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:59:13"
+  },
+  {
+    "name" : "allowsResultExport",
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV18allowsResultExportSbvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:60:13",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV15allowsFileInputSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:61:13",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "name" : "allowsFileInput",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "allowsFileResultExport",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV22allowsFileResultExportSbvp"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:62:13"
+  },
+  {
+    "name" : "fileRestrictionMessage",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:63:13",
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV22fileRestrictionMessageSSSgvp"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV27hasClipboardCopyInterceptorSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:64:13",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "hasClipboardCopyInterceptor",
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:65:13",
+    "name" : "hasDataExportInterceptor",
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV24hasDataExportInterceptorSbvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "hasFileExportInterceptor",
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Encrypt/EncryptView.swift:66:13",
+    "ids" : [
+      "s:9CypherAir11EncryptViewV14RuntimeSyncKeyV24hasFileExportInterceptorSbvp"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir22OnboardingTutorialPageV19presentationContextAA0c12PresentationG0Ovp"
+    ],
+    "name" : "presentationContext",
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/OnboardingView.swift:176:9",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "accessibility" : "private",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:7SwiftUI4ViewP9CypherAirE2if03_C0g9D8321FD57G17AB502AD0E5CDA3B43LL_9transformQrSb_qd__xXEtAaBRd__lF"
+    ],
+    "kind" : "function.method.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/OnboardingView.swift:259:10",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "if(_:transform:)",
+    "attributes" : [
+      "ViewBuilder"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:107:9",
+    "kind" : "var.instance",
+    "name" : "rawValue",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir17TutorialSessionIDV8rawValue10Foundation4UUIDVvp"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "name" : "decryptedMessage",
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir17TutorialArtifactsV16decryptedMessageSSSgvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:121:9",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "name" : "mockSecureEnclave",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir31TutorialSecuritySimulationStackV17mockSecureEnclaveAA04MockhI0Cvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:200:9",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:201:9",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir31TutorialSecuritySimulationStackV12mockKeychainAA04MockH0Cvp"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "mockKeychain"
+  },
+  {
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir31TutorialSecuritySimulationStackV17mockAuthenticatorAA04MockH0Cvp"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:202:9",
+    "name" : "mockAuthenticator",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "name" : "launchOrigin",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:258:9",
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStateV12launchOriginAA0c6LaunchG0Ovp"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStateV15currentGuidanceAA0cG7PayloadVSgvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal",
+    "name" : "currentGuidance",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:267:9"
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialModels.swift:276:9",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "isWorkspacePresented",
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStateV20isWorkspacePresentedSbvp"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialRouteDestinationView.swift:9:9",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "name" : "sizeClass",
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir28TutorialRouteDestinationViewV9sizeClass7SwiftUI017UserInterfaceSizeH0OSgvp"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir21TutorialShellTabsViewV9iOSLayout33_74F3BE2A638DB955E106B14C0A80B61FLLQrvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "iOSLayout",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialShellTabsView.swift:36:17"
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir24TutorialInlineHeaderViewV"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:10:8",
+    "name" : "TutorialInlineHeaderView",
+    "kind" : "struct",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "struct",
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir29TutorialInlineHeaderHeightKey33_57D27535FE56217B6DB8B3D8C638524BLLV"
+    ],
+    "accessibility" : "private",
+    "name" : "TutorialInlineHeaderHeightKey",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:99:16"
+  },
+  {
+    "modifiers" : [
+      "private"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir32TutorialInlineHeaderHostModifier33_57D27535FE56217B6DB8B3D8C638524BLLV"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:107:16",
+    "name" : "TutorialInlineHeaderHostModifier",
+    "attributes" : [
+
+    ],
+    "kind" : "struct"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:153:22",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "tutorialInlineHeaderHost(context:)",
+    "modifiers" : [
+      "fileprivate"
+    ],
+    "ids" : [
+      "s:7SwiftUI4ViewP9CypherAirE24tutorialInlineHeaderHost33_57D27535FE56217B6DB8B3D8C638524BLL7contextQrAD08TutorialgH7ContextVSg_tF"
+    ],
+    "accessibility" : "fileprivate",
+    "kind" : "function.method.instance",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "sizeClass",
+    "attributes" : [
+      "Environment(\\.horizontalSizeClass)"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:163:53",
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir19TutorialSurfaceViewV9sizeClass33_57D27535FE56217B6DB8B3D8C638524BLL7SwiftUI017UserInterfaceSizeG0OSgvp"
+    ],
+    "accessibility" : "private"
+  },
+  {
+    "accessibility" : "private",
+    "ids" : [
+      "s:9CypherAir19TutorialSurfaceViewV19inlineHeaderContext33_57D27535FE56217B6DB8B3D8C638524BLLAA0c6InlinegH0VSgvp"
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+      "private"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/Tutorial/TutorialSurfaceView.swift:187:17",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "inlineHeaderContext"
+  },
+  {
+    "modifiers" : [
+      "private"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSandboxContainer.swift:46:17",
+    "attributes" : [
+
+    ],
+    "accessibility" : "private",
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir24TutorialSandboxContainerC22temporaryArtifactStore33_40F6127F41DDAD7B8F18BA200ED339CDLLAA012AppTemporarygH0Cvp"
+    ],
+    "name" : "temporaryArtifactStore"
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:28:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "visibleTab",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC10visibleTabAA08AppShellG0Ovp"
+    ],
+    "kind" : "var.instance",
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "hasCompletedAllModules",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC22hasCompletedAllModulesSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:47:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC23isShowingCompletionViewSbvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:63:9",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "isShowingCompletionView",
+    "kind" : "var.instance",
+    "accessibility" : "internal"
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "isShowingSandboxAcknowledgement",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC31isShowingSandboxAcknowledgementSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:67:9",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC30canFinishFromCompletionSurfaceSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:75:9",
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "canFinishFromCompletionSurface",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:240:10",
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC21dismissCompletionViewyyF"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "name" : "dismissCompletionView()"
+  },
+  {
+    "kind" : "function.method.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "name" : "setRoutePath(_:)",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:290:10",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC12setRoutePathyySayAA03AppG0OGF"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialSessionStore.swift:354:10",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir20TutorialSessionStoreC12noteGuidanceyyAA0cG7PayloadVSgF"
+    ],
+    "name" : "noteGuidance(_:)",
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir20TutorialTaskHostViewV6moduleAA0C8ModuleIDOvp"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialTaskHostView.swift:4:9",
+    "modifiers" : [
+
+    ],
+    "name" : "module",
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir20TutorialTaskHostViewV23showsCompletionFeedbackSbvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "showsCompletionFeedback",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Onboarding/TutorialTaskHostView.swift:5:9"
+  },
+  {
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir21LocalDataResetSummaryV21removedDirectoryCountSivp"
+    ],
+    "name" : "removedDirectoryCount",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Settings/LocalDataResetService.swift:7:9"
+  },
+  {
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Settings/SettingsAppearanceSection.swift:4:9",
+    "name" : "model",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir25SettingsAppearanceSectionV5modelAA0C11ScreenModelCvp"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Settings/VisionOSAppIconUnavailableView.swift:3:8",
+    "name" : "VisionOSAppIconUnavailableView",
+    "attributes" : [
+
+    ],
+    "kind" : "struct",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir30VisionOSAppIconUnavailableViewV"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir21AppShellTabDefinitionV16visibleInCompactSbvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Shell/AppShellTabs.swift:24:9",
+    "kind" : "var.instance",
+    "name" : "visibleInCompact"
+  },
+  {
+    "name" : "SharedIOSTabShellView",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "kind" : "struct",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir21SharedIOSTabShellViewV"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/App/Shell/SharedIOSTabShellView.swift:3:8"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/AppConfiguration.swift:59:10",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir16AppConfigurationC19requestContentClearyyF"
+    ],
+    "name" : "requestContentClear()"
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/AppConfiguration.swift:82:10",
+    "name" : "recordAuthentication()",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir16AppConfigurationC20recordAuthenticationyyF"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir22ContactIdentitySummaryV5notesSSSgvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactIdentitySummary.swift:11:9",
+    "name" : "notes",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir19ContactImportResultO7contactAA0C15IdentitySummaryVvp"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactImportResult.swift:13:9",
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "name" : "contact"
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir19ContactImportResultO3keyAA0C10KeySummaryVvp"
+    ],
+    "kind" : "var.instance",
+    "name" : "key",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactImportResult.swift:23:9"
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactKeySummary.swift:22:9",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "name" : "certificationArtifactIds",
+    "ids" : [
+      "s:9CypherAir17ContactKeySummaryV24certificationArtifactIdsSaySSGvp"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactKeySummary.swift:36:9",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir17ContactKeySummaryV18isOpenPGPCertifiedSbvp"
+    ],
+    "name" : "isOpenPGPCertified",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactMergePreview.swift:3:8",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir19ContactMergePreviewV"
+    ],
+    "name" : "ContactMergePreview",
+    "attributes" : [
+
+    ],
+    "kind" : "struct",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "removedContactId",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactMergeResult.swift:5:9",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir18ContactMergeResultV07removedC2IdSSvp"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir23ContactRecipientSummaryV12primaryEmailSSSgvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactRecipientSummary.swift:8:9",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "primaryEmail"
+  },
+  {
+    "kind" : "var.instance",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "requiresUnlock",
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactsAvailability.swift:30:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir20ContactsAvailabilityO14requiresUnlockSbvp"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/Contacts/ContactsAvailability.swift:40:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "blocksMutations",
+    "ids" : [
+      "s:9CypherAir20ContactsAvailabilityO15blocksMutationsSbvp"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir29DetailedSignatureVerificationV5EntryV34verificationCertificateFingerprintSSSgvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "verificationCertificateFingerprint",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/DetailedSignatureVerification.swift:17:13"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/ExportableFile.swift:10:8",
+    "kind" : "struct",
+    "ids" : [
+      "s:9CypherAir14ExportableFileV"
+    ],
+    "name" : "ExportableFile",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "recipientKeyIds",
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir26FileDecryptionPhase1ResultV15recipientKeyIdsSaySSGvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/FileDecryptionPhase1Result.swift:9:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "name" : "fingerprintAccessibilityLabel(_:)",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/IdentityPresentation.swift:25:17",
+    "kind" : "function.method.static",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir20IdentityPresentationO29fingerprintAccessibilityLabelyS2SFZ"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "name" : "formatFingerprint(_:)",
+    "accessibility" : "internal",
+    "kind" : "function.method.static",
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/PGPKeyIdentity.swift:76:17",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir14PGPKeyIdentityV17formatFingerprintyS2SFZ"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+      "static"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir21SignatureVerificationV14SignerIdentityV20formattedFingerprintSSvp"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Models/SignatureVerification.swift:28:13",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "name" : "formattedFingerprint"
+  },
+  {
+    "ids" : [
+      "s:9CypherAir23AuthLifecycleTraceStoreC14tracingEnabledSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthLifecycleTraceStore.swift:46:9",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "tracingEnabled",
+    "kind" : "var.instance",
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "name" : "canEvaluate(mode:)",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationEvaluable.swift:363:10",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "ids" : [
+      "s:9CypherAir23AuthenticationEvaluableP11canEvaluate4modeSbAA0C4ModeO_tF"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir23AuthenticationEvaluableP21isBiometricsAvailableSbvp"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationEvaluable.swift:376:9",
+    "name" : "isBiometricsAvailable",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir21AuthenticationManagerC13secureEnclave33_8C7327B022B2C5D7DCC4647ADDC465E9LLAA06SecureF10Manageable_pvp"
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "accessibility" : "private",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationManager.swift:97:17",
+    "name" : "secureEnclave",
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance"
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationManager.swift:98:17",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "keychain",
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir21AuthenticationManagerC8keychain33_8C7327B022B2C5D7DCC4647ADDC465E9LLAA18KeychainManageable_pvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "private"
+  },
+  {
+    "accessibility" : "private",
+    "modifiers" : [
+      "private"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationManager.swift:101:17",
+    "name" : "bundleStore",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir21AuthenticationManagerC11bundleStore33_8C7327B022B2C5D7DCC4647ADDC465E9LLAA09KeyBundleF0Vvp"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationManager.swift:102:17",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "migrationCoordinator",
+    "accessibility" : "private",
+    "ids" : [
+      "s:9CypherAir21AuthenticationManagerC20migrationCoordinator33_8C7327B022B2C5D7DCC4647ADDC465E9LLAA012KeyMigrationF0Vvp"
+    ],
+    "modifiers" : [
+      "private"
+    ]
+  },
+  {
+    "ids" : [
+      "s:So14NSUserDefaultsC9CypherAirE8contains33_8C7327B022B2C5D7DCC4647ADDC465E9LL3keySbSS_tF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "name" : "contains(key:)",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "private",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationManager.swift:866:10"
+  },
+  {
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationPromptCoordinator.swift:14:20",
+    "name" : "idle",
+    "kind" : "var.static",
+    "ids" : [
+      "s:9CypherAir31AuthenticationPromptCoordinatorC09OperationcD8SnapshotV4idleAEvpZ"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "ids" : [
+      "s:9CypherAir31AuthenticationPromptCoordinatorC09OperationcD8SnapshotV11lastBeganAt10Foundation4DateVSgvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationPromptCoordinator.swift:25:13",
+    "name" : "lastBeganAt"
+  },
+  {
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir31AuthenticationPromptCoordinatorC09OperationcD8SnapshotV12isInProgressSbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/AuthenticationPromptCoordinator.swift:42:13",
+    "name" : "isInProgress",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/KeyBundleStore.swift:12:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "fingerprint",
+    "ids" : [
+      "s:9CypherAir21KeyBundleWriteReceiptV11fingerprintSSvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir21KeyBundleWriteReceiptV9namespaceAA0cD9NamespaceOvp"
+    ],
+    "name" : "namespace",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/KeyBundleStore.swift:13:9"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir27KeyMigrationRecoverySummaryV18isNoActionSafeOnlySbvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/KeyMigrationCoordinator.swift:57:9",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "isNoActionSafeOnly"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/MemoryZeroingUtility.swift:31:10",
+    "ids" : [
+      "s:9CypherAir13SensitiveDataC15withUnsafeBytesyxxSWKXEKlF"
+    ],
+    "name" : "withUnsafeBytes(_:)"
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "isEmpty",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/MemoryZeroingUtility.swift:39:9",
+    "ids" : [
+      "s:9CypherAir13SensitiveDataC7isEmptySbvp"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "modifiers" : [
+      "private"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir17MockAuthenticatorC17lastEvaluatedModeAA014AuthenticationG0OSgvp"
+    ],
+    "name" : "lastEvaluatedMode",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockAuthenticator.swift:17:22"
+  },
+  {
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir17MockAuthenticatorC10lastReasonSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockAuthenticator.swift:18:22",
+    "name" : "lastReason",
+    "accessibility" : "private",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockAuthenticator.swift:20:9",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir17MockAuthenticatorC21isBiometricsAvailableSbvp"
+    ],
+    "name" : "isBiometricsAvailable"
+  },
+  {
+    "kind" : "function.method.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir17MockAuthenticatorC11canEvaluate4modeSbAA18AuthenticationModeO_tF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockAuthenticator.swift:25:10",
+    "name" : "canEvaluate(mode:)"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir17MockAuthenticatorC5resetyyF"
+    ],
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockAuthenticator.swift:54:10",
+    "name" : "reset()"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "name" : "lastSavedService",
+    "accessibility" : "private",
+    "modifiers" : [
+      "private"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:23:22",
+    "ids" : [
+      "s:9CypherAir12MockKeychainC16lastSavedServiceSSSgvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "lastDeletedService",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "private",
+    "kind" : "var.instance",
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:9CypherAir12MockKeychainC18lastDeletedServiceSSSgvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:24:22"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir12MockKeychainC5resetyyF"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:163:10",
+    "name" : "reset()",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:230:22",
+    "accessibility" : "private",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "name" : "lastLoadedIdentifier",
+    "ids" : [
+      "s:9CypherAir32MockProtectedDataRootSecretStoreC20lastLoadedIdentifierSSSgvp"
+    ],
+    "modifiers" : [
+      "private"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:308:10",
+    "attributes" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "storedPolicy(identifier:)",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir32MockProtectedDataRootSecretStoreC12storedPolicy10identifierAA024AppSessionAuthenticationJ0OSgSS_tF"
+    ]
+  },
+  {
+    "kind" : "function.method.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "reset()",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockKeychain.swift:312:10",
+    "ids" : [
+      "s:9CypherAir32MockProtectedDataRootSecretStoreC5resetyyF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "isAvailable",
+    "attributes" : [
+
+    ],
+    "kind" : "var.static",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockSecureEnclave.swift:54:16",
+    "ids" : [
+      "s:9CypherAir17MockSecureEnclaveC11isAvailableSbvpZ"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir17MockSecureEnclaveC5resetyyF"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockSecureEnclave.swift:167:10",
+    "name" : "reset()",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "name" : "keyNotFound",
+    "kind" : "enumelement",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir11MockSEErrorO11keyNotFoundyA2CmF"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/Mocks/MockSecureEnclave.swift:199:10",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir22AppSessionOrchestratorC013protectedDataD11Coordinator33_6FED1D760793ADE1AED64A04B1770D8ALLAA09ProtectedgdH0Cvp"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "name" : "protectedDataSessionCoordinator",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/AppSessionOrchestrator.swift:24:17"
+  },
+  {
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "currentRegistryProvider",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "ids" : [
+      "s:9CypherAir22AppSessionOrchestratorC23currentRegistryProvider33_6FED1D760793ADE1AED64A04B1770D8ALLAA013ProtectedDataG0VyKcvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/AppSessionOrchestrator.swift:25:17",
+    "kind" : "var.instance",
+    "modifiers" : [
+      "private"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "hasCommittedDomain()",
+    "ids" : [
+      "s:9CypherAir19ContactsDomainStoreC012hasCommittedD0SbyKF"
+    ],
+    "kind" : "function.method.instance",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ContactsDomainStore.swift:106:10",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ContactsDomainStore.swift:367:9",
+    "kind" : "var.parameter",
+    "name" : "authenticationContext",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir19ContactsDomainStoreC21continuePendingCreate5phase21authenticationContextyAA0hD5PhaseO_So9LAContextCSgtYaKF"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/KeyMetadataDomainStore.swift:513:9",
+    "accessibility" : "internal",
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir22KeyMetadataDomainStoreC21continuePendingCreate5phase21authenticationContextyAA0iE5PhaseO_So9LAContextCSgtYaKF"
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "var.parameter",
+    "name" : "authenticationContext",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/PrivateKeyControlStore.swift:368:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.parameter",
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir22PrivateKeyControlStoreC21continuePendingCreate5phase21authenticationContextyAA0I11DomainPhaseO_So9LAContextCSgtYaKF"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "name" : "authenticationContext",
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataDeviceBinding.swift:6:9",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir34ProtectedDataDeviceBindingProviderP13keyIdentifierSSvp"
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "keyIdentifier"
+  },
+  {
+    "kind" : "enum",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataDomain.swift:35:6",
+    "name" : "ProtectedDataBootstrapState",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir27ProtectedDataBootstrapStateO"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:48:17",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "private",
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir35ProtectedDataFrameworkSentinelStoreC28unlockedGenerationIdentifier33_06B4A6A266C8E9801DF1DDC577C96C63LLSiSgvp"
+    ],
+    "name" : "unlockedGenerationIdentifier",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+      "private"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir35ProtectedDataFrameworkSentinelStoreC18hasCommittedDomainSbvp"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:64:9",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "hasCommittedDomain"
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "name" : "authenticationContext",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:325:9",
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir35ProtectedDataFrameworkSentinelStoreC21continuePendingCreate5phase21authenticationContextyAA0J11DomainPhaseO_So9LAContextCSgtYaKF"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.parameter",
+    "hints" : [
+      "unused"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "name" : "authorizeSharedRight(localizedReason:)",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir31ProtectedDataSessionCoordinatorC20authorizeSharedRight15localizedReasonySS_tYaKF"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift:190:10",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance"
+  },
+  {
+    "accessibility" : "internal",
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir30ProtectedDomainRecoveryHandlerP21continuePendingCreate5phase21authenticationContextyAA0iD5PhaseO_So9LAContextCSgtYaKF"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "authenticationContext",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift:9:9",
+    "kind" : "var.parameter",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedSettingsStore.swift:59:9",
+    "name" : "ordinarySettings",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "var.instance",
+    "ids" : [
+      "s:9CypherAir22ProtectedSettingsStoreC08ordinaryD0AA0c8OrdinaryD8SnapshotVSgvp"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "kind" : "var.instance",
+    "hints" : [
+      "unused"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedSettingsStore.swift:63:9",
+    "name" : "hasCommittedDomain",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir22ProtectedSettingsStoreC18hasCommittedDomainSbvp"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "kind" : "var.parameter",
+    "hints" : [
+      "unused"
+    ],
+    "name" : "authenticationContext",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/ProtectedData/ProtectedSettingsStore.swift:687:9",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:9CypherAir22ProtectedSettingsStoreC21continuePendingCreate5phase21authenticationContextyAA0H11DomainPhaseO_So9LAContextCSgtYaKF"
+    ]
+  },
+  {
+    "modifiers" : [
+      "static"
+    ],
+    "ids" : [
+      "s:9CypherAir41SecureEnclaveCompositeHandlePublicBindingV07mldsa65G9KeyLengthSivpZ"
+    ],
+    "name" : "mldsa65PublicKeyLength",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveCompositeHandle.swift:131:16",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "var.static",
+    "accessibility" : "internal"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveCompositeHandle.swift:132:16",
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "kind" : "var.static",
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir41SecureEnclaveCompositeHandlePublicBindingV08mlkem768G9KeyLengthSivpZ"
+    ],
+    "name" : "mlkem768PublicKeyLength"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift:6:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "serviceKind",
+    "ids" : [
+      "s:9CypherAir39SecureEnclaveCustodyHandleInventoryItemV11serviceKindSSvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir39SecureEnclaveCustodyHandleInventoryItemV11isMalformedSbvp"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift:28:9",
+    "name" : "isMalformed"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir31SecureEnclaveCustodyHandleStoreV06deleteF4Pair19handleSetIdentifierySS_tKF"
+    ],
+    "name" : "deleteHandlePair(handleSetIdentifier:)",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveCustodyHandleStore.swift:413:10"
+  },
+  {
+    "ids" : [
+      "s:9CypherAir23SecureEnclaveManageableP11isAvailableSbvpZ"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "modifiers" : [
+      "static"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "var.static",
+    "name" : "isAvailable",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Security/SecureEnclaveManageable.swift:82:16"
+  },
+  {
+    "kind" : "var.instance",
+    "modifiers" : [
+      "private"
+    ],
+    "name" : "contactImportAdapter",
+    "ids" : [
+      "s:9CypherAir14ContactServiceC20contactImportAdapter022_8589C71434350A19C49C2K9ECB980B77LLAA010PGPContactfG0Cvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/ContactService.swift:7:17",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "private"
+  },
+  {
+    "kind" : "function.method.instance",
+    "name" : "certificationArtifacts(forContactId:)",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/ContactService.swift:421:10",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir14ContactServiceC22certificationArtifacts03forC2IdSayAA0C30CertificationArtifactReferenceVGSS_tF"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/ContactService.swift:522:10",
+    "name" : "refreshCertificationProjections()",
+    "kind" : "function.method.instance",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir14ContactServiceC31refreshCertificationProjectionsyyKF"
+    ]
+  },
+  {
+    "name" : "generateKeyRevocation(secretCert:)",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPCertificateOperationAdapter.swift:149:10",
+    "ids" : [
+      "s:9CypherAir30PGPCertificateOperationAdapterC21generateKeyRevocation10secretCert10Foundation4DataVAH_tYaKF"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "name" : "performGenerateKeyRevocation(engine:secretCert:)",
+    "accessibility" : "private",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPCertificateOperationAdapter.swift:276:25",
+    "modifiers" : [
+      "private",
+      "static"
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.static",
+    "attributes" : [
+      "concurrent"
+    ],
+    "ids" : [
+      "s:9CypherAir30PGPCertificateOperationAdapterC28performGenerateKeyRevocation33_E7EF1B4512B254CB1BF044B3446768AFLL6engine10secretCert10Foundation4DataVAA9PgpEngineC_AJtYaKFZ"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "modifiers" : [
+      "static"
+    ],
+    "kind" : "function.method.static",
+    "modules" : [
+      "CypherAir"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPCertificateSelectionAdapter.swift:51:17",
+    "ids" : [
+      "s:9CypherAir30PGPCertificateSelectionAdapterO014validateUserIdD0_6engine8certData19expectedFingerprintAA0ghD6OptionVAI_AA9PgpEngineC10Foundation0K0VSSSgtKFZ"
+    ],
+    "name" : "validateUserIdSelection(_:engine:certData:expectedFingerprint:)",
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir23PGPContactImportAdapterC8metadata10forKeyDataAA14PGPKeyMetadataV10Foundation0I0V_tKF"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "metadata(forKeyData:)",
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPContactImportAdapter.swift:77:10"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift:16:9",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir42PGPSecureEnclaveCompositeBindingInspectionV21eddsaSigningPublicKey10Foundation4DataVvp"
+    ],
+    "name" : "eddsaSigningPublicKey",
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "ids" : [
+      "s:9CypherAir42PGPSecureEnclaveCompositeBindingInspectionV022ecdhKeyAgreementPublicI010Foundation4DataVvp"
+    ],
+    "name" : "ecdhKeyAgreementPublicKey",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift:17:9",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir23PGPSelfTestGeneratedKeyV11fingerprintSSvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPSelfTestOperationAdapter.swift:7:9",
+    "kind" : "var.instance",
+    "name" : "fingerprint",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:9CypherAir23PGPSelfTestGeneratedKeyV7profileAA13PGPKeyProfileOvp"
+    ],
+    "name" : "profile",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/FFI/PGPSelfTestOperationAdapter.swift:9:9",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "name" : "defaultKey",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:9CypherAir15KeyCatalogStoreC07defaultC0AA14PGPKeyIdentityVSgvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagement/KeyCatalogStore.swift:14:9"
+  },
+  {
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAir"
+    ],
+    "name" : "defaults",
+    "attributes" : [
+
+    ],
+    "accessibility" : "private",
+    "ids" : [
+      "s:9CypherAir18KeyMutationServiceC8defaults33_2D0074A443BD489855793F7621A0594ALLSo14NSUserDefaultsCvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagement/KeyMutationService.swift:40:17",
+    "modifiers" : [
+      "private"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir33SecureEnclaveCompositeSignerRouteV9operationAA23PGPPrivateOperationKindOvp"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift:102:9",
+    "modules" : [
+      "CypherAir"
+    ],
+    "accessibility" : "internal",
+    "name" : "operation",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "name" : "operation",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift:131:9",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir39SecureEnclaveCompositeKeyAgreementRouteV9operationAA23PGPPrivateOperationKindOvp"
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "assignOnlyProperty"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryReport.swift:17:9",
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "s:9CypherAir48SecureEnclaveCustodyGenerationRecoveryAssessmentV21configurationIdentityAA19PGPKeyConfigurationV0J0Ovp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "configurationIdentity"
+  },
+  {
+    "kind" : "var.parameter",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAir"
+    ],
+    "ids" : [
+      "param-authenticator-init(keyAdapter:certificateAdapter:secureEnclave:keychain:authenticator:memoryInfo:defaults:authenticationPromptCoordinator:privateKeyControlStore:expiryAuthenticator:secureEnclaveCustodyOperationAuthenticator:compositeCustodyRouterContext:secureEnclaveCustodyDeletionContext:authLifecycleTraceStore:metadataPersistence:beforeAuthModeReadCheckpoint:provisioningCheckpoint:provisioningWrappingPromptCheckpoint:afterImportOffMainActorCheckpoint:afterPermanentBundleStoreCheckpoint:identityStoreCheckpoint:postProvisioningCheckpoint:commitDrainWaiterRegisteredCheckpoint:relockInvalidationCheckpoint:secureEnclaveCustodyGenerationServiceFactory:secureEnclaveCustodyRecoveryService:)-s:9CypherAir20KeyManagementServiceC10keyAdapter011certificateG013secureEnclave8keychain13authenticator10memoryInfo8defaults31authenticationPromptCoordinator07privateC12ControlStore19expiryAuthenticator0ij16CustodyOperationW009compositeX13RouterContext0ijX15DeletionContext018authLifecycleTraceU019metadataPersistence28beforeAuthModeReadCheckpoint22provisioningCheckpoint020provisioningWrappingQ10Checkpoint33afterImportOffMainActorCheckpoint020afterPermanentBundleU10Checkpoint08identityU10Checkpoint26postProvisioningCheckpoint37commitDrainWaiterRegisteredCheckpoint28relockInvalidationCheckpoint0ijx10GenerationE7Factory0ijx8RecoveryE0AcA06PGPKeyyG0C_AA014PGPCertificateyG0CAA06SecureJ10Manageable_pAA18KeychainManageable_pAA23AuthenticationEvaluable_pAA06MemoryN10Providable_pSo14NSUserDefaultsCAA014AuthenticationqR0CAA07PrivatectU8Protocol_pSo9LAContextCSo09SecAccessT3Refa_SStYaKYCcSgA16_SSYaKYCcSgAA09CompositeX13RouterContextVSgAA06SecurejX15DeletionContextVSgAA018AuthLifecycleTraceU0CSgAA0C19MetadataPersistence_pyyYaYbYCcSgA31_A31_A31_A31_A31_A31_A31_A31_AA06Securejx10GenerationE0CAA0c7CatalogU0C_AA0C28ProvisioningInvalidationGateCAA0c18ProvisioningCommitR0CtcSgAA06SecurejX29GenerationRecoveryClassifying_pSgtcfc"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/KeyManagementService.swift:48:9",
+    "name" : "authenticator",
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "name" : "inspectKeyMetadata(keyData:)",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/QRService.swift:98:10",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAir"
+    ],
+    "kind" : "function.method.instance",
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:9CypherAir9QRServiceC18inspectKeyMetadata7keyDataAA06PGPKeyF0V10Foundation0H0V_tKF"
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Sources/Services/SQLCipher/SQLCipherPreflightProbe.swift:13:10",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests23SQLCipherPreflightErrorO11closeFailedyACs5Int32V_tcACmF",
+      "s:9CypherAir23SQLCipherPreflightErrorO11closeFailedyACs5Int32V_tcACmF"
+    ],
+    "name" : "closeFailed(code:)",
+    "kind" : "enumelement",
+    "modules" : [
+      "CypherAir",
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "name" : "stdout",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests039DeviceSecureEnclaveGnuPGInteropEvidenceC0C9GpgResult33_111B3C789FF4BF64FF01870CED62EFC3LLV6stdout10Foundation4DataVvp"
+    ],
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/DeviceSecurityTests/DeviceSecureEnclaveGnuPGInteropEvidenceTests.swift:202:13"
+  },
+  {
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/AppLockControllerTests.swift:70:48",
+    "kind" : "var.parameter",
+    "name" : "source",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "param-source-postAuth(_:_:)-s:14CypherAirTests017AppLockControllerC0C3SpyC8postAuthyySo9LAContextCSg_SStYaF"
+    ]
+  },
+  {
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "private",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "ids" : [
+      "s:14CypherAirTests27TraceAppSessionOrchestrator33_EAA38A741C1A0E9307073CFCB2360A16LLa"
+    ],
+    "kind" : "typealias",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift:10:19",
+    "name" : "TraceAppSessionOrchestrator",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "accessibility" : "private",
+    "ids" : [
+      "s:14CypherAirTests23TraceProtectedDataError33_EAA38A741C1A0E9307073CFCB2360A16LLa"
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift:13:19",
+    "attributes" : [
+
+    ],
+    "kind" : "typealias",
+    "name" : "TraceProtectedDataError"
+  },
+  {
+    "kind" : "var.static",
+    "modifiers" : [
+      "static"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "name" : "isAvailable",
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests31TraceFailingUnwrapSecureEnclave33_EAA38A741C1A0E9307073CFCB2360A16LLC11isAvailableSbvpZ"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift:61:16"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "param-contactsDirectory-reopenProtectedContactService(harness:contactsDirectory:)-s:14CypherAirTests22ContactServiceTestCaseC015reopenProtecteddE07harness17contactsDirectory0aB00dE0C7service_AG19ContactsDomainStoreC5storetAG0I15DataStorageRootV07storageT0_AG0ir8RegistryP0C08registryP0AG0iO10KeyManagerC06domainxY0AG12MockKeychainC8keychain10Foundation0R0V08wrappingtX0AlMt_AZ3URLVtYaF"
+    ],
+    "kind" : "var.parameter",
+    "name" : "contactsDirectory",
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ContactServiceTestSupport.swift:77:9"
+  },
+  {
+    "name" : "contactsDirectory",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "param-contactsDirectory-makeContactsProtectedHarness(prefix:contactsDirectory:)-s:14CypherAirTests22ContactServiceTestCaseC28makeContactsProtectedHarness6prefix17contactsDirectory0aB00J15DataStorageRootV07storageQ0_AG0jO13RegistryStoreC08registryT0AG0J16DomainKeyManagerC06domainwX0AG12MockKeychainC8keychain10Foundation0O0V08wrappingqW0AG0ivT0C5storetSS_AT3URLVtKF"
+    ],
+    "kind" : "var.parameter",
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ContactServiceTestSupport.swift:237:9"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests018DecryptScreenModelC0C6config33_93FDDF90087C76DA6E0B1686A4C1EF88LL0aB016AppConfigurationCSgvp"
+    ],
+    "name" : "config",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+      "private"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/DecryptScreenModelTests.swift:26:17",
+    "accessibility" : "private"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "name" : "contactsDirectory",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/EncryptScreenModelTests.swift:1588:9",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "param-contactsDirectory-makeReopenedProtectedContactService(harness:contactsDirectory:)-s:14CypherAirTests018EncryptScreenModelC0C35makeReopenedProtectedContactService33_93764AC1B26657ED040011ADB4E56ABFLL7harness17contactsDirectory0aB00jK0C7service_AH19ContactsDomainStoreC5storetAH0I15DataStorageRootV11storageRoot_AH0iz8RegistryX0C08registryX0AH0iW10KeyManagerC16domainKeyManager10Foundation0Z0V15wrappingRootKeyAmNt_AX3URLVtYaF"
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.parameter",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "kind" : "var.parameter",
+    "name" : "contactsDirectory",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "ids" : [
+      "param-contactsDirectory-makeContactsProtectedHarness(prefix:contactsDirectory:)-s:14CypherAirTests018EncryptScreenModelC0C28makeContactsProtectedHarness33_93764AC1B26657ED040011ADB4E56ABFLL6prefix17contactsDirectory0aB00I15DataStorageRootV07storageV0_AH0iT13RegistryStoreC08registryY0AH0I16DomainKeyManagerC16domainKeyManager10Foundation0T0V08wrappingV3KeyAH0h6DomainY0C5storetSS_AR3URLVtKF"
+    ],
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/EncryptScreenModelTests.swift:1614:9",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests28PromptObservingSecureEnclaveC012sawOperationD35InProgressDuringGenerateWrappingKeySbvp"
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "name" : "sawOperationPromptInProgressDuringGenerateWrappingKey",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/KeyManagementServiceTestSupport.swift:15:9"
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.instance",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/KeyManagementServiceTestSupport.swift:21:9",
+    "ids" : [
+      "s:14CypherAirTests28PromptObservingSecureEnclaveC012sawOperationD20InProgressDuringWrapSbvp"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "sawOperationPromptInProgressDuringWrap"
+  },
+  {
+    "ids" : [
+      "s:14CypherAirTests28PromptObservingSecureEnclaveC11isAvailableSbvpZ"
+    ],
+    "kind" : "var.static",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "isAvailable",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+      "static"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/KeyManagementServiceTestSupport.swift:45:16"
+  },
+  {
+    "kind" : "var.static",
+    "modifiers" : [
+      "static"
+    ],
+    "name" : "isAvailable",
+    "ids" : [
+      "s:14CypherAirTests32BlockingReconstructSecureEnclaveC11isAvailableSbvpZ"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/KeyManagementServiceTestSupport.swift:126:16",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "kind" : "function.method.instance",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "name" : "reset()",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/MockDiskSpace.swift:30:10",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests13MockDiskSpaceC5resetyyF"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ModeSwitchOperationPromptCompositionTests.swift:30:13",
+    "ids" : [
+      "s:14CypherAirTests036ModeSwitchOperationPromptCompositionC0C05GateddE13Authenticator33_42E6B962364E8094A76542EECC952C27LLC21isBiometricsAvailableSbvp"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "isBiometricsAvailable",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "canEvaluate(mode:)",
+    "accessibility" : "internal",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ModeSwitchOperationPromptCompositionTests.swift:32:14",
+    "kind" : "function.method.instance",
+    "ids" : [
+      "s:14CypherAirTests036ModeSwitchOperationPromptCompositionC0C05GateddE13Authenticator33_42E6B962364E8094A76542EECC952C27LLC11canEvaluate4modeSb0aB0014AuthenticationD0O_tF"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "name" : "reason",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/PrivateKeyContactCertificationServiceTests.swift:567:25",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests46StubCertificationCustodyOperationAuthenticator33_F823701D1366CDEFEADB94FE904C9B96LLC12authenticateySo9LAContextCSSYaKF"
+    ],
+    "kind" : "var.parameter",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "var.parameter",
+    "name" : "reason",
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/PrivateKeyExpiryMutationServiceTests.swift:793:25",
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests39StubExpiryCustodyOperationAuthenticator33_21C52063D18D48078E678BE6386DB839LLC12authenticateySo9LAContextCSSYaKF"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "kind" : "var.parameter",
+    "name" : "reason",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests31GatedRouterCustodyAuthenticator33_DB79BAABDC0E8C40A5800497BE07BF53LLC12authenticateySo9LAContextCSSYaKF"
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/PrivateKeyOperationRouterTests.swift:1072:25",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests52StubSelectiveRevocationCustodyOperationAuthenticator33_F7EC080F81D0E9928C6675420F3CBB6BLLC12authenticateySo9LAContextCSSYaKF"
+    ],
+    "kind" : "var.parameter",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "accessibility" : "internal",
+    "name" : "reason",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/PrivateKeySelectiveRevocationServiceTests.swift:555:25",
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppG9Containera"
+    ],
+    "kind" : "typealias",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:8:11",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "name" : "ProtectedDataTestAppAppContainer"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "kind" : "typealias",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:10:11",
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "ProtectedDataTestAppAppStartupCoordinator",
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppG18StartupCoordinatora"
+    ]
+  },
+  {
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppdE14BootstrapStatea"
+    ],
+    "kind" : "typealias",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:11:11",
+    "modifiers" : [
+
+    ],
+    "name" : "ProtectedDataTestAppProtectedDataBootstrapState",
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:13:11",
+    "modifiers" : [
+
+    ],
+    "name" : "ProtectedDataTestAppProtectedDataFrameworkState",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppdE14FrameworkStatea"
+    ],
+    "attributes" : [
+
+    ],
+    "kind" : "typealias",
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:16:11",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppdE16RightIdentifiersa"
+    ],
+    "modifiers" : [
+
+    ],
+    "kind" : "typealias",
+    "name" : "ProtectedDataTestAppProtectedDataRightIdentifiers"
+  },
+  {
+    "kind" : "typealias",
+    "name" : "ProtectedDataTestAppProtectedDataPostUnlockOutcome",
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:21:11",
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppdE17PostUnlockOutcomea"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ]
+  },
+  {
+    "ids" : [
+      "s:14CypherAirTests020ProtectedDataTestAppD27OrdinarySettingsCoordinatora"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:32:11",
+    "kind" : "typealias",
+    "attributes" : [
+
+    ],
+    "name" : "ProtectedDataTestAppProtectedOrdinarySettingsCoordinator"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:34:13",
+    "kind" : "class",
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:14CypherAirTests36ProtectedDataTestMutableDateProviderC"
+    ],
+    "modifiers" : [
+      "final"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "ProtectedDataTestMutableDateProvider"
+  },
+  {
+    "name" : "SuspendingRelockParticipant",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests27SuspendingRelockParticipantC"
+    ],
+    "accessibility" : "internal",
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "class",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:129:13",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+      "final"
+    ]
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "name" : "AsyncIntegerCounter",
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:155:7",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "ids" : [
+      "s:14CypherAirTests19AsyncIntegerCounterC"
+    ],
+    "kind" : "class",
+    "hints" : [
+      "unused"
+    ],
+    "attributes" : [
+
+    ]
+  },
+  {
+    "kind" : "class",
+    "name" : "AsyncSuspensionGate",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:168:7",
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests19AsyncSuspensionGateC"
+    ]
+  },
+  {
+    "name" : "authenticationContext",
+    "kind" : "var.parameter",
+    "accessibility" : "internal",
+    "ids" : [
+      "param-authenticationContext-continuePendingCreate(phase:authenticationContext:)-s:14CypherAirTests34MockProtectedDomainRecoveryHandlerC21continuePendingCreate5phase21authenticationContexty0aB00kF5PhaseO_So9LAContextCSgtYaKF"
+    ],
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:260:9"
+  },
+  {
+    "kind" : "function.method.instance",
+    "accessibility" : "internal",
+    "name" : "loadCurrentKeyMetadataEnvelope(storageRoot:)",
+    "ids" : [
+      "s:14CypherAirTests30ProtectedDataFrameworkTestCaseC30loadCurrentKeyMetadataEnvelope11storageRoot0aB00d6DomainM0VAF0de7StorageO0V_tKF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:509:10",
+    "modifiers" : [
+
+    ]
+  },
+  {
+    "modifiers" : [
+      "private"
+    ],
+    "accessibility" : "private",
+    "hints" : [
+      "unused"
+    ],
+    "ids" : [
+      "s:14CypherAirTests37AppProtectedDataStorageValidationMode33_5EADB696E7AE3067D08932D5C9E8C99ELLa"
+    ],
+    "attributes" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "kind" : "typealias",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/ProtectedDataStorageRootTests.swift:8:19",
+    "name" : "AppProtectedDataStorageValidationMode"
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "kind" : "var.parameter",
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests36SessionObservingCustodyAuthenticator33_500549E336BAC436431509A51A1605ACLLC12authenticateySo9LAContextCSSYaYbKF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/SecureEnclaveCustodyGenerationPromptCompositionTests.swift:205:35",
+    "name" : "reason",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/SecureEnclaveCustodyGenerationPromptCompositionTests.swift:230:35",
+    "kind" : "var.parameter",
+    "attributes" : [
+
+    ],
+    "modifiers" : [
+
+    ],
+    "name" : "reason",
+    "hints" : [
+      "unused"
+    ],
+    "accessibility" : "internal",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "ids" : [
+      "param-reason-authenticate(_:)-s:14CypherAirTests25GatedCustodyAuthenticator33_500549E336BAC436431509A51A1605ACLLC12authenticateySo9LAContextCSSYaYbKF"
+    ]
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "kind" : "var.parameter",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:105:9",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "param-engine-makeContactsDomainStore(engine:contactsDirectory:wrappingRootKey:)-s:14CypherAirTests11TestHelpersO23makeContactsDomainStore6engine17contactsDirectory15wrappingRootKey0aB00ghI0CAH9PgpEngineC_10Foundation3URLVAM4DataVtKFZ"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "name" : "engine"
+  },
+  {
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:377:13",
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "attributes" : [
+
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests11TestHelpersO12ServiceStackV14messageAdapter0aB0019PGPMessageOperationI0Cvp"
+    ],
+    "name" : "messageAdapter",
+    "kind" : "var.instance"
+  },
+  {
+    "kind" : "var.instance",
+    "modifiers" : [
+
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:383:13",
+    "ids" : [
+      "s:14CypherAirTests11TestHelpersO12ServiceStackV24passwordMessageEncryptor0aB008PasswordI10Encrypting_pvp"
+    ],
+    "name" : "passwordMessageEncryptor",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ]
+  },
+  {
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests11TestHelpersO12ServiceStackV18detachedFileSigner0aB008DetachedI7Signing_pvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "attributes" : [
+
+    ],
+    "name" : "detachedFileSigner",
+    "kind" : "var.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:384:13",
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ]
+  },
+  {
+    "kind" : "var.instance",
+    "attributes" : [
+
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "name" : "selfTestService",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "accessibility" : "internal",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:390:13",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests11TestHelpersO12ServiceStackV04selfdF00aB004SelfdF0Cvp"
+    ]
+  },
+  {
+    "name" : "mockAuth",
+    "modifiers" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests11TestHelpersO12ServiceStackV8mockAuth0aB017MockAuthenticatorCvp"
+    ],
+    "hints" : [
+      "assignOnlyProperty"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TestHelpers.swift:393:13",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "accessibility" : "internal",
+    "attributes" : [
+
+    ],
+    "kind" : "var.instance"
+  },
+  {
+    "modifiers" : [
+
+    ],
+    "kind" : "var.parameter",
+    "attributes" : [
+
+    ],
+    "name" : "container",
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "accessibility" : "internal",
+    "ids" : [
+      "param-container-open(_:)-s:14CypherAirTests24TutorialContactsOpenGate33_0DE073810F17FEACE45A7E08FEEE7C62LLC4openyy0aB00D16SandboxContainerCYaKF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/ServiceTests/TutorialSessionStoreTests.swift:12:17"
+  },
+  {
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "modifiers" : [
+
+    ],
+    "accessibility" : "internal",
+    "name" : "reset()",
+    "attributes" : [
+
+    ],
+    "ids" : [
+      "s:14CypherAirTests14MockMemoryInfoC5resetyyF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "kind" : "function.method.instance",
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/Support/SecurityMocks/MockMemoryInfo.swift:24:10"
+  },
+  {
+    "attributes" : [
+
+    ],
+    "kind" : "function.method.instance",
+    "accessibility" : "internal",
+    "ids" : [
+      "s:14CypherAirTests32MockSecureEnclaveCustodyKeyStoreC31containsMalformedApplicationTagySbSSF"
+    ],
+    "hints" : [
+      "unused"
+    ],
+    "modifiers" : [
+
+    ],
+    "modules" : [
+      "CypherAirTests"
+    ],
+    "location" : "/Users/tianren/coding/cypherair-main/Tests/Support/SecurityMocks/MockSecureEnclaveCustodyKeyStore.swift:126:10",
+    "name" : "containsMalformedApplicationTag(_:)"
+  }
+]

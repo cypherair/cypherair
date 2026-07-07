@@ -1,0 +1,1171 @@
+{
+ "App": [
+  {
+   "file": "Sources/App/AppContainer.swift",
+   "symbol": "protectedDataRegistryStore",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/AppContainer.swift",
+   "symbol": "passwordMessageService",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/AppContainer.swift",
+   "symbol": "protectedDataPostUnlockCoordinator",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/AppContainer.swift",
+   "symbol": "secureEnclave (AppContainer property)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/AppStartupCoordinator.swift",
+   "symbol": "Result",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/AppStartupCoordinator.swift",
+   "symbol": "performStartup(using:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Common/OutputHandling.swift",
+   "symbol": "backup (OutputArtifactKind.backup)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Contacts/AddContactQRPhotoSelection.swift",
+   "symbol": "identifier",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Contacts/AddContactView.swift",
+   "symbol": "importWorkflow (AddContactScreenHostView)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift",
+   "symbol": "certificateSignatureService (ContactCertificateSignaturesScreenModel)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
+   "symbol": "initialKeyId (ContactCertificationDetailsScreenModel)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
+   "symbol": "certificateSignatureService (ContactCertificationDetailsScreenModel)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift",
+   "symbol": "intent",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactCertificationDetailsView.swift",
+   "symbol": "intent",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactsAvailability+Presentation.swift",
+   "symbol": "unavailableSystemImage",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactsScreenModel.swift",
+   "symbol": "isTagFilterSelected(_:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Contacts/ContactsScreenModel.swift",
+   "symbol": "selectedTagFilters",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Contacts/Import/PublicKeyImportLoader.swift",
+   "symbol": "loadFromQRPhoto(_:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Contacts/ImportConfirmationCoordinator.swift",
+   "symbol": "keyData (ImportConfirmationRequest)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Decrypt/DecryptScreenModel.swift",
+   "symbol": "decryptedFileURL",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Decrypt/DecryptScreenModel.swift",
+   "symbol": "decryptedText",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/DesignSystem/CypherLayout.swift",
+   "symbol": "CypherSpacing.loose",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Encrypt/EncryptScreenModel.swift",
+   "symbol": "isRecipientTagFilterSelected(_:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Keys/KeyGenerationScreenModel.swift",
+   "symbol": "dismissDetails()",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/OnboardingView.swift",
+   "symbol": "View.if(_:transform:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/OnboardingView.swift",
+   "symbol": "presentationContext",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSecuritySimulationStack",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialArtifacts.backupArmoredKey",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSecuritySimulationStack.authManager",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSessionState.currentGuidance",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSecuritySimulationStack.mockAuthenticator",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialGuidancePayload.module",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialArtifacts.authMode",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "launchOrigin",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSecuritySimulationStack.mockKeychain",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSessionState.isWorkspacePresented",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialArtifacts.decryptedVerification",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialGuidancePayload.state",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSecuritySimulationStack.mockSecureEnclave",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialArtifacts.decryptedMessage",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialModels.swift",
+   "symbol": "TutorialSessionState.specVersion",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/Tutorial/TutorialRouteDestinationView.swift",
+   "symbol": "sizeClass",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSandboxContainer.swift",
+   "symbol": "TutorialSandboxContainer.securitySimulationStack",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSandboxContainer.swift",
+   "symbol": "temporaryArtifactStore",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "setRoutePath(_:)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "visibleTab",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "noteGuidance(_:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "dismissCompletionView()",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "isShowingCompletionView",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "hasCompletedAllModules",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "isShowingSandboxAcknowledgement",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialSessionStore.swift",
+   "symbol": "canFinishFromCompletionSurface",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialTaskHostView.swift",
+   "symbol": "TutorialTaskHostView.showsCompletionFeedback",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Onboarding/TutorialTaskHostView.swift",
+   "symbol": "TutorialTaskHostView.module",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Settings/AuthMode/AuthModeChangeConfirmation.swift",
+   "symbol": "AuthModeChangeConfirmationRequest.pendingMode",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Settings/LocalDataResetRestartCoordinator.swift",
+   "symbol": "LocalDataResetRestartCoordinator.resetSummary",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Settings/LocalDataResetService.swift",
+   "symbol": "LocalDataResetError.failures",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Settings/LocalDataResetService.swift",
+   "symbol": "removedDirectoryCount (LocalDataResetSummary property)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/App/Settings/SourceComplianceInfo.swift",
+   "symbol": "SourceComplianceInfo.isStableReleaseBuild",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/App/Shell/AppShellTabs.swift",
+   "symbol": "AppShellTabDefinition.visibleInCompact",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/App/Shell/MacShellNavigationState.swift",
+   "symbol": "visibleRouteByTab",
+   "sources": "E"
+  }
+ ],
+ "Services": [
+  {
+   "file": "Sources/Services/CertificateSignatureService.swift",
+   "symbol": "ContactCertificationArtifactValidation.canSave",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/CertificateSignatureService.swift",
+   "symbol": "CertificateSignatureService.resolveSignerIdentity(primaryFingerprint:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.refreshCertificationProjections()",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.currentContactsDomainSnapshot()",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.removeContact(fingerprint:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.availableContactKeyRecord(contactId:preferredKeyId:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "contactImportAdapter (var.instance)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.contactsDomainRuntimeStateIsClearedForTests",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "ContactService.updateCertificationArtifactValidation(artifactId:status:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/ContactService.swift",
+   "symbol": "certificationArtifacts(forContactId:) (method)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/ContactsPostAuthGateDecision.swift",
+   "symbol": "ContactsPostAuthGateDecision.clearsRuntime",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/DecryptionService.swift",
+   "symbol": "DecryptionService.decryptMessageDetailed(ciphertext:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
+   "symbol": "performGenerateKeyRevocation(engine:secretCert:) (static method)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPCertificateOperationAdapter.swift",
+   "symbol": "generateKeyRevocation(secretCert:) (instance method on PGPCertificateOperationAdapter)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPCertificateSelectionAdapter.swift",
+   "symbol": "validateUserIdSelection(_:engine:certData:expectedFingerprint:) (static overload)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPContactImportAdapter.swift",
+   "symbol": "metadata(forKeyData:) (instance method on PGPContactImportAdapter)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift",
+   "symbol": "PGPSecureEnclaveCompositeBindingInspection.ecdhKeyAgreementPublicKey",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift",
+   "symbol": "PGPSecureEnclaveCompositeBindingInspection.eddsaSigningPublicKey",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
+   "symbol": "PGPSelfTestGeneratedKey.fingerprint",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
+   "symbol": "PGPSelfTestGeneratedKey.revocationCert",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/FFI/PGPSelfTestOperationAdapter.swift",
+   "symbol": "PGPSelfTestGeneratedKey.profile",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/KeyManagement/KeyCatalogStore.swift",
+   "symbol": "defaultKey (var.instance on KeyCatalogStore)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/KeyManagement/KeyMutationService.swift",
+   "symbol": "defaults (var.instance on KeyMutationService)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift",
+   "symbol": "operation (var.instance on SecureEnclaveCompositeKeyAgreementRoute)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryReport.swift",
+   "symbol": "configurationIdentity (var.instance on SecureEnclaveCustodyGenerationRecoveryAssessment)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/KeyManagementService.swift",
+   "symbol": "KeyManagementService.unwrapPrivateKey(fingerprint:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/KeyManagementService.swift",
+   "symbol": "authenticator (var.parameter of KeyManagementService.init)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/KeyManagementService.swift",
+   "symbol": "KeyManagementService.exportKey(fingerprint:passphrase:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/PasswordMessageService.swift",
+   "symbol": "PasswordMessageService.decryptMessageDetailed(ciphertext:password:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/PasswordMessageService.swift",
+   "symbol": "PasswordMessageService.encryptBinary(_:password:format:signWithFingerprint:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/PasswordMessageService.swift",
+   "symbol": "PasswordMessageService.encryptText(_:password:format:signWithFingerprint:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Services/QRService.swift",
+   "symbol": "QRService.inspectKeyMetadata(keyData:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Services/SQLCipher/SQLCipherPreflightProbe.swift",
+   "symbol": "closeFailed(code:) (enum case on SQLCipherPreflightError)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Services/SQLCipher/SQLCipherPreflightProbe.swift",
+   "symbol": "SQLCipherPreflightProbe.run(in:)",
+   "sources": "E"
+  }
+ ],
+ "Security": [
+  {
+   "file": "Sources/Security/AuthLifecycleTraceStore.swift",
+   "symbol": "AuthLifecycleTraceStore.tracingEnabled",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/AuthLifecycleTraceStore.swift",
+   "symbol": "AuthLifecycleTraceStore.recentEntries",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/AuthenticationEvaluable.swift",
+   "symbol": "canEvaluate(mode:) [protocol requirement]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationEvaluable.swift",
+   "symbol": "isBiometricsAvailable [protocol requirement]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "keychain",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "AuthenticationManager.createAccessControl(for:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "secureEnclave",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "bundleStore",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "UserDefaults.contains(key:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/AuthenticationManager.swift",
+   "symbol": "migrationCoordinator",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationPromptCoordinator.swift",
+   "symbol": "idle [static]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationPromptCoordinator.swift",
+   "symbol": "isInProgress",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationPromptCoordinator.swift",
+   "symbol": "AuthenticationPromptCoordinator.operationAuthenticationPromptSnapshot",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/AuthenticationPromptCoordinator.swift",
+   "symbol": "lastBeganAt",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/AuthenticationPromptCoordinator.swift",
+   "symbol": "AuthenticationPromptCoordinator.operationPromptAttemptGeneration",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/KeyBundleStore.swift",
+   "symbol": "namespace",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/KeyBundleStore.swift",
+   "symbol": "fingerprint",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/KeyMigrationCoordinator.swift",
+   "symbol": "KeyMigrationRecoverySummary.isNoActionSafeOnly",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/KeychainManageable.swift",
+   "symbol": "KeychainManageable.update(_:service:account:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/KeychainManageable.swift",
+   "symbol": "KeychainManageable.listItems(servicePrefix:account:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/MemoryZeroingUtility.swift",
+   "symbol": "withUnsafeBytes(_:)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/MemoryZeroingUtility.swift",
+   "symbol": "SensitiveData",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/MemoryZeroingUtility.swift",
+   "symbol": "isEmpty",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "MockAuthenticator.reset()",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "canEvaluate(mode:) [mock witness]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "MockAuthenticator.lastReason",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "isBiometricsAvailable [mock witness]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "MockAuthenticator.lastEvaluatedMode",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockAuthenticator.swift",
+   "symbol": "MockAuthenticator.evaluateCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.existsCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockKeychain.loadError",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockKeychain.lastDeletedService",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.lastLoadedIdentifier",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.storedPolicy(identifier:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.deleteCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockKeychain.listItemsError",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.reprotectError",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.saveCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.deleteError",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockKeychain.loadCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.reset()",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.saveError",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockKeychain.lastSavedService",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockKeychain.swift",
+   "symbol": "MockProtectedDataRootSecretStore.reprotectCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockSecureEnclave.swift",
+   "symbol": "keyNotFound [enum case]",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockSecureEnclave.swift",
+   "symbol": "MockSecureEnclave.deleteCallCount",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/Mocks/MockSecureEnclave.swift",
+   "symbol": "MockSecureEnclave.reset()",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/AppSessionOrchestrator.swift",
+   "symbol": "protectedDataSessionCoordinator (var.instance)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/AppSessionOrchestrator.swift",
+   "symbol": "currentRegistryProvider (var.instance)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ContactsDomainStore.swift",
+   "symbol": "authenticationContext (parameter, ContactsDomainStore.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ContactsDomainStore.swift",
+   "symbol": "hasCommittedDomain() [func]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/KeyMetadataDomainStore.swift",
+   "symbol": "authenticationContext (parameter, KeyMetadataDomainStore.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/PrivateKeyControlStore.swift",
+   "symbol": "authenticationContext (parameter, PrivateKeyControlStore.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataDeviceBinding.swift",
+   "symbol": "keyIdentifier (protocol requirement, ProtectedDataDeviceBindingProvider)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataDomain.swift",
+   "symbol": "ProtectedDataError.registryMissingWithArtifacts [case]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataDomain.swift",
+   "symbol": "ProtectedDataBootstrapState [enum]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataDomain.swift",
+   "symbol": "ProtectedDataError.restartRequired [case]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift",
+   "symbol": "unlockedGenerationIdentifier (var.instance)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift",
+   "symbol": "authenticationContext (parameter, ProtectedDataFrameworkSentinelStore.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift",
+   "symbol": "hasCommittedDomain [property]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift",
+   "symbol": "authorizeSharedRight(localizedReason:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift",
+   "symbol": "authenticationContext (protocol requirement parameter, ProtectedDomainRecoveryHandler.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+   "symbol": "ordinarySettings [property]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+   "symbol": "authenticationContext (parameter, ProtectedSettingsStore.continuePendingCreate)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/ProtectedData/ProtectedSettingsStore.swift",
+   "symbol": "hasCommittedDomain [property]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCompositeHandle.swift",
+   "symbol": "SecureEnclaveCompositeHandlePublicBinding.mlkem768PublicKeyLength",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCompositeHandle.swift",
+   "symbol": "SecureEnclaveCompositeHandlePublicBinding.mldsa65PublicKeyLength",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift",
+   "symbol": "serviceKind (var.instance, SecureEnclaveCustodyHandleInventoryItem)",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift",
+   "symbol": "SecureEnclaveCustodyHandleInventoryItem.isMalformed",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCustodyHandleStore.swift",
+   "symbol": "SecureEnclaveCustodyHandleStore.deleteHandlePair(handleSetIdentifier:)",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCustodyHandleStore.swift",
+   "symbol": "SecureEnclaveCustodyHandleStore.loadKeyAgreementHandle(signingPublicKeyX963:keyAgreementPublicKeyX963:authenticationContext:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveCustodyHandleStore.swift",
+   "symbol": "SecureEnclaveCustodyHandleStore.loadSigningHandle(signingPublicKeyX963:keyAgreementPublicKeyX963:authenticationContext:)",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Security/SecureEnclaveManageable.swift",
+   "symbol": "isAvailable (protocol static requirement, SecureEnclaveManageable)",
+   "sources": "P"
+  }
+ ],
+ "Models": [
+  {
+   "file": "Sources/Models/AppConfiguration.swift",
+   "symbol": "contentClearGeneration [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/AppConfiguration.swift",
+   "symbol": "requestContentClear() [func]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/AppConfiguration.swift",
+   "symbol": "lastAuthenticationDate [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/AppConfiguration.swift",
+   "symbol": "recordAuthentication() [func]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/CertificateSignatureSignerIdentity.swift",
+   "symbol": "shortKeyId [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactIdentitySummary.swift",
+   "symbol": "ContactIdentitySummary.notes",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactImportResult.swift",
+   "symbol": "key",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactImportResult.swift",
+   "symbol": "contact",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactKeySummary.swift",
+   "symbol": "ContactKeySummary.certificationArtifactIds",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactKeySummary.swift",
+   "symbol": "isOpenPGPCertified",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactMergePreview.swift",
+   "symbol": "id",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactMergePreview.swift",
+   "symbol": "ContactMergePreview",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactMergePreview.swift",
+   "symbol": "source",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactMergePreview.swift",
+   "symbol": "target",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactMergeResult.swift",
+   "symbol": "ContactMergeResult.removedContactId",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactRecipientSummary.swift",
+   "symbol": "ContactRecipientSummary.primaryEmail",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactsAvailability.swift",
+   "symbol": "requiresUnlock",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/Contacts/ContactsAvailability.swift",
+   "symbol": "blocksMutations",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/DetailedSignatureVerification.swift",
+   "symbol": "Entry.init(status:signerPrimaryFingerprint:signerIdentity:) [func]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/DetailedSignatureVerification.swift",
+   "symbol": "DetailedSignatureVerification.Entry.verificationCertificateFingerprint",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/ExportableFile.swift",
+   "symbol": "url [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/ExportableFile.swift",
+   "symbol": "transferRepresentation [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/ExportableFile.swift",
+   "symbol": "ExportableFile [type]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/FileDecryptionPhase1Result.swift",
+   "symbol": "FileDecryptionPhase1Result.recipientKeyIds",
+   "sources": "P"
+  },
+  {
+   "file": "Sources/Models/IdentityPresentation.swift",
+   "symbol": "fingerprintAccessibilityLabel(_:) [func]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/PGPKeyIdentity.swift",
+   "symbol": "formattedFingerprint [property]",
+   "sources": "E"
+  },
+  {
+   "file": "Sources/Models/PGPKeyIdentity.swift",
+   "symbol": "formatFingerprint(_:) [func]",
+   "sources": "EP"
+  },
+  {
+   "file": "Sources/Models/SignatureVerification.swift",
+   "symbol": "SignerIdentity.formattedFingerprint [property]",
+   "sources": "EP"
+  }
+ ],
+ "Tests": [
+  {
+   "file": "Tests/DeviceSecurityTests/DeviceSecureEnclaveGnuPGInteropEvidenceTests.swift",
+   "symbol": "stdout",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/AppLockControllerTests.swift",
+   "symbol": "source",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift",
+   "symbol": "TraceProtectedDataError",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift",
+   "symbol": "TraceAppSessionOrchestrator",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ContactServiceTestSupport.swift",
+   "symbol": "contactsDirectory",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/DecryptScreenModelTests.swift",
+   "symbol": "config",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/EncryptScreenModelTests.swift",
+   "symbol": "contactsDirectory",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/KeyManagementServiceTestSupport.swift",
+   "symbol": "sawOperationPromptInProgressDuringWrap",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/KeyManagementServiceTestSupport.swift",
+   "symbol": "sawOperationPromptInProgressDuringGenerateWrappingKey",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/MockDiskSpace.swift",
+   "symbol": "reset()",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppProtectedDataRightIdentifiers",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "AsyncSuspensionGate",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppProtectedDataFrameworkState",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "AsyncIntegerCounter",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestMutableDateProvider",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppAppStartupCoordinator",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppProtectedOrdinarySettingsCoordinator",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "SuspendingRelockParticipant",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppAppContainer",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppProtectedDataPostUnlockOutcome",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "loadCurrentKeyMetadataEnvelope(storageRoot:)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift",
+   "symbol": "ProtectedDataTestAppProtectedDataBootstrapState",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/ProtectedDataStorageRootTests.swift",
+   "symbol": "AppProtectedDataStorageValidationMode",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "detachedFileSigner (ServiceStack property)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "selfTestService (ServiceStack property)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "mockAuth (ServiceStack property)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "engine (param of makeContactsDomainStore)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "passwordMessageEncryptor (ServiceStack property)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TestHelpers.swift",
+   "symbol": "messageAdapter (ServiceStack property)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/ServiceTests/TutorialSessionStoreTests.swift",
+   "symbol": "container (param of TutorialContactsOpenGate.open)",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/Support/SecurityMocks/MockMemoryInfo.swift",
+   "symbol": "MockMemoryInfo.reset()",
+   "sources": "P"
+  },
+  {
+   "file": "Tests/Support/SecurityMocks/MockSecureEnclaveCustodyKeyStore.swift",
+   "symbol": "containsMalformedApplicationTag(_:)",
+   "sources": "P"
+  }
+ ],
+ "Other": [
+  {
+   "file": "Sources/Extensions/Data+Zeroing.swift",
+   "symbol": "zeroize (Array where Element == UInt8)",
+   "sources": "E"
+  }
+ ],
+ "Rust": [
+  {
+   "file": "pgp-mobile/src/lib.rs",
+   "symbol": "get_key_version",
+   "sources": "E"
+  },
+  {
+   "file": "pgp-mobile/src/lib.rs",
+   "symbol": "parse_revocation_cert",
+   "sources": "E"
+  }
+ ]
+}

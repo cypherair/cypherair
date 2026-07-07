@@ -1,0 +1,651 @@
+# CypherAir X — WF1 Map & Triage Inventory
+_Workflow 1 of 2 (runId wf_eb889cb0-7e7). Read-only map. Findings here are candidates for the WF2 deep pass and for remediation PRs; nothing was changed._
+
+## Executive summary
+
+- **Files mapped:** 414 (Swift + Rust src). Oversized (doing several jobs): **18**; watch: 53.
+- **Dead code (two independent floors):** enumeration → 141 dead-confirmed / 19 removal-candidate / 30 live; periphery → 150 dead-confirmed / 38 live. Keying differs between the two lists (names vs name:line) so the unique union needs a dedup pass — order of ~150–290 removable declarations.
+- **Vestigial migration/capability (behaviorally verified):** **12 REMOVE**, 3 kept-live. Modest surface, precisely located — includes leftover scaffolding from the completed contacts-SQLCipher / wrapped-DMK series.
+- **FFI-shape leaks collected:** 11 (9 likely-real) → WF2 verifies.
+- **Tests:** 211 files — 196 real-guard, 10 mixed, 4 vacuous, 1 source-audit. The suite is mostly healthy; only ~15 files have prunable content (the 'tons of dead tests' concern is small).
+- **Docs:** 26 confirmed-stale claims — dominated by pre-#591 'six families' + Profile A/B naming.
+- **Smells:** 221 (124 duplication, 14 boundary-leak, 9 god-object, 3 layering-violation, …). **82 cross-cutting notes** — strongly confirm nine-key-family copy-paste.
+- **Crypto touchpoints for WF2 security pass:** 163 (custody-heavy).
+
+### Known gaps / caveats
+- `periphery:2` agent failed mid-stream → **30 app-area periphery findings unadjudicated** (raw list in /tmp/periphery.chunk02.txt). Fill via resume or fold into WF2.
+- Dead-code enumeration vs periphery use different keys → union not yet deduped (done in WF2/report).
+- Completeness check flagged App/Common (zero dead-code yield); spot-verified as **credible** (shared View-extension helpers, all referenced).
+
+
+## Oversized files (candidate decompositions)
+
+- **1535** `Sources/App/AppContainer.swift` — Three distinguishable jobs bolted into one type: (1) production dependency wiring, (2) a parallel ~230-line UI-test composition root with its own sandboxed prot
+- **1245** `Sources/Security/ProtectedData/ContactsSQLCipherDatabase.swift` — Bundles three separable layers: (1) DB lifecycle + raw-key application + PRAGMA/runtime validation, (2) schema DDL + snapshot CRUD (insert*/load* for identities
+- **1007** `pgp-mobile/src/streaming.rs` — Bundles four distinct crypto operations (file encrypt, file decrypt, detached file sign, detached file verify) that are already split into separate files at the
+- **943** `Sources/Services/ContactSnapshotMutator.swift` — Several distinct jobs sharing only 'mutates ContactsDomainSnapshot and returns a Mutation<T>': (1) contact/key CRUD + merge (~200 lines), (2) key-usage-state no
+- **919** `Sources/App/Encrypt/EncryptScreenModel.swift` — Bundles several genuinely separable jobs into one type: (1) recipient selection + tag-filter state machine, (2) encrypt-to-self/signer/config-sync lifecycle, (3
+- **912** `Sources/Services/ContactService.swift` — Cohesive around one piece of state (runtimeSnapshot + contactsAvailability) but the façade layers four responsibilities: (a) protected-data lifecycle/gate/rollb
+- **830** `Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift` — Three loosely related jobs share one 830-line/116-declaration model — (1) certify-and-save, (2) import-and-verify an externally produced signature, (3) saved-hi
+- **803** `Sources/Security/ProtectedData/ProtectedSettingsStore.swift` — Does at least three separable jobs: (1) the generic per-domain envelope store shape shared with its four siblings, (2) the app-wide "is this the first-ever prot
+- **731** `Sources/App/CypherAirApp.swift` — Several distinct jobs live in one struct: (a) App/Scene definition and window commands, (b) a ~140-line inline closure-graph in init() that is itself a second c
+- **673** `Sources/App/Onboarding/TutorialSessionStore.swift` — Two distinct jobs bundled in one type: (1) the core session/navigation/modal FSM used in production, and (2) three #if DEBUG UI-test-priming methods that constr
+- **646** `Sources/App/Decrypt/DecryptScreenModel.swift` — Bundles the core two-phase decrypt orchestration (phase1 parse + phase2 decrypt, ×text/file) with a distinct, separable sub-feature: file-import inspection/clas
+- **602** `Sources/Services/KeyManagement/KeyMutationService.swift` — Four genuinely separate jobs bundled under one 'mutation' umbrella — modify-expiry (routing + software rewrap + SE/composite delegation, ~260 loc), deletion (ke
+- **545** `Sources/Security/SecureEnclaveCustodyHandleStore.swift` — One struct, five distinguishable responsibilities (create, inspect/classify, locate-by-scan, recovery reporting, delete+partial-reconciliation). The partial-han
+- **531** `Sources/App/Settings/SettingsScreenModel.swift` — Genuinely several unrelated jobs bundled behind one ScreenModel: (1) auth-mode switch confirmation/execution, (2) app-access-policy switch, (3) protected-settin
+- **519** `Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift` — Two distinct generation workflows (single-key vs composite/split-custody) sharing only the outer catalogStore/commitCoordinator plumbing, each with a full autho
+- **390** `Sources/Security/AuthenticationEvaluable.swift` — Three largely independent concerns share one file under a name that only describes one of them: (1) AppSessionAuthenticationPolicy/Result/FailureReason (lock-sc
+- **339** `Sources/App/Onboarding/Tutorial/TutorialModels.swift` — Several unrelated jobs share one file: module catalog data (TutorialModuleID), two FSM state structs (TutorialSessionState/TutorialNavigationState), a route-blo
+- **327** `Sources/Security/Mocks/MockKeychain.swift` — MockKeychain and MockProtectedDataRootSecretStore satisfy two different production protocols for two different subsystems (generic Keychain rows vs. the Protect
+
+## Vestigial migration/capability — REMOVE (behavioral proof verified)
+
+- `Sources/Security/KeyMigrationCoordinator.swift` — KeyMigrationCoordinator.recoveryAction(for:) — the KeyBundleState.partial arms ((.complete,.partial) L104, (.partial,.complete) L108, and the (.partial,.missing)/(.partial,.partial)/(.missing,.partial) alternatives L110-112)
+  - rationale: speculative-forward-compat-scaffold; proof: The only constructor of KeyBundleState anywhere is KeyBundleStore.bundleState() (KeyBundleStore.swift:149-159), which returns `exists ? .complete : .missing` from a single keychain.exists boolean. .partial has no produce
+- `Sources/Security/PrivateKeyRewrapRecoveryCoordinator.swift` — PrivateKeyRewrapRecoveryCoordinator.recoverCommitRequiredRewrapMigration(for:) — the KeyBundleState.partial arms ((.partial,.complete) L87, the whole (.complete,.partial)→.retryableFailure arm L101, and the (.partial,.missing)/(.partial,.partial)/(.missing,.partial) alternatives L103-105)
+  - rationale: speculative-forward-compat-scaffold; proof: Same sole producer as candidate 1: KeyBundleStore.bundleState() (KeyBundleStore.swift:149-159) never returns .partial. This switch is evaluated only when journal.rewrapPhase == .commitRequired, but the (permanent,pending
+- `Sources/Services/KeyManagement/KeyMutationService.swift` — KeyMutationService.checkAndRecoverFromInterruptedModifyExpiry() — the `guard let fingerprint = entry.fingerprint, !fingerprint.isEmpty else { clearModifyExpiryJournal(); return .unrecoverable }` nil/empty branch (L544-548)
+  - rationale: speculative-forward-compat-scaffold; proof: entry = privateKeyControlStore.recoveryJournal().modifyExpiry, of type ModifyExpiryRecoveryEntry (AuthenticationEvaluable.swift:150-152). The only writer of its fingerprint field is ModifyExpiryRecoveryEntry(fingerprint:
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — validateBootstrapMetadata() — `metadata.expectedCurrentGenerationIdentifier == nil` guard (line 297)
+  - rationale: obsolete-handles-past-data; proof: The guard fires only if the Contacts-domain bootstrap plist holds a non-nil expectedCurrentGenerationIdentifier. Bootstrap metadata is strictly per-domain: ProtectedDomainBootstrapStore.loadMetadata/saveMetadata key off 
+  - co-remove tests: ['ContactServiceProtectedDomainTests.test_contactsLegacyBootstrapGenerationRequiresRecovery (Tests/ServiceTests/ContactServiceProtectedDomainTests.swift:701 — injects expectedCurrentGenerationIdentifier: "1" into Contacts metadata purely to assert this guard; re-encodes the dead concept, delete with the guard)']
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — validateBootstrapMetadata() — `metadata.coarseRecoveryReason == nil` guard (line 302)
+  - rationale: speculative-forward-compat-scaffold; proof: coarseRecoveryReason is never written non-nil by any code path in the repository. grep over every ProtectedDomainBootstrapMetadata(...) construction across all five domain stores (Contacts, KeyMetadata, PrivateKeyControl
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — deleteDomainArtifacts() — removeItemIfPresent for stagedWrappedDomainMasterKeyURL / committedWrappedDomainMasterKeyURL (lines 327-332)
+  - rationale: obsolete-handles-past-data; proof: These two removeItemIfPresent calls only do work if a file exists at storageRoot.stagedWrappedDomainMasterKeyURL(.contacts) or committedWrappedDomainMasterKeyURL(.contacts). No current code writes those file URLs for any
+  - co-remove tests: ['ContactServiceProtectedDomainTests.test_contactsLegacyFileBackedWrappedDomainMasterKeyIsNotFallback (Tests/ServiceTests/ContactServiceProtectedDomainTests.swift:405 — writes a legacy record to committedWrappedDomainMasterKeyURL to assert it is ignored; legacy-characterizing, delete only if cascading the storageRoot method removal)', 'ProtectedDataDomainKeyKeychainStoreTests.test_legacyFileBackedWrappedDomainMasterKeyIsIgnored (Tests/ServiceTests/ProtectedDataDomainKeyKeychainStoreTests.swift:132 — same legacy file-fallback characterization, only reason committedWrappedDomainMasterKeyURL would still be referenced after cascade)']
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — ContactsDomainStore.validateBootstrapMetadata() — `expectedCurrentGenerationIdentifier == nil` guard (lines 297-301)
+  - rationale: obsolete-handles-past-data; proof: The contacts bootstrap.plist (per-domain URL Application Support/ProtectedData/contacts/bootstrap.plist) is written ONLY by ContactsDomainStore.saveBootstrapMetadata (lines 274-284), which hard-codes `expectedCurrentGene
+  - co-remove tests: ['Tests/ServiceTests/ContactServiceProtectedDomainTests.swift :: test_contactsLegacyBootstrapGenerationRequiresRecovery (line 701) — it manually saveMetadata()s contacts bootstrap with expectedCurrentGenerationIdentifier: "1" and asserts .recoveryNeeded; it exists solely to characterize this guard\'s throw, so it is deleted WITH the guard (do not re-encode it as a new test).']
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — ContactsDomainStore.validateBootstrapMetadata() — `coarseRecoveryReason == nil` guard (lines 302-306)
+  - rationale: speculative-forward-compat-scaffold; proof: coarseRecoveryReason is written as the literal nil at every one of the 5 saveMetadata call sites — KeyMetadataDomainStore:371, ProtectedSettingsStore:503, PrivateKeyControlStore:512, ProtectedDataFrameworkSentinelStore:2
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — ContactsDomainStore.validateBootstrapMetadata() — `wrappedDomainMasterKeyRecordVersion == WrappedDomainMasterKeyRecord.currentFormatVersion` guard (lines 307-311)
+  - rationale: speculative-forward-compat-scaffold; proof: Every writer stores the LIVE symbol WrappedDomainMasterKeyRecord.currentFormatVersion (not a frozen literal): KeyMetadata:372, Settings:504, PKC:513, Sentinel:235, Contacts:280. The only reader is this contacts guard (li
+- `Sources/Security/ProtectedData/ProtectedSettingsStore.swift` — writePayloadGeneration() bootstrapStore.saveMetadata(...) — write-only bootstrap metadata for domains settings / private-key-control / protected-framework-sentinel (ProtectedSettingsStore:499-507; PrivateKeyControlStore:508-516; ProtectedDataFrameworkSentinelStore:230-238)
+  - rationale: speculative-forward-compat-scaffold; proof: bootstrapStore.loadMetadata is called from EXACTLY two sites in the whole tree — KeyMetadataDomainStore:433 ("key-metadata" domain) and ContactsDomainStore:287 ("contacts" domain). Neither ProtectedSettingsStore, Private
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — validateBootstrapMetadata() -- coarseRecoveryReason != nil guard (lines 302-306)
+  - rationale: speculative-forward-compat-scaffold; proof: No writer in ANY version -- current or historical -- ever set coarseRecoveryReason to a non-nil value. Every ProtectedDomainBootstrapMetadata construction site across all five domain stores (Contacts, KeyMetadataDomainSt
+- `Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift` — Policy.secureEnclaveRefreshBindingOperationSupport (line 9/18) + resolutionForSecureEnclaveCustody case .refreshBinding (lines 184-185)
+  - rationale: speculative-forward-compat-scaffold; proof: refreshBinding is a caller-supplied operation argument, not persisted state, so install age is irrelevant. No production code constructs a PrivateKeyOperationRequest with operation .refreshBinding: all ten PrivateKey*Ser
+  - co-remove tests: ['Tests/ServiceTests/PrivateKeyOperationRouterTests.swift: test_refreshBindingRemainsExplicitlyNotImplementedUnderSigningRoutePolicy (lines 97, 113)', 'Tests/ServiceTests/PGPKeyCapabilityResolverTests.swift: refreshBinding cases (lines 101-105, 152, 256, 297)', 'Tests/ServiceTests/ModelTests.swift: refreshBinding assertions (lines 546, 553, 558)']
+
+**Kept LIVE (do NOT remove):**
+- `Sources/Security/ProtectedData/ProtectedDataStorageRoot.swift` — committedWrappedDomainMasterKeyURL(for:) / stagedWrappedDomainMasterKeyURL(for:), consumed by ContactsDomainStore.deleteDomainArtifacts() — Fresh install: the DMK is Keychain-only (writeWrappedDomainMasterKeyRecordTransaction / loadWrappedDomainMasterKeyRecord use KeychainConstants.protectedDataDoma
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — deleteDomainArtifacts() envelope-slot removals: domainEnvelopeURL(.pending/.current/.previous) (lines 319-326) — Fresh install: stageInitialSnapshot writes ONLY contacts.sqlite via SQLCipher createFresh; no domainEnvelopeURL is written for the Contacts domain, so the preco
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` — validateBootstrapMetadata() -- expectedCurrentGenerationIdentifier != nil guard (lines 297-301) — Fresh install: saveBootstrapMetadata writes expectedCurrentGenerationIdentifier: nil (since cutover f55c556), so the guard never fires on fresh data. But it fir
+
+## Dead code — enumeration dead-confirmed
+
+- `Sources/App/Settings/LocalDataResetRestartCoordinator.swift` :: LocalDataResetRestartCoordinator.resetSummary
+- `Sources/App/Settings/LocalDataResetService.swift` :: LocalDataResetError.failures
+- `Sources/App/Settings/SourceComplianceInfo.swift` :: SourceComplianceInfo.isStableReleaseBuild
+- `Sources/App/Settings/AuthMode/AuthModeChangeConfirmation.swift` :: AuthModeChangeConfirmationRequest.pendingMode
+- `Sources/App/Encrypt/EncryptScreenModel.swift` :: isRecipientTagFilterSelected(_:)
+- `Sources/App/Decrypt/DecryptScreenModel.swift` :: decryptedText
+- `Sources/App/Decrypt/DecryptScreenModel.swift` :: decryptedFileURL
+- `Sources/App/Keys/KeyGenerationScreenModel.swift` :: dismissDetails()
+- `Sources/App/Contacts/Import/PublicKeyImportLoader.swift` :: loadFromQRPhoto(_:)
+- `Sources/App/Contacts/AddContactQRPhotoSelection.swift` :: identifier
+- `Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift` :: intent
+- `Sources/App/Contacts/ContactCertificationDetailsView.swift` :: intent
+- `Sources/App/Contacts/ContactsAvailability+Presentation.swift` :: unavailableSystemImage
+- `Sources/App/Contacts/ContactsScreenModel.swift` :: isTagFilterSelected(_:)
+- `Sources/App/Contacts/ContactsScreenModel.swift` :: selectedTagFilters
+- `Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift` :: authorizeSharedRight(localizedReason:)
+- `Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift` :: hasCommittedDomain [property]
+- `Sources/Security/ProtectedData/ContactsDomainStore.swift` :: hasCommittedDomain() [func]
+- `Sources/Security/ProtectedData/ProtectedSettingsStore.swift` :: hasCommittedDomain [property]
+- `Sources/Security/ProtectedData/ProtectedDataDomain.swift` :: ProtectedDataBootstrapState [enum]
+- `Sources/Security/ProtectedData/ProtectedDataDomain.swift` :: ProtectedDataError.registryMissingWithArtifacts [case]
+- `Sources/Security/ProtectedData/ProtectedDataDomain.swift` :: ProtectedDataError.restartRequired [case]
+- `Sources/Security/ProtectedData/ProtectedSettingsStore.swift` :: ordinarySettings [property]
+- `Sources/Security/AuthLifecycleTraceStore.swift` :: AuthLifecycleTraceStore.tracingEnabled
+- `Sources/Security/AuthLifecycleTraceStore.swift` :: AuthLifecycleTraceStore.recentEntries
+- `Sources/Security/AuthenticationManager.swift` :: AuthenticationManager.createAccessControl(for:)
+- `Sources/Security/AuthenticationManager.swift` :: UserDefaults.contains(key:)
+- `Sources/Security/AuthenticationPromptCoordinator.swift` :: AuthenticationPromptCoordinator.operationPromptAttemptGeneration
+- `Sources/Security/AuthenticationPromptCoordinator.swift` :: AuthenticationPromptCoordinator.operationAuthenticationPromptSnapshot
+- `Sources/Security/KeyMigrationCoordinator.swift` :: KeyMigrationRecoverySummary.isNoActionSafeOnly
+- `Sources/Security/KeychainManageable.swift` :: KeychainManageable.update(_:service:account:)
+- `Sources/Security/KeychainManageable.swift` :: KeychainManageable.listItems(servicePrefix:account:)
+- `Sources/Security/MemoryZeroingUtility.swift` :: SensitiveData
+- `Sources/App/AppContainer.swift` :: protectedDataRegistryStore
+- `Sources/App/AppContainer.swift` :: protectedDataPostUnlockCoordinator
+- `Sources/App/AppContainer.swift` :: passwordMessageService
+- `Sources/App/AppStartupCoordinator.swift` :: performStartup(using:)
+- `Sources/App/AppStartupCoordinator.swift` :: Result
+- `Sources/App/Shell/AppShellTabs.swift` :: AppShellTabDefinition.visibleInCompact
+- `Sources/App/Shell/MacShellNavigationState.swift` :: visibleRouteByTab
+- `Sources/App/DesignSystem/CypherLayout.swift` :: CypherSpacing.loose
+- `Sources/App/Onboarding/OnboardingView.swift` :: View.if(_:transform:)
+- `Sources/App/Onboarding/TutorialSandboxContainer.swift` :: TutorialSandboxContainer.securitySimulationStack
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: visibleTab
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: isShowingCompletionView
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: isShowingSandboxAcknowledgement
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: canFinishFromCompletionSurface
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: dismissCompletionView()
+- `Sources/App/Onboarding/TutorialSessionStore.swift` :: noteGuidance(_:)
+- `Sources/App/Onboarding/TutorialTaskHostView.swift` :: TutorialTaskHostView.module
+- `Sources/App/Onboarding/TutorialTaskHostView.swift` :: TutorialTaskHostView.showsCompletionFeedback
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialArtifacts.decryptedMessage
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialArtifacts.decryptedVerification
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialArtifacts.backupArmoredKey
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialArtifacts.authMode
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSecuritySimulationStack
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSecuritySimulationStack.authManager
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSecuritySimulationStack.mockSecureEnclave
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSecuritySimulationStack.mockKeychain
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSecuritySimulationStack.mockAuthenticator
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSessionState.specVersion
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSessionState.isWorkspacePresented
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialSessionState.currentGuidance
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialGuidancePayload.module
+- `Sources/App/Onboarding/Tutorial/TutorialModels.swift` :: TutorialGuidancePayload.state
+- `Sources/App/Onboarding/Tutorial/TutorialRouteDestinationView.swift` :: sizeClass
+- `Sources/Services/ContactsPostAuthGateDecision.swift` :: ContactsPostAuthGateDecision.clearsRuntime
+- `Sources/Services/PasswordMessageService.swift` :: PasswordMessageService.encryptText(_:password:format:signWithFingerprint:)
+- `Sources/Services/PasswordMessageService.swift` :: PasswordMessageService.encryptBinary(_:password:format:signWithFingerprint:)
+- `Sources/Services/PasswordMessageService.swift` :: PasswordMessageService.decryptMessageDetailed(ciphertext:password:)
+- `Sources/Services/QRService.swift` :: QRService.inspectKeyMetadata(keyData:)
+- `Sources/Services/SQLCipher/SQLCipherPreflightProbe.swift` :: SQLCipherPreflightProbe.run(in:)
+- `Sources/Services/ContactService.swift` :: ContactService.removeContact(fingerprint:)
+- `Sources/Services/ContactService.swift` :: ContactService.currentContactsDomainSnapshot()
+- `Sources/Services/ContactService.swift` :: ContactService.contactsDomainRuntimeStateIsClearedForTests
+- `Sources/Services/ContactService.swift` :: ContactService.updateCertificationArtifactValidation(artifactId:status:)
+- `Sources/Services/ContactService.swift` :: ContactService.refreshCertificationProjections()
+- `Sources/Services/ContactService.swift` :: ContactService.availableContactKeyRecord(contactId:preferredKeyId:)
+- `Sources/Services/KeyManagementService.swift` :: KeyManagementService.exportKey(fingerprint:passphrase:)
+- `Sources/Services/KeyManagementService.swift` :: KeyManagementService.unwrapPrivateKey(fingerprint:)
+- `Sources/Services/DecryptionService.swift` :: DecryptionService.decryptMessageDetailed(ciphertext:)
+- `Sources/Services/CertificateSignatureService.swift` :: ContactCertificationArtifactValidation.canSave
+- `Sources/Services/CertificateSignatureService.swift` :: CertificateSignatureService.resolveSignerIdentity(primaryFingerprint:)
+- `Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift` :: PGPSecureEnclaveCompositeBindingInspection.eddsaSigningPublicKey
+- `Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift` :: PGPSecureEnclaveCompositeBindingInspection.ecdhKeyAgreementPublicKey
+- `Sources/Services/FFI/PGPSelfTestOperationAdapter.swift` :: PGPSelfTestGeneratedKey.fingerprint
+- `Sources/Services/FFI/PGPSelfTestOperationAdapter.swift` :: PGPSelfTestGeneratedKey.profile
+- `Sources/Services/FFI/PGPSelfTestOperationAdapter.swift` :: PGPSelfTestGeneratedKey.revocationCert
+- `Sources/Models/Contacts/ContactImportResult.swift` :: contact
+- `Sources/Models/Contacts/ContactImportResult.swift` :: key
+- `Sources/Models/Contacts/ContactKeySummary.swift` :: isOpenPGPCertified
+- `Sources/Models/Contacts/ContactMergePreview.swift` :: ContactMergePreview
+- `Sources/Models/Contacts/ContactMergePreview.swift` :: id
+- `Sources/Models/Contacts/ContactMergePreview.swift` :: source
+- `Sources/Models/Contacts/ContactMergePreview.swift` :: target
+- `Sources/Models/Contacts/ContactsAvailability.swift` :: requiresUnlock
+- `Sources/Models/Contacts/ContactsAvailability.swift` :: blocksMutations
+- `Sources/Extensions/Data+Zeroing.swift` :: zeroize (Array where Element == UInt8)
+- `Sources/Models/AppConfiguration.swift` :: contentClearGeneration [property]
+- `Sources/Models/AppConfiguration.swift` :: requestContentClear() [func]
+- `Sources/Models/AppConfiguration.swift` :: lastAuthenticationDate [property]
+- `Sources/Models/AppConfiguration.swift` :: recordAuthentication() [func]
+- `Sources/Models/CertificateSignatureSignerIdentity.swift` :: shortKeyId [property]
+- `Sources/Models/DetailedSignatureVerification.swift` :: Entry.init(status:signerPrimaryFingerprint:signerIdentity:) [func]
+- `Sources/Models/ExportableFile.swift` :: ExportableFile [type]
+- `Sources/Models/ExportableFile.swift` :: url [property]
+- `Sources/Models/ExportableFile.swift` :: transferRepresentation [property]
+- `Sources/Models/IdentityPresentation.swift` :: fingerprintAccessibilityLabel(_:) [func]
+- `Sources/Models/PGPKeyIdentity.swift` :: formattedFingerprint [property]
+- `Sources/Models/PGPKeyIdentity.swift` :: formatFingerprint(_:) [func]
+- `Sources/Models/SignatureVerification.swift` :: SignerIdentity.formattedFingerprint [property]
+- `Sources/Security/SecureEnclaveCompositeHandle.swift` :: SecureEnclaveCompositeHandlePublicBinding.mldsa65PublicKeyLength
+- `Sources/Security/SecureEnclaveCompositeHandle.swift` :: SecureEnclaveCompositeHandlePublicBinding.mlkem768PublicKeyLength
+- `Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift` :: SecureEnclaveCustodyHandleInventoryItem.isMalformed
+- `Sources/Security/SecureEnclaveCustodyHandleStore.swift` :: SecureEnclaveCustodyHandleStore.loadSigningHandle(signingPublicKeyX963:keyAgreementPublicKeyX963:authenticationContext:)
+- `Sources/Security/SecureEnclaveCustodyHandleStore.swift` :: SecureEnclaveCustodyHandleStore.loadKeyAgreementHandle(signingPublicKeyX963:keyAgreementPublicKeyX963:authenticationContext:)
+- `Sources/Security/SecureEnclaveCustodyHandleStore.swift` :: SecureEnclaveCustodyHandleStore.deleteHandlePair(handleSetIdentifier:)
+- `Sources/Security/Mocks/MockAuthenticator.swift` :: MockAuthenticator.evaluateCallCount
+- `Sources/Security/Mocks/MockAuthenticator.swift` :: MockAuthenticator.lastEvaluatedMode
+- `Sources/Security/Mocks/MockAuthenticator.swift` :: MockAuthenticator.lastReason
+- `Sources/Security/Mocks/MockAuthenticator.swift` :: MockAuthenticator.reset()
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.lastSavedService
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.lastDeletedService
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.listItemsError
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.reset()
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.loadCallCount
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockKeychain.loadError
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.existsCallCount
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.reprotectCallCount
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.lastLoadedIdentifier
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.storedPolicy(identifier:)
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.reset()
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.saveCallCount
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.deleteCallCount
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.saveError
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.deleteError
+- `Sources/Security/Mocks/MockKeychain.swift` :: MockProtectedDataRootSecretStore.reprotectError
+- `Sources/Security/Mocks/MockSecureEnclave.swift` :: MockSecureEnclave.reset()
+- `Sources/Security/Mocks/MockSecureEnclave.swift` :: MockSecureEnclave.deleteCallCount
+- `pgp-mobile/src/lib.rs` :: get_key_version
+- `pgp-mobile/src/lib.rs` :: parse_revocation_cert
+
+## Dead code — periphery dead-confirmed (deterministic floor)
+
+- stdout — Tests/DeviceSecurityTests/DeviceSecureEnclaveGnuPGInteropEvidenceTests.swift:202
+- source — Tests/ServiceTests/AppLockControllerTests.swift:70:48
+- TraceAppSessionOrchestrator — Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift:10
+- TraceProtectedDataError — Tests/ServiceTests/AuthLifecycleTraceStoreTests.swift:13
+- contactsDirectory — Tests/ServiceTests/ContactServiceTestSupport.swift:77
+- contactsDirectory — Tests/ServiceTests/ContactServiceTestSupport.swift:237
+- config — Tests/ServiceTests/DecryptScreenModelTests.swift:26
+- contactsDirectory — Tests/ServiceTests/EncryptScreenModelTests.swift:1588
+- contactsDirectory — Tests/ServiceTests/EncryptScreenModelTests.swift:1614
+- sawOperationPromptInProgressDuringGenerateWrappingKey — Tests/ServiceTests/KeyManagementServiceTestSupport.swift:15
+- sawOperationPromptInProgressDuringWrap — Tests/ServiceTests/KeyManagementServiceTestSupport.swift:21
+- reset() — Tests/ServiceTests/MockDiskSpace.swift:30
+- ProtectedDataTestAppAppContainer — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:8
+- ProtectedDataTestAppAppStartupCoordinator — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:10
+- ProtectedDataTestAppProtectedDataBootstrapState — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:11
+- ProtectedDataTestAppProtectedDataFrameworkState — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:13
+- ProtectedDataTestAppProtectedDataRightIdentifiers — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:16
+- ProtectedDataTestAppProtectedDataPostUnlockOutcome — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:21
+- ProtectedDataTestAppProtectedOrdinarySettingsCoordinator — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:32
+- ProtectedDataTestMutableDateProvider — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:34
+- SuspendingRelockParticipant — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:129
+- backup (OutputArtifactKind.backup) — Sources/App/Common/OutputHandling.swift:7
+- importWorkflow (AddContactScreenHostView) — Sources/App/Contacts/AddContactView.swift:81
+- certificateSignatureService (ContactCertificateSignaturesScreenModel) — Sources/App/Contacts/ContactCertificateSignaturesScreenModel.swift:56
+- initialKeyId (ContactCertificationDetailsScreenModel) — Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:69
+- intent (ContactCertificationDetailsScreenModel) — Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:70
+- certificateSignatureService (ContactCertificationDetailsScreenModel) — Sources/App/Contacts/ContactCertificationDetailsScreenModel.swift:76
+- unavailableSystemImage — Sources/App/Contacts/ContactsAvailability+Presentation.swift:38
+- isTagFilterSelected(_:) — Sources/App/Contacts/ContactsScreenModel.swift:67
+- loadFromQRPhoto(_:) — Sources/App/Contacts/Import/PublicKeyImportLoader.swift:58
+- keyData (ImportConfirmationRequest) — Sources/App/Contacts/ImportConfirmationCoordinator.swift:6
+- loose (CypherSpacing.loose) — Sources/App/DesignSystem/CypherLayout.swift:19
+- AppConfiguration.requestContentClear() — Sources/Models/AppConfiguration.swift:59
+- AppConfiguration.recordAuthentication() — Sources/Models/AppConfiguration.swift:82
+- ContactIdentitySummary.notes — Sources/Models/Contacts/ContactIdentitySummary.swift:11
+- ContactImportResult.contact — Sources/Models/Contacts/ContactImportResult.swift:13
+- ContactImportResult.key — Sources/Models/Contacts/ContactImportResult.swift:23
+- ContactKeySummary.certificationArtifactIds — Sources/Models/Contacts/ContactKeySummary.swift:22
+- ContactKeySummary.isOpenPGPCertified — Sources/Models/Contacts/ContactKeySummary.swift:36
+- ContactMergePreview (struct) — Sources/Models/Contacts/ContactMergePreview.swift:3
+- ContactMergeResult.removedContactId — Sources/Models/Contacts/ContactMergeResult.swift:5
+- ContactRecipientSummary.primaryEmail — Sources/Models/Contacts/ContactRecipientSummary.swift:8
+- ContactsAvailability.requiresUnlock — Sources/Models/Contacts/ContactsAvailability.swift:30
+- ContactsAvailability.blocksMutations — Sources/Models/Contacts/ContactsAvailability.swift:40
+- DetailedSignatureVerification.Entry.verificationCertificateFingerprint — Sources/Models/DetailedSignatureVerification.swift:17
+- ExportableFile (struct) — Sources/Models/ExportableFile.swift:10
+- FileDecryptionPhase1Result.recipientKeyIds — Sources/Models/FileDecryptionPhase1Result.swift:9
+- IdentityPresentation.fingerprintAccessibilityLabel(_:) — Sources/Models/IdentityPresentation.swift:25
+- PGPKeyIdentity.formatFingerprint(_:) — Sources/Models/PGPKeyIdentity.swift:76
+- SignatureVerification.SignerIdentity.formattedFingerprint — Sources/Models/SignatureVerification.swift:28
+- hasCompletedAllModules — Sources/App/Onboarding/TutorialSessionStore.swift:47
+- isShowingCompletionView — Sources/App/Onboarding/TutorialSessionStore.swift:63
+- isShowingSandboxAcknowledgement — Sources/App/Onboarding/TutorialSessionStore.swift:67
+- canFinishFromCompletionSurface — Sources/App/Onboarding/TutorialSessionStore.swift:75
+- dismissCompletionView() — Sources/App/Onboarding/TutorialSessionStore.swift:240
+- setRoutePath(_:) — Sources/App/Onboarding/TutorialSessionStore.swift:290
+- noteGuidance(_:) — Sources/App/Onboarding/TutorialSessionStore.swift:354
+- module — Sources/App/Onboarding/TutorialTaskHostView.swift:4
+- showsCompletionFeedback — Sources/App/Onboarding/TutorialTaskHostView.swift:5
+- removedDirectoryCount (LocalDataResetSummary property) — Sources/App/Settings/LocalDataResetService.swift:7
+- visibleInCompact (AppShellTabDefinition property) — Sources/App/Shell/AppShellTabs.swift:24
+- secureEnclave (AppContainer property) — Sources/App/AppContainer.swift:8
+- protectedDataRegistryStore (AppContainer property) — Sources/App/AppContainer.swift:14
+- protectedDataPostUnlockCoordinator (AppContainer property) — Sources/App/AppContainer.swift:23
+- passwordMessageService (AppContainer property) — Sources/App/AppContainer.swift:30
+- Result (AppStartupCoordinator.Result) — Sources/App/AppStartupCoordinator.swift:5
+- performStartup(using:) — Sources/App/AppStartupCoordinator.swift:15
+- contactImportAdapter (var.instance) — Sources/Services/ContactService.swift:7
+- certificationArtifacts(forContactId:) (method) — Sources/Services/ContactService.swift:421
+- refreshCertificationProjections() (method) — Sources/Services/ContactService.swift:522
+- generateKeyRevocation(secretCert:) (instance method on PGPCertificateOperationAdapter) — Sources/Services/FFI/PGPCertificateOperationAdapter.swift:149
+- performGenerateKeyRevocation(engine:secretCert:) (static method) — Sources/Services/FFI/PGPCertificateOperationAdapter.swift:276
+- validateUserIdSelection(_:engine:certData:expectedFingerprint:) (static overload) — Sources/Services/FFI/PGPCertificateSelectionAdapter.swift:51
+- metadata(forKeyData:) (instance method on PGPContactImportAdapter) — Sources/Services/FFI/PGPContactImportAdapter.swift:77
+- eddsaSigningPublicKey (var.instance on PGPSecureEnclaveCompositeBindingInspection) — Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift:16
+- ecdhKeyAgreementPublicKey (var.instance on PGPSecureEnclaveCompositeBindingInspection) — Sources/Services/FFI/PGPSecureEnclaveCompositeBindingInspector.swift:17
+- fingerprint (var.instance on PGPSelfTestGeneratedKey) — Sources/Services/FFI/PGPSelfTestOperationAdapter.swift:7
+- profile (var.instance on PGPSelfTestGeneratedKey) — Sources/Services/FFI/PGPSelfTestOperationAdapter.swift:9
+- defaultKey (var.instance on KeyCatalogStore) — Sources/Services/KeyManagement/KeyCatalogStore.swift:14
+- defaults (var.instance on KeyMutationService) — Sources/Services/KeyManagement/KeyMutationService.swift:40
+- operation (var.instance on SecureEnclaveCompositeSignerRoute) — Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift:102
+- operation (var.instance on SecureEnclaveCompositeKeyAgreementRoute) — Sources/Services/KeyManagement/PrivateKeyOperationRouting.swift:131
+- configurationIdentity (var.instance on SecureEnclaveCustodyGenerationRecoveryAssessment) — Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationRecoveryReport.swift:17
+- authenticator (var.parameter of KeyManagementService.init) — Sources/Services/KeyManagementService.swift:48
+- inspectKeyMetadata(keyData:) (method on QRService) — Sources/Services/QRService.swift:98
+- closeFailed(code:) (enum case on SQLCipherPreflightError) — Sources/Services/SQLCipher/SQLCipherPreflightProbe.swift:13
+- protectedDataSessionCoordinator (var.instance) — Sources/Security/ProtectedData/AppSessionOrchestrator.swift:24
+- currentRegistryProvider (var.instance) — Sources/Security/ProtectedData/AppSessionOrchestrator.swift:25
+- hasCommittedDomain() (method) — Sources/Security/ProtectedData/ContactsDomainStore.swift:106
+- authenticationContext (parameter, ContactsDomainStore.continuePendingCreate) — Sources/Security/ProtectedData/ContactsDomainStore.swift:367
+- authenticationContext (parameter, KeyMetadataDomainStore.continuePendingCreate) — Sources/Security/ProtectedData/KeyMetadataDomainStore.swift:513
+- authenticationContext (parameter, PrivateKeyControlStore.continuePendingCreate) — Sources/Security/ProtectedData/PrivateKeyControlStore.swift:368
+- keyIdentifier (protocol requirement, ProtectedDataDeviceBindingProvider) — Sources/Security/ProtectedData/ProtectedDataDeviceBinding.swift:6
+- ProtectedDataBootstrapState (enum) — Sources/Security/ProtectedData/ProtectedDataDomain.swift:35
+- unlockedGenerationIdentifier (var.instance) — Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:48
+- hasCommittedDomain (var.instance) — Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:64
+- authenticationContext (parameter, ProtectedDataFrameworkSentinelStore.continuePendingCreate) — Sources/Security/ProtectedData/ProtectedDataFrameworkSentinelStore.swift:325
+- authorizeSharedRight(localizedReason:) (method) — Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift:190
+- authenticationContext (protocol requirement parameter, ProtectedDomainRecoveryHandler.continuePendingCreate) — Sources/Security/ProtectedData/ProtectedDomainRecoveryCoordinator.swift:9
+- ordinarySettings (var.instance) — Sources/Security/ProtectedData/ProtectedSettingsStore.swift:59
+- hasCommittedDomain (var.instance) — Sources/Security/ProtectedData/ProtectedSettingsStore.swift:63
+- authenticationContext (parameter, ProtectedSettingsStore.continuePendingCreate) — Sources/Security/ProtectedData/ProtectedSettingsStore.swift:687
+- mldsa65PublicKeyLength (var.static) — Sources/Security/SecureEnclaveCompositeHandle.swift:131
+- mlkem768PublicKeyLength (var.static) — Sources/Security/SecureEnclaveCompositeHandle.swift:132
+- serviceKind (var.instance, SecureEnclaveCustodyHandleInventoryItem) — Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift:6
+- isMalformed (var.instance, SecureEnclaveCustodyHandleInventoryItem) — Sources/Security/SecureEnclaveCustodyHandleInventoryItem.swift:28
+- deleteHandlePair(handleSetIdentifier:) (method overload) — Sources/Security/SecureEnclaveCustodyHandleStore.swift:413
+- isAvailable (protocol static requirement, SecureEnclaveManageable) — Sources/Security/SecureEnclaveManageable.swift:82
+- AsyncIntegerCounter — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:155
+- AsyncSuspensionGate — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:168
+- loadCurrentKeyMetadataEnvelope(storageRoot:) — Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift:509
+- AppProtectedDataStorageValidationMode — Tests/ServiceTests/ProtectedDataStorageRootTests.swift:8
+- engine (param of makeContactsDomainStore) — Tests/ServiceTests/TestHelpers.swift:105
+- messageAdapter (ServiceStack property) — Tests/ServiceTests/TestHelpers.swift:377
+- passwordMessageEncryptor (ServiceStack property) — Tests/ServiceTests/TestHelpers.swift:383
+- detachedFileSigner (ServiceStack property) — Tests/ServiceTests/TestHelpers.swift:384
+- selfTestService (ServiceStack property) — Tests/ServiceTests/TestHelpers.swift:390
+- mockAuth (ServiceStack property) — Tests/ServiceTests/TestHelpers.swift:393
+- container (param of TutorialContactsOpenGate.open) — Tests/ServiceTests/TutorialSessionStoreTests.swift:12
+- MockMemoryInfo.reset() — Tests/Support/SecurityMocks/MockMemoryInfo.swift:24
+- containsMalformedApplicationTag(_:) — Tests/Support/SecurityMocks/MockSecureEnclaveCustodyKeyStore.swift:126
+- tracingEnabled — Sources/Security/AuthLifecycleTraceStore.swift:46
+- canEvaluate(mode:) [protocol requirement] — Sources/Security/AuthenticationEvaluable.swift:363
+- isBiometricsAvailable [protocol requirement] — Sources/Security/AuthenticationEvaluable.swift:376
+- secureEnclave — Sources/Security/AuthenticationManager.swift:97
+- keychain — Sources/Security/AuthenticationManager.swift:98
+- bundleStore — Sources/Security/AuthenticationManager.swift:101
+- migrationCoordinator — Sources/Security/AuthenticationManager.swift:102
+- contains(key:) — Sources/Security/AuthenticationManager.swift:866
+- idle [static] — Sources/Security/AuthenticationPromptCoordinator.swift:14
+- lastBeganAt — Sources/Security/AuthenticationPromptCoordinator.swift:25
+- isInProgress — Sources/Security/AuthenticationPromptCoordinator.swift:42
+- fingerprint — Sources/Security/KeyBundleStore.swift:12
+- namespace — Sources/Security/KeyBundleStore.swift:13
+- isNoActionSafeOnly — Sources/Security/KeyMigrationCoordinator.swift:57
+- withUnsafeBytes(_:) — Sources/Security/MemoryZeroingUtility.swift:31
+- isEmpty — Sources/Security/MemoryZeroingUtility.swift:39
+- lastEvaluatedMode — Sources/Security/Mocks/MockAuthenticator.swift:17
+- lastReason — Sources/Security/Mocks/MockAuthenticator.swift:18
+- isBiometricsAvailable [mock witness] — Sources/Security/Mocks/MockAuthenticator.swift:20
+- canEvaluate(mode:) [mock witness] — Sources/Security/Mocks/MockAuthenticator.swift:25
+- reset() — Sources/Security/Mocks/MockAuthenticator.swift:54
+- lastSavedService — Sources/Security/Mocks/MockKeychain.swift:23
+- lastDeletedService — Sources/Security/Mocks/MockKeychain.swift:24
+- reset() — Sources/Security/Mocks/MockKeychain.swift:163
+- lastLoadedIdentifier — Sources/Security/Mocks/MockKeychain.swift:230
+- storedPolicy(identifier:) — Sources/Security/Mocks/MockKeychain.swift:308
+- reset() — Sources/Security/Mocks/MockKeychain.swift:312
+- reset() — Sources/Security/Mocks/MockSecureEnclave.swift:167
+- keyNotFound [enum case] — Sources/Security/Mocks/MockSecureEnclave.swift:199
+
+## Dead code — removal-candidates (confirm by delete + build)
+
+- `Sources/Security/ProtectedData/AppLockController.swift` :: transitionGeneration [property] — AppLockController is @Observable, so SwiftUI dependency tracking is a (dynamic) read vector for this counter. Static gre
+- `Sources/Services/FFI/PGPSecureEnclaveCompositeGenerationAdapter.swift` :: PGPSecureEnclaveCompositeGeneratedMaterial.signingKeyFingerprint — No production consumer reads it; the routing layer re-derives the identical signing fingerprint from the persisted publi
+- `Sources/Services/FFI/PGPSecureEnclaveCompositeGenerationAdapter.swift` :: PGPSecureEnclaveCompositeGeneratedMaterial.keyAgreementSubkeyFingerprint — Production re-derives the key-agreement subkey fingerprint via the composite binding inspector rather than reading this 
+- `Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift` :: PGPSecureEnclaveCustodyGeneratedMaterial.signingKeyFingerprint — No production caller reads it; routing re-derives the signing fingerprint later via PGPSecureEnclaveCustodyPublicBinding
+- `Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift` :: PGPSecureEnclaveCustodyGeneratedMaterial.keyAgreementSubkeyFingerprint — Same shape as the custody signingKeyFingerprint: no production read (routing re-derives via the custody public binding i
+- `Sources/Models/Contacts/ContactCandidateMatch.swift` :: contactIds — Production constructs the field with real data and it feeds synthesized Equatable, but no production code reads it (Impo
+- `Sources/Models/Contacts/ContactMergeResult.swift` :: survivingContact — ContactMergeResult is still constructed in production (from real surviving-contact data) but the returned struct is disc
+- `Sources/Models/Contacts/ContactMergeResult.swift` :: removedContactId — Field is populated in production but the enclosing ContactMergeResult return value is discarded (`_ =`); delete + build 
+- `Sources/Models/Contacts/ContactMergeResult.swift` :: preferredKeyNeedsSelection — The flag is computed in production specifically to signal a follow-up key-selection action, but no UI/production code ev
+- `pgp-mobile/src/external_decryptor/core.rs` :: ExternalP256KeyAgreementRequest::recipient_public_key — The `pub fn recipient_public_key(&self)` accessor is redundant over the already-public field on a uniffi::Record. uniffi
+- `pgp-mobile/src/external_decryptor/core.rs` :: ExternalP256KeyAgreementRequest::ephemeral_public_key — Same as recipient_public_key: `pub fn ephemeral_public_key(&self)` is a redundant accessor over an already-public uniffi
+- `pgp-mobile/src/error.rs` :: PgpError::BadSignature — Never constructed by any Rust path, but it is an FFI-exported uniffi::Error variant mirrored 1:1 into generated bindings
+- `pgp-mobile/src/error.rs` :: PgpError::UnknownSigner — Same as BadSignature: never constructed in Rust, but FFI-mirrored (bindings case 7) and matched by PGPErrorMapper.swift:
+- `pgp-mobile/src/error.rs` :: PgpError::KeyExpired — Never constructed in Rust; FFI-mirrored (bindings case 8) and matched by PGPErrorMapper.swift:89 exhaustive switch. Remo
+- `pgp-mobile/src/error.rs` :: PgpError::Argon2idMemoryExceeded — Rust variant never constructed (guard is Swift pre-flight only), but it is FFI-exported with an ordinal-indexed decode (
+- `pgp-mobile/src/armor.rs` :: ArmorKind::PublicKey — Referenced only inside armor.rs's own encode_armor (input match, armor.rs:11) and decode_armor (output construction, arm
+- `pgp-mobile/src/armor.rs` :: ArmorKind::SecretKey — No production input passes .secretKey (test-only at ContactServiceTests.swift:125); decode_armor still constructs it (ar
+- `pgp-mobile/src/armor.rs` :: ArmorKind::Message — Production input never passes .message (test-only at DeviceMIETests.swift:486); decode_armor constructs it (armor.rs:56)
+- `pgp-mobile/src/armor.rs` :: ArmorKind::Unknown — Dead as encode input (explicitly rejected, armor.rs:15) and inert as decode fallback output (armor.rs:58, always discard
+
+## Exported UniFFI functions never called from production Swift
+
+- get_key_version — pgp-mobile/src/lib.rs:448 (PgpEngine.getKeyVersion) delegating to pgp-mobile/src/keys/profile.rs:4 (keys::get_key_version); zero production Swift call sites — only called from Tests/FFIIntegrationTests+RoundTrip.swift
+- parse_revocation_cert — pgp-mobile/src/lib.rs:1036 (PgpEngine.parseRevocationCert) delegating to pgp-mobile/src/keys/revocation.rs:492 (keys::parse_revocation_cert); zero production Swift call sites — only called from Tests/FFIIntegrationTests+ErrorMapping.swift, Tests/FFIIntegrationTests+Revocation.swift, and 3 files under Tests/ServiceTests
+
+## FFI-shape leaks (collected; WF2 verifies boundary-violation vs sanctioned)
+
+- [maybe-ok] `KeyProfile` in Sources/Models/PGPKeyProfile.swift:5 [Model] — Doc-comment prose only ("Raw values intentionally match the historical generated `KeyProfile` Codable representation..."
+- [maybe-ok] `PgpError` in Sources/Models/CypherAirError.swift:52 [Model] — Doc-comment prose only ("Generated UniFFI `PgpError` values are intentionally normalized by `PGPErrorMapper` in `Sources
+- [LIKELY-REAL] `MessageQuantumSafety` in Sources/App/Encrypt/EncryptScreenModel.swift:34 [ScreenModel] — typealias MessageQuantumSafetyAction = @MainActor (Data) throws -> MessageQuantumSafety - the ScreenModel's own action-c
+- [LIKELY-REAL] `MessageQuantumSafety` in Sources/App/Encrypt/EncryptScreenModel.swift:86 [ScreenModel] — var resultQuantumSafety: MessageQuantumSafety? - internal (non-private) stored property on the ScreenModel holds the raw
+- [LIKELY-REAL] `MessageQuantumSafety` in Sources/App/Encrypt/EncryptScreenModel.swift:826 [ScreenModel] — private func classifyEncryptedFileQuantumSafety(at url: URL) -> MessageQuantumSafety? - return type is the raw generated
+- [LIKELY-REAL] `ExternalMlKem768DecapsulationRequest` in Sources/Security/SecureEnclaveCompositeOperations.swift:30 [other] — Protocol requirement `SecureEnclaveCompositeDecapsulating.decapsulateMlKem768(request:using:)` declares the raw UniFFI r
+- [LIKELY-REAL] `ExternalMlKem1024DecapsulationRequest` in Sources/Security/SecureEnclaveCompositeOperations.swift:38 [other] — Same protocol (`SecureEnclaveCompositeDecapsulating.decapsulateMlKem1024`) also takes the raw generated request record d
+- [LIKELY-REAL] `ExternalMlKem768DecapsulationRequest` in Sources/Security/SecureEnclaveCompositeOperations.swift:83 [other] — Concrete implementation `SystemSecureEnclaveCompositeOperations.decapsulateMlKem768`. The body reads the generated struc
+- [LIKELY-REAL] `ExternalMlKem1024DecapsulationRequest` in Sources/Security/SecureEnclaveCompositeOperations.swift:148 [other] — Concrete implementation `decapsulateMlKem1024`, mirrors the 768 case: fields read directly at lines 157 (`request.recipi
+- [LIKELY-REAL] `ExternalP256KeyAgreementRequest` in Sources/Security/SecureEnclaveCustodyKeyAgreement.swift:36 [other] — Protocol requirement `SecureEnclaveCustodyKeyAgreement.deriveSharedSecret(request:using:)` takes the raw generated recor
+- [LIKELY-REAL] `ExternalP256KeyAgreementRequest` in Sources/Security/SecureEnclaveCustodyKeyAgreement.swift:43 [other] — Concrete implementation `SystemSecureEnclaveCustodyKeyAgreement.deriveSharedSecret`. Body reads generated fields directl
+
+## Tests — non-real-guard (prune candidates)
+
+- [mixed] `Tests/ServiceTests/SecureEnclaveCustodyHandleStoreTests.swift` — Overwhelmingly real-guard: handle creation/rollback, access-policy attribute checks, availability classification (partial/ambiguous/wrong-role/wrong-key), inven
+    - prune: test_storeDoesNotUseLegacySoftwareWrappingServiceNames
+- [source-audit] `Tests/ServiceTests/TestHelpers.swift` — Not a test suite -- shared factory/infrastructure code (service-stack builders, key-generation helpers) used by other test files. No XCTest methods to classify 
+- [vacuous] `Tests/DeviceSecurityTests/DeviceSecureEnclavePqcHighProbeTests.swift` — Both methods call SecureEnclave.MLDSA87/MLKEM1024 directly with no @testable import CypherAir -- they test Apple's CryptoKit/SE framework capability, not any Cy
+    - prune: test_secureEnclave_generatesAndSigns_mlDsa87
+    - prune: test_secureEnclave_generatesAndDecapsulates_mlKem1024
+- [mixed] `Tests/FFIIntegrationTests/FFIIntegrationTests+MemoryZeroing.swift` — Six of seven methods genuinely read back buffer contents and assert all-zero after zeroize() (Data, [UInt8], SensitiveData) -- real guards for the memory-hygien
+    - prune: test_sensitiveData_deinit_zerosStorage
+- [mixed] `Tests/ServiceTests/CypherAirErrorPresentationTests.swift` — Four of five tests are real-guard (non-empty/distinct per-category copy, cancellation reads as neutral not a failure, no leaked implementation vocabulary across
+    - prune: test_noCategoryResolvesToRetiredGenericString
+- [mixed] `Tests/ServiceTests/MockDiskSpace.swift` — Not a test file itself — a small mock (DiskSpaceProvidable) with no XCTestCase/assertions of its own; it exists purely to support disk-space-related tests elsew
+- [mixed] `Tests/ServiceTests/ModelTests.swift` — Overwhelmingly real-guard: PGPErrorMapper case-by-case mapping, ContactKeyRecord/PGPKeyIdentity computed properties, PGPKeyProfile/OpenPGPCertificationKind hist
+    - prune: test_keyFamily_detailPresentationValuesAreCorrect
+- [mixed] `Tests/ServiceTests/OperationPromptLockHarness.swift` — Not a test file — a shared composition harness (real AuthenticationPromptCoordinator + AppLockController wired the way AppContainer does) used by the Mode-Switc
+- [mixed] `Tests/ServiceTests/ProtectedDataFrameworkTestSupport.swift` — Not a test file — shared typealiases, mocks (RecordingProtectedDataRootSecretStore, MockProtectedDataRelockParticipant, etc.), the ProtectedDataFrameworkTestCas
+- [mixed] `pgp-mobile/tests/gnupg_fixture_regression_tests.rs` — Mixed file, three of four tests are prune candidates. test_c3_8_gpg_rejection_output_recorded is a source-audit: it only greps the checked-in fixtures/gpg_v6_im
+    - prune: test_c3_8_gpg_rejection_output_recorded
+    - prune: test_generate_v6_fixture
+    - prune: test_c3_gpg_rsa_key_fixture_import
+    - prune: test_c3_gpg_revoked_key_fixture
+- [mixed] `pgp-mobile/tests/gnupg_message_interop_tests.rs` — The great majority (C3.1-C3.8 fixture-based interop, DEFLATE/ZLIB decompression, bit-tamper error-variant checks, armor round-trip, cross-profile-to-GnuPG forma
+    - prune: test_c2b_10_compressed_seipd2_verified_by_composition
+- [mixed] `pgp-mobile/tests/pqc_spike.rs` — Every test exercises real code (PgpEngine encrypt/decrypt/sign/verify against a hand-built RFC 9980 cert) so none is meaningless, but the file's own header says
+    - prune: pq_cert_shape_and_sizes
+    - prune: pq_engine_encrypt_decrypt_roundtrip
+    - prune: pq_engine_sign_verify_roundtrip
+    - prune: pq_mixed_recipients_with_v4_classical
+    - prune: pq_recipients_surface_in_parse_recipients
+- [vacuous] `pgp-mobile/tests/common/pq.rs` — Not a test file itself — pure test-fixture helper (generate_foreign_pq) with zero #[test] functions, consumed by portable_pq_key_lifecycle_tests.rs. Forced into
+- [vacuous] `pgp-mobile/tests/common/secure_enclave.rs` — Not a test file itself — shared SoftwareP256Material/OracleSigningProvider fixture with zero #[test] functions, consumed by secure_enclave_support_tests.rs, sec
+- [vacuous] `pgp-mobile/tests/common/tamper.rs` — Not a test file itself — tamper_near_payload_tail/tamper_at_ratio helpers with zero #[test] functions, consumed by many real tamper-detection tests across the s
+
+## Docs — confirmed-stale claims
+
+- `docs/TESTING.md`: Section 3 'Family Test Matrix' (lines 210-224) has only three columns — Profile A, Profile B, Post-Quantum — and does not cover the nine doc
+  - fix → The matrix should be expanded from three profile columns to cover all nine families (or at least add a baseline Portable Modern column and split Post-Quantum in
+- `docs/TESTING.md`: Section 5 line 239 reads 'Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) custody family' — 'Device-Bound Co
+  - fix → Replace the display name 'Device-Bound Compatible' with 'Device-Bound Legacy' in the line-239 prose (leaving the internal deviceBoundCompatible string key untou
+- `AGENTS.md`: Project Snapshot 'Key families' (lines 19-22) lists the pre-#591 six-family model (Portable/Device-Bound × Compatible/Modern/Post-Quantum) a
+  - fix → Nine families. Sources/Models/PGPKeyConfiguration.swift `Identity` enum has 9 cases (compatibleSoftwareV4, modernSoftwareV6, modernHighSoftwareV6, postQuantumSo
+- `README.md`: Key Features > 'Six Key Families' (line 11): 'Three software profiles ... times two custody models' — a 3×2=6 cross-product.
+  - fix → Nine families, not a clean 3×2. Five portable tiers (Legacy, Modern, Modern · High, Post-Quantum, Post-Quantum · High) and four device-bound tiers (Legacy, Mode
+- `README.md`: Key Families table (lines 17-24) has only 6 rows and omits 'Portable Modern · High' and both 'Post-Quantum · High' tiers.
+  - fix → Table must add three rows: Portable Modern · High (Ed448/X448), Portable Post-Quantum · High (ML-DSA-87+Ed448 / ML-KEM-1024+X448), and Device-Bound Post-Quantum
+- `README.md`: Key Families table row 'Portable Modern | RFC 9580 (v6) | Ed448 / X448, SEIPDv2 AEAD | ...' (line 20) labels the baseline Portable Modern al
+  - fix → Portable Modern baseline is Ed25519/X25519. Ed448/X448 is now the separate 'Portable Modern · High' family.
+- `README.md`: 'Portable Compatible' / 'Device-Bound Compatible' family names (lines 11, 19, 22) are the current family names.
+  - fix → Shipped display names are 'Portable Legacy' / 'Device-Bound Legacy'.
+- `docs/PRD.md`: §4.10 Self-Test: runs for each software profile '(Profile A, Profile B, Post-Quantum)' — 3 profiles listed.
+  - fix → The self-test covers all FIVE software profiles. PGPKeyProfile declares 5 cases and SelfTestService iterates PGPKeyProfile.allCases. The parenthetical should li
+- `docs/APP_STORE_LISTING.md`: Positioning line (lines 8-11): 'CypherAir X is the enhanced edition of CypherAir — it adds the three Device-Bound (Secure Enclave) families 
+  - fix → There is one unified app offering all nine key families; no base-tier/enhanced-tier product boundary exists. The 2 + 3 + 1 = 6 family framing also undercounts t
+- `docs/APP_STORE_LISTING.md`: App Review notes (line 167): 'Four additional key families on top of CypherAir's two, for six total.'
+  - fix → Nine key families, not six. The doc's en list (lines 42-45) and zh-Hans mirror (lines 117-120) never mention 'Portable Modern · High', 'Portable Post-Quantum · 
+- `docs/APP_STORE_LISTING.md`: Description bullets: 'Device-Bound Compatible — P-256 keys held in the Secure Enclave' (line 42) and 'Beyond the Portable Compatible and Por
+  - fix → User-facing names are 'Portable Legacy' / 'Device-Bound Legacy', not 'Portable Compatible' / 'Device-Bound Compatible'. (Internal localization keys still read d
+- `docs/APP_STORE_LISTING.md`: Screenshot checklist (line 193): 'iPhone 6.9" set — Home, Encrypt, key generation (six families), About.'
+  - fix → The key-generation list has nine families, not six.
+- `docs/APP_STORE_LISTING.md`: 'What's New — 1.5.0 template' (en-US lines 80-86, zh-Hans lines 150-156) lists only the original post-quantum + SE-custody launch set and th
+  - fix → The project is at MARKETING_VERSION 1.5.2 / CURRENT_PROJECT_VERSION 15200 after the nine-families expansion; the template header says 1.5.0 and never mentions t
+- `docs/SECURE_ENCLAVE_CUSTODY.md`: §1 (line 14): 'The product presents it as three of the six key families...' listing Device-Bound Compatible, Device-Bound Modern, Device-Bou
+  - fix → Four of the nine families. The list is missing 'Device-Bound Post-Quantum · High' (RFC 9980 ML-DSA-87/ML-KEM-1024 split custody). The 'Device-Bound Compatible' 
+- `docs/SECURE_ENCLAVE_CUSTODY.md`: §5 'Compatibility language' (lines 83-85) lists three bullets — Device-Bound Compatible (v4), Device-Bound Modern (v6), Device-Bound Post-Qu
+  - fix → A fourth bullet for 'Device-Bound Post-Quantum · High' (ML-DSA-87+Ed448 / ML-KEM-1024+X448) is needed; the family is implemented and tested. The v4 bullet's lab
+- `docs/SECURE_ENCLAVE_CUSTODY.md`: §8.1 evidence row (line 117): single 'split-custody composite' row citing DeviceSecureEnclaveCompositeCustodyTests, without acknowledging th
+  - fix → The same test file covers two tiers; the evidence row/scenario text reflects only the base Device-Bound Post-Quantum tier and does not surface the Device-Bound 
+- `docs/PERSISTED_STATE_INVENTORY.md`: Row 'Secure Enclave composite (post-quantum) private-key blob rows' (line 56): service 'com.cypherair.v1.secure-enclave-composite.<role>', M
+  - fix → There is a second Keychain service namespace for the High tier: the '.high' suffix produces 'com.cypherair.v1.secure-enclave-composite.high.<role>' holding ML-D
+- `docs/PERSISTED_STATE_INVENTORY.md`: Row 'Composite classical-component envelope row' (line 57): '...concatenated 32-byte Ed25519 + 32-byte X25519 classical component secrets...
+  - fix → The row must also account for the High tier: a 57-byte Ed448 secret + a 56-byte X448 secret for Device-Bound Post-Quantum · High (in addition to the base 32-byt
+- `docs/SECURITY.md`: §1 line 11: 'Three software profiles with different algorithm suites; the composite Post-Quantum suite also backs the Device-Bound Post-Quan
+  - fix → Five software profiles. Sources/Models/PGPKeyProfile.swift enumerates universal, modern, advanced, postQuantum, postQuantumHigh. There are TWO composite Post-Qu
+- `docs/SECURITY.md`: §7 line 203: 'Used for private-key export and for importing passphrase-protected key files with Argon2id S2K (Profile B and Portable Post-Qu
+  - fix → Four portable profiles use Argon2id S2K, not two: Portable Modern (modernSoftwareV6), Portable Modern · High / Profile B (modernHighSoftwareV6), Portable Post-Q
+- `docs/ARCHITECTURE.md`: §2 Services Layer table, KeyManagementService row: 'Key generation across all six families — Portable Compatible (Cv25519/RFC 4880), Portabl
+  - fix → Nine families, not six. And the algorithm attribution is wrong: Portable Modern uses CipherSuite::Cv25519 (Ed25519+X25519 v6), while Cv448 is the Advanced tier 
+- `docs/ARCHITECTURE.md`: §2 FFI Adapters, External-provider bridges bullet: 'Swift implementations of the Rust private-operation seams: P-256 signing and key agreeme
+  - fix → Also add ML-DSA-87 signing and ML-KEM-1024 decapsulation bridges (the Post-Quantum · High tier).
+- `docs/ARCHITECTURE.md`: §2 Security Layer table: SecureEnclaveCompositeHandleStore 'enclave-resident ML-DSA-65/ML-KEM-768 component blobs of Device-Bound Post-Quant
+  - fix → These components also serve Device-Bound Post-Quantum · High (ML-DSA-87 4627-byte signature / ML-KEM-1024 1568-byte ciphertext); the table names only the base-t
+- `docs/TDD.md`: §1.3 table header: 'Setting | Profile A (Universal) | Profile B (Advanced) | Post-Quantum' — only three profile columns, no Modern column.
+  - fix → Missing a 'Modern' column for the shipped Portable/Device-Bound Modern configuration (Ed25519+X25519 v6, RFC 9580, SEIPDv2, Argon2id) — modernSoftwareV6 is a di
+- `docs/TDD.md`: §1.3 classification-rule prose (line 37): 'an RFC 9980 composite primary ... classifies as Post-Quantum; any other v6 primary is Profile B; 
+  - fix → An Ed25519 v6 primary classifies as Modern, not Profile B. classify_profile() has a dedicated Ed25519 => KeyProfile::Modern arm distinct from Ed448 => KeyProfil
+- `docs/TDD.md`: §4 line 100: 'Applies to the Argon2id S2K families (Profile B and Portable Post-Quantum); Profile A uses Iterated+Salted (mode 3).'
+  - fix → Omits Portable Modern (modernSoftwareV6) and Portable Post-Quantum · High (postQuantumHighSoftwareV6), which also use .argon2idS2K. Four portable families use A
+
+## Nine-family duplication & cross-cutting refactor notes
+
+- No nine-key-family duplication exists in this chunk — Settings/** never enumerates the 9 key families itself (SelfTestView's per-result `profile.openPGPConfiguration.identity.familyDisplayName` is a single generic label,
+- Clipboard-copy duplication: SourceComplianceView.swift reimplements the exact AppKit/UIKit NSPasteboard/UIPasteboard copy logic privately (`copyIfPresent`) instead of reusing the shared `RepositoryURLCopyAction`/`Reposit
+- Trace/metadata-formatting duplication: ProtectedSettingsAccessCoordinator and ProtectedSettingsHost each independently define near-identical private `accessGateTraceValue(_:)` (AccessGateDecision -> String) switch functi
+- Auth-mode confirmation UI duplication: Settings/AuthMode/AuthModeChangeConfirmation.swift's `SettingsAuthModeConfirmationSheetView` and Onboarding/TutorialAuthModeConfirmationView.swift's `TutorialAuthModeConfirmationVie
+- FileImportRequestGate + fileImportRequestToken (computed) + handleFileImporterResult(_:token:) boilerplate is duplicated near-identically in EncryptScreenModel, DecryptScreenModel, SignScreenModel, and VerifyScreenModel 
+- The clipboard-copy-with-user-notice block (clipboardTask/clipboardToken/clipboardNoticeDecision/clipboardWriter/cancelClipboardCopy, plus the Task{...} cancellation dance in copyCiphertextToClipboard/copySignedMessageToC
+- showsFileCancelAction / showsFileDecryptCancelAction / showsDetachedCancelAction are the identical one-line predicate (`mode == .file && operation.isRunning && operation.progress != nil`) reimplemented in Encrypt/Decrypt
+- dismissError()/finishExport()/handleExportError(_:) + a private mapXError(_:) triad is repeated in all four screen models, varying only in which CypherAirError case the closure produces.
+- The mode-picker toolbar/section block (`usesToolbarModePicker = CypherModePickerPlacement.usesToolbar(...)`, the non-toolbar Section fallback, and the ToolbarItem(.principal) CypherModePicker) is copy-pasted essentially 
+- Encrypt and Decrypt give their `Configuration` a paired `RuntimeSyncKey` + `updateConfiguration(_:)` + `.onChange(of: runtimeSyncKey)` live-reconfiguration path (needed for the interactive tutorial demo); Sign and Verify
+- Duplicated clipboard-copy implementation: Sources/App/Common/CypherClipboard.swift's `CypherClipboard.copy(_:)` and the private `PlatformClipboard.copy(_:)` nested inside Sources/App/Common/OperationController.swift are 
+- Nine-key-family copy-paste: PGPKeyFamily+Presentation.swift re-switches over the same 9 PGPKeyConfiguration.Identity cases in roughly 15 separate computed properties (familyDescription, familyAlgorithmSubtitle, familyInt
+- FileImportRequestGate wiring boilerplate is copy-pasted into all 8 ScreenModels that import files (AddContactScreenModel, ContactCertificateSignaturesScreenModel, ContactCertificationDetailsScreenModel, ImportKeyScreenMo
+- `var outputInterceptionPolicy: OutputInterceptionPolicy = .passthrough` is redeclared as an identical one-line stored property in 7 separate files (ContactCertificateSignaturesView, ContactCertificationDetailsScreenModel
+- KeyBackupStatusBadge.swift and KeyCustodyBadge.swift are structural twins (same Style-enum shape, same CypherStatusBadge/Image-based body) that intentionally diverge only in copy per their own doc comments — not a bug, b
+- AppContainer.swift's makePrivateKey*Service family (11 near-identical private static factories: TextEncryption, StreamingFileEncryption, CleartextSigning, MessageDecryption, StreamingFileDecryption, DetachedFileSigning, 
+- The three traceValue(for:) overloads (ProtectedDataBootstrapOutcome / ProtectedDataRecoveryDisposition / ProtectedDataFrameworkState) are duplicated verbatim as private methods in both Sources/App/AppStartupCoordinator.s
+- AppContainer.makeDefault and AppContainer.makeUITest independently duplicate ~500 lines of protected-data-domain / key-management / service-graph wiring, differing only in the underlying secureEnclave/keychain/rootSecret
+- Tab-to-view construction is duplicated between AppShellComposition.content(for:resolver:rootDecorator:) and ContentView.swift's MacAppShellView.detailContent(for:) — both switch over the same 8 AppShellTab cases to build
+- shouldIgnore(_: Error) -> Bool (checks `error is CancellationError` then `CypherAirError.operationCancelled`) is copy-pasted verbatim as a `private static func` in 7 of this directory's 9 ScreenModel files (BackupKeyScre
+- The error-alert view modifier block (`.alert(String(localized: "error.title"...), isPresented: ..., presenting: model.error) { Button("OK") { model.dismissError() } } message: { Text($0.localizedDescription) }`) is repea
+- Nine-key-family copy-paste risk: split-custody detection (`case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6: ... default: ...`) is independently duplicated with different wording in DeviceBoundKeyCommitmentS
+- The FileExportController-backed `.fileExporter(...)` + `model.finishExport()` + `handleExportError(_:)` triad is repeated near-identically in KeyDetailView, PostGenerationPromptView, and SelectiveRevocationView — a candi
+- KeyDetailScreenModel's default `clipboardCopyAction` re-implements the UIPasteboard/NSPasteboard branching that already exists as the shared `CypherClipboard.copy(_:)` helper (Sources/App/Common/CypherClipboard.swift), w
+- Onboarding's key-families copy (onboarding.keyFamilies.body in OnboardingView.swift) still reads 'Six key families' after the 6→9 nine-families migration (issue #591, merged 2026-07-06 per project memory) — the Onboardin
+- A cluster of write-only 'rich state' fields spans TutorialModels.swift and TutorialSessionStore.swift: TutorialArtifacts.decryptedMessage/decryptedVerification/backupArmoredKey/authMode are set by TutorialSessionStore's 
+- sizeClass is threaded through four points (TutorialSandboxChromeView -> TutorialShellTabsView -> TutorialSurfaceView -> TutorialGuidanceResolver.guidance(sizeClass:), plus a separate copy stored on TutorialRouteDestinati
+- TutorialSandboxContainer.swift hand-rewires nearly the entire production service graph (KeyManagementService, ContactService, EncryptionService, DecryptionService, SigningService, CertificateSignatureService, QRService, 
+- The tutorial's demo identity (TutorialConfigurationFactory.keyGenerationConfiguration) is intentionally pinned to a single legacy family (.modernHighSoftwareV6, i.e. Profile B / Modern·High) rather than covering the nine
+- Five domain stores — ContactsDomainStore, KeyMetadataDomainStore, PrivateKeyControlStore, ProtectedSettingsStore, ProtectedDataFrameworkSentinelStore — each hand-roll the same ~60-80 line shape: stageInitialPayload (gene
+- The 'am I the very first protected domain, so I must provision the shared root secret myself' bootstrap path is independently implemented twice — ProtectedSettingsStore.ensureCommittedIfNeeded (empty-membership branch) a
+- A `hasCommittedDomain` accessor (property in two stores, throwing func in a third) was copy-pasted into ProtectedDataFrameworkSentinelStore, ProtectedSettingsStore, and ContactsDomainStore; all three are confirmed dead —
+- Two error vocabularies cross the ProtectedData boundary without a normalization adapter: KeychainError/LAError (raw Security/LocalAuthentication types) are thrown directly out of KeychainProtectedDataRootSecretStore and 
+- The nine-key-family vocabulary (Portable/Device-Bound × Legacy/Modern/Modern·High/PQ/PQ·High) itself is not duplicated across multiple files inside this chunk — the one place it appears is KeyMetadataDomainStore.Payload.
+- Orphaned screen: `ContactCertificateSignaturesView`/`ContactCertificateSignaturesScreenModel` (678+670 LOC) are wired into two exhaustive AppRoute switches and have unit tests, but `AppRoute.contactCertificateSignatures(
+- That same near-twin pair duplicates logic verbatim rather than sharing it: the `certificationKinds` static array, the `title(for: OpenPGPCertificationKind)` switch, and the default `signatureFileImportAction` closure (Se
+- Hand-rolled 'generation counter + cancel-then-compare Task' bookkeeping (`...LoadGeneration`/`...OperationGeneration: UInt64 = 0`, cancel old task, increment generation, guard `generation == self.xGeneration` before appl
+- `ContactsAvailability.unavailableSystemImage` (in `ContactsAvailability+Presentation.swift`) was clearly meant to centralize the 'availability state → SF Symbol' mapping alongside its sibling `unavailableTitle`/`unavaila
+- Nine-key-family display logic is *not* duplicated in this chunk — `ContactKeySummaryView`, both cert-signature screens, and `ImportConfirmView` all correctly call the single shared `PGPKeyProfile.contactKeyKindDisplayNam
+- The `outputInterceptionPolicy` customization seam on both `ContactCertificateSignaturesView.Configuration` and `ContactCertificationDetailsConfiguration` is read in production (`configuration.outputInterceptionPolicy.int
+- Eight near-identical 'private-key operation' service classes (PrivateKeyCleartextSigningService, PrivateKeyContactCertificationService, PrivateKeyDetachedFileSigningService, PrivateKeyPasswordMessageEncryptionService, Pr
+- The postQuantum/postQuantumHigh two-way `switch route.signingHandle.reference.tier` (or `.keyAgreementHandle.reference.tier`) dispatching to ML-DSA-65/ML-KEM-768 vs ML-DSA-87/ML-KEM-1024 provider-bridge construction repe
+- PrivateKeyOperationRouting.swift defines four structurally identical route-payload structs (SecureEnclaveSignerRoute, SecureEnclaveKeyAgreementRoute, SecureEnclaveCompositeSignerRoute, SecureEnclaveCompositeKeyAgreementR
+- PrivateKeyOperationRouter.swift's routeSecureEnclaveSigningOperation/routeSecureEnclaveKeyAgreementOperation (single-key custody) and routeSecureEnclaveCompositeSigningOperation/routeSecureEnclaveCompositeKeyAgreementOpe
+- SecureEnclaveCustodyGenerationService.swift duplicates its entire authorize/build/commit/rollback skeleton twice: performGenerateKey/createAuthorizedHandlePair/rollbackGeneratedState for single P-256 custody, and perform
+- KeyManagementService.generateKey and .importKey duplicate an identical 5-step pre-check dance (makeToken -> await beforeAuthModeReadCheckpoint -> checkCancellation -> checkValid -> requireUnlockedAuthMode -> checkCancell
+- The classical (P-256) custody family and the composite (PQC) family maintain two structurally-parallel handle-lifecycle stores — SecureEnclaveCustodyHandleStore.swift (545 lines) and SecureEnclaveCompositeHandleStore.swi
+- Error-mapping is reimplemented three times with slightly different shapes: SecureEnclaveCustodyOSStatusMapper (shared, good) is wrapped by three separate private mapCFError/mapEnclaveOperationError helpers in SecureEncla
+- SecureEnclaveP256RawSignature (r/s) and SecureEnclaveP256RawSharedSecret (raw) both hand-roll the identical '32 bytes, not all-zero, else privateHandleInaccessible' validation — a shared value wrapper would remove the du
+- The composite (PQC) vocabulary consolidates 7 types into one file (SecureEnclaveCompositeHandle.swift) while the classical vocabulary spreads the same conceptual pieces across ~10 files (HandlePair/HandlePublicBinding/Ha
+- Mock*.swift test doubles are also live production code paths (Sources/App/Onboarding/TutorialSandboxContainer.swift and AppContainer.makeUITest under #if DEBUG use MockKeychain/MockSecureEnclave/MockAuthenticator/MockPro
+- SecureEnclaveCustodyKeyStoring (classical) is not Sendable while its composite sibling SecureEnclaveCompositeKeyStoring explicitly is — an asymmetry between two protocols meant to model the same shape of thing for differ
+- private func traceErrorMetadata(_:extra:) is copy-pasted (near-identical body: errorType + LAError code/name) across AuthenticationManager.swift, PrivateKeyRewrapWorkflow.swift, and PrivateKeyModeSwitchAuthenticator.swif
+- private extension NSLock { func withLock<T>(...) rethrows -> T } is duplicated verbatim between AuthLifecycleTraceStore.swift and AuthenticationPromptCoordinator.swift.
+- KeychainManager.swift repeats an identical OSStatus->KeychainError switch across load/update/delete/listItems (4x); a single mapping helper would remove most of that file's bulk.
+- No nine-key-family duplication was found in this chunk: AuthenticationManager, KeychainManager, KeyBundleStore, PrivateKeyEnvelope, and the rewrap/migration coordinators all operate purely on opaque fingerprint strings a
+- ContactKeyRecord vs ContactKeySummary duplicate ~17 fields verbatim (fingerprint, profile, primaryAlgo, subkeyAlgo, hasEncryptionSubkey, isRevoked, isExpired, manualVerificationState, usageState, certificationProjection,
+- ContactIdentity/ContactIdentitySummary and ContactTag/ContactTagSummary repeat the same persisted-record + read-model-projection doubling pattern as ContactKeyRecord/ContactKeySummary — consistent across the whole direct
+- No nine-key-family-specific duplication found in this chunk: only ContactKeyRecord.profile: PGPKeyProfile references key-family identity at all; everything else here is family-agnostic, so there's nothing to unify across
+- Two independent 'defeat compiler dead-store elimination' byte-zeroing implementations exist for [UInt8]: Sources/Extensions/Data+Zeroing.swift's `Array<UInt8>.zeroize()` (unused in production, only called from Tests/FFII
+- verificationContext() — a private helper that builds a PGPMessageVerificationContext from contactService.contactsVerificationContext() + keyManagement.keys.map(\.publicKeyData) — is duplicated near-verbatim across Decryp
+- The 'require-available, snapshot, mutate, persist-if-mutated' shape (mutableRuntimeSnapshot() → snapshotMutator.X(&snapshot) → if mutation.didMutate persist) is repeated by hand at ~15 call sites in ContactService.swift;
+- None of the 20 files in this chunk hardcode per-key-family branching — profile-specific logic lives in the Rust engine/FFI adapters, not this layer. SelfTestService's PGPKeyProfile.allCases loop is the one place driven b
+- Two structurally similar 'diagnostic/self-check' subsystems exist side by side with very different reachability: SelfTestService is wired into a Settings screen and fully reachable, while SQLCipherPreflightProbe (concept
+- The six ExternalXxx*ProviderBridge files (P256 sign, P256 ECDH, ML-DSA-65 sign, ML-DSA-87 sign, ML-KEM-768 decap, ML-KEM-1024 decap) each hand-roll a private callbackCategory(for:) that repeats the same ~14-arm PGPKeyOpe
+- PGPErrorMapper's four externalXxxCategory functions repeat the same case list four times, and its five mapExternalXxx/mapRecipientMatching wrappers repeat the same 3-line cast-and-delegate shape five times — the same dup
+- PGPCertificateOperationAdapter, PGPKeyOperationAdapter, and (most heavily) PGPMessageOperationAdapter each carry a plain / WithExternalP256Signer(/KeyAgreement) / WithExternalCompositeSigner(/KeyAgreement) / WithExternal
+- The postQuantum/postQuantumHigh tier-switch duplication recurs in both PGPSecureEnclaveCompositeBindingInspector (performInspect/performInspectHigh) and PGPSecureEnclaveCompositeGenerationAdapter (performGenerateComposit
+- Generation-time fingerprint echoes are dead weight in production: both PGPSecureEnclaveCustodyGeneratedMaterial and PGPSecureEnclaveCompositeGeneratedMaterial return signingKeyFingerprint/keyAgreementSubkeyFingerprint fi
+- Nine-key-family mapping is hand-duplicated across three separate exhaustive switches in two files: PGPKeyConfiguration.Identity.configuration (Identity -> PGPKeyConfiguration), PGPKeyConfiguration.Identity.equivalentSoft
+- Signer-identity resolution is implemented twice with near-identical structs and resolve(fingerprint:contactKeys:ownKeys:) bodies: CertificateSignatureSignerIdentity.swift (for certificate/User-ID signatures) and Signatur
+- Fingerprint-formatting has one real implementation (IdentityPresentation.formattedFingerprint(_:)) but three redundant wrapper declarations funneling to it, two of which are entirely dead: PGPKeyIdentity.formattedFingerp
+- ExportableFile.swift is a byte-for-byte duplicate of the private ExportPayload struct in Sources/App/Common/FileExportController.swift (same url field, same Transferable/FileRepresentation/SentTransferredFile/suggestedFi
+- AppConfiguration carries a full vestigial duplicate of AppSessionOrchestrator's session-tracking API (contentClearGeneration/requestContentClear()/lastAuthenticationDate/recordAuthentication()), apparently orphaned when 
+- The *_with_external_p256_signer / *_with_external_composite_signer / *_with_external_composite_high_signer trio is copy-pasted at every call site across the nine key families: encrypt.rs (5 funcs), streaming.rs (4 encryp
+- The RFC 9980 65-tier vs 87/·High-tier split is handled two different ways in the same subsystem: external_composite_signer/core.rs and external_composite_decryptor/core.rs correctly factor it through a generic CompositeS
+- Case-insensitive fingerprint-matching / signing-key-selection logic is independently reimplemented at least six times: sign.rs::select_external_signing_key, cert_signature.rs::select_external_certification_primary_signin
+- The 'downcast error.chain() into each known external-provider error enum, remap variant-by-variant to PgpError' pattern appears twice at the same conceptual boundary: decrypt.rs::classify_decrypt_error (decrypt-side: Ext
+- Three-tier external-signer triplication: expiry.rs's modify_expiry_with_external_{p256,composite,composite_high}_signer and revocation.rs's generate_subkey_revocation_with_external_{p256,composite,composite_high}_signer 
+- Parallel fixed-length public-key validators: composite_custody_generation/mod.rs's validate_mldsa65_public_key/validate_mldsa87_public_key and validate_mlkem768_public_key/validate_mlkem1024_public_key are each a pair of
+- CONTACT_IMPORT_PUBLIC_ONLY_REASON is a Rust const in keys.rs consumed by public_certificates.rs, but Swift's PGPContactImportAdapter.swift redeclares the identical string as its own literal (publicOnlyReasonToken) instea
+- Stale 'Profile A' / 'Profile B' terminology persists in doc comments in keys.rs (KeyProfile), lib.rs (export_secret_key), and secret_transfer.rs even though the nine-family model now uses descriptive names (Universal/Leg
+
+## Boundary-leaks / layering / god-objects (smells)
+
+- [god-object] `Sources/App/Encrypt/EncryptScreenModel.swift` — 919 lines / ~114 members covering five distinct concerns (see cohesion) in one @Observable class.
+- [boundary-leak] `Sources/App/Encrypt/EncryptScreenModel.swift` — The default messageQuantumSafetyAction constructs `PgpEngine()` directly (line 124) instead of going through the injected `encryptionService`/`decryptionService
+- [god-object] `Sources/App/Common/AppTemporaryArtifactStore.swift` — Combines temp-*file* protection (streaming/decrypted/export artifact directories) with cleanup of a completely different persistence mechanism — a tutorial-sand
+- [god-object] `Sources/App/Common/MacPresentationPolish.swift` — Bundles six largely-unrelated View types (CypherStatusBadge, CypherClearImportedFileButton, CypherOutputTextBlock, CypherScrollableTextLine, CypherImportedFileR
+- [boundary-leak] `Sources/App/AppContainer.swift` — prepareUITestContactsIfNeeded, preloadUITestContact, and makeSandboxContactsDomainStore are NOT gated behind #if DEBUG (unlike makeUITest itself), so this UI-te
+- [boundary-leak] `Sources/App/CypherAirApp.swift` — The ProtectedSettingsHost initializer literal inside init() encodes protected-data authorization business logic (registry loading, authentication-context consum
+- [boundary-leak] `Sources/App/Keys/KeyDetailScreenModel.swift` — presentMappedError always normalizes failures to CypherAirError.keychainError(_:) regardless of which of four different operations (public-key export, revocatio
+- [god-object] `Sources/App/Keys/KeyDetailView.swift` — Single un-decomposed `body` renders 7 distinct Sections (info, validity, fingerprint, public key, backup/revocation actions, set-default, delete) with no extrac
+- [layering-violation] `Sources/App/Keys/ModifyExpiry/ModifyExpirySheetView.swift` — The second `@Environment(\.dismiss) private var dismiss` is declared at the very end of the private host-view struct, after its computed properties, rather than
+- [layering-violation] `Sources/App/Keys/MyKeysView.swift` — keyRowContextMenu's "Set as Default" action calls `try? keyManagement.setDefaultKey(fingerprint: key.fingerprint)` directly from the View, silently discarding a
+- [god-object] `Sources/App/Onboarding/TutorialSandboxContainer.swift` — ~20 stored properties spanning nearly every production service (KeyManagementService, ContactService, Encryption/Decryption/Signing/CertificateSignature/QR/Self
+- [boundary-leak] `Sources/Security/ProtectedData/ProtectedDataSessionCoordinator.swift` — Consumes KeychainError / LAError directly (via KeychainFailureClassifier / AuthenticationError checks) rather than normalizing into ProtectedDataError at this l
+- [boundary-leak] `Sources/Security/ProtectedData/KeychainProtectedDataRootSecretStore.swift` — Throws raw KeychainError (itemNotFound/userCancelled/authenticationFailed/interactionNotAllowed/unhandledError) up through the ProtectedData layer instead of no
+- [god-object] `Sources/Services/KeyManagement/KeyMutationService.swift` — One class owns modify-expiry, deletion, default-key, and crash-recovery — four largely-independent workflows that only share the catalogStore/keychain dependenc
+- [boundary-leak] `Sources/Services/KeyManagement/PGPKeyCapabilityResolver.swift` — Five 'static let test*' Policy fixtures live in the production file and are referenced only from Tests/ServiceTests/*.swift (PGPKeyCapabilityResolverTests, Priv
+- [god-object] `Sources/Services/KeyManagement/SecureEnclaveCustodyGenerationService.swift` — performGenerateKey and performGenerateCompositeKey are two independent ~150-line generation pipelines living in one class.
+- [boundary-leak] `Sources/Services/KeyManagementService.swift` — 9 of the 26 init parameters (beforeAuthModeReadCheckpoint, provisioningCheckpoint, provisioningWrappingPromptCheckpoint, afterImportOffMainActorCheckpoint, afte
+- [layering] `Sources/Security/SecureEnclaveCompositeHandle.swift` — extension PGPKeyConfiguration.Identity (deviceBoundCompositeTier) lives inside a Security file rather than near the Models type or a dedicated routing file; def
+- [god-object] `Sources/Security/AuthenticationEvaluable.swift` — File hosts an entire recovery-journal state machine (PrivateKeyControlRecoveryJournal, PrivateKeyControlRewrapPhase, InMemoryPrivateKeyControlStore) that has no
+- [boundary-leak] `Sources/Security/KeychainManageable.swift` — Two of the five no-authenticationContext convenience overloads are never actually used by production call sites, which always thread an explicit authenticationC
+- [layering-violation] `Sources/Models/Contacts/ContactCertificationArtifactReference.swift` — validatePayload/validatedForPersistence throw ContactsDomainValidationError and are invoked directly by ContactsDomainSnapshot.validateContract and ContactSnaps
+- [boundary-leak] `Sources/Services/ContactsPostAuthGateDecision.swift` — The switch has a catch-all `(_, .sessionAuthorized) -> .locked` arm after several specific `.sessionAuthorized` cases were already handled above it; correct tod
+- [boundary-leak] `Sources/Services/KeyManagementService.swift` — init has ~30 parameters, roughly half of which are test-only checkpoint closures (beforeAuthModeReadCheckpoint, postProvisioningCheckpoint, commitDrainWaiterReg
+- [boundary-leak] `Sources/Services/CertificateSignatureService.swift` — VerifiedContactCertificationArtifact uses @dynamicMemberLookup purely to make a wrapper 'look like' ContactCertificationArtifactReference at call sites within t
+- [naming-leak] `Sources/Services/FFI/PGPSecureEnclaveCustodyGenerationAdapter.swift` — `profile: configuration.keyVersion == 4 ? .universal : .advanced` folds Device-Bound Modern (P-256 v6) into the `.advanced` PGPKeyProfile bucket that the rest o
+- [boundary-leak] `pgp-mobile/src/decrypt.rs` — classify_decrypt_error (line ~398) must know about ExternalP256DecryptorError and ExternalCompositeDecryptorError from two sibling leaf modules to preserve type
+- [god-object] `pgp-mobile/src/lib.rs` — ~82 FFI methods across 11 unrelated capability domains live in one 1427-line impl block; each method itself is a 1-10 line delegation, so the smell is breadth/n
+- [error-boundary-leak] `pgp-mobile/src/error.rs` — 4 of 24 PgpError variants (BadSignature, UnknownSigner, KeyExpired, Argon2idMemoryExceeded) are never constructed anywhere in pgp-mobile/src or pgp-mobile/tests
+- [boundary-leak] `pgp-mobile/src/keys.rs` — CONTACT_IMPORT_PUBLIC_ONLY_REASON is a Rust const consumed by public_certificates.rs, but Swift's PGPContactImportAdapter.swift redeclares the identical string 
+
+## Crypto touchpoints for WF2 security pass (by concern)
+
+- **custody** (49): AuthenticationManager.swift, EnvelopePlistInspector.swift, KeyBundleStore.swift, KeyCatalogStore.swift, KeyManagementService.swift, KeyMetadataPersistence.swift, KeyMigrationCoordinator.swift, KeyProv
+- **custody, memory-zeroize** (18): ContactsSQLCipherDatabase.swift, KeyMetadataDomainStore.swift, KeyMutationService.swift, KeychainProtectedDataRootSecretStore.swift, PGPSecureEnclaveCompositeGenerationAdapter.swift, PrivateKeyAccessS
+- **ffi-seam** (15): PGPContactImportAdapter.swift, composite_kem.rs, core.rs, encrypt.rs, error.rs, expiry.rs, external_composite_decryptor.rs, external_decryptor.rs, keys.rs, lib.rs, provider.rs, sign.rs, streaming.rs
+- **memory-zeroize** (14): AuthLifecycleTraceStore.swift, MemoryZeroingUtility.swift, composite_classical.rs, core.rs, decrypt.rs, expiry.rs, generation.rs, keys.rs, lib.rs, password.rs, secret_transfer.rs, sign.rs, streaming.r
+- **format-selection** (9): EncryptionService.swift, armor.rs, decrypt.rs, encrypt.rs, generation.rs, mod.rs, password.rs, profile.rs
+- **sig-verify** (9): CertificateSignatureService.swift, PGPCertificateSelectionAdapter.swift, cert_signature.rs, core.rs, decrypt.rs, signature_details.rs, streaming.rs, verify.rs
+- **AEAD-hardfail** (6): composite_kem.rs, core.rs, decrypt.rs, error.rs, password.rs, streaming.rs
+- **kdf** (6): Argon2idMemoryGuard.swift, MemoryInfoProvidable.swift, composite_kem.rs, password.rs, s2k.rs, secret_transfer.rs
+- **randomness** (4): composite_classical.rs, generation.rs, secret_transfer.rs, streaming.rs
+- **ffi-seam, custody** (3): PGPExternalMlDsa65SigningProviderBridge.swift, PGPExternalMlDsa87SigningProviderBridge.swift, PGPExternalP256SigningProviderBridge.swift
+- **ffi-seam, custody, memory-zeroize** (3): PGPExternalMlKem1024DecapsulationProviderBridge.swift, PGPExternalMlKem768DecapsulationProviderBridge.swift, PGPExternalP256KeyAgreementProviderBridge.swift
+- **custody, sig-verify** (3): PrivateKeySelectiveRevocationService.swift, SecureEnclaveCompositeOperations.swift, SelectiveRevocationService.swift
+- **sig-verify, custody** (2): SecureEnclaveCustodyDigestSigner.swift, SigningService.swift
+- **sig-verify, ffi-seam** (2): PGPCertificateOperationAdapter.swift, PGPMessageResultMapper.swift
+- **ffi-seam, memory-zeroize** (2): PGPKeyOperationAdapter.swift, PGPSelfTestOperationAdapter.swift
+- **custody, ffi-seam** (2): PGPKeyOperationFailureMapper.swift, PGPSecureEnclaveCustodyGenerationAdapter.swift
+- **custody, AEAD-hardfail, memory-zeroize** (2): PrivateKeyMessageDecryptionService.swift, PrivateKeyStreamingFileDecryptionService.swift
+- **custody, kdf, memory-zeroize** (2): KeyExportService.swift, KeyProvisioningService.swift
+- **custody, AEAD-hardfail** (2): ProtectedDataDeviceBinding.swift, SecureEnclaveManager.swift
+- **custody, randomness, AEAD-hardfail** (2): PrivateKeyEnvelope.swift, ProtectedDataRootSecretEnvelope.swift
+- **AEAD-hardfail, custody, memory-zeroize** (1): DecryptionService.swift
+- **format-selection, AEAD-hardfail, kdf** (1): PasswordMessageService.swift
+- **format-selection, AEAD-hardfail, sig-verify, ffi-seam** (1): PGPMessageOperationAdapter.swift
+- **ffi-seam, AEAD-hardfail** (1): PGPErrorMapper.swift
+- **custody, sig-verify, memory-zeroize** (1): PrivateKeyContactCertificationService.swift
+- **custody, randomness** (1): SecureEnclaveCustodyHandleReference.swift
+- **custody, kdf, randomness, AEAD-hardfail, memory-zeroize** (1): ProtectedDomainKeyManager.swift
+- **custody, memory-zeroize, randomness** (1): PrivateKeyControlStore.swift
