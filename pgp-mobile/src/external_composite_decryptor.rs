@@ -87,17 +87,18 @@ impl DecryptionHelper for ExternalCompositeDecryptHelper {
                 let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
                 if let Some(error) = decryptor.take_last_error() {
                     // Hard-abort fail-closed when the PKESK is explicitly
-                    // addressed to this key, or when the classical component or
-                    // external decapsulation was actually exercised and failed:
-                    // never silently downgrade a genuine failure to "no matching
-                    // key".
+                    // addressed to this key, or when the error is a genuine
+                    // operation failure that must fail closed even for an
+                    // anonymous recipient: never silently downgrade it to "no
+                    // matching key".
                     //
-                    // For a wildcard / hidden recipient, a pre-callback rejection
-                    // (e.g. a non-composite packet intended for a different
-                    // recipient) is a non-match: skip it and keep trying later
-                    // PKESKs instead of failing an otherwise-decryptable
-                    // multi-recipient message.
-                    if explicit_recipient || error.is_external_operation_failure() {
+                    // For a wildcard / hidden recipient, an attacker-inducible
+                    // non-match — a non-composite packet intended for a different
+                    // recipient, or a classical-component failure from a crafted
+                    // low-order peer ephemeral in this PKESK — is skipped so a
+                    // later, legitimately-addressed PKESK can still decrypt the
+                    // message. See `hard_aborts_anonymous_recipient`.
+                    if explicit_recipient || error.hard_aborts_anonymous_recipient() {
                         return Err(error.into());
                     }
                     continue;
@@ -335,7 +336,10 @@ impl DecryptionHelper for ExternalCompositeHighDecryptHelper {
                 )?;
                 let decrypted = pkesk.decrypt(&mut decryptor, sym_algo);
                 if let Some(error) = decryptor.take_last_error() {
-                    if explicit_recipient || error.is_external_operation_failure() {
+                    // See the 768-tier helper above: an anonymous-recipient
+                    // classical-component failure is an attacker-inducible
+                    // non-match and is skipped, not hard-aborted.
+                    if explicit_recipient || error.hard_aborts_anonymous_recipient() {
                         return Err(error.into());
                     }
                     continue;

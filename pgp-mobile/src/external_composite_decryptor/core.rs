@@ -108,22 +108,33 @@ pub(crate) enum ExternalCompositeDecryptorError {
 }
 
 impl ExternalCompositeDecryptorError {
-    /// Distinguish a genuinely attempted external decapsulation that failed
-    /// from a pre-callback "this PKESK is not a valid composite request for
-    /// this key" rejection.
+    /// Whether this error must hard-abort decryption even when it surfaced from a
+    /// wildcard / hidden-recipient PKESK that only speculatively matched this key.
     ///
-    /// `InvalidRequest` is recorded *before* the external operation runs
-    /// (non-composite ciphertext addressed to a different recipient). For a
-    /// wildcard/hidden recipient that speculatively matches every key, such a
-    /// rejection means "this packet is addressed to someone else", so the helper
-    /// can skip it and keep trying later PKESKs. The remaining variants mean the
-    /// classical component or the external callback was actually exercised and
-    /// failed, which must fail closed instead of being skipped.
-    pub(crate) fn is_external_operation_failure(&self) -> bool {
+    /// Two variants are inducible by an anonymous PKESK addressed to a *different*
+    /// recipient, so for a wildcard recipient they are non-matches to skip — not
+    /// failures to abort on:
+    /// - `InvalidRequest` is recorded *before* the external operation runs
+    ///   (non-composite ciphertext addressed to someone else).
+    /// - `ClassicalComponentFailure` is the classical X25519/X448 key agreement
+    ///   failing on the peer ephemeral carried by *this* PKESK. A crafted
+    ///   low-order / all-zero point makes it fail without the packet being ours,
+    ///   so for a wildcard recipient this too means "addressed to someone else".
+    ///   (An explicitly-addressed PKESK still hard-aborts here — that is handled
+    ///   by the `explicit_recipient` check at the call site, not by this method.)
+    ///
+    /// Skipping these mirrors Sequoia's decrypt-and-continue behavior for
+    /// non-matching PKESKs, so a later legitimately-addressed PKESK can still
+    /// decrypt a multi-recipient message instead of the whole message failing.
+    ///
+    /// The remaining variants — a malformed or zero external key share, a genuine
+    /// external decapsulation failure, or user cancellation — are real failures of
+    /// this device/operation and must fail closed even for a wildcard recipient.
+    pub(crate) fn hard_aborts_anonymous_recipient(&self) -> bool {
         match self {
-            ExternalCompositeDecryptorError::InvalidRequest(_) => false,
+            ExternalCompositeDecryptorError::InvalidRequest(_)
+            | ExternalCompositeDecryptorError::ClassicalComponentFailure(_) => false,
             ExternalCompositeDecryptorError::InvalidResponse(_)
-            | ExternalCompositeDecryptorError::ClassicalComponentFailure(_)
             | ExternalCompositeDecryptorError::ExternalFailure(_)
             | ExternalCompositeDecryptorError::OperationCancelled => true,
         }
