@@ -231,3 +231,125 @@ fn test_verify_user_id_binding_signature_by_selector_mismatch_returns_invalid_ke
 
     assert!(matches!(result, Err(PgpError::InvalidKeyData { .. })));
 }
+
+// A cryptographically genuine certification from a signer whose certificate is
+// later revoked (key compromise) must stop reading as a valid vouch: otherwise a
+// compromised contact key could vouch for an attacker-controlled key (#609).
+#[test]
+fn test_verify_user_id_binding_signature_rejects_revoked_signer() {
+    use openpgp::types::ReasonForRevocation;
+
+    let signer = generated_key(KeyProfile::Universal, "RevokedVouchSigner");
+    let target = generated_key(KeyProfile::Universal, "RevokedVouchTarget");
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
+
+    let signature = cert_signature::generate_user_id_certification_by_selector(
+        &signer.cert_data,
+        &target.public_key_data,
+        &selector,
+        CertificationKind::Positive,
+    )
+    .expect("certification generation should succeed");
+
+    // Baseline: with the live signer the same certification is Valid.
+    let live = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &target.public_key_data,
+        &selector,
+        &[signer.public_key_data.clone()],
+    )
+    .expect("verification should return a result");
+    assert_eq!(live.status, CertificateSignatureStatus::Valid);
+
+    // Hard-revoke the signer certificate and re-verify the identical certification.
+    let signer_cert = parse_cert(&signer.cert_data);
+    let mut revoker = signer_cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("signer primary key should have secret material")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let revocation = CertRevocationBuilder::new()
+        .set_reason_for_revocation(ReasonForRevocation::KeyCompromised, b"compromised")
+        .expect("revocation reason should configure")
+        .build(&mut revoker, &signer_cert, None)
+        .expect("cert revocation should build");
+    let (revoked_signer, _) = signer_cert
+        .insert_packets(vec![openpgp::Packet::from(revocation)])
+        .expect("revocation packet should insert");
+    let mut revoked_signer_public = Vec::new();
+    revoked_signer
+        .serialize(&mut revoked_signer_public)
+        .expect("revoked signer public cert should serialize");
+
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &target.public_key_data,
+        &selector,
+        &[revoked_signer_public],
+    )
+    .expect("verification should return a result");
+
+    assert_eq!(
+        result.status,
+        CertificateSignatureStatus::Invalid,
+        "a revoked signer's certification must not verify as Valid"
+    );
+    assert_eq!(result.signer_primary_fingerprint, None);
+    assert_eq!(result.signing_key_fingerprint, None);
+}
+
+// A cryptographically valid certification that uses the collision-weak SHA-1 hash
+// must be rejected for a third-party vouch, even from an otherwise-valid signer.
+#[test]
+fn test_verify_user_id_binding_signature_rejects_sha1_certification() {
+    use openpgp::packet::signature::SignatureBuilder;
+    use openpgp::types::HashAlgorithm;
+
+    let signer = generated_key(KeyProfile::Universal, "Sha1VouchSigner");
+    let target = generated_key(KeyProfile::Universal, "Sha1VouchTarget");
+    let signer_cert = parse_cert(&signer.cert_data);
+    let target_cert = parse_cert(&target.public_key_data);
+    let user_id_data = first_user_id_bytes(&target.public_key_data);
+    let selector = user_id_selector(&user_id_data, 0);
+
+    let mut signer_keypair = signer_cert
+        .primary_key()
+        .key()
+        .clone()
+        .parts_into_secret()
+        .expect("signer primary key should have secret material")
+        .into_keypair()
+        .expect("keypair conversion should succeed");
+    let user_id = target_cert
+        .userids()
+        .next()
+        .expect("target cert should have a User ID")
+        .userid();
+    let sha1_certification = user_id
+        .bind(
+            &mut signer_keypair,
+            &target_cert,
+            SignatureBuilder::new(SignatureType::PositiveCertification)
+                .set_hash_algo(HashAlgorithm::SHA1),
+        )
+        .expect("SHA-1 certification should sign");
+    let signature = serialize_signature(&sha1_certification);
+
+    let result = cert_signature::verify_user_id_binding_signature_by_selector(
+        &signature,
+        &target.public_key_data,
+        &selector,
+        &[signer.public_key_data],
+    )
+    .expect("verification should return a result");
+
+    assert_eq!(
+        result.status,
+        CertificateSignatureStatus::Invalid,
+        "a SHA-1 certification must not verify as Valid"
+    );
+}
