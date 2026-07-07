@@ -575,6 +575,7 @@ final class KeyManagementService: @unchecked Sendable {
             handleStore: handleStore,
             compositeBindingInspector: compositeCustodyRouterContext?.bindingInspector,
             compositeHandleStore: compositeCustodyRouterContext?.handleStore,
+            compositeHighHandleStore: compositeCustodyRouterContext?.highHandleStore,
             compositeClassicalComponentStore: compositeCustodyRouterContext?.classicalComponentStore,
             custodyOperationAuthenticator: secureEnclaveCustodyOperationAuthenticator,
             authenticationPromptCoordinator: authenticationPromptCoordinator

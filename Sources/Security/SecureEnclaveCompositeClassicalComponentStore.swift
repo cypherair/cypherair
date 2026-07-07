@@ -2,26 +2,26 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// Custody for the classical (Ed25519 + X25519) component secrets of a
-/// Device-Bound Post-Quantum identity. The post-quantum halves live in the
-/// Secure Enclave (`SecureEnclaveCompositeHandleStore`); this store holds the
-/// classical halves, which alone can neither sign nor decrypt anything —
-/// every composite operation additionally requires the enclave-resident
-/// ML-DSA/ML-KEM component (docs/POST_QUANTUM.md §3).
+/// Custody for the classical component secrets (Ed25519 + X25519, or Ed448 +
+/// X448 for the · High tier) of a Device-Bound Post-Quantum identity. The
+/// post-quantum halves live in the Secure Enclave
+/// (`SecureEnclaveCompositeHandleStore`); this store holds the classical
+/// halves, which alone can neither sign nor decrypt anything — every composite
+/// operation additionally requires the enclave-resident ML-DSA/ML-KEM component
+/// (docs/POST_QUANTUM.md §3).
 ///
-/// The two 32-byte scalars are concatenated and sealed with the existing
+/// The two component scalars are concatenated and sealed with the existing
 /// per-identity Secure Enclave envelope (ephemeral×static ECDH → HKDF-SHA256 →
-/// AES-GCM). The wrapping key uses FIXED biometric access — never the app's
-/// mode-dependent wrapping key — so the classical component is exempt from
-/// Standard/High-Security mode-switch re-wrap, coherent with the enclave
+/// AES-GCM). Their lengths depend on the tier: a 32-byte Ed25519 + 32-byte
+/// X25519 pair for `.postQuantum`, or a 57-byte Ed448 + 56-byte X448 pair for
+/// `.postQuantumHigh`. The wrapping key uses FIXED biometric access — never the
+/// app's mode-dependent wrapping key — so the classical component is exempt
+/// from Standard/High-Security mode-switch re-wrap, coherent with the enclave
 /// handles it accompanies.
 ///
 /// SECURITY-CRITICAL: raw component secrets are handled here. All plaintext
 /// buffers are zeroized after use. See docs/SECURITY.md Section 10.
 struct SecureEnclaveCompositeClassicalComponentStore {
-    static let componentSecretLength = 32
-    private static let concatenatedLength = componentSecretLength * 2
-
     private let secureEnclave: any SecureEnclaveManageable
     private let bundleStore: KeyBundleStore
 
@@ -39,21 +39,24 @@ struct SecureEnclaveCompositeClassicalComponentStore {
     func store(
         fingerprint: String,
         eddsaSecret: inout Data,
-        ecdhSecret: inout Data
+        ecdhSecret: inout Data,
+        tier: SecureEnclaveCompositeTier
     ) throws -> KeyBundleWriteReceipt {
         defer {
             eddsaSecret.resetBytes(in: 0..<eddsaSecret.count)
             ecdhSecret.resetBytes(in: 0..<ecdhSecret.count)
         }
-        guard eddsaSecret.count == Self.componentSecretLength,
-              ecdhSecret.count == Self.componentSecretLength else {
+        guard eddsaSecret.count == tier.classicalSigningSecretLength,
+              ecdhSecret.count == tier.classicalKeyAgreementSecretLength else {
             throw CypherAirError.invalidKeyData(
-                reason: "Composite classical component secrets must each be 32 bytes."
+                reason: "Composite classical component secrets have an unexpected length."
             )
         }
 
         var concatenated = Data()
-        concatenated.reserveCapacity(Self.concatenatedLength)
+        concatenated.reserveCapacity(
+            tier.classicalSigningSecretLength + tier.classicalKeyAgreementSecretLength
+        )
         concatenated.append(eddsaSecret)
         concatenated.append(ecdhSecret)
         defer { concatenated.resetBytes(in: 0..<concatenated.count) }
@@ -81,7 +84,8 @@ struct SecureEnclaveCompositeClassicalComponentStore {
     /// The caller MUST zeroize both returned buffers after use.
     func load(
         fingerprint: String,
-        authenticationContext: LAContext?
+        authenticationContext: LAContext?,
+        tier: SecureEnclaveCompositeTier
     ) throws -> ClassicalComponent {
         let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
         let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
@@ -98,25 +102,28 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             fingerprint: fingerprint
         )
         defer { concatenated.resetBytes(in: 0..<concatenated.count) }
-        guard concatenated.count == Self.concatenatedLength else {
+        let eddsaLength = tier.classicalSigningSecretLength
+        let ecdhLength = tier.classicalKeyAgreementSecretLength
+        let concatenatedLength = eddsaLength + ecdhLength
+        guard concatenated.count == concatenatedLength else {
             throw CypherAirError.invalidKeyData(
                 reason: "Composite classical component envelope has an unexpected length."
             )
         }
 
         // Copy each half into freshly allocated storage that does not alias
-        // `concatenated`, so the `defer` above zeroizes the real 64-byte
-        // plaintext buffer in place instead of copy-on-writing a fresh copy
-        // and leaving the original intact.
-        var eddsaSecret = Data(count: Self.componentSecretLength)
-        var ecdhSecret = Data(count: Self.componentSecretLength)
+        // `concatenated`, so the `defer` above zeroizes the real plaintext
+        // buffer in place instead of copy-on-writing a fresh copy and leaving
+        // the original intact.
+        var eddsaSecret = Data(count: eddsaLength)
+        var ecdhSecret = Data(count: ecdhLength)
         concatenated.withUnsafeBytes { raw in
             eddsaSecret.withUnsafeMutableBytes { destination in
-                destination.copyBytes(from: raw[0..<Self.componentSecretLength])
+                destination.copyBytes(from: raw[0..<eddsaLength])
             }
             ecdhSecret.withUnsafeMutableBytes { destination in
                 destination.copyBytes(
-                    from: raw[Self.componentSecretLength..<Self.concatenatedLength]
+                    from: raw[eddsaLength..<concatenatedLength]
                 )
             }
         }

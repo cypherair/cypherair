@@ -47,31 +47,34 @@ VoiceOver on all elements; fingerprints read segment-by-segment. Dynamic Type. 4
 
 ## 3. Encryption Profiles and Key Families
 
-The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody: **Portable Compatible** (Profile A software key), **Portable Modern** (Profile B software key), **Portable Post-Quantum** (RFC 9980 software key), **Device-Bound Compatible** (Secure Enclave custody, P-256 v4), **Device-Bound Modern** (Secure Enclave custody, P-256 v6), and **Device-Bound Post-Quantum** (RFC 9980 split custody — post-quantum components in the Secure Enclave, classical components under the fixed-access envelope). Profile A/B remains the technical vocabulary for the two classical software configurations; the family vocabulary is the product-facing layer above it. All six families are product-selectable in the shipped key-generation surface (device-bound rows appear only on Secure Enclave hardware).
+The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody: **Portable Legacy** (Profile A software key, Ed25519 v4), **Portable Modern** (Ed25519 v6 software key), **Portable Modern · High** (Profile B / Ed448 v6 software key), **Portable Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 software key), **Portable Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 software key), **Device-Bound Legacy** (Secure Enclave custody, P-256 v4), **Device-Bound Modern** (Secure Enclave custody, P-256 v6), **Device-Bound Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 split custody), and **Device-Bound Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 split custody — the post-quantum components in the Secure Enclave, the classical components under the fixed-access envelope). Profile A (universal) and Profile B (advanced) remain the technical vocabulary for two of the classical software configurations, with the baseline Modern families (Ed25519 / P-256 v6) sitting between them; the family vocabulary is the product-facing layer above it. All nine families are product-selectable in the shipped key-generation surface (device-bound rows appear only on Secure Enclave hardware).
 
 The post-quantum families ([POST_QUANTUM](POST_QUANTUM.md), [TDD](TDD.md) §1.3) cover generation, contact import/display, message classification, and the encrypt-surface quantum-safety indicator. Like the other RFC 9580-track families they are not compatible with GnuPG, and their public certificates exchange via file, share sheet, or clipboard — never QR (~30 KB armored).
 
-### 3.1 Profile A: Universal Compatible (Default)
+### 3.1 Profile A: Legacy / Universal (Default)
 
-Maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security. Algorithm suite: [SECURITY.md](SECURITY.md) §1.
+The **Portable Legacy** and **Device-Bound Legacy** families. Maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security. Algorithm suite: [SECURITY.md](SECURITY.md) §1.
 
 **Compatible with:** GnuPG 2.1+, Sequoia, OpenPGP.js, GopenPGP, Thunderbird, Bouncy Castle — virtually all PGP tools.
 
-### 3.2 Profile B: Advanced Security
+### 3.2 Modern tier (RFC 9580): baseline and · High (Profile B)
 
-Maximum security using RFC 9580. v6 key format, Ed448+X448, SEIPDv2 AEAD, ~224-bit security. Algorithm suite: [SECURITY.md](SECURITY.md) §1.
+The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bound Modern** and **Portable Modern · High** families). **Modern** uses Ed25519+X25519 v6 with SEIPDv2 AEAD (~128-bit) — the widely supported modern default. **Modern · High** (Profile B) uses the stronger Ed448+X448 v6 (~224-bit), which some tools do not yet support. Algorithm suites: [SECURITY.md](SECURITY.md) §1.
 
-**Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+. **Not compatible with GnuPG.**
+**Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+ (Ed448 requires the newer releases). **Not compatible with GnuPG.**
 
 ### 3.3 Key Type Selection UX
 
-- **Key generation:** the user picks a key family from a flat "Key Type" list before generating. Default: Portable Compatible.
-  - "Portable Compatible" — "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
-  - "Portable Modern" — "Uses the latest encryption standard (RFC 9580) with stronger algorithms. Not compatible with GnuPG. The private key can be exported and backed up."
+- **Key generation:** the user picks a key family from a flat "Key Type" list before generating (order below). Default: Portable Legacy.
+  - "Portable Legacy" — "Works with all PGP tools including GnuPG. The private key can be exported and backed up."
+  - "Portable Modern" — "Uses the modern OpenPGP standard (RFC 9580), widely supported by up-to-date tools. Not compatible with GnuPG. The private key can be exported and backed up."
+  - "Portable Modern · High" — "Uses the modern OpenPGP standard (RFC 9580) with the stronger Ed448 curve; some tools do not yet support it. Not compatible with GnuPG. The private key can be exported and backed up."
   - "Portable Post-Quantum" — "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The private key can be exported and backed up."
-  - "Device-Bound Compatible" — "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
+  - "Portable Post-Quantum · High" — "Uses the strongest post-quantum encryption (RFC 9980, ML-KEM-1024) designed to resist future quantum computers. Not compatible with GnuPG. The private key can be exported and backed up."
+  - "Device-Bound Legacy" — "Works with GnuPG and other OpenPGP tools. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
   - "Device-Bound Modern" — "Uses the latest OpenPGP standard (RFC 9580). Not compatible with GnuPG. The private key lives in this device's Secure Enclave and cannot be exported or backed up."
   - "Device-Bound Post-Quantum" — "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
+  - "Device-Bound Post-Quantum · High" — "Uses the strongest post-quantum encryption (RFC 9980, ML-KEM-1024) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
   - Each row has an info button opening a detail sheet: algorithms, key version, message format, approximate security level, exportability, GnuPG compatibility, custody.
   - Device-bound families require passing a commitment sheet (custody, fixed biometric enforcement, non-exportability, loss consequence, public artifacts are not backups) before generation starts; the rows appear only where the capability resolver and a wired generation service allow them.
 - **Encryption:** message format is determined automatically by recipient key version — v4 → SEIPDv1, v6 → SEIPDv2 (AEAD), mixed → SEIPDv1. Never a manual choice. See [TDD](TDD.md) §1.4.
@@ -80,7 +83,7 @@ Maximum security using RFC 9580. v6 key format, Ed448+X448, SEIPDv2 AEAD, ~224-b
 
 ### 3.4 Apple Secure Enclave Custody (Device-Bound key families)
 
-Secure Enclave custody is the hardware-backed private-key custody mode behind the Device-Bound families — a custody model, not a third `PGPKeyProfile`. Private-key operations happen inside the Secure Enclave and the long-term private scalar never enters CypherAir's Swift or Rust plaintext memory. Device-Bound Post-Quantum extends this as **split custody**: the ML-DSA-65/ML-KEM-768 components live in the enclave, the Ed25519/X25519 classical components are sealed under a fixed-access envelope, and every composite signature or decryption requires an in-enclave operation — the classical component alone can do neither. Full custody contract and evidence: [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md); split-custody rationale: [POST_QUANTUM](POST_QUANTUM.md).
+Secure Enclave custody is the hardware-backed private-key custody mode behind the Device-Bound families — a custody model, not a third `PGPKeyProfile`. Private-key operations happen inside the Secure Enclave and the long-term private scalar never enters CypherAir's Swift or Rust plaintext memory. Device-Bound Post-Quantum extends this as **split custody**: the ML-DSA-65/ML-KEM-768 components (or ML-DSA-87/ML-KEM-1024 for the · High tier) live in the enclave, the Ed25519/X25519 classical components (Ed448/X448 for · High) are sealed under a fixed-access envelope, and every composite signature or decryption requires an in-enclave operation — the classical component alone can do neither. Full custody contract and evidence: [SECURE_ENCLAVE_CUSTODY](SECURE_ENCLAVE_CUSTODY.md); split-custody rationale: [POST_QUANTUM](POST_QUANTUM.md).
 
 The product tradeoff differs from software custody: the private key is device-bound, not exportable, and cannot be migrated or restored from backup. Device loss, key-handle loss, or loss of biometric access can make the key permanently unusable. The shipped UI presents this as an explicit opt-in (commitment sheet before generation), a distinct custody display (Key Type row with device-bound explainer, custody badges), and no backup badge or backup flow for device-bound keys.
 

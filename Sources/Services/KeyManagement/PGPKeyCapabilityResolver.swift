@@ -153,7 +153,8 @@ struct PGPKeyCapabilityResolver: Sendable {
              (.postQuantumHighSoftwareV6, .softwareSecretCertificate),
              (.compatibleP256V4, .appleSecureEnclavePrivateOperations),
              (.modernP256V6, .appleSecureEnclavePrivateOperations),
-             (.deviceBoundPostQuantumV6, .appleSecureEnclavePrivateOperations):
+             (.deviceBoundPostQuantumV6, .appleSecureEnclavePrivateOperations),
+             (.deviceBoundPostQuantumHighV6, .appleSecureEnclavePrivateOperations):
             return true
         case (.compatibleSoftwareV4, .appleSecureEnclavePrivateOperations),
              (.modernSoftwareV6, .appleSecureEnclavePrivateOperations),
@@ -162,7 +163,8 @@ struct PGPKeyCapabilityResolver: Sendable {
              (.postQuantumHighSoftwareV6, .appleSecureEnclavePrivateOperations),
              (.compatibleP256V4, .softwareSecretCertificate),
              (.modernP256V6, .softwareSecretCertificate),
-             (.deviceBoundPostQuantumV6, .softwareSecretCertificate):
+             (.deviceBoundPostQuantumV6, .softwareSecretCertificate),
+             (.deviceBoundPostQuantumHighV6, .softwareSecretCertificate):
             return false
         }
     }

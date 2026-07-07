@@ -11,7 +11,7 @@ struct DeviceBoundKeyCommitmentSheet: View {
 
     private var custodyText: String {
         switch family {
-        case .deviceBoundPostQuantumV6:
+        case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6:
             String(
                 localized: "keygen.deviceBound.confirm.custodySplit",
                 defaultValue: "The post-quantum half of this key is created inside this device's Secure Enclave; the classical half is sealed to this device. Every signature and decryption requires the Secure Enclave."

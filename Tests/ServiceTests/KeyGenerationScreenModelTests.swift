@@ -106,7 +106,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
 
         // Production policy + wired service (the shipping configuration since
         // P7D; Portable Post-Quantum exposed since campaign #567 Phase 4 and
-        // Device-Bound Post-Quantum since Phase 3): all eight families are
+        // Device-Bound Post-Quantum since Phase 3): all nine families are
         // offered, in stable order.
         let availableServiceModel = makeModel(
             capabilityResolver: PGPKeyCapabilityResolver(),
@@ -122,7 +122,8 @@ final class KeyGenerationScreenModelTests: XCTestCase {
                 .postQuantumHighSoftwareV6,
                 .compatibleP256V4,
                 .modernP256V6,
-                .deviceBoundPostQuantumV6
+                .deviceBoundPostQuantumV6,
+                .deviceBoundPostQuantumHighV6
             ]
         )
     }
@@ -142,7 +143,8 @@ final class KeyGenerationScreenModelTests: XCTestCase {
                 .postQuantumHighSoftwareV6,
                 .compatibleP256V4,
                 .modernP256V6,
-                .deviceBoundPostQuantumV6
+                .deviceBoundPostQuantumV6,
+                .deviceBoundPostQuantumHighV6
             ]
         )
 
@@ -444,7 +446,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertEqual(fullModel.availableCustodies, [.portable, .deviceBound])
         XCTAssertEqual(
             fullModel.families(for: .deviceBound),
-            [.compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6]
+            [.compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6]
         )
     }
 

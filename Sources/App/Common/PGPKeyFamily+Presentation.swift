@@ -11,6 +11,7 @@ extension PGPKeyConfiguration.Identity {
         .compatibleP256V4,
         .modernP256V6,
         .deviceBoundPostQuantumV6,
+        .deviceBoundPostQuantumHighV6,
     ]
 
     /// Whether this family's private key is device-bound Secure Enclave custody.
@@ -19,7 +20,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6,
              .postQuantumSoftwareV6, .postQuantumHighSoftwareV6:
             false
-        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
+        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             true
         }
     }
@@ -43,6 +45,8 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.deviceBoundModern.name", defaultValue: "Device-Bound Modern")
         case .deviceBoundPostQuantumV6:
             String(localized: "keyFamily.deviceBoundPostQuantum.name", defaultValue: "Device-Bound Post-Quantum")
+        case .deviceBoundPostQuantumHighV6:
+            String(localized: "keyFamily.deviceBoundPostQuantumHigh.name", defaultValue: "Device-Bound Post-Quantum · High")
         }
     }
 
@@ -89,6 +93,11 @@ extension PGPKeyConfiguration.Identity {
                 localized: "keyFamily.deviceBoundPostQuantum.description",
                 defaultValue: "Uses post-quantum encryption (RFC 9980) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
             )
+        case .deviceBoundPostQuantumHighV6:
+            String(
+                localized: "keyFamily.deviceBoundPostQuantumHigh.description",
+                defaultValue: "Uses the strongest post-quantum encryption (RFC 9980, ML-KEM-1024) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
+            )
         }
     }
 
@@ -111,6 +120,8 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.deviceBoundModern.subtitle", defaultValue: "NIST P-256 · OpenPGP v6")
         case .deviceBoundPostQuantumV6:
             String(localized: "keyFamily.deviceBoundPostQuantum.subtitle", defaultValue: "ML-KEM-768 + X25519 · OpenPGP v6")
+        case .deviceBoundPostQuantumHighV6:
+            String(localized: "keyFamily.deviceBoundPostQuantumHigh.subtitle", defaultValue: "ML-KEM-1024 + X448 · OpenPGP v6")
         }
     }
 
@@ -122,7 +133,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.tagline.legacy", defaultValue: "GnuPG & older tools")
         case .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6,
-             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6:
+             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             nil
         }
     }
@@ -148,7 +160,8 @@ extension PGPKeyConfiguration.Identity {
                 localized: "keyFamily.interop.ed448.warning",
                 defaultValue: "Requires modern OpenPGP tools; some do not yet support Ed448/X448."
             )
-        case .postQuantumSoftwareV6, .postQuantumHighSoftwareV6, .deviceBoundPostQuantumV6:
+        case .postQuantumSoftwareV6, .postQuantumHighSoftwareV6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(
                 localized: "keyFamily.interop.postQuantum.warning",
                 defaultValue: "Post-quantum keys work only with modern OpenPGP tools (RFC 9580/9980), not GnuPG or older software."
@@ -169,7 +182,8 @@ extension PGPKeyConfiguration.Identity {
     /// is large enough to matter for QR export; classical material is compact.
     var familySizeNote: String {
         switch self {
-        case .postQuantumSoftwareV6, .postQuantumHighSoftwareV6, .deviceBoundPostQuantumV6:
+        case .postQuantumSoftwareV6, .postQuantumHighSoftwareV6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(
                 localized: "keyFamily.size.postQuantum",
                 defaultValue: "Large public key and signatures; the public key may not fit in a single QR code."
@@ -202,6 +216,8 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.deviceBoundModern.securityLevel", defaultValue: "~128 bit")
         case .deviceBoundPostQuantumV6:
             String(localized: "keyFamily.deviceBoundPostQuantum.securityLevel", defaultValue: "~192 bit, quantum-resistant")
+        case .deviceBoundPostQuantumHighV6:
+            String(localized: "keyFamily.deviceBoundPostQuantumHigh.securityLevel", defaultValue: "~256 bit, quantum-resistant")
         }
     }
 
@@ -245,6 +261,11 @@ extension PGPKeyConfiguration.Identity {
                 localized: "keyFamily.portablePostQuantum.algorithms",
                 defaultValue: "ML-DSA-65+Ed25519 (30) signing + ML-KEM-768+X25519 (35) encryption"
             )
+        case .deviceBoundPostQuantumHighV6:
+            String(
+                localized: "keyFamily.portablePostQuantumHigh.algorithms",
+                defaultValue: "ML-DSA-87+Ed448 (31) signing + ML-KEM-1024+X448 (36) encryption"
+            )
         }
     }
 
@@ -254,7 +275,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.version.v4", defaultValue: "v4")
         case .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6,
-             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6:
+             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(localized: "keyFamily.version.v6", defaultValue: "v6")
         }
     }
@@ -265,7 +287,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.messageFormat.seipdv1", defaultValue: "SEIPDv1 (MDC)")
         case .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6,
-             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6:
+             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(localized: "keyFamily.messageFormat.seipdv2", defaultValue: "SEIPDv2 (AEAD OCB)")
         }
     }
@@ -276,7 +299,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .modernSoftwareV6, .modernHighSoftwareV6,
              .postQuantumSoftwareV6, .postQuantumHighSoftwareV6:
             String(localized: "keyFamily.exportability.portable", defaultValue: "Private key can be exported and backed up")
-        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6:
+        case .compatibleP256V4, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(localized: "keyFamily.exportability.deviceBound", defaultValue: "Private key cannot be exported or backed up")
         }
     }
@@ -287,7 +311,8 @@ extension PGPKeyConfiguration.Identity {
         case .compatibleSoftwareV4, .compatibleP256V4:
             String(localized: "keyFamily.gnupg.compatible", defaultValue: "Compatible with GnuPG")
         case .modernSoftwareV6, .modernHighSoftwareV6, .postQuantumSoftwareV6,
-             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6:
+             .postQuantumHighSoftwareV6, .modernP256V6, .deviceBoundPostQuantumV6,
+             .deviceBoundPostQuantumHighV6:
             String(localized: "keyFamily.gnupg.notCompatible", defaultValue: "Not compatible with GnuPG")
         }
     }
@@ -300,7 +325,7 @@ extension PGPKeyConfiguration.Identity {
             String(localized: "keyFamily.custody.portable", defaultValue: "Portable software key")
         case .compatibleP256V4, .modernP256V6:
             String(localized: "keyFamily.custody.deviceBound", defaultValue: "Device-bound Secure Enclave custody")
-        case .deviceBoundPostQuantumV6:
+        case .deviceBoundPostQuantumV6, .deviceBoundPostQuantumHighV6:
             String(
                 localized: "keyFamily.custody.deviceBoundSplit",
                 defaultValue: "Device-bound split custody: post-quantum in the Secure Enclave, classical sealed to this device"
@@ -337,8 +362,11 @@ extension PGPKeyConfiguration.Identity {
 
     /// Security tier within a custody column, ordered by ascending capability so
     /// the grid and compact list read consistently. Not every tier exists in
-    /// every custody (the Secure Enclave has no Ed448/X448, so Modern · High is
-    /// portable-only), which is why the picker is data-driven over the family
+    /// every custody — Modern · High is portable-only because a pure Ed448/X448
+    /// key cannot live in the Secure Enclave, whereas Post-Quantum · High exists
+    /// in both custodies (device-bound split custody keeps only the ML-DSA-87 /
+    /// ML-KEM-1024 halves in the enclave and software-seals the Ed448/X448
+    /// classical halves). This is why the picker is data-driven over the family
     /// list rather than a fixed matrix.
     enum Tier: Int, CaseIterable, Hashable, Sendable {
         case legacy
@@ -377,7 +405,7 @@ extension PGPKeyConfiguration.Identity {
             .modernHigh
         case .postQuantumSoftwareV6, .deviceBoundPostQuantumV6:
             .postQuantum
-        case .postQuantumHighSoftwareV6:
+        case .postQuantumHighSoftwareV6, .deviceBoundPostQuantumHighV6:
             .postQuantumHigh
         }
     }

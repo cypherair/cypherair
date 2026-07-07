@@ -93,19 +93,36 @@ final class PrivateKeyPasswordMessageEncryptionService: PasswordMessageEncryptin
             )
 
         case .secureEnclaveCompositeSigner(let route):
-            return try await messageAdapter.encryptWithPasswordAndExternalCompositeSigner(
-                plaintext: plaintext,
-                password: password,
-                format: format,
-                signingPublicCert: route.identity.publicKeyData,
-                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                    handle: route.signingHandle,
-                    compositeSigner: compositeSigner
-                ),
-                binary: binary
-            )
+            switch route.signingHandle.reference.tier {
+            case .postQuantum:
+                return try await messageAdapter.encryptWithPasswordAndExternalCompositeSigner(
+                    plaintext: plaintext,
+                    password: password,
+                    format: format,
+                    signingPublicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    ),
+                    binary: binary
+                )
+            case .postQuantumHigh:
+                return try await messageAdapter.encryptWithPasswordAndExternalCompositeHighSigner(
+                    plaintext: plaintext,
+                    password: password,
+                    format: format,
+                    signingPublicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    ),
+                    binary: binary
+                )
+            }
 
         case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)

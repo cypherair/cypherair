@@ -77,16 +77,30 @@ final class PrivateKeyCleartextSigningService: CleartextMessageSigning, @uncheck
             )
 
         case .secureEnclaveCompositeSigner(let route):
-            return try await messageAdapter.signCleartextWithExternalCompositeSigner(
-                text: text,
-                publicCert: route.identity.publicKeyData,
-                signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
-                classicalEddsaSecret: route.classicalComponent.eddsaSecret,
-                signingProvider: PGPExternalMlDsa65SigningProviderBridge(
-                    handle: route.signingHandle,
-                    compositeSigner: compositeSigner
+            switch route.signingHandle.reference.tier {
+            case .postQuantum:
+                return try await messageAdapter.signCleartextWithExternalCompositeSigner(
+                    text: text,
+                    publicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa65SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    )
                 )
-            )
+            case .postQuantumHigh:
+                return try await messageAdapter.signCleartextWithExternalCompositeHighSigner(
+                    text: text,
+                    publicCert: route.identity.publicKeyData,
+                    signingKeyFingerprint: route.compositeBindingInspection.signingKeyFingerprint,
+                    classicalEddsaSecret: route.classicalComponent.eddsaSecret,
+                    signingProvider: PGPExternalMlDsa87SigningProviderBridge(
+                        handle: route.signingHandle,
+                        compositeSigner: compositeSigner
+                    )
+                )
+            }
 
         case .secureEnclaveKeyAgreement, .secureEnclaveCompositeKeyAgreement:
             throw CypherAirError.keyOperationUnavailable(category: .privateOperationRoleMismatch)

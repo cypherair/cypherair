@@ -732,8 +732,16 @@ final class AppContainer: @unchecked Sendable {
         // composite Secure Enclave blob store, per-identity classical component
         // envelope, and the composite binding inspector, shared by routing,
         // generation, and deletion.
+        // One key store backs both tiers (its keychain rows are namespaced per
+        // tier); each tier gets its own handle store so a create/load
+        // shape-checks against the correct ML-DSA/ML-KEM parameter set.
+        let secureEnclaveCompositeKeyStore = SystemSecureEnclaveCompositeKeyStore()
         let secureEnclaveCompositeHandleStore = SecureEnclaveCompositeHandleStore(
-            keyStore: SystemSecureEnclaveCompositeKeyStore()
+            keyStore: secureEnclaveCompositeKeyStore
+        )
+        let secureEnclaveCompositeHighHandleStore = SecureEnclaveCompositeHandleStore(
+            keyStore: secureEnclaveCompositeKeyStore,
+            tier: .postQuantumHigh
         )
         let secureEnclaveCompositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(
             engine: engine
@@ -776,6 +784,7 @@ final class AppContainer: @unchecked Sendable {
             compositeCustodyRouterContext: CompositeCustodyRouterContext(
                 bindingInspector: secureEnclaveCompositeBindingInspector,
                 handleStore: secureEnclaveCompositeHandleStore,
+                highHandleStore: secureEnclaveCompositeHighHandleStore,
                 classicalComponentStore: secureEnclaveCompositeClassicalComponentStore
             ),
             secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
@@ -799,6 +808,7 @@ final class AppContainer: @unchecked Sendable {
                         digestSigner: secureEnclaveCustodyDigestSigner,
                         compositeCertificateBuilder: PGPSecureEnclaveCompositeGenerationAdapter(engine: engine),
                         compositeHandleStore: secureEnclaveCompositeHandleStore,
+                        compositeHighHandleStore: secureEnclaveCompositeHighHandleStore,
                         compositeSigner: secureEnclaveCompositeOperations,
                         compositeClassicalComponentStore: secureEnclaveCompositeClassicalComponentStore,
                         catalogStore: catalogStore,

@@ -7,15 +7,18 @@ import LocalAuthentication
 /// certificate's component public keys, deletion, and local-data-reset cleanup.
 struct SecureEnclaveCompositeHandleStore {
     private let keyStore: any SecureEnclaveCompositeKeyStoring
+    private let tier: SecureEnclaveCompositeTier
     private let handleSetIdentifierGenerator: () throws -> String
 
     init(
         keyStore: any SecureEnclaveCompositeKeyStoring,
+        tier: SecureEnclaveCompositeTier = .postQuantum,
         handleSetIdentifierGenerator: @escaping () throws -> String = {
             try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
         }
     ) {
         self.keyStore = keyStore
+        self.tier = tier
         self.handleSetIdentifierGenerator = handleSetIdentifierGenerator
     }
 
@@ -29,11 +32,13 @@ struct SecureEnclaveCompositeHandleStore {
         let handleSetIdentifier = try handleSetIdentifierGenerator()
         let signingReference = try SecureEnclaveCompositeHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .signing
+            role: .signing,
+            tier: tier
         )
         let keyAgreementReference = try SecureEnclaveCompositeHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: tier
         )
         let policy = SecureEnclaveCustodyAccessControlPolicy.privateKeyUsageBiometryAny
 
@@ -69,7 +74,8 @@ struct SecureEnclaveCompositeHandleStore {
     ) throws -> SecureEnclaveCompositeLoadedHandle {
         guard SecureEnclaveCompositeHandlePublicBinding.hasExpectedPublicKeyShape(
             expectedPublicKeyRaw,
-            role: reference.role
+            role: reference.role,
+            tier: reference.tier
         ) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(reference.role)
         }
@@ -96,13 +102,15 @@ struct SecureEnclaveCompositeHandleStore {
     ) throws -> SecureEnclaveCompositeHandlePair {
         guard SecureEnclaveCompositeHandlePublicBinding.hasExpectedPublicKeyShape(
             signingPublicKeyRaw,
-            role: .signing
+            role: .signing,
+            tier: tier
         ) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(.signing)
         }
         guard SecureEnclaveCompositeHandlePublicBinding.hasExpectedPublicKeyShape(
             keyAgreementPublicKeyRaw,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: tier
         ) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
         }

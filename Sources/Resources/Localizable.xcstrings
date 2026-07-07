@@ -9957,6 +9957,70 @@
         }
       }
     },
+    "keyFamily.deviceBoundPostQuantumHigh.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the strongest post-quantum encryption (RFC 9980, ML-KEM-1024) designed to resist future quantum computers. Not compatible with GnuPG. The key is split for this device: the post-quantum half lives in the Secure Enclave, the classical half is sealed to this device. It cannot be exported or backed up."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用最强的抗量子加密标准（RFC 9980，ML-KEM-1024），可抵御未来量子计算机的攻击。不兼容 GnuPG。此密钥为本设备拆分保管：后量子部分保存在安全隔区中，经典部分密封绑定于本设备。无法导出或备份。"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantumHigh.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device-Bound Post-Quantum · High"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备绑定后量子 · 高强度"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantumHigh.securityLevel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~256 bit, quantum-resistant"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~256 位，抗量子"
+          }
+        }
+      }
+    },
+    "keyFamily.deviceBoundPostQuantumHigh.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-1024 + X448 · OpenPGP v6"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ML-KEM-1024 + X448 · OpenPGP v6"
+          }
+        }
+      }
+    },
     "keyFamily.exportability.deviceBound" : {
       "localizations" : {
         "en" : {

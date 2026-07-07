@@ -28,10 +28,15 @@ struct PrivateKeyOperationRequest: Equatable, Sendable {
 
 /// The Device-Bound Post-Quantum dependencies the router needs to produce
 /// composite routes. Wired once at the composition root; nil leaves the
-/// composite branch blocked (`operationUnavailableByPolicy`).
+/// composite branch blocked (`operationUnavailableByPolicy`). One binding
+/// inspector and classical component store serve both tiers (the inspector
+/// dispatches on the tier argument; the classical store on the tier of the
+/// component secrets); each tier has its own enclave handle store so a handle
+/// load validates the shape against the correct parameter set.
 struct CompositeCustodyRouterContext {
     let bindingInspector: any SecureEnclaveCompositeBindingInspecting
     let handleStore: SecureEnclaveCompositeHandleStore
+    let highHandleStore: SecureEnclaveCompositeHandleStore
     let classicalComponentStore: SecureEnclaveCompositeClassicalComponentStore
 }
 

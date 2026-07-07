@@ -1030,6 +1030,358 @@ final class PGPMessageOperationAdapter: @unchecked Sendable {
         )
     }
 
+    // MARK: - Device-Bound Post-Quantum · High (ML-DSA-87 + ML-KEM-1024)
+
+    func encryptWithExternalCompositeHighSigner(
+        plaintext: Data,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        selfKey: Data?
+    ) async throws -> Data {
+        do {
+            return try await Self.performEncryptWithExternalCompositeHighSigner(
+                engine: engine,
+                plaintext: plaintext,
+                recipientKeys: recipientKeys,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                selfKey: selfKey
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func encryptFileWithExternalCompositeHighSigner(
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        selfKey: Data?,
+        progress: FileProgressReporter?
+    ) async throws {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            try await Self.performEncryptFileWithExternalCompositeHighSigner(
+                engine: engine,
+                inputPath: inputPath,
+                outputPath: outputPath,
+                recipientKeys: recipientKeys,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                selfKey: selfKey,
+                progress: progressBridge
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func decryptDetailedWithExternalCompositeHighKeyAgreement(
+        ciphertext: Data,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        classicalEcdhSecret: Data,
+        decapsulationProvider: ExternalMlKem1024DecapsulationProvider,
+        verificationContext: PGPMessageVerificationContext
+    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
+        do {
+            let result = try await Self.performDecryptDetailedWithExternalCompositeHighKeyAgreement(
+                engine: engine,
+                ciphertext: ciphertext,
+                recipientPublicCert: recipientPublicCert,
+                keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+                classicalEcdhSecret: classicalEcdhSecret,
+                decapsulationProvider: decapsulationProvider,
+                verificationKeys: verificationContext.verificationKeys
+            )
+            return PGPMessageResultMapper.decryptDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeKeyAgreement(error)
+        }
+    }
+
+    func decryptFileWithExternalCompositeHighKeyAgreement(
+        inputPath: String,
+        outputPath: String,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        classicalEcdhSecret: Data,
+        decapsulationProvider: ExternalMlKem1024DecapsulationProvider,
+        verificationContext: PGPMessageVerificationContext,
+        progress: FileProgressReporter?
+    ) async throws -> DetailedSignatureVerification {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            let result = try await Self.performDecryptFileWithExternalCompositeHighKeyAgreement(
+                engine: engine,
+                inputPath: inputPath,
+                outputPath: outputPath,
+                recipientPublicCert: recipientPublicCert,
+                keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+                classicalEcdhSecret: classicalEcdhSecret,
+                decapsulationProvider: decapsulationProvider,
+                verificationKeys: verificationContext.verificationKeys,
+                progress: progressBridge
+            )
+            return PGPMessageResultMapper.fileDecryptDetailedResult(
+                result,
+                context: verificationContext
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeKeyAgreement(error)
+        }
+    }
+
+    func signCleartextWithExternalCompositeHighSigner(
+        text: Data,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider
+    ) async throws -> Data {
+        do {
+            return try await Self.performSignCleartextWithExternalCompositeHighSigner(
+                engine: engine,
+                text: text,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func signDetachedFileWithExternalCompositeHighSigner(
+        inputPath: String,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        progress: FileProgressReporter?
+    ) async throws -> Data {
+        let progressBridge = progress.map { PGPProgressReporterBridge(reporter: $0) }
+        do {
+            return try await Self.performSignDetachedFileWithExternalCompositeHighSigner(
+                engine: engine,
+                inputPath: inputPath,
+                publicCert: publicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                progress: progressBridge
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    func encryptWithPasswordAndExternalCompositeHighSigner(
+        plaintext: Data,
+        password: String,
+        format: PasswordMessageEnvelopeFormat,
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        binary: Bool
+    ) async throws -> Data {
+        do {
+            return try await Self.performEncryptWithPasswordAndExternalCompositeHighSigner(
+                engine: engine,
+                plaintext: plaintext,
+                password: password,
+                format: format.ffiValue,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signingProvider: signingProvider,
+                binary: binary
+            )
+        } catch {
+            throw PGPErrorMapper.mapExternalCompositeSigning(error)
+        }
+    }
+
+    @concurrent
+    private static func performEncryptWithExternalCompositeHighSigner(
+        engine: PgpEngine,
+        plaintext: Data,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        selfKey: Data?
+    ) async throws -> Data {
+        try engine.encryptWithExternalCompositeHighSigner(
+            plaintext: plaintext,
+            recipients: recipientKeys,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            encryptToSelf: selfKey
+        )
+    }
+
+    @concurrent
+    private static func performEncryptFileWithExternalCompositeHighSigner(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        recipientKeys: [Data],
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        selfKey: Data?,
+        progress: StreamingProgressReporter?
+    ) async throws {
+        try engine.encryptFileWithExternalCompositeHighSigner(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            recipients: recipientKeys,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            encryptToSelf: selfKey,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performDecryptDetailedWithExternalCompositeHighKeyAgreement(
+        engine: PgpEngine,
+        ciphertext: Data,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        classicalEcdhSecret: Data,
+        decapsulationProvider: ExternalMlKem1024DecapsulationProvider,
+        verificationKeys: [Data]
+    ) async throws -> DecryptDetailedResult {
+        try engine.decryptDetailedWithExternalCompositeHighKeyAgreement(
+            ciphertext: ciphertext,
+            recipientPublicCert: recipientPublicCert,
+            keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+            classicalEcdhSecret: classicalEcdhSecret,
+            decapsulationProvider: decapsulationProvider,
+            verificationKeys: verificationKeys
+        )
+    }
+
+    @concurrent
+    private static func performDecryptFileWithExternalCompositeHighKeyAgreement(
+        engine: PgpEngine,
+        inputPath: String,
+        outputPath: String,
+        recipientPublicCert: Data,
+        keyAgreementSubkeyFingerprint: String,
+        classicalEcdhSecret: Data,
+        decapsulationProvider: ExternalMlKem1024DecapsulationProvider,
+        verificationKeys: [Data],
+        progress: StreamingProgressReporter?
+    ) async throws -> FileDecryptDetailedResult {
+        try engine.decryptFileDetailedWithExternalCompositeHighKeyAgreement(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            recipientPublicCert: recipientPublicCert,
+            keyAgreementSubkeyFingerprint: keyAgreementSubkeyFingerprint,
+            classicalEcdhSecret: classicalEcdhSecret,
+            decapsulationProvider: decapsulationProvider,
+            verificationKeys: verificationKeys,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performSignCleartextWithExternalCompositeHighSigner(
+        engine: PgpEngine,
+        text: Data,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider
+    ) async throws -> Data {
+        try engine.signCleartextWithExternalCompositeHighSigner(
+            text: text,
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider
+        )
+    }
+
+    @concurrent
+    private static func performSignDetachedFileWithExternalCompositeHighSigner(
+        engine: PgpEngine,
+        inputPath: String,
+        publicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        progress: StreamingProgressReporter?
+    ) async throws -> Data {
+        try engine.signDetachedFileWithExternalCompositeHighSigner(
+            inputPath: inputPath,
+            publicCert: publicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider,
+            progress: progress
+        )
+    }
+
+    @concurrent
+    private static func performEncryptWithPasswordAndExternalCompositeHighSigner(
+        engine: PgpEngine,
+        plaintext: Data,
+        password: String,
+        format: PasswordMessageFormat,
+        signingPublicCert: Data,
+        signingKeyFingerprint: String,
+        classicalEddsaSecret: Data,
+        signingProvider: ExternalMlDsa87SigningProvider,
+        binary: Bool
+    ) async throws -> Data {
+        if binary {
+            return try engine.encryptBinaryWithPasswordAndExternalCompositeHighSigner(
+                plaintext: plaintext,
+                password: password,
+                format: format,
+                signingPublicCert: signingPublicCert,
+                signingKeyFingerprint: signingKeyFingerprint,
+                classicalEddsaSecret: classicalEddsaSecret,
+                signer: signingProvider
+            )
+        }
+        return try engine.encryptWithPasswordAndExternalCompositeHighSigner(
+            plaintext: plaintext,
+            password: password,
+            format: format,
+            signingPublicCert: signingPublicCert,
+            signingKeyFingerprint: signingKeyFingerprint,
+            classicalEddsaSecret: classicalEddsaSecret,
+            signer: signingProvider
+        )
+    }
+
     @concurrent
     private static func performDecryptWithPassword(
         engine: PgpEngine,

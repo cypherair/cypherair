@@ -27,8 +27,8 @@ struct SystemSecureEnclaveCompositeKeyStore: SecureEnclaveCompositeKeyStoring {
         let publicKeyRaw: Data
         let blob: Data
         do {
-            switch reference.role {
-            case .signing:
+            switch (reference.tier, reference.role) {
+            case (.postQuantum, .signing):
                 let key = try SecureEnclave.MLDSA65.PrivateKey(
                     accessControl: accessControl,
                     authenticationContext: authenticationContext
@@ -36,12 +36,28 @@ struct SystemSecureEnclaveCompositeKeyStore: SecureEnclaveCompositeKeyStoring {
                 privateKey = .mldsa65Signing(key)
                 publicKeyRaw = key.publicKey.rawRepresentation
                 blob = key.dataRepresentation
-            case .keyAgreement:
+            case (.postQuantum, .keyAgreement):
                 let key = try SecureEnclave.MLKEM768.PrivateKey(
                     accessControl: accessControl,
                     authenticationContext: authenticationContext
                 )
                 privateKey = .mlkem768KeyAgreement(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            case (.postQuantumHigh, .signing):
+                let key = try SecureEnclave.MLDSA87.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa87Signing(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            case (.postQuantumHigh, .keyAgreement):
+                let key = try SecureEnclave.MLKEM1024.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem1024KeyAgreement(key)
                 publicKeyRaw = key.publicKey.rawRepresentation
                 blob = key.dataRepresentation
             }
@@ -85,20 +101,34 @@ struct SystemSecureEnclaveCompositeKeyStore: SecureEnclaveCompositeKeyStoring {
         let privateKey: SecureEnclaveCompositeLoadedHandle.PrivateKey
         let reconstructedPublicKeyRaw: Data
         do {
-            switch reference.role {
-            case .signing:
+            switch (reference.tier, reference.role) {
+            case (.postQuantum, .signing):
                 let key = try SecureEnclave.MLDSA65.PrivateKey(
                     dataRepresentation: row.blob,
                     authenticationContext: authenticationContext
                 )
                 privateKey = .mldsa65Signing(key)
                 reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
-            case .keyAgreement:
+            case (.postQuantum, .keyAgreement):
                 let key = try SecureEnclave.MLKEM768.PrivateKey(
                     dataRepresentation: row.blob,
                     authenticationContext: authenticationContext
                 )
                 privateKey = .mlkem768KeyAgreement(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            case (.postQuantumHigh, .signing):
+                let key = try SecureEnclave.MLDSA87.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa87Signing(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            case (.postQuantumHigh, .keyAgreement):
+                let key = try SecureEnclave.MLKEM1024.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem1024KeyAgreement(key)
                 reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
             }
         } catch {
@@ -116,44 +146,48 @@ struct SystemSecureEnclaveCompositeKeyStore: SecureEnclaveCompositeKeyStoring {
 
     func inventoryBindings() throws -> [SecureEnclaveCompositeHandlePublicBinding] {
         var bindings: [SecureEnclaveCompositeHandlePublicBinding] = []
-        for role in [PGPPrivateOperationRole.signing, .keyAgreement] {
-            var query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: "\(SecureEnclaveCompositeHandleReference.servicePrefix).\(role.rawValue)",
-                kSecUseDataProtectionKeychain as String: true,
-                kSecReturnAttributes as String: true,
-                kSecMatchLimit as String: kSecMatchLimitAll
-            ]
-            #if os(macOS)
-            query[kSecAttrSynchronizable as String] = false
-            #endif
+        for tier in SecureEnclaveCompositeTier.allCases {
+            for role in [PGPPrivateOperationRole.signing, .keyAgreement] {
+                var query: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrService as String:
+                        "\(SecureEnclaveCompositeHandleReference.servicePrefix)\(tier.serviceNamespaceSuffix).\(role.rawValue)",
+                    kSecUseDataProtectionKeychain as String: true,
+                    kSecReturnAttributes as String: true,
+                    kSecMatchLimit as String: kSecMatchLimitAll
+                ]
+                #if os(macOS)
+                query[kSecAttrSynchronizable as String] = false
+                #endif
 
-            var result: AnyObject?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
-            switch status {
-            case errSecSuccess:
-                guard let attributesList = result as? [[String: Any]] else {
-                    throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
-                }
-                for attributes in attributesList {
-                    guard let account = attributes[kSecAttrAccount as String] as? String,
-                          let publicKeyRaw = attributes[kSecAttrGeneric as String] as? Data,
-                          let reference = try? SecureEnclaveCompositeHandleReference(
-                              handleSetIdentifier: account,
-                              role: role
-                          ),
-                          let binding = try? SecureEnclaveCompositeHandlePublicBinding(
-                              reference: reference,
-                              publicKeyRaw: publicKeyRaw
-                          ) else {
-                        continue
+                var result: AnyObject?
+                let status = SecItemCopyMatching(query as CFDictionary, &result)
+                switch status {
+                case errSecSuccess:
+                    guard let attributesList = result as? [[String: Any]] else {
+                        throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
                     }
-                    bindings.append(binding)
+                    for attributes in attributesList {
+                        guard let account = attributes[kSecAttrAccount as String] as? String,
+                              let publicKeyRaw = attributes[kSecAttrGeneric as String] as? Data,
+                              let reference = try? SecureEnclaveCompositeHandleReference(
+                                  handleSetIdentifier: account,
+                                  role: role,
+                                  tier: tier
+                              ),
+                              let binding = try? SecureEnclaveCompositeHandlePublicBinding(
+                                  reference: reference,
+                                  publicKeyRaw: publicKeyRaw
+                              ) else {
+                            continue
+                        }
+                        bindings.append(binding)
+                    }
+                case errSecItemNotFound:
+                    continue
+                default:
+                    throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
                 }
-            case errSecItemNotFound:
-                continue
-            default:
-                throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
             }
         }
         return bindings

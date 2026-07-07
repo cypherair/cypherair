@@ -52,7 +52,8 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             switch (configuration.identity, identity.privateKeyCustodyKind) {
             case (.compatibleP256V4, .softwareSecretCertificate),
                  (.modernP256V6, .softwareSecretCertificate),
-                 (.deviceBoundPostQuantumV6, .softwareSecretCertificate):
+                 (.deviceBoundPostQuantumV6, .softwareSecretCertificate),
+                 (.deviceBoundPostQuantumHighV6, .softwareSecretCertificate):
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata cannot use software custody for a device-bound configuration."
                 )

@@ -11,6 +11,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
     private let compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)?
     private let compositeHandleStore: SecureEnclaveCompositeHandleStore?
+    private let compositeHighHandleStore: SecureEnclaveCompositeHandleStore?
     private let compositeSigner: (any SecureEnclaveCompositeSigning)?
     private let compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore?
     private let catalogStore: KeyCatalogStore
@@ -27,6 +28,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         digestSigner: any SecureEnclaveCustodyDigestSigning,
         compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)? = nil,
         compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
+        compositeHighHandleStore: SecureEnclaveCompositeHandleStore? = nil,
         compositeSigner: (any SecureEnclaveCompositeSigning)? = nil,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore? = nil,
         catalogStore: KeyCatalogStore,
@@ -42,6 +44,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.digestSigner = digestSigner
         self.compositeCertificateBuilder = compositeCertificateBuilder
         self.compositeHandleStore = compositeHandleStore
+        self.compositeHighHandleStore = compositeHighHandleStore
         self.compositeSigner = compositeSigner
         self.compositeClassicalComponentStore = compositeClassicalComponentStore
         self.catalogStore = catalogStore
@@ -81,12 +84,13 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         let configuration = configurationIdentity.configuration
-        if configuration.identity == .deviceBoundPostQuantumV6 {
+        if let compositeTier = configuration.identity.deviceBoundCompositeTier {
             return try await performGenerateCompositeKey(
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
                 configuration: configuration,
+                tier: compositeTier,
                 invalidationToken: token
             )
         }
@@ -208,14 +212,30 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         email: String?,
         expirySeconds: UInt64?,
         configuration: PGPKeyConfiguration,
+        tier: SecureEnclaveCompositeTier,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
+        // Each tier creates and shape-checks its handles against its own
+        // parameter set, so the enclave handle store is selected by tier
+        // (exhaustive: a new tier fails to compile until it is wired here).
+        let tierHandleStore: SecureEnclaveCompositeHandleStore?
+        switch tier {
+        case .postQuantum:
+            tierHandleStore = compositeHandleStore
+        case .postQuantumHigh:
+            tierHandleStore = compositeHighHandleStore
+        }
         guard let compositeCertificateBuilder,
-              let compositeHandleStore,
               let compositeSigner,
-              let compositeClassicalComponentStore else {
+              let compositeClassicalComponentStore,
+              let compositeHandleStore = tierHandleStore else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
         }
+        let compositeProfile: PGPKeyProfile =
+            switch tier {
+            case .postQuantum: .postQuantum
+            case .postQuantumHigh: .postQuantumHigh
+            }
         let resolution = resolver.resolution(
             for: .generate,
             configuration: configuration,
@@ -275,7 +295,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             classicalReceipt = try compositeClassicalComponentStore.store(
                 fingerprint: generated.metadata.fingerprint,
                 eddsaSecret: &generated.classicalEddsaSecret,
-                ecdhSecret: &generated.classicalEcdhSecret
+                ecdhSecret: &generated.classicalEcdhSecret,
+                tier: tier
             )
 
             return try await commitCoordinator.performCommit {
@@ -289,7 +310,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                     let identity = PGPKeyIdentity(
                         fingerprint: generated.metadata.fingerprint,
                         keyVersion: generated.metadata.keyVersion,
-                        profile: .postQuantum,
+                        profile: compositeProfile,
                         userId: generated.metadata.userId,
                         hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
                         isRevoked: false,
