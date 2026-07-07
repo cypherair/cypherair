@@ -530,14 +530,27 @@ fn collect_message_context(ciphertext: &[u8]) -> Result<PasswordMessageContext, 
     Ok(context)
 }
 
+/// Ceiling on the Argon2 memory cost accepted from a password-encrypted message.
+///
+/// A password message carries attacker-chosen Argon2 parameters. RFC 9580 encodes
+/// the memory cost as a `2^m` KiB exponent (up to 2 TiB); an absurd value exhausts
+/// memory and Jetsam-kills the app on a decrypt attempt, before any authentication
+/// runs. Our own traffic is unaffected: message encryption uses Sequoia's default
+/// Iterated+Salted S2K (no Argon2), and the highest Argon2 cost we ever emit is the
+/// 512 MiB key export. Mirrors the Swift-side `Argon2idMemoryGuard`, which guards
+/// the passphrase-protected key-import path. 2 GiB accepts RFC 9106's high-security
+/// setting while rejecting the OOM-DoS range on the 8 GB minimum device.
+const MAX_MESSAGE_ARGON2_MEMORY_KIB: u64 = 2 * 1024 * 1024; // 2 GiB
+
 fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {
-    match skesk {
+    let s2k = match skesk {
         SKESK::V4(skesk_v4) => {
             if !skesk_v4.symmetric_algo().is_supported() {
                 return Err(PgpError::UnsupportedAlgorithm {
                     algo: skesk_v4.symmetric_algo().to_string(),
                 });
             }
+            skesk_v4.s2k()
         }
         SKESK::V6(skesk_v6) => {
             if !skesk_v6.symmetric_algo().is_supported() {
@@ -550,10 +563,28 @@ fn validate_skesk(skesk: &SKESK) -> Result<(), PgpError> {
                     algo: skesk_v6.aead_algo().to_string(),
                 });
             }
+            skesk_v6.s2k()
         }
         _ => {
             return Err(PgpError::CorruptData {
                 reason: "Unsupported SKESK packet version".to_string(),
+            });
+        }
+    };
+
+    validate_s2k_memory(s2k)
+}
+
+/// Reject an S2K whose Argon2 memory cost exceeds `MAX_MESSAGE_ARGON2_MEMORY_KIB`.
+/// Runs before `skesk.decrypt`, so the KDF never executes with an OOM parameter.
+fn validate_s2k_memory(s2k: &openpgp::crypto::S2K) -> Result<(), PgpError> {
+    if let openpgp::crypto::S2K::Argon2 { m, .. } = s2k {
+        // RFC 9580 memory cost is `2^m` KiB; guard the shift so a malformed
+        // `m >= 64` saturates instead of panicking on overflow.
+        let memory_kib = 1u64.checked_shl(*m as u32).unwrap_or(u64::MAX);
+        if memory_kib > MAX_MESSAGE_ARGON2_MEMORY_KIB {
+            return Err(PgpError::Argon2idMemoryExceeded {
+                required_mb: memory_kib / 1024,
             });
         }
     }
@@ -624,4 +655,50 @@ fn classify_candidate_error(error: openpgp::anyhow::Error) -> CandidateOutcome {
     }
 
     CandidateOutcome::Reject
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sequoia_openpgp::crypto::{Password, S2K};
+
+    #[test]
+    fn validate_s2k_memory_rejects_oversized_argon2() {
+        // m = 30 -> 2^30 KiB = 1 TiB, far past the ceiling: a decrypt-time OOM
+        // DoS that must be refused before the KDF runs (#611).
+        let s2k = S2K::Argon2 {
+            salt: [0u8; 16],
+            t: 1,
+            p: 1,
+            m: 30,
+        };
+        assert!(matches!(
+            validate_s2k_memory(&s2k),
+            Err(PgpError::Argon2idMemoryExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn validate_s2k_memory_accepts_reasonable_argon2() {
+        // m = 19 -> 2^19 KiB = 512 MiB, the cost of our own high-security export.
+        let s2k = S2K::Argon2 {
+            salt: [0u8; 16],
+            t: 3,
+            p: 4,
+            m: 19,
+        };
+        assert!(validate_s2k_memory(&s2k).is_ok());
+    }
+
+    #[test]
+    fn own_password_message_round_trips_through_memory_clamp() {
+        // Proves the clamp does not reject our own password-encrypted messages:
+        // encrypt then decrypt must succeed through `validate_skesk`.
+        let password = Password::from("correct horse battery staple");
+        let ciphertext = encrypt(b"hello", &password, PasswordMessageFormat::Seipdv2, None)
+            .expect("encrypt password message");
+        let result = decrypt(&ciphertext, &password, &[]).expect("decrypt password message");
+        assert_eq!(result.status, PasswordDecryptStatus::Decrypted);
+        assert_eq!(result.plaintext.as_deref(), Some(&b"hello"[..]));
+    }
 }
