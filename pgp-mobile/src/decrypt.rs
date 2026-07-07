@@ -6,7 +6,7 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use openpgp::types::SymmetricAlgorithm;
 use sequoia_openpgp as openpgp;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::PgpError;
 use crate::external_composite_decryptor::ExternalCompositeDecryptorError;
@@ -266,6 +266,20 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
     })
 }
 
+/// Maximum plaintext size accepted by the in-memory decrypt path.
+///
+/// In-memory decryption (message text, not files) buffers the entire plaintext
+/// in RAM. A small, highly-compressed OpenPGP message can otherwise expand
+/// without bound and OOM / Jetsam-kill the app — a decompression bomb. Files are
+/// decrypted through the streaming path (`streaming::decrypt_file_with_helper`),
+/// which is disk-backed and not subject to this cap. 256 MiB is far above any
+/// legitimate pasted/typed message while bounding peak allocation well under the
+/// 8 GB minimum-device budget.
+pub(crate) const MAX_IN_MEMORY_PLAINTEXT_BYTES: usize = 256 * 1024 * 1024;
+
+/// Chunk size for the capped in-memory read loop.
+const DECRYPT_READ_CHUNK: usize = 64 * 1024;
+
 pub(crate) fn decrypt_with_helper<'a, H>(
     ciphertext: &'a [u8],
     policy: &'a StandardPolicy<'a>,
@@ -282,15 +296,51 @@ where
         .map_err(|e| classify_decrypt_error(e))?;
 
     let mut plaintext = Vec::new();
-    if let Err(e) = decryptor.read_to_end(&mut plaintext) {
+    if let Err(e) =
+        read_capped_zeroizing(&mut decryptor, &mut plaintext, MAX_IN_MEMORY_PLAINTEXT_BYTES)
+    {
         // SECURITY: Zeroize partial plaintext on error to prevent leaking fragments.
         // This enforces the AEAD hard-fail requirement: no partial plaintext on auth failure.
         plaintext.zeroize();
-        return Err(classify_decrypt_error(e.into()));
+        return Err(e);
     }
 
     let helper = decryptor.into_helper();
     Ok((plaintext, helper))
+}
+
+/// Read `reader` fully into `sink`, enforcing an output-size ceiling and zeroizing
+/// the transient chunk buffer on every path.
+///
+/// Bounds the decompression-bomb OOM on the in-memory decrypt path: a read that
+/// would push the accumulated plaintext past `max_bytes` fails closed with
+/// `CorruptData` instead of allocating without bound. Any reader error (including
+/// the terminal AEAD/MDC authentication failure surfaced on the final read) is
+/// classified and returned, so the caller still enforces the AEAD hard-fail
+/// contract before the plaintext is used. The chunk buffer is `Zeroizing`, so no
+/// plaintext fragment survives in the scratch allocation.
+fn read_capped_zeroizing<R: Read>(
+    reader: &mut R,
+    sink: &mut Vec<u8>,
+    max_bytes: usize,
+) -> Result<(), PgpError> {
+    let mut buffer = Zeroizing::new(vec![0u8; DECRYPT_READ_CHUNK]);
+    loop {
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|e| classify_decrypt_error(e.into()))?;
+        if read == 0 {
+            return Ok(());
+        }
+        // `sink.len() <= max_bytes` holds by construction, so the subtraction
+        // never underflows; a read that would exceed the ceiling fails closed.
+        if read > max_bytes - sink.len() {
+            return Err(PgpError::CorruptData {
+                reason: "Decrypted message exceeds the maximum in-memory size".to_string(),
+            });
+        }
+        sink.extend_from_slice(&buffer[..read]);
+    }
 }
 
 pub(crate) fn decrypt_with_fixed_session_key_detailed(
@@ -625,5 +675,36 @@ impl<'a> DecryptionHelper for FixedSessionKeyDecryptHelper<'a> {
         } else {
             Err(openpgp::anyhow::anyhow!("No key to decrypt message"))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_capped_zeroizing_rejects_output_over_ceiling() {
+        // A reader that yields more than the ceiling must fail closed rather
+        // than accumulate without bound (decompression-bomb guard, #611).
+        let data = vec![0xABu8; 20];
+        let mut sink = Vec::new();
+        let result = read_capped_zeroizing(&mut data.as_slice(), &mut sink, 10);
+        assert!(matches!(result, Err(PgpError::CorruptData { .. })));
+    }
+
+    #[test]
+    fn read_capped_zeroizing_accepts_output_within_ceiling() {
+        let data = vec![0xABu8; 8];
+        let mut sink = Vec::new();
+        read_capped_zeroizing(&mut data.as_slice(), &mut sink, 10).expect("within ceiling");
+        assert_eq!(sink, data);
+    }
+
+    #[test]
+    fn read_capped_zeroizing_accepts_output_exactly_at_ceiling() {
+        let data = vec![0xABu8; 10];
+        let mut sink = Vec::new();
+        read_capped_zeroizing(&mut data.as_slice(), &mut sink, 10).expect("exactly at ceiling");
+        assert_eq!(sink.len(), 10);
     }
 }
