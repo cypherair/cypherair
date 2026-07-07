@@ -1,9 +1,12 @@
-use std::{sync::Arc, time::SystemTime};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use openpgp::cert::amalgamation::ValidateAmalgamation;
 use openpgp::packet::{key, Key, Signature, UserID};
 use openpgp::parse::Parse;
-use openpgp::policy::StandardPolicy;
+use openpgp::policy::{HashAlgoSecurity, Policy, StandardPolicy};
 use openpgp::serialize::Marshal;
 use openpgp::types::{HashAlgorithm, RevocationStatus, SignatureType};
 use sequoia_openpgp as openpgp;
@@ -62,13 +65,33 @@ pub fn verify_direct_key_signature(
     let target_cert = parse_cert(target_cert, "Invalid target certificate")?;
     let candidate_signers = parse_candidate_signers(candidate_signers)?;
 
-    if let Some(result) =
-        verify_direct_key_issuer_guided(&signature, &target_cert, &candidate_signers)
-    {
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+
+    // A certification whose own signature is unacceptable under policy (weak hash
+    // such as SHA-1) or is expired can never be a valid vouch, regardless of the
+    // signer.
+    if !certification_signature_acceptable(&signature, &policy, reference_time) {
+        return Ok(invalid_result(None));
+    }
+
+    if let Some(result) = verify_direct_key_issuer_guided(
+        &signature,
+        &target_cert,
+        &candidate_signers,
+        &policy,
+        reference_time,
+    ) {
         return Ok(result);
     }
 
-    verify_direct_key_fallback(&signature, &target_cert, &candidate_signers)
+    verify_direct_key_fallback(
+        &signature,
+        &target_cert,
+        &candidate_signers,
+        &policy,
+        reference_time,
+    )
 }
 
 pub fn verify_user_id_binding_signature_by_selector(
@@ -83,12 +106,21 @@ pub fn verify_user_id_binding_signature_by_selector(
     let user_id = find_user_id_by_selector(target_cert_data, user_id_selector)?;
     let candidate_signers = parse_candidate_signers(candidate_signers)?;
 
+    let policy = StandardPolicy::new();
+    let reference_time = SystemTime::now();
+
+    if !certification_signature_acceptable(&signature, &policy, reference_time) {
+        return Ok(invalid_result(Some(certification_kind)));
+    }
+
     if let Some(result) = verify_user_id_issuer_guided(
         &signature,
         &target_cert,
         &user_id,
         &candidate_signers,
         certification_kind,
+        &policy,
+        reference_time,
     ) {
         return Ok(result);
     }
@@ -99,6 +131,8 @@ pub fn verify_user_id_binding_signature_by_selector(
         &user_id,
         &candidate_signers,
         certification_kind,
+        &policy,
+        reference_time,
     )
 }
 
@@ -449,32 +483,77 @@ struct EligibleVerificationKey<'a> {
     selected_key_is_primary: bool,
 }
 
-fn eligible_verification_keys(cert: &openpgp::Cert) -> Vec<EligibleVerificationKey<'_>> {
-    let mut eligible_keys = vec![EligibleVerificationKey {
-        cert,
-        key: cert.primary_key().key().clone().role_into_unspecified(),
-        selected_key_is_primary: true,
-    }];
+/// Whether a detached certification signature is itself acceptable, independent
+/// of which candidate signer produced it: it must use a policy-acceptable hash
+/// and must not be expired.
+///
+/// Third-party certifications require **collision** resistance — an attacker who
+/// can collide the hash could transfer a vouch onto an attacker-controlled
+/// key/name pair — so SHA-1 is rejected here. (Self-signature checks elsewhere
+/// use second-preimage resistance, under which SHA-1 has a later policy cutoff.)
+fn certification_signature_acceptable(
+    signature: &Signature,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
+) -> bool {
+    policy
+        .signature(signature, HashAlgoSecurity::CollisionResistance)
+        .is_ok()
+        && signature
+            .signature_alive(reference_time, Duration::ZERO)
+            .is_ok()
+}
 
-    for subkey in cert.keys().subkeys() {
-        if !is_explicit_certification_capable(&subkey) {
-            continue;
-        }
-
-        eligible_keys.push(EligibleVerificationKey {
-            cert,
-            key: subkey.key().clone().role_into_unspecified(),
-            selected_key_is_primary: false,
-        });
+/// Candidate signer keys that may have produced a certification, restricted to
+/// keys trustworthy enough to record a `Valid` vouch: the signer certificate
+/// must be policy-valid and unrevoked, and each returned key must be unrevoked,
+/// certification-capable, and use a supported algorithm.
+///
+/// This mirrors the generation-side revocation/policy gate
+/// (`ensure_external_certification_certificate_not_revoked` +
+/// `select_external_certification_primary_signing_key`), which likewise rejects
+/// revoked signers but **allows expired ones**: expiration only means "make no
+/// new signatures with this key", so a certification made while the key was live
+/// stays a valid historical vouch. Revocation (e.g. key compromise) is what
+/// invalidates prior vouches, so we gate on that — not aliveness. (The
+/// certification signature's own expiry is still enforced, in
+/// `certification_signature_acceptable`.)
+fn eligible_verification_keys<'a>(
+    cert: &'a openpgp::Cert,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
+) -> Vec<EligibleVerificationKey<'a>> {
+    let valid_cert = match cert.with_policy(policy, Some(reference_time)) {
+        Ok(valid_cert) => valid_cert,
+        Err(_) => return Vec::new(),
+    };
+    if !matches!(
+        valid_cert.revocation_status(),
+        RevocationStatus::NotAsFarAsWeKnow
+    ) {
+        return Vec::new();
     }
 
-    eligible_keys
+    let primary_fingerprint = cert.fingerprint();
+    valid_cert
+        .keys()
+        .supported()
+        .revoked(false)
+        .for_certification()
+        .map(|candidate| EligibleVerificationKey {
+            cert,
+            selected_key_is_primary: candidate.key().fingerprint() == primary_fingerprint,
+            key: candidate.key().clone(),
+        })
+        .collect()
 }
 
 fn verify_direct_key_issuer_guided(
     signature: &Signature,
     target_cert: &openpgp::Cert,
     candidate_signers: &[openpgp::Cert],
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
 ) -> Option<CertificateSignatureResult> {
     let issuers = signature.get_issuers();
     if issuers.is_empty() {
@@ -483,7 +562,7 @@ fn verify_direct_key_issuer_guided(
 
     let mut saw_match = false;
     for cert in candidate_signers {
-        for key in eligible_verification_keys(cert) {
+        for key in eligible_verification_keys(cert, policy, reference_time) {
             if issuers
                 .iter()
                 .any(|issuer| issuer.aliases(key.key.key_handle()))
@@ -511,12 +590,14 @@ fn verify_direct_key_fallback(
     signature: &Signature,
     target_cert: &openpgp::Cert,
     candidate_signers: &[openpgp::Cert],
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
 ) -> Result<CertificateSignatureResult, PgpError> {
     let mut attempted = false;
 
     for cert in candidate_signers {
         attempted = true;
-        for key in eligible_verification_keys(cert) {
+        for key in eligible_verification_keys(cert, policy, reference_time) {
             if signature
                 .verify_direct_key(&key.key, target_cert.primary_key().key())
                 .is_ok()
@@ -544,6 +625,8 @@ fn verify_user_id_issuer_guided(
     user_id: &UserID,
     candidate_signers: &[openpgp::Cert],
     certification_kind: CertificationKind,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
 ) -> Option<CertificateSignatureResult> {
     let issuers = signature.get_issuers();
     if issuers.is_empty() {
@@ -552,7 +635,7 @@ fn verify_user_id_issuer_guided(
 
     let mut saw_match = false;
     for cert in candidate_signers {
-        for key in eligible_verification_keys(cert) {
+        for key in eligible_verification_keys(cert, policy, reference_time) {
             if issuers
                 .iter()
                 .any(|issuer| issuer.aliases(key.key.key_handle()))
@@ -582,12 +665,14 @@ fn verify_user_id_fallback(
     user_id: &UserID,
     candidate_signers: &[openpgp::Cert],
     certification_kind: CertificationKind,
+    policy: &StandardPolicy,
+    reference_time: SystemTime,
 ) -> Result<CertificateSignatureResult, PgpError> {
     let mut attempted = false;
 
     for cert in candidate_signers {
         attempted = true;
-        for key in eligible_verification_keys(cert) {
+        for key in eligible_verification_keys(cert, policy, reference_time) {
             if signature
                 .verify_userid_binding(&key.key, target_cert.primary_key().key(), user_id)
                 .is_ok()
