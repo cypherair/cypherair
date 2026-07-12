@@ -653,40 +653,6 @@ struct ContactSnapshotMutator {
         return Mutation(output: artifact, didMutate: true)
     }
 
-    func updateCertificationArtifactValidation(
-        artifactId: String,
-        status: ContactCertificationValidationStatus,
-        in snapshot: inout ContactsDomainSnapshot
-    ) throws -> Mutation<ContactCertificationArtifactReference> {
-        let before = snapshot
-        let now = Date()
-        guard status != .valid else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(
-                    localized: "contactcertification.update.validRequiresVerification",
-                    defaultValue: "Certification signatures must be revalidated before they can be marked valid."
-                )
-            )
-        }
-        guard let index = snapshot.certificationArtifacts.firstIndex(where: { $0.artifactId == artifactId }) else {
-            throw CypherAirError.internalError(
-                reason: String(localized: "contacts.notFound", defaultValue: "The selected contact could not be found.")
-            )
-        }
-
-        snapshot.certificationArtifacts[index].validationStatus = status
-        snapshot.certificationArtifacts[index].updatedAt = now
-        snapshot.certificationArtifacts[index].lastValidatedAt = status == .valid
-            ? now
-            : snapshot.certificationArtifacts[index].lastValidatedAt
-        snapshot.certificationArtifacts[index] = try snapshot.certificationArtifacts[index]
-            .validatedForPersistence(now: now)
-        _ = try recomputeCertificationProjections(in: &snapshot, updatedAt: now)
-        snapshot.updatedAt = now
-        try snapshot.validateContract()
-        return Mutation(output: snapshot.certificationArtifacts[index], didMutate: snapshot != before)
-    }
-
     @discardableResult
     func recomputeCertificationProjections(
         in snapshot: inout ContactsDomainSnapshot,

@@ -1473,22 +1473,6 @@
         }
       }
     },
-    "contactcertification.update.validRequiresVerification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certification signatures must be revalidated before they can be marked valid."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "必须重新验证认证签名后才能将其标记为有效。"
-          }
-        }
-      }
-    },
     "contactcertsig.action.certify" : {
       "localizations" : {
         "en" : {

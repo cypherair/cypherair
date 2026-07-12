@@ -728,7 +728,6 @@ final class AppContainer: @unchecked Sendable {
             certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: .standard,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             // Short-window modify-expiry pre-auth: wired in production only.
@@ -1146,7 +1145,6 @@ final class AppContainer: @unchecked Sendable {
             certificateAdapter: certificateAdapter,
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             authLifecycleTraceStore: authLifecycleTraceStore,

@@ -466,7 +466,6 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults,
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )
@@ -514,7 +513,6 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
-            defaults: defaults,
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )

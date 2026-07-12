@@ -43,7 +43,6 @@ enum TestHelpers {
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
                 keychain: mockKC,
                 memoryInfo: memInfo,
-                defaults: .standard,
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,
@@ -56,7 +55,6 @@ enum TestHelpers {
             service = KeyManagementService(
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
                 keychain: mockKC,
-                defaults: .standard,
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,
                 expiryAuthenticator: expiryAuthenticator,

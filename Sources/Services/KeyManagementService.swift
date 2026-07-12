@@ -46,7 +46,6 @@ final class KeyManagementService: @unchecked Sendable {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
-        defaults: UserDefaults = .standard,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
