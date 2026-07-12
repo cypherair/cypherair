@@ -110,8 +110,6 @@
 				App/Contacts/AddContactQRPhotoSelection.swift,
 				App/Contacts/AddContactScreenModel.swift,
 				App/Contacts/AddContactView.swift,
-				App/Contacts/ContactCertificateSignaturesScreenModel.swift,
-				App/Contacts/ContactCertificateSignaturesView.swift,
 				App/Contacts/ContactCertificationDetailsScreenModel.swift,
 				App/Contacts/ContactCertificationDetailsView.swift,
 				App/Contacts/ContactDetailScreenModel.swift,

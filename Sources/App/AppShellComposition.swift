@@ -26,8 +26,6 @@ struct AppRouteDestinationView: View {
                 contactId: contactId,
                 keyId: keyId
             )
-        case .contactCertificateSignatures(let fingerprint):
-            ContactCertificateSignaturesView(fingerprint: fingerprint)
         case .tagManagement:
             TagManagementView()
         case .tagDetail(let tagId):
