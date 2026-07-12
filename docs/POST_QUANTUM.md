@@ -36,6 +36,6 @@ A PQ public certificate armors to ~30 KB — an order of magnitude beyond single
 
 ## 5. Remaining scope (tracked on issue #567)
 
-- **`sq` interop pack:** cross-implementation RFC 9980 round-trip fixtures, including the vendored-combiner KAT against the published sample messages.
+- **`sq` interop pack (landed):** cross-implementation RFC 9580/9980 fixtures plus live `sq` lanes, preserved under `pgp-mobile/tests/` and documented in [TESTING.md](TESTING.md) §5. The vendored-combiner cross-implementation check decrypts the committed `sq`-encapsulated post-quantum fixtures through the split-custody path — real-`sq` sample messages stand in for RFC-appendix sample-message vectors.
 - Oldest-supported-iPhone Secure Enclave probe on maintainer hardware.
 - Watch sequoia issue #1249 (`multi_key_combine` export) to delete the vendored combiner.
