@@ -141,7 +141,8 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
                     userIdData: Data("stale@example.com".utf8),
                     displayText: "Stale <stale@example.com>",
                     isCurrentlyPrimary: true,
-                    isCurrentlyRevoked: false
+                    isCurrentlyRevoked: false,
+                    isSelfCertified: true
                 ),
             ]
         )
@@ -897,7 +898,8 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
                     userIdData: Data("details-stale@example.com".utf8),
                     displayText: "Details Stale <details-stale@example.com>",
                     isCurrentlyPrimary: true,
-                    isCurrentlyRevoked: false
+                    isCurrentlyRevoked: false,
+                    isSelfCertified: true
                 ),
             ]
         )

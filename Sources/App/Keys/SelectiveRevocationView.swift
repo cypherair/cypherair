@@ -317,6 +317,15 @@ private struct SelectiveUserIdRow: View {
                             color: .red
                         )
                     }
+                    if !userId.isSelfCertified {
+                        StatusBadge(
+                            title: String(
+                                localized: "selectiverevocation.status.unauthenticated",
+                                defaultValue: "Unauthenticated"
+                            ),
+                            color: .orange
+                        )
+                    }
                 }
             }
 

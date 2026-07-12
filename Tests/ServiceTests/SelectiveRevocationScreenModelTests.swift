@@ -569,14 +569,16 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
                     userIdData: duplicateUserIdData,
                     displayText: "Alice <alice@example.com>",
                     isCurrentlyPrimary: true,
-                    isCurrentlyRevoked: false
+                    isCurrentlyRevoked: false,
+                    isSelfCertified: true
                 ),
                 UserIdSelectionOption(
                     occurrenceIndex: 1,
                     userIdData: duplicateUserIdData,
                     displayText: "Alice <alice@example.com>",
                     isCurrentlyPrimary: false,
-                    isCurrentlyRevoked: true
+                    isCurrentlyRevoked: true,
+                    isSelfCertified: true
                 )
             ]
         )
@@ -600,7 +602,8 @@ final class SelectiveRevocationScreenModelTests: XCTestCase {
                     userIdData: Data("Bob <bob@example.com>".utf8),
                     displayText: "Bob <bob@example.com>",
                     isCurrentlyPrimary: true,
-                    isCurrentlyRevoked: false
+                    isCurrentlyRevoked: false,
+                    isSelfCertified: true
                 )
             ]
         )

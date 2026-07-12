@@ -768,6 +768,11 @@ pub struct DiscoveredUserId {
     pub is_currently_primary: bool,
     /// Whether this User ID is currently revoked under StandardPolicy + now.
     pub is_currently_revoked: bool,
+    /// Whether this User ID carries a valid self-certification binding it to the
+    /// certificate's primary key under StandardPolicy + now. A raw User ID packet
+    /// with no such binding is unauthenticated: nothing proves the key holder
+    /// claimed that identity.
+    pub is_self_certified: bool,
 }
 
 /// Selector identity for a specific User ID occurrence in a certificate snapshot.
@@ -974,7 +979,7 @@ fn discover_user_id(
     now: SystemTime,
 ) -> DiscoveredUserId {
     let user_id_data = occurrence.user_id.value().to_vec();
-    let (is_currently_primary, is_currently_revoked) =
+    let (is_currently_primary, is_currently_revoked, is_self_certified) =
         current_user_id_occurrence_state(cert, occurrence, policy, now);
 
     DiscoveredUserId {
@@ -983,6 +988,7 @@ fn discover_user_id(
         user_id_data,
         is_currently_primary,
         is_currently_revoked,
+        is_self_certified,
     }
 }
 
@@ -1133,12 +1139,14 @@ fn raw_user_id_occurrences(cert_data: &[u8]) -> Result<Vec<RawUserIdOccurrence>,
     Ok(occurrences)
 }
 
+/// Current display/selector state for one raw User ID occurrence:
+/// `(is_currently_primary, is_currently_revoked, is_self_certified)`.
 fn current_user_id_occurrence_state(
     cert: &openpgp::Cert,
     occurrence: &RawUserIdOccurrence,
     policy: &StandardPolicy,
     now: SystemTime,
-) -> (bool, bool) {
+) -> (bool, bool, bool) {
     let primary_key = cert.primary_key().key();
     let binding_signature = occurrence
         .signatures
@@ -1194,6 +1202,7 @@ fn current_user_id_occurrence_state(
                 .expect("active revocation signatures always have a creation time")
         });
 
+    let is_self_certified = binding_signature.is_some();
     let is_currently_primary = binding_signature
         .and_then(|signature| signature.primary_userid())
         .unwrap_or(false);
@@ -1206,5 +1215,5 @@ fn current_user_id_occurrence_state(
         _ => false,
     };
 
-    (is_currently_primary, is_currently_revoked)
+    (is_currently_primary, is_currently_revoked, is_self_certified)
 }

@@ -121,7 +121,8 @@ enum PGPCertificateSelectionAdapter {
                     userIdData: discoveredUserId.userIdData,
                     displayText: discoveredUserId.displayText,
                     isCurrentlyPrimary: discoveredUserId.isCurrentlyPrimary,
-                    isCurrentlyRevoked: discoveredUserId.isCurrentlyRevoked
+                    isCurrentlyRevoked: discoveredUserId.isCurrentlyRevoked,
+                    isSelfCertified: discoveredUserId.isSelfCertified
                 )
             }
         )

@@ -2297,7 +2297,7 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
     /**
      * Parse S2K parameters from a passphrase-protected key without importing it.
      * Use this to check Argon2id memory requirements before calling import_secret_key.
-     * Returns S2K type, memory requirement (KiB), parallelism, and time passes.
+     * Returns S2K type and memory requirement (KiB).
      */
     func parseS2kParams(armoredData: Data) throws  -> S2kInfo
 
@@ -3543,7 +3543,7 @@ open func parseRevocationCert(revData: Data, certData: Data)throws  -> String  {
     /**
      * Parse S2K parameters from a passphrase-protected key without importing it.
      * Use this to check Argon2id memory requirements before calling import_secret_key.
-     * Returns S2K type, memory requirement (KiB), parallelism, and time passes.
+     * Returns S2K type and memory requirement (KiB).
      */
 open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
     return try  FfiConverterTypeS2kInfo_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -4519,6 +4519,13 @@ public struct DiscoveredUserId: Equatable, Hashable {
      * Whether this User ID is currently revoked under StandardPolicy + now.
      */
     public var isCurrentlyRevoked: Bool
+    /**
+     * Whether this User ID carries a valid self-certification binding it to the
+     * certificate's primary key under StandardPolicy + now. A raw User ID packet
+     * with no such binding is unauthenticated: nothing proves the key holder
+     * claimed that identity.
+     */
+    public var isSelfCertified: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4537,12 +4544,19 @@ public struct DiscoveredUserId: Equatable, Hashable {
          */isCurrentlyPrimary: Bool,
         /**
          * Whether this User ID is currently revoked under StandardPolicy + now.
-         */isCurrentlyRevoked: Bool) {
+         */isCurrentlyRevoked: Bool,
+        /**
+         * Whether this User ID carries a valid self-certification binding it to the
+         * certificate's primary key under StandardPolicy + now. A raw User ID packet
+         * with no such binding is unauthenticated: nothing proves the key holder
+         * claimed that identity.
+         */isSelfCertified: Bool) {
         self.occurrenceIndex = occurrenceIndex
         self.userIdData = userIdData
         self.displayText = displayText
         self.isCurrentlyPrimary = isCurrentlyPrimary
         self.isCurrentlyRevoked = isCurrentlyRevoked
+        self.isSelfCertified = isSelfCertified
     }
 
 
@@ -4565,7 +4579,8 @@ public struct FfiConverterTypeDiscoveredUserId: FfiConverterRustBuffer {
                 userIdData: FfiConverterData.read(from: &buf),
                 displayText: FfiConverterString.read(from: &buf),
                 isCurrentlyPrimary: FfiConverterBool.read(from: &buf),
-                isCurrentlyRevoked: FfiConverterBool.read(from: &buf)
+                isCurrentlyRevoked: FfiConverterBool.read(from: &buf),
+                isSelfCertified: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -4575,6 +4590,7 @@ public struct FfiConverterTypeDiscoveredUserId: FfiConverterRustBuffer {
         FfiConverterString.write(value.displayText, into: &buf)
         FfiConverterBool.write(value.isCurrentlyPrimary, into: &buf)
         FfiConverterBool.write(value.isCurrentlyRevoked, into: &buf)
+        FfiConverterBool.write(value.isSelfCertified, into: &buf)
     }
 }
 
@@ -9730,7 +9746,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_revocation_cert() != 24404) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 51523) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 26152) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {

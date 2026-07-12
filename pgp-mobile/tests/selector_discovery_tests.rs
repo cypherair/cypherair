@@ -132,6 +132,36 @@ fn duplicate_userid_raw_with_signature(
     duplicated
 }
 
+/// Splice a bare User ID packet (no binding signature at all) into the raw
+/// certificate stream, the shape an attacker-injected identity claim takes.
+fn append_unbound_userid_raw(secret_cert: &[u8], user_id: &str) -> Vec<u8> {
+    let userid: UserID = user_id.into();
+    let mut userid_bytes = Vec::new();
+    Packet::from(userid)
+        .serialize(&mut userid_bytes)
+        .expect("userid packet should serialize");
+
+    let raw_cert =
+        openpgp::cert::raw::RawCert::from_bytes(secret_cert).expect("raw secret cert should parse");
+    let mut extended = Vec::new();
+    let mut inserted = false;
+
+    for packet in raw_cert.packets() {
+        if !inserted && matches!(packet.tag(), Tag::PublicSubkey | Tag::SecretSubkey) {
+            extended.extend_from_slice(&userid_bytes);
+            inserted = true;
+        }
+
+        extended.extend_from_slice(packet.as_bytes());
+    }
+
+    if !inserted {
+        extended.extend_from_slice(&userid_bytes);
+    }
+
+    extended
+}
+
 fn revoke_userid_occurrence(secret_cert: &[u8], occurrence_index: usize) -> Vec<u8> {
     revoke_userid_occurrence_with_signature(secret_cert, occurrence_index, None, None)
 }
@@ -659,4 +689,28 @@ fn test_discover_certificate_selectors_secret_and_public_builder_outputs_match()
         .expect("secret selector discovery should succeed");
 
     assert_eq!(from_public, from_secret);
+}
+
+#[test]
+fn test_discover_certificate_selectors_unbound_user_id_is_not_self_certified() {
+    let generated = generate_key(KeyProfile::Universal, "Binding Holder");
+    let extended = append_unbound_userid_raw(
+        &generated.cert_data,
+        "Injected Identity <injected@example.com>",
+    );
+
+    let discovered = keys::discover_certificate_selectors(&extended)
+        .expect("selector discovery should succeed");
+
+    assert_eq!(discovered.user_ids.len(), 2);
+    assert!(
+        discovered.user_ids[0].is_self_certified,
+        "generated User ID must carry a valid self-certification"
+    );
+    assert!(
+        !discovered.user_ids[1].is_self_certified,
+        "raw injected User ID packet has no authenticated binding"
+    );
+    assert!(!discovered.user_ids[1].is_currently_primary);
+    assert!(!discovered.user_ids[1].is_currently_revoked);
 }

@@ -1015,7 +1015,7 @@ impl PgpEngine {
 
     /// Parse S2K parameters from a passphrase-protected key without importing it.
     /// Use this to check Argon2id memory requirements before calling import_secret_key.
-    /// Returns S2K type, memory requirement (KiB), parallelism, and time passes.
+    /// Returns S2K type and memory requirement (KiB).
     pub fn parse_s2k_params(&self, armored_data: Vec<u8>) -> Result<S2kInfo, PgpError> {
         keys::parse_s2k_params(&armored_data)
     }

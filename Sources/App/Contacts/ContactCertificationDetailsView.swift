@@ -314,11 +314,30 @@ private struct ContactCertificationDetailsHostView: View {
                     )
                 ) {
                     ForEach(model.userIds, id: \.self) { userId in
-                        Text(userId.displayText)
-                            .tag(Optional(userId))
+                        Text(
+                            userId.isSelfCertified
+                                ? userId.displayText
+                                : String(
+                                    localized: "contactcertsig.userId.unauthenticated.row",
+                                    defaultValue: "\(userId.displayText) — unauthenticated"
+                                )
+                        )
+                        .tag(Optional(userId))
                     }
                 }
                 .disabled(model.isOperationLocked)
+
+                if model.selectedUserId?.isSelfCertified == false {
+                    Label(
+                        String(
+                            localized: "contactcertsig.userId.unauthenticated.warning",
+                            defaultValue: "This User ID has no valid self-certification binding it to the key. Nothing proves the key holder claimed this identity — certifying it is not recommended."
+                        ),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                }
             }
 
             if model.signers.isEmpty {
