@@ -63,6 +63,9 @@ jobs:
           cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 
   rust-gnupg-interop:
+    # Job key kept as rust-gnupg-interop (branch protection may pin the check
+    # name); the display name covers both cross-tool interop lanes.
+    name: Rust cross-tool interop (GnuPG + sq)
     runs-on: macos-26
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -75,17 +78,21 @@ jobs:
           rustup default stable
           rustc +stable --version
           cargo +stable --version
-      - name: Install GnuPG and assert interop version floor
+      - name: Install GnuPG + sq and assert interop version floors
         run: |
-          brew install gnupg
+          brew install gnupg sequoia-sq
           bash scripts/assert_min_gpg_version.sh 2.4.0
-      - name: Run Secure Enclave + Profile A GnuPG interop lanes (skips forbidden)
+          bash scripts/assert_min_sq_version.sh 1.3.0
+      - name: Run GnuPG + sq cross-tool interop lanes (skips forbidden)
         env:
           CYPHERAIR_REQUIRE_GPG: "1"
+          CYPHERAIR_REQUIRE_SQ: "1"
         run: |
           cargo +stable test --manifest-path pgp-mobile/Cargo.toml \
             --test secure_enclave_gnupg_interop_tests \
-            --test gnupg_binary_tests
+            --test gnupg_binary_tests \
+            --test sq_interop_tests \
+            --test sq_live_interop_tests
 
   xcframework-package:
     needs: rust-full-tests
