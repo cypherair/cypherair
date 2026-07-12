@@ -2069,15 +2069,15 @@ public protocol PgpEngineProtocol: AnyObject, Sendable {
 
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
-     * Profile A → Iterated+Salted S2K. Profile B → Argon2id.
+     * Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
      */
     func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile) throws  -> Data
 
     /**
      * Generate a new key pair with the specified profile.
      *
-     * - Profile A (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-     * - Profile B (Advanced): v6 key, Ed448+X448, RFC 9580.
+     * - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
+     * - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
      */
     func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile) throws  -> GeneratedKey
 
@@ -3008,7 +3008,7 @@ open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: St
 
     /**
      * Export a secret key protected with a passphrase (ASCII-armored).
-     * Profile A → Iterated+Salted S2K. Profile B → Argon2id.
+     * Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
      */
 open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfile)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -3024,8 +3024,8 @@ open func exportSecretKey(certData: Data, passphrase: String, profile: KeyProfil
     /**
      * Generate a new key pair with the specified profile.
      *
-     * - Profile A (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-     * - Profile B (Advanced): v6 key, Ed448+X448, RFC 9580.
+     * - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
+     * - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
      */
 open func generateKey(name: String, email: String?, expirySeconds: UInt64?, profile: KeyProfile)throws  -> GeneratedKey  {
     return try  FfiConverterTypeGeneratedKey_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
@@ -4968,7 +4968,7 @@ public struct GeneratedKey: Equatable, Hashable {
      */
     public var fingerprint: String
     /**
-     * Key version (4 for Profile A, 6 for Profile B).
+     * Key version (4 for Portable Legacy, 6 for Portable Modern · High).
      */
     public var keyVersion: UInt8
     /**
@@ -4994,7 +4994,7 @@ public struct GeneratedKey: Equatable, Hashable {
          * Key fingerprint as lowercase hex string.
          */fingerprint: String,
         /**
-         * Key version (4 for Profile A, 6 for Profile B).
+         * Key version (4 for Portable Legacy, 6 for Portable Modern · High).
          */keyVersion: UInt8,
         /**
          * The profile used to generate this key.
@@ -5883,7 +5883,7 @@ public func FfiConverterTypePublicCertificateValidationResult_lower(_ value: Pub
  */
 public struct S2kInfo: Equatable, Hashable {
     /**
-     * S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
+     * S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
      */
     public var s2kType: String
     /**
@@ -5895,7 +5895,7 @@ public struct S2kInfo: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
+         * S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
          */s2kType: String,
         /**
          * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
@@ -8395,9 +8395,9 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * Encryption profile selection.
- * Profile A (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
+ * Portable Legacy (Universal): v4, Ed25519+X25519, SEIPDv1, Iterated+Salted S2K.
  * Modern: v6, Ed25519+X25519, SEIPDv2 AEAD OCB, Argon2id S2K.
- * Profile B (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
+ * Portable Modern · High (Advanced): v6, Ed448+X448, SEIPDv2 AEAD OCB, Argon2id S2K.
  * Post-Quantum: v6, RFC 9980 composite ML-DSA-65+Ed25519 signing and
  * ML-KEM-768+X25519 encryption, SEIPDv2, Argon2id S2K.
  * Post-Quantum · High: v6, RFC 9980 composite ML-DSA-87+Ed448 signing and
@@ -8407,11 +8407,11 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
 public enum KeyProfile: Equatable, Hashable {
 
     /**
-     * Profile A: Universal compatible. v4 keys, GnuPG compatible.
+     * Portable Legacy: Universal compatible. v4 keys, GnuPG compatible.
      */
     case universal
     /**
-     * Profile B: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
+     * Portable Modern · High: Advanced security. v6 Ed448+X448 keys, RFC 9580. Presented to
      * the user as "Modern · High"; the baseline v6 classical tier is `Modern`.
      */
     case advanced
@@ -9644,10 +9644,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 13100) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 10460) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 34421) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 9133) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 50547) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {

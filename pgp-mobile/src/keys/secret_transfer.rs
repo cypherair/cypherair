@@ -1,15 +1,15 @@
 use super::*;
 
-/// Encrypt a secret key using Argon2id S2K (Profile B).
+/// Encrypt a secret key using Argon2id S2K.
 /// Uses an explicit export strategy rather than inline magic numbers so Swift-side
 /// calibration can later plug into the same path without rewriting the export flow.
-struct ProfileBExportS2kStrategy {
+struct Argon2idExportS2kStrategy {
     time_passes: u8,
     parallelism: u8,
     memory_exponent: u8,
 }
 
-impl ProfileBExportS2kStrategy {
+impl Argon2idExportS2kStrategy {
     fn interactive_default() -> Self {
         Self {
             // PRD target: roughly 3 seconds on contemporary hardware.
@@ -30,7 +30,7 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     let mut salt = [0u8; 16];
     openpgp::crypto::random(&mut salt)?;
 
-    let strategy = ProfileBExportS2kStrategy::interactive_default();
+    let strategy = Argon2idExportS2kStrategy::interactive_default();
 
     // The default export strategy is intentionally explicit and centralized.
     // Future device calibration can override these fields via the same strategy model
@@ -61,7 +61,7 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
 }
 
 /// Export a secret key protected with a passphrase.
-/// - Profile A (Universal): Iterated+Salted S2K (mode 3) — GnuPG compatible.
+/// - Portable Legacy (Universal): Iterated+Salted S2K (mode 3) — GnuPG compatible.
 /// - Every v6 profile (Modern, Advanced, Post-Quantum, Post-Quantum · High):
 ///   Argon2id S2K (512 MB / p=4 / t=3) — RFC 9580.
 ///
@@ -77,7 +77,7 @@ pub fn export_secret_key(
 
     // Validate that the provided profile matches the key's actual shape.
     // Algorithm-aware: a v6 RFC 9980 composite cert is Post-Quantum, not
-    // Profile B, so a bare version check is not sufficient.
+    // Portable Modern · High, so a bare version check is not sufficient.
     let key_version = cert.primary_key().key().version();
     let expected_profile = super::profile::classify_profile(&cert);
     if profile != expected_profile {
@@ -92,10 +92,10 @@ pub fn export_secret_key(
     let password = openpgp::crypto::Password::from(passphrase);
 
     // Encrypt each secret key component with the passphrase.
-    // For Profile A: Sequoia's default S2K (Iterated+Salted) is appropriate.
-    // For Profile B: We must explicitly use Argon2id S2K, because Sequoia's
+    // For Portable Legacy: Sequoia's default S2K (Iterated+Salted) is appropriate.
+    // For Portable Modern · High: We must explicitly use Argon2id S2K, because Sequoia's
     // S2K::default() returns Iterated+Salted for all key versions.
-    // PRD requires Argon2id (512 MB / p=4 / ~3s) for Profile B exports.
+    // PRD requires Argon2id (512 MB / p=4 / ~3s) for Portable Modern · High exports.
     let mut encrypted_packets: Vec<openpgp::Packet> = Vec::new();
 
     // Encrypt primary key

@@ -20,9 +20,9 @@ pub fn generate_key_with_profile(
             // Explicitly set RFC4880 profile and strip SEIPDv2 feature.
             // Sequoia 2.2.0 defaults to advertising SEIPDv2 support in the
             // Features subpacket (because the library itself supports it).
-            // For Profile A (GnuPG-compatible), we must advertise only SEIPDv1
+            // For Portable Legacy (GnuPG-compatible), we must advertise only SEIPDv1
             // so that other implementations send SEIPDv1 messages to this key.
-            // Without this, GnuPG users cannot decrypt messages sent to Profile A keys.
+            // Without this, GnuPG users cannot decrypt messages sent to Portable Legacy keys.
             builder = builder
                 .set_cipher_suite(CipherSuite::Cv25519)
                 .set_profile(openpgp::Profile::RFC4880)

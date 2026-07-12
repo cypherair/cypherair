@@ -64,7 +64,7 @@ impl ExpirySignatureHashStrategy {
 /// Requires the full certificate with secret key material, because updating the expiry
 /// requires re-signing the primary key's binding signatures (direct key sig + all User ID
 /// binding sigs) and any current non-revoked subkey binding signatures that carry their
-/// own validity period. Works identically for v4 (Profile A) and v6 (Profile B) keys.
+/// own validity period. Works identically for v4 (Portable Legacy) and v6 (Portable Modern · High) keys.
 ///
 /// - `cert_data`: Full certificate with secret key material (binary OpenPGP format).
 /// - `new_expiry_seconds`: Duration from now in seconds. `None` removes expiry (never expire).
