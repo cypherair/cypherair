@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(AppKit)
-import AppKit
-#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -86,7 +83,7 @@ final class OperationController {
     }
 
     func copyToClipboard(_ string: String, shouldShowNotice: Bool) {
-        PlatformClipboard.copy(string)
+        CypherClipboard.copy(string)
         if shouldShowNotice {
             isShowingClipboardNotice = true
         }
@@ -162,18 +159,6 @@ final class OperationController {
             return true
         }
         return false
-    }
-}
-
-@MainActor
-private enum PlatformClipboard {
-    static func copy(_ string: String) {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = string
-        #elseif canImport(AppKit)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(string, forType: .string)
-        #endif
     }
 }
 
