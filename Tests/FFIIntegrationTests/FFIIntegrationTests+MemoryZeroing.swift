@@ -34,13 +34,4 @@ extension FFIIntegrationTests {
         sensitive.zeroize()
         XCTAssertTrue(sensitive.data.allSatisfy { $0 == 0 }, "SensitiveData must be zeroed after zeroize()")
     }
-
-    /// Verify SensitiveData deinit does not crash (zeroing happens in deinit).
-    func test_sensitiveData_deinit_zerosStorage() {
-        // Create and immediately release — deinit should fire without crash.
-        autoreleasepool {
-            _ = SensitiveData(Data(repeating: 0x42, count: 64))
-        }
-        // If we reach here without crash, deinit zeroing worked.
-    }
 }

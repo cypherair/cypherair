@@ -103,9 +103,15 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
             0,
             "gpg --verify of the SE-generated signature should succeed.\n\(verifyResult.stderrText)"
         )
+        // Assert the machine-readable GOODSIG/VALIDSIG status tokens (emitted via
+        // --status-fd 2) rather than the localizable "Good signature" human prose.
         XCTAssertTrue(
-            verifyResult.stderrText.contains("Good signature"),
-            "gpg should report a good SE signature.\n\(verifyResult.stderrText)"
+            verifyResult.stderrText.contains("[GNUPG:] GOODSIG"),
+            "gpg --status-fd should emit GOODSIG for the SE signature.\n\(verifyResult.stderrText)"
+        )
+        XCTAssertTrue(
+            verifyResult.stderrText.contains("[GNUPG:] VALIDSIG"),
+            "gpg --status-fd should emit VALIDSIG for the SE signature.\n\(verifyResult.stderrText)"
         )
 
         // Direction B (gpg -> SE): gpg encrypts to the SE certificate; the production
@@ -213,7 +219,10 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
     private func runGpg(_ args: [String], gpg: URL, gnupgHome: URL) throws -> GpgResult {
         let process = Process()
         process.executableURL = gpg
-        process.arguments = ["--batch", "--yes", "--trust-model", "always"] + args
+        // --status-fd 2 routes machine-readable [GNUPG:] status lines to stderr
+        // (captured below), so verification is asserted on GOODSIG/VALIDSIG tokens
+        // rather than localizable human prose.
+        process.arguments = ["--batch", "--yes", "--trust-model", "always", "--status-fd", "2"] + args
         var environment = ProcessInfo.processInfo.environment
         environment["GNUPGHOME"] = gnupgHome.path
         process.environment = environment

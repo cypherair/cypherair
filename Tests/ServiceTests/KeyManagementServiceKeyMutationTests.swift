@@ -61,10 +61,12 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         mockKC.deleteError = MockKeychainError.deleteFailed
 
         XCTAssertThrowsError(try service.deleteKey(fingerprint: first.fingerprint)) { error in
-            guard case .keychainError(let message) = error as? CypherAirError else {
+            // A partial keychain-delete failure surfaces as the typed .keychainError
+            // case; the behavior the test guards is that the current session state
+            // still syncs (asserted below), not the human-readable message text.
+            guard case .keychainError = error as? CypherAirError else {
                 return XCTFail("Expected CypherAirError.keychainError, got \(error)")
             }
-            XCTAssertTrue(message.contains("Partial key deletion"))
         }
 
         XCTAssertEqual(service.keys.map(\.fingerprint), [second.fingerprint])

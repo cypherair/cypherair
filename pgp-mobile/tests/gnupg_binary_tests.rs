@@ -14,7 +14,7 @@
 
 mod common;
 
-use common::gnupg::{gpg_cmd, gpg_import_key, setup_gpg_home};
+use common::gnupg::{assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, setup_gpg_home};
 use common::load_fixture;
 use pgp_mobile::armor;
 use pgp_mobile::encrypt;
@@ -161,8 +161,10 @@ fn test_gpg_verifies_sequoia_cleartext_signature() {
     let signed_file = gnupghome.path().join("sequoia_signed.asc");
     std::fs::write(&signed_file, &signed).expect("Failed to write signed file");
 
-    // gpg --verify
+    // gpg --verify, with machine-readable status on stderr (fd 2).
     let output = gpg_cmd(&gpg, &gnupghome)
+        .arg("--status-fd")
+        .arg("2")
         .arg("--verify")
         .arg(&signed_file)
         .output()
@@ -174,13 +176,7 @@ fn test_gpg_verifies_sequoia_cleartext_signature() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    // GnuPG prints signature info to stderr
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Good signature"),
-        "gpg should report 'Good signature', got stderr:\n{}",
-        stderr,
-    );
+    assert_gpg_status_good_signature(&output.stderr);
 }
 
 /// Verify that `gpg --verify` accepts a Sequoia detached signature.
@@ -213,8 +209,10 @@ fn test_gpg_verifies_sequoia_detached_signature() {
             .expect("Detached signing should succeed");
     std::fs::write(&sig_file, &signature).expect("Failed to write signature file");
 
-    // gpg --verify <sig> <data>
+    // gpg --verify <sig> <data>, with machine-readable status on stderr (fd 2).
     let output = gpg_cmd(&gpg, &gnupghome)
+        .arg("--status-fd")
+        .arg("2")
         .arg("--verify")
         .arg(&sig_file)
         .arg(&data_file)
@@ -227,12 +225,7 @@ fn test_gpg_verifies_sequoia_detached_signature() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Good signature"),
-        "gpg should report 'Good signature', got stderr:\n{}",
-        stderr,
-    );
+    assert_gpg_status_good_signature(&output.stderr);
 }
 
 /// Verify that `gpg --import` rejects a Sequoia-generated Modern High (v6) public key.
@@ -312,8 +305,11 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
     let ct_file = gnupghome.path().join("signed_encrypted.asc");
     std::fs::write(&ct_file, &ciphertext).expect("Failed to write ciphertext file");
 
-    // gpg --decrypt
+    // gpg --decrypt, with machine-readable status on stderr (fd 2) so the
+    // decrypted plaintext on stdout stays clean.
     let output = gpg_cmd(&gpg, &gnupghome)
+        .arg("--status-fd")
+        .arg("2")
         .arg("--decrypt")
         .arg(&ct_file)
         .output()
@@ -333,11 +329,6 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
         "Decrypted plaintext should match original",
     );
 
-    // GnuPG should report signature verification in stderr
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Good signature"),
-        "gpg should verify the inline signature, got stderr:\n{}",
-        stderr,
-    );
+    // GnuPG should report a good signature for the inline signature.
+    assert_gpg_status_good_signature(&output.stderr);
 }

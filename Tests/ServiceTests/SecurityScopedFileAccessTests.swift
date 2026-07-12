@@ -36,7 +36,12 @@ final class SecurityScopedFileAccessTests: XCTestCase {
             }
             XCTFail("Expected an access failure")
         } catch let error as CypherAirError {
-            XCTAssertEqual(error.localizedDescription, CypherAirError.internalError(reason: "second").localizedDescription)
+            // Assert the underlying error case + associated reason, not its copy:
+            // the second (failing) resource's failure is the one propagated.
+            guard case .internalError(let reason) = error else {
+                return XCTFail("Expected CypherAirError.internalError, got \(error)")
+            }
+            XCTAssertEqual(reason, "second")
         } catch {
             XCTFail("Unexpected error type: \(error)")
         }

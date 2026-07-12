@@ -137,9 +137,7 @@ final class KeyMigrationCoordinatorTests: XCTestCase {
 
         XCTAssertFalse(summary.shouldClearRecoveryFlag)
         XCTAssertFalse(summary.shouldUpdateAuthMode)
-        XCTAssertTrue(summary.startupDiagnostics.contains {
-            $0.contains("retry")
-        })
+        XCTAssertTrue(summary.outcomes.contains(.retryableFailure))
     }
 
     private func makeBundle(_ tag: UInt8 = 0x10) -> WrappedKeyBundle {

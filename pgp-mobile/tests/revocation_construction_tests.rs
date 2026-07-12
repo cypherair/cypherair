@@ -164,9 +164,16 @@ fn test_generate_key_revocation_legacy_validates_against_source_cert() {
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
 
-    let result = keys::parse_revocation_cert(&revocation, &generated.public_key_data)
+    keys::parse_revocation_cert(&revocation, &generated.public_key_data)
         .expect("revocation should validate");
-    assert!(result.contains("revocation"));
+    // Inspect the packet directly rather than the description string: the
+    // primary-key revocation must be a KeyRevocation signature (the subkey /
+    // user-ID revocation types are pinned in the signature-type test below).
+    let packet = Packet::from_bytes(&revocation).expect("revocation packet should parse");
+    match packet {
+        Packet::Signature(sig) => assert_eq!(sig.typ(), SignatureType::KeyRevocation),
+        other => panic!("expected key revocation signature, got: {other:?}"),
+    }
 }
 
 #[test]
@@ -175,9 +182,16 @@ fn test_generate_key_revocation_modern_high_validates_against_source_cert() {
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
 
-    let result = keys::parse_revocation_cert(&revocation, &generated.public_key_data)
+    keys::parse_revocation_cert(&revocation, &generated.public_key_data)
         .expect("revocation should validate");
-    assert!(result.contains("revocation"));
+    // Inspect the packet directly rather than the description string: the
+    // primary-key revocation must be a KeyRevocation signature (the subkey /
+    // user-ID revocation types are pinned in the signature-type test below).
+    let packet = Packet::from_bytes(&revocation).expect("revocation packet should parse");
+    match packet {
+        Packet::Signature(sig) => assert_eq!(sig.typ(), SignatureType::KeyRevocation),
+        other => panic!("expected key revocation signature, got: {other:?}"),
+    }
 }
 
 #[test]
