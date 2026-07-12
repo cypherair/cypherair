@@ -351,11 +351,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(identity.shortKeyId, "34567890abcdef12")
     }
 
-    func test_pgpKeyIdentity_formattedFingerprint_groupsOf4() {
-        let identity = makeIdentity(fingerprint: "abcdef1234567890")
-        XCTAssertEqual(identity.formattedFingerprint, "abcd ef12 3456 7890")
-    }
-
     func test_identityPresentation_fingerprintGroups_groupsInChunksOfFour() {
         XCTAssertEqual(
             IdentityPresentation.fingerprintGroups("abcdef1234567890"),

@@ -115,7 +115,6 @@ enum PGPMessageResultMapper {
                 status: DetailedSignatureVerification.Entry.Status(from: entry.status),
                 verificationState: appState,
                 signerPrimaryFingerprint: entry.signerPrimaryFingerprint,
-                verificationCertificateFingerprint: entry.verificationCertificateFingerprint,
                 contactsUnavailableReason: appState == .contactsContextUnavailable ? unavailableReason : nil,
                 signerIdentity: SignatureVerification.SignerIdentity.resolve(
                     fingerprint: entry.verificationCertificateFingerprint,

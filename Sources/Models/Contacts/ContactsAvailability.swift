@@ -26,18 +26,4 @@ extension ContactsAvailability {
     var allowsProtectedCertificationPersistence: Bool {
         self == .availableProtectedDomain
     }
-
-    var requiresUnlock: Bool {
-        switch self {
-        case .locked:
-            true
-        case .availableProtectedDomain, .opening, .recoveryNeeded,
-             .frameworkUnavailable, .restartRequired:
-            false
-        }
-    }
-
-    var blocksMutations: Bool {
-        !isAvailable
-    }
 }

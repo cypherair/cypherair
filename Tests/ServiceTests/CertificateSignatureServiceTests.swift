@@ -538,7 +538,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(identity?.source, .unknown)
-        XCTAssertEqual(identity?.shortKeyId, "89abcdef01234567")
     }
 }
 

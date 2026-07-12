@@ -20,7 +20,6 @@ struct ContactSummaryProjector {
                     primaryEmail: identity.primaryEmail,
                     tagIds: identity.tagIds,
                     tags: tags,
-                    notes: identity.notes,
                     keys: keys
                 )
             }
@@ -38,7 +37,6 @@ struct ContactSummaryProjector {
             return ContactRecipientSummary(
                 contactId: identity.contactId,
                 displayName: identity.displayName,
-                primaryEmail: identity.primaryEmail,
                 tagIds: identity.tagIds,
                 preferredKey: preferredKey
             )
@@ -111,8 +109,7 @@ struct ContactSummaryProjector {
             isExpired: keyRecord.isExpired,
             manualVerificationState: keyRecord.manualVerificationState,
             usageState: keyRecord.usageState,
-            certificationProjection: keyRecord.certificationProjection,
-            certificationArtifactIds: keyRecord.certificationArtifactIds
+            certificationProjection: keyRecord.certificationProjection
         )
     }
 

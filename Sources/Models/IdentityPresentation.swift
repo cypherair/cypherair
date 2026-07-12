@@ -22,12 +22,6 @@ enum IdentityPresentation {
         group.map(String.init).joined(separator: " ")
     }
 
-    static func fingerprintAccessibilityLabel(_ fingerprint: String) -> String {
-        fingerprintGroups(fingerprint)
-            .map(fingerprintAccessibilityGroupLabel(_:))
-            .joined(separator: ", ")
-    }
-
     static func parsedDisplayName(from userId: String?) -> String? {
         guard let userId else { return nil }
         if let angleBracketIndex = userId.firstIndex(of: "<") {

@@ -98,7 +98,6 @@ final class DecryptionService {
         }
 
         return FileDecryptionPhase1Result(
-            recipientKeyIds: matchedFingerprints,
             matchedKey: matchedKey,
             inputPath: inputPath
         )

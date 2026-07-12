@@ -67,16 +67,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         IdentityPresentation.shortKeyId(from: fingerprint)
     }
 
-    /// Formatted fingerprint for display (groups of 4 characters).
-    var formattedFingerprint: String {
-        IdentityPresentation.formattedFingerprint(fingerprint)
-    }
-
-    /// Format a hex fingerprint string into groups of 4 characters separated by spaces.
-    static func formatFingerprint(_ hex: String) -> String {
-        IdentityPresentation.formattedFingerprint(hex)
-    }
-
     var openPGPConfiguration: PGPKeyConfiguration {
         openPGPConfigurationIdentity.configuration
     }

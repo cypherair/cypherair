@@ -52,17 +52,6 @@ final class AppConfiguration {
         }
     }
 
-    /// Incremented when decrypted content should be cleared (e.g., grace period expired).
-    var contentClearGeneration: Int = 0
-
-    /// Request that views holding decrypted content clear it.
-    func requestContentClear() {
-        contentClearGeneration += 1
-    }
-
-    /// Timestamp of last successful authentication, for grace period calculation.
-    var lastAuthenticationDate: Date?
-
     // MARK: - UserDefaults Keys
 
     static let appSessionAuthenticationPolicyKey = "com.cypherair.preference.appSessionAuthenticationPolicy"
@@ -78,16 +67,9 @@ final class AppConfiguration {
             ?? .userPresence
     }
 
-    /// Record a successful authentication.
-    func recordAuthentication() {
-        lastAuthenticationDate = Date()
-    }
-
     func resetToFirstRunDefaults() {
         privateKeyControlState = .locked
         appSessionAuthenticationPolicy = .userPresence
-        contentClearGeneration += 1
-        lastAuthenticationDate = nil
 
         for key in Self.resetPersistentKeys {
             defaults.removeObject(forKey: key)
