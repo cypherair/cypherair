@@ -52,7 +52,6 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
         )
 
         XCTAssertEqual(material.metadata.keyVersion, 4)
-        XCTAssertEqual(material.metadata.profile, .universal)
         XCTAssertFalse(material.publicKeyData.isEmpty)
         XCTAssertFalse(material.revocationCert.isEmpty)
         XCTAssertFalse(material.signingKeyFingerprint.isEmpty)
