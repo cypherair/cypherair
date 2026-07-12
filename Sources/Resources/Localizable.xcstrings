@@ -2145,6 +2145,54 @@
         }
       }
     },
+    "contactcertsig.userId.unauthenticated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unauthenticated"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未认证"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.unauthenticated.row" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — unauthenticated"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@（未认证）"
+          }
+        }
+      }
+    },
+    "contactcertsig.userId.unauthenticated.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This User ID has no valid self-certification binding it to the key. Nothing proves the key holder claimed this identity — certifying it is not recommended."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此用户 ID 缺少将其绑定到该密钥的有效自签认证。无法证明密钥持有者声明过此身份，不建议为其签发认证。"
+          }
+        }
+      }
+    },
     "contactcertsig.userIds" : {
       "localizations" : {
         "en" : {
@@ -12769,6 +12817,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已吊销"
+          }
+        }
+      }
+    },
+    "selectiverevocation.status.unauthenticated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unauthenticated"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未认证"
           }
         }
       }

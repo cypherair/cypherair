@@ -19,4 +19,9 @@ struct UserIdSelectionOption: Equatable, Hashable {
     /// Display-oriented current revocation state.
     let isCurrentlyRevoked: Bool
 
+    /// Whether this User ID carries a valid self-certification binding it to the
+    /// certificate's primary key. A raw User ID packet without one is an
+    /// unauthenticated identity claim: nothing proves the key holder made it.
+    let isSelfCertified: Bool
+
 }

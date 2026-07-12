@@ -419,7 +419,8 @@ final class CertificateSignatureServiceTests: XCTestCase {
             userIdData: selectedUserId.userIdData + Data("-mismatch".utf8),
             displayText: selectedUserId.displayText,
             isCurrentlyPrimary: selectedUserId.isCurrentlyPrimary,
-            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked
+            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked,
+            isSelfCertified: selectedUserId.isSelfCertified
         )
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
@@ -458,7 +459,8 @@ final class CertificateSignatureServiceTests: XCTestCase {
             userIdData: selectedUserId.userIdData,
             displayText: selectedUserId.displayText,
             isCurrentlyPrimary: selectedUserId.isCurrentlyPrimary,
-            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked
+            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked,
+            isSelfCertified: selectedUserId.isSelfCertified
         )
         let unwrapCountBefore = stack.mockSE.unwrapCallCount
 
@@ -501,7 +503,8 @@ final class CertificateSignatureServiceTests: XCTestCase {
             userIdData: selectedUserId.userIdData + Data("-mismatch".utf8),
             displayText: selectedUserId.displayText,
             isCurrentlyPrimary: selectedUserId.isCurrentlyPrimary,
-            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked
+            isCurrentlyRevoked: selectedUserId.isCurrentlyRevoked,
+            isSelfCertified: selectedUserId.isSelfCertified
         )
 
         await XCTAssertThrowsErrorAsync(

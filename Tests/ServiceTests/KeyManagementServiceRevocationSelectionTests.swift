@@ -469,7 +469,8 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             userIdData: baseOption.userIdData,
             displayText: baseOption.displayText,
             isCurrentlyPrimary: baseOption.isCurrentlyPrimary,
-            isCurrentlyRevoked: baseOption.isCurrentlyRevoked
+            isCurrentlyRevoked: baseOption.isCurrentlyRevoked,
+            isSelfCertified: baseOption.isSelfCertified
         )
 
         let unwrapBefore = mockSE.unwrapCallCount
@@ -504,7 +505,8 @@ final class KeyManagementServiceRevocationSelectionTests: KeyManagementServiceTe
             userIdData: tamperedBytes,
             displayText: baseOption.displayText,
             isCurrentlyPrimary: baseOption.isCurrentlyPrimary,
-            isCurrentlyRevoked: baseOption.isCurrentlyRevoked
+            isCurrentlyRevoked: baseOption.isCurrentlyRevoked,
+            isSelfCertified: baseOption.isSelfCertified
         )
 
         let unwrapBefore = mockSE.unwrapCallCount

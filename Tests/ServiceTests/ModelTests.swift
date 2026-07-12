@@ -1095,7 +1095,8 @@ final class ModelTests: XCTestCase {
             userIdData: Data("duplicate@example.com".utf8),
             displayText: "duplicate@example.com",
             isCurrentlyPrimary: false,
-            isCurrentlyRevoked: true
+            isCurrentlyRevoked: true,
+            isSelfCertified: true
         )
         let selectorInput = PGPCertificateSelectionAdapter.userIdSelectorInput(for: option)
 
