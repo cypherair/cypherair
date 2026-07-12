@@ -267,8 +267,12 @@ final class KeyMutationService {
                 namespace: .pending
             )
         } catch {
+            // Journal deliberately retained: cleanupPendingBundle is best-effort,
+            // and clearing the journal after a silently failed cleanup would
+            // re-create the journal-invisible orphan this ordering prevents.
+            // Startup recovery resolves either end state — (complete, missing)
+            // → .none clears the flag; (complete, complete) → .deletePending.
             bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
-            try? privateKeyControlStore.clearModifyExpiryJournal()
             throw error
         }
 
@@ -278,8 +282,8 @@ final class KeyMutationService {
                 namespace: .pending
             )
         } catch {
+            // Journal retained — same rationale as the save catch above.
             bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
-            try? privateKeyControlStore.clearModifyExpiryJournal()
             throw error
         }
 
