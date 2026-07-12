@@ -6,6 +6,7 @@ pub mod format;
 pub mod gnupg;
 pub mod pq;
 pub mod secure_enclave;
+pub mod sq;
 pub mod tamper;
 
 #[allow(dead_code)]
