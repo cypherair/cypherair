@@ -2145,6 +2145,22 @@
         }
       }
     },
+    "contactcertsig.userId.unauthenticated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unauthenticated"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未认证"
+          }
+        }
+      }
+    },
     "contactcertsig.userId.unauthenticated.row" : {
       "localizations" : {
         "en" : {

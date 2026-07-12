@@ -564,6 +564,15 @@ private struct ContactCertificateSelectableUserIdRow: View {
                             color: .red
                         )
                     }
+                    if !userId.isSelfCertified {
+                        ContactCertificateStatusBadge(
+                            title: String(
+                                localized: "contactcertsig.userId.unauthenticated",
+                                defaultValue: "Unauthenticated"
+                            ),
+                            color: .orange
+                        )
+                    }
                 }
             }
 
