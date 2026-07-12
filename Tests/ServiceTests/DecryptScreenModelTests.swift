@@ -1086,7 +1086,6 @@ final class DecryptScreenModelTests: XCTestCase {
         inputURL: URL
     ) -> FileDecryptionPhase1Result {
         FileDecryptionPhase1Result(
-            recipientKeyIds: ["ABCD1234"],
             matchedKey: matchedKey,
             inputPath: inputURL.path
         )
