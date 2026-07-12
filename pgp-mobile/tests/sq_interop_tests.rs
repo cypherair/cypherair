@@ -330,7 +330,7 @@ fn test_verify_sq_pqhigh_signatures() {
 
 // ── (e) Mixed-recipient format rule with sq certificates in the set ────────
 
-/// The SEIPDv1 floor (hard constraint #8): an engine Universal (Profile A)
+/// The SEIPDv1 floor (hard constraint #8): an engine Universal (Portable Legacy)
 /// key advertises only SEIPDv1, so mixing it with an sq v6 cert must floor
 /// the whole message to SEIPDv1 — never SEIPDv2 when a v4-only holder is a
 /// recipient — and both sides must decrypt. Mirrors the cross-profile GnuPG

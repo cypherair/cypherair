@@ -256,7 +256,7 @@ The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIR
 
 The `rust-gnupg-interop` CI job (displayed as "Rust cross-tool interop (GnuPG + sq)") brews sequoia-sq alongside gnupg, asserts the sq version floor (`scripts/assert_min_sq_version.sh`), and runs both sq suites under `CYPHERAIR_REQUIRE_SQ=1`.
 
-Format nuance: sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2; the v4-only SEIPDv1 floor is asserted with an engine Profile A key mixed into the recipient set (TDD §1.4).
+Format nuance: sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2; the v4-only SEIPDv1 floor is asserted with an engine Portable Legacy key mixed into the recipient set (TDD §1.4).
 
 ## 6. MIE Validation
 

@@ -144,7 +144,7 @@ fn test_match_recipients_modern_high_returns_primary_fingerprint() {
         .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"profile b test",
+        b"modern high test",
         &[key.public_key_data.clone()],
         None,
         None,

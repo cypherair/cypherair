@@ -109,7 +109,7 @@ fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
         None,
         KeyProfile::Universal,
     )
-    .expect("profile A generates");
+    .expect("legacy generates");
 
     // Hidden (wildcard) recipients; the non-composite X25519 PKESK is emitted
     // before the composite PKESK. A wildcard recipient speculatively matches
@@ -238,7 +238,7 @@ fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
         None,
         KeyProfile::Universal,
     )
-    .expect("profile A generates");
+    .expect("legacy generates");
 
     let ciphertext = engine()
         .encrypt(
@@ -276,7 +276,7 @@ fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
 
     let secret_keys = vec![Zeroizing::new(legacy.cert_data)];
     let software = decrypt::decrypt_detailed(&ciphertext, &secret_keys, &[])
-        .expect("profile A decrypt succeeds");
+        .expect("legacy decrypt succeeds");
     assert_eq!(software.plaintext, PLAINTEXT);
 }
 
