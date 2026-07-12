@@ -17,11 +17,7 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Key version (4 for the v4 Legacy family, 6 for the v6 families).
     let keyVersion: UInt8
 
-    /// Encryption profile.
-    let profile: PGPKeyProfile
-
-    /// Successor OpenPGP configuration identity, persisted independently from
-    /// the historical profile vocabulary.
+    /// The authoritative OpenPGP configuration identity for this key.
     let openPGPConfigurationIdentity: PGPKeyConfiguration.Identity
 
     /// Private-key custody model for this local identity.
@@ -71,6 +67,14 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
         openPGPConfigurationIdentity.configuration
     }
 
+    /// The portable software profile this identity's configuration maps onto,
+    /// or nil for Secure Enclave custody configurations. Software-only
+    /// operations (secret-key export) require it; everything else reads the
+    /// authoritative `openPGPConfigurationIdentity` instead.
+    var softwareProfile: PGPKeyProfile? {
+        openPGPConfigurationIdentity.equivalentSoftwareProfile
+    }
+
     /// Fingerprints of software-custody identities — the keys with SE-wrapped
     /// private-key bundles subject to auth-mode re-wrap and re-wrap recovery.
     /// Device-bound Secure Enclave custody keys have no bundle and must never
@@ -88,7 +92,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     init(
         fingerprint: String,
         keyVersion: UInt8,
-        profile: PGPKeyProfile,
         userId: String?,
         hasEncryptionSubkey: Bool,
         isRevoked: Bool,
@@ -105,7 +108,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     ) {
         self.fingerprint = fingerprint
         self.keyVersion = keyVersion
-        self.profile = profile
         self.openPGPConfigurationIdentity = openPGPConfigurationIdentity
         self.privateKeyCustodyKind = privateKeyCustodyKind
         self.userId = userId

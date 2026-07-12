@@ -115,9 +115,6 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
               configuration.keyVersion == identity.keyVersion else {
             return .blocked(.unsupported(.invalidConfigurationCustody))
         }
-        guard identity.profile.keyVersion == identity.keyVersion else {
-            return .blocked(.unavailable(.metadataAssociationMismatch))
-        }
         guard !identity.publicKeyData.isEmpty else {
             return .blocked(.unavailable(.publicMaterialUnavailable))
         }
@@ -259,8 +256,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         tier: SecureEnclaveCompositeTier
     ) async -> PrivateKeyOperationRoute {
         let configuration = identity.openPGPConfiguration
-        guard configuration.keyVersion == identity.keyVersion,
-              identity.profile.keyVersion == identity.keyVersion else {
+        guard configuration.keyVersion == identity.keyVersion else {
             return .blocked(.unavailable(.metadataAssociationMismatch))
         }
         guard !identity.publicKeyData.isEmpty else {

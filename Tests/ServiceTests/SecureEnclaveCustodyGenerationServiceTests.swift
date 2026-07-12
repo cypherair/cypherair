@@ -9,9 +9,6 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             PGPKeyConfiguration.Identity.compatibleP256V4,
             .modernP256V6
         ] {
-            let expectedProfile: PGPKeyProfile = configurationIdentity.configuration.keyVersion == 4
-                ? .universal
-                : .advanced
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             let metadataStore = MemoryKeyMetadataPersistence()
             let builder = MockSecureEnclaveCustodyCertificateBuilder(
@@ -41,7 +38,9 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 PGPPrivateKeyCustodyKind.appleSecureEnclavePrivateOperations
             )
             XCTAssertEqual(identity.keyVersion, configurationIdentity.configuration.keyVersion)
-            XCTAssertEqual(identity.profile, expectedProfile)
+            // Device-bound custody has no portable software profile — nothing
+            // synthesized anymore.
+            XCTAssertNil(identity.softwareProfile)
             XCTAssertFalse(identity.publicKeyData.isEmpty)
             XCTAssertFalse(identity.revocationCert.isEmpty)
             XCTAssertEqual(metadataStore.identities, [identity])
@@ -488,7 +487,6 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: configurationIdentity.configuration.keyVersion,
-            profile: configurationIdentity.configuration.keyVersion == 4 ? .universal : .advanced,
             userId: "Existing",
             hasEncryptionSubkey: true,
             isRevoked: false,

@@ -118,7 +118,7 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
     func test_secureEnclaveV6RouteSignsFileAndVerifies() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertEqual(fixture.identity.profile, .advanced)
+        XCTAssertNil(fixture.identity.softwareProfile)
         XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         var recipient = try makeRecipient(profile: .advanced)
@@ -650,7 +650,6 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: keyInfo.keyVersion == 6 ? .advanced : .universal,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -757,7 +756,6 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,

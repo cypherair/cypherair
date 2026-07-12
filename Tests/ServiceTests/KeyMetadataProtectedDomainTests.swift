@@ -37,7 +37,6 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         let invalidIdentity = PGPKeyIdentity(
             fingerprint: "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
             keyVersion: 4,
-            profile: .universal,
             userId: "Invalid <invalid@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -321,12 +320,13 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
     }
 
-    func test_keyMetadataPayloadValidationRejectsProfileKeyVersionMismatch() throws {
+    func test_keyMetadataPayloadValidationRejectsConfigurationKeyVersionMismatch() throws {
+        // The persisted keyVersion must match the authoritative configuration
+        // identity's key version (a v6 record claiming the v4 Legacy family).
         let identity = PGPKeyIdentity(
             fingerprint: "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8",
-            keyVersion: 4,
-            profile: .advanced,
-            userId: "Mismatched Profile <mismatched-profile@example.invalid>",
+            keyVersion: 6,
+            userId: "Mismatched Configuration <mismatched-configuration@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
             isExpired: false,
@@ -349,7 +349,6 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
             keyVersion: 4,
-            profile: .universal,
             userId: "P-256 <p256@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,

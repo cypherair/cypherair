@@ -762,7 +762,7 @@ struct ContactSnapshotMutator {
             displayName: Self.domainDisplayName(from: metadata.userId),
             email: IdentityPresentation.email(from: metadata.userId),
             keyVersion: metadata.keyVersion,
-            profile: metadata.profile,
+            profile: validation.profile,
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
@@ -791,7 +791,7 @@ struct ContactSnapshotMutator {
         updatedRecord.displayName = Self.domainDisplayName(from: metadata.userId)
         updatedRecord.email = IdentityPresentation.email(from: metadata.userId)
         updatedRecord.keyVersion = metadata.keyVersion
-        updatedRecord.profile = metadata.profile
+        updatedRecord.profile = validation.profile
         updatedRecord.primaryAlgo = metadata.primaryAlgo
         updatedRecord.subkeyAlgo = metadata.subkeyAlgo
         updatedRecord.hasEncryptionSubkey = metadata.hasEncryptionSubkey

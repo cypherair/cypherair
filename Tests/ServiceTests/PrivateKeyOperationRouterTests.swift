@@ -190,7 +190,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
             keyVersion: 4,
-            profile: .universal,
             userId: "Invalid <invalid@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -884,7 +883,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
             keyVersion: 6,
-            profile: .postQuantum,
             userId: "Composite <composite@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -905,7 +903,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: "1111111111111111111111111111111111111111",
             keyVersion: 4,
-            profile: .universal,
             userId: "Software <software@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,
@@ -926,7 +923,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: "2222222222222222222222222222222222222222",
             keyVersion: 4,
-            profile: .universal,
             userId: "Secure Enclave <secure@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,

@@ -102,7 +102,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         // Verify fingerprint and profile match
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
-        XCTAssertEqual(imported.profile, .universal,
+        XCTAssertEqual(imported.softwareProfile, .universal,
                        "Imported key should retain Profile A (universal)")
         XCTAssertEqual(imported.keyVersion, 4)
     }
@@ -124,7 +124,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
-        XCTAssertEqual(imported.profile, .advanced,
+        XCTAssertEqual(imported.softwareProfile, .advanced,
                        "Imported key should retain Profile B (advanced)")
         XCTAssertEqual(imported.keyVersion, 6)
     }
@@ -198,7 +198,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Binary import should produce same fingerprint as original")
-        XCTAssertEqual(imported.profile, .universal)
+        XCTAssertEqual(imported.softwareProfile, .universal)
         XCTAssertEqual(imported.keyVersion, 4)
         XCTAssertFalse(imported.revocationCert.isEmpty, "Imported key should immediately store a revocation signature")
 
@@ -226,7 +226,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Binary import should produce same fingerprint as original")
-        XCTAssertEqual(imported.profile, .advanced)
+        XCTAssertEqual(imported.softwareProfile, .advanced)
         XCTAssertEqual(imported.keyVersion, 6)
         XCTAssertFalse(imported.revocationCert.isEmpty)
 

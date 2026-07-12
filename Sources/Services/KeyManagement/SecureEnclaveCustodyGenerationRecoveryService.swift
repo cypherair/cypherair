@@ -83,15 +83,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             )
         }
 
-        guard identity.profile.keyVersion == identity.keyVersion else {
-            return assessment(
-                identity: identity,
-                ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.metadataAssociationMismatch),
-                revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.metadataAssociationMismatch)
-            )
-        }
 
         guard !identity.publicKeyData.isEmpty else {
             return assessment(

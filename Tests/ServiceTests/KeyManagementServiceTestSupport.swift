@@ -845,7 +845,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -913,7 +912,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
             keyVersion: metadata.keyVersion,
-            profile: metadata.profile,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -1008,7 +1006,6 @@ class KeyManagementServiceTestCase: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
             keyVersion: metadata.keyVersion,
-            profile: metadata.profile,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -1020,7 +1017,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: metadata.profile.openPGPConfiguration.identity,
+            openPGPConfigurationIdentity: try XCTUnwrap(metadata.profile).openPGPConfiguration.identity,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
         try storeIdentity(identity)

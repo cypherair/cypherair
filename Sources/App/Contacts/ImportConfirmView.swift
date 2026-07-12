@@ -69,10 +69,14 @@ struct ImportConfirmView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    infoRow(
-                        String(localized: "import.keyType", defaultValue: "Key Type"),
-                        value: metadata.profile.contactKeyKindDisplayName
-                    )
+                    // Contact imports always carry a detected software profile;
+                    // the row simply disappears in the impossible nil case.
+                    if let profile = metadata.profile {
+                        infoRow(
+                            String(localized: "import.keyType", defaultValue: "Key Type"),
+                            value: profile.contactKeyKindDisplayName
+                        )
+                    }
                     infoRow(
                         String(localized: "import.algorithm", defaultValue: "Algorithm"),
                         value: metadata.primaryAlgo

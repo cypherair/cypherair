@@ -584,7 +584,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         PGPKeyIdentity(
             fingerprint: base.fingerprint,
             keyVersion: keyVersion,
-            profile: base.profile,
             userId: base.userId,
             hasEncryptionSubkey: base.hasEncryptionSubkey,
             isRevoked: base.isRevoked,

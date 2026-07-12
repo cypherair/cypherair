@@ -30,6 +30,13 @@ final class KeyExportService {
         guard identity.privateKeyCustodyKind == .softwareSecretCertificate else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnsupportedForCustody)
         }
+        // Software custody implies a portable software family (enforced by the
+        // key-metadata domain contract); guard before unwrapping any secret.
+        guard let softwareProfile = identity.softwareProfile else {
+            throw CypherAirError.internalError(
+                reason: "Secret-key export requires a portable software profile."
+            )
+        }
 
         var secretKey = try await privateKeyAccessService.unwrapPrivateKey(fingerprint: fingerprint)
         defer {
@@ -39,7 +46,7 @@ final class KeyExportService {
         let exported = try await keyAdapter.exportSecretKey(
             certData: secretKey,
             passphrase: passphrase,
-            profile: identity.profile
+            profile: softwareProfile
         )
 
         if markBackedUp {

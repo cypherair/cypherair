@@ -1649,7 +1649,6 @@ final class SettingsScreenModelTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: 4,
-            profile: .universal,
             userId: nil,
             hasEncryptionSubkey: true,
             isRevoked: false,

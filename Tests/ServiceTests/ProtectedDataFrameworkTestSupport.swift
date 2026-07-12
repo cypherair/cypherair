@@ -216,7 +216,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint.lowercased(),
             keyVersion: 4,
-            profile: .universal,
             userId: userId,
             hasEncryptionSubkey: true,
             isRevoked: false,

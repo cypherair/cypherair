@@ -492,7 +492,6 @@ final class ModelTests: XCTestCase {
             [
                 "fingerprint",
                 "keyVersion",
-                "profile",
                 "openPGPConfigurationIdentity",
                 "privateKeyCustodyKind",
                 "userId",
@@ -1075,7 +1074,6 @@ final class ModelTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: 4,
-            profile: .universal,
             userId: "Test",
             hasEncryptionSubkey: true,
             isRevoked: false,

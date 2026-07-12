@@ -480,7 +480,6 @@ func makeKeyRouteTestIdentity(fingerprint: String) -> PGPKeyIdentity {
     PGPKeyIdentity(
         fingerprint: fingerprint,
         keyVersion: 6,
-        profile: .advanced,
         userId: "Alice <alice@example.com>",
         hasEncryptionSubkey: true,
         isRevoked: false,
