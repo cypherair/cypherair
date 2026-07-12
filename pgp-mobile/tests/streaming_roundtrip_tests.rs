@@ -19,12 +19,12 @@ fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
 // ── Encrypt/Decrypt Round-Trip Tests ───────────────────────────────────
 
 #[test]
-fn test_encrypt_decrypt_file_profile_a_roundtrip() {
+fn test_encrypt_decrypt_file_legacy_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeyProfile::Universal);
 
     // Write test data to input file
-    let plaintext = b"Hello from Profile A streaming test!";
+    let plaintext = b"Hello from Legacy streaming test!";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -73,11 +73,11 @@ fn test_encrypt_decrypt_file_profile_a_roundtrip() {
 }
 
 #[test]
-fn test_encrypt_decrypt_file_profile_b_roundtrip() {
+fn test_encrypt_decrypt_file_modern_high_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeyProfile::Advanced);
 
-    let plaintext = b"Hello from Profile B streaming test with AEAD!";
+    let plaintext = b"Hello from Modern High streaming test with AEAD!";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -110,11 +110,11 @@ fn test_encrypt_decrypt_file_profile_b_roundtrip() {
 // ── Signed Encrypt/Decrypt Tests ───────────────────────────────────────
 
 #[test]
-fn test_encrypt_decrypt_file_with_signature_profile_a() {
+fn test_encrypt_decrypt_file_with_signature_legacy() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeyProfile::Universal);
 
-    let plaintext = b"Signed Profile A streaming message";
+    let plaintext = b"Signed Legacy streaming message";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -160,11 +160,11 @@ fn test_encrypt_decrypt_file_with_signature_profile_a() {
 }
 
 #[test]
-fn test_encrypt_decrypt_file_with_signature_profile_b() {
+fn test_encrypt_decrypt_file_with_signature_modern_high() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeyProfile::Advanced);
 
-    let plaintext = b"Signed Profile B streaming message with AEAD";
+    let plaintext = b"Signed Modern High streaming message with AEAD";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -205,11 +205,11 @@ fn test_encrypt_decrypt_file_with_signature_profile_b() {
 // ── Sign/Verify Detached File Tests ────────────────────────────────────
 
 #[test]
-fn test_sign_verify_detached_file_profile_a() {
+fn test_sign_verify_detached_file_legacy() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeyProfile::Universal);
 
-    let data = b"File content to sign with Profile A";
+    let data = b"File content to sign with Legacy";
     let data_path = dir.path().join("document.txt");
     fs::write(&data_path, data).unwrap();
 
@@ -241,11 +241,11 @@ fn test_sign_verify_detached_file_profile_a() {
 }
 
 #[test]
-fn test_sign_verify_detached_file_profile_b() {
+fn test_sign_verify_detached_file_modern_high() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeyProfile::Advanced);
 
-    let data = b"File content to sign with Profile B";
+    let data = b"File content to sign with Modern High";
     let data_path = dir.path().join("document.txt");
     fs::write(&data_path, data).unwrap();
 
@@ -331,7 +331,7 @@ fn test_encrypt_file_cross_profile() {
     let decrypted_path = dir.path().join("decrypted.txt");
     fs::write(&input_path, plaintext).unwrap();
 
-    // Encrypt from Profile B sender to Profile A recipient (should use SEIPDv1)
+    // Encrypt from Modern High sender to Legacy recipient (should use SEIPDv1)
     streaming::encrypt_file(
         input_path.to_str().unwrap(),
         encrypted_path.to_str().unwrap(),
@@ -348,7 +348,7 @@ fn test_encrypt_file_cross_profile() {
     assert!(has_v1, "Cross-profile message should use SEIPDv1");
     assert!(!has_v2, "Cross-profile message should NOT use SEIPDv2");
 
-    // Decrypt with Profile A recipient key
+    // Decrypt with Legacy recipient key
     let result = streaming::decrypt_file_detailed(
         encrypted_path.to_str().unwrap(),
         decrypted_path.to_str().unwrap(),

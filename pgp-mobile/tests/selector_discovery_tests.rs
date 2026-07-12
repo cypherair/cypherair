@@ -245,7 +245,7 @@ fn first_user_id_text(cert_data: &[u8]) -> String {
 }
 
 #[test]
-fn test_discover_certificate_selectors_profile_a_generated_cert_exposes_selectors() {
+fn test_discover_certificate_selectors_legacy_generated_cert_exposes_selectors() {
     let generated = generate_key(KeyProfile::Universal, "SelectorA");
 
     let discovered = keys::discover_certificate_selectors(&generated.public_key_data)
@@ -299,7 +299,7 @@ fn test_discover_certificate_selectors_profile_a_generated_cert_exposes_selector
 }
 
 #[test]
-fn test_discover_certificate_selectors_profile_b_public_and_secret_match() {
+fn test_discover_certificate_selectors_modern_high_public_and_secret_match() {
     let generated = generate_key(KeyProfile::Advanced, "SelectorB");
 
     let from_public = keys::discover_certificate_selectors(&generated.public_key_data)

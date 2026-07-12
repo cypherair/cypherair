@@ -7,7 +7,7 @@ import Foundation
 /// It does NOT apply to routine message decryption or signing (those use
 /// the SE-unwrapped private key directly).
 ///
-/// Profile A keys use Iterated+Salted S2K (memoryKib=0) — the guard is a no-op.
+/// Portable Legacy keys use Iterated+Salted S2K (memoryKib=0) — the guard is a no-op.
 ///
 /// See SECURITY.md Section 7, TDD Section 4.
 struct Argon2idMemoryGuard {
@@ -29,7 +29,7 @@ struct Argon2idMemoryGuard {
     private static let maxMemoryKib: UInt64 = 1 << 31
 
     func validate(protectionInfo: PGPKeyImportS2KInfo) throws {
-        // Non-Argon2id (Profile A: "iterated-salted") — no memory check needed.
+        // Non-Argon2id (Portable Legacy: "iterated-salted") — no memory check needed.
         guard protectionInfo.s2kType == "argon2id" else { return }
 
         // memoryKib=0 means no memory requirement (shouldn't happen for argon2id,

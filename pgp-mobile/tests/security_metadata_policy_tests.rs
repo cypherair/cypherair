@@ -71,15 +71,15 @@ fn test_armor_decode_known_kinds_not_unknown() {
     );
 }
 
-/// Encrypt/decrypt round-trip with Unicode plaintext (Chinese + emoji) for Profile A and Profile B.
+/// Encrypt/decrypt round-trip with Unicode plaintext (Chinese + emoji) for Legacy and Modern High.
 #[test]
 fn test_encrypt_decrypt_unicode_plaintext_round_trip() {
     let unicode_plaintext = "Hello, 你好, 🔐 — encrypted message with CJK and emoji.";
     let plaintext_bytes = unicode_plaintext.as_bytes();
 
     for (profile, label) in [
-        (KeyProfile::Universal, "Profile A"),
-        (KeyProfile::Advanced, "Profile B"),
+        (KeyProfile::Universal, "Legacy"),
+        (KeyProfile::Advanced, "Modern High"),
     ] {
         let key = keys::generate_key_with_profile("Unicode Test".to_string(), None, None, profile)
             .expect("Key gen should succeed");

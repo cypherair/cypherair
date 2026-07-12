@@ -1,4 +1,4 @@
-//! Profile A message-path tests.
+//! Legacy message-path tests.
 //! Covers key generation, sign/verify, encrypt/decrypt, detached signatures,
 //! armor, tamper handling, and other message-centric regressions.
 
@@ -22,7 +22,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
 /// C2A.1: Generate Ed25519+X25519 v4 key pair.
 /// Pass: key version is 4.
 #[test]
-fn test_generate_key_profile_a_produces_v4() {
+fn test_generate_key_legacy_produces_v4() {
     let result = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -31,7 +31,7 @@ fn test_generate_key_profile_a_produces_v4() {
     )
     .expect("Key generation should succeed");
 
-    assert_eq!(result.key_version, 4, "Profile A key must be v4");
+    assert_eq!(result.key_version, 4, "Legacy key must be v4");
     assert_eq!(result.profile, KeyProfile::Universal);
     assert!(!result.fingerprint.is_empty());
     assert!(!result.cert_data.is_empty());
@@ -41,7 +41,7 @@ fn test_generate_key_profile_a_produces_v4() {
 
 /// C2A.1 (extended): Verify key algorithms are Ed25519+X25519.
 #[test]
-fn test_generate_key_profile_a_algorithms() {
+fn test_generate_key_legacy_algorithms() {
     let result = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -61,20 +61,20 @@ fn test_generate_key_profile_a_algorithms() {
     // Verify actual cryptographic algorithms (not just version/profile)
     assert!(
         info.primary_algo.contains("EdDSA"),
-        "Profile A primary key must use EdDSA (Ed25519), got: {}",
+        "Legacy primary key must use EdDSA (Ed25519), got: {}",
         info.primary_algo
     );
     let subkey_algo = info.subkey_algo.expect("Must have subkey algorithm");
     assert!(
         subkey_algo.contains("ECDH"),
-        "Profile A subkey must use ECDH (X25519), got: {}",
+        "Legacy subkey must use ECDH (X25519), got: {}",
         subkey_algo
     );
 }
 
-/// C2A.2: Sign + verify text (Profile A).
+/// C2A.2: Sign + verify text (Legacy).
 #[test]
-fn test_sign_verify_text_profile_a() {
+fn test_sign_verify_text_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key generation should succeed");
@@ -101,12 +101,12 @@ fn test_sign_verify_text_profile_a() {
 
 /// C2A.3: Encrypt + decrypt text (SEIPDv1).
 #[test]
-fn test_encrypt_decrypt_text_profile_a() {
+fn test_encrypt_decrypt_text_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key generation should succeed");
 
-    let plaintext = b"Hello, this is a secret message for Profile A.";
+    let plaintext = b"Hello, this is a secret message for Legacy.";
 
     // Encrypt to self
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
@@ -121,7 +121,7 @@ fn test_encrypt_decrypt_text_profile_a() {
 
 /// C2A.3 (extended): Encrypt + decrypt with signature.
 #[test]
-fn test_encrypt_decrypt_signed_profile_a() {
+fn test_encrypt_decrypt_signed_legacy() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Sender key gen should succeed");
@@ -161,7 +161,7 @@ fn test_encrypt_decrypt_signed_profile_a() {
 
 /// C2A.4: Encrypt-to-self — sender decrypts own ciphertext.
 #[test]
-fn test_encrypt_to_self_profile_a() {
+fn test_encrypt_to_self_legacy() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -195,7 +195,7 @@ fn test_encrypt_to_self_profile_a() {
 
 /// C2A.5: File encrypt/decrypt with various sizes (1 MB).
 #[test]
-fn test_file_encrypt_decrypt_1mb_profile_a() {
+fn test_file_encrypt_decrypt_1mb_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -215,7 +215,7 @@ fn test_file_encrypt_decrypt_1mb_profile_a() {
 
 /// C2A.5: File encrypt/decrypt 10 MB.
 #[test]
-fn test_file_encrypt_decrypt_10mb_profile_a() {
+fn test_file_encrypt_decrypt_10mb_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -237,7 +237,7 @@ fn test_file_encrypt_decrypt_10mb_profile_a() {
 /// Verifies that the integrity protection mechanism (MDC for SEIPDv1) is working,
 /// not just that decryption happens to fail for some other reason.
 #[test]
-fn test_tamper_detection_profile_a() {
+fn test_tamper_detection_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -288,7 +288,7 @@ fn test_tamper_detection_profile_a() {
 
 /// Detached signature: sign + verify file data.
 #[test]
-fn test_detached_signature_profile_a() {
+fn test_detached_signature_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -313,7 +313,7 @@ fn test_detached_signature_profile_a() {
 
 /// Armor round-trip: public key → armor → dearmor → identical.
 #[test]
-fn test_armor_roundtrip_profile_a() {
+fn test_armor_roundtrip_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -372,7 +372,7 @@ fn test_encrypt_binary_rejects_no_encryption_subkey() {
 
 /// Wrong key decryption: decrypt with wrong key → NoMatchingKey error.
 #[test]
-fn test_decrypt_wrong_key_profile_a() {
+fn test_decrypt_wrong_key_legacy() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -395,9 +395,9 @@ fn test_decrypt_wrong_key_profile_a() {
     }
 }
 
-/// Empty plaintext encrypt/decrypt round-trip (Profile A).
+/// Empty plaintext encrypt/decrypt round-trip (Legacy).
 #[test]
-fn test_encrypt_decrypt_empty_plaintext_profile_a() {
+fn test_encrypt_decrypt_empty_plaintext_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -416,9 +416,9 @@ fn test_encrypt_decrypt_empty_plaintext_profile_a() {
     );
 }
 
-/// C5.6: Concurrent encrypt from 2 threads (Profile A, different key pairs).
+/// C5.6: Concurrent encrypt from 2 threads (Legacy, different key pairs).
 #[test]
-fn test_concurrent_encrypt_profile_a() {
+fn test_concurrent_encrypt_legacy() {
     let key1 =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");

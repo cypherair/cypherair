@@ -146,7 +146,7 @@ fn test_qr_url_rejects_secret_key_on_decode() {
 fn test_qr_url_length_reasonable() {
     let engine = PgpEngine::new();
 
-    // Profile A key
+    // Legacy key
     let key_a = keys::generate_key_with_profile("A".to_string(), None, None, KeyProfile::Universal)
         .expect("Key gen should succeed");
     let url_a = engine.encode_qr_url(key_a.public_key_data.clone()).unwrap();
@@ -155,18 +155,18 @@ fn test_qr_url_length_reasonable() {
     // chars in base64url. QR codes at Level M can encode up to 2331 alphanumeric chars.
     assert!(
         url_a.len() < 2500,
-        "Profile A QR URL too long for QR encoding: {} chars",
+        "Legacy QR URL too long for QR encoding: {} chars",
         url_a.len()
     );
 
-    // Profile B key
+    // Modern High key
     let key_b = keys::generate_key_with_profile("B".to_string(), None, None, KeyProfile::Advanced)
         .expect("Key gen should succeed");
     let url_b = engine.encode_qr_url(key_b.public_key_data.clone()).unwrap();
-    // Profile B keys (Ed448+X448, v6 format) have larger signatures and key material.
+    // Modern High keys (Ed448+X448, v6 format) have larger signatures and key material.
     assert!(
         url_b.len() < 3000,
-        "Profile B QR URL too long: {} chars",
+        "Modern High QR URL too long: {} chars",
         url_b.len()
     );
 }

@@ -7,10 +7,10 @@ use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 
-/// C2A.5 (extended): 50 MB file encrypt/decrypt (Profile A).
+/// C2A.5 (extended): 50 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
-fn test_file_encrypt_decrypt_50mb_profile_a() {
+fn test_file_encrypt_decrypt_50mb_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -34,10 +34,10 @@ fn test_file_encrypt_decrypt_50mb_profile_a() {
     );
 }
 
-/// C2A.5 (extended): 100 MB file encrypt/decrypt (Profile A).
+/// C2A.5 (extended): 100 MB file encrypt/decrypt (Legacy).
 #[test]
 #[ignore = "slow"]
-fn test_file_encrypt_decrypt_100mb_profile_a() {
+fn test_file_encrypt_decrypt_100mb_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -57,10 +57,10 @@ fn test_file_encrypt_decrypt_100mb_profile_a() {
     );
 }
 
-/// C2B.5 (extended): 50 MB file encrypt/decrypt (Profile B).
+/// C2B.5 (extended): 50 MB file encrypt/decrypt (Modern High).
 #[test]
 #[ignore = "slow"]
-fn test_file_encrypt_decrypt_50mb_profile_b() {
+fn test_file_encrypt_decrypt_50mb_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -84,10 +84,10 @@ fn test_file_encrypt_decrypt_50mb_profile_b() {
     );
 }
 
-/// C2B.5 (extended): 100 MB file encrypt/decrypt (Profile B).
+/// C2B.5 (extended): 100 MB file encrypt/decrypt (Modern High).
 #[test]
 #[ignore = "slow"]
-fn test_file_encrypt_decrypt_100mb_profile_b() {
+fn test_file_encrypt_decrypt_100mb_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");

@@ -2,7 +2,7 @@ use super::helpers::*;
 use super::*;
 
 #[test]
-fn test_verify_direct_key_signature_valid_profile_a_and_b() {
+fn test_verify_direct_key_signature_valid_legacy_and_modern_high() {
     for profile in [KeyProfile::Universal, KeyProfile::Advanced] {
         let generated = generated_key(profile, "DirectValid");
         let signature = direct_key_signature_bytes(&generated.public_key_data);

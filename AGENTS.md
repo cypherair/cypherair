@@ -16,10 +16,16 @@ stage1 toolchain policy.
   6.0` is the Swift language mode, not the compiler release.
 - **OpenPGP:** Sequoia PGP 2.4.0 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
-- **Key families:** Portable Compatible, Portable Modern, Portable
-  Post-Quantum, Device-Bound Compatible, Device-Bound Modern, and Device-Bound
-  Post-Quantum (RFC 9980 split custody). Profile A/B remains the technical
-  vocabulary for the classical software-key configurations.
+- **Key families:** Nine families combining message compatibility with
+  private-key custody — Portable Legacy (Ed25519 v4, GnuPG-compatible), Portable
+  Modern (Ed25519+X25519 v6), Portable Modern · High (Ed448+X448 v6), Portable
+  Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Portable Post-Quantum · High (RFC
+  9980 ML-DSA-87/ML-KEM-1024), Device-Bound Legacy (Secure Enclave P-256 v4),
+  Device-Bound Modern (Secure Enclave P-256 v6), Device-Bound Post-Quantum (RFC
+  9980 split custody), and Device-Bound Post-Quantum · High (RFC 9980 split
+  custody). The descriptive family names are the technical vocabulary; the retired
+  "Profile A"/"Profile B" labels mapped onto Portable Legacy (universal) and
+  Portable Modern · High (advanced).
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.

@@ -8,9 +8,9 @@
 
 ## 1. Encryption Scheme
 
-All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). Three software profiles with different algorithm suites; the composite Post-Quantum suite also backs the Device-Bound Post-Quantum split-custody family.
+All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). Five software profiles with different algorithm suites; the two composite Post-Quantum suites each also back a device-bound split-custody family — the ML-DSA-65/ML-KEM-768 suite backs Portable Post-Quantum and Device-Bound Post-Quantum, and the ML-DSA-87/ML-KEM-1024 suite backs Portable Post-Quantum · High and Device-Bound Post-Quantum · High.
 
-### Profile A (Universal Compatible)
+### Legacy (Universal)
 
 | Purpose | Algorithm | Notes |
 |---------|-----------|-------|
@@ -23,7 +23,22 @@ All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). T
 | Compression | DEFLATE (read-only) | Outgoing messages never compressed |
 | Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
 
-### Profile B (Advanced Security)
+### Modern
+
+| Purpose | Algorithm | Notes |
+|---------|-----------|-------|
+| Primary key (sign/certify) | Ed25519 | v6 key format; ~128-bit security |
+| Encryption subkey | X25519 | v6 key format |
+| Symmetric encryption | AES-256 | |
+| AEAD | OCB (primary), GCM (secondary) | SEIPDv2; OCB mandatory per RFC 9580 |
+| Hash | SHA-512 | |
+| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Memory-hard |
+| Compression | DEFLATE (read-only) | Outgoing messages never compressed |
+| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
+
+Modern shares the Curve25519 algorithms of Legacy but uses the v6 key format (RFC 9580) with SEIPDv2 AEAD and Argon2id export S2K.
+
+### Modern · High (Advanced)
 
 | Purpose | Algorithm | Notes |
 |---------|-----------|-------|
@@ -42,6 +57,17 @@ All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). T
 |---------|-----------|-------|
 | Primary key (sign/certify) | ML-DSA-65+Ed25519 (composite, algo 30) | v6 key format; ~192-bit, quantum-resistant |
 | Encryption subkey | ML-KEM-768+X25519 (composite, algo 35) | v6 key format; AES-256 floor for any PQ recipient |
+| Symmetric encryption | AES-256 | RFC 9980 floor |
+| AEAD | OCB | SEIPDv2 |
+| Hash | SHA-512 | |
+| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Portable family only; device-bound is never exportable |
+
+### Post-Quantum · High (RFC 9980)
+
+| Purpose | Algorithm | Notes |
+|---------|-----------|-------|
+| Primary key (sign/certify) | ML-DSA-87+Ed448 (composite, algo 31) | v6 key format; NIST level 5, quantum-resistant |
+| Encryption subkey | ML-KEM-1024+X448 (composite, algo 36) | v6 key format; AES-256 floor for any PQ recipient |
 | Symmetric encryption | AES-256 | RFC 9980 floor |
 | AEAD | OCB | SEIPDv2 |
 | Hash | SHA-512 | |
@@ -200,7 +226,7 @@ Changes to tutorial isolation get the same review care as other auth/local-data 
 
 ## 7. Argon2id Parameters
 
-Used for private-key export and for importing passphrase-protected key files with Argon2id S2K (Profile B and Portable Post-Quantum). Not used for routine decrypt/sign, and not used by Profile A (Iterated+Salted, mode 3). The exact parameter set (512 MB / p=4 / t=3, with RFC 9580 encodings) is [TDD.md](TDD.md) §4's table.
+Used for private-key export and for importing passphrase-protected key files with Argon2id S2K (the four v6 portable software families — Portable Modern, Portable Modern · High, Portable Post-Quantum, and Portable Post-Quantum · High). Not used for routine decrypt/sign, and not used by Portable Legacy (Iterated+Salted, mode 3). The exact parameter set (512 MB / p=4 / t=3, with RFC 9580 encodings) is [TDD.md](TDD.md) §4's table.
 
 **Memory-safety guard (import/unlock only):** parse the S2K specifier, compute `2^encoded_m` KiB, query available memory (`os_proc_available_memory()` on iOS/iPadOS/visionOS; total physical memory on macOS, which has no Jetsam), and refuse above the 75% threshold with _"This key uses memory-intensive protection that exceeds this device's capacity."_ — before derivation begins. This prevents iOS Jetsam termination.
 

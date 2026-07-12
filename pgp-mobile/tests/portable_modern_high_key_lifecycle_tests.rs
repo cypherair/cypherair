@@ -1,4 +1,4 @@
-//! Profile B key lifecycle tests.
+//! Modern High key lifecycle tests.
 //! Covers export policy checks, revocation, recipient matching, Unicode key metadata,
 //! and expiry modification paths while leaving the heaviest Argon2id loops in slow tests.
 
@@ -8,7 +8,7 @@ use pgp_mobile::keys::{self, KeyProfile};
 
 /// Export with wrong profile should fail.
 #[test]
-fn test_export_wrong_profile_profile_b() {
+fn test_export_wrong_profile_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -32,7 +32,7 @@ fn test_export_wrong_profile_profile_b() {
 
 /// C2B.9: Generate + parse revocation cert.
 #[test]
-fn test_revocation_cert_profile_b() {
+fn test_revocation_cert_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -44,7 +44,7 @@ fn test_revocation_cert_profile_b() {
 
 /// Revocation cert for key A should not verify against key B.
 #[test]
-fn test_revocation_cert_wrong_key_profile_b() {
+fn test_revocation_cert_wrong_key_modern_high() {
     let key_a =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key A gen should succeed");
@@ -60,10 +60,10 @@ fn test_revocation_cert_wrong_key_profile_b() {
     );
 }
 
-/// C2B.6 (extended): Verify that Profile B export uses Argon2id S2K with expected parameters.
+/// C2B.6 (extended): Verify that Modern High export uses Argon2id S2K with expected parameters.
 /// PRD requires: 512 MB memory (encoded_m=19), p=4 parallelism.
 #[test]
-fn test_export_profile_b_uses_argon2id() {
+fn test_export_modern_high_uses_argon2id() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -77,7 +77,7 @@ fn test_export_profile_b_uses_argon2id() {
 
     assert_eq!(
         s2k_info.s2k_type, "argon2id",
-        "Profile B export must use Argon2id S2K"
+        "Modern High export must use Argon2id S2K"
     );
     assert_eq!(
         s2k_info.memory_kib, 524288,
@@ -96,9 +96,9 @@ fn test_export_profile_b_uses_argon2id() {
     );
 }
 
-/// Fix #3 verification: expired Profile B key detected.
+/// Fix #3 verification: expired Modern High key detected.
 #[test]
-fn test_expired_key_detected_profile_b() {
+fn test_expired_key_detected_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, Some(1), KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -113,9 +113,9 @@ fn test_expired_key_detected_profile_b() {
     assert!(!info.is_revoked);
 }
 
-/// Unicode User ID (Profile B).
+/// Unicode User ID (Modern High).
 #[test]
-fn test_unicode_user_id_profile_b() {
+fn test_unicode_user_id_modern_high() {
     let key = keys::generate_key_with_profile(
         "李四 🛡️".to_string(),
         Some("lisi@example.com".to_string()),
@@ -128,9 +128,9 @@ fn test_unicode_user_id_profile_b() {
     assert!(info.user_id.unwrap().contains("李四"));
 }
 
-/// match_recipients: Profile B (v6 key, SEIPDv2) returns primary fingerprint.
+/// match_recipients: Modern High (v6 key, SEIPDv2) returns primary fingerprint.
 #[test]
-fn test_match_recipients_profile_b_returns_primary_fingerprint() {
+fn test_match_recipients_modern_high_returns_primary_fingerprint() {
     let key = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
         .expect("Key gen should succeed");
 
@@ -143,15 +143,15 @@ fn test_match_recipients_profile_b_returns_primary_fingerprint() {
     .expect("Encryption should succeed");
 
     let matched = decrypt::match_recipients(&ciphertext, &[key.public_key_data.clone()])
-        .expect("match_recipients should succeed for Profile B");
+        .expect("match_recipients should succeed for Modern High");
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], key.fingerprint);
 }
 
-/// match_recipients: Profile B wrong key → NoMatchingKey.
+/// match_recipients: Modern High wrong key → NoMatchingKey.
 #[test]
-fn test_match_recipients_profile_b_wrong_key_returns_error() {
+fn test_match_recipients_modern_high_wrong_key_returns_error() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -174,10 +174,10 @@ fn test_match_recipients_profile_b_wrong_key_returns_error() {
     );
 }
 
-/// match_recipients: encrypt-to-self includes sender in match (Profile B).
-/// Complements test_match_recipients_profile_a_encrypt_to_self (Profile A).
+/// match_recipients: encrypt-to-self includes sender in match (Modern High).
+/// Complements test_match_recipients_legacy_encrypt_to_self (Legacy).
 #[test]
-fn test_match_recipients_profile_b_encrypt_to_self() {
+fn test_match_recipients_modern_high_encrypt_to_self() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -212,10 +212,10 @@ fn test_match_recipients_profile_b_encrypt_to_self() {
     assert!(matched.contains(&recipient.fingerprint));
 }
 
-/// Modify expiry on a Profile B key: extend to 3 years.
+/// Modify expiry on a Modern High key: extend to 3 years.
 /// Pass: key is not expired, expiry_timestamp is set, key info updated.
 #[test]
-fn test_modify_expiry_profile_b_extend() {
+fn test_modify_expiry_modern_high_extend() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -225,7 +225,7 @@ fn test_modify_expiry_profile_b_extend() {
     .expect("Key generation should succeed");
 
     let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed for Profile B");
+        .expect("modify_expiry should succeed for Modern High");
 
     assert!(!result.cert_data.is_empty());
     assert!(!result.public_key_data.is_empty());
@@ -240,10 +240,10 @@ fn test_modify_expiry_profile_b_extend() {
     assert!(re_parsed.expiry_timestamp.is_some());
 }
 
-/// Modify expiry on a Profile B key: remove expiry (set to never expire).
+/// Modify expiry on a Modern High key: remove expiry (set to never expire).
 /// Pass: key has no expiry timestamp, key is not expired.
 #[test]
-fn test_modify_expiry_profile_b_remove() {
+fn test_modify_expiry_modern_high_remove() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,
@@ -263,10 +263,10 @@ fn test_modify_expiry_profile_b_remove() {
     assert!(result.key_info.expiry_timestamp.is_none());
 }
 
-/// Modify expiry on a Profile B key: set to 1 second (effectively expired).
+/// Modify expiry on a Modern High key: set to 1 second (effectively expired).
 /// Pass: key is expired.
 #[test]
-fn test_modify_expiry_profile_b_to_past() {
+fn test_modify_expiry_modern_high_to_past() {
     let generated =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key generation should succeed");
@@ -283,9 +283,9 @@ fn test_modify_expiry_profile_b_to_past() {
     );
 }
 
-/// Verify that encrypt/decrypt still works after modifying expiry on a Profile B key.
+/// Verify that encrypt/decrypt still works after modifying expiry on a Modern High key.
 #[test]
-fn test_modify_expiry_profile_b_roundtrip_encrypt_decrypt() {
+fn test_modify_expiry_modern_high_roundtrip_encrypt_decrypt() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,
@@ -297,7 +297,7 @@ fn test_modify_expiry_profile_b_roundtrip_encrypt_decrypt() {
     let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
         .expect("modify_expiry should succeed");
 
-    let plaintext = b"Hello after expiry modification (Profile B)!";
+    let plaintext = b"Hello after expiry modification (Modern High)!";
     let ciphertext = encrypt::encrypt(plaintext, &[result.public_key_data.clone()], None, None)
         .expect("Encryption should succeed with updated key");
 

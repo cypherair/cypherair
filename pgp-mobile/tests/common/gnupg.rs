@@ -1,7 +1,7 @@
 //! Shared GnuPG (`gpg` binary) harness for integration tests.
 //!
 //! Hosts the isolated-GNUPGHOME setup and the `require_gpg_or_skip` gate used by
-//! both the Profile A interop tests (`gnupg_binary_tests.rs`) and the Secure Enclave
+//! both the Legacy interop tests (`gnupg_binary_tests.rs`) and the Secure Enclave
 //! custody interop lanes. The gate honors `CYPHERAIR_REQUIRE_GPG=1`: the mandatory CI
 //! lane fails (does not silently pass) when gpg is missing, while local/contributor
 //! runs without gpg skip cleanly.

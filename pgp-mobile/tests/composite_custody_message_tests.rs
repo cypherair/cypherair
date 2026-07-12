@@ -103,7 +103,7 @@ fn encrypt_hidden_recipients(recipient_cert_data: &[&[u8]], plaintext: &[u8]) ->
 #[test]
 fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
     let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let profile_a = keys::generate_key_with_profile(
+    let legacy = keys::generate_key_with_profile(
         "Hidden Universal Peer".to_string(),
         None,
         None,
@@ -117,7 +117,7 @@ fn wildcard_non_composite_pkesk_is_skipped_and_composite_pkesk_decrypts() {
     // a non-match: it must be skipped, not treated as a definitive failure.
     let ciphertext = encrypt_hidden_recipients(
         &[
-            profile_a.public_key_data.as_slice(),
+            legacy.public_key_data.as_slice(),
             material.public_key_data.as_slice(),
         ],
         PLAINTEXT,
@@ -232,7 +232,7 @@ fn engine_encrypts_and_signs_to_foreign_pq_recipient() {
 #[test]
 fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
     let material = SoftwareCompositeMaterial::generate(None).expect("generation succeeds");
-    let profile_a = keys::generate_key_with_profile(
+    let legacy = keys::generate_key_with_profile(
         "Universal Peer".to_string(),
         None,
         None,
@@ -245,7 +245,7 @@ fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
             PLAINTEXT.to_vec(),
             vec![
                 material.public_key_data.clone(),
-                profile_a.public_key_data.clone(),
+                legacy.public_key_data.clone(),
             ],
             None,
             None,
@@ -274,7 +274,7 @@ fn mixed_v4_recipient_set_keeps_both_recipients_decryptable() {
         .expect("split-custody decrypt succeeds");
     assert_eq!(split_custody.plaintext, PLAINTEXT);
 
-    let secret_keys = vec![Zeroizing::new(profile_a.cert_data)];
+    let secret_keys = vec![Zeroizing::new(legacy.cert_data)];
     let software = decrypt::decrypt_detailed(&ciphertext, &secret_keys, &[])
         .expect("profile A decrypt succeeds");
     assert_eq!(software.plaintext, PLAINTEXT);

@@ -159,7 +159,7 @@ fn assert_invalid_key_data(result: Result<Vec<u8>, PgpError>) {
 }
 
 #[test]
-fn test_generate_key_revocation_profile_a_validates_against_source_cert() {
+fn test_generate_key_revocation_legacy_validates_against_source_cert() {
     let generated = generate_key(KeyProfile::Universal, "RevocationA");
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
@@ -170,7 +170,7 @@ fn test_generate_key_revocation_profile_a_validates_against_source_cert() {
 }
 
 #[test]
-fn test_generate_key_revocation_profile_b_validates_against_source_cert() {
+fn test_generate_key_revocation_modern_high_validates_against_source_cert() {
     let generated = generate_key(KeyProfile::Advanced, "RevocationB");
     let revocation =
         keys::generate_key_revocation(&generated.cert_data).expect("revocation should generate");
