@@ -7,7 +7,6 @@ enum PGPPrivateOperationKind: String, CaseIterable, Codable, Hashable, Sendable 
     case certify
     case revoke
     case modifyExpiry
-    case refreshBinding
 
     var keyOperationKind: PGPKeyOperationKind {
         switch self {
@@ -21,8 +20,6 @@ enum PGPPrivateOperationKind: String, CaseIterable, Codable, Hashable, Sendable 
             .revoke
         case .modifyExpiry:
             .modifyExpiry
-        case .refreshBinding:
-            .refreshBinding
         }
     }
 
@@ -33,8 +30,7 @@ enum PGPPrivateOperationKind: String, CaseIterable, Codable, Hashable, Sendable 
         case .sign,
              .certify,
              .revoke,
-             .modifyExpiry,
-             .refreshBinding:
+             .modifyExpiry:
             .signing
         }
     }

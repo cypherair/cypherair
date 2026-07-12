@@ -275,9 +275,7 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         try bootstrapStore.saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: ContactsDomainSnapshot.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: nil,
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
+                expectedCurrentGenerationIdentifier: nil
             ),
             for: Self.domainID
         )
@@ -294,42 +292,12 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
                 "Contacts bootstrap metadata schema is unsupported."
             )
         }
-        guard metadata.expectedCurrentGenerationIdentifier == nil else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts bootstrap metadata contains a legacy generation authority."
-            )
-        }
-        guard metadata.coarseRecoveryReason == nil else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts bootstrap metadata records a recovery reason."
-            )
-        }
-        guard metadata.wrappedDomainMasterKeyRecordVersion == WrappedDomainMasterKeyRecord.currentFormatVersion else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Contacts bootstrap metadata references an unsupported wrapped-DMK version."
-            )
-        }
     }
 
     private func deleteDomainArtifacts() throws {
         try closeDatabase()
         clearUnlockedState()
         try storageRoot.removeContactsSQLCipherDatabaseFilesIfPresent(for: Self.domainID)
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.stagedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
-        try storageRoot.removeItemIfPresent(
-            at: storageRoot.committedWrappedDomainMasterKeyURL(for: Self.domainID)
-        )
         try domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: Self.domainID)
         try bootstrapStore.removeMetadata(for: Self.domainID)
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)

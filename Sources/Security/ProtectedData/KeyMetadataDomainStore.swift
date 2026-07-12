@@ -367,9 +367,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         try bootstrapStore.saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: Payload.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
+                expectedCurrentGenerationIdentifier: String(generationIdentifier)
             ),
             for: Self.domainID
         )

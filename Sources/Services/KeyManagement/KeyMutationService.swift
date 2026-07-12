@@ -541,13 +541,7 @@ final class KeyMutationService {
             return nil
         }
 
-        guard let fingerprint = entry.fingerprint,
-              !fingerprint.isEmpty else {
-            try? privateKeyControlStore.clearModifyExpiryJournal()
-            return .unrecoverable
-        }
-
-        let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(for: fingerprint)
+        let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(for: entry.fingerprint)
 
         if recoveryOutcome.shouldClearRecoveryFlag {
             try? privateKeyControlStore.clearModifyExpiryJournal()

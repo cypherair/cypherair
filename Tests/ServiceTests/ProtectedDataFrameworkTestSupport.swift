@@ -402,15 +402,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
             try storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
         }
         try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
-        try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
-            ProtectedDomainBootstrapMetadata(
-                schemaVersion: schemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentFormatVersion
-            ),
-            for: ProtectedSettingsStore.domainID
-        )
     }
 
     func writeKeyMetadataEnvelope<P: Encodable>(
@@ -459,9 +450,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: schemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentFormatVersion
+                expectedCurrentGenerationIdentifier: String(generationIdentifier)
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
         )
@@ -676,9 +665,7 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         try ProtectedDomainBootstrapStore(storageRoot: storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: ProtectedDataTestAppKeyMetadataDomainStore.Payload.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: "1",
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentFormatVersion
+                expectedCurrentGenerationIdentifier: "1"
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
         )

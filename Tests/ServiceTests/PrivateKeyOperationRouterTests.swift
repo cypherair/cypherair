@@ -94,29 +94,6 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         }
     }
 
-    func test_refreshBindingRemainsExplicitlyNotImplementedUnderSigningRoutePolicy() async throws {
-        let identity = makeSecureEnclaveIdentity()
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        keyStore.failInventory = true
-        let inspector = RecordingPublicBindingInspector()
-        inspector.error = CypherAirError.invalidKeyData(reason: "Unexpected public binding inspection")
-        let router = try makeRouter(
-            identities: [identity],
-            policy: .testSecureEnclaveSigningRoutes,
-            inspector: inspector,
-            keyStore: keyStore
-        )
-
-        assertBlocked(
-            await router.route(for: PrivateKeyOperationRequest(
-                fingerprint: identity.fingerprint,
-                operation: .refreshBinding
-            )),
-            .notImplemented(.operationNotImplementedForCustody)
-        )
-        XCTAssertEqual(inspector.inspectCallCount, 0)
-    }
-
     func test_decryptRemainsBlockedForPhase5ASigningRouter() async throws {
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()

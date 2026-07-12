@@ -32,7 +32,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
-    private let bootstrapStore: ProtectedDomainBootstrapStore
     private let currentWrappingRootKey: (() throws -> Data)?
 
     private(set) var privateKeyControlState: PrivateKeyControlState = .locked
@@ -47,13 +46,11 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
-        bootstrapStore: ProtectedDomainBootstrapStore? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
         self.storageRoot = storageRoot
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
-        self.bootstrapStore = bootstrapStore ?? ProtectedDomainBootstrapStore(storageRoot: storageRoot)
         self.currentWrappingRootKey = currentWrappingRootKey
     }
 
@@ -504,16 +501,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             try storageRoot.promoteStagedFile(from: currentURL, to: previousURL)
         }
         try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
-
-        try bootstrapStore.saveMetadata(
-            ProtectedDomainBootstrapMetadata(
-                schemaVersion: Payload.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier),
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: WrappedDomainMasterKeyRecord.currentFormatVersion
-            ),
-            for: Self.domainID
-        )
     }
 
     private func readAuthoritativeSnapshot(
@@ -606,7 +593,6 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             at: storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .previous)
         )
         try domainKeyManager.deleteWrappedDomainMasterKeyRecords(for: Self.domainID)
-        try bootstrapStore.removeMetadata(for: Self.domainID)
         try storageRoot.removeDomainDirectoryIfPresent(for: Self.domainID)
     }
 

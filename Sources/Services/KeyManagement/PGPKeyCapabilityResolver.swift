@@ -6,16 +6,13 @@ struct PGPKeyCapabilityResolver: Sendable {
         var secureEnclaveGenerationSupport: PGPKeyOperationSupport
         var secureEnclaveSigningOperationSupport: PGPKeyOperationSupport
         var secureEnclaveKeyAgreementOperationSupport: PGPKeyOperationSupport
-        var secureEnclaveRefreshBindingOperationSupport: PGPKeyOperationSupport
 
         /// Production exposure (issue #501 decision 3, P7D): generation and the
-        /// implemented private-operation classes are supported; refreshBinding
-        /// stays `.notImplemented` because no service implements that route.
+        /// implemented private-operation classes are supported.
         static let production = Policy(
             secureEnclaveGenerationSupport: .supported,
             secureEnclaveSigningOperationSupport: .supported,
-            secureEnclaveKeyAgreementOperationSupport: .supported,
-            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .supported
         )
 
         /// All Secure Enclave supports blocked — a test-only fixture that pins
@@ -25,36 +22,31 @@ struct PGPKeyCapabilityResolver: Sendable {
         static let testSecureEnclaveOperationsBlocked = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .unavailable,
-            secureEnclaveKeyAgreementOperationSupport: .unavailable,
-            secureEnclaveRefreshBindingOperationSupport: .unavailable
+            secureEnclaveKeyAgreementOperationSupport: .unavailable
         )
 
         static let testSecureEnclavePrivateOperations = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
-            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveGeneration = Policy(
             secureEnclaveGenerationSupport: .supported,
             secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
-            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveSigningRoutes = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .supported,
-            secureEnclaveKeyAgreementOperationSupport: .notImplemented,
-            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .notImplemented
         )
 
         static let testSecureEnclaveKeyAgreementRoutes = Policy(
             secureEnclaveGenerationSupport: .unavailable,
             secureEnclaveSigningOperationSupport: .notImplemented,
-            secureEnclaveKeyAgreementOperationSupport: .supported,
-            secureEnclaveRefreshBindingOperationSupport: .notImplemented
+            secureEnclaveKeyAgreementOperationSupport: .supported
         )
     }
 
@@ -181,8 +173,6 @@ struct PGPKeyCapabilityResolver: Sendable {
              .revoke,
              .modifyExpiry:
             return resolutionForPolicySupport(policy.secureEnclaveSigningOperationSupport)
-        case .refreshBinding:
-            return resolutionForPolicySupport(policy.secureEnclaveRefreshBindingOperationSupport)
         case .decrypt:
             return resolutionForPolicySupport(policy.secureEnclaveKeyAgreementOperationSupport)
         case .exportPrivateMaterial:

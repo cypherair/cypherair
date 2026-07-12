@@ -129,27 +129,6 @@ final class ProtectedDataDomainKeyKeychainStoreTests: ProtectedDataFrameworkTest
         )
     }
 
-    func test_legacyFileBackedWrappedDomainMasterKeyIsIgnored() throws {
-        let harness = try makeDomainKeyHarness("DomainKeyLegacyFileIgnored")
-        defer { cleanup(harness) }
-        let legacyRecord = try harness.manager.wrapDomainMasterKey(
-            Data(repeating: 0x66, count: 32),
-            for: harness.domainID,
-            wrappingRootKey: harness.wrappingRootKey
-        )
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        try harness.storageRoot.writeProtectedData(
-            try encoder.encode(legacyRecord),
-            to: harness.storageRoot.committedWrappedDomainMasterKeyURL(for: harness.domainID)
-        )
-
-        let loadedRecord = try harness.manager.loadWrappedDomainMasterKeyRecord(for: harness.domainID)
-
-        XCTAssertNil(loadedRecord)
-        XCTAssertFalse(try harness.manager.hasAnyPersistedDomainKeyRecord())
-    }
-
     private func makeDomainKeyHarness(
         _ prefix: String,
         domainID: ProtectedDataDomainID = "contacts"
