@@ -128,9 +128,6 @@ struct SecureEnclaveCompositeHandleReference: Hashable, Sendable {
 /// certificate carries for this role, used to locate and verify handles without
 /// touching the private blob.
 struct SecureEnclaveCompositeHandlePublicBinding: Hashable, Sendable {
-    static let mldsa65PublicKeyLength = 1952
-    static let mlkem768PublicKeyLength = 1184
-
     let reference: SecureEnclaveCompositeHandleReference
     let publicKeyRaw: Data
 

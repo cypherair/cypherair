@@ -19,10 +19,4 @@ final class MockMemoryInfo: MemoryInfoProvidable, @unchecked Sendable {
         callCount += 1
         return availableBytes
     }
-
-    /// Reset state for clean test setup.
-    func reset() {
-        availableBytes = 4 * 1024 * 1024 * 1024
-        callCount = 0
-    }
 }

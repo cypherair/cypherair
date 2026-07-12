@@ -32,12 +32,6 @@ enum ProtectedDataFrameworkState: Equatable, Sendable {
     case restartRequired
 }
 
-enum ProtectedDataBootstrapState: Equatable, Sendable {
-    case loadedExistingRegistry
-    case bootstrappedEmptyRegistry
-    case frameworkRecoveryNeeded
-}
-
 enum ProtectedDataRecoveryDisposition: Equatable, Sendable {
     case resumeSteadyState
     case continuePendingMutation

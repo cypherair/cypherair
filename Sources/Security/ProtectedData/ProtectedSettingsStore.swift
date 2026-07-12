@@ -57,10 +57,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
         payload?.ordinarySettings
     }
 
-    var hasCommittedDomain: Bool {
-        (try? registryStore.loadRegistry().committedMembership[Self.domainID] != nil) ?? false
-    }
-
     func ordinarySettingsSnapshot() throws -> ProtectedOrdinarySettingsSnapshot {
         guard domainState == .unlocked,
               let payload else {

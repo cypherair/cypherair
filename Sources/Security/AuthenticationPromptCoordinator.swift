@@ -11,14 +11,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     struct OperationAuthenticationPromptSnapshot: Equatable, Sendable {
-        static let idle = OperationAuthenticationPromptSnapshot(
-            generation: 0,
-            sessionGeneration: 0,
-            depth: 0,
-            lastBeganAt: nil,
-            lastEndedAt: nil
-        )
-
         let generation: UInt64
         let sessionGeneration: UInt64
         let depth: Int
@@ -37,10 +29,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             self.depth = depth
             self.lastBeganAt = lastBeganAt
             self.lastEndedAt = lastEndedAt
-        }
-
-        var isInProgress: Bool {
-            depth > 0
         }
     }
 

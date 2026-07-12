@@ -43,10 +43,6 @@ final class AuthLifecycleTraceStore: @unchecked Sendable {
 #endif
     }
 
-    var tracingEnabled: Bool {
-        isEnabled
-    }
-
     var recentEntries: [Entry] {
         lock.withLock {
             entries

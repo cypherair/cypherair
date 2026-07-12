@@ -410,20 +410,6 @@ struct SecureEnclaveCustodyHandleStore {
         }
     }
 
-    func deleteHandlePair(handleSetIdentifier: String) throws {
-        let references = try [
-            SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .signing
-            ),
-            SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .keyAgreement
-            )
-        ]
-        try deleteReferences(references)
-    }
-
     private func deleteReferences(_ references: [SecureEnclaveCustodyHandleReference]) throws {
         var cleanupFailed = false
         for reference in references {

@@ -21,8 +21,6 @@ import LocalAuthentication
 @Observable
 @MainActor
 final class AppSessionOrchestrator {
-    private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
-    private let currentRegistryProvider: () throws -> ProtectedDataRegistry
     private let protectedDataAccessGateClassifier: ProtectedDataAccessGateClassifier
     private let traceStore: AuthLifecycleTraceStore?
 
@@ -36,8 +34,6 @@ final class AppSessionOrchestrator {
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
-        self.currentRegistryProvider = currentRegistryProvider
-        self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.protectedDataAccessGateClassifier = ProtectedDataAccessGateClassifier(
             currentRegistryProvider: currentRegistryProvider,
             frameworkStateProvider: {

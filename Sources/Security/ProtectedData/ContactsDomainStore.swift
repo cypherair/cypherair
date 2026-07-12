@@ -103,10 +103,6 @@ final class ContactsDomainStore: ProtectedDataRelockParticipant, @unchecked Send
         domainState = .locked
     }
 
-    func hasCommittedDomain() throws -> Bool {
-        try registryStore.loadRegistry().committedMembership[Self.domainID] != nil
-    }
-
     @discardableResult
     func openDomainIfNeeded(
         wrappingRootKey: Data

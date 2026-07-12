@@ -12,11 +12,6 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
     /// Whether biometrics are available on this (mock) device.
     var biometricsAvailable = true
 
-    /// Track calls for test verification.
-    private(set) var evaluateCallCount = 0
-    private(set) var lastEvaluatedMode: AuthenticationMode?
-    private(set) var lastReason: String?
-
     var isBiometricsAvailable: Bool { biometricsAvailable }
 
     /// Mock has no real LAContext — returns nil.
@@ -34,10 +29,6 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
     }
 
     func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
-        evaluateCallCount += 1
-        lastEvaluatedMode = mode
-        lastReason = reason
-
         // High Security mode with no biometrics → always fail
         if mode == .highSecurity && !biometricsAvailable {
             throw AuthenticationError.biometricsUnavailable
@@ -48,15 +39,6 @@ final class MockAuthenticator: AuthenticationEvaluable, @unchecked Sendable {
         } else {
             throw AuthenticationError.failed
         }
-    }
-
-    /// Reset all state for clean test setup.
-    func reset() {
-        shouldSucceed = true
-        biometricsAvailable = true
-        evaluateCallCount = 0
-        lastEvaluatedMode = nil
-        lastReason = nil
     }
 }
 

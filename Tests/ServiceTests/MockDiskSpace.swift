@@ -25,11 +25,4 @@ final class MockDiskSpace: DiskSpaceProvidable, @unchecked Sendable {
         }
         return availableBytes
     }
-
-    /// Reset state for clean test setup.
-    func reset() {
-        availableBytes = 10 * 1024 * 1024 * 1024
-        callCount = 0
-        shouldThrow = false
-    }
 }

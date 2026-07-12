@@ -123,10 +123,6 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         storage[reference]?.isEmpty == false
     }
 
-    func containsMalformedApplicationTag(_ applicationTagString: String) -> Bool {
-        containsMalformedApplicationTagData(Data(applicationTagString.utf8))
-    }
-
     func containsMalformedApplicationTagData(_ applicationTagData: Data) -> Bool {
         malformedApplicationTags.contains(applicationTagData)
     }
