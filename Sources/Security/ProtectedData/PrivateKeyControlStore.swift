@@ -85,7 +85,10 @@ final class PrivateKeyControlStore: ProtectedDataRelockParticipant, PrivateKeyCo
             data: try randomData(count: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength)
         )
         var rawRootKeyInput = provisionedSecret.dataCopy()
-        let derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawRootKeyInput)
+        var derivedWrappingRootKey = try domainKeyManager.deriveWrappingRootKey(from: &rawRootKeyInput)
+        defer {
+            derivedWrappingRootKey.protectedDataZeroize()
+        }
         rawRootKeyInput.protectedDataZeroize()
         let wrappingRootKey = SensitiveBytesBox(data: derivedWrappingRootKey)
         defer {

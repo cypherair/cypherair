@@ -499,6 +499,26 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
+    func test_encryptText_staleEncryptToSelfFingerprint_throwsInsteadOfSilentFallback() async throws {
+        _ = try await generateKeyAndContact(profile: .universal, name: "Default")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient")
+
+        do {
+            _ = try await stack.encryptionService.encryptText(
+                "Stale self key",
+                recipientContactIds: [try contactId(for: recipient)],
+                signWithFingerprint: nil,
+                encryptToSelf: true,
+                encryptToSelfFingerprint: "DEADBEEF00000000000000000000000000000000"
+            )
+            XCTFail("Expected a failure for a missing Encrypt to Self key, not a silent default-key fallback.")
+        } catch let error as CypherAirError {
+            guard case .encryptionFailed = error else {
+                return XCTFail("Expected .encryptionFailed, got \(error)")
+            }
+        }
+    }
+
     func test_encryptText_encryptToSelfFingerprintNil_usesDefaultKey() async throws {
         // Generate two keys — first becomes default
         let defaultKey = try await generateKeyAndContact(profile: .universal, name: "Default")
