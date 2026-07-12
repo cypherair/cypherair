@@ -33,9 +33,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_1GB_lowMemory_throwsExceeded() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: 1_048_576, // 1 GB = 2^20 KiB
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 1_048_576 // 1 GB = 2^20 KiB
         )
 
         // Mock: 1 GB available (device under heavy load).
@@ -61,9 +59,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_1GB_ampleMemory_passes() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: 1_048_576, // 1 GB
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 1_048_576 // 1 GB
         )
 
         // Mock: 6 GB available.
@@ -79,9 +75,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_2GB_moderateMemory_throwsExceeded() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: 2_097_152, // 2 GB = 2^21 KiB
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 2_097_152 // 2 GB = 2^21 KiB
         )
 
         // Mock: 2.5 GB available (8 GB device under moderate load).
@@ -115,9 +109,7 @@ extension FFIIntegrationTests {
 
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: requiredKib,
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: requiredKib
         )
 
         let mockMemory = MockMemoryInfo()
@@ -136,9 +128,7 @@ extension FFIIntegrationTests {
 
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: requiredKib,
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: requiredKib
         )
 
         // 1 byte below the minimum passing available: should fail.
@@ -174,9 +164,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_argon2idTypeZeroMemory_passes() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: 0,
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 0
         )
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
@@ -188,9 +176,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_unknownS2kType_passes() throws {
         let s2kInfo = S2kInfo(
             s2kType: "unknown",
-            memoryKib: 999_999_999,
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 999_999_999
         )
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
@@ -202,9 +188,7 @@ extension FFIIntegrationTests {
     func test_argon2idGuard_queriesMemoryProviderExactlyOnce() throws {
         let s2kInfo = S2kInfo(
             s2kType: "argon2id",
-            memoryKib: 524_288,
-            parallelism: 4,
-            timePasses: 3
+            memoryKib: 524_288
         )
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 8 * 1024 * 1024 * 1024

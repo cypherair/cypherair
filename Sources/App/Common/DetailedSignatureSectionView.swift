@@ -72,26 +72,10 @@ struct DetailedSignatureSectionView: View {
 private extension SignatureVerification {
     init(entry: DetailedSignatureVerification.Entry) {
         self.init(
-            status: MessageSignatureStatus(from: entry.status),
             signerFingerprint: entry.signerPrimaryFingerprint,
             signerIdentity: entry.signerIdentity,
             verificationState: entry.verificationState,
             contactsUnavailableReason: entry.contactsUnavailableReason
         )
-    }
-}
-
-private extension MessageSignatureStatus {
-    init(from status: DetailedSignatureVerification.Entry.Status) {
-        switch status {
-        case .valid:
-            self = .valid
-        case .unknownSigner:
-            self = .unknownSigner
-        case .bad:
-            self = .bad
-        case .expired:
-            self = .expired
-        }
     }
 }

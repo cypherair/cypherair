@@ -20,7 +20,7 @@ use openssl::md::Md;
 use pgp_mobile::error::PgpError;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::password::{self, PasswordDecryptStatus, PasswordMessageFormat};
-use pgp_mobile::signature_details::SignatureVerificationState;
+use pgp_mobile::signature_details::{DetailedSignatureStatus, SignatureVerificationState};
 use sequoia_openpgp as openpgp;
 
 fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
@@ -334,8 +334,8 @@ fn test_password_encrypt_decrypt_armored_seipdv2_round_trip_signed() {
     );
     assert_eq!(result.signatures.len(), 1);
     assert_eq!(
-        result.signatures[0].state,
-        SignatureVerificationState::Verified
+        result.signatures[0].status,
+        DetailedSignatureStatus::Valid
     );
 }
 
@@ -364,8 +364,8 @@ fn test_password_decrypt_signed_without_verification_cert_reports_missing_certif
     assert_eq!(result.summary_entry_index, Some(0));
     assert_eq!(result.signatures.len(), 1);
     assert_eq!(
-        result.signatures[0].state,
-        SignatureVerificationState::SignerCertificateUnavailable
+        result.signatures[0].status,
+        DetailedSignatureStatus::UnknownSigner
     );
 }
 

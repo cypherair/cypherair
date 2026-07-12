@@ -108,16 +108,15 @@ enum PGPMessageResultMapper {
 
         let mappedEntries = signatures.map { entry in
             let appState = SignatureVerification.VerificationState(
-                ffiState: entry.state,
+                ffiStatus: entry.status,
                 contactsAvailability: contactsAvailability
             )
             return DetailedSignatureVerification.Entry(
-                status: DetailedSignatureVerification.Entry.Status(from: entry.status),
                 verificationState: appState,
                 signerPrimaryFingerprint: entry.signerPrimaryFingerprint,
                 contactsUnavailableReason: appState == .contactsContextUnavailable ? unavailableReason : nil,
                 signerIdentity: SignatureVerification.SignerIdentity.resolve(
-                    fingerprint: entry.verificationCertificateFingerprint,
+                    fingerprint: entry.signerPrimaryFingerprint,
                     contactKeys: contactKeysForVerification,
                     ownKeys: ownKeys
                 )
@@ -160,19 +159,24 @@ private extension SignatureVerification.VerificationState {
             }
         }
     }
-}
 
-private extension DetailedSignatureVerification.Entry.Status {
-    init(from status: DetailedSignatureStatus) {
-        switch status {
+    init(
+        ffiStatus: DetailedSignatureStatus,
+        contactsAvailability: ContactsAvailability
+    ) {
+        switch ffiStatus {
         case .valid:
-            self = .valid
-        case .unknownSigner:
-            self = .unknownSigner
+            self = .verified
         case .bad:
-            self = .bad
+            self = .invalid
         case .expired:
             self = .expired
+        case .unknownSigner:
+            if contactsAvailability.allowsContactsVerification {
+                self = .signerCertificateUnavailable
+            } else {
+                self = .contactsContextUnavailable
+            }
         }
     }
 }

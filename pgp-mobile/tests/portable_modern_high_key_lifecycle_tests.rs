@@ -61,9 +61,13 @@ fn test_revocation_cert_wrong_key_modern_high() {
 }
 
 /// C2B.6 (extended): Verify that Modern High export uses Argon2id S2K with expected parameters.
-/// PRD requires: 512 MB memory (encoded_m=19), p=4 parallelism.
+/// PRD requires: 512 MB memory (encoded_m=19), t=3 passes, p=4 parallelism. Memory is asserted
+/// through the FFI probe the app uses; t/p are pinned on the exported packets directly.
 #[test]
 fn test_export_modern_high_uses_argon2id() {
+    use sequoia_openpgp::packet::key::SecretKeyMaterial;
+    use sequoia_openpgp::parse::Parse;
+
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -84,16 +88,21 @@ fn test_export_modern_high_uses_argon2id() {
         "Argon2id memory must be 512 MB (524288 KiB = 2^19 KiB per PRD), got {} KiB",
         s2k_info.memory_kib
     );
-    assert_eq!(
-        s2k_info.parallelism, 4,
-        "Argon2id parallelism must be 4 per PRD, got {}",
-        s2k_info.parallelism
-    );
-    assert_eq!(
-        s2k_info.time_passes, 3,
-        "Argon2id time passes must be 3 per PRD, got {}",
-        s2k_info.time_passes
-    );
+
+    let cert = sequoia_openpgp::Cert::from_bytes(&exported).expect("Exported key should parse");
+    let mut argon2_keys = 0;
+    for ka in cert.keys() {
+        let Some(SecretKeyMaterial::Encrypted(encrypted)) = ka.key().optional_secret() else {
+            panic!("Every exported key packet must carry encrypted secret material");
+        };
+        let sequoia_openpgp::crypto::S2K::Argon2 { t, p, .. } = encrypted.s2k() else {
+            panic!("Every exported key packet must use Argon2id S2K");
+        };
+        assert_eq!(*t, 3, "Argon2id time passes must be 3 per PRD, got {t}");
+        assert_eq!(*p, 4, "Argon2id parallelism must be 4 per PRD, got {p}");
+        argon2_keys += 1;
+    }
+    assert!(argon2_keys >= 2, "Expected primary + subkey packets");
 }
 
 /// Fix #3 verification: expired Modern High key detected.

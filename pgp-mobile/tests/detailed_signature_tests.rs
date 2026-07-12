@@ -176,10 +176,6 @@ fn test_verify_cleartext_detailed_multi_signature_all_valid() {
         .signatures
         .iter()
         .all(|entry| entry.status == DetailedSignatureStatus::Valid));
-    assert!(detailed
-        .signatures
-        .iter()
-        .all(|entry| entry.state == SignatureVerificationState::Verified));
     let observed_fingerprints: Vec<String> = detailed
         .signatures
         .iter()
@@ -265,8 +261,7 @@ fn test_verify_detached_file_detailed_known_plus_unknown_preserves_unknown_nil_f
             && entry.signer_primary_fingerprint == Some(signer_a.fingerprint.clone())));
     assert!(detailed.signatures.iter().any(|entry| entry.status
         == DetailedSignatureStatus::UnknownSigner
-        && entry.signer_primary_fingerprint.is_none()
-        && entry.state == SignatureVerificationState::SignerCertificateUnavailable));
+        && entry.signer_primary_fingerprint.is_none()));
 }
 
 #[test]
@@ -315,7 +310,6 @@ fn test_verify_detached_file_detailed_preserves_unknown_entry() {
     assert!(file_detailed.signatures.iter().any(|entry| {
         entry.status == DetailedSignatureStatus::UnknownSigner
             && entry.signer_primary_fingerprint.is_none()
-            && entry.state == SignatureVerificationState::SignerCertificateUnavailable
     }));
 }
 
