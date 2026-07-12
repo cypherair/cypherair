@@ -582,6 +582,10 @@ fn test_discover_certificate_selectors_newer_revocation_beats_older_binding() {
         discovered.user_ids[1].is_currently_revoked,
         "newer current revocation must beat an older binding"
     );
+    assert!(
+        discovered.user_ids[1].is_self_certified,
+        "revocation must not clear the valid-binding flag"
+    );
 }
 
 #[test]
