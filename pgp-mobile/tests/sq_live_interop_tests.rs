@@ -8,7 +8,10 @@
 //!
 //! Every test probes for sq first (`common/sq.rs`) and skips with a note when
 //! it is unavailable; the `rust-gnupg-interop` CI job brews sequoia-sq and
-//! runs this lane under `CYPHERAIR_REQUIRE_SQ=1`, which forbids skips.
+//! runs this lane under `CYPHERAIR_REQUIRE_SQ=1`, which forbids skips. The
+//! post-quantum tests additionally gate on a functional capability probe —
+//! an sq built on pre-2.4 sequoia-openpgp cannot read final RFC 9980
+//! artifacts and skips those tests loudly (see `require_pq_capable_sq_or_skip`).
 //! Each test uses an isolated `sq --home` inside a temp dir; the user's real
 //! cert/key store is never touched, and nothing goes near the network.
 
@@ -21,7 +24,18 @@ use pgp_mobile::keys::{self, GeneratedKey, KeyProfile};
 use pgp_mobile::sign;
 
 mod common;
-use common::sq::{require_sq_or_skip, run_sq, setup_sq_home, sq_cmd};
+use common::sq::{
+    require_pq_capable_sq_or_skip, require_sq_or_skip, run_sq, setup_sq_home, sq_cmd,
+};
+
+/// Post-quantum profiles need an sq that reads final RFC 9980 artifacts;
+/// classical profiles only need sq present.
+fn sq_for(profile: &KeyProfile) -> Option<std::path::PathBuf> {
+    match profile {
+        KeyProfile::PostQuantum | KeyProfile::PostQuantumHigh => require_pq_capable_sq_or_skip(),
+        _ => require_sq_or_skip(),
+    }
+}
 
 fn generate_engine_key(profile: KeyProfile, label: &str) -> GeneratedKey {
     keys::generate_key_with_profile(
@@ -49,7 +63,7 @@ fn read_file(path: &Path) -> Vec<u8> {
 // ── (f) Our engine encrypts → sq decrypts with our imported secret key ─────
 
 fn assert_sq_decrypts_our_message(profile: KeyProfile, label: &str) {
-    let Some(sq) = require_sq_or_skip() else {
+    let Some(sq) = sq_for(&profile) else {
         return;
     };
     let home = setup_sq_home();
@@ -114,7 +128,7 @@ fn test_sq_decrypts_engine_message_pqhigh() {
 // ── (g) Our engine signs → sq verifies against our public certificate ──────
 
 fn assert_sq_verifies_our_cleartext_signature(profile: KeyProfile, label: &str) {
-    let Some(sq) = require_sq_or_skip() else {
+    let Some(sq) = sq_for(&profile) else {
         return;
     };
     let home = setup_sq_home();

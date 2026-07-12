@@ -10,6 +10,7 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use tempfile::TempDir;
 
@@ -40,6 +41,79 @@ pub fn require_sq_or_skip() -> Option<PathBuf> {
 
 fn sq_is_required() -> bool {
     std::env::var_os("CYPHERAIR_REQUIRE_SQ").is_some_and(|value| value == "1")
+}
+
+/// Resolve an `sq` binary that can also consume final-RFC-9980 post-quantum
+/// artifacts, or skip.
+///
+/// Homebrew's sequoia-sq 1.3.1 embeds sequoia-openpgp 2.0.0, whose
+/// post-quantum wire format predates the final RFC 9980 encoding this engine
+/// (sequoia-openpgp 2.4.0) emits, so it rejects engine ML-DSA certificates
+/// as malformed. The probe is functional rather than version-sniffing: the
+/// engine generates a throwaway post-quantum key and `sq key import` — the
+/// same operation the live tests perform — must accept it. The result is
+/// cached per test process. ML-DSA-65 stands in for both post-quantum tiers:
+/// a decoder with the final composite encoding reads 65/768 and 87/1024
+/// alike.
+///
+/// `CYPHERAIR_REQUIRE_SQ=1` keeps meaning "sq must be present", not "the
+/// newest sq": a present-but-PQ-incapable sq skips the post-quantum live
+/// tests with a loud note, and the coverage self-activates once the
+/// installed sq is built on sequoia-openpgp >= 2.4.
+pub fn require_pq_capable_sq_or_skip() -> Option<PathBuf> {
+    static PQ_CAPABLE: OnceLock<bool> = OnceLock::new();
+
+    let sq = require_sq_or_skip()?;
+    if *PQ_CAPABLE.get_or_init(|| sq_imports_engine_pq_key(&sq)) {
+        return Some(sq);
+    }
+    eprintln!(
+        "sq at {} cannot read final RFC 9980 post-quantum artifacts \
+         (pre-2.4 sequoia-openpgp); skipping this post-quantum live test",
+        sq.display()
+    );
+    None
+}
+
+/// Functional probe body for [`require_pq_capable_sq_or_skip`].
+fn sq_imports_engine_pq_key(sq_path: &PathBuf) -> bool {
+    let key = match pgp_mobile::keys::generate_key_with_profile(
+        "CypherAir PQ Capability Probe".to_string(),
+        None,
+        None,
+        pgp_mobile::keys::KeyProfile::PostQuantum,
+    ) {
+        Ok(key) => key,
+        Err(error) => {
+            eprintln!("post-quantum capability probe: engine keygen failed: {error:?}");
+            return false;
+        }
+    };
+
+    let home = setup_sq_home();
+    let tsk_path = home.path().join("pq_probe_key.pgp");
+    if let Err(error) = std::fs::write(&tsk_path, &key.cert_data) {
+        eprintln!("post-quantum capability probe: could not write probe key: {error}");
+        return false;
+    }
+
+    let mut import = sq_cmd(sq_path, &home);
+    import.arg("key").arg("import").arg(&tsk_path);
+    match import.output() {
+        Ok(output) if output.status.success() => true,
+        Ok(output) => {
+            eprintln!(
+                "post-quantum capability probe: `sq key import` rejected an engine \
+                 ML-DSA-65 key:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            false
+        }
+        Err(error) => {
+            eprintln!("post-quantum capability probe: failed to run sq: {error}");
+            false
+        }
+    }
 }
 
 /// Search for a working `sq` binary: PATH first, then common Homebrew/system
