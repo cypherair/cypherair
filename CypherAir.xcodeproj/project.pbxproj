@@ -274,7 +274,6 @@
 				Models/FileDecryptionPhase1Result.swift,
 				Models/IdentityPresentation.swift,
 				Models/InMemoryOrdinarySettingsStore.swift,
-				Models/MessageSignatureStatus.swift,
 				Models/OpenPGPCertificationKind.swift,
 				Models/PasswordMessageDetailedDecryptOutcome.swift,
 				Models/PasswordMessageEnvelopeFormat.swift,

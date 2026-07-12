@@ -537,7 +537,7 @@ final class DecryptionServiceTests: XCTestCase {
         )
         XCTAssertEqual(detailed.plaintext, plaintext)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
+        XCTAssertEqual(detailed.verification.signatures[0].verificationState, .verified)
         XCTAssertEqual(
             detailed.verification.signatures[0].signerPrimaryFingerprint,
             sender.fingerprint
@@ -653,7 +653,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(detailed.verification.summaryState, .contactsContextUnavailable)
         XCTAssertEqual(detailed.verification.contactsUnavailableReason, .locked)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .contactsContextUnavailable)
         XCTAssertEqual(detailed.verification.signatures[0].contactsUnavailableReason, .locked)
         XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
@@ -871,7 +870,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: detailed.artifact.fileURL), plaintext)
         XCTAssertEqual(detailed.verification, inMemory.verification)
         XCTAssertEqual(detailed.verification.signatures.count, 1)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.verification.signatures[0].verificationState, .contactsContextUnavailable)
         XCTAssertNil(detailed.verification.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.verification.signatures[0].signerIdentity)
@@ -915,7 +913,7 @@ final class DecryptionServiceTests: XCTestCase {
             [signerAInfo.fingerprint, signerAInfo.fingerprint]
         )
         XCTAssertTrue(detailed.verification.signatures.allSatisfy {
-            $0.status == .valid && $0.signerIdentity?.source == .contact
+            $0.verificationState == .verified && $0.signerIdentity?.source == .contact
         })
     }
 
@@ -1249,8 +1247,8 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(actual.count, expected.count, file: file, line: line)
         for (actualEntry, expectedEntry) in zip(actual, expected) {
             XCTAssertEqual(
-                actualEntry.status,
-                detailedStatus(from: expectedEntry.status),
+                actualEntry.verificationState,
+                verificationState(from: expectedEntry.status),
                 file: file,
                 line: line
             )
@@ -1263,16 +1261,18 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    private func detailedStatus(
+    /// Expected app-level state for an FFI per-signature status when contacts verification
+    /// is available (the context these tests decrypt under).
+    private func verificationState(
         from status: DetailedSignatureStatus
-    ) -> DetailedSignatureVerification.Entry.Status {
+    ) -> SignatureVerification.VerificationState {
         switch status {
         case .valid:
-            return .valid
+            return .verified
         case .unknownSigner:
-            return .unknownSigner
+            return .signerCertificateUnavailable
         case .bad:
-            return .bad
+            return .invalid
         case .expired:
             return .expired
         }

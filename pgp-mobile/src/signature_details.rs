@@ -24,13 +24,25 @@ pub enum DetailedSignatureStatus {
     Expired,
 }
 
+impl DetailedSignatureStatus {
+    /// Certificate-backed verification state equivalent of this per-signature status.
+    pub(crate) fn verification_state(&self) -> SignatureVerificationState {
+        match self {
+            DetailedSignatureStatus::Valid => SignatureVerificationState::Verified,
+            DetailedSignatureStatus::UnknownSigner => {
+                SignatureVerificationState::SignerCertificateUnavailable
+            }
+            DetailedSignatureStatus::Bad => SignatureVerificationState::Invalid,
+            DetailedSignatureStatus::Expired => SignatureVerificationState::Expired,
+        }
+    }
+}
+
 /// One observed signature result in parser order.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DetailedSignatureEntry {
     pub status: DetailedSignatureStatus,
     pub signer_primary_fingerprint: Option<String>,
-    pub state: SignatureVerificationState,
-    pub verification_certificate_fingerprint: Option<String>,
 }
 
 /// Detailed result for in-memory verification APIs.
@@ -148,38 +160,26 @@ impl SignatureCollector {
 
     fn observe_result(&mut self, result: VerificationResult) {
         let entry = entry_from_result(&result);
+        let status = entry.status.clone();
         let entry_index = self.signatures.len() as u64;
-        self.signatures.push(entry.clone());
+        self.signatures.push(entry);
+        self.fold_summary(status, entry_index);
+    }
 
+    fn fold_summary(&mut self, status: DetailedSignatureStatus, entry_index: u64) {
         if self.summary_stopped {
             return;
         }
 
-        match result {
-            Ok(GoodChecksum { .. }) => {
-                self.summary_state = Some(entry.state);
-                self.summary_entry_index = Some(entry_index);
+        self.summary_state = Some(status.verification_state());
+        self.summary_entry_index = Some(entry_index);
+
+        match status {
+            DetailedSignatureStatus::Valid => {
                 self.summary_stopped = true;
             }
-            Err(VerificationError::MissingKey { .. }) => {
-                self.summary_state = Some(entry.state);
-                self.summary_entry_index = Some(entry_index);
-            }
-            Err(VerificationError::BadKey { error, .. }) => {
-                if is_expired_error(&error) {
-                    self.summary_state = Some(SignatureVerificationState::Expired);
-                } else {
-                    self.summary_state = Some(SignatureVerificationState::Invalid);
-                }
-                self.summary_entry_index = Some(entry_index);
-
-                if matches!(self.mode, SummaryFoldMode::VerifyLike) {
-                    self.summary_stopped = true;
-                }
-            }
-            Err(_) => {
-                self.summary_state = Some(SignatureVerificationState::Invalid);
-                self.summary_entry_index = Some(entry_index);
+            DetailedSignatureStatus::UnknownSigner => {}
+            DetailedSignatureStatus::Bad | DetailedSignatureStatus::Expired => {
                 if matches!(self.mode, SummaryFoldMode::VerifyLike) {
                     self.summary_stopped = true;
                 }
@@ -190,64 +190,35 @@ impl SignatureCollector {
 
 fn entry_from_result(result: &VerificationResult) -> DetailedSignatureEntry {
     match result {
-        Ok(GoodChecksum { ka, .. }) => {
-            let fingerprint = ka.cert().fingerprint().to_hex().to_lowercase();
-            DetailedSignatureEntry {
-                status: DetailedSignatureStatus::Valid,
-                signer_primary_fingerprint: Some(fingerprint.clone()),
-                state: SignatureVerificationState::Verified,
-                verification_certificate_fingerprint: Some(fingerprint),
-            }
-        }
+        Ok(GoodChecksum { ka, .. }) => DetailedSignatureEntry {
+            status: DetailedSignatureStatus::Valid,
+            signer_primary_fingerprint: Some(ka.cert().fingerprint().to_hex().to_lowercase()),
+        },
         Err(VerificationError::MissingKey { .. }) => DetailedSignatureEntry {
             status: DetailedSignatureStatus::UnknownSigner,
             signer_primary_fingerprint: None,
-            state: SignatureVerificationState::SignerCertificateUnavailable,
-            verification_certificate_fingerprint: None,
         },
-        Err(VerificationError::BadKey { ka, error, .. }) => {
-            let fingerprint = ka.cert().fingerprint().to_hex().to_lowercase();
-            let expired = is_expired_error(error);
-            DetailedSignatureEntry {
-                status: if expired {
-                    DetailedSignatureStatus::Expired
-                } else {
-                    DetailedSignatureStatus::Bad
-                },
-                signer_primary_fingerprint: Some(fingerprint.clone()),
-                state: if expired {
-                    SignatureVerificationState::Expired
-                } else {
-                    SignatureVerificationState::Invalid
-                },
-                verification_certificate_fingerprint: Some(fingerprint),
-            }
-        }
-        Err(VerificationError::BadSignature { ka, .. }) => {
-            let fingerprint = ka.cert().fingerprint().to_hex().to_lowercase();
-            DetailedSignatureEntry {
-                status: DetailedSignatureStatus::Bad,
-                signer_primary_fingerprint: Some(fingerprint.clone()),
-                state: SignatureVerificationState::Invalid,
-                verification_certificate_fingerprint: Some(fingerprint),
-            }
-        }
-        Err(VerificationError::UnboundKey { cert, .. }) => {
-            let fingerprint = cert.fingerprint().to_hex().to_lowercase();
-            DetailedSignatureEntry {
-                status: DetailedSignatureStatus::Bad,
-                signer_primary_fingerprint: Some(fingerprint.clone()),
-                state: SignatureVerificationState::Invalid,
-                verification_certificate_fingerprint: Some(fingerprint),
-            }
-        }
+        Err(VerificationError::BadKey { ka, error, .. }) => DetailedSignatureEntry {
+            status: if is_expired_error(error) {
+                DetailedSignatureStatus::Expired
+            } else {
+                DetailedSignatureStatus::Bad
+            },
+            signer_primary_fingerprint: Some(ka.cert().fingerprint().to_hex().to_lowercase()),
+        },
+        Err(VerificationError::BadSignature { ka, .. }) => DetailedSignatureEntry {
+            status: DetailedSignatureStatus::Bad,
+            signer_primary_fingerprint: Some(ka.cert().fingerprint().to_hex().to_lowercase()),
+        },
+        Err(VerificationError::UnboundKey { cert, .. }) => DetailedSignatureEntry {
+            status: DetailedSignatureStatus::Bad,
+            signer_primary_fingerprint: Some(cert.fingerprint().to_hex().to_lowercase()),
+        },
         Err(VerificationError::MalformedSignature { .. })
         | Err(VerificationError::UnknownSignature { .. })
         | Err(_) => DetailedSignatureEntry {
             status: DetailedSignatureStatus::Bad,
             signer_primary_fingerprint: None,
-            state: SignatureVerificationState::Invalid,
-            verification_certificate_fingerprint: None,
         },
     }
 }
@@ -262,46 +233,13 @@ mod tests {
             status: DetailedSignatureStatus,
             signer_primary_fingerprint: Option<&str>,
         ) {
-            let signer_primary_fingerprint =
-                signer_primary_fingerprint.map(std::string::ToString::to_string);
-            let state = state_from_detailed_status(&status);
             self.signatures.push(DetailedSignatureEntry {
                 status: status.clone(),
-                signer_primary_fingerprint: signer_primary_fingerprint.clone(),
-                state: state.clone(),
-                verification_certificate_fingerprint: signer_primary_fingerprint.clone(),
+                signer_primary_fingerprint: signer_primary_fingerprint
+                    .map(std::string::ToString::to_string),
             });
             let entry_index = (self.signatures.len() - 1) as u64;
-
-            if self.summary_stopped {
-                return;
-            }
-
-            match status {
-                DetailedSignatureStatus::Valid => {
-                    self.summary_state = Some(SignatureVerificationState::Verified);
-                    self.summary_entry_index = Some(entry_index);
-                    self.summary_stopped = true;
-                }
-                DetailedSignatureStatus::UnknownSigner => {
-                    self.summary_state = Some(state);
-                    self.summary_entry_index = Some(entry_index);
-                }
-                DetailedSignatureStatus::Bad => {
-                    self.summary_state = Some(SignatureVerificationState::Invalid);
-                    self.summary_entry_index = Some(entry_index);
-                    if matches!(self.mode, SummaryFoldMode::VerifyLike) {
-                        self.summary_stopped = true;
-                    }
-                }
-                DetailedSignatureStatus::Expired => {
-                    self.summary_state = Some(SignatureVerificationState::Expired);
-                    self.summary_entry_index = Some(entry_index);
-                    if matches!(self.mode, SummaryFoldMode::VerifyLike) {
-                        self.summary_stopped = true;
-                    }
-                }
-            }
+            self.fold_summary(status, entry_index);
         }
     }
 
@@ -318,18 +256,12 @@ mod tests {
         );
         assert_eq!(collector.summary_entry_index(), Some(0));
         assert_eq!(collector.signatures.len(), 3);
+        assert_eq!(collector.signatures[0].status, DetailedSignatureStatus::Valid);
         assert_eq!(
-            collector.signatures[0].state,
-            SignatureVerificationState::Verified
+            collector.signatures[1].status,
+            DetailedSignatureStatus::UnknownSigner
         );
-        assert_eq!(
-            collector.signatures[1].state,
-            SignatureVerificationState::SignerCertificateUnavailable
-        );
-        assert_eq!(
-            collector.signatures[2].state,
-            SignatureVerificationState::Invalid
-        );
+        assert_eq!(collector.signatures[2].status, DetailedSignatureStatus::Bad);
     }
 
     #[test]
@@ -391,16 +323,5 @@ mod tests {
         );
         assert_eq!(collector.summary_entry_index(), None);
         assert!(collector.signatures.is_empty());
-    }
-
-    fn state_from_detailed_status(status: &DetailedSignatureStatus) -> SignatureVerificationState {
-        match status {
-            DetailedSignatureStatus::Valid => SignatureVerificationState::Verified,
-            DetailedSignatureStatus::UnknownSigner => {
-                SignatureVerificationState::SignerCertificateUnavailable
-            }
-            DetailedSignatureStatus::Bad => SignatureVerificationState::Invalid,
-            DetailedSignatureStatus::Expired => SignatureVerificationState::Expired,
-        }
     }
 }

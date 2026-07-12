@@ -35,8 +35,8 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         XCTAssertEqual(detailed.text, Data("FFI detailed multi-signer cleartext".utf8))
         XCTAssertEqual(detailed.verification.signatures.count, 2)
-        XCTAssertEqual(detailed.verification.signatures[0].status, .valid)
-        XCTAssertEqual(detailed.verification.signatures[1].status, .valid)
+        XCTAssertEqual(detailed.verification.signatures[0].verificationState, .verified)
+        XCTAssertEqual(detailed.verification.signatures[1].verificationState, .verified)
         XCTAssertEqual(
             detailed.verification.signatures[0].signerPrimaryFingerprint,
             signerBInfo.fingerprint
@@ -65,12 +65,10 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
 
         XCTAssertEqual(detailed.signatures.count, 2)
-        XCTAssertEqual(detailed.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
         XCTAssertNil(detailed.signatures[0].contactsUnavailableReason)
         XCTAssertNil(detailed.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[0].signerIdentity)
-        XCTAssertEqual(detailed.signatures[1].status, .valid)
         XCTAssertEqual(detailed.signatures[1].verificationState, .verified)
         XCTAssertEqual(
             detailed.signatures[1].signerPrimaryFingerprint,
@@ -95,8 +93,8 @@ final class SigningServiceDetailedResultTests: XCTestCase {
         )
 
         XCTAssertEqual(detailed.signatures.count, 2)
-        XCTAssertEqual(detailed.signatures[0].status, .valid)
-        XCTAssertEqual(detailed.signatures[1].status, .valid)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .verified)
+        XCTAssertEqual(detailed.signatures[1].verificationState, .verified)
         XCTAssertEqual(
             detailed.signatures[0].signerPrimaryFingerprint,
             signerAInfo.fingerprint
@@ -126,11 +124,9 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         XCTAssertEqual(detailed.summaryState, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
-        XCTAssertEqual(detailed.signatures[0].status, .unknownSigner)
         XCTAssertEqual(detailed.signatures[0].verificationState, .signerCertificateUnavailable)
         XCTAssertNil(detailed.signatures[0].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[0].signerIdentity)
-        XCTAssertEqual(detailed.signatures[1].status, .expired)
         XCTAssertEqual(detailed.signatures[1].verificationState, .expired)
         XCTAssertEqual(
             detailed.signatures[1].signerPrimaryFingerprint,
@@ -158,10 +154,10 @@ final class SigningServiceDetailedResultTests: XCTestCase {
 
         XCTAssertEqual(detailed.summaryState, .expired)
         XCTAssertEqual(detailed.signatures.count, 2)
-        XCTAssertEqual(detailed.signatures[0].status, .expired)
+        XCTAssertEqual(detailed.signatures[0].verificationState, .expired)
         XCTAssertEqual(detailed.signatures[0].signerPrimaryFingerprint, expiredInfo.fingerprint)
         XCTAssertEqual(detailed.signatures[0].signerIdentity?.source, .contact)
-        XCTAssertEqual(detailed.signatures[1].status, .bad)
+        XCTAssertEqual(detailed.signatures[1].verificationState, .invalid)
         XCTAssertNil(detailed.signatures[1].signerPrimaryFingerprint)
         XCTAssertNil(detailed.signatures[1].signerIdentity)
     }

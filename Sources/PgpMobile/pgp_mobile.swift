@@ -441,22 +441,6 @@ fileprivate struct FfiConverterUInt8: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
-    typealias FfiType = UInt32
-    typealias SwiftType = UInt32
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
-        return try lift(readInt(&buf))
-    }
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
@@ -4282,16 +4266,12 @@ public func FfiConverterTypeDecryptDetailedResult_lower(_ value: DecryptDetailed
 public struct DetailedSignatureEntry: Equatable, Hashable {
     public var status: DetailedSignatureStatus
     public var signerPrimaryFingerprint: String?
-    public var state: SignatureVerificationState
-    public var verificationCertificateFingerprint: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?, state: SignatureVerificationState, verificationCertificateFingerprint: String?) {
+    public init(status: DetailedSignatureStatus, signerPrimaryFingerprint: String?) {
         self.status = status
         self.signerPrimaryFingerprint = signerPrimaryFingerprint
-        self.state = state
-        self.verificationCertificateFingerprint = verificationCertificateFingerprint
     }
 
 
@@ -4311,17 +4291,13 @@ public struct FfiConverterTypeDetailedSignatureEntry: FfiConverterRustBuffer {
         return
             try DetailedSignatureEntry(
                 status: FfiConverterTypeDetailedSignatureStatus.read(from: &buf),
-                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf),
-                state: FfiConverterTypeSignatureVerificationState.read(from: &buf),
-                verificationCertificateFingerprint: FfiConverterOptionString.read(from: &buf)
+                signerPrimaryFingerprint: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: DetailedSignatureEntry, into buf: inout [UInt8]) {
         FfiConverterTypeDetailedSignatureStatus.write(value.status, into: &buf)
         FfiConverterOptionString.write(value.signerPrimaryFingerprint, into: &buf)
-        FfiConverterTypeSignatureVerificationState.write(value.state, into: &buf)
-        FfiConverterOptionString.write(value.verificationCertificateFingerprint, into: &buf)
     }
 }
 
@@ -5898,14 +5874,6 @@ public struct S2kInfo: Equatable, Hashable {
      * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
      */
     public var memoryKib: UInt64
-    /**
-     * For Argon2id: parallelism lanes. 0 for non-Argon2id.
-     */
-    public var parallelism: UInt32
-    /**
-     * For Argon2id: time passes. 0 for non-Argon2id.
-     */
-    public var timePasses: UInt32
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5915,17 +5883,9 @@ public struct S2kInfo: Equatable, Hashable {
          */s2kType: String,
         /**
          * For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
-         */memoryKib: UInt64,
-        /**
-         * For Argon2id: parallelism lanes. 0 for non-Argon2id.
-         */parallelism: UInt32,
-        /**
-         * For Argon2id: time passes. 0 for non-Argon2id.
-         */timePasses: UInt32) {
+         */memoryKib: UInt64) {
         self.s2kType = s2kType
         self.memoryKib = memoryKib
-        self.parallelism = parallelism
-        self.timePasses = timePasses
     }
 
 
@@ -5945,17 +5905,13 @@ public struct FfiConverterTypeS2kInfo: FfiConverterRustBuffer {
         return
             try S2kInfo(
                 s2kType: FfiConverterString.read(from: &buf),
-                memoryKib: FfiConverterUInt64.read(from: &buf),
-                parallelism: FfiConverterUInt32.read(from: &buf),
-                timePasses: FfiConverterUInt32.read(from: &buf)
+                memoryKib: FfiConverterUInt64.read(from: &buf)
         )
     }
 
     public static func write(_ value: S2kInfo, into buf: inout [UInt8]) {
         FfiConverterString.write(value.s2kType, into: &buf)
         FfiConverterUInt64.write(value.memoryKib, into: &buf)
-        FfiConverterUInt32.write(value.parallelism, into: &buf)
-        FfiConverterUInt32.write(value.timePasses, into: &buf)
     }
 }
 

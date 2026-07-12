@@ -8,10 +8,6 @@ pub struct S2kInfo {
     pub s2k_type: String,
     /// For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
     pub memory_kib: u64,
-    /// For Argon2id: parallelism lanes. 0 for non-Argon2id.
-    pub parallelism: u32,
-    /// For Argon2id: time passes. 0 for non-Argon2id.
-    pub time_passes: u32,
 }
 
 /// Parse S2K parameters from a passphrase-protected key file.
@@ -34,26 +30,17 @@ pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
     let mut check_secret = |secret: Option<&openpgp::packet::key::SecretKeyMaterial>| match secret {
         Some(openpgp::packet::key::SecretKeyMaterial::Encrypted(encrypted)) => {
             let info = match encrypted.s2k() {
-                openpgp::crypto::S2K::Argon2 { t, p, m, .. } => {
-                    let memory_kib: u64 = 1u64 << (*m as u64);
-                    S2kInfo {
-                        s2k_type: "argon2id".to_string(),
-                        memory_kib,
-                        parallelism: *p as u32,
-                        time_passes: *t as u32,
-                    }
-                }
+                openpgp::crypto::S2K::Argon2 { m, .. } => S2kInfo {
+                    s2k_type: "argon2id".to_string(),
+                    memory_kib: 1u64 << (*m as u64),
+                },
                 openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
                     s2k_type: "iterated-salted".to_string(),
                     memory_kib: 0,
-                    parallelism: 0,
-                    time_passes: 0,
                 },
                 _ => S2kInfo {
                     s2k_type: "unknown".to_string(),
                     memory_kib: 0,
-                    parallelism: 0,
-                    time_passes: 0,
                 },
             };
             if best

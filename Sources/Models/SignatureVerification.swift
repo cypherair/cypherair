@@ -65,9 +65,6 @@ struct SignatureVerification {
         }
     }
 
-    /// The graded verification result.
-    let status: MessageSignatureStatus
-
     /// App-level verification state that separates crypto verification from Contacts availability.
     let verificationState: VerificationState
 
@@ -83,13 +80,11 @@ struct SignatureVerification {
     }
 
     init(
-        status: MessageSignatureStatus,
         signerFingerprint: String?,
         signerIdentity: SignerIdentity? = nil,
         verificationState: VerificationState,
         contactsUnavailableReason: ContactsAvailability? = nil
     ) {
-        self.status = status
         self.verificationState = verificationState
         self.signerFingerprint = signerFingerprint
         self.contactsUnavailableReason = contactsUnavailableReason
