@@ -91,12 +91,6 @@ struct TutorialRouteDestinationView: View {
                     SelectiveRevocationView(fingerprint: fingerprint)
                 }
             )
-        case .contactCertificateSignatures(let fingerprint):
-            return AnyView(
-                TutorialSurfaceView(tab: definitionTab, route: route) {
-                    ContactCertificateSignaturesView(fingerprint: fingerprint)
-                }
-            )
         case .contactCertification(let contactId, let keyId, _):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {

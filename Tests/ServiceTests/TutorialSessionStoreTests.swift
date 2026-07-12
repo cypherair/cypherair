@@ -527,7 +527,6 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertNotNil(blocklist.blockedRoute(for: .selfTest))
         XCTAssertNotNil(blocklist.blockedRoute(for: .appIcon))
         XCTAssertNotNil(blocklist.blockedRoute(for: .selectiveRevocation(fingerprint: "test-fingerprint")))
-        XCTAssertNotNil(blocklist.blockedRoute(for: .contactCertificateSignatures(fingerprint: "test-fingerprint")))
         XCTAssertNil(blocklist.blockedRoot(for: .sign))
         XCTAssertNil(blocklist.blockedRoot(for: .verify))
         XCTAssertNil(blocklist.blockedRoute(for: .encrypt))

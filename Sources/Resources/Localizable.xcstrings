@@ -1473,54 +1473,6 @@
         }
       }
     },
-    "contactcertsig.action.certify" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate Certification"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成认证签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.action.verifyBinding" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify User ID Binding"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "验证用户 ID 绑定"
-          }
-        }
-      }
-    },
-    "contactcertsig.action.verifyDirect" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verify Direct-Key Signature"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "验证直接密钥签名"
-          }
-        }
-      }
-    },
     "contactcertsig.certificationKind" : {
       "localizations" : {
         "en" : {
@@ -1665,134 +1617,6 @@
         }
       }
     },
-    "contactcertsig.loadFailed.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could Not Load Certificate Details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法加载证书详情"
-          }
-        }
-      }
-    },
-    "contactcertsig.loading" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading certificate signature context..."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在加载证书签名上下文..."
-          }
-        }
-      }
-    },
-    "contactcertsig.mode" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mode"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模式"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.binding" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "User ID Binding Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用户 ID 绑定验证"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.certify" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certify User ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证用户 ID"
-          }
-        }
-      }
-    },
-    "contactcertsig.mode.direct" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Direct Key Verify"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "直接密钥验证"
-          }
-        }
-      }
-    },
-    "contactcertsig.notFound.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact Not Found"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找不到联系人"
-          }
-        }
-      }
-    },
-    "contactcertsig.overview" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Overview"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "概览"
-          }
-        }
-      }
-    },
     "contactcertsig.result" : {
       "localizations" : {
         "en" : {
@@ -1889,22 +1713,6 @@
         }
       }
     },
-    "contactcertsig.signature.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supports .asc and .sig signature files. Imported file bytes remain authoritative until the text is edited or cleared."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持 .asc 和 .sig 签名文件。在编辑或清除文本之前，导入文件的字节内容始终作为权威来源。"
-          }
-        }
-      }
-    },
     "contactcertsig.signer" : {
       "localizations" : {
         "en" : {
@@ -1921,22 +1729,6 @@
         }
       }
     },
-    "contactcertsig.signer.contact" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系人"
-          }
-        }
-      }
-    },
     "contactcertsig.signer.empty" : {
       "localizations" : {
         "en" : {
@@ -1949,70 +1741,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有可用于为此联系人认证的本地密钥。"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.footer.empty" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create or import one of your own keys before generating a certification signature."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先创建或导入你自己的密钥，再生成认证签名。"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.ownKey" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your Key"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的密钥"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.unknown" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unknown"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未知"
-          }
-        }
-      }
-    },
-    "contactcertsig.signer.verified" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verified Contact"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已验证联系人"
           }
         }
       }
@@ -2061,86 +1789,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有效"
-          }
-        }
-      }
-    },
-    "contactcertsig.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certificate Signatures"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书签名"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.occurrence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Occurrence %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 个"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.primary" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Primary"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "主"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.revoked" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revoked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已吊销"
-          }
-        }
-      }
-    },
-    "contactcertsig.userId.unauthenticated" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unauthenticated"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未认证"
           }
         }
       }
@@ -2205,22 +1853,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到可供选择的用户 ID。"
-          }
-        }
-      }
-    },
-    "contactcertsig.userIds.footer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duplicate User IDs remain separate choices. The occurrence number identifies the exact packet."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重复的用户 ID 会分别保留为独立选项。出现序号用于标识确切的数据包。"
           }
         }
       }

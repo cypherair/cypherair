@@ -169,7 +169,7 @@ struct TutorialUnsafeRouteBlocklist {
                 message: String(localized: "guidedTutorial.blocked.selectiveRevocation.body", defaultValue: "Selective revocation exports are unavailable inside the tutorial sandbox."),
                 systemImage: "xmark.seal"
             )
-        case .contactCertification, .contactCertificateSignatures:
+        case .contactCertification:
             TutorialBlockedSurface(
                 title: String(
                     localized: "guidedTutorial.blocked.certificateSignatures.title",
