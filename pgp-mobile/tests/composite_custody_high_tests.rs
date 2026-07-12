@@ -147,9 +147,10 @@ fn cleartext_signing_round_trips_and_rejects_wrong_classical_component() {
         material.signing_provider(),
     );
     match wrong_secret {
-        Err(PgpError::SigningFailed { reason }) => {
-            assert!(reason.contains("does not match"), "reason: {reason}")
-        }
+        // Fail-closed guarantee: the wrong-length Ed448 secret fails at signer
+        // construction and never emits a signature. The typed variant (with panic
+        // on any other outcome) is the contract; the prose reason adds nothing.
+        Err(PgpError::SigningFailed { .. }) => {}
         other => panic!("expected SigningFailed, got {other:?}"),
     }
 }

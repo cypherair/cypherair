@@ -13,7 +13,9 @@
 
 mod common;
 
-use common::gnupg::{gpg_cmd, gpg_import_key, require_gpg_or_skip, setup_gpg_home};
+use common::gnupg::{
+    assert_gpg_status_good_signature, gpg_cmd, gpg_import_key, require_gpg_or_skip, setup_gpg_home,
+};
 use common::secure_enclave::SoftwareP256Material;
 use pgp_mobile::keys::SecureEnclaveCertificateVersion;
 use pgp_mobile::signature_details::SignatureVerificationState;
@@ -136,6 +138,8 @@ fn test_se_v4_gpg_verifies_se_generated_signature() {
     let signed_file = write(&gnupghome, "se_signed.asc", &signed);
 
     let output = gpg_cmd(&gpg, &gnupghome)
+        .arg("--status-fd")
+        .arg("2")
         .arg("--verify")
         .arg(&signed_file)
         .output()
@@ -145,11 +149,7 @@ fn test_se_v4_gpg_verifies_se_generated_signature() {
         "gpg should verify the SE-generated signature.\nstderr: {}",
         String::from_utf8_lossy(&output.stderr),
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Good signature"),
-        "gpg should report a good signature.\n{stderr}"
-    );
+    assert_gpg_status_good_signature(&output.stderr);
     record_evidence("gpgVerifiesSeSignature");
 }
 
@@ -290,6 +290,8 @@ fn test_se_v4_bidirectional_sign_plus_encrypt() {
 
     let ct_file = write(&gnupghome, "se_signed_encrypted.gpg", &ciphertext);
     let output = gpg_cmd(&gpg, &gnupghome)
+        .arg("--status-fd")
+        .arg("2")
         .arg("--decrypt")
         .arg(&ct_file)
         .output()
@@ -300,11 +302,7 @@ fn test_se_v4_bidirectional_sign_plus_encrypt() {
         String::from_utf8_lossy(&output.stderr),
     );
     assert_eq!(output.stdout, plaintext);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("Good signature"),
-        "gpg should verify the SE-generated signature.\n{stderr}"
-    );
+    assert_gpg_status_good_signature(&output.stderr);
     record_evidence("bidirectionalSignPlusEncrypt");
 }
 

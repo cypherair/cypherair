@@ -95,12 +95,12 @@ fn test_external_signer_runtime_cleartext_rejects_revoked_signing_key_before_cal
             Arc::new(UnexpectedRuntimeSigningProvider),
         );
 
+        // "Fails selection before the callback" is proven structurally: the
+        // provider is `UnexpectedRuntimeSigningProvider`, which panics if invoked,
+        // so reaching a typed SigningFailed error means selection rejected the
+        // revoked subkey before any callback. The prose reason adds nothing.
         assert!(
-            matches!(
-                &result,
-                Err(PgpError::SigningFailed { reason })
-                    if reason.contains("No matching external signing key")
-            ),
+            matches!(&result, Err(PgpError::SigningFailed { .. })),
             "revoked signing key must fail selection before the callback ({}): {result:?}",
             version.label()
         );

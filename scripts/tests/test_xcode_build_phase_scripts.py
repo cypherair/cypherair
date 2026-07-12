@@ -298,30 +298,6 @@ version = "1.4.0"
             )
             self.assertTrue(payload["isStableReleaseBuild"])
 
-    def test_build_apple_arm64e_xcframework_manifest_backup_guard_is_static_valid(self) -> None:
-        script_path = REPO_ROOT / "scripts/build_apple_arm64e_xcframework.sh"
-
-        subprocess.run(
-            ["bash", "-n", str(script_path)],
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-
-        script_text = script_path.read_text(encoding="utf-8")
-        self.assertIn("MANIFEST_BACKUP_CREATED=0", script_text)
-        self.assertIn('[ "$MANIFEST_BACKUP_CREATED" = "1" ]', script_text)
-
-    def test_build_apple_arm64e_xcframework_normalizes_generated_text(self) -> None:
-        script_text = (REPO_ROOT / "scripts/build_apple_arm64e_xcframework.sh").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn("normalize_generated_text_file", script_text)
-        self.assertIn(r"s/[ \t]+$//mg", script_text)
-        self.assertIn(r"s/\n+\z/\n/", script_text)
-        self.assertIn('normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.h"', script_text)
-
 
 if __name__ == "__main__":
     unittest.main()

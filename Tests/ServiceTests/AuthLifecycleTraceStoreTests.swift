@@ -275,7 +275,9 @@ final class AuthLifecycleTraceStoreTests: XCTestCase {
         XCTAssertEqual(metadata["errorCode"], "260")
         XCTAssertEqual(metadata["underlyingErrorDomain"], NSPOSIXErrorDomain)
         XCTAssertEqual(metadata["underlyingErrorCode"], "2")
-        XCTAssertEqual(metadata["errorDescription"], "The file could not be opened.")
+        // The error's localized description is captured into metadata; assert it is
+        // present rather than pinning Apple's system-provided (localizable) copy.
+        XCTAssertFalse((metadata["errorDescription"] ?? "").isEmpty)
     }
 
     func test_protectedDataStorageRoot_recordsContractStagesForMissingBaseBootstrap() throws {

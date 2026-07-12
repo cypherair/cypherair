@@ -378,12 +378,14 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
     // by `PrivateKeyEnvelopeTests`.
 
     func test_postUnlockRecoveryWarningBuilder_surfacesOnlyUnsafeOutcomes() {
+        // The builder surfaces a warning only for unsafe outcomes, and maps
+        // distinct unsafe outcomes to distinct user-facing text. Guarded through
+        // nil-ness and outcome differentiation, not the exact localized copy.
         let retryableWarning = AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .retryableFailure]),
             modifyExpiryOutcome: nil
         )
         XCTAssertNotNil(retryableWarning)
-        XCTAssertTrue(retryableWarning?.contains("retry") == true)
 
         let duplicateWarning = AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.retryableFailure]),
@@ -396,7 +398,10 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             modifyExpiryOutcome: .unrecoverable
         )
         XCTAssertNotNil(unrecoverableWarning)
-        XCTAssertTrue(unrecoverableWarning?.contains("Restore from backup") == true)
+        XCTAssertNotEqual(
+            retryableWarning, unrecoverableWarning,
+            "Retryable and unrecoverable outcomes must surface distinct warnings."
+        )
 
         XCTAssertNil(AppContainer.postUnlockRecoveryLoadWarning(
             rewrapSummary: KeyMigrationRecoverySummary(outcomes: [.noActionSafe, .cleanedPendingSafe]),
@@ -437,7 +442,8 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
 
         let warning = try XCTUnwrap(config.postUnlockRecoveryLoadWarning)
         XCTAssertTrue(warning.contains(customWarning))
-        XCTAssertTrue(warning.contains("retry"))
+        // Assert the actual produced key warning survived — not a prose substring.
+        XCTAssertTrue(warning.contains(try XCTUnwrap(keyWarning)))
         XCTAssertEqual(warning.components(separatedBy: "\n").count, 2)
     }
 
@@ -533,7 +539,9 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         )
 
         XCTAssertEqual(config.authModeIfUnlocked, .highSecurity)
-        XCTAssertTrue(config.postUnlockRecoveryLoadWarning?.contains("retry") == true)
+        // The warning path surfaced a recovery warning (non-nil) while still
+        // resyncing config — the exact copy is not the contract here.
+        XCTAssertNotNil(config.postUnlockRecoveryLoadWarning)
         XCTAssertEqual(try privateKeyControlStore.recoveryJournal().rewrapTargetMode, .highSecurity)
     }
 

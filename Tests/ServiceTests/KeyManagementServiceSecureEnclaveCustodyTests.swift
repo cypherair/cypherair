@@ -207,10 +207,12 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         // A non-missing Secure Enclave handle-delete failure still surfaces a
         // partial-deletion error to the caller…
         XCTAssertThrowsError(try targetService.deleteKey(fingerprint: fixture.identity.fingerprint)) { error in
-            guard case CypherAirError.keychainError(let message) = error else {
+            // Partial deletion surfaces as the typed .keychainError case; the
+            // guarded behavior is the catalog-metadata removal and handle state
+            // asserted below, not the human-readable message text.
+            guard case CypherAirError.keychainError = error else {
                 return XCTFail("Expected keychainError, got \(error)")
             }
-            XCTAssertTrue(message.contains("Partial key deletion"))
         }
 
         // …but the catalog metadata is REMOVED, so the device-bound key is no longer
@@ -258,10 +260,12 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         try targetService.loadKeys()
 
         XCTAssertThrowsError(try targetService.deleteKey(fingerprint: desyncedIdentity.fingerprint)) { error in
-            guard case CypherAirError.keychainError(let message) = error else {
+            // Partial deletion surfaces as the typed .keychainError case; the
+            // guarded behavior is the catalog-metadata removal and handle state
+            // asserted below, not the human-readable message text.
+            guard case CypherAirError.keychainError = error else {
                 return XCTFail("Expected keychainError, got \(error)")
             }
-            XCTAssertTrue(message.contains("Partial key deletion"))
         }
 
         // The desync no longer makes the key permanently undeletable.

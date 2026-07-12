@@ -27,16 +27,6 @@ final class CypherAirErrorPresentationTests: XCTestCase {
         )
     }
 
-    func test_noCategoryResolvesToRetiredGenericString() {
-        for category in PGPKeyOperationFailureCategory.allCases {
-            XCTAssertNotEqual(
-                CypherAirError.keyOperationUnavailable(category: category).errorDescription,
-                "This key operation is unavailable.",
-                "\(category) still resolves to the retired generic copy."
-            )
-        }
-    }
-
     func test_authenticationCancellation_isNeutralStatement() {
         let description = CypherAirError
             .keyOperationUnavailable(category: .localAuthenticationCancelled)

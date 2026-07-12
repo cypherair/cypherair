@@ -50,7 +50,12 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         XCTAssertNil(try recoveryJournal().modifyExpiry)
     }
 
-    func test_modifyExpiry_beginJournalFailureCleansPendingBundle() async throws {
+    func test_modifyExpiry_beginJournalFailure_leavesNoPendingBundleOrJournalEntry() async throws {
+        // modifyExpiry journals first (beginModifyExpiry precedes the pending-bundle
+        // write), so a begin-journal failure fails closed before any pending bundle
+        // exists: the permanent envelope stays intact, no pending row is written, and
+        // no journal entry is left behind. (The former "CleansPendingBundle" name
+        // predated the journal-first ordering, when a pending row could exist first.)
         let failingStore = FailingModifyExpiryPrivateKeyControlStore()
         failingStore.failNextBeginModifyExpiry = true
         let stack = TestHelpers.makeKeyManagement(

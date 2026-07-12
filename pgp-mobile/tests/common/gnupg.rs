@@ -123,3 +123,23 @@ pub fn gpg_import_key(gpg_path: &PathBuf, gnupghome: &TempDir, key_data: &[u8]) 
         String::from_utf8_lossy(&output.stderr),
     );
 }
+
+/// Assert, through GnuPG's machine-readable `--status-fd` interface, that gpg
+/// reported a cryptographically good and valid signature.
+///
+/// Callers invoke gpg with `--status-fd 2`, so the `[GNUPG:]` status lines land
+/// on stderr alongside the human output; pass the captured stderr here. This
+/// matches the stable `GOODSIG`/`VALIDSIG` status tokens (a documented,
+/// locale-independent contract) instead of the localizable "Good signature"
+/// human prose.
+pub fn assert_gpg_status_good_signature(status_stream: &[u8]) {
+    let status = String::from_utf8_lossy(status_stream);
+    assert!(
+        status.contains("[GNUPG:] GOODSIG"),
+        "gpg --status-fd should emit a GOODSIG line; got:\n{status}"
+    );
+    assert!(
+        status.contains("[GNUPG:] VALIDSIG"),
+        "gpg --status-fd should emit a VALIDSIG line; got:\n{status}"
+    );
+}

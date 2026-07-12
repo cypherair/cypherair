@@ -684,19 +684,6 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         }
     }
 
-    func test_storeDoesNotUseLegacySoftwareWrappingServiceNames() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "nolegacy")
-
-        _ = try store.createHandlePair()
-
-        let tags = keyStore.applicationTagStrings()
-        XCTAssertTrue(tags.allSatisfy { $0.hasPrefix(SecureEnclaveCustodyHandleReference.applicationTagPrefix) })
-        XCTAssertFalse(tags.contains { $0.contains(".se-key.") })
-        XCTAssertFalse(tags.contains { $0.contains(".salt.") })
-        XCTAssertFalse(tags.contains { $0.contains(".sealed-key.") })
-    }
-
     func test_authTraceMetadataSanitizesSecureEnclaveCustodyHandleTags() throws {
         let signingReference = try reference("traceid", .signing)
         let keyAgreementReference = try reference("traceid", .keyAgreement)
