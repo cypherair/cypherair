@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import os
 
 struct ProtectedDataAuthorizationContextResult: @unchecked Sendable {
     let result: ProtectedDataAuthorizationResult
@@ -13,7 +14,10 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     private let traceStore: AuthLifecycleTraceStore?
     private let rootSecretCoordinator: ProtectedDataRootSecretCoordinator
 
-    private var wrappingRootKey: Data?
+    /// Session wrapping root key, guarded by an unfair lock (issue #610) —
+    /// same rationale as `ProtectedDomainKeyManager.unlockedDomainMasterKeys`:
+    /// synchronized by construction rather than by main-thread convention.
+    private let wrappingRootKeyLock = OSAllocatedUnfairLock<Data?>(initialState: nil)
     private let relockCoordinator = ProtectedDataSessionRelockCoordinator()
 
     private(set) var frameworkState: ProtectedDataFrameworkState = .sessionLocked
@@ -141,7 +145,7 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
             )
 
             clearSessionSecrets()
-            wrappingRootKey = derivedWrappingRootKey
+            wrappingRootKeyLock.withLock { $0 = derivedWrappingRootKey }
             frameworkState = .sessionAuthorized
             traceStore?.record(
                 category: .operation,
@@ -195,10 +199,12 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     }
 
     func wrappingRootKeyData() throws -> Data {
-        guard let wrappingRootKey else {
-            throw ProtectedDataError.missingWrappingRootKey
+        try wrappingRootKeyLock.withLock { key in
+            guard let key else {
+                throw ProtectedDataError.missingWrappingRootKey
+            }
+            return key
         }
-        return wrappingRootKey
     }
 
     func registerRelockParticipant(_ participant: any ProtectedDataRelockParticipant) {
@@ -227,15 +233,17 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     }
 
     private func clearSessionSecrets() {
-        if wrappingRootKey != nil {
-            wrappingRootKey?.protectedDataZeroize()
-            wrappingRootKey = nil
+        wrappingRootKeyLock.withLock { key in
+            if key != nil {
+                key?.protectedDataZeroize()
+                key = nil
+            }
         }
         domainKeyManager.clearUnlockedDomainMasterKeys()
     }
 
     var hasActiveWrappingRootKey: Bool {
-        wrappingRootKey != nil
+        wrappingRootKeyLock.withLock { $0 != nil }
     }
 
     private func makeRootSecretAuthenticationContext(localizedReason: String) -> LAContext {
