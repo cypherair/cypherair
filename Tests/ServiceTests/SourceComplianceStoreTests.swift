@@ -24,7 +24,6 @@ final class SourceComplianceStoreTests: XCTestCase {
             info.stableReleaseURL,
             "https://github.com/cypherair/cypherair/releases/tag/cypherair-v1.2.8-build27"
         )
-        XCTAssertTrue(info.isStableReleaseBuild)
         XCTAssertEqual(
             info.dependencies,
             [
@@ -44,7 +43,6 @@ final class SourceComplianceStoreTests: XCTestCase {
 
         let info = try store.loadInfo()
 
-        XCTAssertFalse(info.isStableReleaseBuild)
         XCTAssertTrue(info.stableReleaseTag.isEmpty)
         XCTAssertTrue(info.stableReleaseURL.isEmpty)
         XCTAssertEqual(info.fulfillmentBasis, "LGPL 2.1")

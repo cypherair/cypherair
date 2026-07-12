@@ -25,7 +25,6 @@ final class TutorialSessionStore {
     var selectedTab: AppShellTab { navigation.selectedTab }
     var routePath: [AppRoute] { navigation.path(for: navigation.selectedTab) }
     var activeModal: TutorialModal? { navigation.activeModal }
-    var visibleTab: AppShellTab { navigation.visibleSurface.tab }
     var visibleRoute: AppRoute? { navigation.visibleSurface.route }
     var isInspectorPresented: Bool { navigation.isInspectorPresented }
     var isOpeningModule: Bool { openingModule != nil }
@@ -44,10 +43,6 @@ final class TutorialSessionStore {
         session.nextIncompleteModule
     }
 
-    var hasCompletedAllModules: Bool {
-        session.hasCompletedAllModules
-    }
-
     var lifecycleState: TutorialLifecycleState {
         session.lifecycleState
     }
@@ -60,20 +55,8 @@ final class TutorialSessionStore {
         session.activeModule
     }
 
-    var isShowingCompletionView: Bool {
-        session.surface == .completion
-    }
-
-    var isShowingSandboxAcknowledgement: Bool {
-        session.surface == .sandboxAcknowledgement
-    }
-
     var pendingCompletionPromptModule: TutorialModuleID? {
         session.pendingCompletionPromptModule
-    }
-
-    var canFinishFromCompletionSurface: Bool {
-        session.lifecycleState == .stepsCompleted
     }
 
     var requiresLeaveConfirmation: Bool {
@@ -133,7 +116,6 @@ final class TutorialSessionStore {
     }
 
     func prepareForPresentation(launchOrigin: TutorialLaunchOrigin) {
-        session.launchOrigin = launchOrigin
         navigation.activeModal = nil
         errorMessage = nil
         session.pendingCompletionPromptModule = nil
@@ -141,7 +123,6 @@ final class TutorialSessionStore {
 
         if session.lifecycleState == .finished {
             resetTutorial()
-            session.launchOrigin = launchOrigin
         } else if session.hasStartedSession && container == nil {
             recreateContainer()
             session.surface = .hub
@@ -237,10 +218,6 @@ final class TutorialSessionStore {
         refreshLifecycleState()
     }
 
-    func dismissCompletionView() {
-        session.surface = .hub
-    }
-
     func dismissCompletionPrompt() {
         session.pendingCompletionPromptModule = nil
     }
@@ -285,10 +262,6 @@ final class TutorialSessionStore {
         navigation.activeModal = nil
         navigation.visibleSurface.tab = tab
         navigation.visibleSurface.route = routePath(for: tab).last
-    }
-
-    func setRoutePath(_ path: [AppRoute]) {
-        setRoutePath(path, for: navigation.selectedTab)
     }
 
     func routePath(for tab: AppShellTab) -> [AppRoute] {
@@ -351,10 +324,6 @@ final class TutorialSessionStore {
         navigation.visibleSurface = TutorialVisibleSurface(tab: tab, route: route)
     }
 
-    func noteGuidance(_ guidance: TutorialGuidancePayload?) {
-        session.currentGuidance = guidance
-    }
-
     func setInspectorPresented(_ isPresented: Bool) {
         navigation.isInspectorPresented = isPresented
     }
@@ -383,18 +352,14 @@ final class TutorialSessionStore {
         plaintext: Data,
         verification: DetailedSignatureVerification
     ) {
-        session.artifacts.decryptedMessage = String(data: plaintext, encoding: .utf8)
-        session.artifacts.decryptedVerification = verification
         complete(.decryptAndVerify)
     }
 
     func noteBackupExported(_ backupData: Data) {
-        session.artifacts.backupArmoredKey = String(data: backupData, encoding: .utf8)
         complete(.backupKey)
     }
 
     func noteHighSecurityEnabled(_ mode: AuthenticationMode) {
-        session.artifacts.authMode = mode
         complete(.enableHighSecurity)
     }
 

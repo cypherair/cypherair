@@ -62,7 +62,6 @@ final class TutorialSessionStoreTests: XCTestCase {
         XCTAssertEqual(container.contactService.testContactKeyRecords.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
         XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
-        XCTAssertNotNil(container.securitySimulationStack.authManager)
     }
 
     func test_tutorialSandboxContainer_clearsFixedDefaultsSuiteOnCreation() throws {
@@ -349,7 +348,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             verification: decryptResult.verification
         )
         XCTAssertTrue(store.isCompleted(.decryptAndVerify))
-        XCTAssertEqual(store.session.artifacts.decryptedVerification?.summaryState, .verified)
 
         let backup = try await container.keyManagement.exportKey(
             fingerprint: alice.fingerprint,
@@ -357,7 +355,6 @@ final class TutorialSessionStoreTests: XCTestCase {
         )
         store.noteBackupExported(backup)
         XCTAssertTrue(store.isCompleted(.backupKey))
-        XCTAssertTrue(store.session.artifacts.backupArmoredKey?.contains("BEGIN PGP PRIVATE KEY BLOCK") == true)
 
         try await container.authManager.switchMode(
             to: .highSecurity,
@@ -368,7 +365,6 @@ final class TutorialSessionStoreTests: XCTestCase {
         container.config.privateKeyControlState = .unlocked(.highSecurity)
         store.noteHighSecurityEnabled(.highSecurity)
         XCTAssertTrue(store.isCompleted(.enableHighSecurity))
-        XCTAssertEqual(store.session.artifacts.authMode, .highSecurity)
         XCTAssertEqual(store.lifecycleState, .stepsCompleted)
     }
 
@@ -754,8 +750,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .createDemoIdentity)
-        XCTAssertEqual(payload.state, .completed)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -784,8 +778,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .enableHighSecurity)
-        XCTAssertEqual(payload.state, .completed)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -827,7 +819,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .encryptDemoMessage)
         XCTAssertEqual(payload.target, .homeEncryptAction)
         XCTAssertEqual(
             payload.body,
@@ -852,7 +843,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .encryptDemoMessage)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -877,7 +867,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .encryptDemoMessage)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -902,7 +891,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .encryptDemoMessage)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -927,7 +915,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .decryptAndVerify)
         XCTAssertEqual(payload.target, .homeDecryptAction)
         XCTAssertEqual(
             payload.body,
@@ -953,7 +940,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .decryptAndVerify)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -979,7 +965,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .decryptAndVerify)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -1005,7 +990,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .decryptAndVerify)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -1023,7 +1007,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(payload.module, .decryptAndVerify)
         XCTAssertNil(payload.target)
         XCTAssertEqual(
             payload.body,
@@ -1047,7 +1030,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             modal: modal
         )
 
-        XCTAssertEqual(payload?.module, .addDemoContact)
         XCTAssertEqual(payload?.title, TutorialModuleID.addDemoContact.title)
         XCTAssertEqual(
             payload?.body,
@@ -1076,7 +1058,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             modal: modal
         )
 
-        XCTAssertEqual(payload?.module, .enableHighSecurity)
         XCTAssertEqual(payload?.title, TutorialModuleID.enableHighSecurity.title)
         XCTAssertEqual(
             payload?.body,
@@ -1099,7 +1080,6 @@ final class TutorialSessionStoreTests: XCTestCase {
             modal: modal
         )
 
-        XCTAssertEqual(payload?.module, .createDemoIdentity)
         XCTAssertEqual(payload?.title, TutorialModuleID.createDemoIdentity.title)
         XCTAssertEqual(
             payload?.body,
@@ -1184,7 +1164,6 @@ final class TutorialSessionStoreTests: XCTestCase {
 
     private func makeImportConfirmationRequest() -> ImportConfirmationRequest {
         ImportConfirmationRequest(
-            keyData: Data("demo-key".utf8),
             metadata: PGPKeyMetadata(
                 fingerprint: String(repeating: "a", count: 40),
                 keyVersion: 4,

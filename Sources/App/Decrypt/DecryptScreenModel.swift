@@ -62,9 +62,6 @@ final class DecryptScreenModel {
     var fileImportTarget: DecryptView.FileImportTarget?
     var selectedFileURL: URL?
     var selectedFileName: String?
-    var decryptedFileURL: URL? {
-        fileDecryptionResult?.output.fileURL
-    }
     var filePhase1Result: FileDecryptionPhase1Result?
     var importedCiphertext = ImportedTextInputState()
     private var pendingTextModeImport: PendingTextModeImport?
@@ -204,10 +201,6 @@ final class DecryptScreenModel {
         case .file:
             filePhase1Result != nil
         }
-    }
-
-    var decryptedText: String? {
-        textDecryptionResult?.plaintext
     }
 
     var activeDetailedSignatureVerification: DetailedSignatureVerification? {

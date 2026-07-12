@@ -78,7 +78,6 @@ struct AddContactView: View {
 
 private struct AddContactScreenHostView: View {
     let importLoader: PublicKeyImportLoader
-    let importWorkflow: ContactImportWorkflow
     let importConfirmationCoordinator: ImportConfirmationCoordinator?
     let appSessionOrchestrator: AppSessionOrchestrator
     let configuration: AddContactView.Configuration
@@ -98,7 +97,6 @@ private struct AddContactScreenHostView: View {
         dismissAction: @escaping @MainActor () -> Void
     ) {
         self.importLoader = importLoader
-        self.importWorkflow = importWorkflow
         self.importConfirmationCoordinator = importConfirmationCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.configuration = configuration

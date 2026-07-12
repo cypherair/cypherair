@@ -21,7 +21,6 @@ struct AppShellTabDefinition: Identifiable {
     let title: String
     let systemImage: String
     let section: AppShellTabSection
-    let visibleInCompact: Bool
     let content: AnyView
 
     var id: AppShellTab { tab }

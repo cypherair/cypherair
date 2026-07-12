@@ -8,9 +8,6 @@ final class MacShellNavigationState {
         uniqueKeysWithValues: AppShellTab.allCases.map { ($0, []) }
     )
     var activePresentation: MacPresentation?
-    var visibleRouteByTab: [AppShellTab: AppRoute?] = Dictionary(
-        uniqueKeysWithValues: AppShellTab.allCases.map { ($0, nil) }
-    )
     var columnVisibility: NavigationSplitViewVisibility = .automatic
     var preferredCompactColumn: NavigationSplitViewColumn = .detail
 
@@ -20,7 +17,6 @@ final class MacShellNavigationState {
 
     func setPath(_ path: [AppRoute], for tab: AppShellTab) {
         pathsByTab[tab] = path
-        visibleRouteByTab[tab] = path.last
     }
 
     func push(_ route: AppRoute, for tab: AppShellTab) {

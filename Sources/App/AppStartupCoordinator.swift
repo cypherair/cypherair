@@ -2,19 +2,10 @@ import Foundation
 
 /// Startup workflow for loading persisted state and recovering interrupted operations.
 struct AppStartupCoordinator {
-    struct Result {
-        let loadError: String?
-    }
-
     struct AppStartupBootstrapSnapshot {
         let loadError: String?
         let bootstrapOutcome: ProtectedDataBootstrapOutcome
         let protectedDataFrameworkState: ProtectedDataFrameworkState
-    }
-
-    func performStartup(using container: AppContainer) -> Result {
-        let snapshot = performPreAuthBootstrap(using: container)
-        return Result(loadError: snapshot.loadError)
     }
 
     func performPreAuthBootstrap(using container: AppContainer) -> AppStartupBootstrapSnapshot {

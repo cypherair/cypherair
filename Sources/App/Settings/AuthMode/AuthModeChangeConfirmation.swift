@@ -3,7 +3,6 @@ import SwiftUI
 @MainActor
 struct AuthModeChangeConfirmationRequest: Identifiable {
     let id: UUID
-    let pendingMode: AuthenticationMode
     let title: String
     let message: String
     let requiresRiskAcknowledgement: Bool
@@ -12,7 +11,6 @@ struct AuthModeChangeConfirmationRequest: Identifiable {
 
     init(
         id: UUID = UUID(),
-        pendingMode: AuthenticationMode,
         title: String,
         message: String,
         requiresRiskAcknowledgement: Bool,
@@ -20,7 +18,6 @@ struct AuthModeChangeConfirmationRequest: Identifiable {
         onCancel: @escaping @MainActor () -> Void
     ) {
         self.id = id
-        self.pendingMode = pendingMode
         self.title = title
         self.message = message
         self.requiresRiskAcknowledgement = requiresRiskAcknowledgement

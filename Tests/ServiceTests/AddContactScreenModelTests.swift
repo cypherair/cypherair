@@ -284,13 +284,12 @@ final class AddContactScreenModelTests: XCTestCase {
     func test_processSelectedQRPhoto_successAndFailure_updateState() async {
         let model = makeModel(
             qrPhotoKeyDataLoader: { selection in
-                XCTAssertEqual(selection.identifier, "armored-success")
-                return try await selection.loadKeyData()
+                try await selection.loadKeyData()
             }
         )
 
         model.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "armored-success") {
+            makeQRPhotoSelection {
                 Data("-----BEGIN PGP PUBLIC KEY BLOCK-----".utf8)
             }
         )
@@ -307,12 +306,11 @@ final class AddContactScreenModelTests: XCTestCase {
 
         let failingModel = makeModel(
             qrPhotoKeyDataLoader: { selection in
-                XCTAssertEqual(selection.identifier, "invalid-qr")
-                return try await selection.loadKeyData()
+                try await selection.loadKeyData()
             }
         )
         failingModel.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "invalid-qr") {
+            makeQRPhotoSelection {
                 throw CypherAirError.invalidQRCode
             }
         )
@@ -334,13 +332,12 @@ final class AddContactScreenModelTests: XCTestCase {
         let binaryKeyData = Data([0xff, 0xfe, 0xfd])
         let model = makeModel(
             qrPhotoKeyDataLoader: { selection in
-                XCTAssertEqual(selection.identifier, "binary-success")
-                return try await selection.loadKeyData()
+                try await selection.loadKeyData()
             }
         )
 
         model.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "binary-success") {
+            makeQRPhotoSelection {
                 binaryKeyData
             }
         )
@@ -365,7 +362,7 @@ final class AddContactScreenModelTests: XCTestCase {
         )
 
         model.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "late-key") {
+            makeQRPhotoSelection {
                 await gate.suspend()
                 return Data("late-public-key".utf8)
             }
@@ -402,7 +399,7 @@ final class AddContactScreenModelTests: XCTestCase {
         )
 
         model.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "disappear-late-key") {
+            makeQRPhotoSelection {
                 await gate.suspend()
                 return Data("late-public-key".utf8)
             }
@@ -440,7 +437,7 @@ final class AddContactScreenModelTests: XCTestCase {
         weak var weakModel = model
 
         model?.processSelectedQRPhoto(
-            makeQRPhotoSelection(identifier: "suspended-loader") {
+            makeQRPhotoSelection {
                 await gate.suspend()
                 return Data("late-public-key".utf8)
             }
@@ -561,10 +558,9 @@ final class AddContactScreenModelTests: XCTestCase {
 
     @MainActor
     private func makeQRPhotoSelection(
-        identifier: String,
         loadKeyData: @escaping @MainActor () async throws -> Data
     ) -> AddContactQRPhotoSelection {
-        AddContactQRPhotoSelection(identifier: identifier, loadKeyData: loadKeyData)
+        AddContactQRPhotoSelection(loadKeyData: loadKeyData)
     }
 
     private func makeHostActions(

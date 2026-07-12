@@ -12,7 +12,6 @@ enum SettingsAuthModeRequestBuilder {
     ) -> AuthModeChangeConfirmationRequest {
         AuthModeChangeConfirmationRequest(
             id: id,
-            pendingMode: mode,
             title: warningTitle(for: mode),
             message: warningMessage(for: mode, hasBackup: hasBackup),
             requiresRiskAcknowledgement: mode == .highSecurity && !hasBackup,

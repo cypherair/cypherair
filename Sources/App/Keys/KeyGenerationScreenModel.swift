@@ -151,10 +151,6 @@ final class KeyGenerationScreenModel {
         detailFamily = selectedFamily
     }
 
-    func dismissDetails() {
-        detailFamily = nil
-    }
-
     func presentFamilyDetail(_ family: PGPKeyConfiguration.Identity) {
         presentedFamilyDetail = family
     }
