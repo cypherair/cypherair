@@ -101,12 +101,15 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         expirySeconds: UInt64?,
         profile: PGPKeyProfile
     ) async throws -> PGPSelfTestGeneratedKey {
-        let generated = try engine.generateKey(
+        var generated = try engine.generateKey(
             name: name,
             email: email,
             expirySeconds: expirySeconds,
             profile: profile.ffiValue
         )
+        // Self-test never stores the revocation certificate, so per the
+        // GeneratedKey contract the sole in-memory copy is zeroized here.
+        generated.revocationCert.resetBytes(in: 0..<generated.revocationCert.count)
         return PGPSelfTestGeneratedKey(
             certData: generated.certData,
             publicKeyData: generated.publicKeyData,
