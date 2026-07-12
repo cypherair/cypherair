@@ -52,24 +52,24 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         }
     }
 
-    // MARK: - C8.2: Full PGP Workflow Under MIE (Profile A + Profile B)
+    // MARK: - C8.2: Full PGP Workflow Under MIE (Legacy + Modern High)
 
-    /// C8.2: Complete Profile A (v4, Ed25519+X25519, SEIPDv1) workflow on device.
+    /// C8.2: Complete Legacy (v4, Ed25519+X25519, SEIPDv1) workflow on device.
     /// Exercises OpenSSL: AES-256, X25519 key agreement, Ed25519 signing, SHA-512 hashing.
     /// Pass: all operations complete without EXC_GUARD / GUARD_EXC_MTE_SYNC_FAULT.
-    func test_mie_fullPGPWorkflow_profileA_noTagMismatch() throws {
+    func test_mie_fullPGPWorkflow_legacy_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.2 Profile A MIE: full workflow — 你好世界 🔐".utf8)
+        let plaintext = Data("C8.2 Legacy MIE: full workflow — 你好世界 🔐".utf8)
 
         // 1. Key generation (Ed25519+X25519, v4).
         let key = try engine.generateKey(
             name: "C8.2 MIE Test A", email: "mie-a@test.local",
             expirySeconds: nil, profile: .universal
         )
-        XCTAssertFalse(key.certData.isEmpty, "Profile A key generation must succeed")
-        XCTAssertFalse(key.fingerprint.isEmpty, "Profile A fingerprint must not be empty")
+        XCTAssertFalse(key.certData.isEmpty, "Legacy key generation must succeed")
+        XCTAssertFalse(key.fingerprint.isEmpty, "Legacy fingerprint must not be empty")
 
         // 2. Encrypt with signing (AES-256 via SEIPDv1, X25519 key agreement).
         let ciphertext = try engine.encrypt(
@@ -78,7 +78,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             signingKey: key.certData,
             encryptToSelf: nil
         )
-        XCTAssertFalse(ciphertext.isEmpty, "Profile A ciphertext must not be empty")
+        XCTAssertFalse(ciphertext.isEmpty, "Legacy ciphertext must not be empty")
 
         // 3. Decrypt (AES-256 decryption, Ed25519 signature verification).
         let decrypted = try engine.decryptDetailed(
@@ -87,9 +87,9 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData]
         )
         XCTAssertEqual(decrypted.plaintext, plaintext,
-            "Profile A decrypted plaintext must match original")
+            "Legacy decrypted plaintext must match original")
         XCTAssertEqual(decrypted.summaryState, .verified,
-            "Profile A signature must verify")
+            "Legacy signature must verify")
 
         // 4. Cleartext sign (Ed25519 + SHA-512).
         let signed = try engine.signCleartext(
@@ -103,7 +103,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData]
         )
         XCTAssertEqual(verifyResult.summaryState, .verified,
-            "Profile A cleartext signature must verify")
+            "Legacy cleartext signature must verify")
 
         // 6. Detached file sign.
         let detachedURL = try writeTemporaryFile(plaintext)
@@ -123,24 +123,24 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             progress: nil
         )
         XCTAssertEqual(detachedVerify.summaryState, .verified,
-            "Profile A detached signature must verify")
+            "Legacy detached signature must verify")
     }
 
-    /// C8.2: Complete Profile B (v6, Ed448+X448, SEIPDv2 AEAD OCB) workflow on device.
+    /// C8.2: Complete Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB) workflow on device.
     /// Exercises OpenSSL: AES-256-OCB AEAD, X448 key agreement, Ed448 signing, SHA-512.
     /// Pass: all operations complete without tag mismatch crashes.
-    func test_mie_fullPGPWorkflow_profileB_noTagMismatch() throws {
+    func test_mie_fullPGPWorkflow_modernHigh_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
-        let plaintext = Data("C8.2 Profile B MIE: full workflow — AEAD OCB 🛡️".utf8)
+        let plaintext = Data("C8.2 Modern High MIE: full workflow — AEAD OCB 🛡️".utf8)
 
         // 1. Key generation (Ed448+X448, v6).
         let key = try engine.generateKey(
             name: "C8.2 MIE Test B", email: "mie-b@test.local",
             expirySeconds: nil, profile: .advanced
         )
-        XCTAssertFalse(key.certData.isEmpty, "Profile B key generation must succeed")
+        XCTAssertFalse(key.certData.isEmpty, "Modern High key generation must succeed")
 
         // 2. Encrypt with signing (AES-256-OCB AEAD via SEIPDv2, X448).
         let ciphertext = try engine.encrypt(
@@ -149,7 +149,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             signingKey: key.certData,
             encryptToSelf: nil
         )
-        XCTAssertFalse(ciphertext.isEmpty, "Profile B ciphertext must not be empty")
+        XCTAssertFalse(ciphertext.isEmpty, "Modern High ciphertext must not be empty")
 
         // 3. Decrypt (AEAD OCB decryption, Ed448 signature verification).
         let decrypted = try engine.decryptDetailed(
@@ -158,15 +158,15 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData]
         )
         XCTAssertEqual(decrypted.plaintext, plaintext,
-            "Profile B decrypted plaintext must match original")
+            "Modern High decrypted plaintext must match original")
         XCTAssertEqual(decrypted.summaryState, .verified,
-            "Profile B signature must verify")
+            "Modern High signature must verify")
 
         // 4. Cleartext sign (Ed448 + SHA-512).
         let signed = try engine.signCleartext(
             text: plaintext, signerCert: key.certData
         )
-        XCTAssertFalse(signed.isEmpty, "Profile B cleartext signature must not be empty")
+        XCTAssertFalse(signed.isEmpty, "Modern High cleartext signature must not be empty")
 
         // 5. Verify cleartext signature.
         let verifyResult = try engine.verifyCleartextDetailed(
@@ -174,7 +174,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: [key.publicKeyData]
         )
         XCTAssertEqual(verifyResult.summaryState, .verified,
-            "Profile B cleartext signature must verify")
+            "Modern High cleartext signature must verify")
 
         // 6. Detached file sign.
         let detachedURL = try writeTemporaryFile(plaintext)
@@ -184,7 +184,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             signerCert: key.certData,
             progress: nil
         )
-        XCTAssertFalse(detachedSig.isEmpty, "Profile B detached signature must not be empty")
+        XCTAssertFalse(detachedSig.isEmpty, "Modern High detached signature must not be empty")
 
         // 7. Verify detached file signature.
         let detachedVerify = try engine.verifyDetachedFileDetailed(
@@ -194,7 +194,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             progress: nil
         )
         XCTAssertEqual(detachedVerify.summaryState, .verified,
-            "Profile B detached signature must verify")
+            "Modern High detached signature must verify")
     }
 
     /// C8.2: Cross-profile encryption format auto-selection under MIE.
@@ -266,7 +266,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
     }
 
     /// C8.2: Key export/import round-trip under MIE.
-    /// Profile A: Iterated+Salted S2K. Profile B: Argon2id S2K (512 MB).
+    /// Legacy: Iterated+Salted S2K. Modern High: Argon2id S2K (512 MB).
     func test_mie_keyExportImport_bothProfiles_noTagMismatch() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
@@ -274,7 +274,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let passphrase = "mie-export-test-passphrase"
         let plaintext = Data("C8.2 export/import round-trip test".utf8)
 
-        // Profile A: export with Iterated+Salted S2K, then import.
+        // Legacy: export with Iterated+Salted S2K, then import.
         let keyA = try engine.generateKey(
             name: "Export A", email: nil, expirySeconds: nil, profile: .universal
         )
@@ -288,12 +288,12 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let exportedA = try engine.exportSecretKey(
             certData: keyA.certData, passphrase: passphrase, profile: .universal
         )
-        XCTAssertFalse(exportedA.isEmpty, "Profile A export must produce data")
+        XCTAssertFalse(exportedA.isEmpty, "Legacy export must produce data")
 
         let importedA = try engine.importSecretKey(
             armoredData: exportedA, passphrase: passphrase
         )
-        XCTAssertFalse(importedA.isEmpty, "Profile A import must succeed")
+        XCTAssertFalse(importedA.isEmpty, "Legacy import must succeed")
 
         // Decrypt with the imported key to verify round-trip.
         let decryptedA = try engine.decryptDetailed(
@@ -302,9 +302,9 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: []
         )
         XCTAssertEqual(decryptedA.plaintext, plaintext,
-            "Profile A: imported key must decrypt correctly")
+            "Legacy: imported key must decrypt correctly")
 
-        // Profile B: export with Argon2id S2K, then import.
+        // Modern High: export with Argon2id S2K, then import.
         let keyB = try engine.generateKey(
             name: "Export B", email: nil, expirySeconds: nil, profile: .advanced
         )
@@ -318,12 +318,12 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let exportedB = try engine.exportSecretKey(
             certData: keyB.certData, passphrase: passphrase, profile: .advanced
         )
-        XCTAssertFalse(exportedB.isEmpty, "Profile B export must produce data")
+        XCTAssertFalse(exportedB.isEmpty, "Modern High export must produce data")
 
         let importedB = try engine.importSecretKey(
             armoredData: exportedB, passphrase: passphrase
         )
-        XCTAssertFalse(importedB.isEmpty, "Profile B import must succeed")
+        XCTAssertFalse(importedB.isEmpty, "Modern High import must succeed")
 
         let decryptedB = try engine.decryptDetailed(
             ciphertext: ciphertextB,
@@ -331,7 +331,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             verificationKeys: []
         )
         XCTAssertEqual(decryptedB.plaintext, plaintext,
-            "Profile B: imported key must decrypt correctly")
+            "Modern High: imported key must decrypt correctly")
     }
 
     // MARK: - C8.3: OpenSSL Crypto Operations Under MIE
@@ -345,7 +345,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         let engine = PgpEngine()
         let plaintext = Data("C8.3 OpenSSL paths MIE validation".utf8)
 
-        // --- Generate keys for Profile A and Profile B ---
+        // --- Generate keys for Legacy and Modern High ---
         let keyA = try engine.generateKey(
             name: "OpenSSL A", email: nil, expirySeconds: nil, profile: .universal
         )
@@ -353,7 +353,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             name: "OpenSSL B", email: nil, expirySeconds: nil, profile: .advanced
         )
 
-        // 1. AES-256 via SEIPDv1 (Profile A encrypt + decrypt).
+        // 1. AES-256 via SEIPDv1 (Legacy encrypt + decrypt).
         //    OpenSSL path: AES-256-CFB encryption + MDC (SHA-1 hash).
         let ciphertextA = try engine.encrypt(
             plaintext: plaintext,
@@ -368,7 +368,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(resultA.plaintext, plaintext, "AES-256 SEIPDv1 round-trip failed")
 
-        // 2. SHA-512 via signing (Profile A and Profile B).
+        // 2. SHA-512 via signing (Legacy and Modern High).
         //    OpenSSL path: SHA-512 hash for signature computation.
         let signedA = try engine.signCleartext(text: plaintext, signerCert: keyA.certData)
         let verifyA = try engine.verifyCleartextDetailed(
@@ -382,14 +382,14 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(verifyB.summaryState, .verified, "SHA-512 + Ed448 sign/verify failed")
 
-        // 3. Ed25519 via Profile A sign + verify (covered above in step 2).
+        // 3. Ed25519 via Legacy sign + verify (covered above in step 2).
 
-        // 4. X25519 via Profile A encrypt (covered above in step 1).
+        // 4. X25519 via Legacy encrypt (covered above in step 1).
         //    OpenSSL path: X25519 ECDH key agreement for session key.
 
-        // 5. Ed448 via Profile B sign + verify (covered above in step 2).
+        // 5. Ed448 via Modern High sign + verify (covered above in step 2).
 
-        // 6. X448 via Profile B encrypt.
+        // 6. X448 via Modern High encrypt.
         //    OpenSSL path: X448 ECDH key agreement for session key.
         let ciphertextB = try engine.encrypt(
             plaintext: plaintext,
@@ -404,9 +404,9 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
         XCTAssertEqual(resultB.plaintext, plaintext, "AES-256-OCB AEAD + X448 round-trip failed")
 
-        // 7. AES-256-OCB AEAD via SEIPDv2 (Profile B, covered above in step 6).
+        // 7. AES-256-OCB AEAD via SEIPDv2 (Modern High, covered above in step 6).
 
-        // 8. Argon2id via Profile B key export.
+        // 8. Argon2id via Modern High key export.
         //    OpenSSL path: Argon2id KDF (512 MB memory, 4 lanes).
         let exported = try engine.exportSecretKey(
             certData: keyB.certData, passphrase: "openssltest", profile: .advanced
@@ -464,16 +464,16 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
         // Armor public keys and round-trip.
         let armoredA = try engine.armorPublicKey(certData: keyA.publicKeyData)
-        XCTAssertFalse(armoredA.isEmpty, "Profile A armored public key must not be empty")
+        XCTAssertFalse(armoredA.isEmpty, "Legacy armored public key must not be empty")
         let dearmoredA = try engine.dearmor(armored: armoredA)
         XCTAssertEqual(dearmoredA, keyA.publicKeyData,
-            "Profile A armor/dearmor must round-trip")
+            "Legacy armor/dearmor must round-trip")
 
         let armoredB = try engine.armorPublicKey(certData: keyB.publicKeyData)
-        XCTAssertFalse(armoredB.isEmpty, "Profile B armored public key must not be empty")
+        XCTAssertFalse(armoredB.isEmpty, "Modern High armored public key must not be empty")
         let dearmoredB = try engine.dearmor(armored: armoredB)
         XCTAssertEqual(dearmoredB, keyB.publicKeyData,
-            "Profile B armor/dearmor must round-trip")
+            "Modern High armor/dearmor must round-trip")
 
         // Armor ciphertext and round-trip decrypt.
         let plaintext = Data("Armor round-trip test".utf8)
@@ -492,11 +492,11 @@ final class DeviceMIETests: DeviceSecurityTestCase {
 
     // MARK: - C8.4: 100× Encrypt/Decrypt Cycles Under MIE
 
-    /// C8.4: 100 encrypt/decrypt cycles for Profile A (SEIPDv1) under MIE.
+    /// C8.4: 100 encrypt/decrypt cycles for Legacy (SEIPDv1) under MIE.
     /// Detects intermittent tag mismatches that single-cycle tests might miss.
     /// Monitor: `log stream --predicate 'eventMessage contains "MTE"'`
     /// Pass: zero tag violations across 100 cycles.
-    func test_mie_100xEncryptDecryptCycles_profileA_noIntermittentCrashes() throws {
+    func test_mie_100xEncryptDecryptCycles_legacy_noIntermittentCrashes() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
@@ -505,7 +505,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
 
         for i in 0..<100 {
-            let plaintext = Data("C8.4 Profile A iteration \(i) — \(UUID().uuidString)".utf8)
+            let plaintext = Data("C8.4 Legacy iteration \(i) — \(UUID().uuidString)".utf8)
 
             let ciphertext = try engine.encrypt(
                 plaintext: plaintext,
@@ -521,16 +521,16 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             )
 
             XCTAssertEqual(result.plaintext, plaintext,
-                "Profile A iteration \(i): plaintext mismatch")
+                "Legacy iteration \(i): plaintext mismatch")
             XCTAssertEqual(result.summaryState, .verified,
-                "Profile A iteration \(i): signature invalid")
+                "Legacy iteration \(i): signature invalid")
         }
     }
 
-    /// C8.4: 100 encrypt/decrypt cycles for Profile B (SEIPDv2 AEAD OCB) under MIE.
+    /// C8.4: 100 encrypt/decrypt cycles for Modern High (SEIPDv2 AEAD OCB) under MIE.
     /// Exercises OpenSSL AES-256-OCB + X448 + Ed448 100 times.
     /// Pass: zero tag violations across 100 cycles.
-    func test_mie_100xEncryptDecryptCycles_profileB_noIntermittentCrashes() throws {
+    func test_mie_100xEncryptDecryptCycles_modernHigh_noIntermittentCrashes() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
@@ -539,7 +539,7 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         )
 
         for i in 0..<100 {
-            let plaintext = Data("C8.4 Profile B iteration \(i) — \(UUID().uuidString)".utf8)
+            let plaintext = Data("C8.4 Modern High iteration \(i) — \(UUID().uuidString)".utf8)
 
             let ciphertext = try engine.encrypt(
                 plaintext: plaintext,
@@ -555,13 +555,13 @@ final class DeviceMIETests: DeviceSecurityTestCase {
             )
 
             XCTAssertEqual(result.plaintext, plaintext,
-                "Profile B iteration \(i): plaintext mismatch")
+                "Modern High iteration \(i): plaintext mismatch")
             XCTAssertEqual(result.summaryState, .verified,
-                "Profile B iteration \(i): signature invalid")
+                "Modern High iteration \(i): signature invalid")
         }
     }
 
-    /// C8.4: 100 sign/verify cycles for Profile A and Profile B under MIE.
+    /// C8.4: 100 sign/verify cycles for Legacy and Modern High under MIE.
     /// Exercises Ed25519 + Ed448 + SHA-512 hashing 200 times total.
     /// Pass: zero tag violations across all cycles.
     func test_mie_100xSignVerifyCycles_bothProfiles_noIntermittentCrashes() throws {
@@ -578,21 +578,21 @@ final class DeviceMIETests: DeviceSecurityTestCase {
         for i in 0..<100 {
             let text = Data("C8.4 sign/verify iteration \(i) — \(UUID().uuidString)".utf8)
 
-            // Profile A: Ed25519 cleartext sign + verify.
+            // Legacy: Ed25519 cleartext sign + verify.
             let signedA = try engine.signCleartext(text: text, signerCert: keyA.certData)
             let verifyA = try engine.verifyCleartextDetailed(
                 signedMessage: signedA, verificationKeys: [keyA.publicKeyData]
             )
             XCTAssertEqual(verifyA.summaryState, .verified,
-                "Profile A sign/verify iteration \(i) failed")
+                "Legacy sign/verify iteration \(i) failed")
 
-            // Profile B: Ed448 cleartext sign + verify.
+            // Modern High: Ed448 cleartext sign + verify.
             let signedB = try engine.signCleartext(text: text, signerCert: keyB.certData)
             let verifyB = try engine.verifyCleartextDetailed(
                 signedMessage: signedB, verificationKeys: [keyB.publicKeyData]
             )
             XCTAssertEqual(verifyB.summaryState, .verified,
-                "Profile B sign/verify iteration \(i) failed")
+                "Modern High sign/verify iteration \(i) failed")
         }
     }
 }

@@ -6,8 +6,8 @@ import XCTest
 
 final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase {
 
-    func test_exportKey_profileA_returnsArmoredData() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+    func test_exportKey_legacy_returnsArmoredData() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-123")
 
@@ -19,7 +19,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
     }
 
     func test_exportKey_marksKeyAsBackedUp() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         XCTAssertFalse(identity.isBackedUp)
 
         _ = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "backup-pass")
@@ -29,7 +29,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
     }
 
     func test_exportKeyBackupData_doesNotMarkBackedUpUntilConfirmed() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         XCTAssertFalse(try XCTUnwrap(service.keys.first).isBackedUp)
 
         var exported = try await service.exportKeyBackupData(
@@ -48,7 +48,7 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
     }
 
     func test_exportKey_metadataUpdateFailure_keepsSessionBackedUp_butFreshServiceSeesOldState() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         metadataPersistence.failNextUpdate = true
 
         _ = try await service.exportKey(
@@ -74,15 +74,15 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         }
     }
 
-    func test_exportKey_profileB_returnsArmoredData() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service)
+    func test_exportKey_modernHigh_returnsArmoredData() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service)
 
         let exported = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: "test-pass-456")
         XCTAssertFalse(exported.isEmpty)
     }
 
-    func test_importKey_profileA_exportThenImport_fingerprintMatches() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Export Test A")
+    func test_importKey_legacy_exportThenImport_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Export Test A")
         let passphrase = "test-passphrase-123"
 
         // Export the key
@@ -103,12 +103,12 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
         XCTAssertEqual(imported.softwareProfile, .universal,
-                       "Imported key should retain Profile A (universal)")
+                       "Imported key should retain Legacy (universal)")
         XCTAssertEqual(imported.keyVersion, 4)
     }
 
-    func test_importKey_profileB_exportThenImport_fingerprintMatches() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Export Test B")
+    func test_importKey_modernHigh_exportThenImport_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Export Test B")
         let passphrase = "test-passphrase-456"
 
         let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
@@ -125,12 +125,12 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         XCTAssertEqual(imported.fingerprint, identity.fingerprint,
                        "Imported key fingerprint should match original")
         XCTAssertEqual(imported.softwareProfile, .advanced,
-                       "Imported key should retain Profile B (advanced)")
+                       "Imported key should retain Modern High (advanced)")
         XCTAssertEqual(imported.keyVersion, 6)
     }
 
     func test_importKey_duplicateFingerprint_throwsDuplicateKeyError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Original A")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Original A")
         let passphrase = "test-pass-dup-a"
 
         // Export the key (to get armored data for re-import)
@@ -153,8 +153,8 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
                        "SE key should not be generated for duplicate import")
     }
 
-    func test_importKey_duplicateFingerprint_profileB_throwsDuplicateKeyError() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Original B")
+    func test_importKey_duplicateFingerprint_modernHigh_throwsDuplicateKeyError() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Original B")
         let passphrase = "test-pass-dup-b"
 
         let exportedData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)
@@ -170,11 +170,11 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         }
 
         XCTAssertEqual(mockSE.generateCallCount, 1,
-                       "SE key should not be generated for duplicate Profile B import")
+                       "SE key should not be generated for duplicate Modern High import")
     }
 
-    func test_importKey_binaryFormat_profileA_fingerprintMatches() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Binary Import A")
+    func test_importKey_binaryFormat_legacy_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Binary Import A")
         let passphrase = "binary-test-pass-a"
 
         // Export produces ASCII armor
@@ -209,8 +209,8 @@ final class KeyManagementServiceExportImportTests: KeyManagementServiceTestCase 
         XCTAssertTrue(revocationValidation.lowercased().contains(imported.fingerprint.lowercased()))
     }
 
-    func test_importKey_binaryFormat_profileB_fingerprintMatches() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Binary Import B")
+    func test_importKey_binaryFormat_modernHigh_fingerprintMatches() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Binary Import B")
         let passphrase = "binary-test-pass-b"
 
         let armoredData = try await service.exportKey(fingerprint: identity.fingerprint, passphrase: passphrase)

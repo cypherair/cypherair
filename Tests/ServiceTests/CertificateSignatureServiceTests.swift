@@ -179,7 +179,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
     }
 
-    func test_generateUserIdCertification_roundTrip_profileA_returnsOwnKeyIdentity() async throws {
+    func test_generateUserIdCertification_roundTrip_legacy_returnsOwnKeyIdentity() async throws {
         let signer = try await generateSigner(
             profile: .universal,
             name: "Service Signer A",
@@ -209,7 +209,7 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
     }
 
-    func test_generateUserIdCertification_roundTrip_profileB_returnsOwnKeyIdentity() async throws {
+    func test_generateUserIdCertification_roundTrip_modernHigh_returnsOwnKeyIdentity() async throws {
         let signer = try await generateSigner(
             profile: .advanced,
             name: "Service Signer B",

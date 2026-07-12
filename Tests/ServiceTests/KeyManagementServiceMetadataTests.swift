@@ -7,7 +7,7 @@ import XCTest
 final class KeyManagementServiceMetadataTests: KeyManagementServiceTestCase {
 
     func test_generateKey_persistsIdentityThroughInjectedMetadataPersistence() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         XCTAssertEqual(metadataPersistence.saveCallCount, 1)
         XCTAssertEqual(metadataPersistence.identities, [identity])
@@ -23,7 +23,7 @@ final class KeyManagementServiceMetadataTests: KeyManagementServiceTestCase {
     }
 
     func test_loadKeys_withStoredMetadata_loadsKeys() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         // Create a new service instance over the same metadata persistence
         let newService = makeFreshService()
@@ -34,7 +34,7 @@ final class KeyManagementServiceMetadataTests: KeyManagementServiceTestCase {
     }
 
     func test_loadKeys_persistenceFailure_entersRecoveryNeeded() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: service)
+        _ = try await TestHelpers.generateLegacyKey(service: service)
         metadataPersistence.failNextLoadAll = true
 
         let newService = makeFreshService()

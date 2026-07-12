@@ -4,7 +4,7 @@ import XCTest
 extension FFIIntegrationTests {
     // MARK: - C5.2B Certificate Merge / Update
 
-    func test_certificateMergeUpdate_profileA_expiryRefreshReturnsUpdated() throws {
+    func test_certificateMergeUpdate_legacy_expiryRefreshReturnsUpdated() throws {
         let generated = try engine.generateKey(
             name: "Merge A",
             email: "merge-a@example.com",
@@ -27,7 +27,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(info.expiryTimestamp, refreshed.keyInfo.expiryTimestamp)
     }
 
-    func test_certificateMergeUpdate_profileB_expiryRefreshReturnsUpdated() throws {
+    func test_certificateMergeUpdate_modernHigh_expiryRefreshReturnsUpdated() throws {
         let generated = try engine.generateKey(
             name: "Merge B",
             email: "merge-b@example.com",
@@ -86,9 +86,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(mergedInfo.userId, "bbbbb")
     }
 
-    func test_certificateMergeUpdate_profileA_revocationFixtureReturnsUpdated() throws {
-        let base = try loadFixture("merge_revocation_profile_a_base")
-        let update = try loadFixture("merge_revocation_profile_a_update")
+    func test_certificateMergeUpdate_legacy_revocationFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_revocation_legacy_base")
+        let update = try loadFixture("merge_revocation_legacy_update")
 
         let result = try engine.mergePublicCertificateUpdate(
             existingCert: base,
@@ -101,9 +101,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(info.profile, .universal)
     }
 
-    func test_certificateMergeUpdate_profileB_revocationFixtureReturnsUpdated() throws {
-        let base = try loadFixture("merge_revocation_profile_b_base")
-        let update = try loadFixture("merge_revocation_profile_b_update")
+    func test_certificateMergeUpdate_modernHigh_revocationFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_revocation_modern_high_base")
+        let update = try loadFixture("merge_revocation_modern_high_update")
 
         let result = try engine.mergePublicCertificateUpdate(
             existingCert: base,
@@ -116,9 +116,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(info.profile, .advanced)
     }
 
-    func test_certificateMergeUpdate_profileA_encryptionSubkeyFixtureReturnsUpdated() throws {
-        let base = try loadFixture("merge_add_encryption_subkey_profile_a_base")
-        let update = try loadFixture("merge_add_encryption_subkey_profile_a_update")
+    func test_certificateMergeUpdate_legacy_encryptionSubkeyFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_legacy_base")
+        let update = try loadFixture("merge_add_encryption_subkey_legacy_update")
 
         XCTAssertFalse(try engine.parseKeyInfo(keyData: base).hasEncryptionSubkey)
 
@@ -133,9 +133,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(info.profile, .universal)
     }
 
-    func test_certificateMergeUpdate_profileB_encryptionSubkeyFixtureReturnsUpdated() throws {
-        let base = try loadFixture("merge_add_encryption_subkey_profile_b_base")
-        let update = try loadFixture("merge_add_encryption_subkey_profile_b_update")
+    func test_certificateMergeUpdate_modernHigh_encryptionSubkeyFixtureReturnsUpdated() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_modern_high_base")
+        let update = try loadFixture("merge_add_encryption_subkey_modern_high_update")
 
         XCTAssertFalse(try engine.parseKeyInfo(keyData: base).hasEncryptionSubkey)
 

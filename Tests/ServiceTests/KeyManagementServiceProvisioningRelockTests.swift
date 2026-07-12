@@ -223,7 +223,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_invalidatedBeforeAuthModeRead_doesNotPersistBundleOrMetadata() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Import Before Auth Mode Source"
         )
@@ -276,7 +276,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_invalidatedAfterOffMainImportBeforeDuplicateLookup_prioritizesCancellation() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Import Duplicate Race Source"
         )
@@ -345,7 +345,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_existingPersistenceMetadataButUnloadedCatalog_keepsExistingMetadataAndRollsBackNewBundle() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Existing Metadata"
         )
@@ -380,7 +380,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_existingPermanentBundleButUnloadedCatalog_keepsExistingBundle() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Existing Bundle"
         )
@@ -443,7 +443,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_generateKey_invalidatedAfterIdentityStore_rollsBackOnlyNewIdentityAndBundle() async throws {
-        let existing = try await TestHelpers.generateProfileBKey(
+        let existing = try await TestHelpers.generateModernHighKey(
             service: service,
             name: "Existing Unrelated"
         )
@@ -521,7 +521,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_generateKey_metadataDiscardFailureAfterIdentityStore_preservesNewBundle() async throws {
-        let existing = try await TestHelpers.generateProfileBKey(
+        let existing = try await TestHelpers.generateModernHighKey(
             service: service,
             name: "Existing Metadata Discard Failure"
         )
@@ -667,7 +667,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_invalidatedBeforeProvisioning_doesNotPersistBundleOrMetadata() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Import Source"
         )
@@ -713,7 +713,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_invalidatedAfterProvisioningBeforeSync_doesNotRepublishCatalogKeys() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Import Post Source"
         )
@@ -763,7 +763,7 @@ final class KeyManagementServiceProvisioningRelockTests: KeyManagementServiceTes
     }
 
     func test_importKey_cancelledAfterProvisioningBeforeSync_stillSyncsCommittedIdentity() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: service,
             name: "Import Cancel Source"
         )

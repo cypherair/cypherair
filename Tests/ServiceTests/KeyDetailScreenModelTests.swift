@@ -55,7 +55,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_prepareIfNeeded_publicKeyExportFailure_doesNotBlockScreenState() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let model = makeModel(
             fingerprint: identity.fingerprint,
             publicKeyExportAction: { _ in
@@ -72,7 +72,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_copyAndSavePublicKey_routeThroughInterceptionPolicy() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var interceptedClipboard: String?
         var interceptedExportFilename: String?
@@ -109,7 +109,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_configurationFlags_gateCopyAndSave() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var configuration = KeyDetailView.Configuration()
         configuration.allowsPublicKeyCopy = false
@@ -132,7 +132,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_exportRevocationCertificate_preparesExportPayload() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let model = makeModel(
             fingerprint: identity.fingerprint,
             revocationExportAction: { _ in
@@ -153,7 +153,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_exportRevocationCertificate_failure_surfacesError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let model = makeModel(
             fingerprint: identity.fingerprint,
             revocationExportAction: { _ in
@@ -174,7 +174,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_handleDisappear_suppressesLateRevocationExportPayloadAndError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let gate = KeyDetailRevocationExportGate()
         let model = makeModel(
             fingerprint: identity.fingerprint,
@@ -207,7 +207,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_setDefaultAndDelete_invokeInjectedActionsAndDismiss() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         var defaultFingerprint: String?
         var deletedFingerprint: String?
         var dismissCount = 0
@@ -236,7 +236,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_presentModifyExpiry_withoutMacController_keepsLocalRequest_andReloadsAfterCompletion() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         var exportCount = 0
         let model = makeModel(
             fingerprint: identity.fingerprint,
@@ -261,7 +261,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_presentModifyExpiry_withMacController_routesRequestThroughPresentationHost() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         var capturedPresentation: MacPresentation?
         let macPresentationController = MacPresentationController(
             present: { presentation in
@@ -288,7 +288,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_softwareKey_isNotDeviceBoundAndNeverShowsDegradedRow() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         // Even a maximally degraded report must not surface for software keys.
         let degradedReport = SecureEnclaveCustodyGenerationRecoveryReport(
             assessments: [],
@@ -311,7 +311,7 @@ final class KeyDetailScreenModelTests: XCTestCase {
 
     @MainActor
     func test_deleteConfirmationMessage_branchesOnCustody() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let model = makeModel(fingerprint: identity.fingerprint)
 
         // The instance property delegates to the custody branch for a real

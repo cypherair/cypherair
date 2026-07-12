@@ -94,14 +94,14 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.7: Concurrent operations with Profile B (AEAD).
-    func test_concurrentEncryptDecrypt_profileB_threadsafe() async throws {
+    /// C5.7: Concurrent operations with Modern High (AEAD).
+    func test_concurrentEncryptDecrypt_modernHigh_threadsafe() async throws {
         let key = try engine.generateKey(
             name: "ConcurrentB", email: nil, expirySeconds: nil, profile: .advanced
         )
 
         let preCiphertext = try engine.encrypt(
-            plaintext: Data("Profile B concurrent".utf8),
+            plaintext: Data("Modern High concurrent".utf8),
             recipients: [key.publicKeyData],
             signingKey: nil,
             encryptToSelf: nil

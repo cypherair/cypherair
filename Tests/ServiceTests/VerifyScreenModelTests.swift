@@ -37,7 +37,7 @@ final class VerifyScreenModelTests: XCTestCase {
 
     @MainActor
     func test_verifyCleartext_importedFileAndEditedTextInvalidateImportedStateAndResult() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )

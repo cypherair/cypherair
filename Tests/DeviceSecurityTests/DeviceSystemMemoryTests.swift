@@ -28,7 +28,7 @@ final class DeviceSystemMemoryTests: DeviceSecurityTestCase {
     func test_argon2idGuard_realDevice_512MB_import_succeeds() throws {
         let engine = PgpEngine()
 
-        // Generate and export a Profile B key.
+        // Generate and export a Modern High key.
         let key = try engine.generateKey(
             name: "Device Argon2id", email: nil, expirySeconds: nil, profile: .advanced
         )

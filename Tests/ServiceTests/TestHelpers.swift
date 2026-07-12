@@ -169,9 +169,9 @@ enum TestHelpers {
         )
     }
 
-    /// Generate a Profile A key and return its identity.
+    /// Generate a Legacy key and return its identity.
     @discardableResult
-    static func generateProfileAKey(
+    static func generateLegacyKey(
         service: KeyManagementService,
         name: String = "Alice",
         email: String? = "alice@example.com"
@@ -179,9 +179,9 @@ enum TestHelpers {
         try await generateAndStoreKey(service: service, profile: .universal, name: name, email: email)
     }
 
-    /// Generate a Profile B key and return its identity.
+    /// Generate a Modern High key and return its identity.
     @discardableResult
-    static func generateProfileBKey(
+    static func generateModernHighKey(
         service: KeyManagementService,
         name: String = "Bob",
         email: String? = "bob@example.com"

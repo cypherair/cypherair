@@ -5,7 +5,7 @@ extension FFIIntegrationTests {
     // MARK: - C5.1 Binary Round-Trip
 
     /// C5.1: Generate key → encrypt → decrypt. Verify Data↔Vec<u8> integrity.
-    func test_binaryRoundTrip_profileA_dataPreservedAcrossFFI() throws {
+    func test_binaryRoundTrip_legacy_dataPreservedAcrossFFI() throws {
         let plaintext = Data("Hello from Swift to Rust and back!".utf8)
 
         let generated = try engine.generateKey(
@@ -34,9 +34,9 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext, "Decrypted data must match original plaintext")
     }
 
-    /// C5.1: Same round-trip for Profile B (v6, Ed448+X448, SEIPDv2).
-    func test_binaryRoundTrip_profileB_dataPreservedAcrossFFI() throws {
-        let plaintext = Data("Profile B round-trip test data with binary: \0\u{01}\u{FF}".utf8)
+    /// C5.1: Same round-trip for Modern High (v6, Ed448+X448, SEIPDv2).
+    func test_binaryRoundTrip_modernHigh_dataPreservedAcrossFFI() throws {
+        let plaintext = Data("Modern High round-trip test data with binary: \0\u{01}\u{FF}".utf8)
 
         let generated = try engine.generateKey(
             name: "Test User B",
@@ -61,8 +61,8 @@ extension FFIIntegrationTests {
         XCTAssertEqual(result.plaintext, plaintext)
     }
 
-    /// C5.1: Large data round-trip (1 MB) Profile A to stress the RustBuffer transfer.
-    func test_binaryRoundTrip_largeData_1MB_profileA() throws {
+    /// C5.1: Large data round-trip (1 MB) Legacy to stress the RustBuffer transfer.
+    func test_binaryRoundTrip_largeData_1MB_legacy() throws {
         var plaintext = Data(count: 1_000_000)
         for i in 0..<plaintext.count {
             plaintext[i] = UInt8(i % 256)
@@ -88,11 +88,11 @@ extension FFIIntegrationTests {
             verificationKeys: []
         )
 
-        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Profile A)")
+        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Legacy)")
     }
 
-    /// C5.1: Large data round-trip (1 MB) Profile B (SEIPDv2 AEAD).
-    func test_binaryRoundTrip_largeData_1MB_profileB() throws {
+    /// C5.1: Large data round-trip (1 MB) Modern High (SEIPDv2 AEAD).
+    func test_binaryRoundTrip_largeData_1MB_modernHigh() throws {
         var plaintext = Data(count: 1_000_000)
         for i in 0..<plaintext.count {
             plaintext[i] = UInt8(i % 256)
@@ -118,7 +118,7 @@ extension FFIIntegrationTests {
             verificationKeys: []
         )
 
-        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Profile B)")
+        XCTAssertEqual(result.plaintext, plaintext, "1 MB data must survive FFI round-trip (Modern High)")
     }
 
     // MARK: - C5.2 Unicode Round-Trip
@@ -191,7 +191,7 @@ extension FFIIntegrationTests {
     /// C5.5: KeyProfile.universal → v4 key, KeyProfile.advanced → v6 key.
     func test_keyProfileEnum_universal_producesV4() throws {
         let key = try engine.generateKey(
-            name: "Profile A", email: nil, expirySeconds: nil, profile: .universal
+            name: "Legacy", email: nil, expirySeconds: nil, profile: .universal
         )
 
         let version = try engine.getKeyVersion(certData: key.publicKeyData)
@@ -204,7 +204,7 @@ extension FFIIntegrationTests {
     /// C5.5: KeyProfile.advanced → v6 key.
     func test_keyProfileEnum_advanced_producesV6() throws {
         let key = try engine.generateKey(
-            name: "Profile B", email: nil, expirySeconds: nil, profile: .advanced
+            name: "Modern High", email: nil, expirySeconds: nil, profile: .advanced
         )
 
         let version = try engine.getKeyVersion(certData: key.publicKeyData)

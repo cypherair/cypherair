@@ -2,7 +2,7 @@ import XCTest
 @testable import CypherAir
 
 /// Tests for streaming file encryption, decryption, signing, and verification.
-/// Covers both Profile A and Profile B, cancellation, disk space validation,
+/// Covers both Legacy and Modern High, cancellation, disk space validation,
 /// tamper detection, and error handling.
 final class StreamingServiceTests: XCTestCase {
 
@@ -51,14 +51,14 @@ final class StreamingServiceTests: XCTestCase {
         return url
     }
 
-    // MARK: - Encrypt/Decrypt Round-Trip: Profile A
+    // MARK: - Encrypt/Decrypt Round-Trip: Legacy
 
-    func test_encryptFileStreaming_profileA_roundTrip() async throws {
+    func test_encryptFileStreaming_legacy_roundTrip() async throws {
         let sender = try await generateKeyAndContact(profile: .universal, name: "Sender A")
         let recipient = try await generateKeyAndContact(profile: .universal, name: "Recipient A")
 
         // Write test file
-        let plaintext = Data("Hello streaming Profile A! 你好世界 🔐".utf8)
+        let plaintext = Data("Hello streaming Legacy! 你好世界 🔐".utf8)
         let inputURL = try writeTempFile(plaintext)
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
@@ -101,13 +101,13 @@ final class StreamingServiceTests: XCTestCase {
         )
     }
 
-    // MARK: - Encrypt/Decrypt Round-Trip: Profile B
+    // MARK: - Encrypt/Decrypt Round-Trip: Modern High
 
-    func test_encryptFileStreaming_profileB_roundTrip() async throws {
+    func test_encryptFileStreaming_modernHigh_roundTrip() async throws {
         let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
         let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
-        let plaintext = Data("Hello streaming Profile B! 你好世界 🔐".utf8)
+        let plaintext = Data("Hello streaming Modern High! 你好世界 🔐".utf8)
         let inputURL = try writeTempFile(plaintext)
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
@@ -228,12 +228,12 @@ final class StreamingServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Sign/Verify Round-Trip: Profile A
+    // MARK: - Sign/Verify Round-Trip: Legacy
 
-    func test_signDetachedStreaming_profileA_roundTrip() async throws {
+    func test_signDetachedStreaming_legacy_roundTrip() async throws {
         let signer = try await generateKeyAndContact(profile: .universal, name: "Signer A")
 
-        let fileData = Data("Sign me (Profile A)".utf8)
+        let fileData = Data("Sign me (Legacy)".utf8)
         let inputURL = try writeTempFile(fileData)
         defer { try? FileManager.default.removeItem(at: inputURL) }
 
@@ -257,12 +257,12 @@ final class StreamingServiceTests: XCTestCase {
         )
     }
 
-    // MARK: - Sign/Verify Round-Trip: Profile B
+    // MARK: - Sign/Verify Round-Trip: Modern High
 
-    func test_signDetachedStreaming_profileB_roundTrip() async throws {
+    func test_signDetachedStreaming_modernHigh_roundTrip() async throws {
         let signer = try await generateKeyAndContact(profile: .advanced, name: "Signer B")
 
-        let fileData = Data("Sign me (Profile B)".utf8)
+        let fileData = Data("Sign me (Modern High)".utf8)
         let inputURL = try writeTempFile(fileData)
         defer { try? FileManager.default.removeItem(at: inputURL) }
 

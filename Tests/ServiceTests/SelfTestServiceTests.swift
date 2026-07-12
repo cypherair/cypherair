@@ -29,7 +29,7 @@ final class SelfTestServiceTests: XCTestCase {
 
     // MARK: - M1: SelfTestService Tests
 
-    func test_selfTest_profileA_allChecksPass() async {
+    func test_selfTest_legacy_allChecksPass() async {
         await selfTestService.runAllTests()
 
         guard case .completed(let results) = selfTestService.state else {
@@ -37,16 +37,16 @@ final class SelfTestServiceTests: XCTestCase {
             return
         }
 
-        // Profile A has 5 tests (keygen, encrypt/decrypt, sign/verify, tamper, export/import)
-        let profileAResults = results.filter { $0.profile == .universal }
-        XCTAssertEqual(profileAResults.count, 5, "Profile A should have 5 test results")
+        // Legacy has 5 tests (keygen, encrypt/decrypt, sign/verify, tamper, export/import)
+        let legacyResults = results.filter { $0.profile == .universal }
+        XCTAssertEqual(legacyResults.count, 5, "Legacy should have 5 test results")
 
-        for result in profileAResults {
-            XCTAssertTrue(result.passed, "\(result.name) should pass for Profile A: \(result.message)")
+        for result in legacyResults {
+            XCTAssertTrue(result.passed, "\(result.name) should pass for Legacy: \(result.message)")
         }
     }
 
-    func test_selfTest_profileB_allChecksPass() async {
+    func test_selfTest_modernHigh_allChecksPass() async {
         await selfTestService.runAllTests()
 
         guard case .completed(let results) = selfTestService.state else {
@@ -54,11 +54,11 @@ final class SelfTestServiceTests: XCTestCase {
             return
         }
 
-        let profileBResults = results.filter { $0.profile == .advanced }
-        XCTAssertEqual(profileBResults.count, 5, "Profile B should have 5 test results")
+        let modernHighResults = results.filter { $0.profile == .advanced }
+        XCTAssertEqual(modernHighResults.count, 5, "Modern High should have 5 test results")
 
-        for result in profileBResults {
-            XCTAssertTrue(result.passed, "\(result.name) should pass for Profile B: \(result.message)")
+        for result in modernHighResults {
+            XCTAssertTrue(result.passed, "\(result.name) should pass for Modern High: \(result.message)")
         }
     }
 

@@ -46,7 +46,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_handleAppear_preservesEditedCiphertextInput_butReappliesInitialPhase1Result() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -82,7 +82,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_updateConfiguration_updatesTutorialState_withoutOverwritingEditedCiphertext() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -113,7 +113,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_updateConfiguration_clearsTutorialPhase1Seed_whenConfigurationBecomesInactive() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -142,7 +142,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_parseRecipientsText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -195,7 +195,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_decryptText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -251,7 +251,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_contentClearDuringTextParseSuppressesLatePhase1ResultAndCallback() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Parse Privacy"
         )
@@ -293,7 +293,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_contentClearDuringTextDecryptSuppressesLatePlaintextAndCallback() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Decrypt Privacy"
         )
@@ -334,7 +334,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_setCiphertextInput_invalidatesImportedTextAndTextPhase1State() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -471,7 +471,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_parseAndDecryptText_invokeCallbacks_andPublishResult() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -533,7 +533,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_parseAndDecryptFile_andExportRouteThroughInterceptionPolicy() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -616,7 +616,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_decryptFile_cancellation_clearsProgress_andDoesNotPublishOutputURL() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -680,7 +680,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_decryptFile_cancellationAfterServiceSuccess_cleansUnpublishedOutput() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -730,7 +730,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_handleDisappearCancelsInFlightFileDecryptAndCleansLateOutput() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )

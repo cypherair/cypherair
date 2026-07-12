@@ -311,7 +311,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         let catalog = try stack.certificateSignatureService.selectionCatalog(
             targetCert: contact.publicKeyData
         )
-        _ = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )
@@ -475,7 +475,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
             signingKeyFingerprint: "1234567890abcdef1234567890abcdef12345678",
             signerIdentity: nil
         )
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
 
         let model = makeModel(
             fingerprint: contact.fingerprint,
@@ -511,7 +511,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         let catalog = try stack.certificateSignatureService.selectionCatalog(
             targetCert: contact.publicKeyData
         )
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         var interceptedKind: OutputArtifactKind?
         var interceptedFilename: String?
         let configuration = ContactCertificateSignaturesView.Configuration(
@@ -563,7 +563,7 @@ final class ContactCertificateSignaturesScreenModelTests: XCTestCase {
         let catalog = try stack.certificateSignatureService.selectionCatalog(
             targetCert: contact.publicKeyData
         )
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
 
         let model = makeModel(
             fingerprint: contact.fingerprint,
@@ -752,7 +752,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactService: protectedContacts.service,
             certificateSignatureService: certificateSignatureService
         )
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Details Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Details Signer")
         var interceptedFilename: String?
         let configuration = ContactCertificationDetailsConfiguration(
             outputInterceptionPolicy: OutputInterceptionPolicy(
@@ -814,7 +814,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactService: protectedContacts.service,
             certificateSignatureService: certificateSignatureService
         )
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Details Import Signer"
         )
@@ -1027,7 +1027,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             name: "Details Relock",
             email: "details-relock@example.com"
         )
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Details Relock Signer"
         )
@@ -1200,7 +1200,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactService: protectedContacts.service,
             certificateSignatureService: certificateSignatureService
         )
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Details Save Clear Signer"
         )
@@ -1270,7 +1270,7 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
             contactService: protectedContacts.service,
             certificateSignatureService: certificateSignatureService
         )
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Details Export Clear Signer"
         )

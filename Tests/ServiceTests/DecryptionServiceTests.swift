@@ -77,7 +77,7 @@ final class DecryptionServiceTests: XCTestCase {
     // MARK: - Phase 1: Parse Recipients Behavior
 
     func test_parseRecipients_returnsNonEmptyKeyIds() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -98,8 +98,8 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_parseRecipients_profileB_returnsNonEmptyKeyIds() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
+    func test_parseRecipients_modernHigh_returnsNonEmptyKeyIds() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -116,7 +116,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_noMatchingKey_throwsError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -195,7 +195,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_parseRecipients_doesNotTriggerSeUnwrap() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -220,8 +220,8 @@ final class DecryptionServiceTests: XCTestCase {
 
     // MARK: - Phase 2: Decrypt (Authentication Required)
 
-    func test_decrypt_phase2_profileA_returnsPlaintext() async throws {
-        let plaintext = "Profile A secret message 🔐"
+    func test_decrypt_phase2_legacy_returnsPlaintext() async throws {
+        let plaintext = "Legacy secret message 🔐"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
             profile: .universal, plaintext: plaintext
         )
@@ -232,8 +232,8 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(decryptedText, plaintext)
     }
 
-    func test_decrypt_phase2_profileB_returnsPlaintext() async throws {
-        let plaintext = "Profile B secret message 🛡️"
+    func test_decrypt_phase2_modernHigh_returnsPlaintext() async throws {
+        let plaintext = "Modern High secret message 🛡️"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
             profile: .advanced, plaintext: plaintext
         )
@@ -287,7 +287,7 @@ final class DecryptionServiceTests: XCTestCase {
 
     // MARK: - Tamper Detection (1-Bit Flip)
 
-    func test_decrypt_profileA_tamperedCiphertext_throwsIntegrityError() async throws {
+    func test_decrypt_legacy_tamperedCiphertext_throwsIntegrityError() async throws {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
             profile: .universal
         )
@@ -305,12 +305,12 @@ final class DecryptionServiceTests: XCTestCase {
             ciphertext: tampered
         )
 
-        // Phase 2 should fail — MDC integrity check (Profile A / SEIPDv1)
+        // Phase 2 should fail — MDC integrity check (Legacy / SEIPDv1)
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected decryption to fail on tampered ciphertext")
         } catch let error as CypherAirError {
-            // Profile A (SEIPDv1): bit-flip may corrupt the encrypted payload
+            // Legacy (SEIPDv1): bit-flip may corrupt the encrypted payload
             // (→ integrityCheckFailed), the framing (→ corruptData), or the
             // recipient key ID (→ noMatchingKey).
             switch error {
@@ -331,7 +331,7 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_decrypt_profileB_tamperedCiphertext_throwsAEADError() async throws {
+    func test_decrypt_modernHigh_tamperedCiphertext_throwsAEADError() async throws {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
             profile: .advanced
         )
@@ -349,12 +349,12 @@ final class DecryptionServiceTests: XCTestCase {
             ciphertext: tampered
         )
 
-        // Phase 2 should fail — AEAD hard-fail (Profile B / SEIPDv2)
+        // Phase 2 should fail — AEAD hard-fail (Modern High / SEIPDv2)
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
             XCTFail("Expected AEAD hard-fail on tampered ciphertext")
         } catch let error as CypherAirError {
-            // Profile B (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
+            // Modern High (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
             // (→ aeadAuthenticationFailed), the framing (→ corruptData/integrityCheckFailed),
             // or the recipient key ID (→ noMatchingKey).
             switch error {
@@ -377,8 +377,8 @@ final class DecryptionServiceTests: XCTestCase {
 
     // MARK: - Full Round-Trip via Engine (Encrypt → Decrypt)
 
-    func test_encryptDecrypt_profileA_fullRoundTrip() async throws {
-        let plaintext = "Full round-trip Profile A 你好"
+    func test_encryptDecrypt_legacy_fullRoundTrip() async throws {
+        let plaintext = "Full round-trip Legacy 你好"
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
             profile: .universal, plaintext: plaintext
         )
@@ -398,8 +398,8 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(decryptedText, plaintext)
     }
 
-    func test_encryptDecrypt_profileB_fullRoundTrip() async throws {
-        let plaintext = "Full round-trip Profile B 加密"
+    func test_encryptDecrypt_modernHigh_fullRoundTrip() async throws {
+        let plaintext = "Full round-trip Modern High 加密"
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
             profile: .advanced, plaintext: plaintext
         )
@@ -438,8 +438,8 @@ final class DecryptionServiceTests: XCTestCase {
 
     // MARK: - Phase 2 via DecryptionService (with prepared Phase1Result)
 
-    func test_decryptViaService_profileA_fullFlow() async throws {
-        let plaintext = "Service layer decrypt Profile A"
+    func test_decryptViaService_legacy_fullFlow() async throws {
+        let plaintext = "Service layer decrypt Legacy"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
             profile: .universal, plaintext: plaintext, sign: true
         )
@@ -451,8 +451,8 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
-    func test_decryptViaService_profileB_fullFlow() async throws {
-        let plaintext = "Service layer decrypt Profile B"
+    func test_decryptViaService_modernHigh_fullFlow() async throws {
+        let plaintext = "Service layer decrypt Modern High"
         let (_, _, phase1) = try await encryptAndPreparePhase1(
             profile: .advanced, plaintext: plaintext, sign: true
         )
@@ -464,8 +464,8 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
-    func test_parseRecipients_profileA_matchesCorrectKey() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+    func test_parseRecipients_legacy_matchesCorrectKey() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -478,13 +478,13 @@ final class DecryptionServiceTests: XCTestCase {
         let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
 
         XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
-                       "Should match the correct Profile A key")
+                       "Should match the correct Legacy key")
         XCTAssertFalse(phase1.recipientKeyIds.isEmpty,
                        "Should return matched fingerprints")
     }
 
-    func test_parseRecipients_profileB_matchesCorrectKey() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
+    func test_parseRecipients_modernHigh_matchesCorrectKey() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
 
         let ciphertext = try await stack.encryptionService.encryptText(
@@ -497,7 +497,7 @@ final class DecryptionServiceTests: XCTestCase {
         let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
 
         XCTAssertEqual(phase1.matchedKey?.fingerprint, identity.fingerprint,
-                       "Should match the correct Profile B key")
+                       "Should match the correct Modern High key")
     }
 
     // MARK: - Detailed Results
@@ -553,7 +553,7 @@ final class DecryptionServiceTests: XCTestCase {
     }
 
     func test_decryptDetailed_unsigned_returnsEmptySignaturesAndNotSigned() async throws {
-        let recipient = try await TestHelpers.generateProfileAKey(
+        let recipient = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Unsigned Detailed Recipient"
         )
@@ -626,7 +626,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptDetailed_runtimeUnknownSigner_returnsUnknownEntryWithoutFingerprint()
         async throws
     {
-        let recipient = try await TestHelpers.generateProfileAKey(
+        let recipient = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Unknown Detailed Recipient"
         )
@@ -677,7 +677,7 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(stack.mockSE.unwrapCallCount, unwrapBefore)
     }
 
-    func test_decryptDetailed_profileA_midpointBitFlip_rejectsTamperedCiphertext()
+    func test_decryptDetailed_legacy_midpointBitFlip_rejectsTamperedCiphertext()
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
@@ -706,7 +706,7 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_decryptDetailed_profileA_targetedTamper_throwsIntegrityCheckFailed()
+    func test_decryptDetailed_legacy_targetedTamper_throwsIntegrityCheckFailed()
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
@@ -728,7 +728,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-            XCTFail("Expected targeted Profile A tamper to surface integrityCheckFailed")
+            XCTFail("Expected targeted Legacy tamper to surface integrityCheckFailed")
         } catch {
             assertCypherAirError(error) {
                 if case .integrityCheckFailed = $0 { return true }
@@ -737,7 +737,7 @@ final class DecryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_decryptDetailed_profileB_midpointBitFlip_hardFailsWithMappedSecurityError()
+    func test_decryptDetailed_modernHigh_midpointBitFlip_hardFailsWithMappedSecurityError()
         async throws
     {
         let (identity, binaryCiphertext, _) = try await encryptAndPreparePhase1(
@@ -753,7 +753,7 @@ final class DecryptionServiceTests: XCTestCase {
 
         do {
             _ = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-            XCTFail("Expected self-generated Profile B midpoint corruption to hard-fail")
+            XCTFail("Expected self-generated Modern High midpoint corruption to hard-fail")
         } catch {
             // Self-generated v6 PKESK + SEIPDv2 messages may fail session-key recovery
             // before payload AEAD validation, so NoMatchingKey remains acceptable here.
@@ -831,7 +831,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptFileStreamingDetailed_runtimeUnknownSigner_matchesInMemoryDetailed()
         async throws
     {
-        let recipient = try await TestHelpers.generateProfileAKey(
+        let recipient = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Unknown File Detailed Recipient"
         )
@@ -920,7 +920,7 @@ final class DecryptionServiceTests: XCTestCase {
     func test_decryptFileStreamingDetailed_cancellation_throwsMappedOperationCancelledAndCleansUp()
         async throws
     {
-        let recipient = try await TestHelpers.generateProfileAKey(
+        let recipient = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Detailed Cancel Recipient"
         )
@@ -964,10 +964,10 @@ final class DecryptionServiceTests: XCTestCase {
         try assertNoDecryptedOperationArtifacts()
     }
 
-    func test_decryptFileStreamingDetailed_profileA_midpointBitFlip_rejectsTamperedFileAndCleansUp()
+    func test_decryptFileStreamingDetailed_legacy_midpointBitFlip_rejectsTamperedFileAndCleansUp()
         async throws
     {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Detailed Tampered File A"
         )
@@ -1019,10 +1019,10 @@ final class DecryptionServiceTests: XCTestCase {
         try assertNoDecryptedOperationArtifacts()
     }
 
-    func test_decryptFileStreamingDetailed_profileA_targetedTamper_throwsIntegrityCheckFailedAndCleansUp()
+    func test_decryptFileStreamingDetailed_legacy_targetedTamper_throwsIntegrityCheckFailedAndCleansUp()
         async throws
     {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Detailed Targeted File A"
         )
@@ -1063,7 +1063,7 @@ final class DecryptionServiceTests: XCTestCase {
                 phase1: phase1,
                 progress: nil
             )
-            XCTFail("Expected targeted Profile A file tamper to surface integrityCheckFailed")
+            XCTFail("Expected targeted Legacy file tamper to surface integrityCheckFailed")
         } catch {
             assertCypherAirError(error) {
                 if case .integrityCheckFailed = $0 { return true }
@@ -1074,10 +1074,10 @@ final class DecryptionServiceTests: XCTestCase {
         try assertNoDecryptedOperationArtifacts()
     }
 
-    func test_decryptFileStreamingDetailed_profileB_midpointBitFlip_hardFailsAndCleansUp()
+    func test_decryptFileStreamingDetailed_modernHigh_midpointBitFlip_hardFailsAndCleansUp()
         async throws
     {
-        let identity = try await TestHelpers.generateProfileBKey(
+        let identity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Detailed Tampered File B"
         )
@@ -1114,7 +1114,7 @@ final class DecryptionServiceTests: XCTestCase {
                 phase1: phase1,
                 progress: nil
             )
-            XCTFail("Expected self-generated Profile B file corruption to hard-fail")
+            XCTFail("Expected self-generated Modern High file corruption to hard-fail")
         } catch {
             // Self-generated v6 PKESK + SEIPDv2 messages may fail session-key recovery
             // before payload AEAD validation, so NoMatchingKey remains acceptable here.
