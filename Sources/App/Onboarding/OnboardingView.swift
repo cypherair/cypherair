@@ -149,7 +149,7 @@ struct OnboardingKeyFamiliesPage: View {
             Text(String(localized: "onboarding.keyFamilies.title", defaultValue: "Secure Enclave & Post-Quantum"))
                 .font(.title.bold())
 
-            Text(String(localized: "onboarding.keyFamilies.body", defaultValue: "Six key families to choose from. Device-Bound keys keep private keys inside this device’s Secure Enclave — they can never leave. Post-Quantum keys are designed to resist future quantum computers. Classical portable keys remain for full GnuPG compatibility."))
+            Text(String(localized: "onboarding.keyFamilies.body", defaultValue: "Nine key families to choose from. Device-Bound keys keep private keys inside this device’s Secure Enclave — they can never leave. Post-Quantum keys are designed to resist future quantum computers. Classical portable keys remain for full GnuPG compatibility."))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
