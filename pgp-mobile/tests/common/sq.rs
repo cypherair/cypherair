@@ -76,44 +76,53 @@ pub fn require_pq_capable_sq_or_skip() -> Option<PathBuf> {
 }
 
 /// Functional probe body for [`require_pq_capable_sq_or_skip`].
+///
+/// Only an actual `sq key import` rejection counts as "not PQ-capable" (and
+/// therefore a skip). Probe SETUP failures — engine keygen, filesystem, or
+/// failing to run an already-located sq binary — say nothing about sq's
+/// capability, so they panic instead: a mandatory interop lane must fail
+/// loudly rather than silently skip its post-quantum coverage.
 fn sq_imports_engine_pq_key(sq_path: &PathBuf) -> bool {
-    let key = match pgp_mobile::keys::generate_key_with_profile(
+    let key = pgp_mobile::keys::generate_key_with_profile(
         "CypherAir PQ Capability Probe".to_string(),
         None,
         None,
         pgp_mobile::keys::KeyProfile::PostQuantum,
-    ) {
-        Ok(key) => key,
-        Err(error) => {
-            eprintln!("post-quantum capability probe: engine keygen failed: {error:?}");
-            return false;
-        }
-    };
+    )
+    .unwrap_or_else(|error| {
+        panic!(
+            "post-quantum capability probe: engine keygen failed \
+             (probe setup, not an sq capability signal): {error:?}"
+        )
+    });
 
     let home = setup_sq_home();
     let tsk_path = home.path().join("pq_probe_key.pgp");
-    if let Err(error) = std::fs::write(&tsk_path, &key.cert_data) {
-        eprintln!("post-quantum capability probe: could not write probe key: {error}");
-        return false;
-    }
+    std::fs::write(&tsk_path, &key.cert_data).unwrap_or_else(|error| {
+        panic!(
+            "post-quantum capability probe: could not write probe key \
+             (probe setup, not an sq capability signal): {error}"
+        )
+    });
 
     let mut import = sq_cmd(sq_path, &home);
     import.arg("key").arg("import").arg(&tsk_path);
-    match import.output() {
-        Ok(output) if output.status.success() => true,
-        Ok(output) => {
-            eprintln!(
-                "post-quantum capability probe: `sq key import` rejected an engine \
-                 ML-DSA-65 key:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-            false
-        }
-        Err(error) => {
-            eprintln!("post-quantum capability probe: failed to run sq: {error}");
-            false
-        }
+    let output = import.output().unwrap_or_else(|error| {
+        panic!(
+            "post-quantum capability probe: failed to run sq at {} \
+             (probe setup, not an sq capability signal): {error}",
+            sq_path.display()
+        )
+    });
+    if output.status.success() {
+        return true;
     }
+    eprintln!(
+        "post-quantum capability probe: `sq key import` rejected an engine \
+         ML-DSA-65 key:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    false
 }
 
 /// Search for a working `sq` binary: PATH first, then common Homebrew/system
