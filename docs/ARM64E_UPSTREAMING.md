@@ -90,7 +90,16 @@ The substantive work: teaching `rustc_codegen_llvm` to emit Apple arm64e pointer
 
 (d) Not independently upstreamable — they extend the test suites introduced by §3.1/§3.2 to visionOS and are upstreamed together with whichever feature they cover. `c6de391a` squashes into `df93416f`.
 
-### 3.6 Fork release + validation CI — keep (no upstream home)
+### 3.6 Serialized-output ptrauth-bundle compensation — LLVM, low near-term feasibility
+
+| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
+| --- | --- | --- | --- | --- |
+| `6f895c2d` | Strip `ptrauth` operand bundles before serialized output | LLVM doesn't canonicalize/lower `ptrauth` operand bundles on the affected call shapes, so they leak into serialized output and break consumers | LLVM (AArch64 ptrauth canonicalization/lowering) | Low · Med |
+| `394813b6` | Keep direct-call bundles out of serialization (follow-up) | Same root cause on direct calls; its own commit message names the durable fix — prevention by LLVM canonicalization, not downstream repair | LLVM | Low · Med |
+
+(d) The pair is interdependent (the follow-up extends the strip pass) and is carried as a downstream compensation in `llvm-wrapper/`. Both drop the moment upstream LLVM canonicalizes the bundles (§4 step 3), but LLVM's release cadence means that fix reaches the Rust fork only with a much later LLVM bump — keep-carrying until then.
+
+### 3.7 Fork release + validation CI — keep (no upstream home)
 
 All twelve are fork-only automation: they build, package, attest, smoke-test, and publish the `rust-arm64e-stage1-*` prerelease the app pins ([ARM64E_STATUS.md](ARM64E_STATUS.md) §Pinned Rust stage1 Toolchain), and run fork-shape arm64e validation. None has an upstream destination; "minimization" here means consolidating history, not shrinking carry surface (§4).
 
@@ -132,7 +141,7 @@ Realistic end state: from 29 carried commits down to a codegen core of ~5–6 pa
 
 The two best first proposals maximize (feasibility × low effort × zero LLVM entanglement × already test/doc-complete) and are independent of the contentious codegen heart:
 
-1. **`88546cd4` + `e63ffa3e` — reject disabling ptrauth (`-paca` / `-pacg` / `-pauth`) on Apple arm64e.** Self-contained in `rustc_codegen_ssa` / `rustc_session`, no LLVM dependency, and shipped with full UI-test coverage and stderr snapshots across Darwin/iOS/tvOS/visionOS. It is pure fail-closed hardening — it prevents silently building an arm64e binary with the ABI-mandatory authentication turned off — and the arm64e Apple targets it protects **already exist upstream**, so it stands on its own without the codegen group. Low-controversy diagnostics like this are what upstream accepts without a design discussion; merging it removes two patches from carry at near-zero cost.
+1. **`88546cd4` + `e63ffa3e` — reject disabling ptrauth (`-paca` / `-pacg` / `-pauth`) on Apple arm64e.** Self-contained in `rustc_codegen_ssa` / `rustc_session`, no LLVM dependency, and shipped with full UI-test coverage and stderr snapshots across Darwin/iOS/tvOS/visionOS. It is pure fail-closed hardening — it prevents silently building an arm64e binary with the ABI-mandatory authentication turned off. The Darwin/iOS/tvOS targets it protects already exist upstream; the **visionOS stderr snapshots reference `arm64e-apple-visionos`, which does not** — trim those snapshots from the upstream proposal (or sequence it after candidate 2) so the PR stands on its own without either the codegen group or the target addition. Low-controversy diagnostics like this are what upstream accepts without a design discussion; merging it removes two patches from carry at near-zero cost.
 
 2. **`1b3d8853` (squashed with `b34d21ad` + `46da820b`) — add the `arm64e-apple-visionos` Tier-3 target.** It mechanically mirrors the upstream `arm64e-apple-ios` / `arm64e-apple-tvos` Tier-3 targets — a spec file, a `sanity.rs` entry, and platform-support docs, with no codegen and no LLVM surface. Tier-3 has the lowest upstream bar (no CI guarantee required, just a target maintainer plus the docs already written in the patch), and it retires a whole target definition from the carry-set. The only prerequisite is committing a target maintainer — the `b34d21ad` fixup exists precisely because the maintainer slot must be filled by someone who agrees.
 
