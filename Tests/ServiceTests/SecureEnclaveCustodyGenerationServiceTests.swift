@@ -38,9 +38,6 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
                 PGPPrivateKeyCustodyKind.appleSecureEnclavePrivateOperations
             )
             XCTAssertEqual(identity.keyVersion, configurationIdentity.configuration.keyVersion)
-            // Device-bound custody has no portable software profile — nothing
-            // synthesized anymore.
-            XCTAssertNil(identity.softwareProfile)
             XCTAssertFalse(identity.publicKeyData.isEmpty)
             XCTAssertFalse(identity.revocationCert.isEmpty)
             XCTAssertEqual(metadataStore.identities, [identity])

@@ -83,7 +83,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             )
         }
 
-
         guard !identity.publicKeyData.isEmpty else {
             return assessment(
                 identity: identity,

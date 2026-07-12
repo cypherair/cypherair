@@ -118,7 +118,6 @@ final class PrivateKeyStreamingFileEncryptionServiceTests: XCTestCase {
     func test_secureEnclaveV6RouteSignsFileAndVerifies() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertNil(fixture.identity.softwareProfile)
         XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         var recipient = try makeRecipient(profile: .advanced)

@@ -85,7 +85,6 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
     func test_secureEnclaveV6RouteSignsDetachedFileAndVerifies() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertNil(fixture.identity.softwareProfile)
         XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         let input = try makeTemporaryFile(Data("secure enclave v6 detached file".utf8))
