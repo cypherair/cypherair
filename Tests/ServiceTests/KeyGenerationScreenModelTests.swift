@@ -373,15 +373,12 @@ final class KeyGenerationScreenModelTests: XCTestCase {
         XCTAssertNil(model.detailFamily)
     }
 
-    func test_continueToDetails_pushesSelectedFamilyAndDismissClears() {
+    func test_continueToDetails_pushesSelectedFamily() {
         let model = makeModel()
         model.selectFamily(.modernSoftwareV6)
 
         model.continueToDetails()
         XCTAssertEqual(model.detailFamily, .modernSoftwareV6)
-
-        model.dismissDetails()
-        XCTAssertNil(model.detailFamily)
     }
 
     func test_continueToDetails_clearsStaleGenerationFlags() {

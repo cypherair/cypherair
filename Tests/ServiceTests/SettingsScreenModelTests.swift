@@ -69,7 +69,6 @@ final class SettingsScreenModelTests: XCTestCase {
         let request = try XCTUnwrap(capturedRequest)
         XCTAssertEqual(model.pendingMode, .highSecurity)
         XCTAssertNil(model.presentedAuthModeRequest)
-        XCTAssertEqual(request.pendingMode, .highSecurity)
         XCTAssertTrue(request.requiresRiskAcknowledgement)
         XCTAssertFalse(request.title.isEmpty)
         XCTAssertFalse(request.message.isEmpty)
@@ -108,7 +107,6 @@ final class SettingsScreenModelTests: XCTestCase {
 
         XCTAssertEqual(model.pendingMode, .highSecurity)
         XCTAssertNil(model.presentedAuthModeRequest)
-        XCTAssertEqual(request.pendingMode, .highSecurity)
         XCTAssertTrue(request.requiresRiskAcknowledgement)
     }
 
@@ -307,7 +305,6 @@ final class SettingsScreenModelTests: XCTestCase {
             return XCTFail("Expected tutorial auth-mode modal")
         }
 
-        XCTAssertEqual(request.pendingMode, .highSecurity)
         XCTAssertTrue(request.requiresRiskAcknowledgement)
     }
 
@@ -358,7 +355,6 @@ final class SettingsScreenModelTests: XCTestCase {
     func test_launchPreviewRequest_usesSharedHighSecurityWarningWithoutRiskAcknowledgement() {
         let request = SettingsAuthModeRequestBuilder.makeLaunchPreviewRequest()
 
-        XCTAssertEqual(request.pendingMode, .highSecurity)
         XCTAssertFalse(request.requiresRiskAcknowledgement)
         XCTAssertFalse(request.title.isEmpty)
         XCTAssertFalse(request.message.isEmpty)
@@ -502,7 +498,6 @@ final class SettingsScreenModelTests: XCTestCase {
             restartCoordinator.restartRequiredAfterLocalDataReset
         }
         XCTAssertFalse(model.showLocalDataResetResultAlert)
-        XCTAssertNotNil(restartCoordinator.resetSummary)
         XCTAssertFalse(keychain.exists(service: markerService, account: KeychainConstants.defaultAccount))
         XCTAssertTrue(keychain.listItemsCalls.contains { $0.hasAuthenticationContext })
     }

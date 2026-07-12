@@ -4,12 +4,9 @@ import SwiftUI
 
 struct LocalDataResetSummary: Equatable {
     let deletedKeychainItemCount: Int
-    let removedDirectoryCount: Int
 }
 
 struct LocalDataResetError: LocalizedError, Equatable {
-    let failures: [String]
-
     var errorDescription: String? {
         String(
             localized: "settings.resetAll.error",
@@ -165,7 +162,7 @@ final class LocalDataResetService {
                 name: "localDataReset.finish",
                 metadata: ["result": "failed", "failureCount": String(failures.count)]
             )
-            throw LocalDataResetError(failures: failures)
+            throw LocalDataResetError()
         }
 
         traceStore?.record(
@@ -178,8 +175,7 @@ final class LocalDataResetService {
             ]
         )
         return LocalDataResetSummary(
-            deletedKeychainItemCount: deletedKeychainItemCount,
-            removedDirectoryCount: removedDirectoryCount
+            deletedKeychainItemCount: deletedKeychainItemCount
         )
     }
 

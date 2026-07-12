@@ -26,7 +26,7 @@ struct OnboardingView: View {
             OnboardingKeyFamiliesPage()
                 .tag(2)
 
-            OnboardingTutorialPage(presentationContext: presentationContext)
+            OnboardingTutorialPage()
                 .tag(3)
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
@@ -38,7 +38,7 @@ struct OnboardingView: View {
                 case 0: OnboardingOfflinePage()
                 case 1: OnboardingStandardPage()
                 case 2: OnboardingKeyFamiliesPage()
-                case 3: OnboardingTutorialPage(presentationContext: presentationContext)
+                case 3: OnboardingTutorialPage()
                 default: OnboardingOfflinePage()
                 }
             }
@@ -173,8 +173,6 @@ struct OnboardingTutorialPage: View {
     @Environment(\.iosPresentationController) private var iosPresentationController
     @Environment(\.macPresentationController) private var macPresentationController
 
-    let presentationContext: OnboardingPresentationContext
-
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -250,20 +248,6 @@ struct OnboardingTutorialPage: View {
             iosPresentationController.dismiss()
         } else {
             dismiss()
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func `if`<Content: View>(
-        _ condition: Bool,
-        transform: (Self) -> Content
-    ) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
         }
     }
 }

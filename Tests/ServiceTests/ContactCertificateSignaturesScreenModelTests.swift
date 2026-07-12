@@ -1362,7 +1362,6 @@ final class ContactCertificationDetailsScreenModelTests: XCTestCase {
         ContactCertificationDetailsScreenModel(
             contactId: contactId,
             initialKeyId: keyId,
-            intent: .details,
             contactService: contactService ?? stack.contactService,
             keyManagement: keyManagement ?? stack.keyManagement,
             certificateSignatureService: certificateSignatureService ?? stack.certificateSignatureService,

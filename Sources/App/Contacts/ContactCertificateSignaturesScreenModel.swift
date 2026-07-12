@@ -53,7 +53,6 @@ final class ContactCertificateSignaturesScreenModel {
 
     private let contactService: ContactService
     private let keyManagement: KeyManagementService
-    private let certificateSignatureService: CertificateSignatureService
     private let selectionCatalogAction: SelectionCatalogAction
     private let verifyDirectKeyAction: VerifyDirectKeyAction
     private let verifyUserIdBindingAction: VerifyUserIdBindingAction
@@ -102,7 +101,6 @@ final class ContactCertificateSignaturesScreenModel {
         self.fingerprint = fingerprint
         self.contactService = contactService
         self.keyManagement = keyManagement
-        self.certificateSignatureService = certificateSignatureService
         self.configuration = configuration
         self.exportController = exportController
         self.selectionCatalogAction = selectionCatalogAction ?? { targetCert in

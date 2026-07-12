@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 struct ContactCertificationDetailsView: View {
     let contactId: String
     let keyId: String?
-    let intent: ContactCertificationRouteIntent
     let configuration: ContactCertificationDetailsConfiguration
 
     @Environment(ContactService.self) private var contactService
@@ -15,12 +14,10 @@ struct ContactCertificationDetailsView: View {
     init(
         contactId: String,
         keyId: String?,
-        intent: ContactCertificationRouteIntent,
         configuration: ContactCertificationDetailsConfiguration = .default
     ) {
         self.contactId = contactId
         self.keyId = keyId
-        self.intent = intent
         self.configuration = configuration
     }
 
@@ -28,7 +25,6 @@ struct ContactCertificationDetailsView: View {
         ContactCertificationDetailsHostView(
             contactId: contactId,
             keyId: keyId,
-            intent: intent,
             contactService: contactService,
             keyManagement: keyManagement,
             certificateSignatureService: certificateSignatureService,
@@ -46,7 +42,6 @@ private struct ContactCertificationDetailsHostView: View {
     init(
         contactId: String,
         keyId: String?,
-        intent: ContactCertificationRouteIntent,
         contactService: ContactService,
         keyManagement: KeyManagementService,
         certificateSignatureService: CertificateSignatureService,
@@ -58,7 +53,6 @@ private struct ContactCertificationDetailsHostView: View {
             initialValue: ContactCertificationDetailsScreenModel(
                 contactId: contactId,
                 initialKeyId: keyId,
-                intent: intent,
                 contactService: contactService,
                 keyManagement: keyManagement,
                 certificateSignatureService: certificateSignatureService,

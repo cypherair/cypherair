@@ -5,13 +5,11 @@ final class AppContainer: @unchecked Sendable {
     let authLifecycleTraceStore: AuthLifecycleTraceStore?
     let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
-    let secureEnclave: any SecureEnclaveManageable
     let keychain: any KeychainManageable
     let authManager: AuthenticationManager
     let config: AppConfiguration
     let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     let protectedDataStorageRoot: ProtectedDataStorageRoot
-    let protectedDataRegistryStore: ProtectedDataRegistryStore
     let protectedDomainKeyManager: ProtectedDomainKeyManager
     let protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator
     let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
@@ -20,14 +18,12 @@ final class AppContainer: @unchecked Sendable {
     let contactsDomainStore: ContactsDomainStore?
     let protectedSettingsStore: ProtectedSettingsStore
     let protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore
-    let protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator
     let appSessionOrchestrator: AppSessionOrchestrator
     let engine: PgpEngine
     let keyManagement: KeyManagementService
     let contactService: ContactService
     let encryptionService: EncryptionService
     let decryptionService: DecryptionService
-    let passwordMessageService: PasswordMessageService
     let signingService: SigningService
     let certificateSignatureService: CertificateSignatureService
     let qrService: QRService
@@ -41,13 +37,11 @@ final class AppContainer: @unchecked Sendable {
         authLifecycleTraceStore: AuthLifecycleTraceStore?,
         appLockController: AppLockController,
         authPromptCoordinator: AuthenticationPromptCoordinator,
-        secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         authManager: AuthenticationManager,
         config: AppConfiguration,
         protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator,
         protectedDataStorageRoot: ProtectedDataStorageRoot,
-        protectedDataRegistryStore: ProtectedDataRegistryStore,
         protectedDomainKeyManager: ProtectedDomainKeyManager,
         protectedDomainRecoveryCoordinator: ProtectedDomainRecoveryCoordinator,
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
@@ -56,14 +50,12 @@ final class AppContainer: @unchecked Sendable {
         contactsDomainStore: ContactsDomainStore? = nil,
         protectedSettingsStore: ProtectedSettingsStore,
         protectedDataFrameworkSentinelStore: ProtectedDataFrameworkSentinelStore,
-        protectedDataPostUnlockCoordinator: ProtectedDataPostUnlockCoordinator = .noOp,
         appSessionOrchestrator: AppSessionOrchestrator,
         engine: PgpEngine,
         keyManagement: KeyManagementService,
         contactService: ContactService,
         encryptionService: EncryptionService,
         decryptionService: DecryptionService,
-        passwordMessageService: PasswordMessageService,
         signingService: SigningService,
         certificateSignatureService: CertificateSignatureService,
         qrService: QRService,
@@ -75,13 +67,11 @@ final class AppContainer: @unchecked Sendable {
         self.authLifecycleTraceStore = authLifecycleTraceStore
         self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
-        self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.authManager = authManager
         self.config = config
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         self.protectedDataStorageRoot = protectedDataStorageRoot
-        self.protectedDataRegistryStore = protectedDataRegistryStore
         self.protectedDomainKeyManager = protectedDomainKeyManager
         self.protectedDomainRecoveryCoordinator = protectedDomainRecoveryCoordinator
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
@@ -90,14 +80,12 @@ final class AppContainer: @unchecked Sendable {
         self.contactsDomainStore = contactsDomainStore
         self.protectedSettingsStore = protectedSettingsStore
         self.protectedDataFrameworkSentinelStore = protectedDataFrameworkSentinelStore
-        self.protectedDataPostUnlockCoordinator = protectedDataPostUnlockCoordinator
         self.appSessionOrchestrator = appSessionOrchestrator
         self.engine = engine
         self.keyManagement = keyManagement
         self.contactService = contactService
         self.encryptionService = encryptionService
         self.decryptionService = decryptionService
-        self.passwordMessageService = passwordMessageService
         self.signingService = signingService
         self.certificateSignatureService = certificateSignatureService
         self.qrService = qrService
@@ -126,7 +114,6 @@ final class AppContainer: @unchecked Sendable {
         let temporaryArtifactStore: AppTemporaryArtifactStore
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
-        let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
         let qrService: QRService
@@ -386,13 +373,6 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
             secureEnclaveDigestSigner: secureEnclaveDigestSigner
         )
-        let passwordEncryptor = makePrivateKeyPasswordMessageEncryptionService(
-            engine: engine,
-            messageAdapter: messageAdapter,
-            keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
-        )
         let contactCertificationSigner = makePrivateKeyContactCertificationService(
             engine: engine,
             certificateAdapter: certificateAdapter,
@@ -428,12 +408,6 @@ final class AppContainer: @unchecked Sendable {
                 messageDecryptor: messageDecryptor,
                 fileDecryptor: fileDecryptor,
                 temporaryArtifactStore: temporaryArtifactStore
-            ),
-            passwordMessageService: PasswordMessageService(
-                messageAdapter: messageAdapter,
-                keyManagement: keyManagement,
-                contactService: contactService,
-                passwordEncryptor: passwordEncryptor
             ),
             signingService: SigningService(
                 messageAdapter: messageAdapter,
@@ -552,24 +526,6 @@ final class AppContainer: @unchecked Sendable {
         secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
     ) -> PrivateKeyDetachedFileSigningService {
         PrivateKeyDetachedFileSigningService(
-            router: keyManagement.makePrivateKeyOperationRouter(
-                publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: secureEnclaveCustodyHandleStore
-            ),
-            softwarePrivateKeyAccess: keyManagement,
-            messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
-        )
-    }
-
-    private static func makePrivateKeyPasswordMessageEncryptionService(
-        engine: PgpEngine,
-        messageAdapter: PGPMessageOperationAdapter,
-        keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
-    ) -> PrivateKeyPasswordMessageEncryptionService {
-        PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
                 handleStore: secureEnclaveCustodyHandleStore
@@ -1004,13 +960,11 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
-            secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
             config: config,
             protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            protectedDataRegistryStore: protectedDataRegistryStore,
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
@@ -1019,14 +973,12 @@ final class AppContainer: @unchecked Sendable {
             contactsDomainStore: contactsDomainStore,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
-            protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,
             encryptionService: pgpServices.encryptionService,
             decryptionService: pgpServices.decryptionService,
-            passwordMessageService: pgpServices.passwordMessageService,
             signingService: pgpServices.signingService,
             certificateSignatureService: pgpServices.certificateSignatureService,
             qrService: pgpServices.qrService,
@@ -1330,13 +1282,11 @@ final class AppContainer: @unchecked Sendable {
             authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
-            secureEnclave: secureEnclave,
             keychain: keychain,
             authManager: authManager,
             config: config,
             protectedOrdinarySettingsCoordinator: protectedOrdinarySettingsCoordinator,
             protectedDataStorageRoot: protectedDataStorageRoot,
-            protectedDataRegistryStore: protectedDataRegistryStore,
             protectedDomainKeyManager: protectedDomainKeyManager,
             protectedDomainRecoveryCoordinator: protectedDomainRecoveryCoordinator,
             protectedDataSessionCoordinator: protectedDataSessionCoordinator,
@@ -1344,14 +1294,12 @@ final class AppContainer: @unchecked Sendable {
             contactsDomainStore: nil,
             protectedSettingsStore: protectedSettingsStore,
             protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore,
-            protectedDataPostUnlockCoordinator: protectedDataPostUnlockCoordinator,
             appSessionOrchestrator: appSessionOrchestrator,
             engine: engine,
             keyManagement: keyManagement,
             contactService: contactService,
             encryptionService: pgpServices.encryptionService,
             decryptionService: pgpServices.decryptionService,
-            passwordMessageService: pgpServices.passwordMessageService,
             signingService: pgpServices.signingService,
             certificateSignatureService: pgpServices.certificateSignatureService,
             qrService: pgpServices.qrService,

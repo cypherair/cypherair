@@ -45,12 +45,6 @@ final class ContactsScreenModel {
         return contactService.contactTagSummaries()
     }
 
-    var selectedTagFilters: [ContactTagSummary] {
-        let filters = tagFilters
-        let selectedIds = tagFilterState.selectedIds(availableTags: filters)
-        return filters.filter { selectedIds.contains($0.tagId) }
-    }
-
     var tagSuggestions: [ContactTagSummary] {
         contactService.tagSuggestions(matching: searchText)
     }
@@ -62,10 +56,6 @@ final class ContactsScreenModel {
 
     func toggleTagFilter(_ tagId: String) {
         tagFilterState.toggle(tagId, availableTags: tagFilters)
-    }
-
-    func isTagFilterSelected(_ tagId: String) -> Bool {
-        tagFilterState.isSelected(tagId, availableTags: tagFilters)
     }
 
     func applyTagSuggestion(_ tagId: String) {

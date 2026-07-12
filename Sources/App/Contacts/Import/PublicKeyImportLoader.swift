@@ -31,7 +31,7 @@ struct PublicKeyImportLoader {
     }
 
     func makeQRPhotoSelection(from item: PhotosPickerItem) -> AddContactQRPhotoSelection {
-        AddContactQRPhotoSelection(identifier: item.itemIdentifier) { [self, item] in
+        AddContactQRPhotoSelection { [self, item] in
             try await loadKeyDataFromQRPhoto(item)
         }
     }
@@ -53,10 +53,6 @@ struct PublicKeyImportLoader {
         }
 
         return try qrService.parseImportURL(url)
-    }
-
-    func loadFromQRPhoto(_ item: PhotosPickerItem) async throws -> PublicKeyImportInspection {
-        try inspect(keyData: try await loadKeyDataFromQRPhoto(item))
     }
 
     func loadFromFile(url: URL, failure: CypherAirError) throws -> LoadedPublicKeyFile {

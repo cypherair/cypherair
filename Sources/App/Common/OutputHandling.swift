@@ -4,7 +4,6 @@ enum OutputArtifactKind {
     case ciphertext
     case publicKey
     case revocation
-    case backup
     case generic
 }
 

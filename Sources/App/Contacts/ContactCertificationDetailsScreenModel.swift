@@ -66,14 +66,11 @@ final class ContactCertificationDetailsScreenModel {
     ]
 
     let contactId: String
-    let initialKeyId: String?
-    let intent: ContactCertificationRouteIntent
     let configuration: ContactCertificationDetailsConfiguration
     let exportController: FileExportController
 
     private let contactService: ContactService
     private let keyManagement: KeyManagementService
-    private let certificateSignatureService: CertificateSignatureService
     private let selectionCatalogAction: SelectionCatalogAction
     private let generateArmoredCertificationAction: GenerateArmoredCertificationAction
     private let validateUserIdArtifactAction: ValidateUserIdArtifactAction
@@ -114,7 +111,6 @@ final class ContactCertificationDetailsScreenModel {
     init(
         contactId: String,
         initialKeyId: String?,
-        intent: ContactCertificationRouteIntent,
         contactService: ContactService,
         keyManagement: KeyManagementService,
         certificateSignatureService: CertificateSignatureService,
@@ -129,11 +125,8 @@ final class ContactCertificationDetailsScreenModel {
         signatureFileImportAction: SignatureFileImportAction? = nil
     ) {
         self.contactId = contactId
-        self.initialKeyId = initialKeyId
-        self.intent = intent
         self.contactService = contactService
         self.keyManagement = keyManagement
-        self.certificateSignatureService = certificateSignatureService
         self.configuration = configuration
         self.exportController = exportController
         self.selectionCatalogAction = selectionCatalogAction ?? { targetCert in

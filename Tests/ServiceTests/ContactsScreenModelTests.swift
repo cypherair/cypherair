@@ -35,11 +35,9 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
 
         model.toggleTagFilter(workTag.tagId)
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [workContactId])
-        XCTAssertEqual(model.selectedTagFilters.map(\.tagId), [workTag.tagId])
 
         model.toggleTagFilter(personalTag.tagId)
         XCTAssertEqual(Set(model.visibleContacts.map(\.contactId)), Set([workContactId, personalContactId]))
-        XCTAssertEqual(Set(model.selectedTagFilters.map(\.tagId)), Set([workTag.tagId, personalTag.tagId]))
 
         model.clearTagFilters()
         model.searchText = "personal"
@@ -47,7 +45,6 @@ final class ContactsScreenModelTests: ContactServiceTestCase {
 
         model.applyTagSuggestion(workTag.tagId)
         XCTAssertEqual(model.searchText, "")
-        XCTAssertEqual(model.selectedTagFilters.map(\.tagId), [workTag.tagId])
         XCTAssertEqual(model.visibleContacts.map(\.contactId), [workContactId])
     }
 

@@ -118,10 +118,6 @@ struct TutorialArtifacts {
     var bobContact: ContactIdentitySummary?
     var encryptedMessage: String?
     var parseResult: DecryptionPhase1Result?
-    var decryptedMessage: String?
-    var decryptedVerification: DetailedSignatureVerification?
-    var backupArmoredKey: String?
-    var authMode: AuthenticationMode = .standard
 }
 
 struct TutorialModuleState {
@@ -195,13 +191,6 @@ struct TutorialUnsafeRouteBlocklist {
     }
 }
 
-struct TutorialSecuritySimulationStack {
-    let authManager: AuthenticationManager
-    let mockSecureEnclave: MockSecureEnclave
-    let mockKeychain: MockKeychain
-    let mockAuthenticator: MockAuthenticator
-}
-
 enum TutorialAutomationContract {
     static let rootReadyMarker = "tutorial.ready"
     static let hubReadyMarker = "tutorial.hub.ready"
@@ -254,8 +243,6 @@ struct TutorialNavigationState {
 }
 
 struct TutorialSessionState {
-    var specVersion = GuidedTutorialVersion.current
-    var launchOrigin: TutorialLaunchOrigin = .inApp
     var lifecycleState: TutorialLifecycleState = .notStarted
     var sessionID: TutorialSessionID?
     var moduleStates: [TutorialModuleID: TutorialModuleState] = Dictionary(
@@ -264,20 +251,12 @@ struct TutorialSessionState {
     var artifacts = TutorialArtifacts()
     var surface: TutorialHostSurface = .hub
     var pendingCompletionPromptModule: TutorialModuleID?
-    var currentGuidance: TutorialGuidancePayload?
 
     var activeModule: TutorialModuleID? {
         if case .workspace(let module) = surface {
             return module
         }
         return nil
-    }
-
-    var isWorkspacePresented: Bool {
-        if case .workspace = surface {
-            return true
-        }
-        return false
     }
 
     var hasStartedSession: Bool {
@@ -302,13 +281,6 @@ struct TutorialSessionState {
 }
 
 struct TutorialGuidancePayload {
-    enum State: Equatable {
-        case inProgress
-        case completed
-    }
-
-    let module: TutorialModuleID
-    let state: State
     let title: String
     let body: String
     let realAppLocation: String?
