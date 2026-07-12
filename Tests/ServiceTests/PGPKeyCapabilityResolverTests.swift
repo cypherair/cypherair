@@ -27,7 +27,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 XCTAssertEqual(
                     resolver.support(for: operation, identity: identity),
                     .supported,
-                    "Expected \(operation) to be supported for \(identity.profile)."
+                    "Expected \(operation) to be supported for \(identity.openPGPConfigurationIdentity)."
                 )
             }
         }
@@ -399,7 +399,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: keyVersion,
-            profile: profile,
             userId: "Test <test@example.invalid>",
             hasEncryptionSubkey: true,
             isRevoked: false,

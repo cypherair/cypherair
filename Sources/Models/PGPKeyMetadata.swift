@@ -20,8 +20,9 @@ struct PGPKeyMetadata: Equatable, Hashable, Sendable {
     /// Whether the key has expired.
     let isExpired: Bool
 
-    /// Detected encryption profile.
-    let profile: PGPKeyProfile
+    /// Detected portable software profile, or nil when the certificate's
+    /// suite has no such profile (P-256 Secure Enclave custody certificates).
+    let profile: PGPKeyProfile?
 
     /// Primary key algorithm name.
     let primaryAlgo: String

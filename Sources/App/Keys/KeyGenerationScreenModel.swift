@@ -42,19 +42,11 @@ final class KeyGenerationScreenModel {
         self.isSecureEnclaveGenerationAvailable = isSecureEnclaveGenerationAvailable
             ?? keyManagement.isSecureEnclaveCustodyGenerationAvailable
         self.generateKeyAction = generateKeyAction ?? { name, email, expirySeconds, family in
-            if let profile = family.equivalentSoftwareProfile {
-                return try await keyManagement.generateKey(
-                    name: name,
-                    email: email,
-                    expirySeconds: expirySeconds,
-                    profile: profile
-                )
-            }
-            return try await keyManagement.generateSecureEnclaveCustodyKey(
+            try await keyManagement.generateKey(
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
-                configurationIdentity: family
+                family: family
             )
         }
     }

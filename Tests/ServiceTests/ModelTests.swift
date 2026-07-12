@@ -477,41 +477,6 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(postQuantumHigh.softwareExportProtection, .argon2idS2K)
     }
 
-    func test_pgpKeyIdentity_persistsSuccessorVocabulary() throws {
-        let identity = makeIdentity(fingerprint: "abababababababababababababababababababab")
-
-        XCTAssertEqual(identity.openPGPConfiguration, .compatibleSoftwareV4)
-        XCTAssertEqual(identity.openPGPConfigurationIdentity, .compatibleSoftwareV4)
-        XCTAssertEqual(identity.privateKeyCustodyKind, .softwareSecretCertificate)
-
-        let encoded = try JSONEncoder().encode(identity)
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-
-        XCTAssertEqual(
-            Set(object.keys),
-            [
-                "fingerprint",
-                "keyVersion",
-                "profile",
-                "openPGPConfigurationIdentity",
-                "privateKeyCustodyKind",
-                "userId",
-                "hasEncryptionSubkey",
-                "isRevoked",
-                "isExpired",
-                "isDefault",
-                "isBackedUp",
-                "publicKeyData",
-                "revocationCert",
-                "primaryAlgo",
-                "subkeyAlgo",
-            ]
-        )
-        XCTAssertEqual(object["openPGPConfigurationIdentity"] as? String, "compatibleSoftwareV4")
-        XCTAssertEqual(object["privateKeyCustodyKind"] as? String, "softwareSecretCertificate")
-        XCTAssertNil(object["openPGPConfiguration"])
-    }
-
     func test_secureEnclaveVocabulary_isRepresentableButNotSelectedByCurrentProfiles() {
         let compatibleP256 = PGPKeyConfiguration.compatibleP256V4
         XCTAssertEqual(compatibleP256.identity, .compatibleP256V4)
@@ -1075,7 +1040,6 @@ final class ModelTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: 4,
-            profile: .universal,
             userId: "Test",
             hasEncryptionSubkey: true,
             isRevoked: false,

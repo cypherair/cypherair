@@ -85,7 +85,6 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
     func test_secureEnclaveV6RouteSignsDetachedFileAndVerifies() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertEqual(fixture.identity.profile, .advanced)
         XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         let input = try makeTemporaryFile(Data("secure enclave v6 detached file".utf8))
@@ -438,7 +437,6 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: .universal,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -512,7 +510,6 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,

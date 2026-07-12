@@ -178,7 +178,7 @@ struct PGPKeyConfiguration: Codable, Equatable, Hashable, Sendable {
 }
 
 extension PGPKeyConfiguration.Identity {
-    /// The historical software profile this configuration identity maps onto,
+    /// The portable software profile this configuration identity maps onto,
     /// or nil for Secure Enclave custody configurations.
     var equivalentSoftwareProfile: PGPKeyProfile? {
         switch self {

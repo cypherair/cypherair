@@ -103,7 +103,6 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
     func test_secureEnclaveV6RouteSignsPasswordMessage() async throws {
         let fixture = try await makeSecureEnclaveRouteFixture(configurationIdentity: .modernP256V6)
         XCTAssertEqual(fixture.identity.keyVersion, 6)
-        XCTAssertEqual(fixture.identity.profile, .advanced)
         XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, .modernP256V6)
         XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)
         let router = StaticPasswordPrivateKeyOperationRouter(route: .secureEnclaveSigner(fixture.route))
@@ -451,7 +450,6 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: .advanced,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -528,7 +526,6 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,

@@ -6,9 +6,11 @@ enum PGPKeyMetadataAdapter {
         metadata(from: keyInfo, profile: keyInfo.profile)
     }
 
+    /// `profile: nil` means the certificate's suite has no portable software
+    /// profile (P-256 Secure Enclave custody), not a classification failure.
     static func metadata(
         from keyInfo: KeyInfo,
-        profile: KeyProfile
+        profile: KeyProfile?
     ) -> PGPKeyMetadata {
         PGPKeyMetadata(
             fingerprint: keyInfo.fingerprint,
@@ -17,7 +19,7 @@ enum PGPKeyMetadataAdapter {
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
             isExpired: keyInfo.isExpired,
-            profile: profile.appProfile,
+            profile: profile?.appProfile,
             primaryAlgo: keyInfo.primaryAlgo,
             subkeyAlgo: keyInfo.subkeyAlgo,
             expiryTimestamp: keyInfo.expiryTimestamp

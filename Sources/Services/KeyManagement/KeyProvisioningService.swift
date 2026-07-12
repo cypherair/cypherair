@@ -107,7 +107,6 @@ final class KeyProvisioningService {
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: generated.metadata.keyVersion,
-            profile: profile,
             userId: generated.metadata.userId,
             hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -189,10 +188,17 @@ final class KeyProvisioningService {
         try invalidationGate.checkValid(token)
 
         let fingerprint = imported.metadata.fingerprint
+        // Imports are always portable software certificates, so the engine's
+        // detected profile must be present; its absence means the certificate
+        // has no portable software profile and cannot become an owned software key.
+        guard let detectedProfile = imported.metadata.profile else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Imported certificate has no portable software profile."
+            )
+        }
         let identity = PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: imported.metadata.keyVersion,
-            profile: imported.metadata.profile,
             userId: imported.metadata.userId,
             hasEncryptionSubkey: imported.metadata.hasEncryptionSubkey,
             isRevoked: false,
@@ -204,7 +210,7 @@ final class KeyProvisioningService {
             primaryAlgo: imported.metadata.primaryAlgo,
             subkeyAlgo: imported.metadata.subkeyAlgo,
             expiryDate: imported.metadata.expiryDate,
-            openPGPConfigurationIdentity: imported.metadata.profile.openPGPConfiguration.identity,
+            openPGPConfigurationIdentity: detectedProfile.openPGPConfiguration.identity,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
 

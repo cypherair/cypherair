@@ -224,7 +224,6 @@ enum TestHelpers {
         let identity = PGPKeyIdentity(
             fingerprint: metadata.fingerprint,
             keyVersion: metadata.keyVersion,
-            profile: metadata.profile,
             userId: metadata.userId,
             hasEncryptionSubkey: metadata.hasEncryptionSubkey,
             isRevoked: metadata.isRevoked,
@@ -236,7 +235,7 @@ enum TestHelpers {
             primaryAlgo: metadata.primaryAlgo,
             subkeyAlgo: metadata.subkeyAlgo,
             expiryDate: metadata.expiryDate,
-            openPGPConfigurationIdentity: metadata.profile.openPGPConfiguration.identity,
+            openPGPConfigurationIdentity: try XCTUnwrap(metadata.profile).openPGPConfiguration.identity,
             privateKeyCustodyKind: .softwareSecretCertificate
         )
 

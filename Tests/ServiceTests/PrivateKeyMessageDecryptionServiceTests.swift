@@ -577,7 +577,6 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         return PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: profile,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -641,7 +640,6 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,

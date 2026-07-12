@@ -16,7 +16,6 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: keyInfo.fingerprint,
             keyVersion: UInt8(keyInfo.keyVersion),
-            profile: .universal,
             userId: keyInfo.userId,
             hasEncryptionSubkey: keyInfo.hasEncryptionSubkey,
             isRevoked: keyInfo.isRevoked,
@@ -312,7 +311,6 @@ final class PrivateKeyCleartextSigningServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,

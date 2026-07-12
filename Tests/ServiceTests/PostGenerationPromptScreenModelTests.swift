@@ -121,7 +121,6 @@ final class PostGenerationPromptScreenModelTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: "2222222222222222222222222222222222222222",
             keyVersion: 4,
-            profile: .universal,
             userId: "Alice <alice@example.com>",
             hasEncryptionSubkey: true,
             isRevoked: false,

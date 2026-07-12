@@ -35,11 +35,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
 
         private static func validateIdentityContract(_ identity: PGPKeyIdentity) throws {
             let configuration = identity.openPGPConfiguration
-            guard identity.profile.keyVersion == identity.keyVersion else {
-                throw ProtectedDataError.invalidEnvelope(
-                    "Key metadata profile does not match key version."
-                )
-            }
             guard identity.keyVersion == configuration.keyVersion else {
                 throw ProtectedDataError.invalidEnvelope(
                     "Key metadata configuration does not match key version."

@@ -149,7 +149,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                     let identity = PGPKeyIdentity(
                         fingerprint: generated.metadata.fingerprint,
                         keyVersion: generated.metadata.keyVersion,
-                        profile: configuration.keyVersion == 4 ? .universal : .advanced,
                         userId: generated.metadata.userId,
                         hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
                         isRevoked: false,
@@ -231,11 +230,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
               let compositeHandleStore = tierHandleStore else {
             throw CypherAirError.keyOperationUnavailable(category: .operationUnavailableByPolicy)
         }
-        let compositeProfile: PGPKeyProfile =
-            switch tier {
-            case .postQuantum: .postQuantum
-            case .postQuantumHigh: .postQuantumHigh
-            }
         let resolution = resolver.resolution(
             for: .generate,
             configuration: configuration,
@@ -310,7 +304,6 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                     let identity = PGPKeyIdentity(
                         fingerprint: generated.metadata.fingerprint,
                         keyVersion: generated.metadata.keyVersion,
-                        profile: compositeProfile,
                         userId: generated.metadata.userId,
                         hasEncryptionSubkey: generated.metadata.hasEncryptionSubkey,
                         isRevoked: false,

@@ -204,6 +204,30 @@ final class KeyManagementService: @unchecked Sendable {
 
     // MARK: - Key Generation
 
+    /// Single generation entry point: dispatches to the portable software
+    /// path or the Secure Enclave custody path by the family's custody model.
+    func generateKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        family: PGPKeyConfiguration.Identity
+    ) async throws -> PGPKeyIdentity {
+        if let profile = family.equivalentSoftwareProfile {
+            return try await generateKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                profile: profile
+            )
+        }
+        return try await generateSecureEnclaveCustodyKey(
+            name: name,
+            email: email,
+            expirySeconds: expirySeconds,
+            configurationIdentity: family
+        )
+    }
+
     /// Generate a new key pair with the specified profile.
     /// The private key is immediately SE-wrapped and stored in Keychain.
     ///

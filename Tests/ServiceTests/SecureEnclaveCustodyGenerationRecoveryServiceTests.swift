@@ -227,7 +227,6 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         PGPKeyIdentity(
             fingerprint: fingerprint,
             keyVersion: keyVersion,
-            profile: keyVersion == 4 ? .universal : .advanced,
             userId: "Secure Enclave <se@example.test>",
             hasEncryptionSubkey: true,
             isRevoked: false,

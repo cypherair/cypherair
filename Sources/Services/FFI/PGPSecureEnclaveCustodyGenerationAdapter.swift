@@ -95,9 +95,10 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
             signer: signingProvider
         )
         let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
+        // P-256 Secure Enclave certificates have no portable software profile.
         let metadata = PGPKeyMetadataAdapter.metadata(
             from: keyInfo,
-            profile: configuration.keyVersion == 4 ? .universal : .advanced
+            profile: nil
         )
 
         return PGPSecureEnclaveCustodyGeneratedMaterial(

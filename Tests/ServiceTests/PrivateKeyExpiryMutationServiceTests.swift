@@ -625,7 +625,6 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
             keyVersion: material.metadata.keyVersion,
-            profile: material.metadata.profile,
             userId: material.metadata.userId,
             hasEncryptionSubkey: material.metadata.hasEncryptionSubkey,
             isRevoked: material.metadata.isRevoked,
@@ -698,7 +697,7 @@ final class PrivateKeyExpiryMutationServiceTests: XCTestCase {
                 hasEncryptionSubkey: identity.hasEncryptionSubkey,
                 isRevoked: identity.isRevoked,
                 isExpired: false,
-                profile: identity.profile,
+                profile: identity.softwareProfile,
                 primaryAlgo: identity.primaryAlgo,
                 subkeyAlgo: identity.subkeyAlgo,
                 expiryTimestamp: expiryTimestamp
