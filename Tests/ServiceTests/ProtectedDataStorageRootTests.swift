@@ -5,7 +5,6 @@ import XCTest
 private typealias AppAppContainer = CypherAir.AppContainer
 private typealias AppProtectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore
 private typealias AppProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
-private typealias AppProtectedDataStorageValidationMode = CypherAir.ProtectedDataStorageValidationMode
 private typealias AppProtectedDomainBootstrapMetadata = CypherAir.ProtectedDomainBootstrapMetadata
 private typealias AppProtectedDomainBootstrapStore = CypherAir.ProtectedDomainBootstrapStore
 

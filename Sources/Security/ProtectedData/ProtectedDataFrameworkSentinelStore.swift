@@ -44,8 +44,6 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
 
     private(set) var payload: Payload?
 
-    private var unlockedGenerationIdentifier: Int?
-
     init(
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
@@ -56,10 +54,6 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
         self.registryStore = registryStore
         self.domainKeyManager = domainKeyManager
         self.currentWrappingRootKey = currentWrappingRootKey
-    }
-
-    var hasCommittedDomain: Bool {
-        (try? registryStore.loadRegistry().committedMembership[Self.domainID] != nil) ?? false
     }
 
     func ensureCommittedIfNeeded(wrappingRootKey: Data) async throws {
@@ -132,7 +126,6 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
             var mutableDomainMasterKey = unwrappedDomainMasterKey
             mutableDomainMasterKey.protectedDataZeroize()
             payload = openedSnapshot.payload
-            unlockedGenerationIdentifier = openedSnapshot.generationIdentifier
 
             if registry.committedMembership[Self.domainID] == .recoveryNeeded {
                 _ = try await registryStore.updateCommittedDomainState(
@@ -297,7 +290,6 @@ final class ProtectedDataFrameworkSentinelStore: ProtectedDataRelockParticipant,
 
     private func clearUnlockedState() {
         payload = nil
-        unlockedGenerationIdentifier = nil
     }
 }
 

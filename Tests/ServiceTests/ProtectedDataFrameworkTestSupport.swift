@@ -5,20 +5,14 @@ import Security
 import XCTest
 @testable import CypherAir
 
-typealias ProtectedDataTestAppAppContainer = CypherAir.AppContainer
 typealias ProtectedDataTestAppAppSessionOrchestrator = CypherAir.AppSessionOrchestrator
-typealias ProtectedDataTestAppAppStartupCoordinator = CypherAir.AppStartupCoordinator
-typealias ProtectedDataTestAppProtectedDataBootstrapState = CypherAir.ProtectedDataBootstrapState
 typealias ProtectedDataTestAppProtectedDataAccessGateClassifier = CypherAir.ProtectedDataAccessGateClassifier
-typealias ProtectedDataTestAppProtectedDataFrameworkState = CypherAir.ProtectedDataFrameworkState
 typealias ProtectedDataTestAppProtectedDataRegistryStore = CypherAir.ProtectedDataRegistryStore
 typealias ProtectedDataTestAppProtectedDataRelockParticipant = CypherAir.ProtectedDataRelockParticipant
-typealias ProtectedDataTestAppProtectedDataRightIdentifiers = CypherAir.ProtectedDataRightIdentifiers
 typealias ProtectedDataTestAppProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 typealias ProtectedDataTestAppProtectedDataSessionRelockCoordinator = CypherAir.ProtectedDataSessionRelockCoordinator
 typealias ProtectedDataTestAppProtectedDataPostUnlockCoordinator = CypherAir.ProtectedDataPostUnlockCoordinator
 typealias ProtectedDataTestAppProtectedDataPostUnlockDomainOpener = CypherAir.ProtectedDataPostUnlockDomainOpener
-typealias ProtectedDataTestAppProtectedDataPostUnlockOutcome = CypherAir.ProtectedDataPostUnlockOutcome
 typealias ProtectedDataTestAppProtectedDataFrameworkSentinelStore = CypherAir.ProtectedDataFrameworkSentinelStore
 typealias ProtectedDataTestAppPrivateKeyControlStore = CypherAir.PrivateKeyControlStore
 typealias ProtectedDataTestAppKeyMetadataDomainStore = CypherAir.KeyMetadataDomainStore
@@ -29,19 +23,6 @@ typealias ProtectedDataTestAppProtectedDomainRecoveryCoordinator = CypherAir.Pro
 typealias ProtectedDataTestAppMockProtectedDataRootSecretStore = CypherAir.MockProtectedDataRootSecretStore
 typealias ProtectedDataTestAppPendingRecoveryOutcome = CypherAir.PendingRecoveryOutcome
 typealias ProtectedDataTestAppWrappedDomainMasterKeyRecord = CypherAir.WrappedDomainMasterKeyRecord
-typealias ProtectedDataTestAppProtectedOrdinarySettingsCoordinator = CypherAir.ProtectedOrdinarySettingsCoordinator
-
-final class ProtectedDataTestMutableDateProvider: @unchecked Sendable {
-    var value: Date
-
-    init(_ value: Date) {
-        self.value = value
-    }
-
-    func now() -> Date {
-        value
-    }
-}
 
 final class RecordingProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol, @unchecked Sendable {
     private var storage: [String: Data] = [:]
@@ -122,24 +103,6 @@ final class MockProtectedDataRelockParticipant: ProtectedDataTestAppProtectedDat
     }
 }
 
-/// Relock participant that parks inside `relockProtectedData()` on a gate, so a
-/// resume Task suspends precisely inside `relockCurrentSession()` — the window
-/// between the orchestrator's `guard !isAuthenticating` and its in-flight flag
-/// set. Used to deterministically prove the double-entry race is closed.
-final class SuspendingRelockParticipant: ProtectedDataTestAppProtectedDataRelockParticipant {
-    let gate: AsyncSuspensionGate
-    private(set) var relockCallCount = 0
-
-    init(gate: AsyncSuspensionGate) {
-        self.gate = gate
-    }
-
-    func relockProtectedData() async throws {
-        relockCallCount += 1
-        await gate.suspend()
-    }
-}
-
 actor AsyncBooleanFlag {
     var value = false
 
@@ -149,41 +112,6 @@ actor AsyncBooleanFlag {
 
     func currentValue() -> Bool {
         value
-    }
-}
-
-actor AsyncIntegerCounter {
-    var value = 0
-
-    func next() -> Int {
-        value += 1
-        return value
-    }
-
-    func currentValue() -> Int {
-        value
-    }
-}
-
-actor AsyncSuspensionGate {
-    var continuation: CheckedContinuation<Void, Never>?
-    var suspended = false
-
-    func suspend() async {
-        suspended = true
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
-        }
-        suspended = false
-    }
-
-    func isSuspended() -> Bool {
-        suspended
-    }
-
-    func resume() {
-        continuation?.resume()
-        continuation = nil
     }
 }
 
@@ -493,14 +421,6 @@ class ProtectedDataFrameworkTestCase: XCTestCase {
         let envelopeData = try encoder.encode(envelope)
         let pendingURL = storageRoot.domainEnvelopeURL(for: ProtectedDataTestAppKeyMetadataDomainStore.domainID, slot: .pending)
         try storageRoot.writeProtectedData(envelopeData, to: pendingURL)
-    }
-
-    func loadCurrentKeyMetadataEnvelope(
-        storageRoot: ProtectedDataTestAppProtectedDataStorageRoot
-    ) throws -> ProtectedDomainEnvelope {
-        let url = storageRoot.domainEnvelopeURL(for: ProtectedDataTestAppKeyMetadataDomainStore.domainID, slot: .current)
-        let data = try storageRoot.readManagedData(at: url)
-        return try PropertyListDecoder().decode(ProtectedDomainEnvelope.self, from: data)
     }
 
     func makeKeyMetadataDomainHarness(

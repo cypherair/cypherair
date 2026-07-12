@@ -17,11 +17,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
 
     /// Tracking flags for test verification.
     private(set) var saveCallCount = 0
-    private(set) var loadCallCount = 0
     private(set) var deleteCallCount = 0
     private(set) var listItemsCallCount = 0
-    private(set) var lastSavedService: String?
-    private(set) var lastDeletedService: String?
     private(set) var loadCalls: [(service: String, account: String, hasAuthenticationContext: Bool)] = []
     private(set) var saveCalls: [(service: String, account: String, hasAccessControl: Bool)] = []
     private(set) var updateCalls: [(service: String, account: String, hasAuthenticationContext: Bool)] = []
@@ -29,12 +26,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
 
     /// If set, the next save operation will throw this error (one-shot).
     var saveError: MockKeychainError?
-    /// If set, the next load operation will throw this error (one-shot).
-    var loadError: MockKeychainError?
     /// If set, the next delete operation will throw this error (one-shot).
     var deleteError: MockKeychainError?
-    /// If set, the next list operation will throw this error (one-shot).
-    var listItemsError: MockKeychainError?
 
     /// If non-zero, the save at this call count (1-based) will throw `saveError ?? MockKeychainError.saveFailed`.
     /// Example: `failOnSaveNumber = 4` means the 4th save call will fail.
@@ -70,13 +63,11 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         if failOnSaveNumber > 0 && saveCallCount == failOnSaveNumber {
             throw MockKeychainError.saveFailed
         }
-        lastSavedService = service
         saveCalls.append((service: service, account: account, hasAccessControl: accessControl != nil))
         storage[key] = data
     }
 
     func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
-        loadCallCount += 1
         loadCalls.append(
             (
                 service: service,
@@ -84,10 +75,6 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
                 hasAuthenticationContext: authenticationContext != nil
             )
         )
-        if let error = loadError {
-            loadError = nil
-            throw error
-        }
         let key = storageKey(service: service, account: account)
         guard let data = storage[key] else {
             throw MockKeychainError.itemNotFound
@@ -124,7 +111,6 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         if failOnDeleteNumber > 0 && deleteCallCount == failOnDeleteNumber {
             throw MockKeychainError.deleteFailed
         }
-        lastDeletedService = service
         let key = storageKey(service: service, account: account)
         // Match real Keychain behavior: throw if item doesn't exist (errSecItemNotFound)
         guard storage.removeValue(forKey: key) != nil else {
@@ -146,10 +132,6 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
                 hasAuthenticationContext: authenticationContext != nil
             )
         )
-        if let error = listItemsError {
-            listItemsError = nil
-            throw error
-        }
         let suffix = ":\(account)"
         return storage.keys.compactMap { key in
             guard key.hasSuffix(suffix) else { return nil }
@@ -164,9 +146,7 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
         storage.removeAll()
         resetCallHistory()
         saveError = nil
-        loadError = nil
         deleteError = nil
-        listItemsError = nil
         throwOnDuplicate = true
         failOnSaveNumber = 0
         failOnDeleteNumber = 0
@@ -174,11 +154,8 @@ final class MockKeychain: KeychainManageable, @unchecked Sendable {
 
     func resetCallHistory() {
         saveCallCount = 0
-        loadCallCount = 0
         deleteCallCount = 0
         listItemsCallCount = 0
-        lastSavedService = nil
-        lastDeletedService = nil
         loadCalls.removeAll()
         saveCalls.removeAll()
         updateCalls.removeAll()
@@ -222,18 +199,10 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
 
     private var storage: [String: StoredSecret] = [:]
 
-    private(set) var saveCallCount = 0
     private(set) var loadCallCount = 0
-    private(set) var deleteCallCount = 0
-    private(set) var existsCallCount = 0
-    private(set) var reprotectCallCount = 0
-    private(set) var lastLoadedIdentifier: String?
     private(set) var lastAuthenticationContext: LAContext?
 
-    var saveError: MockKeychainError?
     var loadError: MockKeychainError?
-    var deleteError: MockKeychainError?
-    var reprotectError: MockKeychainError?
     var throwOnDuplicate = true
 
     func saveRootSecret(
@@ -241,11 +210,6 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
         identifier: String,
         policy: AppSessionAuthenticationPolicy
     ) throws {
-        saveCallCount += 1
-        if let saveError {
-            self.saveError = nil
-            throw saveError
-        }
         if throwOnDuplicate && storage[identifier] != nil {
             throw MockKeychainError.duplicateItem
         }
@@ -257,7 +221,6 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
         authenticationContext: LAContext
     ) throws -> Data {
         loadCallCount += 1
-        lastLoadedIdentifier = identifier
         lastAuthenticationContext = authenticationContext
         if let loadError {
             self.loadError = nil
@@ -270,19 +233,13 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
     }
 
     func deleteRootSecret(identifier: String) throws {
-        deleteCallCount += 1
-        if let deleteError {
-            self.deleteError = nil
-            throw deleteError
-        }
         guard storage.removeValue(forKey: identifier) != nil else {
             throw MockKeychainError.itemNotFound
         }
     }
 
     func rootSecretExists(identifier: String) -> Bool {
-        existsCallCount += 1
-        return storage[identifier] != nil
+        storage[identifier] != nil
     }
 
     func reprotectRootSecret(
@@ -292,12 +249,7 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
         authenticationContext: LAContext
     ) throws {
         _ = currentPolicy
-        reprotectCallCount += 1
         lastAuthenticationContext = authenticationContext
-        if let reprotectError {
-            self.reprotectError = nil
-            throw reprotectError
-        }
         guard var storedSecret = storage[identifier] else {
             throw MockKeychainError.itemNotFound
         }
@@ -305,23 +257,4 @@ final class MockProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtoc
         storage[identifier] = storedSecret
     }
 
-    func storedPolicy(identifier: String) -> AppSessionAuthenticationPolicy? {
-        storage[identifier]?.policy
-    }
-
-    func reset() {
-        storage.removeAll()
-        saveCallCount = 0
-        loadCallCount = 0
-        deleteCallCount = 0
-        existsCallCount = 0
-        reprotectCallCount = 0
-        lastLoadedIdentifier = nil
-        lastAuthenticationContext = nil
-        saveError = nil
-        loadError = nil
-        deleteError = nil
-        reprotectError = nil
-        throwOnDuplicate = true
-    }
 }

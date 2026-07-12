@@ -27,7 +27,6 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
     private(set) var generateCallCount = 0
     private(set) var wrapCallCount = 0
     private(set) var unwrapCallCount = 0
-    private(set) var deleteCallCount = 0
     private(set) var reconstructCallCount = 0
 
     /// The `authenticationContext` passed to the most recent `reconstructKey` /
@@ -139,7 +138,6 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
             nextError = nil
             throw error
         }
-        deleteCallCount += 1
         keys.removeValue(forKey: handle.dataRepresentation)
     }
 
@@ -163,20 +161,6 @@ final class MockSecureEnclave: SecureEnclaveManageable, @unchecked Sendable {
         #endif
     }
 
-    /// Reset all state for clean test setup.
-    func reset() {
-        generateCallCount = 0
-        wrapCallCount = 0
-        unwrapCallCount = 0
-        deleteCallCount = 0
-        reconstructCallCount = 0
-        lastReconstructAuthenticationContext = nil
-        lastGenerateAuthenticationContext = nil
-        nextError = nil
-        simulatedAuthMode = nil
-        biometricsAvailable = true
-        keys.removeAll()
-    }
 }
 
 #if canImport(CryptoKit)
@@ -196,6 +180,5 @@ final class MockSEKey: SEKeyHandle {
 
 enum MockSEError: Error {
     case invalidKeyHandle
-    case keyNotFound
     case authenticationFailed
 }

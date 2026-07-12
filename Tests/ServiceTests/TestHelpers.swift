@@ -255,11 +255,10 @@ enum TestHelpers {
         engine: PgpEngine = PgpEngine(),
         memoryInfo: (any MemoryInfoProvidable)? = nil
     ) async -> ServiceStack {
-        let (keyMgmt, mockSE, mockKC, mockAuth, metadataPersistence) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
+        let (keyMgmt, mockSE, mockKC, _, metadataPersistence) = makeKeyManagement(engine: engine, memoryInfo: memoryInfo)
         let (contactSvc, tempDir) = await makeContactService(engine: engine)
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
-        let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
         let textEncryptor = makeTextEncryptor(
             engine: engine,
             keyManagement: keyMgmt,
@@ -347,26 +346,18 @@ enum TestHelpers {
 
         return ServiceStack(
             engine: engine,
-            messageAdapter: messageAdapter,
             keyManagement: keyMgmt,
             metadataPersistence: metadataPersistence,
             contactService: contactSvc,
             textEncryptor: textEncryptor,
             fileEncryptor: fileEncryptor,
-            passwordMessageEncryptor: passwordMessageEncryptor,
-            detachedFileSigner: detachedFileSigner,
             encryptionService: encryptionSvc,
             decryptionService: decryptionSvc,
             passwordMessageService: passwordMessageSvc,
             signingService: signingSvc,
             certificateSignatureService: certificateSignatureSvc,
-            selfTestService: SelfTestService(
-                selfTestAdapter: selfTestAdapter,
-                messageAdapter: messageAdapter
-            ),
             mockSE: mockSE,
             mockKC: mockKC,
-            mockAuth: mockAuth,
             tempDir: tempDir
         )
     }
@@ -374,23 +365,18 @@ enum TestHelpers {
     /// Holds all services and mocks for a complete test environment.
     struct ServiceStack {
         let engine: PgpEngine
-        let messageAdapter: PGPMessageOperationAdapter
         let keyManagement: KeyManagementService
         let metadataPersistence: any KeyMetadataPersistence
         let contactService: ContactService
         let textEncryptor: any TextMessageEncrypting
         let fileEncryptor: any StreamingFileEncrypting
-        let passwordMessageEncryptor: any PasswordMessageEncrypting
-        let detachedFileSigner: any DetachedFileSigning
         let encryptionService: EncryptionService
         let decryptionService: DecryptionService
         let passwordMessageService: PasswordMessageService
         let signingService: SigningService
         let certificateSignatureService: CertificateSignatureService
-        let selfTestService: SelfTestService
         let mockSE: MockSecureEnclave
         let mockKC: MockKeychain
-        let mockAuth: MockAuthenticator
         let tempDir: URL
 
         /// Clean up temporary files. Call in tearDown.

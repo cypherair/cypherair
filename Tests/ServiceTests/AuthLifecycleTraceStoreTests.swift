@@ -7,10 +7,8 @@ import XCTest
 private typealias TraceProtectedDataSessionCoordinator = CypherAir.ProtectedDataSessionCoordinator
 private typealias TraceProtectedDataStorageRoot = CypherAir.ProtectedDataStorageRoot
 private typealias TraceProtectedDomainKeyManager = CypherAir.ProtectedDomainKeyManager
-private typealias TraceAppSessionOrchestrator = CypherAir.AppSessionOrchestrator
 private typealias TraceAuthenticationPromptCoordinator = CypherAir.AuthenticationPromptCoordinator
 private typealias TraceAuthLifecycleTraceStore = CypherAir.AuthLifecycleTraceStore
-private typealias TraceProtectedDataError = CypherAir.ProtectedDataError
 private typealias TraceAuthenticationManager = CypherAir.AuthenticationManager
 
 private final class TraceLineSink: @unchecked Sendable {

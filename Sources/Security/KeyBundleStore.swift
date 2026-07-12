@@ -9,8 +9,6 @@ enum KeyBundleNamespace: Equatable, Sendable {
 
 /// Receipt for the bundle row created by one save operation.
 struct KeyBundleWriteReceipt: Equatable, Sendable {
-    let fingerprint: String
-    let namespace: KeyBundleNamespace
     let services: [String]
 }
 
@@ -73,8 +71,6 @@ struct KeyBundleStore {
             accessControl: nil
         )
         return KeyBundleWriteReceipt(
-            fingerprint: fingerprint,
-            namespace: namespace,
             services: [service]
         )
     }

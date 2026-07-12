@@ -199,7 +199,6 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
 
     private struct GpgResult {
         let status: Int32
-        let stdout: Data
         let stderr: Data
 
         var stderrText: String {
@@ -233,9 +232,8 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         try? stdoutHandle.close()
         try? stderrHandle.close()
 
-        let stdoutData = (try? Data(contentsOf: stdoutURL)) ?? Data()
         let stderrData = (try? Data(contentsOf: stderrURL)) ?? Data()
-        return GpgResult(status: process.terminationStatus, stdout: stdoutData, stderr: stderrData)
+        return GpgResult(status: process.terminationStatus, stderr: stderrData)
     }
 }
 

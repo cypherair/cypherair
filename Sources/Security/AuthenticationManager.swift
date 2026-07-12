@@ -94,12 +94,8 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
     // MARK: - Dependencies
 
-    private let secureEnclave: any SecureEnclaveManageable
-    private let keychain: any KeychainManageable
     private let defaults: UserDefaults
     private let allowsUITestAuthenticationBypass: Bool
-    private let bundleStore: KeyBundleStore
-    private let migrationCoordinator: KeyMigrationCoordinator
     private let modeSwitchAuthenticator: PrivateKeyModeSwitchAuthenticator
     private let rewrapRecoveryCoordinator: PrivateKeyRewrapRecoveryCoordinator
     private let rewrapWorkflow: PrivateKeyRewrapWorkflow
@@ -159,8 +155,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
             }
         }
     ) {
-        self.secureEnclave = secureEnclave
-        self.keychain = keychain
         self.defaults = defaults
         self.allowsUITestAuthenticationBypass = allowsUITestAuthenticationBypass
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
@@ -169,8 +163,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
-        self.bundleStore = bundleStore
-        self.migrationCoordinator = migrationCoordinator
         self.modeSwitchAuthenticator = PrivateKeyModeSwitchAuthenticator(traceStore: traceStore)
         self.rewrapRecoveryCoordinator = PrivateKeyRewrapRecoveryCoordinator(
             bundleStore: bundleStore,
@@ -857,13 +849,4 @@ final class AuthenticationManager: AuthenticationEvaluable {
         )
     }
 
-}
-
-// MARK: - UserDefaults Helper
-
-private extension UserDefaults {
-    /// Check if a key has been explicitly set (distinguishes "0" from "never set").
-    func contains(key: String) -> Bool {
-        object(forKey: key) != nil
-    }
 }

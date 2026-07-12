@@ -23,7 +23,6 @@ private actor DecryptOperationGate {
 
 final class DecryptScreenModelTests: XCTestCase {
     private var stack: TestHelpers.ServiceStack!
-    private var config: AppConfiguration!
     private var defaultsSuiteName: String!
 
     override func setUp() async throws {
@@ -32,7 +31,6 @@ final class DecryptScreenModelTests: XCTestCase {
         defaultsSuiteName = "com.cypherair.tests.decryptscreen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defaults.removePersistentDomain(forName: defaultsSuiteName)
-        config = AppConfiguration(defaults: defaults)
     }
 
     override func tearDown() {
@@ -42,7 +40,6 @@ final class DecryptScreenModelTests: XCTestCase {
         }
         stack.cleanup()
         stack = nil
-        config = nil
         defaultsSuiteName = nil
         super.tearDown()
     }

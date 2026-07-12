@@ -54,10 +54,6 @@ struct KeyMigrationRecoverySummary: Equatable {
             && outcomes.contains(.promotedPendingSafe)
     }
 
-    var isNoActionSafeOnly: Bool {
-        !outcomes.isEmpty && outcomes.allSatisfy { $0 == .noActionSafe }
-    }
-
     var isRewrapTargetCommitSafe: Bool {
         !outcomes.isEmpty && outcomes.allSatisfy {
             $0 == .noActionSafe || $0 == .promotedPendingSafe
