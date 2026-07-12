@@ -9,7 +9,7 @@ private struct SettingsScreenModelTestError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-final class SettingsScreenModelTests: XCTestCase {
+final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase {
     private var stack: TestHelpers.ServiceStack!
     private var config: AppConfiguration!
     private var protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator!

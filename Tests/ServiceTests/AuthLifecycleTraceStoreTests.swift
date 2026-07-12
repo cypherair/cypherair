@@ -94,7 +94,7 @@ private final class TraceFailingUnwrapSecureEnclave: SecureEnclaveManageable, @u
 }
 
 @MainActor
-final class AuthLifecycleTraceStoreTests: XCTestCase {
+final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestCase {
     private func makeTemporaryDirectory(_ prefix: String) -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)", isDirectory: true)

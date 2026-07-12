@@ -3,7 +3,7 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
-final class AppStartupCoordinatorTests: XCTestCase {
+final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCase {
     func test_appStartupCoordinator_cleansTemporaryArtifactsAndTutorialSandboxDefaults() throws {
         let baseDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirStartupTemp-\(UUID().uuidString)", isDirectory: true)

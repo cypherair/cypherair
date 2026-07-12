@@ -44,7 +44,7 @@ private final class TutorialContactsOpenGate {
 }
 
 @MainActor
-final class TutorialSessionStoreTests: XCTestCase {
+final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase {
     func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() async throws {
         let container = try TutorialSandboxContainer()
         defer { container.cleanup() }
