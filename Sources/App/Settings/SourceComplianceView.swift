@@ -1,9 +1,4 @@
 import SwiftUI
-#if canImport(AppKit)
-import AppKit
-#elseif canImport(UIKit)
-import UIKit
-#endif
 
 struct SourceComplianceView: View {
     private let store: SourceComplianceStore
@@ -185,14 +180,7 @@ struct SourceComplianceView: View {
             return false
         }
 
-        #if canImport(AppKit)
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(releaseURL, forType: .string)
-        #elseif canImport(UIKit)
-        UIPasteboard.general.string = releaseURL
-        #endif
-
+        CypherClipboard.copy(releaseURL)
         return true
     }
 }

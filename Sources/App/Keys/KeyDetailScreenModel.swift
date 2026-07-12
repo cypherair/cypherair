@@ -1,10 +1,4 @@
 import Foundation
-#if canImport(AppKit)
-import AppKit
-#endif
-#if canImport(UIKit)
-import UIKit
-#endif
 
 @MainActor
 @Observable
@@ -78,14 +72,7 @@ final class KeyDetailScreenModel {
         self.deleteKeyAction = deleteKeyAction ?? { fingerprint in
             try keyManagement.deleteKey(fingerprint: fingerprint)
         }
-        self.clipboardCopyAction = clipboardCopyAction ?? { string in
-            #if canImport(UIKit)
-            UIPasteboard.general.string = string
-            #elseif canImport(AppKit)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(string, forType: .string)
-            #endif
-        }
+        self.clipboardCopyAction = clipboardCopyAction ?? CypherClipboard.copy
         self.recoveryReportProvider = recoveryReportProvider ?? {
             keyManagement.secureEnclaveCustodyRecoveryReport
         }
