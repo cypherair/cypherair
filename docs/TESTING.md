@@ -234,9 +234,9 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 - Crash-recovery coverage exercises all four outcomes of the crash-recovery invariant ([SECURITY.md](SECURITY.md) §4): cleanup-only, promote-pending, retryable (keeps flags set), unrecoverable (generic startup warning, no fingerprints).
 - Never hardcode key material or ciphertexts; generate fresh keys in setup. Clean up Keychain entries in `tearDown`. Guard device-only tests with `XCTSkipUnless(SecureEnclave.isAvailable)`.
 
-## 5. GnuPG Interoperability
+## 5. Cross-Tool Interoperability
 
-Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) custody family. **v6 output — Profile B and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
+**GnuPG.** Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) custody family. **v6 output — Profile B and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
 
 `gpg` runs on macOS only. Two mechanisms:
 
@@ -247,6 +247,15 @@ Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) 
   - `secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) SEIPDv2 AEAD correctness through the production seam (no gpg; runs in `rust-full-tests`).
 
 The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; captured evidence lives in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
+
+**sq (sequoia-sq).** The `sq` pack is the cross-implementation evidence for the RFC 9580/9980 families (issue #567), covering all five portable suites (legacy v4, modern, modern-high, post-quantum, post-quantum-high). Device-bound families share these wire formats; their custody halves are covered by the custody suites and device lanes above. Same two mechanisms:
+
+- **Fixtures** — `sq`-generated certs, encrypted messages, and signatures committed as test data (`fixtures/generate_sq_fixtures.sh`; tested tool versions recorded in `sq_version.txt`). `sq_interop_tests.rs` runs always-on and CI-safe: family classification, both encryption directions, signature verification, mixed-recipient format rules, and split-custody consumption of the sq post-quantum fixtures — the cross-implementation check for the vendored RFC 9980 KEM combiner.
+- **Live lane** — `sq_live_interop_tests.rs` drives the `sq` binary through `pgp-mobile/tests/common/sq.rs` and its `require_sq_or_skip()` gate (`CYPHERAIR_REQUIRE_SQ=1` forbids skips) for the directions fixtures cannot prove: sq imports engine-generated secret keys, decrypts engine-encrypted messages, and verifies engine cleartext signatures.
+
+The `rust-gnupg-interop` CI job (displayed as "Rust cross-tool interop (GnuPG + sq)") brews sequoia-sq alongside gnupg, asserts the sq version floor (`scripts/assert_min_sq_version.sh`), and runs both sq suites under `CYPHERAIR_REQUIRE_SQ=1`.
+
+Format nuance: sq advertises the SEIPDv2 feature even on its default v4 profile, so every sq suite negotiates SEIPDv2; the v4-only SEIPDv1 floor is asserted with an engine Profile A key mixed into the recipient set (TDD §1.4).
 
 ## 6. MIE Validation
 
