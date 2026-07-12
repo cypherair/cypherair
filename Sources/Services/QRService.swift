@@ -93,12 +93,6 @@ final class QRService {
         )
     }
 
-    /// Parse key metadata for display in the import confirmation view.
-    /// This is a read-only inspection — no keys are stored.
-    func inspectKeyMetadata(keyData: Data) throws -> PGPKeyMetadata {
-        try inspectImportablePublicCertificate(keyData: keyData).metadata
-    }
-
     // MARK: - QR Decoding from Image
 
     /// Decode QR codes from a CIImage (e.g., from PHPicker selection).

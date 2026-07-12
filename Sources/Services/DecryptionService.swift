@@ -182,17 +182,6 @@ final class DecryptionService {
         )
     }
 
-    // MARK: - Convenience: Full Decrypt
-
-    /// Perform both Phase 1 and Phase 2 in sequence while preserving
-    /// per-signature detailed verification results.
-    func decryptMessageDetailed(
-        ciphertext: Data
-    ) async throws -> (plaintext: Data, verification: DetailedSignatureVerification) {
-        let phase1 = try await parseRecipients(ciphertext: ciphertext)
-        return try await decryptDetailed(phase1: phase1)
-    }
-
     // MARK: - Private
 
     private func verificationContext() -> PGPMessageVerificationContext {

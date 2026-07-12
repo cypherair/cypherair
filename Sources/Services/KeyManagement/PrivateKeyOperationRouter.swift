@@ -424,7 +424,6 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             return .secureEnclaveCompositeKeyAgreement(
                 SecureEnclaveCompositeKeyAgreementRoute(
                     identity: identity,
-                    operation: request.operation,
                     compositeBindingInspection: inspection,
                     keyAgreementHandle: authorized.handle,
                     classicalComponent: authorized.classicalComponent,

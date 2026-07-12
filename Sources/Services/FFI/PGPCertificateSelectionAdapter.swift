@@ -48,26 +48,6 @@ enum PGPCertificateSelectionAdapter {
         return selectedUserId
     }
 
-    static func validateUserIdSelection(
-        _ selectedUserId: UserIdSelectionOption,
-        engine: PgpEngine,
-        certData: Data,
-        expectedFingerprint: String? = nil
-    ) throws -> UserIdSelectionOption {
-        let catalog: CertificateSelectionCatalog
-        if let expectedFingerprint {
-            catalog = try validatedCatalog(
-                engine: engine,
-                certData: certData,
-                expectedFingerprint: expectedFingerprint
-            )
-        } else {
-            catalog = try selectionCatalog(engine: engine, certData: certData)
-        }
-
-        return try validateUserIdSelection(selectedUserId, in: catalog)
-    }
-
     static func userIdSelectorInput(
         for selectedUserId: UserIdSelectionOption
     ) -> UserIdSelectorInput {

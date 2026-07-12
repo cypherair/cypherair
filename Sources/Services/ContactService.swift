@@ -4,7 +4,6 @@ import Foundation
 /// Production persistence lives in the protected contacts app-data domain after post-auth unlock.
 @Observable
 final class ContactService: @unchecked Sendable {
-    private let contactImportAdapter: PGPContactImportAdapter
     private let certificateAdapter: PGPCertificateOperationAdapter
     private let contactsDomainStore: ContactsDomainStore?
     private let recipientResolver = ContactRecipientResolver()
@@ -19,7 +18,6 @@ final class ContactService: @unchecked Sendable {
         certificateAdapter: PGPCertificateOperationAdapter,
         contactsDomainStore: ContactsDomainStore? = nil
     ) {
-        self.contactImportAdapter = contactImportAdapter
         self.certificateAdapter = certificateAdapter
         snapshotMutator = ContactSnapshotMutator(contactImportAdapter: contactImportAdapter)
         self.contactsDomainStore = contactsDomainStore
@@ -189,14 +187,6 @@ final class ContactService: @unchecked Sendable {
 
     // MARK: - Remove Contact
 
-    /// Remove a contact key from the protected contacts snapshot.
-    func removeContact(fingerprint: String) throws {
-        try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            try performProtectedRemoveKey(fingerprint: fingerprint)
-        }
-    }
-
     func removeContactIdentity(contactId: String) throws {
         try requireContactsAvailable()
         try withProtectedRuntimeRollback {
@@ -229,17 +219,6 @@ final class ContactService: @unchecked Sendable {
         let mutation = try snapshotMutator.setVerificationState(
             verificationState,
             for: fingerprint,
-            in: &snapshot
-        )
-        if mutation.didMutate {
-            try persistProtectedRuntimeSnapshot(snapshot)
-        }
-    }
-
-    private func performProtectedRemoveKey(fingerprint: String) throws {
-        var snapshot = try mutableRuntimeSnapshot()
-        let mutation = try snapshotMutator.removeKey(
-            fingerprint: fingerprint,
             in: &snapshot
         )
         if mutation.didMutate {
@@ -418,28 +397,6 @@ final class ContactService: @unchecked Sendable {
             }
     }
 
-    func certificationArtifacts(
-        forContactId contactId: String
-    ) -> [ContactCertificationArtifactReference] {
-        guard contactsAvailability.isAvailable,
-              let runtimeSnapshot else {
-            return []
-        }
-        let keyIds = Set(
-            runtimeSnapshot.keyRecords
-                .filter { $0.contactId == contactId }
-                .map(\.keyId)
-        )
-        return runtimeSnapshot.certificationArtifacts
-            .filter { keyIds.contains($0.keyId) }
-            .sorted { lhs, rhs in
-                if lhs.createdAt != rhs.createdAt {
-                    return lhs.createdAt > rhs.createdAt
-                }
-                return lhs.artifactId < rhs.artifactId
-            }
-    }
-
     @discardableResult
     func saveCertificationArtifact(
         _ artifact: VerifiedContactCertificationArtifact
@@ -453,38 +410,6 @@ final class ContactService: @unchecked Sendable {
             var snapshot = try mutableRuntimeSnapshot()
             let mutation = try snapshotMutator.saveCertificationArtifact(
                 artifact.reference,
-                in: &snapshot
-            )
-            if mutation.didMutate {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-            return mutation.output
-        }
-    }
-
-    @discardableResult
-    func updateCertificationArtifactValidation(
-        artifactId: String,
-        status: ContactCertificationValidationStatus
-    ) throws -> ContactCertificationArtifactReference {
-        try requireContactsAvailable()
-        guard contactsAvailability == .availableProtectedDomain else {
-            throw CypherAirError.contactsUnavailable(contactsAvailability)
-        }
-        guard status != .valid else {
-            throw CypherAirError.invalidKeyData(
-                reason: String(
-                    localized: "contactcertification.update.validRequiresVerification",
-                    defaultValue: "Certification signatures must be revalidated before they can be marked valid."
-                )
-            )
-        }
-
-        return try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            let mutation = try snapshotMutator.updateCertificationArtifactValidation(
-                artifactId: artifactId,
-                status: status,
                 in: &snapshot
             )
             if mutation.didMutate {
@@ -517,16 +442,6 @@ final class ContactService: @unchecked Sendable {
             try certificateAdapter.armorSignatureForExport(artifact.canonicalSignatureData),
             artifact.resolvedExportFilename
         )
-    }
-
-    func refreshCertificationProjections() throws {
-        try requireContactsAvailable()
-        try withProtectedRuntimeRollback {
-            var snapshot = try mutableRuntimeSnapshot()
-            if try snapshotMutator.recomputeCertificationProjections(in: &snapshot) {
-                try persistProtectedRuntimeSnapshot(snapshot)
-            }
-        }
     }
 
     func requireContactPublicKeyData(fingerprint: String) throws -> Data {

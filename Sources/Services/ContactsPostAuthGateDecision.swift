@@ -3,14 +3,11 @@ import Foundation
 struct ContactsPostAuthGateDecision: Equatable, Sendable {
     let availability: ContactsAvailability
     let allowsProtectedDomainOpen: Bool
-    let clearsRuntime: Bool
 
     init(
         postUnlockOutcome: ProtectedDataPostUnlockOutcome,
         frameworkState: ProtectedDataFrameworkState
     ) {
-        clearsRuntime = true
-
         if frameworkState == .restartRequired {
             availability = .restartRequired
             allowsProtectedDomainOpen = false

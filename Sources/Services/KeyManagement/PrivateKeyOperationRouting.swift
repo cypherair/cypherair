@@ -128,7 +128,6 @@ struct SecureEnclaveCompositeSignerRoute {
 /// operation window ends.
 struct SecureEnclaveCompositeKeyAgreementRoute {
     let identity: PGPKeyIdentity
-    let operation: PGPPrivateOperationKind
     let compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection
     let keyAgreementHandle: SecureEnclaveCompositeLoadedHandle
     let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
@@ -136,14 +135,12 @@ struct SecureEnclaveCompositeKeyAgreementRoute {
 
     init(
         identity: PGPKeyIdentity,
-        operation: PGPPrivateOperationKind,
         compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection,
         keyAgreementHandle: SecureEnclaveCompositeLoadedHandle,
         classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent,
         operationAuthorization: SecureEnclaveCustodyOperationAuthorization? = nil
     ) {
         self.identity = identity
-        self.operation = operation
         self.compositeBindingInspection = compositeBindingInspection
         self.keyAgreementHandle = keyAgreementHandle
         self.classicalComponent = classicalComponent

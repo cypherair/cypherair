@@ -13,8 +13,6 @@ struct PGPSecureEnclaveCompositeBindingInspection: Equatable, Sendable {
     let keyAgreementSubkeyFingerprint: String
     let signingComponentPublicKey: Data
     let keyAgreementComponentPublicKey: Data
-    let eddsaSigningPublicKey: Data
-    let ecdhKeyAgreementPublicKey: Data
 }
 
 protocol SecureEnclaveCompositeBindingInspecting: Sendable {
@@ -67,9 +65,7 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
             signingKeyFingerprint: inspection.signingKeyFingerprint,
             keyAgreementSubkeyFingerprint: inspection.keyAgreementSubkeyFingerprint,
             signingComponentPublicKey: inspection.mldsa65SigningPublicKey,
-            keyAgreementComponentPublicKey: inspection.mlkem768KeyAgreementPublicKey,
-            eddsaSigningPublicKey: inspection.eddsaSigningPublicKey,
-            ecdhKeyAgreementPublicKey: inspection.ecdhKeyAgreementPublicKey
+            keyAgreementComponentPublicKey: inspection.mlkem768KeyAgreementPublicKey
         )
     }
 
@@ -86,9 +82,7 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
             signingKeyFingerprint: inspection.signingKeyFingerprint,
             keyAgreementSubkeyFingerprint: inspection.keyAgreementSubkeyFingerprint,
             signingComponentPublicKey: inspection.mldsa87SigningPublicKey,
-            keyAgreementComponentPublicKey: inspection.mlkem1024KeyAgreementPublicKey,
-            eddsaSigningPublicKey: inspection.eddsaSigningPublicKey,
-            ecdhKeyAgreementPublicKey: inspection.ecdhKeyAgreementPublicKey
+            keyAgreementComponentPublicKey: inspection.mlkem1024KeyAgreementPublicKey
         )
     }
 }

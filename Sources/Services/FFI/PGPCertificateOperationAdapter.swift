@@ -146,17 +146,6 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         }
     }
 
-    func generateKeyRevocation(secretCert: Data) async throws -> Data {
-        do {
-            return try await Self.performGenerateKeyRevocation(
-                engine: engine,
-                secretCert: secretCert
-            )
-        } catch {
-            throw PGPErrorMapper.map(error) { .revocationError(reason: $0) }
-        }
-    }
-
     func generateSubkeyRevocation(
         secretCert: Data,
         subkeyFingerprint: String
@@ -270,14 +259,6 @@ final class PGPCertificateOperationAdapter: @unchecked Sendable {
         data: Data
     ) async throws -> Data {
         try engine.armor(data: data, kind: .signature)
-    }
-
-    @concurrent
-    private static func performGenerateKeyRevocation(
-        engine: PgpEngine,
-        secretCert: Data
-    ) async throws -> Data {
-        try engine.generateKeyRevocation(secretCert: secretCert)
     }
 
     @concurrent

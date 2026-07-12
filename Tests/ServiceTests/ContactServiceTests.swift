@@ -426,24 +426,6 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertEqual(contactService.testContactKeyRecords.count, 2)
     }
 
-    // MARK: - Remove Contact
-
-    func test_removeContact_existingContact_removesFromArray() throws {
-        let generated = try engine.generateKey(
-            name: "Dave", email: nil,
-            expirySeconds: nil, profile: .advanced
-        )
-
-        _ = try contactService.importContact(publicKeyData: generated.publicKeyData)
-        XCTAssertEqual(contactService.testContactKeyRecords.count, 1)
-
-        let keyInfo = try engine.parseKeyInfo(keyData: generated.publicKeyData)
-        try contactService.removeContact(fingerprint: keyInfo.fingerprint)
-
-        XCTAssertEqual(contactService.testContactKeyRecords.count, 0,
-                       "Contact should be removed from array")
-    }
-
     // MARK: - Binary Key Import
 
     func test_addContact_binaryPublicKey_profileA_returnsAdded() throws {
