@@ -21,6 +21,7 @@
 - The prerelease publishes host-specific `rust-stage1-for-arm64e-<host-triple>.*` asset sets (`aarch64-apple-darwin` and `x86_64-apple-darwin`); downloaders select the asset matching the build host and verify the packaged checksum and manifest (`requiresBuildStd: false`, arm64e std targets for Darwin, iOS, tvOS, visionOS).
 - CI and local packaging force-download this pinned prerelease via direct release-asset URLs with token variables scrubbed. **`latest` is never allowed** — `scripts/download_arm64e_stage1_toolchain.sh` rejects it. `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate Rust-compiler testing only.
 - App-side Rust or UniFFI changes never require a new stage1 prerelease; only changes to the Rust compiler fork itself do.
+- Carry-set strategy — a patch-by-patch enumeration of the fork's carried commits, the LLVM/rustc/keep upstreaming assessment, and the minimization + rebase plan — lives in [ARM64E_UPSTREAMING.md](ARM64E_UPSTREAMING.md). That companion is planning-only; this file stays the status source of truth.
 
 **Re-pin rule.** When a new stage1 prerelease becomes the official input, update every pinned location in the same PR (agent checklist: `.claude/skills/repin-arm64e`):
 
