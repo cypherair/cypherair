@@ -157,6 +157,8 @@ pgp-mobile/src/
 
 (`pgp-mobile/uniffi-bindgen.rs`, at the crate root, is the bindgen entrypoint used by the build script.)
 
+The artifact shape of `PgpMobile.xcframework`, the `pgp_mobileFFI` module name, and why the generated UniFFI outputs are tracked in-tree rather than restored on demand are recorded — with the triggers that would reopen them — in [FFI_ARTIFACT_DECISION.md](FFI_ARTIFACT_DECISION.md).
+
 ## 3. Data Flows
 
 **Encrypt** collects recipient keys (plus own key when encrypt-to-self is on) and calls the message adapter; the Rust engine selects the format from recipient key versions ([TDD.md](TDD.md) §1.4) and classifies quantum safety for the result indicator. **SE wrapping and auth-mode switching** choreography is owned by [SECURITY.md](SECURITY.md) §3–§4. The two flows below earn diagrams because their boundaries are security-critical and non-obvious.
