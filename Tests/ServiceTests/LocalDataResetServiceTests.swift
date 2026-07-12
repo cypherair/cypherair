@@ -5,7 +5,7 @@ import XCTest
 @testable import CypherAir
 
 @MainActor
-final class LocalDataResetServiceTests: XCTestCase {
+final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCase {
     func test_resetAllLocalData_removesStorageAndClearsMemoryState() async throws {
         let container = AppContainer.makeUITest(authTraceEnabled: true)
         defer {

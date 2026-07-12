@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import CypherAir
 
-final class IncomingURLImportCoordinatorTests: XCTestCase {
+final class IncomingURLImportCoordinatorTests: TutorialSandboxDefaultsSerializedTestCase {
     private var stack: TestHelpers.ServiceStack!
 
     override func setUp() async throws {
