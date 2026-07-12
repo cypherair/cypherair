@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate GnuPG interoperability test fixtures for CypherAir POC.
-# These fixtures validate C3.1–C3.8 (GnuPG interop) and C2A.9/C2B.10 (DEFLATE).
+# These fixtures validate C3.1–C3.8 (GnuPG interop) and C2A.9 (DEFLATE).
 #
 # Requirements: GnuPG 2.4.x or later (fixtures last generated with 2.5.18)
 # Output: All fixtures written to the same directory as this script.
