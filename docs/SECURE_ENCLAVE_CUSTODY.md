@@ -61,7 +61,6 @@ Resolved by `PGPKeyCapabilityResolver` and routed by `PrivateKeyOperationRouter`
 | Decrypt (message + streaming file) | Supported (key-agreement role) | external ECDH / composite decapsulation seam |
 | Export public material | Supported when present | uses stored public artifact |
 | Export revocation artifact | Supported when present | uses stored revocation artifact |
-| Refresh binding (standalone) | Not implemented | `.operationNotImplementedForCustody` |
 | Export / back up private material | **Unsupported (red line)** | `.operationUnsupportedForCustody` |
 | Import existing private key into Secure Enclave | **Unsupported (red line)** | not an operation |
 
