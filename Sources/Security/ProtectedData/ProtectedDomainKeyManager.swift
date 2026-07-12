@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import Security
+import os
 
 /// Self-describing envelope that seals a 32-byte per-domain master key under the
 /// HKDF-derived domain wrapping key (AES-256-GCM). Follows the same envelope
@@ -183,7 +184,12 @@ final class ProtectedDomainKeyManager {
     private let storageRoot: ProtectedDataStorageRoot
     private let keychain: any KeychainManageable
     private let account: String
-    private var unlockedDomainMasterKeys: [ProtectedDataDomainID: Data] = [:]
+    /// Decrypted per-domain master keys, guarded by an unfair lock (issue #610):
+    /// every caller runs on the main actor today, but nothing enforces that, so
+    /// the lock makes cache reads, writes, and relock zeroization safe by
+    /// construction instead of by convention. Compile-time isolation of the
+    /// whole custody layer is #502 Track B scope.
+    private let unlockedDomainMasterKeys = OSAllocatedUnfairLock<[ProtectedDataDomainID: Data]>(initialState: [:])
 
     init(
         storageRoot: ProtectedDataStorageRoot,
@@ -336,22 +342,24 @@ final class ProtectedDomainKeyManager {
     }
 
     func cacheUnlockedDomainMasterKey(_ domainMasterKey: Data, for domainID: ProtectedDataDomainID) {
-        unlockedDomainMasterKeys[domainID] = domainMasterKey
+        unlockedDomainMasterKeys.withLock { $0[domainID] = domainMasterKey }
     }
 
     func unlockedDomainMasterKey(for domainID: ProtectedDataDomainID) -> Data? {
-        unlockedDomainMasterKeys[domainID]
+        unlockedDomainMasterKeys.withLock { $0[domainID] }
     }
 
     func clearUnlockedDomainMasterKeys() {
-        for domainID in unlockedDomainMasterKeys.keys {
-            unlockedDomainMasterKeys[domainID]?.protectedDataZeroize()
+        unlockedDomainMasterKeys.withLock { keys in
+            for domainID in keys.keys {
+                keys[domainID]?.protectedDataZeroize()
+            }
+            keys.removeAll()
         }
-        unlockedDomainMasterKeys.removeAll()
     }
 
     var hasUnlockedDomainMasterKeys: Bool {
-        !unlockedDomainMasterKeys.isEmpty
+        unlockedDomainMasterKeys.withLock { !$0.isEmpty }
     }
 
     private func saveOrUpdateKeychainRow(_ data: Data, service: String) throws {
