@@ -56,14 +56,6 @@ struct ProtectedDataStorageRoot {
         domainDirectory(for: domainID).appendingPathComponent("bootstrap.plist")
     }
 
-    func committedWrappedDomainMasterKeyURL(for domainID: ProtectedDataDomainID) -> URL {
-        domainDirectory(for: domainID).appendingPathComponent("wrapped-dmk.plist")
-    }
-
-    func stagedWrappedDomainMasterKeyURL(for domainID: ProtectedDataDomainID) -> URL {
-        domainDirectory(for: domainID).appendingPathComponent("wrapped-dmk.staged.plist")
-    }
-
     func domainEnvelopeURL(
         for domainID: ProtectedDataDomainID,
         slot: ProtectedDomainGenerationSlot

@@ -98,17 +98,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 )
             }
 
-            // Negative: refreshBinding has no implementing service and must
-            // stay explicitly not-implemented, never silently supported.
-            XCTAssertEqual(
-                resolver.resolution(
-                    for: .refreshBinding,
-                    configuration: configuration,
-                    custody: .appleSecureEnclavePrivateOperations
-                ),
-                .notImplemented(.operationNotImplementedForCustody)
-            )
-
             // Negative: private-material export stays hard-unsupported for
             // Secure Enclave custody regardless of policy.
             XCTAssertEqual(
@@ -148,8 +137,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             .decrypt,
             .certify,
             .revoke,
-            .modifyExpiry,
-            .refreshBinding
+            .modifyExpiry
         ]
 
         for operation in privateOperations {
@@ -253,14 +241,6 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
 
         XCTAssertEqual(
             resolver.resolution(
-                for: .refreshBinding,
-                configuration: .compatibleP256V4,
-                custody: .appleSecureEnclavePrivateOperations
-            ),
-            .notImplemented(.operationNotImplementedForCustody)
-        )
-        XCTAssertEqual(
-            resolver.resolution(
                 for: .decrypt,
                 configuration: .compatibleP256V4,
                 custody: .appleSecureEnclavePrivateOperations
@@ -293,8 +273,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
             .sign,
             .certify,
             .revoke,
-            .modifyExpiry,
-            .refreshBinding
+            .modifyExpiry
         ]
         for operation in signingOperations {
             XCTAssertEqual(

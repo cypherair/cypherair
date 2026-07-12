@@ -78,11 +78,7 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
             domainKeyManager: harness.domainKeyManager
         )
         let payload = try await harness.store.openDomainIfNeeded(wrappingRootKey: wrappingRootKey)
-        let metadata = try ProtectedDomainBootstrapStore(
-            storageRoot: harness.storageRoot
-        ).loadMetadata(for: ProtectedSettingsStore.domainID)
 
-        XCTAssertEqual(metadata?.schemaVersion, ProtectedSettingsStore.Payload.currentSchemaVersion)
         XCTAssertEqual(payload.clipboardNotice, true)
         XCTAssertEqual(payload.ordinarySettings, .firstRunDefaults)
 

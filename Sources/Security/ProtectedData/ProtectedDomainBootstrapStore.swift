@@ -3,8 +3,6 @@ import Foundation
 struct ProtectedDomainBootstrapMetadata: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let expectedCurrentGenerationIdentifier: String?
-    let coarseRecoveryReason: String?
-    let wrappedDomainMasterKeyRecordVersion: Int?
 }
 
 struct ProtectedDomainBootstrapStore {

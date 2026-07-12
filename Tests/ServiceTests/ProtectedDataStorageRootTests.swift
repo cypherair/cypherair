@@ -103,9 +103,7 @@ final class ProtectedDataStorageRootTests: XCTestCase {
         try bootstrapStore.saveMetadata(
             AppProtectedDomainBootstrapMetadata(
                 schemaVersion: 1,
-                expectedCurrentGenerationIdentifier: "current-1",
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: 1
+                expectedCurrentGenerationIdentifier: "current-1"
             ),
             for: "settings"
         )

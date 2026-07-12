@@ -203,9 +203,7 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: 2,
-                expectedCurrentGenerationIdentifier: "3",
-                coarseRecoveryReason: nil,
-                wrappedDomainMasterKeyRecordVersion: ProtectedDataTestAppWrappedDomainMasterKeyRecord.currentFormatVersion
+                expectedCurrentGenerationIdentifier: "3"
             ),
             for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
         )

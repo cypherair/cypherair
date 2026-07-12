@@ -148,7 +148,7 @@ enum PrivateKeyControlState: Equatable, Sendable {
 }
 
 struct ModifyExpiryRecoveryEntry: Codable, Equatable, Sendable {
-    var fingerprint: String?
+    var fingerprint: String
 }
 
 enum PrivateKeyControlRewrapPhase: String, Codable, Equatable, Sendable {
