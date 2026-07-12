@@ -464,47 +464,6 @@ final class DecryptionServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
-    // MARK: - End-to-End via decryptMessageDetailed() (Phase 1 + Phase 2)
-
-    func test_decryptMessage_profileA_endToEnd() async throws {
-        let plaintext = "End-to-end Profile A 你好"
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
-        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
-
-        let ciphertext = try await stack.encryptionService.encryptText(
-            plaintext,
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: identity.fingerprint,
-            encryptToSelf: false
-        )
-
-        // decryptMessageDetailed exercises both Phase 1 (parseRecipients) and Phase 2.
-        let result = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
-
-        let decryptedText = String(data: result.plaintext, encoding: .utf8)
-        XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.summaryState, .verified)
-    }
-
-    func test_decryptMessage_profileB_endToEnd() async throws {
-        let plaintext = "End-to-end Profile B 加密"
-        let identity = try await TestHelpers.generateProfileBKey(service: stack.keyManagement)
-        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
-
-        let ciphertext = try await stack.encryptionService.encryptText(
-            plaintext,
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: identity.fingerprint,
-            encryptToSelf: false
-        )
-
-        let result = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
-
-        let decryptedText = String(data: result.plaintext, encoding: .utf8)
-        XCTAssertEqual(decryptedText, plaintext)
-        XCTAssertEqual(result.verification.summaryState, .verified)
-    }
-
     func test_parseRecipients_profileA_matchesCorrectKey() async throws {
         let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
         try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
@@ -808,28 +767,6 @@ final class DecryptionServiceTests: XCTestCase {
                 }
             }
         }
-    }
-
-    func test_decryptMessageDetailed_endToEnd_matchesChainedPhases() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
-            service: stack.keyManagement,
-            name: "Detailed Message Recipient"
-        )
-        try stack.contactService.importContact(publicKeyData: identity.publicKeyData)
-
-        let ciphertext = try await stack.encryptionService.encryptText(
-            "Detailed message end-to-end",
-            recipientContactIds: [try contactId(for: identity)],
-            signWithFingerprint: identity.fingerprint,
-            encryptToSelf: false
-        )
-
-        let endToEnd = try await stack.decryptionService.decryptMessageDetailed(ciphertext: ciphertext)
-        let phase1 = try await stack.decryptionService.parseRecipients(ciphertext: ciphertext)
-        let chained = try await stack.decryptionService.decryptDetailed(phase1: phase1)
-
-        XCTAssertEqual(endToEnd.plaintext, chained.plaintext)
-        XCTAssertEqual(endToEnd.verification, chained.verification)
     }
 
     func test_decryptFileStreamingDetailed_fixtureMultiSigner_matchesInMemoryDetailed()

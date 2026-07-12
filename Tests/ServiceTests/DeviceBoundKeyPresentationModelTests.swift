@@ -43,7 +43,6 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             assessments: [
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: 0,
-                    configurationIdentity: .compatibleP256V4,
                     publicMaterialAvailability: .available,
                     revocationArtifactAvailability: .available,
                     handleAvailability: .available
@@ -97,7 +96,6 @@ final class DeviceBoundKeyPresentationModelTests: KeyManagementServiceTestCase {
             assessments: [
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: 0,
-                    configurationIdentity: .compatibleP256V4,
                     publicMaterialAvailability: .available,
                     revocationArtifactAvailability: .available,
                     handleAvailability: .unavailable(.privateHandleMissing)

@@ -171,7 +171,6 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
         SecureEnclaveCustodyGenerationRecoveryAssessment(
             identityOrdinal: ordinal,
-            configurationIdentity: identity.openPGPConfigurationIdentity,
             publicMaterialAvailability: publicMaterialAvailability,
             revocationArtifactAvailability: revocationArtifactAvailability,
             handleAvailability: handleAvailability

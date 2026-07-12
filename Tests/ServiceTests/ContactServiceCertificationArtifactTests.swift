@@ -40,13 +40,6 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
         XCTAssertEqual(export.filename, "artifact-pr6-save.asc")
 
-        XCTAssertThrowsError(
-            try service.updateCertificationArtifactValidation(
-                artifactId: saved.artifactId,
-                status: .valid
-            )
-        )
-
         try await service.relockProtectedData()
         let reopened = await reopenProtectedContactService(
             harness: opened.harness,

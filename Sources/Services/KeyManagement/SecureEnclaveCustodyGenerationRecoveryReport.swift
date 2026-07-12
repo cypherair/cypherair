@@ -14,7 +14,6 @@ struct SecureEnclaveCustodyGenerationRecoveryReport: Equatable, Sendable {
 
 struct SecureEnclaveCustodyGenerationRecoveryAssessment: Equatable, Sendable {
     let identityOrdinal: Int
-    let configurationIdentity: PGPKeyConfiguration.Identity
     let publicMaterialAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
     let revocationArtifactAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
     let handleAvailability: SecureEnclaveCustodyHandleAvailability

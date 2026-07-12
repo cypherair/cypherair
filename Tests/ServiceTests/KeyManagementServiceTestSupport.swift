@@ -516,7 +516,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
-            authenticator: mockAuth,
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )
@@ -567,7 +566,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
-            authenticator: localAuthenticator,
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             provisioningCheckpoint: checkpoint
@@ -592,7 +590,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
-            authenticator: localAuthenticator,
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             postProvisioningCheckpoint: checkpoint
@@ -622,7 +619,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
-            authenticator: localAuthenticator,
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             beforeAuthModeReadCheckpoint: beforeAuthModeReadCheckpoint,
@@ -656,7 +652,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
-            authenticator: localAuthenticator,
             authenticationPromptCoordinator: authenticationPromptCoordinator ?? AuthenticationPromptCoordinator(),
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
@@ -750,7 +745,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
-            authenticator: MockAuthenticator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: keyMetadataStore,
             identityStoreCheckpoint: identityStoreCheckpoint,
@@ -1004,7 +998,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             .map { ordinal, identity in
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: ordinal,
-                    configurationIdentity: identity.openPGPConfigurationIdentity,
                     publicMaterialAvailability: .available,
                     revocationArtifactAvailability: identity.revocationCert.isEmpty
                         ? .unavailable(.revocationArtifactUnavailable)

@@ -128,7 +128,6 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
             XCTAssertEqual(verification.signingKeyFingerprint, nil)
             XCTAssertEqual(verification.signerIdentity?.source, .ownKey)
             XCTAssertEqual(validation.verification.status, .valid)
-            XCTAssertTrue(validation.canSave)
             XCTAssertEqual(fixture.identity.keyVersion, configurationIdentity.configuration.keyVersion)
             XCTAssertEqual(fixture.identity.openPGPConfigurationIdentity, configurationIdentity)
             XCTAssertEqual(fixture.identity.privateKeyCustodyKind, .appleSecureEnclavePrivateOperations)

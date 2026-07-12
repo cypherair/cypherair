@@ -97,7 +97,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             assessments: [
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: 0,
-                    configurationIdentity: .compatibleP256V4,
                     publicMaterialAvailability: .available,
                     revocationArtifactAvailability: .available,
                     handleAvailability: .unavailable(.privateHandleMissing)
@@ -114,7 +113,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
-            authenticator: MockAuthenticator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -143,7 +141,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
-            authenticator: MockAuthenticator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -314,7 +311,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
-            authenticator: MockAuthenticator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -539,7 +535,6 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
-            authenticator: MockAuthenticator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

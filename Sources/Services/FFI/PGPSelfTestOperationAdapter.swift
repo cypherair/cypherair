@@ -3,14 +3,10 @@ import Foundation
 struct PGPSelfTestGeneratedKey: Sendable {
     var certData: Data
     let publicKeyData: Data
-    var revocationCert: Data
-    let fingerprint: String
     let keyVersion: UInt8
-    let profile: PGPKeyProfile
 
     mutating func zeroizeSensitiveMaterial() {
         certData.resetBytes(in: 0..<certData.count)
-        revocationCert.resetBytes(in: 0..<revocationCert.count)
     }
 }
 
@@ -114,10 +110,7 @@ final class PGPSelfTestOperationAdapter: @unchecked Sendable {
         return PGPSelfTestGeneratedKey(
             certData: generated.certData,
             publicKeyData: generated.publicKeyData,
-            revocationCert: generated.revocationCert,
-            fingerprint: generated.fingerprint,
-            keyVersion: generated.keyVersion,
-            profile: generated.profile.appProfile
+            keyVersion: generated.keyVersion
         )
     }
 

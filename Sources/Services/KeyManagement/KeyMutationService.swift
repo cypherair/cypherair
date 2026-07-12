@@ -37,7 +37,6 @@ final class KeyMutationService {
     private let keyAdapter: PGPKeyOperationAdapter
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
-    private let defaults: UserDefaults
     private let bundleStore: KeyBundleStore
     private let migrationCoordinator: KeyMigrationCoordinator
     private let catalogStore: KeyCatalogStore
@@ -52,7 +51,6 @@ final class KeyMutationService {
         keyAdapter: PGPKeyOperationAdapter,
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
-        defaults: UserDefaults,
         bundleStore: KeyBundleStore,
         migrationCoordinator: KeyMigrationCoordinator,
         catalogStore: KeyCatalogStore,
@@ -65,7 +63,6 @@ final class KeyMutationService {
         self.keyAdapter = keyAdapter
         self.secureEnclave = secureEnclave
         self.keychain = keychain
-        self.defaults = defaults
         self.bundleStore = bundleStore
         self.migrationCoordinator = migrationCoordinator
         self.catalogStore = catalogStore

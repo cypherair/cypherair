@@ -531,14 +531,6 @@ final class CertificateSignatureServiceTests: XCTestCase {
         XCTAssertEqual(candidates[0], signer.publicKeyData)
         XCTAssertEqual(candidates[1], signer.publicKeyData)
     }
-
-    func test_resolveSignerIdentity_unknownFingerprint_returnsUnknownSource() {
-        let identity = stack.certificateSignatureService.resolveSignerIdentity(
-            primaryFingerprint: "0123456789abcdef0123456789abcdef01234567"
-        )
-
-        XCTAssertEqual(identity?.source, .unknown)
-    }
 }
 
 private func XCTAssertThrowsErrorAsync<T>(

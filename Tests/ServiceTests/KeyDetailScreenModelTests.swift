@@ -395,7 +395,6 @@ final class KeyDetailScreenModelTests: XCTestCase {
             assessments: [
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: 0,
-                    configurationIdentity: .compatibleP256V4,
                     publicMaterialAvailability: .unavailable(.publicMaterialUnavailable),
                     revocationArtifactAvailability: .available,
                     handleAvailability: .available
@@ -414,7 +413,6 @@ final class KeyDetailScreenModelTests: XCTestCase {
             assessments: [
                 SecureEnclaveCustodyGenerationRecoveryAssessment(
                     identityOrdinal: 0,
-                    configurationIdentity: .compatibleP256V4,
                     publicMaterialAvailability: .available,
                     revocationArtifactAvailability: .unavailable(.revocationArtifactUnavailable),
                     handleAvailability: .available
@@ -462,7 +460,6 @@ final class KeyDetailScreenModelTests: XCTestCase {
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
         SecureEnclaveCustodyGenerationRecoveryAssessment(
             identityOrdinal: ordinal,
-            configurationIdentity: .compatibleP256V4,
             publicMaterialAvailability: .available,
             revocationArtifactAvailability: .available,
             handleAvailability: handleAvailability

@@ -3,10 +3,6 @@ import Foundation
 struct ContactCertificationArtifactValidation: Equatable {
     let verification: CertificateSignatureVerification
     let artifact: VerifiedContactCertificationArtifact?
-
-    var canSave: Bool {
-        artifact != nil
-    }
 }
 
 @dynamicMemberLookup
@@ -195,16 +191,6 @@ final class CertificateSignatureService {
     func candidateSignerCertificates() throws -> [Data] {
         let contactKeys = try contactService.candidateSignerPublicKeyData()
         return contactKeys + keyManagement.keys.map(\.publicKeyData)
-    }
-
-    func resolveSignerIdentity(
-        primaryFingerprint: String?
-    ) -> CertificateSignatureSignerIdentity? {
-        CertificateSignatureSignerIdentity.resolve(
-            fingerprint: primaryFingerprint,
-            contactKeys: contactService.contactsVerificationContext().contactKeys,
-            ownKeys: keyManagement.keys
-        )
     }
 
     private func makeCertificationArtifact(

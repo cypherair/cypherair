@@ -74,16 +74,6 @@ final class PGPContactImportAdapter: @unchecked Sendable {
         }
     }
 
-    func metadata(forKeyData keyData: Data) throws -> PGPKeyMetadata {
-        do {
-            let keyInfo = try engine.parseKeyInfo(keyData: keyData)
-            let profile = try engine.detectProfile(certData: keyData)
-            return PGPKeyMetadataAdapter.metadata(from: keyInfo, profile: profile)
-        } catch {
-            throw mapContactImportError(error)
-        }
-    }
-
     func mapContactImportError(_ error: Error) -> CypherAirError {
         if let cypherAirError = error as? CypherAirError {
             return cypherAirError

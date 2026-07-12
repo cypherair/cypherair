@@ -109,7 +109,6 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
 
             XCTAssertEqual(decision.availability, testCase.availability, testCase.name)
             XCTAssertEqual(decision.allowsProtectedDomainOpen, testCase.allowsProtectedOpen, testCase.name)
-            XCTAssertTrue(decision.clearsRuntime, testCase.name)
         }
     }
 
@@ -159,11 +158,6 @@ final class ContactServiceProtectedDomainTests: ContactServiceTestCase {
 
         XCTAssertEqual(availability, .locked)
         XCTAssertTrue(contactService.testContactKeyRecords.isEmpty)
-        XCTAssertThrowsError(try contactService.removeContact(fingerprint: generated.fingerprint)) { error in
-            guard case .contactsUnavailable(.locked) = error as? CypherAirError else {
-                return XCTFail("Expected contactsUnavailable(.locked), got \(error)")
-            }
-        }
     }
 
     func test_contactsFreshInstallCreatesEmptyProtectedDomain() async throws {

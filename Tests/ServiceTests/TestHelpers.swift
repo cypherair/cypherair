@@ -41,7 +41,7 @@ enum TestHelpers {
         if let memInfo = memoryInfo {
             service = KeyManagementService(
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
-                keychain: mockKC, authenticator: mockAuth,
+                keychain: mockKC,
                 memoryInfo: memInfo,
                 defaults: .standard,
                 authenticationPromptCoordinator: promptCoordinator,
@@ -55,7 +55,7 @@ enum TestHelpers {
         } else {
             service = KeyManagementService(
                 keyAdapter: keyAdapter, certificateAdapter: certificateAdapter, secureEnclave: secureEnclave,
-                keychain: mockKC, authenticator: mockAuth,
+                keychain: mockKC,
                 defaults: .standard,
                 authenticationPromptCoordinator: promptCoordinator,
                 privateKeyControlStore: privateKeyControlStore,

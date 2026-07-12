@@ -11,10 +11,6 @@ final class KeyCatalogStore {
         self.metadataStore = metadataStore
     }
 
-    var defaultKey: PGPKeyIdentity? {
-        keys.first(where: \.isDefault)
-    }
-
     func loadAll() throws {
         keys = try metadataStore.loadAll()
     }
