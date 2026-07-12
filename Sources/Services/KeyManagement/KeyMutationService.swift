@@ -255,6 +255,11 @@ final class KeyMutationService {
             authenticationContext: authenticationContext
         )
 
+        // Crash-consistency invariant: the recovery journal must exist before the
+        // pending bundle is written (mirrors PrivateKeyRewrapWorkflow) — a kill
+        // between the two must never leave a journal-invisible pending key copy.
+        try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
+
         do {
             try bundleStore.saveBundle(
                 bundle,
@@ -263,6 +268,7 @@ final class KeyMutationService {
             )
         } catch {
             bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
+            try? privateKeyControlStore.clearModifyExpiryJournal()
             throw error
         }
 
@@ -273,13 +279,7 @@ final class KeyMutationService {
             )
         } catch {
             bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
-            throw error
-        }
-
-        do {
-            try privateKeyControlStore.beginModifyExpiry(fingerprint: fingerprint)
-        } catch {
-            bundleStore.cleanupPendingBundle(fingerprint: fingerprint)
+            try? privateKeyControlStore.clearModifyExpiryJournal()
             throw error
         }
 
