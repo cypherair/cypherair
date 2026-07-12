@@ -471,61 +471,6 @@ fn test_c2a_9_decrypt_zlib_compressed_message() {
     );
 }
 
-// ── C2B.10: Decrypt a DEFLATE-compressed SEIPDv2 message ───────────────────
-// GnuPG cannot produce SEIPDv2 messages, so we generate this with Sequoia
-// by manually constructing a compressed+encrypted message.
-// Since Sequoia's high-level API doesn't compress outgoing messages (per PRD),
-// we test that Sequoia can READ compressed messages even in SEIPDv2 context.
-// This test generates the compressed message using Sequoia's low-level API.
-
-/// C2B.10: Sequoia decrypts a DEFLATE-compressed message within SEIPDv2 context.
-///
-/// Since our app never produces compressed messages (PRD requirement), and GnuPG
-/// cannot produce SEIPDv2 messages, we verify this by:
-/// 1. Confirming Sequoia can handle compression in decryption (already tested in C2A.9)
-/// 2. Confirming Modern High encrypt/decrypt works (already tested in modern_high_tests)
-/// 3. The combination (compressed SEIPDv2) would only come from another RFC 9580
-///    implementation that compresses — this is a theoretical compatibility path.
-///
-/// For now, we mark this as "verified by composition" — if C2A.9 (DEFLATE read) passes
-/// and C2B.3 (SEIPDv2 decrypt) passes, the combined path is covered by Sequoia's
-/// internal handling. A dedicated fixture would need another RFC 9580 implementation
-/// (e.g., OpenPGP.js or GopenPGP) to produce compressed SEIPDv2 messages.
-///
-/// KNOWN LIMITATION (M6): This test verifies by composition only. A true end-to-end
-/// compressed-SEIPDv2 test requires a fixture from another RFC 9580 implementation
-/// (OpenPGP.js, GopenPGP, or PGPainless) that both compresses and uses SEIPDv2.
-/// GnuPG cannot produce SEIPDv2, and our app never compresses outgoing messages.
-/// When such a fixture becomes available, add it to the fixtures directory and
-/// replace this composition test with a direct fixture-based decryption test.
-#[test]
-fn test_c2b_10_compressed_seipd2_verified_by_composition() {
-    // Verify DEFLATE reading works (C2A.9 dependency)
-    let deflate_ct = load_fixture("gpg_encrypted_compressed_deflate.asc");
-    let secretkey = load_fixture("gpg_secretkey.asc");
-    let pubkey = load_fixture("gpg_pubkey.asc");
-    let expected = expected_plaintext();
-
-    let result = decrypt::decrypt_detailed(&deflate_ct, &[secretkey], &[pubkey])
-        .expect("DEFLATE decompression must work");
-    assert_eq!(result.plaintext, expected);
-
-    // Verify SEIPDv2 decrypt works (C2B.3 dependency)
-    let key_b =
-        keys::generate_key_with_profile("B User".to_string(), None, None, KeyProfile::Advanced)
-            .expect("Key gen should succeed");
-
-    let plaintext = b"SEIPDv2 decrypt test for composition";
-    let ct = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
-        .expect("Modern High encrypt should succeed");
-    let result = decrypt::decrypt_detailed(&ct, &[key_b.cert_data], &[key_b.public_key_data])
-        .expect("Modern High decrypt should succeed");
-    assert_eq!(result.plaintext, plaintext);
-
-    // Both components verified. Sequoia's internal decompression is format-agnostic
-    // (applies to both SEIPDv1 and SEIPDv2 packets).
-}
-
 // ── Additional interop edge cases ──────────────────────────────────────────
 
 /// Verify GnuPG key can be armored and dearmored by Sequoia.

@@ -92,7 +92,6 @@ final class TutorialSandboxContainer {
             certificateAdapter: certificateAdapter,
             secureEnclave: mockSecureEnclave,
             keychain: mockKeychain,
-            defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
