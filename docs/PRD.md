@@ -17,7 +17,7 @@ A fully offline OpenPGP encryption tool that enables everyday users to communica
 
 - **Truly Offline:** Zero network access; data leakage eliminated at the architectural level.
 - **Minimal Permissions:** A single usage-description key and system-picker I/O only (the hard requirement is §2).
-- **Standards-Compliant:** Compatible with GnuPG (Profile A), RFC 9580 (Profile B), and post-quantum RFC 9980.
+- **Standards-Compliant:** Interoperates with GnuPG (Portable Legacy), RFC 9580 (the Modern families), and post-quantum RFC 9980.
 - **Usable by Anyone:** No cryptographic knowledge required.
 
 ### 1.3 Supported Platforms
@@ -47,19 +47,19 @@ VoiceOver on all elements; fingerprints read segment-by-segment. Dynamic Type. 4
 
 ## 3. Encryption Profiles and Key Families
 
-The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody: **Portable Legacy** (Profile A software key, Ed25519 v4), **Portable Modern** (Ed25519 v6 software key), **Portable Modern · High** (Profile B / Ed448 v6 software key), **Portable Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 software key), **Portable Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 software key), **Device-Bound Legacy** (Secure Enclave custody, P-256 v4), **Device-Bound Modern** (Secure Enclave custody, P-256 v6), **Device-Bound Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 split custody), and **Device-Bound Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 split custody — the post-quantum components in the Secure Enclave, the classical components under the fixed-access envelope). Profile A (universal) and Profile B (advanced) remain the technical vocabulary for two of the classical software configurations, with the baseline Modern families (Ed25519 / P-256 v6) sitting between them; the family vocabulary is the product-facing layer above it. All nine families are product-selectable in the shipped key-generation surface (device-bound rows appear only on Secure Enclave hardware).
+The App presents key generation as a choice between **key families** that combine message compatibility and private-key custody: **Portable Legacy** (Ed25519 v4 software key), **Portable Modern** (Ed25519 v6 software key), **Portable Modern · High** (Ed448 v6 software key), **Portable Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 software key), **Portable Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 software key), **Device-Bound Legacy** (Secure Enclave custody, P-256 v4), **Device-Bound Modern** (Secure Enclave custody, P-256 v6), **Device-Bound Post-Quantum** (RFC 9980 ML-DSA-65/ML-KEM-768 split custody), and **Device-Bound Post-Quantum · High** (RFC 9980 ML-DSA-87/ML-KEM-1024 split custody — the post-quantum components in the Secure Enclave, the classical components under the fixed-access envelope). The universal **Portable Legacy** and advanced **Portable Modern · High** are the two classical software configurations (formerly labeled Profile A and Profile B), with the baseline Modern families (Ed25519 / P-256 v6) sitting between them. All nine families are product-selectable in the shipped key-generation surface (device-bound rows appear only on Secure Enclave hardware).
 
 The post-quantum families ([POST_QUANTUM](POST_QUANTUM.md), [TDD](TDD.md) §1.3) cover generation, contact import/display, message classification, and the encrypt-surface quantum-safety indicator. Like the other RFC 9580-track families they are not compatible with GnuPG, and their public certificates exchange via file, share sheet, or clipboard — never QR (~30 KB armored).
 
-### 3.1 Profile A: Legacy / Universal (Default)
+### 3.1 Legacy tier (RFC 4880): Universal (Default)
 
 The **Portable Legacy** and **Device-Bound Legacy** families. Maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security. Algorithm suite: [SECURITY.md](SECURITY.md) §1.
 
 **Compatible with:** GnuPG 2.1+, Sequoia, OpenPGP.js, GopenPGP, Thunderbird, Bouncy Castle — virtually all PGP tools.
 
-### 3.2 Modern tier (RFC 9580): baseline and · High (Profile B)
+### 3.2 Modern tier (RFC 9580): baseline and · High
 
-The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bound Modern** and **Portable Modern · High** families). **Modern** uses Ed25519+X25519 v6 with SEIPDv2 AEAD (~128-bit) — the widely supported modern default. **Modern · High** (Profile B) uses the stronger Ed448+X448 v6 (~224-bit), which some tools do not yet support. Algorithm suites: [SECURITY.md](SECURITY.md) §1.
+The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bound Modern** and **Portable Modern · High** families). **Modern** uses Ed25519+X25519 v6 with SEIPDv2 AEAD (~128-bit) — the widely supported modern default. **Modern · High** uses the stronger Ed448+X448 v6 (~224-bit), which some tools do not yet support. Algorithm suites: [SECURITY.md](SECURITY.md) §1.
 
 **Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+ (Ed448 requires the newer releases). **Not compatible with GnuPG.**
 
@@ -79,7 +79,7 @@ The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bou
   - Device-bound families require passing a commitment sheet (custody, fixed biometric enforcement, non-exportability, loss consequence, public artifacts are not backups) before generation starts; the rows appear only where the capability resolver and a wired generation service allow them.
 - **Encryption:** message format is determined automatically by recipient key version — v4 → SEIPDv1, v6 → SEIPDv2 (AEAD), mixed → SEIPDv1. Never a manual choice. See [TDD](TDD.md) §1.4.
 - **Decryption:** the App accepts and decrypts both v4 and v6 messages regardless of the user's own key profile.
-- **Multiple keys:** a user may hold keys of different families (e.g. a Profile A key for GnuPG contacts and a post-quantum key for the future-proof ones). One key is designated "Default." Profiles are immutable after generation — switching means generating a new key.
+- **Multiple keys:** a user may hold keys of different families (e.g. a Portable Legacy key for GnuPG contacts and a post-quantum key for the future-proof ones). One key is designated "Default." Profiles are immutable after generation — switching means generating a new key.
 
 ### 3.4 Apple Secure Enclave Custody (Device-Bound key families)
 
@@ -138,7 +138,7 @@ Text: cleartext signature. File: detached `.sig`. Signatures auto-verify during 
 
 ### 4.6 Backup & Restore
 
-- Backup: authenticate → passphrase → S2K protect (Iterated+Salted for Profile A; Argon2id for Profile B and Portable Post-Quantum) → `.asc` via Share Sheet.
+- Backup: authenticate → passphrase → S2K protect (Iterated+Salted for Portable Legacy; Argon2id for the v6 portable families — Modern, Modern · High, and both Post-Quantum tiers) → `.asc` via Share Sheet.
 - Restore: import `.asc` → passphrase → stored with SE protection.
 - Device-bound keys have no backup flow (§3.4).
 
@@ -188,7 +188,7 @@ Activation safeguards for High Security: a warning that losing biometric access 
 
 ### 4.10 Self-Test
 
-One-tap diagnostic: key generation, encrypt/decrypt, sign/verify, tamper, and key export/import round-trip run for each software profile (Profile A, Profile B, Post-Quantum), plus one profile-agnostic QR round-trip. Shareable report; report data is export-only and never persisted.
+One-tap diagnostic: key generation, encrypt/decrypt, sign/verify, tamper, and key export/import round-trip run for each software profile (Portable Legacy, Portable Modern, Portable Modern · High, Portable Post-Quantum, Portable Post-Quantum · High), plus one profile-agnostic QR round-trip. Shareable report; report data is export-only and never persisted.
 
 ## 5. Technical Architecture (Summary)
 

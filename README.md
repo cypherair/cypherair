@@ -8,7 +8,7 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 
 - **Truly Offline** — No HTTP(S), no networked SDKs, no update checks. Works fully in airplane mode.
 - **Minimal Permissions** — Only the biometric usage description is configured for local authentication. No camera, photo library, contacts, or network permissions. All I/O goes through system-provided pickers and the Share Sheet.
-- **Six Key Families** — Three software profiles (GnuPG-compatible, RFC 9580 modern, and RFC 9980 post-quantum) times two custody models (portable software keys and device-bound Secure Enclave custody).
+- **Nine Key Families** — Five portable software tiers (Legacy, Modern, Modern · High, Post-Quantum, Post-Quantum · High) and four device-bound Secure Enclave tiers (Legacy, Modern, Post-Quantum, Post-Quantum · High). Legacy is GnuPG-compatible (RFC 4880); the Modern tiers follow RFC 9580 and the Post-Quantum tiers RFC 9980. Modern · High (Ed448/X448) is portable-only.
 - **Secure Enclave Custody** — Device-bound keys perform signing and decryption inside the Secure Enclave and can never be exported; portable software keys are wrapped at rest via Secure Enclave P-256 ECDH + AES-GCM with biometric authentication.
 - **Usable by Anyone** — No cryptographic knowledge required. Clean, accessible UI built with SwiftUI, using iOS 26 Liquid Glass conventions where applicable and native platform chrome elsewhere.
 
@@ -16,12 +16,15 @@ CypherAir is an open-source OpenPGP encryption tool for iOS 26.5+ / iPadOS 26.5+
 
 | Family | Standard | Algorithms | Custody | GnuPG |
 |--------|----------|-----------|---------|-------|
-| Portable Compatible | RFC 4880 (v4) | Ed25519 / X25519, SEIPDv1 | Software, exportable | Compatible |
-| Portable Modern | RFC 9580 (v6) | Ed448 / X448, SEIPDv2 AEAD | Software, exportable | Not compatible |
+| Portable Legacy | RFC 4880 (v4) | Ed25519 / X25519, SEIPDv1 | Software, exportable | Compatible |
+| Portable Modern | RFC 9580 (v6) | Ed25519 / X25519, SEIPDv2 AEAD | Software, exportable | Not compatible |
+| Portable Modern · High | RFC 9580 (v6) | Ed448 / X448, SEIPDv2 AEAD | Software, exportable | Not compatible |
 | Portable Post-Quantum | RFC 9980 (v6) | ML-DSA-65+Ed25519 / ML-KEM-768+X25519 | Software, exportable | Not compatible |
-| Device-Bound Compatible | RFC 4880 (v4) | P-256 / P-256 | Secure Enclave, non-exportable | Compatible |
+| Portable Post-Quantum · High | RFC 9980 (v6) | ML-DSA-87+Ed448 / ML-KEM-1024+X448 | Software, exportable | Not compatible |
+| Device-Bound Legacy | RFC 4880 (v4) | P-256 / P-256 | Secure Enclave, non-exportable | Compatible |
 | Device-Bound Modern | RFC 9580 (v6) | P-256 / P-256 | Secure Enclave, non-exportable | Not compatible |
 | Device-Bound Post-Quantum | RFC 9980 (v6) | ML-DSA-65+Ed25519 / ML-KEM-768+X25519 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
+| Device-Bound Post-Quantum · High | RFC 9980 (v6) | ML-DSA-87+Ed448 / ML-KEM-1024+X448 | Split custody: post-quantum in Secure Enclave, classical sealed to device | Not compatible |
 
 Message format is selected automatically by recipient key version; any post-quantum recipient enforces an AES-256 floor. Full family and format canon: [docs/PRD.md](docs/PRD.md) §3 and [docs/TDD.md](docs/TDD.md) §1.
 

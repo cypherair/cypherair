@@ -1,8 +1,8 @@
-//! Profile B slow tests.
+//! Portable Modern · High slow tests.
 //! These preserve full Argon2id export/import coverage without keeping the default
 //! `cargo test` path stuck on long-running passphrase-protected key operations.
 //! GitHub PR and nightly workflows run this target explicitly with:
-//! `cargo test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored`.
+//! `cargo test --manifest-path pgp-mobile/Cargo.toml --test portable_modern_high_slow_tests -- --ignored`.
 
 use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
@@ -12,7 +12,7 @@ use pgp_mobile::sign;
 /// C2B.6: Export key with Argon2id.
 #[test]
 #[ignore = "slow"]
-fn test_export_key_profile_b() {
+fn test_export_key_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -27,7 +27,7 @@ fn test_export_key_profile_b() {
 /// C2B.7: Re-import with correct passphrase.
 #[test]
 #[ignore = "slow"]
-fn test_import_correct_passphrase_profile_b() {
+fn test_import_correct_passphrase_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -45,7 +45,7 @@ fn test_import_correct_passphrase_profile_b() {
 /// C2B.8: Re-import with wrong passphrase → graceful error.
 #[test]
 #[ignore = "slow"]
-fn test_import_wrong_passphrase_profile_b() {
+fn test_import_wrong_passphrase_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -61,10 +61,10 @@ fn test_import_wrong_passphrase_profile_b() {
     }
 }
 
-/// Fix #1 verification: exported Profile B key is truly passphrase-protected.
+/// Fix #1 verification: exported Modern High key is truly passphrase-protected.
 #[test]
 #[ignore = "slow"]
-fn test_export_produces_encrypted_key_profile_b() {
+fn test_export_produces_encrypted_key_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -81,15 +81,15 @@ fn test_export_produces_encrypted_key_profile_b() {
     );
 }
 
-/// Fix #1+#2 verification: full export → import → decrypt round-trip (Profile B).
+/// Fix #1+#2 verification: full export → import → decrypt round-trip (Modern High).
 #[test]
 #[ignore = "slow"]
-fn test_export_import_decrypt_roundtrip_profile_b() {
+fn test_export_import_decrypt_roundtrip_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
 
-    let plaintext = b"Profile B export/import chain test.";
+    let plaintext = b"Modern High export/import chain test.";
 
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
         .expect("Encryption should succeed");
@@ -105,12 +105,12 @@ fn test_export_import_decrypt_roundtrip_profile_b() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// Unicode passphrase export/import round-trip (Profile B, Argon2id).
+/// Unicode passphrase export/import round-trip (Modern High, Argon2id).
 /// Verifies that passphrases containing CJK, Japanese, and emoji characters
 /// survive the Argon2id S2K derivation and produce a usable key.
 #[test]
 #[ignore = "slow"]
-fn test_unicode_passphrase_export_import_profile_b() {
+fn test_unicode_passphrase_export_import_modern_high() {
     let key = keys::generate_key_with_profile(
         "Unicode Test".to_string(),
         None,

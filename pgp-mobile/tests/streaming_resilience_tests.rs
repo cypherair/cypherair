@@ -63,11 +63,11 @@ fn gen_key(name: &str, profile: KeyProfile) -> keys::GeneratedKey {
 }
 
 #[test]
-fn test_decrypt_file_tampered_profile_a() {
+fn test_decrypt_file_tampered_legacy() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeyProfile::Universal);
 
-    let plaintext = b"Tamper test Profile A";
+    let plaintext = b"Tamper test Legacy";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -113,11 +113,11 @@ fn test_decrypt_file_tampered_profile_a() {
 }
 
 #[test]
-fn test_decrypt_file_tampered_profile_b() {
+fn test_decrypt_file_tampered_modern_high() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeyProfile::Advanced);
 
-    let plaintext = b"Tamper test Profile B AEAD";
+    let plaintext = b"Tamper test Modern High AEAD";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -152,7 +152,7 @@ fn test_decrypt_file_tampered_profile_b() {
 }
 
 #[test]
-fn test_streaming_decrypt_tampered_profile_b_returns_specific_error() {
+fn test_streaming_decrypt_tampered_modern_high_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeyProfile::Advanced);
 
@@ -196,7 +196,7 @@ fn test_streaming_decrypt_tampered_profile_b_returns_specific_error() {
 }
 
 #[test]
-fn test_streaming_decrypt_tampered_profile_a_returns_specific_error() {
+fn test_streaming_decrypt_tampered_legacy_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeyProfile::Universal);
 

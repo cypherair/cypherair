@@ -27,7 +27,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
     input
 }
 
-// ── C3.1: Export Profile A pubkey → gpg --import succeeds ──────────────────
+// ── C3.1: Export Legacy pubkey → gpg --import succeeds ──────────────────
 // This is verified during fixture generation (gpg imports our key).
 // Here we verify the reverse: Sequoia can import a GnuPG-exported public key.
 
@@ -61,7 +61,7 @@ fn test_c3_1_import_gpg_pubkey_binary() {
     assert!(info.has_encryption_subkey);
 }
 
-// ── C3.2: App (Profile A) encrypt → gpg --decrypt succeeds ────────────────
+// ── C3.2: App (Legacy) encrypt → gpg --decrypt succeeds ────────────────
 // We can't run gpg here, but we verify Sequoia can encrypt to a GnuPG key
 // and then decrypt it with the GnuPG secret key (proving format compatibility).
 
@@ -102,7 +102,7 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
     let plaintext = b"Signed message from CypherAir";
 
-    // Generate a Profile A key for signing
+    // Generate a Legacy key for signing
     let sender = keys::generate_key_with_profile(
         "Sender".to_string(),
         Some("sender@example.com".to_string()),
@@ -132,18 +132,18 @@ fn test_c3_2_app_encrypt_signed_to_gpg_key() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-// ── C3.3: App (Profile A) sign → gpg --verify "Good signature" ────────────
+// ── C3.3: App (Legacy) sign → gpg --verify "Good signature" ────────────
 // We verify Sequoia's signature is verifiable by Sequoia itself using the
 // same verification path GnuPG would use. The fixture test verifies the reverse.
 
-/// C3.3: Sequoia Profile A cleartext signature is valid.
+/// C3.3: Sequoia Legacy cleartext signature is valid.
 #[test]
-fn test_c3_3_app_sign_profile_a() {
+fn test_c3_3_app_sign_legacy() {
     let sender =
         keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
 
-    let plaintext = b"This message is signed by CypherAir Profile A";
+    let plaintext = b"This message is signed by CypherAir Legacy";
     let signed = sign::sign_cleartext(plaintext, &sender.cert_data)
         .expect("Cleartext signing should succeed");
 
@@ -344,7 +344,7 @@ fn test_c3_7_full_roundtrip_signed() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
-    // Generate a Profile A signing key
+    // Generate a Legacy signing key
     let signer = keys::generate_key_with_profile(
         "App User".to_string(),
         Some("app@example.com".to_string()),
@@ -375,51 +375,55 @@ fn test_c3_7_full_roundtrip_signed() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-// ── C3.8: Profile B pubkey → gpg (GnuPG 2.4.x) ───────────────────────────
+// ── C3.8: Modern High pubkey → gpg (GnuPG 2.4.x) ───────────────────────────
 // GnuPG cannot import v6 keys. We verify that Sequoia generates a v6 key
 // and that it has the expected structure that GnuPG would reject.
 
-/// C3.8: Profile B key is v6 (incompatible with GnuPG).
+/// C3.8: Modern High key is v6 (incompatible with GnuPG).
 /// GnuPG 2.4.x rejects v6 keys. We verify the key is indeed v6.
 /// GnuPG rejection is captured by running `generate_gpg_fixtures.sh` after
 /// generating the v6 fixture with `test_generate_v6_fixture`.
 #[test]
-fn test_c3_8_profile_b_key_is_v6_gnupg_incompatible() {
+fn test_c3_8_modern_high_key_is_v6_gnupg_incompatible() {
     let key_b = keys::generate_key_with_profile(
-        "Profile B User".to_string(),
+        "Modern High User".to_string(),
         None,
         None,
         KeyProfile::Advanced,
     )
     .expect("Key gen should succeed");
 
-    assert_eq!(key_b.key_version, 6, "Profile B must produce v6 key");
+    assert_eq!(key_b.key_version, 6, "Modern High must produce v6 key");
 
     let info =
-        keys::parse_key_info(&key_b.public_key_data).expect("Should parse Profile B public key");
+        keys::parse_key_info(&key_b.public_key_data).expect("Should parse Modern High public key");
     assert_eq!(info.key_version, 6);
     assert_eq!(info.profile, KeyProfile::Advanced);
 
     // v6 keys use a different packet format that GnuPG 2.4.x cannot parse.
     // GnuPG will report: "gpg: no valid OpenPGP data found" or similar.
-    // This is the expected behavior — Profile B is NOT GnuPG compatible.
+    // This is the expected behavior — Modern High is NOT GnuPG compatible.
 }
 
-/// C3.8 (encryption): Profile B encryption produces SEIPDv2 (incompatible with GnuPG).
+/// C3.8 (encryption): Modern High encryption produces SEIPDv2 (incompatible with GnuPG).
 #[test]
-fn test_c3_8_profile_b_encryption_not_gnupg_compatible() {
-    let key_b =
-        keys::generate_key_with_profile("Profile B".to_string(), None, None, KeyProfile::Advanced)
-            .expect("Key gen should succeed");
+fn test_c3_8_modern_high_encryption_not_gnupg_compatible() {
+    let key_b = keys::generate_key_with_profile(
+        "Modern High".to_string(),
+        None,
+        None,
+        KeyProfile::Advanced,
+    )
+    .expect("Key gen should succeed");
 
     let plaintext = b"This is encrypted with SEIPDv2 AEAD";
     let ciphertext = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
         .expect("Encrypt should succeed");
 
-    // Verify Sequoia can decrypt it (Profile B → Profile B works)
+    // Verify Sequoia can decrypt it (Modern High → Modern High works)
     let result =
         decrypt::decrypt_detailed(&ciphertext, &[key_b.cert_data], &[key_b.public_key_data])
-            .expect("Profile B self-decrypt should succeed");
+            .expect("Modern High self-decrypt should succeed");
     assert_eq!(result.plaintext, plaintext);
 
     // GnuPG would fail to decrypt this because:
@@ -479,7 +483,7 @@ fn test_c2a_9_decrypt_zlib_compressed_message() {
 /// Since our app never produces compressed messages (PRD requirement), and GnuPG
 /// cannot produce SEIPDv2 messages, we verify this by:
 /// 1. Confirming Sequoia can handle compression in decryption (already tested in C2A.9)
-/// 2. Confirming Profile B encrypt/decrypt works (already tested in profile_b_tests)
+/// 2. Confirming Modern High encrypt/decrypt works (already tested in modern_high_tests)
 /// 3. The combination (compressed SEIPDv2) would only come from another RFC 9580
 ///    implementation that compresses — this is a theoretical compatibility path.
 ///
@@ -513,9 +517,9 @@ fn test_c2b_10_compressed_seipd2_verified_by_composition() {
 
     let plaintext = b"SEIPDv2 decrypt test for composition";
     let ct = encrypt::encrypt(plaintext, &[key_b.public_key_data.clone()], None, None)
-        .expect("Profile B encrypt should succeed");
+        .expect("Modern High encrypt should succeed");
     let result = decrypt::decrypt_detailed(&ct, &[key_b.cert_data], &[key_b.public_key_data])
-        .expect("Profile B decrypt should succeed");
+        .expect("Modern High decrypt should succeed");
     assert_eq!(result.plaintext, plaintext);
 
     // Both components verified. Sequoia's internal decompression is format-agnostic
@@ -554,7 +558,7 @@ fn test_gpg_secretkey_import_unprotected() {
     assert!(info.has_encryption_subkey);
 }
 
-/// Cross-implementation encrypt: Sequoia Profile A → GnuPG key → decrypt.
+/// Cross-implementation encrypt: Sequoia Legacy → GnuPG key → decrypt.
 /// With encrypt-to-self enabled (both keys are v4 → SEIPDv1).
 #[test]
 fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
@@ -595,23 +599,23 @@ fn test_cross_impl_encrypt_to_self_with_gpg_recipient() {
     assert_eq!(result2.plaintext, plaintext);
 }
 
-/// Cross-profile: Profile B sender encrypts to GnuPG v4 recipient → SEIPDv1.
+/// Cross-profile: Modern High sender encrypts to GnuPG v4 recipient → SEIPDv1.
 #[test]
-fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
+fn test_modern_high_sender_to_gpg_v4_recipient_uses_seipdv1() {
     let gpg_pubkey = load_fixture("gpg_pubkey.gpg");
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
 
     let sender_b = keys::generate_key_with_profile(
-        "Profile B Sender".to_string(),
+        "Modern High Sender".to_string(),
         None,
         None,
         KeyProfile::Advanced,
     )
     .expect("Key gen should succeed");
 
-    let plaintext = b"Profile B sender to GnuPG v4 recipient";
+    let plaintext = b"Modern High sender to GnuPG v4 recipient";
 
-    // Profile B sender encrypts to v4 GnuPG recipient → must produce SEIPDv1
+    // Modern High sender encrypts to v4 GnuPG recipient → must produce SEIPDv1
     let ciphertext = encrypt::encrypt(
         plaintext,
         &[gpg_pubkey.clone()],
@@ -626,11 +630,11 @@ fn test_profile_b_sender_to_gpg_v4_recipient_uses_seipdv1() {
     let (has_v1, has_v2) = detect_message_format(&ciphertext_binary);
     assert!(
         has_v1,
-        "Profile B sender to v4 recipient must produce SEIPDv1"
+        "Modern High sender to v4 recipient must produce SEIPDv1"
     );
     assert!(
         !has_v2,
-        "Profile B sender to v4 recipient must NOT produce SEIPDv2"
+        "Modern High sender to v4 recipient must NOT produce SEIPDv2"
     );
 
     // GnuPG v4 recipient decrypts successfully

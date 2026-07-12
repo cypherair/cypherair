@@ -63,7 +63,7 @@ fn test_detect_profile_classifies_post_quantum() {
 }
 
 /// A foreign (sq-style) RFC 9980 cert must classify as Post-Quantum, not
-/// Profile B — the pre-fix version-only heuristic mislabeled it Advanced.
+/// Modern High — the pre-fix version-only heuristic mislabeled it Advanced.
 #[test]
 fn test_detect_profile_classifies_foreign_pq_cert() {
     let (_tsk, pub_armored) = common::pq::generate_foreign_pq();
@@ -124,7 +124,7 @@ fn test_export_import_roundtrip_post_quantum_uses_argon2id() {
     let s2k = keys::parse_s2k_params(&exported).expect("parse S2K");
     assert_eq!(
         s2k.s2k_type, "argon2id",
-        "Post-Quantum exports must use Argon2id like Profile B"
+        "Post-Quantum exports must use Argon2id like Modern High"
     );
 
     // Every secret packet must carry Argon2id individually — parse_s2k_params

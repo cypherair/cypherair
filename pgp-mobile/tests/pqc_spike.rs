@@ -32,17 +32,17 @@ fn generate_pq() -> (openpgp::Cert, Vec<u8>, Vec<u8>) {
     (cert, tsk, pub_armored)
 }
 
-/// Generate a Profile A-equivalent classical cert (v4, Cv25519,
+/// Generate a Legacy-equivalent classical cert (v4, Cv25519,
 /// RFC 4880) the same way the engine's Universal profile does.
 fn generate_classical_v4() -> (Vec<u8>, Vec<u8>) {
     let (cert, _rev) = CertBuilder::general_purpose(Some("Classic Spike <classic@spike.example>"))
         .set_cipher_suite(CipherSuite::Cv25519)
         .set_profile(openpgp::Profile::RFC4880)
         .expect("set RFC 4880 profile")
-        // Match the engine's Profile A exactly: advertise SEIPDv1 only
+        // Match the engine's Legacy exactly: advertise SEIPDv1 only
         // (see keys/generation.rs — GnuPG compatibility).
         .set_features(openpgp::types::Features::empty().set_seipdv1())
-        .expect("set Profile A features")
+        .expect("set Legacy features")
         .generate()
         .expect("generate classical cert");
     let mut tsk = Vec::new();

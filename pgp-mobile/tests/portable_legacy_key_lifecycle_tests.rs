@@ -1,4 +1,4 @@
-//! Profile A key lifecycle tests.
+//! Legacy key lifecycle tests.
 //! Covers export/import, revocation, key identity metadata, recipient matching,
 //! and expiry modification paths for Universal profile keys.
 
@@ -9,7 +9,7 @@ use pgp_mobile::sign;
 
 /// C2A.6: Export key with Iterated+Salted S2K. Re-import with correct passphrase.
 #[test]
-fn test_export_import_key_profile_a() {
+fn test_export_import_key_legacy() {
     let key = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -31,7 +31,7 @@ fn test_export_import_key_profile_a() {
 
 /// C2A.7: Re-import with wrong passphrase → graceful error.
 #[test]
-fn test_import_wrong_passphrase_profile_a() {
+fn test_import_wrong_passphrase_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -48,9 +48,9 @@ fn test_import_wrong_passphrase_profile_a() {
     }
 }
 
-/// Unicode passphrase round-trip for S2K export/import (Profile A, Iterated+Salted).
+/// Unicode passphrase round-trip for S2K export/import (Legacy, Iterated+Salted).
 #[test]
-fn test_unicode_passphrase_export_import_profile_a() {
+fn test_unicode_passphrase_export_import_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -85,7 +85,7 @@ fn test_unicode_passphrase_export_import_profile_a() {
 
 /// Export with wrong profile should fail.
 #[test]
-fn test_export_wrong_profile_profile_a() {
+fn test_export_wrong_profile_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -109,7 +109,7 @@ fn test_export_wrong_profile_profile_a() {
 
 /// C2A.8: Generate + parse revocation cert.
 #[test]
-fn test_revocation_cert_profile_a() {
+fn test_revocation_cert_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -121,7 +121,7 @@ fn test_revocation_cert_profile_a() {
 
 /// Revocation cert for key A should not verify against key B.
 #[test]
-fn test_revocation_cert_wrong_key_profile_a() {
+fn test_revocation_cert_wrong_key_legacy() {
     let key_a =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key A gen should succeed");
@@ -139,7 +139,7 @@ fn test_revocation_cert_wrong_key_profile_a() {
 
 /// Unicode round-trip: Chinese + emoji User IDs survive.
 #[test]
-fn test_unicode_user_id_profile_a() {
+fn test_unicode_user_id_legacy() {
     let key = keys::generate_key_with_profile(
         "张三 🔐".to_string(),
         Some("zhangsan@example.com".to_string()),
@@ -158,7 +158,7 @@ fn test_unicode_user_id_profile_a() {
 /// Fix #1 verification: exported key is truly passphrase-protected.
 /// After export, the key should not be usable without decryption (import).
 #[test]
-fn test_export_produces_encrypted_key_profile_a() {
+fn test_export_produces_encrypted_key_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -177,7 +177,7 @@ fn test_export_produces_encrypted_key_profile_a() {
 
 /// Fix #1+#2 verification: full export → import → decrypt message round-trip.
 #[test]
-fn test_export_import_decrypt_roundtrip_profile_a() {
+fn test_export_import_decrypt_roundtrip_legacy() {
     let key = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -203,9 +203,9 @@ fn test_export_import_decrypt_roundtrip_profile_a() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// Verify that Profile A export uses Iterated+Salted S2K (not Argon2id).
+/// Verify that Legacy export uses Iterated+Salted S2K (not Argon2id).
 #[test]
-fn test_export_profile_a_uses_iterated_salted() {
+fn test_export_legacy_uses_iterated_salted() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -217,7 +217,7 @@ fn test_export_profile_a_uses_iterated_salted() {
 
     assert_eq!(
         s2k_info.s2k_type, "iterated-salted",
-        "Profile A export must use Iterated+Salted S2K, not {}",
+        "Legacy export must use Iterated+Salted S2K, not {}",
         s2k_info.s2k_type
     );
     assert_eq!(
@@ -228,7 +228,7 @@ fn test_export_profile_a_uses_iterated_salted() {
 
 /// Fix #3 verification: expired key detected by parse_key_info.
 #[test]
-fn test_expired_key_detected_profile_a() {
+fn test_expired_key_detected_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, Some(1), KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -246,10 +246,10 @@ fn test_expired_key_detected_profile_a() {
     );
 }
 
-/// match_recipients: encrypt to a Profile A key, match against its public cert.
+/// match_recipients: encrypt to a Legacy key, match against its public cert.
 /// Verifies the returned fingerprint is the primary key fingerprint (not the subkey ID).
 #[test]
-fn test_match_recipients_profile_a_returns_primary_fingerprint() {
+fn test_match_recipients_legacy_returns_primary_fingerprint() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -270,7 +270,7 @@ fn test_match_recipients_profile_a_returns_primary_fingerprint() {
 
 /// match_recipients: encrypt to key A, match against key B → NoMatchingKey.
 #[test]
-fn test_match_recipients_profile_a_wrong_key_returns_error() {
+fn test_match_recipients_legacy_wrong_key_returns_error() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -295,7 +295,7 @@ fn test_match_recipients_profile_a_wrong_key_returns_error() {
 
 /// match_recipients: multi-recipient message matches both certs.
 #[test]
-fn test_match_recipients_profile_a_multi_recipient() {
+fn test_match_recipients_legacy_multi_recipient() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -324,7 +324,7 @@ fn test_match_recipients_profile_a_multi_recipient() {
 
 /// match_recipients: encrypt-to-self includes sender in match.
 #[test]
-fn test_match_recipients_profile_a_encrypt_to_self() {
+fn test_match_recipients_legacy_encrypt_to_self() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -348,10 +348,10 @@ fn test_match_recipients_profile_a_encrypt_to_self() {
     assert_eq!(matched[0], sender.fingerprint);
 }
 
-/// Modify expiry on a Profile A key: extend to 3 years.
+/// Modify expiry on a Legacy key: extend to 3 years.
 /// Pass: key is not expired, expiry_timestamp is set, key info updated.
 #[test]
-fn test_modify_expiry_profile_a_extend() {
+fn test_modify_expiry_legacy_extend() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -361,7 +361,7 @@ fn test_modify_expiry_profile_a_extend() {
     .expect("Key generation should succeed");
 
     let result = keys::modify_expiry(&generated.cert_data, Some(3 * 365 * 24 * 3600))
-        .expect("modify_expiry should succeed for Profile A");
+        .expect("modify_expiry should succeed for Legacy");
 
     assert!(
         !result.cert_data.is_empty(),
@@ -388,10 +388,10 @@ fn test_modify_expiry_profile_a_extend() {
     assert!(re_parsed.expiry_timestamp.is_some());
 }
 
-/// Modify expiry on a Profile A key: remove expiry (set to never expire).
+/// Modify expiry on a Legacy key: remove expiry (set to never expire).
 /// Pass: key has no expiry timestamp, key is not expired.
 #[test]
-fn test_modify_expiry_profile_a_remove() {
+fn test_modify_expiry_legacy_remove() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,
@@ -420,10 +420,10 @@ fn test_modify_expiry_profile_a_remove() {
     );
 }
 
-/// Modify expiry on a Profile A key: set to 1 second (effectively expired).
+/// Modify expiry on a Legacy key: set to 1 second (effectively expired).
 /// Pass: key is expired.
 #[test]
-fn test_modify_expiry_profile_a_to_past() {
+fn test_modify_expiry_legacy_to_past() {
     let generated =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key generation should succeed");
@@ -440,9 +440,9 @@ fn test_modify_expiry_profile_a_to_past() {
     );
 }
 
-/// Verify that encrypt/decrypt still works after modifying expiry on a Profile A key.
+/// Verify that encrypt/decrypt still works after modifying expiry on a Legacy key.
 #[test]
-fn test_modify_expiry_profile_a_roundtrip_encrypt_decrypt() {
+fn test_modify_expiry_legacy_roundtrip_encrypt_decrypt() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,

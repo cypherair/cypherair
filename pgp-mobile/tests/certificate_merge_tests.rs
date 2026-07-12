@@ -126,7 +126,7 @@ fn make_subkey_update(secret_cert: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn test_merge_public_certificate_duplicate_no_op_profile_a() {
+fn test_merge_public_certificate_duplicate_no_op_legacy() {
     let generated = generate_key(KeyProfile::Universal, "DuplicateA");
 
     let result = keys::merge_public_certificate_update(
@@ -141,7 +141,7 @@ fn test_merge_public_certificate_duplicate_no_op_profile_a() {
 }
 
 #[test]
-fn test_merge_public_certificate_duplicate_no_op_profile_b() {
+fn test_merge_public_certificate_duplicate_no_op_modern_high() {
     let generated = generate_key(KeyProfile::Advanced, "DuplicateB");
 
     let result = keys::merge_public_certificate_update(
@@ -157,7 +157,7 @@ fn test_merge_public_certificate_duplicate_no_op_profile_b() {
 }
 
 #[test]
-fn test_merge_public_certificate_expiry_refresh_profile_a() {
+fn test_merge_public_certificate_expiry_refresh_legacy() {
     let generated = generate_key(KeyProfile::Universal, "ExpiryA");
     let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
         .expect("expiry refresh should succeed");
@@ -175,7 +175,7 @@ fn test_merge_public_certificate_expiry_refresh_profile_a() {
 }
 
 #[test]
-fn test_merge_public_certificate_expiry_refresh_profile_b() {
+fn test_merge_public_certificate_expiry_refresh_modern_high() {
     let generated = generate_key(KeyProfile::Advanced, "ExpiryB");
     let refreshed = keys::modify_expiry(&generated.cert_data, Some(60 * 60 * 24 * 365))
         .expect("expiry refresh should succeed");
@@ -303,7 +303,7 @@ fn test_parse_key_info_revoked_cert_uses_relaxed_display_user_id_fallback() {
 }
 
 #[test]
-fn test_merge_public_certificate_absorbs_revocation_update_profile_a_fixture() {
+fn test_merge_public_certificate_absorbs_revocation_update_legacy_fixture() {
     let base = load_fixture("merge_revocation_profile_a_base.gpg");
     let update = load_fixture("merge_revocation_profile_a_update.gpg");
 
@@ -318,7 +318,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_profile_a_fixture() {
 }
 
 #[test]
-fn test_merge_public_certificate_absorbs_revocation_update_profile_b_fixture() {
+fn test_merge_public_certificate_absorbs_revocation_update_modern_high_fixture() {
     let base = load_fixture("merge_revocation_profile_b_base.gpg");
     let update = load_fixture("merge_revocation_profile_b_update.gpg");
 
@@ -333,7 +333,7 @@ fn test_merge_public_certificate_absorbs_revocation_update_profile_b_fixture() {
 }
 
 #[test]
-fn test_merge_public_certificate_adds_encryption_subkey_profile_a_fixture() {
+fn test_merge_public_certificate_adds_encryption_subkey_legacy_fixture() {
     let base = load_fixture("merge_add_encryption_subkey_profile_a_base.gpg");
     let update = load_fixture("merge_add_encryption_subkey_profile_a_update.gpg");
 
@@ -351,7 +351,7 @@ fn test_merge_public_certificate_adds_encryption_subkey_profile_a_fixture() {
 }
 
 #[test]
-fn test_merge_public_certificate_adds_encryption_subkey_profile_b_fixture() {
+fn test_merge_public_certificate_adds_encryption_subkey_modern_high_fixture() {
     let base = load_fixture("merge_add_encryption_subkey_profile_b_base.gpg");
     let update = load_fixture("merge_add_encryption_subkey_profile_b_update.gpg");
 

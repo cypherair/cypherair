@@ -5,9 +5,9 @@ use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 use pgp_mobile::sign;
 
-/// parse_recipients() returns valid hex key IDs for a Profile A message.
+/// parse_recipients() returns valid hex key IDs for a Legacy message.
 #[test]
-fn test_parse_recipients_valid_message_profile_a() {
+fn test_parse_recipients_valid_message_legacy() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -28,9 +28,9 @@ fn test_parse_recipients_valid_message_profile_a() {
     }
 }
 
-/// parse_recipients() returns valid key IDs for a Profile B message.
+/// parse_recipients() returns valid key IDs for a Modern High message.
 #[test]
-fn test_parse_recipients_valid_message_profile_b() {
+fn test_parse_recipients_valid_message_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -105,10 +105,10 @@ fn test_parse_recipients_signed_not_encrypted() {
     );
 }
 
-/// Encrypting to an expired key must fail (Profile A).
+/// Encrypting to an expired key must fail (Legacy).
 /// Uses 1-second expiry + sleep to create a genuinely expired key.
 #[test]
-fn test_encrypt_to_expired_key_rejected_profile_a() {
+fn test_encrypt_to_expired_key_rejected_legacy() {
     let key = keys::generate_key_with_profile(
         "Expiring".to_string(),
         None,
@@ -125,9 +125,9 @@ fn test_encrypt_to_expired_key_rejected_profile_a() {
     assert!(result.is_err(), "Encrypting to an expired v4 key must fail");
 }
 
-/// Encrypting to an expired key must fail (Profile B).
+/// Encrypting to an expired key must fail (Modern High).
 #[test]
-fn test_encrypt_to_expired_key_rejected_profile_b() {
+fn test_encrypt_to_expired_key_rejected_modern_high() {
     let key = keys::generate_key_with_profile(
         "Expiring".to_string(),
         None,
@@ -173,10 +173,10 @@ fn test_encrypt_to_revoked_key_rejected() {
     assert!(result.is_err(), "Encrypting to a revoked key must fail");
 }
 
-/// Encrypting to a revoked Profile B key must fail.
-/// Complements test_encrypt_to_revoked_key_rejected (Profile A).
+/// Encrypting to a revoked Modern High key must fail.
+/// Complements test_encrypt_to_revoked_key_rejected (Legacy).
 #[test]
-fn test_encrypt_to_revoked_key_profile_b_rejected() {
+fn test_encrypt_to_revoked_key_modern_high_rejected() {
     use openpgp::parse::Parse;
     use openpgp::serialize::Serialize;
     use sequoia_openpgp as openpgp;
@@ -201,7 +201,7 @@ fn test_encrypt_to_revoked_key_profile_b_rejected() {
     let result = encrypt::encrypt_binary(b"Should fail", &[revoked_pubkey], None, None);
     assert!(
         result.is_err(),
-        "Encrypting to a revoked Profile B key must fail"
+        "Encrypting to a revoked Modern High key must fail"
     );
 }
 
@@ -398,11 +398,11 @@ fn test_key_info_reports_not_encryptable_for_revoked_only_subkey() {
     );
 }
 
-/// Encrypting to a signing-only cert (no encryption subkey) must fail (Profile B / v6).
-/// Complements test_encrypt_binary_rejects_no_encryption_subkey (Profile A) in
-/// profile_a_message_tests.rs.
+/// Encrypting to a signing-only cert (no encryption subkey) must fail (Modern High / v6).
+/// Complements test_encrypt_binary_rejects_no_encryption_subkey (Legacy) in
+/// legacy_message_tests.rs.
 #[test]
-fn test_encrypt_rejects_signing_only_cert_profile_b() {
+fn test_encrypt_rejects_signing_only_cert_modern_high() {
     use openpgp::cert::prelude::*;
     use openpgp::serialize::Serialize;
     use sequoia_openpgp as openpgp;

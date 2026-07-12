@@ -12,7 +12,7 @@ fn generate_key(profile: KeyProfile, name: &str) -> keys::GeneratedKey {
 }
 
 #[test]
-fn test_validate_public_certificate_accepts_profile_a_public_cert() {
+fn test_validate_public_certificate_accepts_legacy_public_cert() {
     let generated = generate_key(KeyProfile::Universal, "ValidatePublicA");
 
     let result = keys::validate_public_certificate(&generated.public_key_data)
@@ -24,7 +24,7 @@ fn test_validate_public_certificate_accepts_profile_a_public_cert() {
 }
 
 #[test]
-fn test_validate_public_certificate_accepts_profile_b_public_cert() {
+fn test_validate_public_certificate_accepts_modern_high_public_cert() {
     let generated = generate_key(KeyProfile::Advanced, "ValidatePublicB");
 
     let result = keys::validate_public_certificate(&generated.public_key_data)
@@ -36,7 +36,7 @@ fn test_validate_public_certificate_accepts_profile_b_public_cert() {
 }
 
 #[test]
-fn test_validate_public_certificate_rejects_profile_a_secret_cert() {
+fn test_validate_public_certificate_rejects_legacy_secret_cert() {
     let generated = generate_key(KeyProfile::Universal, "ValidateSecretA");
 
     let error = keys::validate_public_certificate(&generated.cert_data)
@@ -51,7 +51,7 @@ fn test_validate_public_certificate_rejects_profile_a_secret_cert() {
 }
 
 #[test]
-fn test_validate_public_certificate_rejects_profile_b_secret_cert() {
+fn test_validate_public_certificate_rejects_modern_high_secret_cert() {
     let generated = generate_key(KeyProfile::Advanced, "ValidateSecretB");
 
     let error = keys::validate_public_certificate(&generated.cert_data)

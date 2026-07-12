@@ -8,19 +8,19 @@ use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 
-/// Generate a Profile B (v6) public key fixture for GnuPG rejection testing.
+/// Generate a Modern High (v6) public key fixture for GnuPG rejection testing.
 /// Run manually: `cargo test test_generate_v6_fixture -- --ignored`
 /// Then run `generate_gpg_fixtures.sh` to test GnuPG import rejection.
 #[test]
 #[ignore]
 fn test_generate_v6_fixture() {
     let key_b = keys::generate_key_with_profile(
-        "Profile B Test".to_string(),
+        "Modern High Test".to_string(),
         Some("profile-b@example.com".to_string()),
         None,
         KeyProfile::Advanced,
     )
-    .expect("Profile B key gen should succeed");
+    .expect("Modern High key gen should succeed");
 
     assert_eq!(key_b.key_version, 6);
 

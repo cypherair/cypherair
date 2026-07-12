@@ -12,10 +12,10 @@ use pgp_mobile::sign;
 use pgp_mobile::signature_details::SignatureVerificationState;
 use pgp_mobile::verify;
 
-/// C2X.1: Profile A encrypts to Profile B recipient (v6 key).
+/// C2X.1: Legacy encrypts to Modern High recipient (v6 key).
 /// Pass: message format is SEIPDv2. Recipient decrypts.
 #[test]
-fn test_profile_a_encrypts_to_profile_b() {
+fn test_legacy_encrypts_to_modern_high() {
     let sender_a =
         keys::generate_key_with_profile("Alice (A)".to_string(), None, None, KeyProfile::Universal)
             .expect("Sender key gen should succeed");
@@ -24,7 +24,7 @@ fn test_profile_a_encrypts_to_profile_b() {
         keys::generate_key_with_profile("Bob (B)".to_string(), None, None, KeyProfile::Advanced)
             .expect("Recipient key gen should succeed");
 
-    let plaintext = b"From Profile A sender to Profile B recipient.";
+    let plaintext = b"From Legacy sender to Modern High recipient.";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -34,7 +34,7 @@ fn test_profile_a_encrypts_to_profile_b() {
     )
     .expect("Encryption should succeed");
 
-    // Profile B recipient should decrypt
+    // Modern High recipient should decrypt
     let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_b.cert_data.clone()],
@@ -46,10 +46,10 @@ fn test_profile_a_encrypts_to_profile_b() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2X.2: Profile B encrypts to Profile A recipient (v4 key).
+/// C2X.2: Modern High encrypts to Legacy recipient (v4 key).
 /// Pass: message format is SEIPDv1. Recipient decrypts.
 #[test]
-fn test_profile_b_encrypts_to_profile_a() {
+fn test_modern_high_encrypts_to_legacy() {
     let sender_b =
         keys::generate_key_with_profile("Alice (B)".to_string(), None, None, KeyProfile::Advanced)
             .expect("Sender key gen should succeed");
@@ -58,7 +58,7 @@ fn test_profile_b_encrypts_to_profile_a() {
         keys::generate_key_with_profile("Bob (A)".to_string(), None, None, KeyProfile::Universal)
             .expect("Recipient key gen should succeed");
 
-    let plaintext = b"From Profile B sender to Profile A recipient.";
+    let plaintext = b"From Modern High sender to Legacy recipient.";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -68,7 +68,7 @@ fn test_profile_b_encrypts_to_profile_a() {
     )
     .expect("Encryption should succeed");
 
-    // Profile A recipient should decrypt
+    // Legacy recipient should decrypt
     let result = decrypt::decrypt_detailed(
         &ciphertext,
         &[recipient_a.cert_data.clone()],
@@ -80,7 +80,7 @@ fn test_profile_b_encrypts_to_profile_a() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2X.3: Profile B encrypts to mixed recipients (v4 + v6).
+/// C2X.3: Modern High encrypts to mixed recipients (v4 + v6).
 /// Pass: format is SEIPDv1 (lowest common). Both decrypt.
 #[test]
 fn test_mixed_recipients_v4_and_v6() {
@@ -125,10 +125,10 @@ fn test_mixed_recipients_v4_and_v6() {
     assert_eq!(result_b.plaintext, plaintext);
 }
 
-/// C2X.4: Profile B with encrypt-to-self encrypts to v4 recipient.
+/// C2X.4: Modern High with encrypt-to-self encrypts to v4 recipient.
 /// Pass: SEIPDv1 (mixed rule). Both sender and recipient decrypt.
 #[test]
-fn test_profile_b_encrypt_to_self_with_v4_recipient() {
+fn test_modern_high_encrypt_to_self_with_v4_recipient() {
     let sender_b =
         keys::generate_key_with_profile("Alice (B)".to_string(), None, None, KeyProfile::Advanced)
             .expect("Sender key gen should succeed");
@@ -158,43 +158,43 @@ fn test_profile_b_encrypt_to_self_with_v4_recipient() {
     assert_eq!(result_b.plaintext, plaintext);
 }
 
-/// C2X.5: Profile A signature verified by Profile B user, and vice versa.
+/// C2X.5: Legacy signature verified by Modern High user, and vice versa.
 #[test]
 fn test_cross_profile_signature_verification() {
     let key_a =
         keys::generate_key_with_profile("Alice (A)".to_string(), None, None, KeyProfile::Universal)
-            .expect("Profile A key gen should succeed");
+            .expect("Legacy key gen should succeed");
 
     let key_b =
         keys::generate_key_with_profile("Bob (B)".to_string(), None, None, KeyProfile::Advanced)
-            .expect("Profile B key gen should succeed");
+            .expect("Modern High key gen should succeed");
 
     let text = b"Cross-profile signature test.";
 
-    // Profile A signs, Profile B verifies
+    // Legacy signs, Modern High verifies
     let signed_a =
-        sign::sign_cleartext(text, &key_a.cert_data).expect("Profile A signing should succeed");
+        sign::sign_cleartext(text, &key_a.cert_data).expect("Legacy signing should succeed");
     let verify_a_by_b =
         verify::verify_cleartext_detailed(&signed_a, &[key_a.public_key_data.clone()])
-            .expect("Profile B should verify Profile A signature");
+            .expect("Modern High should verify Legacy signature");
     assert_eq!(
         verify_a_by_b.summary_state,
         SignatureVerificationState::Verified
     );
 
-    // Profile B signs, Profile A verifies
+    // Modern High signs, Legacy verifies
     let signed_b =
-        sign::sign_cleartext(text, &key_b.cert_data).expect("Profile B signing should succeed");
+        sign::sign_cleartext(text, &key_b.cert_data).expect("Modern High signing should succeed");
     let verify_b_by_a =
         verify::verify_cleartext_detailed(&signed_b, &[key_b.public_key_data.clone()])
-            .expect("Profile A should verify Profile B signature");
+            .expect("Legacy should verify Modern High signature");
     assert_eq!(
         verify_b_by_a.summary_state,
         SignatureVerificationState::Verified
     );
 }
 
-/// Extended: Profile A sender signs encrypted message for Profile B recipient.
+/// Extended: Legacy sender signs encrypted message for Modern High recipient.
 /// Full round-trip: sign + encrypt + decrypt + verify.
 #[test]
 fn test_cross_profile_signed_encrypted_round_trip() {
@@ -237,11 +237,11 @@ fn test_cross_profile_signed_encrypted_round_trip() {
     );
 }
 
-/// Extended: Profile B sender signs encrypted message for Profile A recipient.
+/// Extended: Modern High sender signs encrypted message for Legacy recipient.
 /// Full round-trip: sign + encrypt + decrypt + verify.
 /// Complements test_cross_profile_signed_encrypted_round_trip (which tests A→B).
 #[test]
-fn test_cross_profile_b_to_a_signed_encrypted_round_trip() {
+fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
     let sender_b =
         keys::generate_key_with_profile("Alice (B)".to_string(), None, None, KeyProfile::Advanced)
             .expect("Sender key gen should succeed");
@@ -370,7 +370,7 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
 
 // ── H2: Format verification for cross-profile encrypt (sender ≠ recipient profile) ──
 
-/// Profile A sender encrypts to Profile B recipient → must produce SEIPDv2.
+/// Legacy sender encrypts to Modern High recipient → must produce SEIPDv2.
 /// Validates that format selection depends on RECIPIENT key version, not sender's profile.
 #[test]
 fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
@@ -399,7 +399,7 @@ fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
     assert!(has_v2, "A sender to v6 recipient must produce SEIPDv2");
 }
 
-/// Profile B sender encrypts to Profile A recipient → must produce SEIPDv1.
+/// Modern High sender encrypts to Legacy recipient → must produce SEIPDv1.
 /// Validates format downgrade for v4 recipients regardless of sender's profile.
 #[test]
 fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
@@ -428,13 +428,13 @@ fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
     assert!(!has_v2, "B sender to v4 recipient must NOT produce SEIPDv2");
 }
 
-// ── H3: Profile A sender + encrypt-to-self + v6 recipient ────────────────
+// ── H3: Legacy sender + encrypt-to-self + v6 recipient ────────────────
 
-/// Profile A sender with encrypt-to-self encrypts to v6 recipient.
+/// Legacy sender with encrypt-to-self encrypts to v6 recipient.
 /// Mixed v4 (sender) + v6 (recipient) → must use SEIPDv1.
-/// Inverse of test_profile_b_encrypt_to_self_with_v4_recipient.
+/// Inverse of test_modern_high_encrypt_to_self_with_v4_recipient.
 #[test]
-fn test_profile_a_encrypt_to_self_with_v6_recipient() {
+fn test_legacy_encrypt_to_self_with_v6_recipient() {
     let sender_a =
         keys::generate_key_with_profile("Alice (A)".to_string(), None, None, KeyProfile::Universal)
             .expect("Sender key gen should succeed");
@@ -481,38 +481,38 @@ fn test_profile_a_encrypt_to_self_with_v6_recipient() {
     );
 }
 
-/// Revocation cert from Profile A key should not verify against Profile B key (and vice versa).
+/// Revocation cert from Legacy key should not verify against Modern High key (and vice versa).
 #[test]
 fn test_revocation_cert_cross_profile_mismatch() {
     let key_a =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Universal)
-            .expect("Profile A key gen should succeed");
+            .expect("Legacy key gen should succeed");
 
     let key_b =
         keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
-            .expect("Profile B key gen should succeed");
+            .expect("Modern High key gen should succeed");
 
-    // Profile A revocation cert vs Profile B cert
+    // Legacy revocation cert vs Modern High cert
     let result = keys::parse_revocation_cert(&key_a.revocation_cert, &key_b.cert_data);
     assert!(
         result.is_err(),
-        "Profile A revocation cert should not verify against Profile B key"
+        "Legacy revocation cert should not verify against Modern High key"
     );
 
-    // Profile B revocation cert vs Profile A cert
+    // Modern High revocation cert vs Legacy cert
     let result = keys::parse_revocation_cert(&key_b.revocation_cert, &key_a.cert_data);
     assert!(
         result.is_err(),
-        "Profile B revocation cert should not verify against Profile A key"
+        "Modern High revocation cert should not verify against Legacy key"
     );
 }
 
 // ── match_recipients cross-profile tests ────────────────────────────
 
-/// match_recipients: cross-profile — Profile B sender encrypts to Profile A recipient.
+/// match_recipients: cross-profile — Modern High sender encrypts to Legacy recipient.
 /// Message format is SEIPDv1 (mixed/v4 recipient). match_recipients should still find the match.
 #[test]
-fn test_match_recipients_cross_profile_b_sender_a_recipient() {
+fn test_match_recipients_cross_modern_high_sender_a_recipient() {
     let sender_b =
         keys::generate_key_with_profile("Sender B".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -540,10 +540,10 @@ fn test_match_recipients_cross_profile_b_sender_a_recipient() {
     assert_eq!(matched[0], recipient_a.fingerprint);
 }
 
-/// match_recipients: cross-profile — Profile A sender encrypts to Profile B recipient.
+/// match_recipients: cross-profile — Legacy sender encrypts to Modern High recipient.
 /// Message format is SEIPDv2 (v6 recipient). match_recipients should find the match.
 #[test]
-fn test_match_recipients_cross_profile_a_sender_b_recipient() {
+fn test_match_recipients_cross_legacy_sender_b_recipient() {
     let sender_a =
         keys::generate_key_with_profile("Sender A".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -574,9 +574,9 @@ fn test_match_recipients_cross_profile_a_sender_b_recipient() {
 // ── Modify Expiry: Negative Tests ───────────────────────────────────────
 
 /// modify_expiry with public key only (no secret material) must fail.
-/// Tests both Profile A and Profile B.
+/// Tests both Legacy and Modern High.
 #[test]
-fn test_modify_expiry_public_key_only_fails_profile_a() {
+fn test_modify_expiry_public_key_only_fails_legacy() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,
@@ -601,7 +601,7 @@ fn test_modify_expiry_public_key_only_fails_profile_a() {
 }
 
 #[test]
-fn test_modify_expiry_public_key_only_fails_profile_b() {
+fn test_modify_expiry_public_key_only_fails_modern_high() {
     let generated = keys::generate_key_with_profile(
         "Alice".to_string(),
         None,
@@ -616,7 +616,7 @@ fn test_modify_expiry_public_key_only_fails_profile_b() {
         result.is_err(),
         "modify_expiry should fail with public key only"
     );
-    // L9: Match on the error variant only — see comment in Profile A test above.
+    // L9: Match on the error variant only — see comment in Legacy test above.
     match result.unwrap_err() {
         pgp_mobile::error::PgpError::InvalidKeyData { .. } => {} // expected
         other => panic!("Expected InvalidKeyData error, got: {other:?}"),

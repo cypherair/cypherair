@@ -102,9 +102,9 @@ fn make_expired_signer(profile: KeyProfile) -> (GeneratedKey, Vec<u8>, Vec<u8>) 
     (signer, cleartext_signed, detached_sig)
 }
 
-/// Verify cleartext signed by an expired Profile A key → an Expired summary.
+/// Verify cleartext signed by an expired Legacy key → an Expired summary.
 #[test]
-fn test_verify_cleartext_expired_signer_profile_a() {
+fn test_verify_cleartext_expired_signer_legacy() {
     let (signer, cleartext_signed, _) = make_expired_signer(KeyProfile::Universal);
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -116,13 +116,13 @@ fn test_verify_cleartext_expired_signer_profile_a() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Cleartext verification with expired Profile A signer key must produce an Expired summary state"
+        "Cleartext verification with expired Legacy signer key must produce an Expired summary state"
     );
 }
 
-/// Verify cleartext signed by an expired Profile B key → an Expired summary.
+/// Verify cleartext signed by an expired Modern High key → an Expired summary.
 #[test]
-fn test_verify_cleartext_expired_signer_profile_b() {
+fn test_verify_cleartext_expired_signer_modern_high() {
     let (signer, cleartext_signed, _) = make_expired_signer(KeyProfile::Advanced);
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -134,13 +134,13 @@ fn test_verify_cleartext_expired_signer_profile_b() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Cleartext verification with expired Profile B signer key must produce an Expired summary state"
+        "Cleartext verification with expired Modern High signer key must produce an Expired summary state"
     );
 }
 
-/// Verify detached signature by an expired Profile A key → an Expired summary.
+/// Verify detached signature by an expired Legacy key → an Expired summary.
 #[test]
-fn test_verify_detached_expired_signer_profile_a() {
+fn test_verify_detached_expired_signer_legacy() {
     let (signer, _, detached_sig) = make_expired_signer(KeyProfile::Universal);
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -154,13 +154,13 @@ fn test_verify_detached_expired_signer_profile_a() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Detached verification with expired Profile A signer key must produce an Expired summary state"
+        "Detached verification with expired Legacy signer key must produce an Expired summary state"
     );
 }
 
-/// Verify detached signature by an expired Profile B key → an Expired summary.
+/// Verify detached signature by an expired Modern High key → an Expired summary.
 #[test]
-fn test_verify_detached_expired_signer_profile_b() {
+fn test_verify_detached_expired_signer_modern_high() {
     let (signer, _, detached_sig) = make_expired_signer(KeyProfile::Advanced);
 
     std::thread::sleep(std::time::Duration::from_secs(3));
@@ -174,14 +174,14 @@ fn test_verify_detached_expired_signer_profile_b() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Detached verification with expired Profile B signer key must produce an Expired summary state"
+        "Detached verification with expired Modern High signer key must produce an Expired summary state"
     );
 }
 
 /// Decrypt message signed by an expired signer → an Expired summary.
 /// Uses a non-expiring recipient key and an expired signer key.
 #[test]
-fn test_decrypt_expired_signer_profile_a() {
+fn test_decrypt_expired_signer_legacy() {
     let signer = keys::generate_key_with_profile(
         "Expiring Signer A".to_string(),
         None,
@@ -218,13 +218,13 @@ fn test_decrypt_expired_signer_profile_a() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Decrypt with expired Profile A signer must produce an Expired summary state"
+        "Decrypt with expired Legacy signer must produce an Expired summary state"
     );
 }
 
-/// Decrypt message signed by an expired Profile B signer → an Expired summary.
+/// Decrypt message signed by an expired Modern High signer → an Expired summary.
 #[test]
-fn test_decrypt_expired_signer_profile_b() {
+fn test_decrypt_expired_signer_modern_high() {
     let signer = keys::generate_key_with_profile(
         "Expiring Signer B".to_string(),
         None,
@@ -261,14 +261,14 @@ fn test_decrypt_expired_signer_profile_b() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Expired,
-        "Decrypt with expired Profile B signer must produce an Expired summary state"
+        "Decrypt with expired Modern High signer must produce an Expired summary state"
     );
 }
 
-/// Tampered cleartext-signed message must produce an Invalid summary (Profile B).
-/// Complements test_verify_tampered_cleartext_returns_bad (Profile A only).
+/// Tampered cleartext-signed message must produce an Invalid summary (Modern High).
+/// Complements test_verify_tampered_cleartext_returns_bad (Legacy only).
 #[test]
-fn test_verify_tampered_cleartext_returns_bad_profile_b() {
+fn test_verify_tampered_cleartext_returns_bad_modern_high() {
     let key =
         keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -290,14 +290,14 @@ fn test_verify_tampered_cleartext_returns_bad_profile_b() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Invalid,
-        "Tampered cleartext message must produce an Invalid summary state (Profile B)"
+        "Tampered cleartext message must produce an Invalid summary state (Modern High)"
     );
 }
 
-/// Tampered data with detached signature must produce an Invalid summary (Profile A).
-/// Complements test_verify_tampered_detached_returns_bad (Profile B only).
+/// Tampered data with detached signature must produce an Invalid summary (Legacy).
+/// Complements test_verify_tampered_detached_returns_bad (Modern High only).
 #[test]
-fn test_verify_tampered_detached_returns_bad_profile_a() {
+fn test_verify_tampered_detached_returns_bad_legacy() {
     let key =
         keys::generate_key_with_profile("Signer".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -314,7 +314,7 @@ fn test_verify_tampered_detached_returns_bad_profile_a() {
     assert_eq!(
         result.summary_state,
         SignatureVerificationState::Invalid,
-        "Tampered data with detached signature must produce an Invalid summary state (Profile A)"
+        "Tampered data with detached signature must produce an Invalid summary state (Legacy)"
     );
 }
 
@@ -325,8 +325,8 @@ fn test_verify_tampered_detached_returns_bad_profile_a() {
 #[test]
 fn test_sign_with_expired_key_not_accepted_as_valid() {
     for (profile, label) in [
-        (KeyProfile::Universal, "Profile A"),
-        (KeyProfile::Advanced, "Profile B"),
+        (KeyProfile::Universal, "Legacy"),
+        (KeyProfile::Advanced, "Modern High"),
     ] {
         let key =
             keys::generate_key_with_profile("Expiring Signer".to_string(), None, Some(1), profile)

@@ -6,10 +6,10 @@ use pgp_mobile::decrypt;
 use pgp_mobile::encrypt;
 use pgp_mobile::keys::{self, KeyProfile};
 
-/// Verify that tampered Profile A (SEIPDv1) ciphertext produces an integrity-related
+/// Verify that tampered Legacy (SEIPDv1) ciphertext produces an integrity-related
 /// error, not a generic CorruptData. Exercises the case-insensitive error classification.
 #[test]
-fn test_error_classification_tampered_profile_a() {
+fn test_error_classification_tampered_legacy() {
     let key =
         keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Universal)
             .expect("Key gen should succeed");
@@ -30,14 +30,14 @@ fn test_error_classification_tampered_profile_a() {
         Err(pgp_mobile::error::PgpError::AeadAuthenticationFailed) => {}
         Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
-        Err(other) => panic!("Unexpected error for tampered Profile A data: {other}"),
+        Err(other) => panic!("Unexpected error for tampered Legacy data: {other}"),
     }
 }
 
-/// Verify that tampered Profile B (SEIPDv2 AEAD) ciphertext produces an
+/// Verify that tampered Modern High (SEIPDv2 AEAD) ciphertext produces an
 /// AEAD-related error. Exercises the case-insensitive error classification.
 #[test]
-fn test_error_classification_tampered_profile_b() {
+fn test_error_classification_tampered_modern_high() {
     let key =
         keys::generate_key_with_profile("Audit".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -58,7 +58,7 @@ fn test_error_classification_tampered_profile_b() {
         Err(pgp_mobile::error::PgpError::IntegrityCheckFailed) => {}
         Err(pgp_mobile::error::PgpError::CorruptData { .. }) => {}
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
-        Err(other) => panic!("Unexpected error for tampered Profile B data: {other}"),
+        Err(other) => panic!("Unexpected error for tampered Modern High data: {other}"),
     }
 }
 
@@ -140,7 +140,7 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 // ── H1: AeadAuthenticationFailed exercisability analysis ──────────────────
 //
 // FINDING: PgpError::AeadAuthenticationFailed is never produced by self-generated
-// Profile B messages because v6 PKESK uses AEAD-protected session key transport.
+// Modern High messages because v6 PKESK uses AEAD-protected session key transport.
 // ANY byte corruption (PKESK or SEIPD body) causes the PKESK AEAD to fail first,
 // producing NoMatchingKey before the SEIPD payload AEAD check is reached.
 //
@@ -149,8 +149,8 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 // 2. OpenSSL AEAD tag mismatch errors caught by classify_decrypt_error string matching
 //
 // The CRITICAL security property — no plaintext leak on tampered ciphertext — is
-// verified by test_tamper_detection_aead_profile_b (profile_b_message_tests.rs) and
-// test_error_classification_tampered_profile_b (this file).
+// verified by test_tamper_detection_aead_modern_high (modern_high_message_tests.rs) and
+// test_error_classification_tampered_modern_high (this file).
 //
 // A dedicated test exercising AeadAuthenticationFailed would require constructing
 // a message with valid v3 PKESK but corrupted SEIPDv2 body, which requires either
@@ -158,10 +158,10 @@ fn test_decrypt_legacy_seipd_no_mdc_rejected() {
 // another RFC 9580 implementation. Tracked as a future improvement alongside M10
 // (RSA fixture) and M6 (compressed SEIPDv2 fixture).
 
-/// Decryption with wrong key must never return plaintext (Profile B / AEAD path).
-/// Complements test_decrypt_wrong_key_no_plaintext_leak (Profile A only).
+/// Decryption with wrong key must never return plaintext (Modern High / AEAD path).
+/// Complements test_decrypt_wrong_key_no_plaintext_leak (Legacy only).
 #[test]
-fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
+fn test_decrypt_wrong_key_no_plaintext_leak_modern_high() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -179,7 +179,7 @@ fn test_decrypt_wrong_key_no_plaintext_leak_profile_b() {
 
     let result = decrypt::decrypt_detailed(&ciphertext, &[bob.cert_data.clone()], &[]);
     match result {
-        Ok(_) => panic!("Wrong key must fail decryption (Profile B)"),
+        Ok(_) => panic!("Wrong key must fail decryption (Modern High)"),
         Err(pgp_mobile::error::PgpError::NoMatchingKey) => {}
         Err(other) => panic!("Expected NoMatchingKey, got: {other}"),
     }

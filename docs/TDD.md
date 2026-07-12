@@ -20,23 +20,25 @@
 
 The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36). Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
 
-| Setting | Profile A (Universal) | Profile B (Advanced) | Post-Quantum |
-|---------|----------------------|---------------------|--------------|
-| `Profile` | `Profile::RFC4880` | `Profile::RFC9580` | `Profile::RFC9580` |
-| `CipherSuite` | `CipherSuite::Cv25519` | `CipherSuite::Cv448` | `CipherSuite::MLDSA65_Ed25519` |
-| Key version | v4 | v6 | v6 |
-| Signing algo | Ed25519 (legacy EdDSA) | Ed448 | ML-DSA-65+Ed25519 (composite, algo 30) |
-| Encryption algo | X25519 (legacy ECDH) | X448 | ML-KEM-768+X25519 (composite, algo 35) |
-| Hash | SHA-512 (accepts SHA-256 for legacy verification) | SHA-512 | SHA-512 |
-| Symmetric | AES-256 | AES-256 | AES-256 (RFC 9980 floor) |
-| Message format | SEIPDv1 (MDC) | SEIPDv2 (AEAD OCB) | SEIPDv2 (AEAD OCB) |
-| S2K (export) | Iterated+Salted (mode 3) | Argon2id (512 MB / p=4 / ~3s) | Argon2id (512 MB / p=4 / ~3s) |
-| Compression | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) |
-| Security level | ~128 bit | ~224 bit | ~192 bit, quantum-resistant |
+| Setting | Legacy (Universal) | Modern | Modern · High (Advanced) | Post-Quantum |
+|---------|--------------------|--------|--------------------------|--------------|
+| `Profile` | `Profile::RFC4880` | `Profile::RFC9580` | `Profile::RFC9580` | `Profile::RFC9580` |
+| `CipherSuite` | `CipherSuite::Cv25519` | `CipherSuite::Cv25519` | `CipherSuite::Cv448` | `CipherSuite::MLDSA65_Ed25519` |
+| Key version | v4 | v6 | v6 | v6 |
+| Signing algo | Ed25519 (legacy EdDSA) | Ed25519 | Ed448 | ML-DSA-65+Ed25519 (composite, algo 30) |
+| Encryption algo | X25519 (legacy ECDH) | X25519 | X448 | ML-KEM-768+X25519 (composite, algo 35) |
+| Hash | SHA-512 (accepts SHA-256 for legacy verification) | SHA-512 | SHA-512 | SHA-512 |
+| Symmetric | AES-256 | AES-256 | AES-256 | AES-256 (RFC 9980 floor) |
+| Message format | SEIPDv1 (MDC) | SEIPDv2 (AEAD OCB) | SEIPDv2 (AEAD OCB) | SEIPDv2 (AEAD OCB) |
+| S2K (export) | Iterated+Salted (mode 3) | Argon2id (512 MB / p=4 / ~3s) | Argon2id (512 MB / p=4 / ~3s) | Argon2id (512 MB / p=4 / ~3s) |
+| Compression | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) | DEFLATE (read-only) |
+| Security level | ~128 bit | ~128 bit | ~224 bit | ~192 bit, quantum-resistant |
 
-**Classification is algorithm-aware, not version-only:** an RFC 9980 composite primary (ML-DSA-65+Ed25519 or ML-DSA-87+Ed448) classifies as Post-Quantum; any other v6 primary is Profile B; v4 is Profile A. SLH-DSA primaries fall back to the Profile B bucket (an under-claim, never an over-claim). The rule lives in one shared function (`classify_profile`) used by `detect_profile`, `parse_key_info`, and the export profile-mismatch guard.
+Legacy (Universal) and Modern share `CipherSuite::Cv25519` (Ed25519+X25519); they differ only by `Profile` — RFC 4880 yields a v4 key, RFC 9580 a v6 key. Modern · High (Advanced) is the Ed448+X448 v6 tier (`CipherSuite::Cv448`).
 
-**Profile A Features subpacket:** Sequoia defaults to advertising SEIPDv2 support. Profile A generation explicitly sets `Features::empty().set_seipdv1()` so other implementations send SEIPDv1 to this key — otherwise a GnuPG sender would see SEIPDv2 advertised and produce a message it cannot construct correctly. `set_profile(Profile::RFC4880)` is likewise explicit.
+**Classification is algorithm-aware, not version-only:** an RFC 9980 composite primary (ML-DSA-65+Ed25519 or ML-DSA-87+Ed448) classifies as Post-Quantum; an Ed25519 v6 primary classifies as Modern; an Ed448 v6 primary classifies as Advanced; v4 classifies as Universal. Any other v6 primary hits the defensive Advanced catch-all (`_ if version >= 6 => Advanced`), so SLH-DSA primaries fall back to Advanced (an under-claim, never an over-claim). The rule lives in one shared function (`classify_profile`) used by `detect_profile`, `parse_key_info`, and the export profile-mismatch guard.
+
+**Legacy (Universal) Features subpacket:** Sequoia defaults to advertising SEIPDv2 support. Legacy generation explicitly sets `Features::empty().set_seipdv1()` so other implementations send SEIPDv1 to this key — otherwise a GnuPG sender would see SEIPDv2 advertised and produce a message it cannot construct correctly. `set_profile(Profile::RFC4880)` is likewise explicit.
 
 ### 1.4 Encryption Format Auto-Selection
 
@@ -97,7 +99,7 @@ SE keys are destroyed by device erase, iCloud restore, or backup restore. The ap
 
 ## 4. Argon2id Configuration
 
-Applies to the Argon2id S2K families (Profile B and Portable Post-Quantum); Profile A uses Iterated+Salted (mode 3). Canonical scope, guard procedure, and refusal message: [SECURITY.md](SECURITY.md) §7.
+Applies to the four v6 portable software families that use Argon2id S2K — Portable Modern, Portable Modern · High, Portable Post-Quantum, and Portable Post-Quantum · High; Portable Legacy uses Iterated+Salted (mode 3). Canonical scope, guard procedure, and refusal message: [SECURITY.md](SECURITY.md) §7.
 
 | Parameter | Value | RFC 9580 encoding | Rationale |
 |-----------|-------|-------------------|-----------|

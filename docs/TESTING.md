@@ -12,7 +12,7 @@ Four layers, distinguished by what they can run on.
 
 ### Layer 1: Rust unit and integration tests
 
-No Apple dependency — they exercise the `pgp-mobile` engine directly: per-family key lifecycle and message suites (`profile_a_*`, `profile_b_*`, `portable_pq_*`, `composite_custody_*`), cross-profile format selection, password/SKESK, streaming, revocation/certification, QR URL validation, the external signer/decryptor seams, and the security policy suites. The files under `pgp-mobile/tests/` are the source of truth for current coverage.
+No Apple dependency — they exercise the `pgp-mobile` engine directly: per-family key lifecycle and message suites (`portable_legacy_*`, `portable_modern_*`, `portable_modern_high_*`, `portable_pq_*`, `composite_custody_*`), cross-family format selection, password/SKESK, streaming, revocation/certification, QR URL validation, the external signer/decryptor seams, and the security policy suites. The files under `pgp-mobile/tests/` are the source of truth for current coverage.
 
 ```bash
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
@@ -21,7 +21,7 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 The default run skips tests marked `#[ignore = "slow"]`. CI's blocking lanes add them explicitly:
 
 ```bash
-cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test profile_b_slow_tests -- --ignored
+cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test portable_modern_high_slow_tests -- --ignored
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml --test large_payload_tests -- --ignored
 ```
 
@@ -211,17 +211,18 @@ Keep the hygiene gate clean before submitting: `python3 scripts/check_text_hygie
 
 Crypto tests cover every family the change touches. The software profiles are what most suites parameterize over; the device-bound families get equivalent coverage through the custody unit suites (mocks + software P-256) plus the Layer 4 device lane.
 
-| Test category | Profile A | Profile B | Post-Quantum |
-|---|---|---|---|
-| Key generation | v4 Ed25519+X25519 | v6 Ed448+X448 | v6 ML-DSA-65+Ed25519 / ML-KEM-768+X25519 |
-| Encrypt/decrypt round-trip | SEIPDv1 | SEIPDv2 OCB | SEIPDv2 OCB, AES-256 floor |
-| Sign/verify | v4 sigs | v6 sigs | v6 composite sigs |
-| Tamper | MDC fatal | AEAD fatal | AEAD fatal |
-| Cross-profile encrypt | A→B recipient | B→A recipient | PQ+v4 mixed → SEIPDv1 with AES-256 floor |
-| Key export/import S2K | Iterated+Salted | Argon2id | Argon2id |
-| GnuPG interop | Yes | Expected rejection | No claim (LibrePGP divergence) |
-| Argon2id memory guard | N/A | Yes | Yes |
-| SE software-custody wrap | Yes | Yes | Yes (portable family) |
+| Test category | Legacy | Modern | Modern · High | Post-Quantum | Post-Quantum · High |
+|---|---|---|---|---|---|
+| Key generation | v4 Ed25519+X25519 | v6 Ed25519+X25519 | v6 Ed448+X448 | v6 ML-DSA-65+Ed25519 / ML-KEM-768+X25519 | v6 ML-DSA-87+Ed448 / ML-KEM-1024+X448 |
+| Encrypt/decrypt round-trip | SEIPDv1 | SEIPDv2 OCB | SEIPDv2 OCB | SEIPDv2 OCB, AES-256 floor | SEIPDv2 OCB, AES-256 floor |
+| Sign/verify | v4 sigs | v6 sigs | v6 sigs | v6 composite sigs | v6 composite sigs |
+| Tamper | MDC fatal | AEAD fatal | AEAD fatal | AEAD fatal | AEAD fatal |
+| Cross-family format | → SEIPDv1 (v4 recipient) | → SEIPDv2 (v6 recipient) | → SEIPDv2 (v6 recipient) | PQ-only → SEIPDv2; mixed w/ v4 → SEIPDv1 + AES-256 floor | PQ-only → SEIPDv2; mixed w/ v4 → SEIPDv1 + AES-256 floor |
+| Key export/import S2K | Iterated+Salted | Argon2id | Argon2id | Argon2id | Argon2id |
+| GnuPG interop | Yes | Expected rejection | Expected rejection | No claim (LibrePGP divergence) | No claim (LibrePGP divergence) |
+| Argon2id memory guard | N/A | Yes | Yes | Yes | Yes |
+| SE software-custody wrap | Yes | Yes | Yes | Yes (portable family) | Yes (portable family) |
+| Rust suite | `portable_legacy_*` | `portable_modern_*` | `portable_modern_high_*` | `portable_pq_*` | `portable_pq_high_*`, `composite_custody_high_*` |
 
 Password/SKESK round-trips (armored + binary) are recipient-key-independent and covered per message format. Tamper tests for password messages use targeted payload/tag-area mutations, not arbitrary bit flips.
 
@@ -236,14 +237,14 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 
 ## 5. GnuPG Interoperability
 
-Interop applies to Profile A (software v4) and the Device-Bound Compatible (v4) custody family. **v6 output — Profile B and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_profile_b_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
+Interop applies to Portable Legacy (software v4) and the Device-Bound Legacy (v4) custody family. **v6 output — Modern, Modern · High, and Device-Bound Modern — is expected to be rejected by GnuPG** (no v6 support; `gnupg_binary_tests::test_gpg_rejects_sequoia_modern_high_pubkey` proves the rejection). The post-quantum families make no GnuPG claim at all — GnuPG follows LibrePGP's different PQ wire format ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
 
 `gpg` runs on macOS only. Two mechanisms:
 
 - **Fixtures** — `gpg`-generated messages/signatures/keys committed as test data; deterministic and CI-safe. Regenerate when the Sequoia version, algorithm selection, or GnuPG major version changes (`gnupg_fixture_regression_tests.rs`, manual).
 - **Live lanes** — drive the `gpg` binary through `pgp-mobile/tests/common/gnupg.rs` and its `require_gpg_or_skip()` gate: under `CYPHERAIR_REQUIRE_GPG=1` a missing gpg fails instead of skipping.
-  - `gnupg_binary_tests.rs` — Profile A Sequoia↔gpg.
-  - `secure_enclave_gnupg_interop_tests.rs` — device-bound compatible (v4) SE-shaped certificates ↔ gpg, bidirectional, through the production external-signer/key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
+  - `gnupg_binary_tests.rs` — Portable Legacy Sequoia↔gpg.
+  - `secure_enclave_gnupg_interop_tests.rs` — device-bound legacy (v4) SE-shaped certificates ↔ gpg, bidirectional, through the production external-signer/key-agreement seams driven by a software-P256 stand-in; asserts PKESK v3 + SEIPDv1/MDC, not AEAD.
   - `secure_enclave_v6_aead_evidence_tests.rs` — device-bound modern (v6) SEIPDv2 AEAD correctness through the production seam (no gpg; runs in `rust-full-tests`).
 
 The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; captured evidence lives in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
