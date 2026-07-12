@@ -1059,7 +1059,6 @@ final class DecryptionServiceTests: XCTestCase {
         try encryptedData.write(to: encryptedURL, options: .atomic)
 
         let phase1 = FileDecryptionPhase1Result(
-            recipientKeyIds: [identity.fingerprint],
             matchedKey: identity,
             inputPath: encryptedURL.path
         )
@@ -1170,7 +1169,6 @@ final class DecryptionServiceTests: XCTestCase {
         try encryptedData.write(to: encryptedURL, options: .atomic)
 
         let phase1 = FileDecryptionPhase1Result(
-            recipientKeyIds: [identity.fingerprint],
             matchedKey: identity,
             inputPath: encryptedURL.path
         )

@@ -38,13 +38,13 @@ macro_rules! require_gpg {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-/// Verify that `gpg --import` accepts a Sequoia-generated Profile A public key.
+/// Verify that `gpg --import` accepts a Sequoia-generated Legacy public key.
 #[test]
-fn test_gpg_imports_sequoia_profile_a_pubkey() {
+fn test_gpg_imports_sequoia_legacy_pubkey() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
 
-    // Generate a Profile A key with Sequoia
+    // Generate a Legacy key with Sequoia
     let key = keys::generate_key_with_profile(
         "Sequoia User".to_string(),
         Some("sequoia@example.com".to_string()),
@@ -70,7 +70,7 @@ fn test_gpg_imports_sequoia_profile_a_pubkey() {
 
     assert!(
         output.status.success(),
-        "gpg --import should accept Sequoia Profile A public key.\nstderr: {}",
+        "gpg --import should accept Sequoia Legacy public key.\nstderr: {}",
         String::from_utf8_lossy(&output.stderr),
     );
 
@@ -138,7 +138,7 @@ fn test_gpg_verifies_sequoia_cleartext_signature() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
 
-    // Generate a Profile A signing key with Sequoia
+    // Generate a Legacy signing key with Sequoia
     let signer = keys::generate_key_with_profile(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),
@@ -189,7 +189,7 @@ fn test_gpg_verifies_sequoia_detached_signature() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
 
-    // Generate a Profile A signing key
+    // Generate a Legacy signing key
     let signer = keys::generate_key_with_profile(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),
@@ -235,23 +235,23 @@ fn test_gpg_verifies_sequoia_detached_signature() {
     );
 }
 
-/// Verify that `gpg --import` rejects a Sequoia-generated Profile B (v6) public key.
+/// Verify that `gpg --import` rejects a Sequoia-generated Modern High (v6) public key.
 /// GnuPG does not support v6 keys — this is the expected behavior.
 #[test]
-fn test_gpg_rejects_sequoia_profile_b_pubkey() {
+fn test_gpg_rejects_sequoia_modern_high_pubkey() {
     let gpg = require_gpg!();
     let gnupghome = setup_gpg_home();
 
-    // Generate a Profile B key with Sequoia
+    // Generate a Modern High key with Sequoia
     let key = keys::generate_key_with_profile(
-        "Profile B User".to_string(),
+        "Modern High User".to_string(),
         Some("profileb@example.com".to_string()),
         None,
         KeyProfile::Advanced,
     )
     .expect("Key generation should succeed");
 
-    assert_eq!(key.key_version, 6, "Profile B must produce v6 key");
+    assert_eq!(key.key_version, 6, "Modern High must produce v6 key");
 
     // Armor the public key
     let armored_pubkey =
@@ -270,7 +270,7 @@ fn test_gpg_rejects_sequoia_profile_b_pubkey() {
 
     assert!(
         !output.status.success(),
-        "gpg --import should reject v6 key (Profile B is not GnuPG compatible).\nstderr: {}",
+        "gpg --import should reject v6 key (Modern High is not GnuPG compatible).\nstderr: {}",
         String::from_utf8_lossy(&output.stderr),
     );
 }
@@ -286,7 +286,7 @@ fn test_gpg_decrypts_sequoia_signed_encrypted_message() {
     let gpg_secretkey = load_fixture("gpg_secretkey.asc");
     gpg_import_key(&gpg, &gnupghome, &gpg_secretkey);
 
-    // Generate a Profile A signing key with Sequoia
+    // Generate a Legacy signing key with Sequoia
     let signer = keys::generate_key_with_profile(
         "Sequoia Signer".to_string(),
         Some("signer@example.com".to_string()),

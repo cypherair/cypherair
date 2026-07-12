@@ -196,8 +196,6 @@ struct TutorialGuidanceResolver {
         guard let module = modalModule(for: session) else { return nil }
 
         return TutorialGuidancePayload(
-            module: module,
-            state: .inProgress,
             title: module.title,
             body: modalBody(for: modal),
             realAppLocation: module.realAppLocation,
@@ -211,8 +209,6 @@ struct TutorialGuidanceResolver {
         target: TutorialAnchorID?
     ) -> TutorialGuidancePayload {
         TutorialGuidancePayload(
-            module: module,
-            state: .inProgress,
             title: module.title,
             body: body,
             realAppLocation: module.realAppLocation,
@@ -251,8 +247,6 @@ struct TutorialGuidanceResolver {
 
     private func completionPayload(_ module: TutorialModuleID) -> TutorialGuidancePayload {
         TutorialGuidancePayload(
-            module: module,
-            state: .completed,
             title: module.title,
             body: completionMessage(for: module),
             realAppLocation: module.realAppLocation,

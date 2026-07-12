@@ -761,7 +761,6 @@ final class ContactService: @unchecked Sendable {
             )
             return ContactMergeResult(
                 survivingContact: surviving,
-                removedContactId: mutation.output.sourceContactId,
                 preferredKeyNeedsSelection: surviving.preferredKey == nil
                     && surviving.keys.contains(where: { $0.usageState == .additionalActive })
             )

@@ -15,7 +15,6 @@ struct ContactImportWorkflow {
             publicKeyData: inspection.keyData
         )
         return ImportConfirmationRequest(
-            keyData: inspection.keyData,
             metadata: inspection.metadata,
             candidateMatch: candidateMatch,
             allowsUnverifiedImport: allowsUnverifiedImport,

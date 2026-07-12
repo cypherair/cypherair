@@ -9,7 +9,6 @@ struct SourceComplianceInfo: Decodable, Equatable {
     let dependencies: [SourceComplianceDependency]
     let firstPartyLicense: String
     let fulfillmentBasis: String
-    let isStableReleaseBuild: Bool
 
     var versionDisplay: String {
         "\(marketingVersion) (\(buildNumber))"

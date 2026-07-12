@@ -1,4 +1,4 @@
-//! Profile B message-path tests.
+//! Modern High message-path tests.
 //! Covers key generation, sign/verify, encrypt/decrypt, tamper handling,
 //! detached signatures, and message-centric regressions for v6 keys.
 
@@ -21,7 +21,7 @@ fn write_temp_data_file(data: &[u8]) -> NamedTempFile {
 /// C2B.1: Generate Ed448+X448 v6 key pair.
 /// Pass: key version is 6, algo is Ed448/X448.
 #[test]
-fn test_generate_key_profile_b_produces_v6() {
+fn test_generate_key_modern_high_produces_v6() {
     let result = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -30,7 +30,7 @@ fn test_generate_key_profile_b_produces_v6() {
     )
     .expect("Key generation should succeed");
 
-    assert_eq!(result.key_version, 6, "Profile B key must be v6");
+    assert_eq!(result.key_version, 6, "Modern High key must be v6");
     assert_eq!(result.profile, KeyProfile::Advanced);
     assert!(!result.fingerprint.is_empty());
     assert!(!result.cert_data.is_empty());
@@ -40,7 +40,7 @@ fn test_generate_key_profile_b_produces_v6() {
 
 /// C2B.1 (extended): Verify key algorithms and parse info.
 #[test]
-fn test_generate_key_profile_b_algorithms() {
+fn test_generate_key_modern_high_algorithms() {
     let result = keys::generate_key_with_profile(
         "Alice".to_string(),
         Some("alice@example.com".to_string()),
@@ -58,28 +58,28 @@ fn test_generate_key_profile_b_algorithms() {
 
     // T2: Verify algorithms are Ed448 and X448 (not Ed25519/X25519).
     // Require specific algorithm names — generic "EdDSA"/"ECDH" would also match
-    // Profile A (Ed25519/X25519) and would fail to catch a cipher suite misconfiguration.
+    // Legacy (Ed25519/X25519) and would fail to catch a cipher suite misconfiguration.
     assert!(
         info.primary_algo.contains("Ed448"),
-        "Profile B primary key must use Ed448 (not generic EdDSA), got: {}",
+        "Modern High primary key must use Ed448 (not generic EdDSA), got: {}",
         info.primary_algo
     );
     let subkey_algo = info.subkey_algo.expect("Must have subkey algorithm");
     assert!(
         subkey_algo.contains("X448"),
-        "Profile B subkey must use X448 (not generic ECDH), got: {}",
+        "Modern High subkey must use X448 (not generic ECDH), got: {}",
         subkey_algo
     );
 }
 
-/// C2B.2: Sign + verify text (Profile B).
+/// C2B.2: Sign + verify text (Modern High).
 #[test]
-fn test_sign_verify_text_profile_b() {
+fn test_sign_verify_text_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key generation should succeed");
 
-    let text = b"Hello from Profile B!";
+    let text = b"Hello from Modern High!";
 
     let signed = sign::sign_cleartext(text, &key.cert_data).expect("Signing should succeed");
 
@@ -99,12 +99,12 @@ fn test_sign_verify_text_profile_b() {
 
 /// C2B.3: Encrypt + decrypt text (SEIPDv2 AEAD OCB).
 #[test]
-fn test_encrypt_decrypt_text_profile_b() {
+fn test_encrypt_decrypt_text_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key generation should succeed");
 
-    let plaintext = b"Secret message for Profile B with AEAD.";
+    let plaintext = b"Secret message for Modern High with AEAD.";
 
     let ciphertext = encrypt::encrypt(plaintext, &[key.public_key_data.clone()], None, None)
         .expect("Encryption should succeed");
@@ -117,7 +117,7 @@ fn test_encrypt_decrypt_text_profile_b() {
 
 /// C2B.3 (extended): Encrypt + decrypt with signature.
 #[test]
-fn test_encrypt_decrypt_signed_profile_b() {
+fn test_encrypt_decrypt_signed_modern_high() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Sender key gen should succeed");
@@ -126,7 +126,7 @@ fn test_encrypt_decrypt_signed_profile_b() {
         keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
             .expect("Recipient key gen should succeed");
 
-    let plaintext = b"Signed and encrypted Profile B message.";
+    let plaintext = b"Signed and encrypted Modern High message.";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -147,9 +147,9 @@ fn test_encrypt_decrypt_signed_profile_b() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// C2B.4: Encrypt-to-self (Profile B).
+/// C2B.4: Encrypt-to-self (Modern High).
 #[test]
-fn test_encrypt_to_self_profile_b() {
+fn test_encrypt_to_self_modern_high() {
     let sender =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -158,7 +158,7 @@ fn test_encrypt_to_self_profile_b() {
         keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
 
-    let plaintext = b"Profile B with encrypt-to-self.";
+    let plaintext = b"Modern High with encrypt-to-self.";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -179,9 +179,9 @@ fn test_encrypt_to_self_profile_b() {
     assert_eq!(result_sender.plaintext, plaintext);
 }
 
-/// C2B.5: File encrypt/decrypt 1 MB (Profile B).
+/// C2B.5: File encrypt/decrypt 1 MB (Modern High).
 #[test]
-fn test_file_encrypt_decrypt_1mb_profile_b() {
+fn test_file_encrypt_decrypt_1mb_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -198,9 +198,9 @@ fn test_file_encrypt_decrypt_1mb_profile_b() {
     assert_eq!(result.plaintext, plaintext);
 }
 
-/// C2B.5: File encrypt/decrypt 10 MB (Profile B).
+/// C2B.5: File encrypt/decrypt 10 MB (Modern High).
 #[test]
-fn test_file_encrypt_decrypt_10mb_profile_b() {
+fn test_file_encrypt_decrypt_10mb_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -223,7 +223,7 @@ fn test_file_encrypt_decrypt_10mb_profile_b() {
 /// Verifies the specific error type to confirm AEAD integrity protection is working.
 /// Tests multiple tamper positions to exercise different code paths.
 #[test]
-fn test_tamper_detection_aead_profile_b() {
+fn test_tamper_detection_aead_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -251,7 +251,7 @@ fn test_tamper_detection_aead_profile_b() {
         ("second-to-last byte", len.saturating_sub(2).max(1)),
     ];
 
-    // DESIGN NOTE: For SEIPDv2 with v6 PKESK (Profile B), Sequoia uses AEAD-protected
+    // DESIGN NOTE: For SEIPDv2 with v6 PKESK (Modern High), Sequoia uses AEAD-protected
     // session key transport. Corrupting any byte — even in the SEIP body — causes the
     // PKESK v6 session key decryption to fail, producing NoMatchingKey rather than
     // AeadAuthenticationFailed. This is correct and expected: the AEAD protection covers
@@ -281,14 +281,14 @@ fn test_tamper_detection_aead_profile_b() {
     }
 }
 
-/// Detached signature (Profile B).
+/// Detached signature (Modern High).
 #[test]
-fn test_detached_signature_profile_b() {
+fn test_detached_signature_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
 
-    let data = b"File content for Profile B.";
+    let data = b"File content for Modern High.";
 
     let input = write_temp_data_file(data);
     let signature =
@@ -306,9 +306,9 @@ fn test_detached_signature_profile_b() {
     assert_eq!(result.summary_state, SignatureVerificationState::Verified);
 }
 
-/// Empty plaintext encrypt/decrypt round-trip (Profile B).
+/// Empty plaintext encrypt/decrypt round-trip (Modern High).
 #[test]
-fn test_encrypt_decrypt_empty_plaintext_profile_b() {
+fn test_encrypt_decrypt_empty_plaintext_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -327,9 +327,9 @@ fn test_encrypt_decrypt_empty_plaintext_profile_b() {
     );
 }
 
-/// C5.7: Concurrent encrypt + decrypt on separate key pairs (Profile B).
+/// C5.7: Concurrent encrypt + decrypt on separate key pairs (Modern High).
 #[test]
-fn test_concurrent_encrypt_decrypt_profile_b() {
+fn test_concurrent_encrypt_decrypt_modern_high() {
     let key1 =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -364,10 +364,10 @@ fn test_concurrent_encrypt_decrypt_profile_b() {
     handle2.join().expect("Thread 2 should not panic");
 }
 
-/// Decrypt with wrong Profile B key → NoMatchingKey error.
+/// Decrypt with wrong Modern High key → NoMatchingKey error.
 /// Ensures the full AEAD decrypt path fails correctly with wrong key.
 #[test]
-fn test_decrypt_wrong_key_profile_b() {
+fn test_decrypt_wrong_key_modern_high() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -375,7 +375,7 @@ fn test_decrypt_wrong_key_profile_b() {
     let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
         .expect("Key gen should succeed");
 
-    let plaintext = b"Only for Alice (Profile B).";
+    let plaintext = b"Only for Alice (Modern High).";
 
     let ciphertext = encrypt::encrypt(plaintext, &[alice.public_key_data.clone()], None, None)
         .expect("Encryption should succeed");
@@ -389,11 +389,11 @@ fn test_decrypt_wrong_key_profile_b() {
     }
 }
 
-// ── M3: Multi-recipient encrypt/decrypt (Profile B) ──────────────────────
+// ── M3: Multi-recipient encrypt/decrypt (Modern High) ──────────────────────
 
 /// Encrypt to multiple v6 recipients → each can independently decrypt.
 #[test]
-fn test_multi_recipient_encrypt_decrypt_profile_b() {
+fn test_multi_recipient_encrypt_decrypt_modern_high() {
     let alice =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");
@@ -401,7 +401,7 @@ fn test_multi_recipient_encrypt_decrypt_profile_b() {
     let bob = keys::generate_key_with_profile("Bob".to_string(), None, None, KeyProfile::Advanced)
         .expect("Key gen should succeed");
 
-    let plaintext = b"Message for both Alice and Bob (Profile B).";
+    let plaintext = b"Message for both Alice and Bob (Modern High).";
 
     let ciphertext = encrypt::encrypt(
         plaintext,
@@ -422,9 +422,9 @@ fn test_multi_recipient_encrypt_decrypt_profile_b() {
     assert_eq!(result_bob.plaintext, plaintext);
 }
 
-/// Armor round-trip: Profile B public key → armor → dearmor → identical.
+/// Armor round-trip: Modern High public key → armor → dearmor → identical.
 #[test]
-fn test_armor_roundtrip_profile_b() {
+fn test_armor_roundtrip_modern_high() {
     let key =
         keys::generate_key_with_profile("Alice".to_string(), None, None, KeyProfile::Advanced)
             .expect("Key gen should succeed");

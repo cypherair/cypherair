@@ -14,7 +14,6 @@ struct DetailedSignatureVerification: Equatable {
         let status: Status
         let verificationState: SignatureVerification.VerificationState
         let signerPrimaryFingerprint: String?
-        let verificationCertificateFingerprint: String?
         let contactsUnavailableReason: ContactsAvailability?
         let signerIdentity: SignatureVerification.SignerIdentity?
 
@@ -22,14 +21,12 @@ struct DetailedSignatureVerification: Equatable {
             status: Status,
             verificationState: SignatureVerification.VerificationState,
             signerPrimaryFingerprint: String?,
-            verificationCertificateFingerprint: String?,
             contactsUnavailableReason: ContactsAvailability? = nil,
             signerIdentity: SignatureVerification.SignerIdentity?
         ) {
             self.status = status
             self.verificationState = verificationState
             self.signerPrimaryFingerprint = signerPrimaryFingerprint
-            self.verificationCertificateFingerprint = verificationCertificateFingerprint
             self.contactsUnavailableReason = contactsUnavailableReason
             self.signerIdentity = signerIdentity
         }
@@ -43,7 +40,6 @@ struct DetailedSignatureVerification: Equatable {
                 status: status,
                 verificationState: SignatureVerification.VerificationState(entryStatus: status),
                 signerPrimaryFingerprint: signerPrimaryFingerprint,
-                verificationCertificateFingerprint: signerPrimaryFingerprint,
                 signerIdentity: signerIdentity
             )
         }

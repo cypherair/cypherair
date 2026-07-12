@@ -11,11 +11,12 @@
 
 Secure Enclave custody is a device-bound private-key custody model: long-term signing and key-agreement private operations stay bound to the current device's Secure Enclave — P-256 for the classical device-bound families, RFC 9980 split custody for Device-Bound Post-Quantum (§4.1). It sits alongside, and does not replace, the portable software-key model. It is a custody model, not a third OpenPGP profile.
 
-The product presents it as three of the six key families ([PRD.md](PRD.md) §3 owns the full taxonomy, generation UX, commitment sheet, and compatibility copy):
+The product presents it as four of the nine key families ([PRD.md](PRD.md) §3 owns the full taxonomy, generation UX, commitment sheet, and compatibility copy):
 
-- **Device-Bound Compatible** — P-256, v4 certificate.
+- **Device-Bound Legacy** — P-256, v4 certificate.
 - **Device-Bound Modern** — P-256, v6 (RFC 9580) certificate.
-- **Device-Bound Post-Quantum** — RFC 9980 composite split custody, v6 certificate (§4.1).
+- **Device-Bound Post-Quantum** — RFC 9980 composite split custody (ML-DSA-65/ML-KEM-768), v6 certificate (§4.1).
+- **Device-Bound Post-Quantum · High** — RFC 9980 composite split custody (ML-DSA-87/ML-KEM-1024), v6 certificate (§4.1).
 
 All three are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and shipped in the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
 
@@ -79,9 +80,10 @@ Routing mirrors the P-256 flow: non-prompting handle lookup by the certificate's
 
 ## 5. Compatibility language
 
-- **Device-Bound Compatible (v4)** — described as GnuPG-oriented; entitled by the v4 GnuPG interop evidence (§8).
+- **Device-Bound Legacy (v4)** — described as GnuPG-oriented; entitled by the v4 GnuPG interop evidence (§8).
 - **Device-Bound Modern (v6)** — described as RFC 9580 / AEAD-oriented OpenPGP; it makes **no** GnuPG interoperability claim (GnuPG does not support v6 keys).
 - **Device-Bound Post-Quantum** — makes no GnuPG claim ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
+- **Device-Bound Post-Quantum · High** — RFC 9980 ML-DSA-87+Ed448 / ML-KEM-1024+X448; makes no GnuPG claim ([POST_QUANTUM.md](POST_QUANTUM.md) §1).
 - Existing private keys are never converted into Secure Enclave custody; the product must not imply otherwise.
 
 ## 6. Validation
@@ -113,7 +115,7 @@ Real SE private operations via `CypherAir-DeviceTests` (and the destructive `Cyp
 | payload tamper hard-fail (no partial plaintext) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
 | local-reset cleanup (dangerous plan) | ✅ captured | deferred | deferred | exposed, no evidence |
 | interaction-not-allowed proxy (fail-closed) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| split-custody composite (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests`, 2026-07) | deferred | deferred | exposed, no evidence |
+| split-custody composite, both tiers (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests` — base ML-DSA-65/ML-KEM-768 and · High ML-DSA-87/ML-KEM-1024, 2026-07) | deferred | deferred | exposed, no evidence |
 
 Capture notes:
 
@@ -140,7 +142,7 @@ These lanes drive the **production** Secure Enclave seams with a software-P256 s
 | v6: AEAD tamper fails closed | CI (default) | production seam errors, no plaintext | ✅ macOS |
 | v6: signed+encrypted decrypt+verify | CI (default) | plaintext recovered; signature `Verified` | ✅ macOS |
 | v6: gpg rejects v6 public key | CI (default) | `gpg --import` non-zero (v6 unsupported) | ✅ (`gnupg_binary_tests`) |
-| Profile A (software): gpg bidirectional | CI (mandatory) | import / decrypt / verify / reject-v6 | ✅ macOS, gpg 2.5.19 |
+| Portable Legacy (software): gpg bidirectional | CI (mandatory) | import / decrypt / verify / reject-v6 | ✅ macOS, gpg 2.5.19 |
 
 ### 8.3 Real-SE ↔ gpg bidirectional interop (manual lane)
 

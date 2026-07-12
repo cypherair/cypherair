@@ -27,7 +27,6 @@ final class TutorialSandboxContainer {
     let mockAuthenticator: MockAuthenticator
     let authManager: AuthenticationManager
     let privateKeyControlStore: InMemoryPrivateKeyControlStore
-    let securitySimulationStack: TutorialSecuritySimulationStack
     let config: AppConfiguration
     let protectedOrdinarySettingsCoordinator: ProtectedOrdinarySettingsCoordinator
     let keyManagement: KeyManagementService
@@ -43,12 +42,10 @@ final class TutorialSandboxContainer {
 
     private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let contactsWrappingRootKey: Data
     private var didCleanup = false
 
     init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
-        self.temporaryArtifactStore = temporaryArtifactStore
         self.engine = PgpEngine()
         self.mockSecureEnclave = MockSecureEnclave()
         self.mockKeychain = MockKeychain()
@@ -79,12 +76,6 @@ final class TutorialSandboxContainer {
         )
         self.privateKeyControlStore = InMemoryPrivateKeyControlStore(mode: .standard)
         self.authManager.configurePrivateKeyControlStore(privateKeyControlStore)
-        self.securitySimulationStack = TutorialSecuritySimulationStack(
-            authManager: authManager,
-            mockSecureEnclave: mockSecureEnclave,
-            mockKeychain: mockKeychain,
-            mockAuthenticator: mockAuthenticator
-        )
         self.config = AppConfiguration(defaults: defaults)
         self.config.privateKeyControlState = .unlocked(.standard)
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(

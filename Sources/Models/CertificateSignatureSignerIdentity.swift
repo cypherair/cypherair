@@ -4,7 +4,6 @@ struct CertificateSignatureSignerIdentity: Equatable {
     let source: CertificateSignerSource
     let displayName: String
     let secondaryText: String?
-    let shortKeyId: String?
     let fingerprint: String
     let isVerifiedContact: Bool
 
@@ -20,7 +19,6 @@ struct CertificateSignatureSignerIdentity: Equatable {
                 source: .contact,
                 displayName: contactKey.displayName,
                 secondaryText: contactKey.email ?? contactKey.primaryUserId,
-                shortKeyId: IdentityPresentation.shortKeyId(from: contactKey.fingerprint),
                 fingerprint: contactKey.fingerprint,
                 isVerifiedContact: contactKey.manualVerificationState.isVerified
             )
@@ -33,7 +31,6 @@ struct CertificateSignatureSignerIdentity: Equatable {
                 source: .ownKey,
                 displayName: displayName,
                 secondaryText: ownKey.userId,
-                shortKeyId: ownKey.shortKeyId,
                 fingerprint: ownKey.fingerprint,
                 isVerifiedContact: true
             )
@@ -43,7 +40,6 @@ struct CertificateSignatureSignerIdentity: Equatable {
             source: .unknown,
             displayName: IdentityPresentation.shortKeyId(from: fingerprint),
             secondaryText: nil,
-            shortKeyId: IdentityPresentation.shortKeyId(from: fingerprint),
             fingerprint: fingerprint,
             isVerifiedContact: false
         )

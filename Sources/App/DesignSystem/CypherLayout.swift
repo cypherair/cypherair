@@ -15,8 +15,6 @@ enum CypherSpacing {
     static let standard: CGFloat = 16
     /// Spacing between sections of a screen.
     static let section: CGFloat = 20
-    /// Breathing room around hero content.
-    static let loose: CGFloat = 24
 }
 
 /// Shared corner-radius scale. macOS uses tighter radii to match native

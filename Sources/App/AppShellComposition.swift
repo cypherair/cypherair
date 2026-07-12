@@ -21,11 +21,10 @@ struct AppRouteDestinationView: View {
             ImportKeyView()
         case .contactDetail(let contactId):
             ContactDetailView(contactId: contactId)
-        case .contactCertification(let contactId, let keyId, let intent):
+        case .contactCertification(let contactId, let keyId, _):
             ContactCertificationDetailsView(
                 contactId: contactId,
-                keyId: keyId,
-                intent: intent
+                keyId: keyId
             )
         case .contactCertificateSignatures(let fingerprint):
             ContactCertificateSignaturesView(fingerprint: fingerprint)
@@ -76,7 +75,6 @@ enum AppShellComposition {
             title: title(for: tab),
             systemImage: systemImage(for: tab),
             section: section(for: tab),
-            visibleInCompact: visibleInCompact(tab),
             content: content
         )
     }
@@ -130,10 +128,6 @@ enum AppShellComposition {
         case .encrypt, .decrypt, .sign, .verify:
             .tools
         }
-    }
-
-    static func visibleInCompact(_ tab: AppShellTab) -> Bool {
-        section(for: tab) == .primary
     }
 
     static func content(

@@ -326,12 +326,10 @@ final class DecryptScreenModelTests: XCTestCase {
 
         model.handleContentClearGenerationChange()
         XCTAssertFalse(model.operation.isRunning)
-        XCTAssertNil(model.decryptedText)
 
         await gate.resume()
         await settleAsyncWork()
 
-        XCTAssertNil(model.decryptedText)
         XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNil(decryptedPlaintext)
         XCTAssertFalse(model.operation.isShowingError)
@@ -362,7 +360,6 @@ final class DecryptScreenModelTests: XCTestCase {
         XCTAssertFalse(model.importedCiphertext.hasImportedFile)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.activeDetailedSignatureVerification)
-        XCTAssertNil(model.decryptedText)
         XCTAssertEqual(model.textInputSectionEpoch, startingEpoch)
     }
 
@@ -530,7 +527,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertEqual(model.decryptedText, "decrypted-text")
+        XCTAssertEqual(model.textDecryptionResult?.plaintext, "decrypted-text")
         XCTAssertEqual(model.textDecryptionResult?.verification.summaryState, .verified)
         XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
         XCTAssertEqual(decryptedPlaintext, Data("decrypted-text".utf8))
@@ -607,7 +604,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertEqual(model.decryptedFileURL, outputURL)
+        XCTAssertEqual(model.fileDecryptionResult?.output.fileURL, outputURL)
         XCTAssertEqual(model.fileDecryptionResult?.verification.summaryState, .signerCertificateUnavailable)
         XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .signerCertificateUnavailable)
 
@@ -679,7 +676,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.decryptedFileURL)
+        XCTAssertNil(model.fileDecryptionResult)
         XCTAssertNil(model.operation.progress)
         XCTAssertFalse(model.operation.isShowingError)
     }
@@ -728,7 +725,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.decryptedFileURL)
+        XCTAssertNil(model.fileDecryptionResult)
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
         XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertFalse(model.operation.isShowingError)
@@ -783,12 +780,10 @@ final class DecryptScreenModelTests: XCTestCase {
         model.handleDisappear()
 
         XCTAssertFalse(model.operation.isRunning)
-        XCTAssertNil(model.decryptedFileURL)
 
         await gate.resume()
         await settleAsyncWork()
 
-        XCTAssertNil(model.decryptedFileURL)
         XCTAssertNil(model.fileDecryptionResult)
         XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertFalse(FileManager.default.fileExists(atPath: outputURL.path))
@@ -815,12 +810,10 @@ final class DecryptScreenModelTests: XCTestCase {
 
         model.decryptMode = .text
 
-        XCTAssertEqual(model.decryptedText, "Text plaintext")
         XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
 
         model.decryptMode = .file
 
-        XCTAssertEqual(model.decryptedFileURL, fileOutputURL)
         XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .invalid)
 
         model.setCiphertextInput("edited text")
@@ -874,7 +867,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         model.decryptMode = .text
 
-        XCTAssertEqual(model.decryptedText, "Text plaintext")
+        XCTAssertEqual(model.textDecryptionResult?.plaintext, "Text plaintext")
         XCTAssertEqual(model.activeDetailedSignatureVerification?.summaryState, .verified)
     }
 
@@ -910,7 +903,7 @@ final class DecryptScreenModelTests: XCTestCase {
         model.handleContentClearGenerationChange()
 
         XCTAssertEqual(model.ciphertextInput, "")
-        XCTAssertNil(model.decryptedText)
+        XCTAssertNil(model.textDecryptionResult)
         XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNil(model.phase1Result)
         XCTAssertNil(model.filePhase1Result)
@@ -941,7 +934,7 @@ final class DecryptScreenModelTests: XCTestCase {
 
         model.handleDisappear()
 
-        XCTAssertNil(model.decryptedFileURL)
+        XCTAssertNil(model.fileDecryptionResult)
         XCTAssertFalse(FileManager.default.fileExists(atPath: disappearURL.path))
         XCTAssertFalse(model.importedCiphertext.hasImportedFile)
         XCTAssertNil(model.fileImportTarget)
@@ -967,7 +960,7 @@ final class DecryptScreenModelTests: XCTestCase {
             model.operation.isRunning == false
         }
 
-        XCTAssertNil(model.decryptedText)
+        XCTAssertNil(model.textDecryptionResult)
         XCTAssertNil(model.activeDetailedSignatureVerification)
         XCTAssertNotNil(model.phase1Result)
     }
@@ -1086,7 +1079,6 @@ final class DecryptScreenModelTests: XCTestCase {
         inputURL: URL
     ) -> FileDecryptionPhase1Result {
         FileDecryptionPhase1Result(
-            recipientKeyIds: ["ABCD1234"],
             matchedKey: matchedKey,
             inputPath: inputURL.path
         )

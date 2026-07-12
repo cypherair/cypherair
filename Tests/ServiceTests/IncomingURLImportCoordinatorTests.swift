@@ -274,7 +274,6 @@ final class IncomingURLImportCoordinatorTests: XCTestCase {
     @MainActor
     private func makeRequest(fingerprintSeed: Character) -> ImportConfirmationRequest {
         ImportConfirmationRequest(
-            keyData: Data(),
             metadata: PGPKeyMetadata(
                 fingerprint: String(repeating: String(fingerprintSeed), count: 40),
                 keyVersion: 4,

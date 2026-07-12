@@ -3,7 +3,6 @@ import SwiftUI
 @MainActor
 struct ImportConfirmationRequest: Identifiable {
     let id = UUID()
-    let keyData: Data
     let metadata: PGPKeyMetadata
     let candidateMatch: ContactCandidateMatch?
     let allowsUnverifiedImport: Bool
@@ -12,7 +11,6 @@ struct ImportConfirmationRequest: Identifiable {
     let onCancel: @MainActor () -> Void
 
     init(
-        keyData: Data,
         metadata: PGPKeyMetadata,
         candidateMatch: ContactCandidateMatch? = nil,
         allowsUnverifiedImport: Bool,
@@ -20,7 +18,6 @@ struct ImportConfirmationRequest: Identifiable {
         onImportUnverified: @escaping @MainActor () -> Void,
         onCancel: @escaping @MainActor () -> Void
     ) {
-        self.keyData = keyData
         self.metadata = metadata
         self.candidateMatch = candidateMatch
         self.allowsUnverifiedImport = allowsUnverifiedImport

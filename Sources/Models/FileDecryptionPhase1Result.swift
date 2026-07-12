@@ -5,8 +5,6 @@ import Foundation
 /// This mirrors `DecryptionPhase1Result` without loading the ciphertext into
 /// memory; Phase 2 must still authenticate before private-key use.
 struct FileDecryptionPhase1Result {
-    /// Recipient key IDs found in the ciphertext header.
-    let recipientKeyIds: [String]
     /// Matched local key identity, if any.
     let matchedKey: PGPKeyIdentity?
     /// Path to the encrypted input file passed through for Phase 2.

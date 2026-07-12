@@ -14,14 +14,14 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Full key fingerprint (lowercase hex, no spaces).
     let fingerprint: String
 
-    /// Key version (4 for Profile A, 6 for Profile B).
+    /// Key version (4 for the v4 Legacy family, 6 for the v6 families).
     let keyVersion: UInt8
 
     /// Encryption profile.
     let profile: PGPKeyProfile
 
     /// Successor OpenPGP configuration identity, persisted independently from
-    /// historical Profile A/B vocabulary.
+    /// the historical profile vocabulary.
     let openPGPConfigurationIdentity: PGPKeyConfiguration.Identity
 
     /// Private-key custody model for this local identity.
@@ -65,16 +65,6 @@ struct PGPKeyIdentity: Identifiable, Hashable, Codable {
     /// Short Key ID (last 16 hex chars of fingerprint). De-emphasized in UI.
     var shortKeyId: String {
         IdentityPresentation.shortKeyId(from: fingerprint)
-    }
-
-    /// Formatted fingerprint for display (groups of 4 characters).
-    var formattedFingerprint: String {
-        IdentityPresentation.formattedFingerprint(fingerprint)
-    }
-
-    /// Format a hex fingerprint string into groups of 4 characters separated by spaces.
-    static func formatFingerprint(_ hex: String) -> String {
-        IdentityPresentation.formattedFingerprint(hex)
     }
 
     var openPGPConfiguration: PGPKeyConfiguration {

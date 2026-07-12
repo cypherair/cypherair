@@ -25,10 +25,6 @@ struct SignatureVerification {
         let fingerprint: String
         let isVerifiedContact: Bool
 
-        var formattedFingerprint: String {
-            IdentityPresentation.formattedFingerprint(fingerprint)
-        }
-
         static func resolve(
             fingerprint: String?,
             contactKeys: [ContactKeyRecord],

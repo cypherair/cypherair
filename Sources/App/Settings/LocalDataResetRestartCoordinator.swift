@@ -4,10 +4,8 @@ import SwiftUI
 @Observable
 final class LocalDataResetRestartCoordinator {
     private(set) var restartRequiredAfterLocalDataReset = false
-    private(set) var resetSummary: LocalDataResetSummary?
 
-    func markRestartRequired(summary: LocalDataResetSummary) {
-        resetSummary = summary
+    func markRestartRequired() {
         restartRequiredAfterLocalDataReset = true
     }
 }

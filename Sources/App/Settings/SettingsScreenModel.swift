@@ -403,11 +403,11 @@ final class SettingsScreenModel {
                 }
                 resetAuthenticationContext = result.context
 
-                let summary = try await localDataResetService.resetAllLocalData(
+                _ = try await localDataResetService.resetAllLocalData(
                     authenticationContext: resetAuthenticationContext
                 )
                 localDataResetSucceeded = true
-                localDataResetRestartCoordinator?.markRestartRequired(summary: summary)
+                localDataResetRestartCoordinator?.markRestartRequired()
             } catch {
                 localDataResetErrorMessage = error.localizedDescription
             }

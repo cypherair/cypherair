@@ -418,10 +418,6 @@ final class EncryptScreenModel {
         recipientTagFilterState.toggle(tagId, availableTags: recipientTagFilters)
     }
 
-    func isRecipientTagFilterSelected(_ tagId: String) -> Bool {
-        recipientTagFilterState.isSelected(tagId, availableTags: recipientTagFilters)
-    }
-
     func clearRecipientTagFilters() {
         recipientTagFilterState.clear()
     }

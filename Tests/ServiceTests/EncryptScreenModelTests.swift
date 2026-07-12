@@ -548,12 +548,10 @@ final class EncryptScreenModelTests: XCTestCase {
 
         // Selecting a tag narrows the candidates to that tag's members.
         model.toggleRecipientTagFilter(tag.tagId)
-        XCTAssertTrue(model.isRecipientTagFilterSelected(tag.tagId))
         XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [taggedContactId])
 
         // Toggling the same tag off restores the full candidate list.
         model.toggleRecipientTagFilter(tag.tagId)
-        XCTAssertFalse(model.isRecipientTagFilterSelected(tag.tagId))
         XCTAssertEqual(
             Set(model.filteredRecipientContacts.map(\.contactId)),
             Set([taggedContactId, untaggedContactId])

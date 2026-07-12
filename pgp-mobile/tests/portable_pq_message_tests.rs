@@ -133,7 +133,7 @@ fn test_pq_plus_v4_mixed_uses_seipdv1_with_aes256_floor() {
     assert!(algos.contains(&PublicKeyAlgorithm::MLKEM768_X25519));
 
     let (v1, v2) = detect_message_format(&ct);
-    assert!(v1 && !v2, "mixed PQ + Profile A must fall back to SEIPDv1");
+    assert!(v1 && !v2, "mixed PQ + Legacy must fall back to SEIPDv1");
 
     // Both recipients decrypt through the engine.
     let via_pq = decrypt::decrypt_detailed(&ct, &[pq.cert_data.clone()], &[]).expect("pq");

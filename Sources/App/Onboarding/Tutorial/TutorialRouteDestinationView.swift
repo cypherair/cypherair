@@ -6,7 +6,6 @@ struct TutorialRouteDestinationView: View {
 
     let route: AppRoute
     let definitionTab: AppShellTab
-    let sizeClass: UserInterfaceSizeClass?
 
     var body: some View {
         destination
@@ -98,13 +97,12 @@ struct TutorialRouteDestinationView: View {
                     ContactCertificateSignaturesView(fingerprint: fingerprint)
                 }
             )
-        case .contactCertification(let contactId, let keyId, let intent):
+        case .contactCertification(let contactId, let keyId, _):
             return AnyView(
                 TutorialSurfaceView(tab: definitionTab, route: route) {
                     ContactCertificationDetailsView(
                         contactId: contactId,
-                        keyId: keyId,
-                        intent: intent
+                        keyId: keyId
                     )
                 }
             )

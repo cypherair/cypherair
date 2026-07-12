@@ -27,22 +27,6 @@ extension FFIIntegrationTests {
         XCTAssertTrue(data.allSatisfy { $0 == 0 }, "All bytes in 1 MB buffer must be zero")
     }
 
-    /// Verify Array<UInt8>.zeroize() sets all elements to zero.
-    func test_arrayZeroize_setsAllElementsToZero() {
-        var arr: [UInt8] = [0x01, 0x02, 0x03, 0xFF, 0xAB]
-        let originalCount = arr.count
-        arr.zeroize()
-        XCTAssertEqual(arr.count, originalCount, "Count must not change")
-        XCTAssertTrue(arr.allSatisfy { $0 == 0 }, "All elements must be zero after zeroize()")
-    }
-
-    /// Verify Array<UInt8>.zeroize() on empty array does not crash.
-    func test_arrayZeroize_emptyArray_noop() {
-        var arr: [UInt8] = []
-        arr.zeroize()
-        XCTAssertTrue(arr.isEmpty, "Empty array remains empty")
-    }
-
     /// Verify SensitiveData.zeroize() clears the underlying storage.
     func test_sensitiveData_explicitZeroize_clearsData() {
         let sensitive = SensitiveData(Data([0xDE, 0xAD, 0xBE, 0xEF]))

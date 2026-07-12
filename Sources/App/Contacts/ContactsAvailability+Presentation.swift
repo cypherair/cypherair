@@ -34,21 +34,4 @@ extension ContactsAvailability {
             String(localized: "contacts.availability.restart.description", defaultValue: "Restart CypherAir X before using protected contact data.")
         }
     }
-
-    var unavailableSystemImage: String {
-        switch self {
-        case .opening:
-            "lock.open"
-        case .locked:
-            "lock"
-        case .recoveryNeeded:
-            "exclamationmark.triangle"
-        case .frameworkUnavailable:
-            "externaldrive.badge.exclamationmark"
-        case .restartRequired:
-            "arrow.clockwise"
-        case .availableProtectedDomain:
-            "person.2"
-        }
-    }
 }

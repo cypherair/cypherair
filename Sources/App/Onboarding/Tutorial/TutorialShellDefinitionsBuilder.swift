@@ -97,8 +97,7 @@ struct TutorialShellDefinitionsBuilder {
             AnyView(
                 TutorialRouteDestinationView(
                     route: route,
-                    definitionTab: tab,
-                    sizeClass: sizeClass
+                    definitionTab: tab
                 )
             )
         }

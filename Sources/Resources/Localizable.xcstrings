@@ -4403,6 +4403,22 @@
         }
       }
     },
+    "encrypt.encryptToSelf.staleSelection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Encrypt to Self key is no longer available. Review the selection and try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您的“加密给自己”密钥已不可用。请检查所选密钥后再重试。"
+          }
+        }
+      }
+    },
     "encrypt.recipients.staleSelection" : {
       "localizations" : {
         "en" : {

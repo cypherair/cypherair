@@ -5,7 +5,7 @@ struct PGPKeyMetadata: Equatable, Hashable, Sendable {
     /// Key fingerprint as lowercase hex string.
     let fingerprint: String
 
-    /// Key version (4 for Profile A, 6 for Profile B).
+    /// Key version (4 for the v4 Legacy family, 6 for the v6 families).
     let keyVersion: UInt8
 
     /// Policy-selected primary User ID string for display and identity matching.
