@@ -1,9 +1,10 @@
 # CypherAir arm64e Toolchain Upstreaming Plan
 
-> Status: Active Rust 1.97 / LLVM ownership split candidate. This is not the
-> production pin source of truth.
+> Status: Active Rust 1.97 / LLVM ownership split. The stable197 stage1 is
+> published and selected for the CypherAir production re-pin. This document is
+> not the production pin source of truth.
 > Purpose: Record which arm64e changes belong in Rust, which belong in LLVM,
-> and how the candidate is validated without changing the shipped toolchain.
+> and how the owned-fork carry is validated, published, and consumed.
 > Source of truth for the production stage1 pin:
 > [ARM64E_STATUS.md](ARM64E_STATUS.md).
 > Scope boundary: The OpenSSL carry chain remains owned by
@@ -28,9 +29,9 @@ Rust 1.96-to-1.97 rebase:
 - A semantically equivalent LLVM series is replayed locally onto Rust's pinned
   LLVM revision to test compatibility. That replay stays local-only under the
   LLVM workspace fork-topology policy.
-- No upstream Rust or LLVM pull request is part of this work. No Rust stage1
-  tag, prerelease, or CypherAir production re-pin is authorized by this
-  candidate.
+- No upstream Rust or LLVM pull request is part of this work. The Rust stage1
+  prerelease and CypherAir production re-pin were separately approved for the
+  CypherAir-owned repositories.
 
 Decision update (2026-07-13): this supersedes the 2026-07-12 issue comment only
 in its conclusion to retain the Rust serialized-output stripper. Reconstructing
@@ -39,12 +40,14 @@ commits and could be removed completely once Rust's frontend emission was
 narrowed and regression-covered. The no-consumed-fork decision remains:
 Rust's `src/llvm-project` is not repointed, no second Rust-LLVM fork is
 introduced, and the canonical LLVM patches are replayed local-only for
-compatibility. No upstream pull request, release, or production re-pin is
-authorized.
+compatibility. No upstream pull request, release, or production re-pin was
+authorized by the ownership decision itself; the owned-fork publication and
+CypherAir re-pin were subsequently approved and executed as separate steps.
 
-The production app therefore continues to use the stable 1.96 stage1 tag
-recorded in [ARM64E_STATUS.md](ARM64E_STATUS.md). A candidate becoming green
-does not change that pin.
+The production app now uses the stable197 stage1 tag recorded in
+[ARM64E_STATUS.md](ARM64E_STATUS.md). Candidate validation alone did not change
+that pin: publication, provenance readback, and the explicit re-pin were
+separate gates.
 
 ## 2. Repository And Branch State
 
@@ -58,8 +61,12 @@ snapshots, not the Rust stable-tag or LLVM work-branch bases:
 | `cypherair/llvm-project-upstream` | `llvm/llvm-project` `main` at `171ba71128eec9f1859bb995c597dcff296ee730` | `cypherair-arm64e-ptrauth-canonical` |
 
 The Rust 1.97 carry is based exactly on the `1.97.0` tag commit
-`2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`. Its signed candidate tip is
-`c3a04d4e4ff987b59aacb8d42b66c853db74c02a`.
+`2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`. Its twelve-commit signed logical
+compiler/CI series ends at `c3a04d4e4ff987b59aacb8d42b66c853db74c02a`.
+The signed publication tip is
+`027700f412b05d0148e6eb4e865d618582cbb63f`; its additional commit fixes the
+owned-fork workflow's attestation source-ref comparison and does not change
+compiler behavior.
 
 The issue's stable-1.96 pre-step is also resolved: after fetching the owned
 Rust fork, `carry/cypherair-arm64e-toolchain-stable-1.96` includes the pinned
@@ -86,11 +93,12 @@ Rust still uses small LLVM C API shims for APIs that LLVM's public C interface
 does not expose. Those shims express Rust frontend decisions; they do not
 perform optimizer repair or serialized-output rewriting.
 
-## 4. Rust 1.97 Candidate
+## 4. Rust 1.97 Carry
 
 The former 29-patch stable-1.96 history was reconstructed as twelve signed,
-logical commits on Rust 1.97. The history was rebuilt so the output stripper
-does not exist at any intermediate commit.
+logical compiler/carry commits on Rust 1.97. The history was rebuilt so the
+output stripper does not exist at any intermediate commit. A thirteenth signed
+commit contains only the later publication-workflow fix.
 
 | Commit | Purpose | Owner |
 | --- | --- | --- |
@@ -106,6 +114,7 @@ does not exist at any intermediate commit.
 | `23f3f80209af` | Cover visionOS pointer-authentication integration | Rust |
 | `92e1dbfed5a2` | Carry safe, opt-in stage1 workflows for stable 1.97 | Fork CI |
 | `c3a04d4e4ff9` | Close frontend pointer-authentication IR emission gaps | Rust |
+| `027700f412b0` | Verify publication attestations against the canonical GitHub source ref | Fork CI |
 
 The old Mach-O metadata-subtype patch is absent because Rust 1.97 already
 contains the equivalent upstream change (`8c029d5f456775294204a8c28b24d6ba19865d79`).
@@ -171,8 +180,8 @@ Completed locally:
 - `x.py fmt --check` passed for 6,874 files using the available nightly
   rustfmt with a temporary bootstrap configuration. The ordinary tidy entry
   point was unavailable only because the downloaded stage0 lacked rustfmt.
-- All twelve Rust commits and all three canonical LLVM commits have valid SSH
-  signatures; both ranges pass `git diff --check`.
+- All thirteen Rust-branch commits and all three canonical LLVM commits have
+  valid SSH signatures; both ranges pass `git diff --check`.
 - The canonical LLVM 23.0.0git optimized assertions build passed five focused
   lit tests plus direct InstCombine, verifier, `llc`, and Mach-O relocation
   checks. The suite covers `Transforms/InstCombine/ptrauth-call.ll`, both
@@ -191,14 +200,50 @@ Completed locally:
   `aarch64-apple-darwin` and `x86_64-apple-darwin`; `publish-stage1` was
   skipped. Both uploaded artifact checksums verify, and their manifests record
   source tip `c3a04d4`, Rust 1.97.0 base `2d8144b`, Rust source, and all four
-  Apple arm64e targets. No stable-1.97 tag or release exists.
+  Apple arm64e targets.
+- The first approved publication run, `29273772623`, again built and tested
+  both host artifacts but failed before creating a tag or release because its
+  publish job compared a raw branch name with the canonical attestation source
+  ref. Cleanup confirmed that no partial tag or release remained.
+- Signed workflow fix `027700f412b0` made the source-ref contract explicit.
+  Retry run `29277996466` passed both host builds, created and published the
+  stable197 prerelease, and completed post-publication asset-attestation
+  verification. The release tag resolves to the exact signed source tip.
+- Independent release readback confirmed the expected eight uploaded assets,
+  both schema-v2 manifests, both packaged-tar checksum digests, and the four
+  small release-asset attestations. Each manifest records Rust 1.97.0 base
+  `2d8144b`, source tip `027700f`, no build-std requirement, included Rust
+  source, and all four Apple arm64e targets.
+- The CypherAir Rust test suite passed under stable Rust 1.97.0. A forced fresh
+  consumer build then downloaded the published aarch64 host artifact, verified
+  its checksum and manifest, rebuilt every app XCFramework slice, and regenerated
+  byte-identical UniFFI bindings. The emitted build manifest binds the package
+  to source tip `027700f`, Rust 1.97.0 base `2d8144b`, and workflow
+  `29277996466`; the iOS, macOS, and visionOS device libraries each contain
+  both `arm64` and `arm64e`, and `requiredSlicesPresent` is true.
+- Xcode 27 beta's eligible generic visionOS destination also built the app for
+  visionOS 27 with minimum OS 26.5; its executable contains both `arm64` and
+  `arm64e`. This is supplemental evidence because the local Xcode 26.6 install
+  has the visionOS 26.5 SDK files but reports that platform component as
+  unavailable for destinations.
 
-Still required before this candidate can be considered for production:
+Local app-test limitation:
 
-1. Obtain explicit maintainer approval before creating any stable-1.97 stage1
-   tag or prerelease.
-2. Only after an approved prerelease exists, perform the documented CypherAir
-   re-pin, XCFramework rebuild, and full app test chain.
+- Xcode 26.6 launches both the `arm64e` and control `arm64` unit-test hosts, but
+  this Mac's existing sandboxed CypherAir test container returns
+  `protectedFileWriteFailed` while creating a fresh UI-test Contacts protected
+  domain. The app deliberately traps before XCTest connects, so no unit tests
+  run. The identical cross-architecture failure and Swift-only crash path rule
+  out the stable197 compiler/XCFramework; resetting any shared app-container
+  state requires separate explicit approval.
+
+Still required to complete the CypherAir production re-pin:
+
+1. Complete the unit, device, and UI validation on a clean app-test container
+   or in pull-request CI, and run the native visionOS 26.5 probe where that
+   platform component is available.
+2. Complete the pull-request checks and the required fresh-context pre-merge
+   review.
 
 ## 7. Release And Upstream Gates
 
@@ -212,10 +257,11 @@ The stable-1.97 workflow is safe by default:
   prep with both `create_refresh_pr=true` and
   `dispatch_stage1_prerelease=true`; all defaults are false.
 
-Publishing that prerelease, changing the production pin, or opening any
-upstream Rust/LLVM pull request requires a separate explicit maintainer
-decision. Until then, the validated work remains on CypherAir-owned branches
-and the 1.96 pin remains authoritative.
+The stable197 prerelease publication and CypherAir re-pin received that
+separate maintainer approval. The exact production pin is therefore the one in
+[ARM64E_STATUS.md](ARM64E_STATUS.md). Opening any upstream Rust or LLVM pull
+request remains outside this approval and requires a new explicit decision;
+all upstream-facing work remains on CypherAir-owned branches.
 
 ## 8. Stable-1.96 To Stable-1.97 Lineage
 

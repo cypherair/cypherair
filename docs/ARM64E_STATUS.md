@@ -4,7 +4,7 @@
 > Purpose: The pinned arm64e Rust stage1 toolchain, the packaging policy, and the external SQLCipher pin.
 > Audience: Human developers, release owners, and AI coding tools.
 > Update triggers: The pinned stage1 tag or its source ref/commit, the stage1 consumption policy, the `openssl-src` patch target or the OpenSSL forks' role, the dual-arch packaging policy or build-manifest contract, or the SQLCipher wrapper pin.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-13.
 
 ## Packaging Policy
 
@@ -15,9 +15,9 @@
 
 ## Pinned Rust stage1 Toolchain
 
-- Fork repository: `cypherair/rust`; stable base `1.96.0` (`ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`). New stage1 prereleases are published by that fork's `arm64e-stage1-prerelease.yml` workflow.
-- **Pinned prerelease tag:** `rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1`
-- Pinned source ref/commit: `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96` @ `abeb8459f2b459704c1d698c01d8b8c0df8ffffd` (workflow run `27765229620`).
+- Fork repository: `cypherair/rust`; stable base `1.97.0` (`2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`). New stage1 prereleases are published by that fork's `arm64e-stage1-prerelease.yml` workflow.
+- **Pinned prerelease tag:** `rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1`
+- Pinned source ref/commit: `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.97` @ `027700f412b05d0148e6eb4e865d618582cbb63f` (workflow run `29277996466`).
 - The prerelease publishes host-specific `rust-stage1-for-arm64e-<host-triple>.*` asset sets (`aarch64-apple-darwin` and `x86_64-apple-darwin`); downloaders select the asset matching the build host and verify the packaged checksum and manifest (`requiresBuildStd: false`, arm64e std targets for Darwin, iOS, tvOS, visionOS).
 - CI and local packaging force-download this pinned prerelease via direct release-asset URLs with token variables scrubbed. **`latest` is never allowed** — `scripts/download_arm64e_stage1_toolchain.sh` rejects it. `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate Rust-compiler testing only.
 - App-side Rust or UniFFI changes never require a new stage1 prerelease; only changes to the Rust compiler fork itself do.

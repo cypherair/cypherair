@@ -155,7 +155,7 @@ Run after any Rust or UniFFI change that can affect Swift-visible behavior (deci
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1 \
     ./build-xcframework.sh --release
 ```
 

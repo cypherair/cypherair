@@ -21,9 +21,9 @@ STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
-ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
+ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable197}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
 ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
 ARM64E_RUSTC="${ARM64E_RUSTC:-}"
@@ -154,10 +154,10 @@ with open(manifest_path, encoding="utf-8") as handle:
     payload = json.load(handle)
 
 errors = []
-if payload.get("stableBaseRelease") != "1.96.0":
-    errors.append("stableBaseRelease must be 1.96.0")
-if payload.get("stableBaseCommit") != "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96":
-    errors.append("stableBaseCommit must be ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96")
+if payload.get("stableBaseRelease") != "1.97.0":
+    errors.append("stableBaseRelease must be 1.97.0")
+if payload.get("stableBaseCommit") != "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3":
+    errors.append("stableBaseCommit must be 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3")
 if payload.get("requiresBuildStd") is not False:
     errors.append("requiresBuildStd must be false")
 if payload.get("asset", {}).get("purpose") != "rust-stage1-for-arm64e":
@@ -263,7 +263,7 @@ EOF
         target_libdir="$("$ARM64E_RUSTC" --print target-libdir --target "$target")"
         if ! compgen -G "$target_libdir/libstd-*.rlib" >/dev/null; then
             echo "error: arm64e stage1 toolchain is missing prebuilt std for ${target} at ${target_libdir}" >&2
-            echo "       republish the stable196 Rust fork stage1 with prebuilt std payloads." >&2
+            echo "       republish the stable197 Rust fork stage1 with prebuilt std payloads." >&2
             exit 1
         fi
     done
