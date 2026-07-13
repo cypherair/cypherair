@@ -131,7 +131,7 @@ class ContactServiceTestCase: XCTestCase {
         exportFilenames: (String, String)
     ) async throws -> (VerifiedContactCertificationArtifact, VerifiedContactCertificationArtifact) {
         let keyManagement = TestHelpers.makeKeyManagement(engine: engine).service
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: keyManagement,
             name: "PR6 Certification Signer",
             email: "pr6-signer@example.invalid"

@@ -40,7 +40,7 @@ extension FFIIntegrationTests {
     }
 
     /// C5.3: IntegrityCheckFailed / AeadAuthenticationFailed on tampered ciphertext.
-    func test_errorMapping_integrityCheckFailed_profileA() throws {
+    func test_errorMapping_integrityCheckFailed_legacy() throws {
         let key = try engine.generateKey(
             name: "Tamper A", email: nil, expirySeconds: nil, profile: .universal
         )
@@ -66,7 +66,7 @@ extension FFIIntegrationTests {
             guard let pgpError = error as? PgpError else {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
             }
-            // Profile A (SEIPDv1): bit-flip in armored ciphertext may corrupt
+            // Legacy (SEIPDv1): bit-flip in armored ciphertext may corrupt
             // the encrypted payload (→ IntegrityCheckFailed), the armor framing
             // (→ CorruptData), or the recipient key ID (→ NoMatchingKey).
             switch pgpError {
@@ -78,8 +78,8 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: AeadAuthenticationFailed on tampered Profile B (SEIPDv2) ciphertext.
-    func test_errorMapping_aeadAuthenticationFailed_profileB() throws {
+    /// C5.3: AeadAuthenticationFailed on tampered Modern High (SEIPDv2) ciphertext.
+    func test_errorMapping_aeadAuthenticationFailed_modernHigh() throws {
         let key = try engine.generateKey(
             name: "Tamper B", email: nil, expirySeconds: nil, profile: .advanced
         )
@@ -105,7 +105,7 @@ extension FFIIntegrationTests {
             guard let pgpError = error as? PgpError else {
                 return XCTFail("Expected PgpError, got \(type(of: error))")
             }
-            // Profile B (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
+            // Modern High (SEIPDv2 AEAD): bit-flip may corrupt the AEAD payload
             // (→ AeadAuthenticationFailed), the armor framing (→ CorruptData),
             // or the recipient key ID (→ NoMatchingKey).
             switch pgpError {
@@ -366,8 +366,8 @@ extension FFIIntegrationTests {
         }
     }
 
-    /// C5.3: S2kError / WrongPassphrase on Profile B export-import with wrong passphrase.
-    func test_errorMapping_s2kError_profileB_wrongPassphrase() throws {
+    /// C5.3: S2kError / WrongPassphrase on Modern High export-import with wrong passphrase.
+    func test_errorMapping_s2kError_modernHigh_wrongPassphrase() throws {
         let key = try engine.generateKey(
             name: "S2K Test", email: nil, expirySeconds: nil, profile: .advanced
         )

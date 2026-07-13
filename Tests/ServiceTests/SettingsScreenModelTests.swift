@@ -55,7 +55,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_handleAuthModeSelection_withoutBackup_routesCallbackRequestWithRiskAcknowledgement() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var capturedRequest: AuthModeChangeConfirmationRequest?
         var configuration = SettingsView.Configuration()
@@ -76,7 +76,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_handleAuthModeSelection_withoutExternalPresenter_usesLocalSheetRequest() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         let model = makeModel()
         model.handleAuthModeSelection(.highSecurity)
@@ -88,7 +88,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_handleAuthModeSelection_withMacPresentationController_routesThroughMacHost() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var capturedPresentation: MacPresentation?
         let macPresentationController = MacPresentationController(
@@ -112,7 +112,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_confirmedModeSwitch_updatesConfigAndClearsPendingState() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         config.privateKeyControlState = .unlocked(.highSecurity)
 
         var receivedMode: AuthenticationMode?
@@ -143,7 +143,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_modeSwitchFailure_surfacesErrorState() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         let model = makeModel(authModeSwitchAction: { _, _, _ in
             throw SettingsScreenModelTestError(message: "Switch failed")
@@ -165,7 +165,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_modeSwitchFailureMarksRecoveryWhenCurrentModeUnavailable() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         let model = makeModel(authModeSwitchAction: { [self] newMode, _, _ in
             try privateKeyControlStore.beginRewrap(targetMode: newMode)
@@ -223,7 +223,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_staleRequestConfirm_executesItsCapturedMode() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var capturedRequests: [AuthModeChangeConfirmationRequest] = []
         var receivedModes: [AuthenticationMode] = []
@@ -258,7 +258,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_staleRequestCancel_doesNotClearNewerPendingRequest() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
 
         var capturedRequests: [AuthModeChangeConfirmationRequest] = []
         var receivedModes: [AuthenticationMode] = []
@@ -295,7 +295,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
 
     @MainActor
     func test_tutorialConfiguration_routesRequestToTutorialStore() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Alice")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Alice")
         let store = TutorialSessionStore()
 
         let model = makeModel(configuration: store.configurationFactory.settingsConfiguration())

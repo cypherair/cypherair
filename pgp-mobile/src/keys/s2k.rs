@@ -4,7 +4,7 @@ use super::*;
 /// Used by Swift side to check memory requirements before importing.
 #[derive(Debug, uniffi::Record)]
 pub struct S2kInfo {
-    /// S2K type: "iterated-salted" for Profile A, "argon2id" for Profile B, or "unknown".
+    /// S2K type: "iterated-salted" for Portable Legacy, "argon2id" for Portable Modern · High, or "unknown".
     pub s2k_type: String,
     /// For Argon2id: memory requirement in KiB (2^encoded_m). 0 for non-Argon2id.
     pub memory_kib: u64,

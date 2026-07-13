@@ -68,11 +68,11 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_syncSignerFromDefaultOnAppear_updatesToLatestDefaultKey() async throws {
-        let firstIdentity = try await TestHelpers.generateProfileAKey(
+        let firstIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "First"
         )
-        let secondIdentity = try await TestHelpers.generateProfileAKey(
+        let secondIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Second"
         )
@@ -89,11 +89,11 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_syncSignerFromDefaultOnAppear_resetsManualSelectionToCurrentDefault() async throws {
-        let firstIdentity = try await TestHelpers.generateProfileAKey(
+        let firstIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Default"
         )
-        let secondIdentity = try await TestHelpers.generateProfileAKey(
+        let secondIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Alternate"
         )
@@ -110,11 +110,11 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_syncSignerFromDefaultOnAppear_recoversAfterDefaultKeyDeletion() async throws {
-        let firstIdentity = try await TestHelpers.generateProfileAKey(
+        let firstIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Default"
         )
-        let secondIdentity = try await TestHelpers.generateProfileBKey(
+        let secondIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Other"
         )
@@ -131,7 +131,7 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_signText_updatesResult_and_routesClipboardAndExportThroughInterceptionPolicy() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
 
         var interceptedClipboard: String?
         var interceptedExportFilename: String?
@@ -174,7 +174,7 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_signFile_handlesSelection_and_preparesSigExport() async throws {
-        _ = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )
@@ -213,7 +213,7 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_signFile_cancellation_clearsProgress_andDoesNotPublishSignature() async throws {
-        _ = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )
@@ -287,7 +287,7 @@ final class SignScreenModelTests: XCTestCase {
 
     @MainActor
     func test_contentClearDuringTextSigningSuppressesLateSignedMessage() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(
+        let identity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signing Privacy"
         )

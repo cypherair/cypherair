@@ -44,7 +44,7 @@ final class SigningServiceTests: XCTestCase {
 
     // MARK: - Cleartext Signing
 
-    func test_signCleartext_profileA_producesSignedMessage() async throws {
+    func test_signCleartext_legacy_producesSignedMessage() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
 
         let signed = try await stack.signingService.signCleartext(
@@ -60,11 +60,11 @@ final class SigningServiceTests: XCTestCase {
                       "Should produce cleartext signed message")
     }
 
-    func test_signCleartext_profileB_producesSignedMessage() async throws {
+    func test_signCleartext_modernHigh_producesSignedMessage() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
 
         let signed = try await stack.signingService.signCleartext(
-            "Test message Profile B",
+            "Test message Modern High",
             signerFingerprint: identity.fingerprint
         )
 
@@ -73,7 +73,7 @@ final class SigningServiceTests: XCTestCase {
 
     // MARK: - Detached Signing
 
-    func test_signDetachedStreaming_profileA_producesDetachedSignature() async throws {
+    func test_signDetachedStreaming_legacy_producesDetachedSignature() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
         let data = Data("File content for signing".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
@@ -88,9 +88,9 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertFalse(signature.isEmpty, "Detached signature should not be empty")
     }
 
-    func test_signDetachedStreaming_profileB_producesDetachedSignature() async throws {
+    func test_signDetachedStreaming_modernHigh_producesDetachedSignature() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
-        let data = Data("File content for Profile B signing".utf8)
+        let data = Data("File content for Modern High signing".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
@@ -117,17 +117,17 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.summaryState, .verified)
     }
 
-    func test_verifyCleartext_profileB_validSignature_returnsValid() async throws {
+    func test_verifyCleartext_modernHigh_validSignature_returnsValid() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
 
         let signed = try await stack.signingService.signCleartext(
-            "Verify this Profile B message",
+            "Verify this Modern High message",
             signerFingerprint: identity.fingerprint
         )
 
         let result = try await stack.signingService.verifyCleartextDetailed(signed)
         XCTAssertEqual(result.verification.summaryState, .verified,
-                       "Valid Profile B signature should verify as .verified")
+                       "Valid Modern High signature should verify as .verified")
     }
 
     func test_verifyCleartext_tamperedMessage_returnsBad() async throws {
@@ -148,11 +148,11 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.summaryState, .invalid)
     }
 
-    func test_verifyCleartext_profileB_tamperedMessage_returnsBad() async throws {
+    func test_verifyCleartext_modernHigh_tamperedMessage_returnsBad() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
 
         var signed = try await stack.signingService.signCleartext(
-            "Original Profile B message",
+            "Original Modern High message",
             signerFingerprint: identity.fingerprint
         )
 
@@ -164,7 +164,7 @@ final class SigningServiceTests: XCTestCase {
 
         let result = try await stack.signingService.verifyCleartextDetailed(signed)
         XCTAssertEqual(result.verification.summaryState, .invalid,
-                       "Tampered Profile B message should verify as .invalid")
+                       "Tampered Modern High message should verify as .invalid")
     }
 
     func test_verifyCleartext_unknownSigner_returnsUnknownSigner() async throws {
@@ -192,7 +192,7 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.signatures.first?.verificationState, .contactsContextUnavailable)
     }
 
-    func test_verifyCleartext_profileB_unknownSigner_returnsUnknownSigner() async throws {
+    func test_verifyCleartext_modernHigh_unknownSigner_returnsUnknownSigner() async throws {
         let otherStack = await TestHelpers.makeServiceStack()
         defer { otherStack.cleanup() }
 
@@ -203,7 +203,7 @@ final class SigningServiceTests: XCTestCase {
         )
 
         let strangerSigned = try await otherStack.signingService.signCleartext(
-            "Profile B message from a stranger",
+            "Modern High message from a stranger",
             signerFingerprint: otherIdentity.fingerprint
         )
 
@@ -234,9 +234,9 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.summaryState, .verified)
     }
 
-    func test_verifyDetachedStreaming_profileB_validSignature_returnsValid() async throws {
+    func test_verifyDetachedStreaming_modernHigh_validSignature_returnsValid() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
-        let data = Data("Detached verify Profile B data".utf8)
+        let data = Data("Detached verify Modern High data".utf8)
         let fileURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
@@ -279,9 +279,9 @@ final class SigningServiceTests: XCTestCase {
                        "Tampered data should fail detached verification")
     }
 
-    func test_verifyDetachedStreaming_profileB_tamperedData_returnsBad() async throws {
+    func test_verifyDetachedStreaming_modernHigh_tamperedData_returnsBad() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
-        let data = Data("Original detached Profile B data".utf8)
+        let data = Data("Original detached Modern High data".utf8)
         let originalURL = try makeTemporaryFile(contents: data)
         defer { try? FileManager.default.removeItem(at: originalURL) }
 
@@ -291,7 +291,7 @@ final class SigningServiceTests: XCTestCase {
             progress: nil
         )
 
-        let tamperedData = Data("Tampered detached Profile B data".utf8)
+        let tamperedData = Data("Tampered detached Modern High data".utf8)
         let tamperedURL = try makeTemporaryFile(contents: tamperedData)
         defer { try? FileManager.default.removeItem(at: tamperedURL) }
 
@@ -301,7 +301,7 @@ final class SigningServiceTests: XCTestCase {
             progress: nil
         )
         XCTAssertEqual(result.summaryState, .invalid,
-                       "Tampered data should fail Profile B detached verification")
+                       "Tampered data should fail Modern High detached verification")
     }
 
     // MARK: - Expired Signer Key
@@ -339,10 +339,10 @@ final class SigningServiceTests: XCTestCase {
         )
     }
 
-    func test_verifyCleartext_profileB_expiredSignerKey_returnsExpiredOrWarning() async throws {
+    func test_verifyCleartext_modernHigh_expiredSignerKey_returnsExpiredOrWarning() async throws {
         // Generate a key with 1-second expiry
         let identity = try await stack.keyManagement.generateKey(
-            name: "Expiring Profile B Signer",
+            name: "Expiring Modern High Signer",
             email: nil,
             expirySeconds: 1,
             profile: .advanced
@@ -351,7 +351,7 @@ final class SigningServiceTests: XCTestCase {
 
         // Sign while key is still valid
         let signed = try await stack.signingService.signCleartext(
-            "Signed before expiry (Profile B)",
+            "Signed before expiry (Modern High)",
             signerFingerprint: identity.fingerprint
         )
 
@@ -366,7 +366,7 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertNotEqual(
             result.verification.summaryState,
             .notSigned,
-            "Profile B verification should produce a signed result even with expired key"
+            "Modern High verification should produce a signed result even with expired key"
         )
     }
 
@@ -387,11 +387,11 @@ final class SigningServiceTests: XCTestCase {
         XCTAssertEqual(result.verification.signatures.first?.signerIdentity?.source, .contact)
     }
 
-    func test_verifyCleartext_profileB_knownContact_resolvesSigner() async throws {
+    func test_verifyCleartext_modernHigh_knownContact_resolvesSigner() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced, name: "Bob Known")
 
         let signed = try await stack.signingService.signCleartext(
-            "From a known Profile B contact",
+            "From a known Modern High contact",
             signerFingerprint: identity.fingerprint
         )
 
@@ -404,7 +404,7 @@ final class SigningServiceTests: XCTestCase {
     // MARK: - H1: High Security Biometrics Blocking
 
     func test_signCleartext_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: stack.keyManagement)
+        let identity = try await TestHelpers.generateLegacyKey(service: stack.keyManagement)
 
         stack.mockSE.simulatedAuthMode = .highSecurity
         stack.mockSE.biometricsAvailable = false

@@ -35,7 +35,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
     }
 
     func test_exportKey_highSecurity_biometricsUnavailable_throwsAuthError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         mockSE.simulatedAuthMode = .highSecurity
         mockSE.biometricsAvailable = false
@@ -51,8 +51,8 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         }
     }
 
-    func test_importKey_profileA_wrongPassphrase_throwsError() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+    func test_importKey_legacy_wrongPassphrase_throwsError() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         let exported = try await service.exportKey(
             fingerprint: identity.fingerprint,
             passphrase: "correct-passphrase"
@@ -76,8 +76,8 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         }
     }
 
-    func test_importKey_profileB_wrongPassphrase_throwsError() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service)
+    func test_importKey_modernHigh_wrongPassphrase_throwsError() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service)
         let exported = try await service.exportKey(
             fingerprint: identity.fingerprint,
             passphrase: "correct-passphrase"
@@ -99,9 +99,9 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         }
     }
 
-    func test_importKey_profileB_lowMemory_throwsArgon2idExceeded() async throws {
+    func test_importKey_modernHigh_lowMemory_throwsArgon2idExceeded() async throws {
         // Service with full memory for key generation + export
-        let identity = try await TestHelpers.generateProfileBKey(service: service)
+        let identity = try await TestHelpers.generateModernHighKey(service: service)
         let exported = try await service.exportKey(
             fingerprint: identity.fingerprint,
             passphrase: "test-pass"
@@ -112,7 +112,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         mockMemory.availableBytes = 500_000_000
         let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
 
-        // Profile B uses Argon2id with 512 MB; 512 MB > 75% of 500 MB (375 MB) → rejected
+        // Modern High uses Argon2id with 512 MB; 512 MB > 75% of 500 MB (375 MB) → rejected
         do {
             _ = try await lowMemService.importKey(
                 armoredData: exported,
@@ -128,8 +128,8 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         }
     }
 
-    func test_importKey_profileA_lowMemory_succeeds() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+    func test_importKey_legacy_lowMemory_succeeds() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         let exported = try await service.exportKey(
             fingerprint: identity.fingerprint,
             passphrase: "test-pass"
@@ -140,7 +140,7 @@ final class KeyManagementServiceSecurityInvariantTests: KeyManagementServiceTest
         mockMemory.availableBytes = 500_000_000
         let (lowMemService, _, _, _, _) = TestHelpers.makeKeyManagement(memoryInfo: mockMemory)
 
-        // Profile A uses Iterated+Salted S2K (no Argon2id) — guard is no-op
+        // Legacy uses Iterated+Salted S2K (no Argon2id) — guard is no-op
         let imported = try await lowMemService.importKey(
             armoredData: exported,
             passphrase: "test-pass"

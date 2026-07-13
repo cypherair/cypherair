@@ -6,8 +6,8 @@ import XCTest
 
 final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCase {
 
-    func test_modifyExpiry_profileA_updatesExpiryDate() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Expiry A")
+    func test_modifyExpiry_legacy_updatesExpiryDate() async throws {
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Expiry A")
 
         // Modify expiry to 1 year (31536000 seconds)
         let updated = try await service.modifyExpiry(
@@ -22,8 +22,8 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
                        "Fingerprint should not change after expiry modification")
     }
 
-    func test_modifyExpiry_profileB_updatesExpiryDate() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service, name: "Expiry B")
+    func test_modifyExpiry_modernHigh_updatesExpiryDate() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service, name: "Expiry B")
 
         let updated = try await service.modifyExpiry(
             fingerprint: identity.fingerprint,
@@ -37,7 +37,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     }
 
     func test_modifyExpiry_setsAndClearsCrashRecoveryFlag() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Flag Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Flag Test")
 
         XCTAssertNil(try recoveryJournal().modifyExpiry)
 
@@ -64,7 +64,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         )
         let localService = stack.service
         let localKeychain = stack.mockKC
-        let identity = try await TestHelpers.generateProfileAKey(service: localService, name: "Begin Journal Failure")
+        let identity = try await TestHelpers.generateLegacyKey(service: localService, name: "Begin Journal Failure")
         let account = KeychainConstants.defaultAccount
 
         do {
@@ -101,7 +101,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
         )
         let localService = stack.service
         let localKeychain = stack.mockKC
-        let identity = try await TestHelpers.generateProfileAKey(service: localService, name: "Clear Journal Failure")
+        let identity = try await TestHelpers.generateLegacyKey(service: localService, name: "Clear Journal Failure")
         let originalStoredIdentity = try loadStoredIdentity(
             fingerprint: identity.fingerprint,
             persistence: localMetadataPersistence
@@ -134,7 +134,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     }
 
     func test_modifyExpiryCrashRecovery_oldAndPendingExist_deletesPending() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Recovery Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Recovery Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -166,7 +166,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     func test_modifyExpiryCrashRecovery_onlyPendingExists_promotesToPermanent() async throws {
         // Generate a key, then manually move its envelope to the pending row and delete the
         // permanent row to simulate a crash after deletion but before promotion.
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Promote Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Promote Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -194,7 +194,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     }
 
     func test_modifyExpiryCrashRecovery_noFlag_doesNothing() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "No Flag Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "No Flag Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -223,7 +223,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     // that scenario collapses to `_onlyPendingExists_promotesToPermanent` above.
 
     func test_modifyExpiryCrashRecovery_retryableFailure_keepsFlags() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Retry Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Retry Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 
@@ -243,7 +243,7 @@ final class KeyManagementServiceExpiryRecoveryTests: KeyManagementServiceTestCas
     }
 
     func test_modifyExpiryCrashRecovery_unrecoverable_clearsFlags() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service, name: "Unrecoverable Test")
+        let identity = try await TestHelpers.generateLegacyKey(service: service, name: "Unrecoverable Test")
         let fp = identity.fingerprint
         let account = KeychainConstants.defaultAccount
 

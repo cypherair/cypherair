@@ -56,13 +56,13 @@ final class EncryptionServiceTests: XCTestCase {
         return try XCTUnwrap(stack.contactService.contactId(forFingerprint: info.fingerprint))
     }
 
-    // MARK: - Text Encryption: Profile A
+    // MARK: - Text Encryption: Legacy
 
-    func test_encryptText_profileA_producesNonEmptyCiphertext() async throws {
+    func test_encryptText_legacy_producesNonEmptyCiphertext() async throws {
         let identity = try await generateKeyAndContact(profile: .universal)
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Hello, Profile A!",
+            "Hello, Legacy!",
             recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
@@ -74,13 +74,13 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertTrue(header?.hasPrefix("-----BEGIN PGP") == true)
     }
 
-    // MARK: - Text Encryption: Profile B
+    // MARK: - Text Encryption: Modern High
 
-    func test_encryptText_profileB_producesNonEmptyCiphertext() async throws {
+    func test_encryptText_modernHigh_producesNonEmptyCiphertext() async throws {
         let identity = try await generateKeyAndContact(profile: .advanced)
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Hello, Profile B!",
+            "Hello, Modern High!",
             recipientContactIds: [try contactId(for: identity)],
             signWithFingerprint: nil,
             encryptToSelf: false
@@ -222,12 +222,12 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
-    func test_encryptText_profileB_encryptToSelf_canDecryptWithOwnKey() async throws {
+    func test_encryptText_modernHigh_encryptToSelf_canDecryptWithOwnKey() async throws {
         let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
         let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Profile B encrypt to self test",
+            "Modern High encrypt to self test",
             recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true
@@ -244,15 +244,15 @@ final class EncryptionServiceTests: XCTestCase {
             verificationKeys: []
         )
         let decryptedText = String(data: result.plaintext, encoding: .utf8)
-        XCTAssertEqual(decryptedText, "Profile B encrypt to self test")
+        XCTAssertEqual(decryptedText, "Modern High encrypt to self test")
     }
 
-    func test_encryptText_profileB_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
+    func test_encryptText_modernHigh_encryptToSelfOff_cannotDecryptWithSenderKey() async throws {
         let sender = try await generateKeyAndContact(profile: .advanced, name: "Sender B")
         let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Profile B no self-encryption",
+            "Modern High no self-encryption",
             recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: false
@@ -283,9 +283,9 @@ final class EncryptionServiceTests: XCTestCase {
 
     // MARK: - Cross-Profile
 
-    func test_encryptText_profileBSender_profileARecipient_succeeds() async throws {
-        let sender = try await generateKeyAndContact(profile: .advanced, name: "ProfileB Sender")
-        let recipient = try await generateKeyAndContact(profile: .universal, name: "ProfileA Recipient")
+    func test_encryptText_modernHighSender_legacyRecipient_succeeds() async throws {
+        let sender = try await generateKeyAndContact(profile: .advanced, name: "ModernHigh Sender")
+        let recipient = try await generateKeyAndContact(profile: .universal, name: "Legacy Recipient")
 
         let ciphertext = try await stack.encryptionService.encryptText(
             "Cross-profile message",
@@ -294,7 +294,7 @@ final class EncryptionServiceTests: XCTestCase {
             encryptToSelf: false
         )
 
-        // Recipient (Profile A, v4) should be able to decrypt
+        // Recipient (Legacy, v4) should be able to decrypt
         let binary = try stack.engine.dearmor(armored: ciphertext)
         var recipientSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: recipient.fingerprint)
         defer { recipientSecret.resetBytes(in: 0..<recipientSecret.count) }
@@ -548,13 +548,13 @@ final class EncryptionServiceTests: XCTestCase {
         XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Default key fallback")
     }
 
-    func test_encryptText_encryptToSelfWithSpecificKey_profileB() async throws {
+    func test_encryptText_encryptToSelfWithSpecificKey_modernHigh() async throws {
         let defaultKey = try await generateKeyAndContact(profile: .advanced, name: "Default B")
         let specificKey = try await generateKeyAndContact(profile: .advanced, name: "Specific B")
         let recipient = try await generateKeyAndContact(profile: .advanced, name: "Recipient B")
 
         let ciphertext = try await stack.encryptionService.encryptText(
-            "Profile B specific key",
+            "Modern High specific key",
             recipientContactIds: [try contactId(for: recipient)],
             signWithFingerprint: nil,
             encryptToSelf: true,
@@ -572,7 +572,7 @@ final class EncryptionServiceTests: XCTestCase {
             secretKeys: [specificSecret],
             verificationKeys: []
         )
-        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Profile B specific key")
+        XCTAssertEqual(String(data: result.plaintext, encoding: .utf8), "Modern High specific key")
 
         // Default key cannot decrypt
         var defaultSecret = try await stack.keyManagement.unwrapPrivateKey(fingerprint: defaultKey.fingerprint)

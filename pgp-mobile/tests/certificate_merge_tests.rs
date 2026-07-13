@@ -304,66 +304,66 @@ fn test_parse_key_info_revoked_cert_uses_relaxed_display_user_id_fallback() {
 
 #[test]
 fn test_merge_public_certificate_absorbs_revocation_update_legacy_fixture() {
-    let base = load_fixture("merge_revocation_profile_a_base.gpg");
-    let update = load_fixture("merge_revocation_profile_a_update.gpg");
+    let base = load_fixture("merge_revocation_legacy_base.gpg");
+    let update = load_fixture("merge_revocation_legacy_update.gpg");
 
     let result = keys::merge_public_certificate_update(&base, &update)
-        .expect("profile A revocation merge should succeed");
+        .expect("legacy revocation merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged profile A revocation cert should parse");
+        .expect("merged legacy revocation cert should parse");
     assert!(info.is_revoked);
     assert_eq!(info.profile, KeyProfile::Universal);
 }
 
 #[test]
 fn test_merge_public_certificate_absorbs_revocation_update_modern_high_fixture() {
-    let base = load_fixture("merge_revocation_profile_b_base.gpg");
-    let update = load_fixture("merge_revocation_profile_b_update.gpg");
+    let base = load_fixture("merge_revocation_modern_high_base.gpg");
+    let update = load_fixture("merge_revocation_modern_high_update.gpg");
 
     let result = keys::merge_public_certificate_update(&base, &update)
-        .expect("profile B revocation merge should succeed");
+        .expect("modern high revocation merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let info = keys::parse_key_info(&result.merged_cert_data)
-        .expect("merged profile B revocation cert should parse");
+        .expect("merged modern high revocation cert should parse");
     assert!(info.is_revoked);
     assert_eq!(info.profile, KeyProfile::Advanced);
 }
 
 #[test]
 fn test_merge_public_certificate_adds_encryption_subkey_legacy_fixture() {
-    let base = load_fixture("merge_add_encryption_subkey_profile_a_base.gpg");
-    let update = load_fixture("merge_add_encryption_subkey_profile_a_update.gpg");
+    let base = load_fixture("merge_add_encryption_subkey_legacy_base.gpg");
+    let update = load_fixture("merge_add_encryption_subkey_legacy_update.gpg");
 
-    let base_info = keys::parse_key_info(&base).expect("profile A base cert should parse");
+    let base_info = keys::parse_key_info(&base).expect("legacy base cert should parse");
     assert!(!base_info.has_encryption_subkey);
 
     let result = keys::merge_public_certificate_update(&base, &update)
-        .expect("profile A subkey merge should succeed");
+        .expect("legacy subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let merged_info =
-        keys::parse_key_info(&result.merged_cert_data).expect("profile A merged cert should parse");
+        keys::parse_key_info(&result.merged_cert_data).expect("legacy merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
     assert_eq!(merged_info.profile, KeyProfile::Universal);
 }
 
 #[test]
 fn test_merge_public_certificate_adds_encryption_subkey_modern_high_fixture() {
-    let base = load_fixture("merge_add_encryption_subkey_profile_b_base.gpg");
-    let update = load_fixture("merge_add_encryption_subkey_profile_b_update.gpg");
+    let base = load_fixture("merge_add_encryption_subkey_modern_high_base.gpg");
+    let update = load_fixture("merge_add_encryption_subkey_modern_high_update.gpg");
 
-    let base_info = keys::parse_key_info(&base).expect("profile B base cert should parse");
+    let base_info = keys::parse_key_info(&base).expect("modern high base cert should parse");
     assert!(!base_info.has_encryption_subkey);
 
     let result = keys::merge_public_certificate_update(&base, &update)
-        .expect("profile B subkey merge should succeed");
+        .expect("modern high subkey merge should succeed");
 
     assert_eq!(result.outcome, CertificateMergeOutcome::Updated);
     let merged_info =
-        keys::parse_key_info(&result.merged_cert_data).expect("profile B merged cert should parse");
+        keys::parse_key_info(&result.merged_cert_data).expect("modern high merged cert should parse");
     assert!(merged_info.has_encryption_subkey);
     assert_eq!(merged_info.profile, KeyProfile::Advanced);
 }

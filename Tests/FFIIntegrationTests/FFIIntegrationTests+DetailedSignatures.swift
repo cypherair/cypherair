@@ -219,22 +219,22 @@ extension FFIIntegrationTests {
         XCTAssertTrue(detailed.signatures.isEmpty)
     }
 
-    func test_detailedApis_profileB_runtimeSmoke() throws {
+    func test_detailedApis_modernHigh_runtimeSmoke() throws {
         let signer = try engine.generateKey(
-            name: "FFI Detailed Profile B Signer",
+            name: "FFI Detailed Modern High Signer",
             email: "ffi-detailed-b@example.com",
             expirySeconds: nil,
             profile: .advanced
         )
         let recipient = try engine.generateKey(
-            name: "FFI Detailed Profile B Recipient",
+            name: "FFI Detailed Modern High Recipient",
             email: "ffi-detailed-b-recipient@example.com",
             expirySeconds: nil,
             profile: .advanced
         )
 
         let signed = try engine.signCleartext(
-            text: Data("Profile B detailed verify".utf8),
+            text: Data("Modern High detailed verify".utf8),
             signerCert: signer.certData
         )
         let verifyDetailed = try engine.verifyCleartextDetailed(
@@ -245,7 +245,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(verifyDetailed.signatures.count, 1)
 
         let ciphertext = try engine.encryptBinary(
-            plaintext: Data("Profile B detailed decrypt".utf8),
+            plaintext: Data("Modern High detailed decrypt".utf8),
             recipients: [recipient.publicKeyData],
             signingKey: signer.certData,
             encryptToSelf: nil

@@ -238,7 +238,7 @@ fn test_gpg_rejects_sequoia_modern_high_pubkey() {
     // Generate a Modern High key with Sequoia
     let key = keys::generate_key_with_profile(
         "Modern High User".to_string(),
-        Some("profileb@example.com".to_string()),
+        Some("modernhigh@example.com".to_string()),
         None,
         KeyProfile::Advanced,
     )

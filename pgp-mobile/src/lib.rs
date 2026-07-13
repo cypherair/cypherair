@@ -70,8 +70,8 @@ impl PgpEngine {
 
     /// Generate a new key pair with the specified profile.
     ///
-    /// - Profile A (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
-    /// - Profile B (Advanced): v6 key, Ed448+X448, RFC 9580.
+    /// - Portable Legacy (Universal): v4 key, Ed25519+X25519, GnuPG compatible.
+    /// - Portable Modern · High (Advanced): v6 key, Ed448+X448, RFC 9580.
     pub fn generate_key(
         &self,
         name: String,
@@ -1002,7 +1002,7 @@ impl PgpEngine {
     // ── Key Export/Import ────────────────────────────────────────────
 
     /// Export a secret key protected with a passphrase (ASCII-armored).
-    /// Profile A → Iterated+Salted S2K. Profile B → Argon2id.
+    /// Portable Legacy → Iterated+Salted S2K. Portable Modern · High → Argon2id.
     pub fn export_secret_key(
         &self,
         cert_data: Vec<u8>,

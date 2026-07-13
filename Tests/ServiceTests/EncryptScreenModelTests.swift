@@ -82,11 +82,11 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_handleAppear_preservesCurrentPlaintextAndRecipients_butResetsSigningState() async throws {
-        let signerIdentity = try await TestHelpers.generateProfileAKey(
+        let signerIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -128,11 +128,11 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_updateConfiguration_updatesTutorialState_withoutOverwritingEditedPlaintext() async throws {
-        let signerIdentity = try await TestHelpers.generateProfileAKey(
+        let signerIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Signer"
         )
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -167,7 +167,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_updateConfiguration_clearsTutorialRecipientSeed_whenConfigurationBecomesInactive() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -193,7 +193,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_initialRecipientContactIdsFiltersStaleIdsWhenContactsAreAvailable() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -210,7 +210,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_handleAppear_preservesInitialContactIdsWhenContactsAreLocked() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Delayed Recipient"
         )
@@ -231,7 +231,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_encryptText_usesCallbackCapturedAtOperationStart_whenConfigurationChangesMidFlight() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Callback Recipient"
         )
@@ -278,8 +278,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_requestEncrypt_withUnverifiedRecipients_showsWarningUntilConfirmed() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Unverified Recipient"
         )
@@ -327,7 +327,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_requestEncrypt_verifiedPreferredWithUnverifiedHistoricalKeyDoesNotWarn() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptPreferredVerification")
         defer {
             try? FileManager.default.removeItem(
@@ -395,7 +395,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_tagSelectionAddsDedupesSupportsManualUncheckAndClearAll() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagSelection")
         defer {
             try? FileManager.default.removeItem(
@@ -462,7 +462,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_tagFilterExcludesContactsWithoutPreferredKeyFromCandidates() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagSelectionSkip")
         defer {
             try? FileManager.default.removeItem(
@@ -513,7 +513,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_filteredRecipientContacts_appliesMultiSelectTagFilter() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptRecipientFilterTag")
         defer {
             try? FileManager.default.removeItem(
@@ -560,7 +560,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_recipientTagFilter_togglesAndResetsOnContentClearButNotOnClearRecipients() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagFilterToggle")
         defer {
             try? FileManager.default.removeItem(
@@ -598,7 +598,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_selectedRecipientSummaries_resolvesSelectedIdsAndDropsStale() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptSelectedSummaries")
         defer {
             try? FileManager.default.removeItem(
@@ -641,7 +641,7 @@ final class EncryptScreenModelTests: XCTestCase {
         // Design doc §5 (campaign #567): the quantum-safe claim describes the
         // produced message — its actual PKESK algorithms — never the live
         // selection, which can change after encryption without re-encrypting.
-        let signer = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        let signer = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptQuantumSafety")
         defer {
             try? FileManager.default.removeItem(
@@ -731,7 +731,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_effectiveRecipientContactIds_dropStaleWhenAvailableAndGateEncryptButton() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptResolvedSelection")
         defer {
             try? FileManager.default.removeItem(
@@ -767,7 +767,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_staleSelectedRecipientGatesButtonUntilRemoved() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStaleGate")
         defer {
             try? FileManager.default.removeItem(
@@ -805,7 +805,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_togglingRecipientDoesNotReorderFilteredList() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStableList")
         defer {
             try? FileManager.default.removeItem(
@@ -851,7 +851,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_recipientTagFilters_excludesTagsWithNoEncryptableMember() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptEncryptableTagFilter")
         defer {
             try? FileManager.default.removeItem(
@@ -902,7 +902,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_selectAllShownSelectsEveryVisibleRecipient() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptSelectAllShown")
         defer {
             try? FileManager.default.removeItem(
@@ -929,7 +929,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_hiddenSelectedRecipientCount_surfacesAndRevealsFilteredSelections() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptHiddenSelected")
         defer {
             try? FileManager.default.removeItem(
@@ -985,7 +985,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_recipientTagFilter_prunesDeletedTagFromActiveFilter() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagFilterPrune")
         defer {
             try? FileManager.default.removeItem(
@@ -1016,7 +1016,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_addAllVisibleRecipients_doesNotAddSearchHiddenRecipients() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptAddAllVisible")
         defer {
             try? FileManager.default.removeItem(
@@ -1058,7 +1058,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_requestEncryptFailsAndClearsStaleDirectRecipientSelection() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptStaleDirectRecipient")
         defer {
             try? FileManager.default.removeItem(
@@ -1104,7 +1104,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_tagSelectionKeepsExistingUnverifiedRecipientWarning() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagUnverifiedWarning")
         defer {
             try? FileManager.default.removeItem(
@@ -1143,7 +1143,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_confirmEncryptRevalidatesTagSelectedRecipientsAfterUnverifiedWarning() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
         let opened = try await makeOpenedProtectedContactService(prefix: "EncryptTagConfirmRevalidate")
         defer {
             try? FileManager.default.removeItem(
@@ -1187,8 +1187,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_encryptText_routesClipboardAndExportThroughInterceptionPolicy() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
-        let recipientIdentity = try await TestHelpers.generateProfileBKey(
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateModernHighKey(
             service: stack.keyManagement,
             name: "Verified Recipient"
         )
@@ -1242,7 +1242,7 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_contentClearDuringTextEncryptionSuppressesLateCiphertextAndCallback() async throws {
-        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+        let recipientIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Privacy Recipient"
         )
@@ -1286,8 +1286,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_encryptFile_handlesSelection_andRoutesFileExportThroughInterceptionPolicy() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
-        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -1345,8 +1345,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_encryptFile_cancellation_clearsProgress_andDoesNotPublishOutputURL() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
-        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )
@@ -1409,8 +1409,8 @@ final class EncryptScreenModelTests: XCTestCase {
 
     @MainActor
     func test_encryptFile_cancellationAfterServiceSuccess_cleansUnpublishedOutput() async throws {
-        _ = try await TestHelpers.generateProfileAKey(service: stack.keyManagement, name: "Signer")
-        let recipientIdentity = try await TestHelpers.generateProfileAKey(
+        _ = try await TestHelpers.generateLegacyKey(service: stack.keyManagement, name: "Signer")
+        let recipientIdentity = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Recipient"
         )

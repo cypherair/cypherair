@@ -4,9 +4,9 @@ import XCTest
 extension FFIIntegrationTests {
     // MARK: - C4: Argon2id Memory Guard Tests
 
-    /// C4.1: Import Profile B key with 512 MB Argon2id → success on device with enough memory.
-    /// Uses real Profile B key export/parseS2kParams, but mocks memory to ensure success.
-    func test_argon2idGuard_profileB_512MB_8GBDevice_passes() throws {
+    /// C4.1: Import Modern High key with 512 MB Argon2id → success on device with enough memory.
+    /// Uses real Modern High key export/parseS2kParams, but mocks memory to ensure success.
+    func test_argon2idGuard_modernHigh_512MB_8GBDevice_passes() throws {
         let key = try engine.generateKey(
             name: "Argon2id Test", email: nil, expirySeconds: nil, profile: .advanced
         )
@@ -18,7 +18,7 @@ extension FFIIntegrationTests {
 
         let s2kInfo = try engine.parseS2kParams(armoredData: exported)
         XCTAssertEqual(s2kInfo.s2kType, "argon2id")
-        XCTAssertEqual(s2kInfo.memoryKib, 524_288, "Profile B export should use 512 MB (2^19 KiB)")
+        XCTAssertEqual(s2kInfo.memoryKib, 524_288, "Modern High export should use 512 MB (2^19 KiB)")
 
         // Mock: 8 GB device with 6 GB available.
         let mockMemory = MockMemoryInfo()
@@ -138,10 +138,10 @@ extension FFIIntegrationTests {
         XCTAssertThrowsError(try memoryGuard.validate(protectionInfo: PGPKeyImportS2KInfo(s2kType: s2kInfo.s2kType, memoryKib: s2kInfo.memoryKib)))
     }
 
-    /// C4.4: Profile A (Iterated+Salted) — guard is a no-op even with minimal memory.
-    func test_argon2idGuard_profileA_iteratedSalted_alwaysPasses() throws {
+    /// C4.4: Legacy (Iterated+Salted) — guard is a no-op even with minimal memory.
+    func test_argon2idGuard_legacy_iteratedSalted_alwaysPasses() throws {
         let key = try engine.generateKey(
-            name: "Profile A Test", email: nil, expirySeconds: nil, profile: .universal
+            name: "Legacy Test", email: nil, expirySeconds: nil, profile: .universal
         )
         let exported = try engine.exportSecretKey(
             certData: key.certData,
@@ -153,7 +153,7 @@ extension FFIIntegrationTests {
         XCTAssertEqual(s2kInfo.s2kType, "iterated-salted")
         XCTAssertEqual(s2kInfo.memoryKib, 0)
 
-        // Even with absurdly low memory, guard should pass for Profile A.
+        // Even with absurdly low memory, guard should pass for Legacy.
         let mockMemory = MockMemoryInfo()
         mockMemory.availableBytes = 1
         let memoryGuard = Argon2idMemoryGuard(memoryInfo: mockMemory)

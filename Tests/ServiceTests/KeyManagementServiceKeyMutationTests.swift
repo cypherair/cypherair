@@ -7,7 +7,7 @@ import XCTest
 final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
 
     func test_deleteKey_removesKeychainItemsAndMetadata() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         let fp = identity.fingerprint
 
         try service.deleteKey(fingerprint: fp)
@@ -19,7 +19,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_removesFromKeysArray() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         XCTAssertEqual(service.keys.count, 1)
 
         try service.deleteKey(fingerprint: identity.fingerprint)
@@ -27,7 +27,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_removesPendingKeychainItems() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         let fp = identity.fingerprint
 
         try copyPermanentBundleToPending(fingerprint: fp)
@@ -40,8 +40,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_reassignsDefaultIfNeeded() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         XCTAssertTrue(first.isDefault)
         XCTAssertFalse(second.isDefault)
@@ -55,8 +55,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_partialFailure_stillSyncsCurrentSessionState() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         mockKC.deleteError = MockKeychainError.deleteFailed
 
@@ -75,7 +75,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_interruptedModifyExpiry_clearsRecoveryStateAndBlocksRestore() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         let fp = identity.fingerprint
 
         try copyPermanentBundleToPending(fingerprint: fp)
@@ -94,7 +94,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_interruptedRewrap_lastKeyClearsGlobalRecoveryState() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         try copyPermanentBundleToPending(fingerprint: identity.fingerprint)
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
@@ -105,8 +105,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_interruptedRewrap_withOtherKeysPreservesGlobalRecoveryState() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         try copyPermanentBundleToPending(fingerprint: first.fingerprint)
         try privateKeyControlStore.beginRewrap(targetMode: .highSecurity)
@@ -121,7 +121,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_unwrapPrivateKey_validFingerprint_returnsData() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
 
         let privateKeyData = try await service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty, "Unwrapped private key should not be empty")
@@ -145,7 +145,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )
-        let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
+        let identity = try await TestHelpers.generateLegacyKey(service: promptAwareService)
 
         let privateKeyData = try await promptAwareService.unwrapPrivateKey(
             fingerprint: identity.fingerprint
@@ -178,7 +178,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )
-        let identity = try await TestHelpers.generateProfileAKey(service: promptAwareService)
+        let identity = try await TestHelpers.generateLegacyKey(service: promptAwareService)
 
         // Run the unwrap on the main actor, mirroring production (OperationController's
         // `Task { @MainActor in ... }`).
@@ -212,16 +212,16 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
         }
     }
 
-    func test_unwrapPrivateKey_profileB_returnsData() async throws {
-        let identity = try await TestHelpers.generateProfileBKey(service: service)
+    func test_unwrapPrivateKey_modernHigh_returnsData() async throws {
+        let identity = try await TestHelpers.generateModernHighKey(service: service)
 
         let privateKeyData = try await service.unwrapPrivateKey(fingerprint: identity.fingerprint)
         XCTAssertFalse(privateKeyData.isEmpty)
     }
 
     func test_setDefaultKey_switchesDefault() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         XCTAssertTrue(service.keys.first(where: { $0.fingerprint == first.fingerprint })!.isDefault)
         XCTAssertFalse(service.keys.first(where: { $0.fingerprint == second.fingerprint })!.isDefault)
@@ -233,8 +233,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_setDefaultKey_metadataSaveFailure_stillSyncsCurrentSessionState() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         metadataPersistence.failNextUpdate = true
 
@@ -251,7 +251,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_defaultKey_returnsFirstDefault() async throws {
-        let identity = try await TestHelpers.generateProfileAKey(service: service)
+        let identity = try await TestHelpers.generateLegacyKey(service: service)
         XCTAssertEqual(service.defaultKey?.fingerprint, identity.fingerprint)
     }
 
@@ -260,8 +260,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_setDefaultKey_persistsAcrossReload() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "First")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Second")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "First")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Second")
 
         // Switch default from first to second
         try service.setDefaultKey(fingerprint: second.fingerprint)
@@ -287,8 +287,8 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
     }
 
     func test_deleteKey_reassignsDefault_persistsAcrossReload() async throws {
-        let first = try await TestHelpers.generateProfileAKey(service: service, name: "Default")
-        let second = try await TestHelpers.generateProfileBKey(service: service, name: "Other")
+        let first = try await TestHelpers.generateLegacyKey(service: service, name: "Default")
+        let second = try await TestHelpers.generateModernHighKey(service: service, name: "Other")
 
         XCTAssertTrue(first.isDefault)
         XCTAssertFalse(second.isDefault)

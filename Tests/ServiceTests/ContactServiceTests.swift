@@ -316,13 +316,13 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertNotNil(contactService.availableContactKeyRecord(fingerprint: conflictingKey.fingerprint))
     }
 
-    func test_addContact_sameFingerprintRevocationUpdate_profileA_refreshesRevocationState() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactRevocationUpdateProfileA")
+    func test_addContact_sameFingerprintRevocationUpdate_legacy_refreshesRevocationState() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactRevocationUpdateLegacy")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
-        let base = try loadFixture("merge_revocation_profile_a_base")
-        let update = try loadFixture("merge_revocation_profile_a_update")
+        let base = try loadFixture("merge_revocation_legacy_base")
+        let update = try loadFixture("merge_revocation_legacy_update")
 
         _ = try opened.service.importContact(publicKeyData: base)
         let result = try opened.service.importContact(publicKeyData: update)
@@ -342,9 +342,9 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertTrue(reopened.service.testContactKeyRecords[0].isRevoked)
     }
 
-    func test_addContact_sameFingerprintRevocationUpdate_profileB_refreshesRevocationState() throws {
-        let base = try loadFixture("merge_revocation_profile_b_base")
-        let update = try loadFixture("merge_revocation_profile_b_update")
+    func test_addContact_sameFingerprintRevocationUpdate_modernHigh_refreshesRevocationState() throws {
+        let base = try loadFixture("merge_revocation_modern_high_base")
+        let update = try loadFixture("merge_revocation_modern_high_update")
 
         _ = try contactService.importContact(publicKeyData: base)
         let result = try contactService.importContact(publicKeyData: update)
@@ -358,9 +358,9 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertEqual(updatedKey.profile, .advanced)
     }
 
-    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileA_refreshesEncryptionCapability() throws {
-        let base = try loadFixture("merge_add_encryption_subkey_profile_a_base")
-        let update = try loadFixture("merge_add_encryption_subkey_profile_a_update")
+    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_legacy_refreshesEncryptionCapability() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_legacy_base")
+        let update = try loadFixture("merge_add_encryption_subkey_legacy_update")
 
         let added = try contactService.importContact(publicKeyData: base)
         guard case .added(_, let baseKey) = added else {
@@ -378,9 +378,9 @@ final class ContactServiceTests: ContactServiceTestCase {
         XCTAssertTrue(updatedKey.canEncryptTo)
     }
 
-    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_profileB_refreshesEncryptionCapability() throws {
-        let base = try loadFixture("merge_add_encryption_subkey_profile_b_base")
-        let update = try loadFixture("merge_add_encryption_subkey_profile_b_update")
+    func test_addContact_sameFingerprintEncryptionSubkeyUpdate_modernHigh_refreshesEncryptionCapability() throws {
+        let base = try loadFixture("merge_add_encryption_subkey_modern_high_base")
+        let update = try loadFixture("merge_add_encryption_subkey_modern_high_update")
 
         let added = try contactService.importContact(publicKeyData: base)
         guard case .added(_, let baseKey) = added else {
@@ -428,7 +428,7 @@ final class ContactServiceTests: ContactServiceTestCase {
 
     // MARK: - Binary Key Import
 
-    func test_addContact_binaryPublicKey_profileA_returnsAdded() throws {
+    func test_addContact_binaryPublicKey_legacy_returnsAdded() throws {
         // generateKey returns publicKeyData in binary OpenPGP format (not armored).
         // This confirms the service accepts raw binary Data — the same format
         // the views should pass after the binary import fix.
@@ -446,11 +446,11 @@ final class ContactServiceTests: ContactServiceTestCase {
         if case .added(_, let key) = result {
             XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
-            XCTFail("Expected .added for binary Profile A key, got \(result)")
+            XCTFail("Expected .added for binary Legacy key, got \(result)")
         }
     }
 
-    func test_addContact_binaryPublicKey_profileB_returnsAdded() throws {
+    func test_addContact_binaryPublicKey_modernHigh_returnsAdded() throws {
         let generated = try engine.generateKey(
             name: "BinaryB", email: nil,
             expirySeconds: nil, profile: .advanced
@@ -464,11 +464,11 @@ final class ContactServiceTests: ContactServiceTestCase {
         if case .added(_, let key) = result {
             XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
-            XCTFail("Expected .added for binary Profile B key, got \(result)")
+            XCTFail("Expected .added for binary Modern High key, got \(result)")
         }
     }
 
-    func test_addContact_armoredPublicKey_profileA_returnsAdded() throws {
+    func test_addContact_armoredPublicKey_legacy_returnsAdded() throws {
         // Verify armored format also works (regression guard)
         let generated = try engine.generateKey(
             name: "ArmoredA", email: nil,
@@ -484,7 +484,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         if case .added(_, let key) = result {
             XCTAssertFalse(key.fingerprint.isEmpty)
         } else {
-            XCTFail("Expected .added for armored Profile A key, got \(result)")
+            XCTFail("Expected .added for armored Legacy key, got \(result)")
         }
     }
 

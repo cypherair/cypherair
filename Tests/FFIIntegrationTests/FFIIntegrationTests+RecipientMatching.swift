@@ -4,8 +4,8 @@ import XCTest
 extension FFIIntegrationTests {
     // MARK: - Phase 1/Phase 2 Two-Phase Decryption Tests
 
-    /// Verify Phase 1 (parseRecipients) returns key IDs for Profile A ciphertext.
-    func test_parseRecipients_profileA_returnsMatchingKeyIDs() throws {
+    /// Verify Phase 1 (parseRecipients) returns key IDs for Legacy ciphertext.
+    func test_parseRecipients_legacy_returnsMatchingKeyIDs() throws {
         let engine = try XCTUnwrap(self.engine)
         let key = try engine.generateKey(name: "Phase1 A", email: nil, expirySeconds: nil, profile: .universal)
         let ciphertext = try engine.encrypt(
@@ -18,8 +18,8 @@ extension FFIIntegrationTests {
         XCTAssertFalse(recipientKeyIDs.isEmpty, "Phase 1 must identify at least one recipient")
     }
 
-    /// Verify Phase 1 (parseRecipients) returns key IDs for Profile B ciphertext.
-    func test_parseRecipients_profileB_returnsMatchingKeyIDs() throws {
+    /// Verify Phase 1 (parseRecipients) returns key IDs for Modern High ciphertext.
+    func test_parseRecipients_modernHigh_returnsMatchingKeyIDs() throws {
         let engine = try XCTUnwrap(self.engine)
         let key = try engine.generateKey(name: "Phase1 B", email: nil, expirySeconds: nil, profile: .advanced)
         let ciphertext = try engine.encrypt(
@@ -29,7 +29,7 @@ extension FFIIntegrationTests {
             encryptToSelf: nil
         )
         let recipientKeyIDs = try engine.parseRecipients(ciphertext: ciphertext)
-        XCTAssertFalse(recipientKeyIDs.isEmpty, "Phase 1 must identify at least one recipient for Profile B")
+        XCTAssertFalse(recipientKeyIDs.isEmpty, "Phase 1 must identify at least one recipient for Modern High")
     }
 
     /// Phase 1 succeeds (no auth), Phase 2 fails with wrong key.
@@ -94,8 +94,8 @@ extension FFIIntegrationTests {
 
     // MARK: - matchRecipients FFI Tests
 
-    /// matchRecipients returns primary fingerprint for Profile A (v4) key.
-    func test_matchRecipients_profileA_returnsPrimaryFingerprint() throws {
+    /// matchRecipients returns primary fingerprint for Legacy (v4) key.
+    func test_matchRecipients_legacy_returnsPrimaryFingerprint() throws {
         let engine = try XCTUnwrap(self.engine)
         let key = try engine.generateKey(name: "Match A", email: nil, expirySeconds: nil, profile: .universal)
 
@@ -116,8 +116,8 @@ extension FFIIntegrationTests {
                        "Should return the primary fingerprint")
     }
 
-    /// matchRecipients returns primary fingerprint for Profile B (v6) key.
-    func test_matchRecipients_profileB_returnsPrimaryFingerprint() throws {
+    /// matchRecipients returns primary fingerprint for Modern High (v6) key.
+    func test_matchRecipients_modernHigh_returnsPrimaryFingerprint() throws {
         let engine = try XCTUnwrap(self.engine)
         let key = try engine.generateKey(name: "Match B", email: nil, expirySeconds: nil, profile: .advanced)
 
@@ -135,7 +135,7 @@ extension FFIIntegrationTests {
 
         XCTAssertEqual(matched.count, 1, "Should match exactly one certificate")
         XCTAssertEqual(matched.first, key.fingerprint.lowercased(),
-                       "Should return the primary fingerprint for Profile B")
+                       "Should return the primary fingerprint for Modern High")
     }
 
     /// matchRecipients throws NoMatchingKey when no local cert matches.

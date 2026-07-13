@@ -270,16 +270,16 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
     // MARK: - C6.4: SE Unwrap → FFI Decrypt (End-to-End)
 
     /// C6.4: Full pipeline — generate key via FFI, SE wrap certData, store in Keychain,
-    /// load + SE unwrap, then decrypt via FFI. Profile A (v4, SEIPDv1).
-    func test_seUnwrapThenDecrypt_profileA_succeeds() throws {
+    /// load + SE unwrap, then decrypt via FFI. Legacy (v4, SEIPDv1).
+    func test_seUnwrapThenDecrypt_legacy_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
-        let plaintext = Data("C6.4 Profile A: SE → FFI decrypt test".utf8)
+        let plaintext = Data("C6.4 Legacy: SE → FFI decrypt test".utf8)
 
-        // 1. Generate Profile A key via FFI.
+        // 1. Generate Legacy key via FFI.
         let generated = try engine.generateKey(
             name: "C6.4 Test A", email: nil, expirySeconds: nil, profile: .universal
         )
@@ -330,16 +330,16 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
             "Signature must verify after SE round-trip")
     }
 
-    /// C6.4: Same end-to-end pipeline for Profile B (v6, Ed448+X448, SEIPDv2 AEAD OCB).
-    func test_seUnwrapThenDecrypt_profileB_succeeds() throws {
+    /// C6.4: Same end-to-end pipeline for Modern High (v6, Ed448+X448, SEIPDv2 AEAD OCB).
+    func test_seUnwrapThenDecrypt_modernHigh_succeeds() throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let engine = PgpEngine()
         let fingerprint = uniqueFingerprint()
         let account = KeychainConstants.defaultAccount
-        let plaintext = Data("C6.4 Profile B: SE → FFI decrypt test (AEAD OCB)".utf8)
+        let plaintext = Data("C6.4 Modern High: SE → FFI decrypt test (AEAD OCB)".utf8)
 
-        // 1. Generate Profile B key via FFI.
+        // 1. Generate Modern High key via FFI.
         let generated = try engine.generateKey(
             name: "C6.4 Test B", email: nil, expirySeconds: nil, profile: .advanced
         )
@@ -385,9 +385,9 @@ final class DeviceSecureEnclaveTests: DeviceSecurityTestCase {
 
         // 7. Verify plaintext and signature.
         XCTAssertEqual(result.plaintext, plaintext,
-            "Profile B decrypted plaintext must match original after SE round-trip")
+            "Modern High decrypted plaintext must match original after SE round-trip")
         XCTAssertEqual(result.summaryState, .verified,
-            "Profile B signature must verify after SE round-trip")
+            "Modern High signature must verify after SE round-trip")
     }
 
     // MARK: - C6.5: SE Key Deletion → Unwrap Fails

@@ -9,7 +9,7 @@ final class PrivateKeyContactCertificationServiceTests: XCTestCase {
     func test_softwareUserIdCertificationRemainsBehaviorCompatibleAndZeroizes() async throws {
         let stack = await TestHelpers.makeServiceStack(engine: engine)
         defer { stack.cleanup() }
-        let signer = try await TestHelpers.generateProfileAKey(
+        let signer = try await TestHelpers.generateLegacyKey(
             service: stack.keyManagement,
             name: "Software Certification Signer",
             email: "software-certification-signer@example.invalid"

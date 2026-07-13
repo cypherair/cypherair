@@ -23,8 +23,8 @@ final class QRServiceTests: XCTestCase {
 
     // MARK: - Positive: Valid URL Round-Trip
 
-    func test_parseImportURL_validV1URL_profileA_returnsPublicKeyData() throws {
-        // Generate a Profile A key and encode it as a QR URL
+    func test_parseImportURL_validV1URL_legacy_returnsPublicKeyData() throws {
+        // Generate a Legacy key and encode it as a QR URL
         let generated = try engine.generateKey(
             name: "Alice", email: "alice@example.com",
             expirySeconds: nil, profile: .universal
@@ -40,10 +40,10 @@ final class QRServiceTests: XCTestCase {
 
         // Verify the parsed data is a valid key by parsing its info
         let keyInfo = try engine.parseKeyInfo(keyData: parsedData)
-        XCTAssertEqual(keyInfo.keyVersion, 4, "Profile A should produce v4 key")
+        XCTAssertEqual(keyInfo.keyVersion, 4, "Legacy should produce v4 key")
     }
 
-    func test_parseImportURL_validV1URL_profileB_returnsPublicKeyData() throws {
+    func test_parseImportURL_validV1URL_modernHigh_returnsPublicKeyData() throws {
         let generated = try engine.generateKey(
             name: "Bob", email: "bob@example.com",
             expirySeconds: nil, profile: .advanced
@@ -55,7 +55,7 @@ final class QRServiceTests: XCTestCase {
 
         XCTAssertFalse(parsedData.isEmpty)
         let keyInfo = try engine.parseKeyInfo(keyData: parsedData)
-        XCTAssertEqual(keyInfo.keyVersion, 6, "Profile B should produce v6 key")
+        XCTAssertEqual(keyInfo.keyVersion, 6, "Modern High should produce v6 key")
     }
 
     func test_parseImportURL_roundTrip_fingerprintMatches() throws {
@@ -75,7 +75,7 @@ final class QRServiceTests: XCTestCase {
                        "Fingerprint should survive QR URL round-trip")
     }
 
-    func test_parseImportURL_roundTrip_profileB_fingerprintMatches() throws {
+    func test_parseImportURL_roundTrip_modernHigh_fingerprintMatches() throws {
         let generated = try engine.generateKey(
             name: "Dave", email: "dave@example.com",
             expirySeconds: nil, profile: .advanced
@@ -88,7 +88,7 @@ final class QRServiceTests: XCTestCase {
         let parsedInfo = try engine.parseKeyInfo(keyData: parsedData)
 
         XCTAssertEqual(originalInfo.fingerprint, parsedInfo.fingerprint,
-                       "Profile B fingerprint should survive QR URL round-trip")
+                       "Modern High fingerprint should survive QR URL round-trip")
     }
 
     func test_inspectImportablePublicCertificate_returnsAppOwnedInspection() throws {
