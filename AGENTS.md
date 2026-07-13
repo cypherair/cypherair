@@ -165,9 +165,9 @@ the code alone:
 - Do not set `autoResolutionMs` on `request_user_input` and wait for an
   explicit user response.
 - Prefer regular merge commits over squash or rebase merges.
-- Commits are signed and use conventional prefixes (`feat:`, `fix:`,
-  `refactor:`, `test:`, `docs:`). If the signing key is unavailable, ask the
-  user to unlock it; never create an unsigned commit.
-- Never run destructive git operations on project files (`*.pbxproj`,
+- Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`,
+  `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run
+  `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
+- Do not run destructive git operations on project files (`*.pbxproj`,
   `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user
   approval.

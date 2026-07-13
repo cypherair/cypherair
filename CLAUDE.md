@@ -121,5 +121,5 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 - Prefer small, reviewable diffs. Maintain existing user-visible behavior unless the task explicitly changes it.
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.
-- Commits are signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the signing key is unavailable, ask the user to unlock it; never create an unsigned commit.
-- Never run destructive git operations (checkout, reset, restore) on project files (`*.pbxproj`, `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user approval — they are difficult to reconstruct if lost.
+- Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
+- Do not run destructive git operations (checkout, reset, restore) on project files (`*.pbxproj`, `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user approval — they are difficult to reconstruct if lost.
