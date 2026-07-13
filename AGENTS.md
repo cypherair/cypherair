@@ -154,11 +154,12 @@ the code alone:
 
 ## Releases, Git, And Workflow
 
-- Stable releases are tag-first per `docs/RELEASE.md`; never treat
-  `workflow_dispatch` alone as a substitute for the stable tag. Bumping
-  `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of
-  release preparation. Before publishing any release or tag, confirm the final
-  versions with the maintainer.
+- Stable releases are tag-first per `docs/RELEASE.md`. Never treat
+  `workflow_dispatch` alone as a substitute for the stable tag. Ask before
+  publishing any release or tag.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope
+  part of preparing a release (`docs/RELEASE.md` Section 1); confirm the
+  intended version with the maintainer before creating the release tag.
 - Work on a topic branch and submit a PR. Do not commit directly to `main`
   unless the user explicitly asks.
 - Do not set `autoResolutionMs` on `request_user_input` and wait for an
@@ -167,3 +168,6 @@ the code alone:
 - Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`,
   `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run
   `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
+- Do not run destructive git operations on project files (`*.pbxproj`,
+  `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user
+  approval.

@@ -111,7 +111,8 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 ## Releases & Versioning
 
-- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of release preparation: read the current values, choose the next pair, and commit them. Before publishing any release or tag, confirm the final versions with the maintainer (docs/RELEASE.md §1).
+- Stable releases are tag-first per docs/RELEASE.md; never treat `workflow_dispatch` alone as a substitute for the stable tag. Ask before publishing any release or tag.
+- Bumping `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` is a normal in-scope part of preparing a release — read the current values, choose the next pair, and commit them (docs/RELEASE.md §1). Confirm the intended version with the maintainer before creating the release tag, since publishing is outward-facing.
 
 ## Git & Workflow
 
@@ -121,3 +122,4 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.
 - Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
+- Do not run destructive git operations (checkout, reset, restore) on project files (`*.pbxproj`, `*.entitlements`, `*.xctestplan`, `*.xcscheme`) without explicit user approval — they are difficult to reconstruct if lost.
