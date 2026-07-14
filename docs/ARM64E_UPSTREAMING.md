@@ -265,11 +265,10 @@ Local app-test incident and resolution:
   behavior was not weakened. Issue #651 retains the diagnostic history and
   non-blocking test-lifecycle follow-up.
 
-Still required to complete the CypherAir production re-pin:
+Final merge gates for the CypherAir production re-pin:
 
-1. Commit this final validation record and recheck pull-request CI on the
-   resulting final PR head.
-2. Before merge, obtain a fresh verification of that exact state using
+1. Pull-request CI must pass on the exact final PR head.
+2. Before merge, obtain a fresh verification of that exact final state using
    `gpt-5.6-sol` at maximum effort with fork context disabled.
 
 ## 7. Release And Upstream Gates
