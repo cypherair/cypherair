@@ -144,8 +144,9 @@ private struct CypherMultilineEditorSheet: View {
         }
         // The sheet escapes the main window content's cosmetic cover, so it
         // carries its own (docs/SECURITY.md: sensitive content never appears
-        // in the app-switcher snapshot).
-        .cosmeticPrivacyCover(isCovered: !(appLockController?.isForegroundActive ?? true))
+        // in the app-switcher snapshot). Binds the same resolve-aware predicate
+        // so it holds across a foreground return while the editor is open.
+        .cosmeticPrivacyCover(isCovered: appLockController?.isCosmeticallyCovered ?? false)
     }
 }
 

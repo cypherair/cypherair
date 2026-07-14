@@ -338,6 +338,116 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(spy.evaluateCount, 2)
     }
 
+    // MARK: - Resume-time cover hold (resume-race)
+
+    /// The cosmetic cover must NOT drop in the synchronous window between the
+    /// foreground signal (`noteForegroundActive(true)`, which sets
+    /// `isForegroundActive`) and the async lock decision (`handleForegroundActive`).
+    /// Otherwise protected content flashes before the lock surface can appear.
+    func test_resumeCover_heldSynchronouslyOnForegroundReturn_untilDecisionResolves() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        let controller = makeController(spy: spy)
+
+        // Away → covered because not foreground-active.
+        controller.noteForegroundActive(false)
+        XCTAssertTrue(controller.isCosmeticallyCovered)
+
+        // Genuine foreground return: isForegroundActive flips true, but the cover
+        // must be held by the resolve flag so it does not drop for a frame.
+        controller.noteForegroundActive(true)
+        XCTAssertTrue(controller.isForegroundActive)
+        XCTAssertTrue(controller.isResolvingForegroundLock)
+        XCTAssertTrue(controller.isCosmeticallyCovered)
+
+        // Resolve the foreground (from .locked → full unlock flow).
+        await controller.handleForegroundActive(source: "scenePhase.active")
+
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertFalse(controller.isResolvingForegroundLock, "The resume hold releases once the decision resolves.")
+        XCTAssertFalse(controller.isCosmeticallyCovered)
+    }
+
+    /// While authentication is in flight the cover stays up together with the lock
+    /// surface (`.authenticating`), and is released only after the flow resolves.
+    func test_resumeCover_remainsCoveredWhileAuthenticating() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        spy.pauseAuth = true
+        let controller = makeController(spy: spy)
+
+        controller.noteForegroundActive(false)
+        controller.noteForegroundActive(true)
+
+        let suspended = expectation(description: "auth suspended")
+        spy.onAuthSuspended = { suspended.fulfill() }
+        let task = Task { await controller.handleForegroundActive(source: "scenePhase.active") }
+        await fulfillment(of: [suspended], timeout: 1.0)
+
+        XCTAssertEqual(controller.lockState, .authenticating)
+        XCTAssertTrue(controller.isResolvingForegroundLock, "Cover stays held through the authentication.")
+        XCTAssertTrue(controller.isCosmeticallyCovered)
+
+        spy.resumeAuth()
+        await task.value
+
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertFalse(controller.isResolvingForegroundLock)
+        XCTAssertFalse(controller.isCosmeticallyCovered)
+    }
+
+    /// A within-grace foreground return does not re-authenticate; the resume hold
+    /// must still be released so content (correctly preserved) becomes visible.
+    func test_resumeCover_withinGrace_releasesCoverAndStaysUnlocked() async {
+        let spy = Spy()
+        spy.gracePeriod = 300
+        spy.lastAuthenticationDate = Date()
+        let controller = makeController(spy: spy)
+
+        // Prime to unlocked.
+        await controller.handleForegroundActive(source: "unlock")
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 1)
+
+        // Away (non-zero grace: no immediate lock) then a genuine return.
+        controller.noteForegroundActive(false)
+        controller.handleAwayEvent(source: "scenePhase.background")
+        controller.noteForegroundActive(true)
+        XCTAssertTrue(controller.isCosmeticallyCovered, "Cover held across the resume gap.")
+
+        await controller.handleForegroundActive(source: "scenePhase.active")
+
+        XCTAssertEqual(controller.lockState, .unlocked)
+        XCTAssertEqual(spy.evaluateCount, 1, "A within-grace return must not re-authenticate.")
+        XCTAssertFalse(controller.isResolvingForegroundLock)
+        XCTAssertFalse(controller.isCosmeticallyCovered)
+    }
+
+    /// The resume hold is released on EVERY exit path — including the
+    /// not-foreground-active early return — so the cover can never stick up. Here
+    /// the app loses the foreground again before the decision runs; the flag clears
+    /// and the cover then rests solely on `!isForegroundActive`.
+    func test_resumeCover_clearedEvenWhenForegroundLostBeforeResolution() async {
+        let spy = Spy()
+        spy.gracePeriod = 0
+        let controller = makeController(spy: spy)
+
+        controller.noteForegroundActive(false)
+        controller.noteForegroundActive(true)
+        XCTAssertTrue(controller.isResolvingForegroundLock)
+
+        // The app goes not-foreground again before handleForegroundActive runs.
+        controller.noteForegroundActive(false)
+        XCTAssertTrue(controller.isResolvingForegroundLock, "Still set; only handleForegroundActive clears it.")
+        XCTAssertTrue(controller.isCosmeticallyCovered)
+
+        await controller.handleForegroundActive(source: "scenePhase.active")
+
+        XCTAssertEqual(spy.evaluateCount, 0, "A not-foreground-active resolution must not authenticate.")
+        XCTAssertFalse(controller.isResolvingForegroundLock, "The hold must never stick, even on the early return.")
+        XCTAssertTrue(controller.isCosmeticallyCovered, "Still covered — now via !isForegroundActive.")
+    }
+
     // MARK: - Away events
 
     func test_awayEvent_intervalZero_locksAndRelocks() async {
