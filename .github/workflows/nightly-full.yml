@@ -144,7 +144,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - name: Check Xcode 26.5 platform probe readiness
+      - name: Check pinned-Xcode platform probe readiness
         id: platform_preflight
         run: bash scripts/ci_xcode_platform_preflight.sh preflight
       - name: Download XCFramework artifact

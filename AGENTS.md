@@ -12,8 +12,10 @@ stage1 toolchain policy.
 
 - **Platforms:** iOS 26.5+, iPadOS 26.5+, macOS 26.5+, visionOS 26.5+. Minimum
   device: 8 GB RAM.
-- **Language:** Apple Swift 6.3.2, SwiftUI, and Rust stable. `SWIFT_VERSION =
-  6.0` is the Swift language mode, not the compiler release.
+- **Language:** Apple Swift (6.4 beta on the Xcode 27.0 beta development
+  toolchain; 6.3.3 on the Xcode 26.6 release toolchain), SwiftUI, and Rust
+  stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler
+  release.
 - **OpenPGP:** Sequoia PGP 2.4.0 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
 - **Key families:** Nine families combining message compatibility with

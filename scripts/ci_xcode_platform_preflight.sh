@@ -36,8 +36,12 @@ elif [ $# -ne 1 ]; then
   exit 2
 fi
 
-required_version="${XCODE_PLATFORM_REQUIRED_VERSION:-26.5}"
+required_version="${XCODE_PLATFORM_REQUIRED_VERSION:-26.6}"
 required_xcode_path="/Applications/Xcode_${required_version}.app/Contents/Developer"
+# Xcode 26.6 is an IDE-only update: it ships the 26.5 SDKs and simulator
+# runtimes, so the SDK/runtime expectation is pinned independently of the
+# Xcode release that hosts it.
+required_sdk_version="${XCODE_PLATFORM_REQUIRED_SDK_VERSION:-26.5}"
 
 github_env_set() {
   local name="$1"
@@ -198,7 +202,7 @@ show_destinations() {
 showdestinations_failure_is_runtime_missing_only() {
   local output_file="$1"
 
-  awk -v version="$required_version" '
+  awk -v version="$required_sdk_version" '
     BEGIN {
       version_regex = version
       gsub(/\./, "\\.", version_regex)
@@ -251,21 +255,21 @@ check_platform_readiness() {
   esac
 
   iphoneos_version="$(sdk_version iphoneos)"
-  if [ "$iphoneos_version" != "$required_version" ]; then
-    record_failure skippable_failures "iphoneos SDK is ${iphoneos_version:-missing}, not $required_version"
+  if [ "$iphoneos_version" != "$required_sdk_version" ]; then
+    record_failure skippable_failures "iphoneos SDK is ${iphoneos_version:-missing}, not $required_sdk_version"
   fi
 
   xros_version="$(sdk_version xros)"
-  if [ "$xros_version" != "$required_version" ]; then
-    record_failure skippable_failures "xros SDK is ${xros_version:-missing}, not $required_version"
+  if [ "$xros_version" != "$required_sdk_version" ]; then
+    record_failure skippable_failures "xros SDK is ${xros_version:-missing}, not $required_sdk_version"
   fi
 
-  if ! runtime_available "iOS" "$required_version"; then
-    record_failure skippable_failures "iOS $required_version simulator runtime is not available"
+  if ! runtime_available "iOS" "$required_sdk_version"; then
+    record_failure skippable_failures "iOS $required_sdk_version simulator runtime is not available"
   fi
 
-  if ! runtime_available "visionOS" "$required_version"; then
-    record_failure skippable_failures "visionOS $required_version simulator runtime is not available"
+  if ! runtime_available "visionOS" "$required_sdk_version"; then
+    record_failure skippable_failures "visionOS $required_sdk_version simulator runtime is not available"
   fi
 
   destinations_file="$(mktemp "${TMPDIR:-/tmp}/cypherair-destinations.XXXXXX")"
@@ -275,14 +279,14 @@ check_platform_readiness() {
     destinations_status=$?
   fi
 
-  if grep -q "iOS $required_version is not installed" "$destinations_file"; then
+  if grep -q "iOS $required_sdk_version is not installed" "$destinations_file"; then
     ios_runtime_missing_reported="true"
-    record_failure skippable_failures "generic iOS destination reports iOS $required_version is not installed"
+    record_failure skippable_failures "generic iOS destination reports iOS $required_sdk_version is not installed"
   fi
 
-  if grep -q "visionOS $required_version is not installed" "$destinations_file"; then
+  if grep -q "visionOS $required_sdk_version is not installed" "$destinations_file"; then
     visionos_runtime_missing_reported="true"
-    record_failure skippable_failures "generic visionOS destination reports visionOS $required_version is not installed"
+    record_failure skippable_failures "generic visionOS destination reports visionOS $required_sdk_version is not installed"
   fi
 
   if [ "$destinations_status" -ne 0 ]; then
@@ -331,8 +335,8 @@ check_macos_unit_test_readiness() {
   esac
 
   macosx_version="$(sdk_version macosx)"
-  if [ "$macosx_version" != "$required_version" ]; then
-    record_failure skippable_failures "macosx SDK is ${macosx_version:-missing}, not $required_version"
+  if [ "$macosx_version" != "$required_sdk_version" ]; then
+    record_failure skippable_failures "macosx SDK is ${macosx_version:-missing}, not $required_sdk_version"
   fi
 
   host_macos_version="$(sw_vers -productVersion 2>/dev/null || true)"
