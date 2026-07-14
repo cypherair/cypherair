@@ -55,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Check Xcode 26.5 platform probe readiness
+      - name: Check pinned-Xcode platform probe readiness
         id: platform_preflight
         run: bash scripts/ci_xcode_platform_preflight.sh preflight
       - name: Install Rust stable toolchain
@@ -241,7 +241,7 @@ jobs:
           else
             APPLE_PLATFORM_PROBES_STATUS="skipped"
             APPLE_PLATFORM_PROBES_SKIP_REASON="${APPLE_PLATFORM_PROBES_SKIP_REASON:-unknown hosted runner readiness failure}"
-            APPLE_PLATFORM_PROBES_SUMMARY="Apple app build probes were skipped because the hosted runner was not Xcode 26.5 platform-ready: $APPLE_PLATFORM_PROBES_SKIP_REASON."
+            APPLE_PLATFORM_PROBES_SUMMARY="Apple app build probes were skipped because the hosted runner was not ready for the pinned Xcode platform probes: $APPLE_PLATFORM_PROBES_SKIP_REASON."
           fi
           export APPLE_PLATFORM_PROBES_STATUS
           export APPLE_PLATFORM_PROBES_SKIP_REASON
