@@ -273,6 +273,36 @@ fn test_message_quantum_safety_classifies_by_pkesk_algorithms() {
         decrypt::message_quantum_safety(&mixed_binary[..prefix_len]).expect("prefix"),
         MessageQuantumSafety::Mixed
     );
+
+    // A prefix truncated BEFORE the encrypted container — only the leading
+    // session-key packets survive — must fail closed rather than return a
+    // verdict computed from an unknown-completeness set of PKESKs. Re-serialize
+    // just the PKESK packets (dropping the SEIP container) to build exactly
+    // that input.
+    let mut pkesks_only: Vec<u8> = Vec::new();
+    let mut ppr =
+        openpgp::parse::PacketParser::from_bytes(&mixed_binary).expect("reparse mixed binary");
+    while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
+        if matches!(pp.packet, openpgp::Packet::SEIP(_)) {
+            break;
+        }
+        if matches!(pp.packet, openpgp::Packet::PKESK(_)) {
+            use openpgp::serialize::Serialize;
+            pp.packet
+                .serialize(&mut pkesks_only)
+                .expect("serialize pkesk");
+        }
+        let (_, next) = pp.recurse().expect("recurse");
+        ppr = next;
+    }
+    assert!(
+        !pkesks_only.is_empty(),
+        "expected at least one leading PKESK packet"
+    );
+    assert!(
+        decrypt::message_quantum_safety(&pkesks_only).is_err(),
+        "a container-less PKESK prefix must fail closed"
+    );
 }
 
 #[test]

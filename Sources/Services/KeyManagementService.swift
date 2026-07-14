@@ -77,6 +77,7 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
+            certificatePrimaryFingerprint: keyAdapter.certificatePrimaryFingerprintInspector(),
             traceStore: authLifecycleTraceStore
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
