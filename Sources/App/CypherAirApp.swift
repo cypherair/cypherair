@@ -384,7 +384,7 @@ struct CypherAirApp: App {
                     .task {
                         await prepareUITestContactsIfNeeded()
                     }
-                    .cosmeticPrivacyCover(isCovered: !container.appLockController.isForegroundActive)
+                    .cosmeticPrivacyCover(isCovered: container.appLockController.isCosmeticallyCovered)
                     .overlay {
                         if container.appLockController.isLocked {
                             AppLockSurfaceView(appLockController: container.appLockController)
@@ -482,7 +482,7 @@ struct CypherAirApp: App {
         LoadWarningPresentationState(
             isAppLocked: container.appLockController.isLocked,
             isAuthenticating: container.appLockController.isAuthenticating,
-            isLockCoverVisible: !container.appLockController.isForegroundActive,
+            isLockCoverVisible: container.appLockController.isCosmeticallyCovered,
             hasAuthenticatedSession: container.appSessionOrchestrator.lastAuthenticationDate != nil,
             allowsPreAuthenticationPresentation: launchConfiguration.usesUITestAppContainer
                 && !launchConfiguration.requiresManualAuthentication

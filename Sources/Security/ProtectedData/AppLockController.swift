@@ -115,8 +115,8 @@ final class AppLockController {
 
     /// Whether the app is genuinely foreground-active. Owned here as the single
     /// source of truth and updated by the lifecycle observer via
-    /// `noteForegroundActive(_:)`. The cosmetic cover reads this
-    /// (`isCovered = !isForegroundActive`).
+    /// `noteForegroundActive(_:)`. The cosmetic cover reads this through
+    /// `isCosmeticallyCovered`.
     ///
     /// It also gates `handleForegroundActive`: the lock surface auto-invokes
     /// authentication when it appears, but at grace=0 the surface is inserted
@@ -125,6 +125,19 @@ final class AppLockController {
     /// (`handledAwayGeneration`), suppressing the genuine foreground return.
     /// Defaults to `true` because a cold launch is foreground.
     private(set) var isForegroundActive = true
+
+    /// Holds the cosmetic cover up across the *asynchronous* gap between a
+    /// genuine foreground return and the lock decision that follows it. The
+    /// observer sets `isForegroundActive = true` synchronously (which alone would
+    /// drop the cover) and only then schedules `handleForegroundActive` on a
+    /// `Task`. If grace has expired, the lock surface is not raised until that
+    /// task runs, so for one or more frames the underlying content would be
+    /// visible — a resume-time flash of protected content. Set `true`
+    /// synchronously in `noteForegroundActive` on the false→true transition and
+    /// cleared by `handleForegroundActive`'s top-level `defer` on every exit path,
+    /// so the cover persists until the lock decision has resolved (surface raised,
+    /// stayed unlocked within grace, bypass, or spurious foreground).
+    private(set) var isResolvingForegroundLock = false
 
     /// Generation of lock-state transitions, used by views/tests as an
     /// `@Observable` change signal independent of equal states.
@@ -179,6 +192,16 @@ final class AppLockController {
         return nil
     }
 
+    /// The single predicate every cosmetic-cover site binds to. True while the app
+    /// is not foreground-active, and additionally while a foreground return is
+    /// still resolving its lock decision (`isResolvingForegroundLock`) so content
+    /// cannot flash between the synchronous foreground signal and the asynchronous
+    /// lock surface. Distinct from `isLocked`: the cover is cosmetic (app-switcher
+    /// snapshot / shoulder-surfing), the lock surface is the authentication gate.
+    var isCosmeticallyCovered: Bool {
+        !isForegroundActive || isResolvingForegroundLock
+    }
+
     // MARK: - Lifecycle entry points (called by the lifecycle observer)
 
     /// Update the foreground-active signal from the lifecycle observer (the single
@@ -192,6 +215,15 @@ final class AppLockController {
             return
         }
         isForegroundActive = active
+        if active {
+            // Keep the cosmetic cover up across the async gap until
+            // `handleForegroundActive` resolves the lock decision. Set
+            // unconditionally on the transition (not gated on grace/lock
+            // predicates — that would duplicate the decision and race it); the
+            // matching `handleForegroundActive` — always scheduled by the observer
+            // right after this call — clears it on every exit path.
+            isResolvingForegroundLock = true
+        }
         traceStore?.record(
             category: .lifecycle,
             name: "lock.foregroundActiveChanged",
@@ -342,6 +374,16 @@ final class AppLockController {
     /// lifecycle observer (`.active` / `didBecomeActive`) and the lock surface's
     /// auto-invoke. Replaces the orchestrator's `handleResume`/`handleInitialAppearance`.
     func handleForegroundActive(source: String = "foregroundActive") async {
+        // Release the resume-time cover hold once the lock decision has resolved,
+        // on EVERY exit path (bypass, not-foreground-active, in-flight, spurious,
+        // within-grace, or the full unlock flow). On the unlock path this fires in
+        // the same main-actor slice as the terminal `setLockState`, so when the
+        // surface is not raised (unlocked/within-grace) the cover and any surface
+        // drop together with no post-decision flash; when the surface IS raised it
+        // already draws above the cover, so clearing here is safe. Structurally
+        // prevents a cover stuck up forever.
+        defer { isResolvingForegroundLock = false }
+
         traceStore?.record(
             category: .lifecycle,
             name: "lock.foregroundActive",
