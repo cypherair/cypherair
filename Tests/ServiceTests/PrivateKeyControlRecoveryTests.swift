@@ -466,6 +466,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: secureEnclave,
             keychain: keychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )
@@ -513,6 +514,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )
@@ -550,6 +552,7 @@ final class PrivateKeyControlRecoveryTests: XCTestCase {
         AuthenticationManager(
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore
         )
     }

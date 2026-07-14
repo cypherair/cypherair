@@ -105,7 +105,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let initialSessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let handoffContext = LAContext()
         defer { handoffContext.invalidate() }
@@ -127,7 +128,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let restartedSessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let settingsStore = CypherAir.ProtectedSettingsStore(
             storageRoot: storageRoot,
@@ -225,7 +227,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
-            sharedRightIdentifier: registry.sharedRightIdentifier
+            sharedRightIdentifier: registry.sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let coordinator = ProtectedDataTestAppProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: { registry },
@@ -259,7 +262,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.missing"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.missing",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -292,7 +296,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.secret"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.secret",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -337,7 +342,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
             let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
                 rootSecretStore: rootSecretStore,
                 domainKeyManager: keyManager,
-                sharedRightIdentifier: sharedRightIdentifier
+                sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
             )
             let registry = ProtectedDataRegistry(
                 formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -372,7 +378,8 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.cancelled"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.authorization.cancelled",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,

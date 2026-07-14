@@ -390,7 +390,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyCleartextSigningService {
         PrivateKeyCleartextSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -400,7 +401,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -412,7 +414,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement(),
+        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -422,7 +425,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: keyAgreement
+            keyAgreement: keyAgreement,
+            compositeDecapsulator: compositeDecapsulator
         )
     }
 
@@ -434,7 +438,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement(),
+        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyStreamingFileDecryptionService {
         PrivateKeyStreamingFileDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -444,7 +449,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: keyAgreement
+            keyAgreement: keyAgreement,
+            compositeDecapsulator: compositeDecapsulator
         )
     }
 
@@ -456,7 +462,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -466,7 +473,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -478,7 +486,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyStreamingFileEncryptionService {
         PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -488,7 +497,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -500,7 +510,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyPasswordMessageEncryptionService {
         PrivateKeyPasswordMessageEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -510,7 +521,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -522,7 +534,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyDetachedFileSigningService {
         PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -532,7 +545,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -544,7 +558,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyExpiryMutationService {
         PrivateKeyExpiryMutationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -553,7 +568,8 @@ enum TestHelpers {
                 handleStore: handleStore
             ),
             keyAdapter: keyAdapter ?? PGPKeyOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -565,7 +581,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeySelectiveRevocationService {
         PrivateKeySelectiveRevocationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -574,7 +591,8 @@ enum TestHelpers {
                 handleStore: handleStore
             ),
             certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 
@@ -586,7 +604,8 @@ enum TestHelpers {
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
             keyStore: MockSecureEnclaveCustodyKeyStore()
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyContactCertificationService {
         PrivateKeyContactCertificationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -596,7 +615,8 @@ enum TestHelpers {
             ),
             softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter ?? PGPCertificateOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: compositeSigner
         )
     }
 

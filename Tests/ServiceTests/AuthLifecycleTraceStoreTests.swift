@@ -697,6 +697,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
             defaults: defaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore,
             localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
                 probe.record(policy: policy, reason: receivedReason)
@@ -746,6 +747,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             keychain: MockKeychain(),
             defaults: defaults,
             allowsUITestAuthenticationBypass: true,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore,
             localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
                 probe.record(policy: policy, reason: receivedReason)
@@ -997,6 +999,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
             defaults: defaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore,
             localAuthenticationPolicyEvaluator: { context, policy, receivedReason, reply in
                 XCTAssertEqual(context.localizedFallbackTitle, "")
@@ -1050,6 +1053,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             keychain: MockKeychain(),
             defaults: defaults,
             allowsUITestAuthenticationBypass: true,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore,
             localAuthenticationPolicyEvaluator: { _, policy, receivedReason, reply in
                 probe.record(policy: policy, reason: receivedReason)
@@ -1094,6 +1098,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: secureEnclave,
             keychain: keychain,
             defaults: defaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore
         )
         manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
@@ -1135,6 +1140,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
             defaults: defaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore
         )
         manager.configurePrivateKeyControlStore(InMemoryPrivateKeyControlStore(mode: .standard))
@@ -1175,6 +1181,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             rootSecretStore: rootSecretStore,
             domainKeyManager: TraceProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
             sharedRightIdentifier: "com.cypherair.tests.trace.root-secret",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             traceStore: traceStore
         )
         let registry = ProtectedDataRegistry(

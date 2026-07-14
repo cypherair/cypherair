@@ -56,7 +56,8 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
                 router: StaticRoute(.secureEnclaveKeyAgreement(prepared.route)),
                 softwarePrivateKeyAccess: unwrapper,
                 messageAdapter: messageAdapter,
-                keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+                keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+                compositeDecapsulator: SystemSecureEnclaveCompositeOperations()
             )
 
             let result = try await service.decryptDetailed(
@@ -128,7 +129,8 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             router: StaticRoute(.secureEnclaveKeyAgreement(prepared.route)),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            compositeDecapsulator: SystemSecureEnclaveCompositeOperations()
         )
 
         let verification = try await service.decryptFile(

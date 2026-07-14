@@ -408,7 +408,8 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             router: router,
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
     }
 

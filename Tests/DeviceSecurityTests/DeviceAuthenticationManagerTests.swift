@@ -145,7 +145,8 @@ final class DeviceAuthenticationManagerTests: DeviceSecurityTestCase {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: testDefaults
+            defaults: testDefaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         XCTAssertNil(authManager.currentMode, "Locked private-key control must not expose a default mode")
         testDefaults.removePersistentDomain(forName: "com.cypherair.test")

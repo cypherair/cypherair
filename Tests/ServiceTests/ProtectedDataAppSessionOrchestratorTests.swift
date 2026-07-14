@@ -22,7 +22,8 @@ final class ProtectedDataAppSessionOrchestratorTests: ProtectedDataFrameworkTest
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.orchestrator.custody"
+            sharedRightIdentifier: "com.cypherair.tests.orchestrator.custody",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         return AppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("not needed") },

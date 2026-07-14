@@ -200,7 +200,8 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
         var recipient = try makeRecipient(name: "Recipient With Self")
         defer { recipient.certData.resetBytes(in: 0..<recipient.certData.count) }
@@ -447,7 +448,8 @@ final class PrivateKeyTextEncryptionServiceTests: XCTestCase {
             router: router,
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
     }
 
