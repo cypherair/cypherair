@@ -114,6 +114,7 @@ final class TutorialSandboxContainer {
             keyStore: SystemSecureEnclaveCustodyKeyStore()
         )
         let secureEnclaveDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
+        let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
         keyManagement.configurePrivateKeyExpiryMutationService(
             PrivateKeyExpiryMutationService(
                 router: keyManagement.makePrivateKeyOperationRouter(
@@ -121,7 +122,8 @@ final class TutorialSandboxContainer {
                     handleStore: secureEnclaveCustodyHandleStore
                 ),
                 keyAdapter: keyAdapter,
-                digestSigner: secureEnclaveDigestSigner
+                digestSigner: secureEnclaveDigestSigner,
+                compositeSigner: secureEnclaveCompositeOperations
             )
         )
         keyManagement.configurePrivateKeySelectiveRevocationService(
@@ -131,7 +133,8 @@ final class TutorialSandboxContainer {
                     handleStore: secureEnclaveCustodyHandleStore
                 ),
                 certificateAdapter: certificateAdapter,
-                digestSigner: secureEnclaveDigestSigner
+                digestSigner: secureEnclaveDigestSigner,
+                compositeSigner: secureEnclaveCompositeOperations
             )
         )
         let textEncryptor = PrivateKeyTextEncryptionService(
@@ -141,7 +144,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeOperations
         )
         let fileEncryptor = PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -150,7 +154,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeOperations
         )
         self.encryptionService = EncryptionService(
             keyManagement: keyManagement,
@@ -166,7 +171,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            compositeDecapsulator: secureEnclaveCompositeOperations
         )
         let fileDecryptor = PrivateKeyStreamingFileDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -175,7 +181,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            compositeDecapsulator: secureEnclaveCompositeOperations
         )
         self.decryptionService = DecryptionService(
             messageAdapter: messageAdapter,
@@ -192,7 +199,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeOperations
         )
         let detachedFileSigner = PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -201,7 +209,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeOperations
         )
         self.signingService = SigningService(
             messageAdapter: messageAdapter,
@@ -217,7 +226,8 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeOperations
         )
         self.certificateSignatureService = CertificateSignatureService(
             certificateAdapter: certificateAdapter,

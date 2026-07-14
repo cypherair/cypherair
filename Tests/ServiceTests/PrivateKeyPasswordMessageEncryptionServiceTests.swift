@@ -147,7 +147,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
 
         do {
@@ -186,7 +187,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
         let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
         defer { TestHelpers.cleanupTempDir(contactsDirectory) }
@@ -232,7 +234,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
 
         do {
@@ -441,7 +444,8 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             router: router,
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
-            digestSigner: digestSigner
+            digestSigner: digestSigner,
+            compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
     }
 

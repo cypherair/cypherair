@@ -126,7 +126,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.empty"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.empty",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
@@ -152,7 +153,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.pending"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.pending",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
@@ -182,7 +184,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.auth"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.auth",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let orchestrator = ProtectedDataTestAppAppSessionOrchestrator(
             currentRegistryProvider: { throw ProtectedDataError.invalidRegistry("Should not be called") },
@@ -215,7 +218,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.reuse"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.reuse",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -253,7 +257,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.framework-recovery"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.framework-recovery",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -291,7 +296,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.restart-required"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.gate.restart-required",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let participant = MockProtectedDataRelockParticipant()
         participant.shouldThrow = true
@@ -335,7 +341,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.open"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.open",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -383,7 +390,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.no-context"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.no-context",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let coordinator = ProtectedDataTestAppProtectedDataPostUnlockCoordinator(
             currentRegistryProvider: {
@@ -418,7 +426,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.pending"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.post-unlock.pending",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -472,7 +481,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: ProtectedDataTestAppProtectedDomainKeyManager(storageRoot: storageRoot, keychain: MockKeychain()),
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -526,7 +536,8 @@ final class ProtectedDataAccessGatePostUnlockTests: ProtectedDataFrameworkTestCa
         let sessionCoordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let protectedSettingsStore = ProtectedSettingsStore(
             storageRoot: storageRoot,

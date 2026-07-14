@@ -87,7 +87,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.session"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let participant = MockProtectedDataRelockParticipant()
         coordinator.registerRelockParticipant(participant)
@@ -148,7 +149,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: identifier
+            sharedRightIdentifier: identifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -189,7 +191,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: identifier
+            sharedRightIdentifier: identifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -229,7 +232,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-handoff"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.session-handoff",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let registry = ProtectedDataRegistry(
             formatVersion: ProtectedDataRegistry.currentFormatVersion,
@@ -264,7 +268,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.reprotect"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.reprotect",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let context = LAContext()
         defer { context.invalidate() }
@@ -291,7 +296,8 @@ final class ProtectedDataDomainKeySessionTests: ProtectedDataFrameworkTestCase {
         let coordinator = ProtectedDataTestAppProtectedDataSessionCoordinator(
             rootSecretStore: rightStoreClient,
             domainKeyManager: keyManager,
-            sharedRightIdentifier: "com.cypherair.tests.protected-data.restart"
+            sharedRightIdentifier: "com.cypherair.tests.protected-data.restart",
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let participant = MockProtectedDataRelockParticipant()
         participant.shouldThrow = true

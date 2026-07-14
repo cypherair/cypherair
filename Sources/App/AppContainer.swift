@@ -323,7 +323,8 @@ final class AppContainer: @unchecked Sendable {
         keyManagement: KeyManagementService,
         contactService: ContactService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeOperations: any SecureEnclaveCompositeSigning & SecureEnclaveCompositeDecapsulating
     ) -> PgpServiceGraph {
         let temporaryArtifactStore = AppTemporaryArtifactStore()
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
@@ -333,7 +334,8 @@ final class AppContainer: @unchecked Sendable {
                 keyAdapter: keyAdapter,
                 keyManagement: keyManagement,
                 secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-                secureEnclaveDigestSigner: secureEnclaveDigestSigner
+                secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+                secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
             )
         )
         keyManagement.configurePrivateKeySelectiveRevocationService(
@@ -342,7 +344,8 @@ final class AppContainer: @unchecked Sendable {
                 certificateAdapter: certificateAdapter,
                 keyManagement: keyManagement,
                 secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-                secureEnclaveDigestSigner: secureEnclaveDigestSigner
+                secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+                secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
             )
         )
         let textEncryptor = makePrivateKeyTextEncryptionService(
@@ -350,47 +353,54 @@ final class AppContainer: @unchecked Sendable {
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
         )
         let fileEncryptor = makePrivateKeyStreamingFileEncryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
         )
         let cleartextSigner = makePrivateKeyCleartextSigningService(
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
         )
         let detachedFileSigner = makePrivateKeyDetachedFileSigningService(
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
         )
         let contactCertificationSigner = makePrivateKeyContactCertificationService(
             engine: engine,
             certificateAdapter: certificateAdapter,
             keyManagement: keyManagement,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveDigestSigner,
+            secureEnclaveCompositeSigner: secureEnclaveCompositeOperations
         )
         let messageDecryptor = makePrivateKeyMessageDecryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveCompositeDecapsulator: secureEnclaveCompositeOperations
         )
         let fileDecryptor = makePrivateKeyStreamingFileDecryptionService(
             engine: engine,
             messageAdapter: messageAdapter,
             keyManagement: keyManagement,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
+            secureEnclaveCompositeDecapsulator: secureEnclaveCompositeOperations
         )
         return PgpServiceGraph(
             temporaryArtifactStore: temporaryArtifactStore,
@@ -435,7 +445,8 @@ final class AppContainer: @unchecked Sendable {
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -444,7 +455,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -453,7 +465,8 @@ final class AppContainer: @unchecked Sendable {
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyStreamingFileEncryptionService {
         PrivateKeyStreamingFileEncryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -462,7 +475,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -471,7 +485,8 @@ final class AppContainer: @unchecked Sendable {
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyCleartextSigningService {
         PrivateKeyCleartextSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -480,7 +495,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -488,7 +504,8 @@ final class AppContainer: @unchecked Sendable {
         engine: PgpEngine,
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveCompositeDecapsulator: any SecureEnclaveCompositeDecapsulating
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -497,7 +514,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            compositeDecapsulator: secureEnclaveCompositeDecapsulator
         )
     }
 
@@ -505,7 +523,8 @@ final class AppContainer: @unchecked Sendable {
         engine: PgpEngine,
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
+        secureEnclaveCompositeDecapsulator: any SecureEnclaveCompositeDecapsulating
     ) -> PrivateKeyStreamingFileDecryptionService {
         PrivateKeyStreamingFileDecryptionService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -514,7 +533,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            compositeDecapsulator: secureEnclaveCompositeDecapsulator
         )
     }
 
@@ -523,7 +543,8 @@ final class AppContainer: @unchecked Sendable {
         messageAdapter: PGPMessageOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyDetachedFileSigningService {
         PrivateKeyDetachedFileSigningService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -532,7 +553,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -541,7 +563,8 @@ final class AppContainer: @unchecked Sendable {
         keyAdapter: PGPKeyOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyExpiryMutationService {
         PrivateKeyExpiryMutationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -549,7 +572,8 @@ final class AppContainer: @unchecked Sendable {
                 handleStore: secureEnclaveCustodyHandleStore
             ),
             keyAdapter: keyAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -558,7 +582,8 @@ final class AppContainer: @unchecked Sendable {
         certificateAdapter: PGPCertificateOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeySelectiveRevocationService {
         PrivateKeySelectiveRevocationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -566,7 +591,8 @@ final class AppContainer: @unchecked Sendable {
                 handleStore: secureEnclaveCustodyHandleStore
             ),
             certificateAdapter: certificateAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -575,7 +601,8 @@ final class AppContainer: @unchecked Sendable {
         certificateAdapter: PGPCertificateOperationAdapter,
         keyManagement: KeyManagementService,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore,
-        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning
+        secureEnclaveDigestSigner: any SecureEnclaveCustodyDigestSigning,
+        secureEnclaveCompositeSigner: any SecureEnclaveCompositeSigning
     ) -> PrivateKeyContactCertificationService {
         PrivateKeyContactCertificationService(
             router: keyManagement.makePrivateKeyOperationRouter(
@@ -584,7 +611,8 @@ final class AppContainer: @unchecked Sendable {
             ),
             softwarePrivateKeyAccess: keyManagement,
             certificateAdapter: certificateAdapter,
-            digestSigner: secureEnclaveDigestSigner
+            digestSigner: secureEnclaveDigestSigner,
+            compositeSigner: secureEnclaveCompositeSigner
         )
     }
 
@@ -929,7 +957,8 @@ final class AppContainer: @unchecked Sendable {
             keyManagement: keyManagement,
             contactService: contactService,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveDigestSigner: secureEnclaveCustodyDigestSigner
+            secureEnclaveDigestSigner: secureEnclaveCustodyDigestSigner,
+            secureEnclaveCompositeOperations: secureEnclaveCompositeOperations
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,
@@ -1251,7 +1280,8 @@ final class AppContainer: @unchecked Sendable {
             secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore(
                 keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
             ),
-            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            secureEnclaveCompositeOperations: SystemSecureEnclaveCompositeOperations()
         )
         let localDataResetService = LocalDataResetService(
             keychain: keychain,

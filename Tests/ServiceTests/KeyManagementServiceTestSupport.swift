@@ -494,6 +494,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )
@@ -544,6 +545,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             provisioningCheckpoint: checkpoint
@@ -568,6 +570,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             postProvisioningCheckpoint: checkpoint
@@ -597,6 +600,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: localSE,
             keychain: localKeychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: localPrivateKeyControlStore,
             metadataPersistence: metadataPersistence,
             beforeAuthModeReadCheckpoint: beforeAuthModeReadCheckpoint,
@@ -715,14 +719,17 @@ class KeyManagementServiceTestCase: XCTestCase {
         )
 
         let protectedDataSessionCoordinator = ProtectedDataSessionCoordinator(
+            rootSecretStore: MockProtectedDataRootSecretStore(),
             domainKeyManager: domainKeyManager,
-            sharedRightIdentifier: sharedRightIdentifier
+            sharedRightIdentifier: sharedRightIdentifier,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         let keyManagement = KeyManagementService(
             keyAdapter: PGPKeyOperationAdapter(engine: engine),
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: keychain,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: keyMetadataStore,
             identityStoreCheckpoint: identityStoreCheckpoint,

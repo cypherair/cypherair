@@ -24,7 +24,7 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
         router: any PrivateKeyOperationRouting,
         keyAdapter: PGPKeyOperationAdapter,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
+        compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.router = router
         self.keyAdapter = keyAdapter

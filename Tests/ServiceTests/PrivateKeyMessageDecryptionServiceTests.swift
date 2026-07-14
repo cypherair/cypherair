@@ -546,7 +546,8 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             router: router,
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter ?? PGPMessageOperationAdapter(engine: engine),
-            keyAgreement: keyAgreement
+            keyAgreement: keyAgreement,
+            compositeDecapsulator: SystemSecureEnclaveCompositeOperations()
         )
     }
 
