@@ -191,7 +191,8 @@ if [ -f "$SCRIPT_DIR/modern_high_v6_pubkey.gpg" ]; then
         echo "GnuPG correctly rejected v6 key import (expected behavior)"
     fi
     # Normalize local paths captured in GnuPG diagnostics before committing fixtures.
-    perl -0pi -e "s|\\Q$SCRIPT_DIR/\\E|<fixture-dir>/|g" "$SCRIPT_DIR/gpg_v6_import_rejection.txt"
+    # The path travels via %ENV so shell interpolation cannot inject perl code.
+    FIXTURE_DIR="$SCRIPT_DIR" perl -0pi -e 's|\Q$ENV{FIXTURE_DIR}/\E|<fixture-dir>/|g' "$SCRIPT_DIR/gpg_v6_import_rejection.txt"
     echo "Exported: gpg_v6_import_rejection.txt"
 else
     echo "--- Skipping v6 rejection test (modern_high_v6_pubkey.gpg not found) ---"
