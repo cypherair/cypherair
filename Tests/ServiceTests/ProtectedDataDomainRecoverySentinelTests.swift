@@ -343,7 +343,7 @@ final class ProtectedDataDomainRecoverySentinelTests: ProtectedDataFrameworkTest
                 rootSecretStore: rootSecretStore,
                 domainKeyManager: keyManager,
                 sharedRightIdentifier: sharedRightIdentifier,
-            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
+                authenticationPromptCoordinator: AuthenticationPromptCoordinator()
             )
             let registry = ProtectedDataRegistry(
                 formatVersion: ProtectedDataRegistry.currentFormatVersion,
