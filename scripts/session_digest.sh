@@ -6,7 +6,7 @@
 #   arg 1  a project directory (default: cwd) whose Claude Code transcript
 #          store is derived as ~/.claude/projects/<sanitized-path>; if the
 #          given directory itself contains .jsonl transcripts it is used as-is
-#   arg 2  output directory (default: /tmp/session-digests)
+#   arg 2  output directory (default: ${TMPDIR:-/tmp}/session-digests)
 #
 # Produces, per session:
 #   <out>/user/<id>.txt  — user messages only (asks, corrections, approvals)
@@ -20,13 +20,17 @@
 #   jq -r 'select(.type=="assistant") | .message.model' <id>.jsonl | sort -u
 set -uo pipefail
 
+# Digests replay session content; keep them unreadable to other local users
+# and default to the per-user temp dir instead of world-writable /tmp.
+umask 077
+
 ARG="${1:-$PWD}"
 if ls "$ARG"/*.jsonl >/dev/null 2>&1; then
   SRC="$ARG"
 else
   SRC="$HOME/.claude/projects/$(cd "$ARG" && pwd | sed 's|[^A-Za-z0-9]|-|g')"
 fi
-OUT="${2:-/tmp/session-digests}"
+OUT="${2:-${TMPDIR:-/tmp}/session-digests}"
 if ! ls "$SRC"/*.jsonl >/dev/null 2>&1; then
   echo "no transcripts found under $SRC" >&2
   exit 2

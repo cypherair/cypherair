@@ -14,8 +14,10 @@
 #
 # The arm64e stage1 toolchain pin is owned by build_apple_arm64e_xcframework.sh
 # (DEFAULT_ARM64E_STAGE1_RELEASE_TAG) and docs/ARM64E_STATUS.md; this script does
-# not re-pin it. GitHub tokens are intentionally kept out of the Rust/xcframework
-# build subprocesses (the build script unsets them).
+# not re-pin it. Workflow secrets (GITHUB_PAT, ASC_*) are captured and scrubbed
+# from the environment at the top of main(), so brew/rustup/curl/cargo and the
+# Rust/xcframework build subprocesses never inherit them; the build script also
+# unsets GitHub tokens itself as a second belt.
 
 set -euo pipefail
 
@@ -29,6 +31,15 @@ ARM64E_MANIFEST="PgpMobile.arm64e-build-manifest.json"
 
 log() { echo "[ci_post_clone] $*"; }
 fail() { echo "[ci_post_clone] error: $*" >&2; exit 1; }
+
+# Xcode Cloud exports workflow secrets into the hook environment, where every
+# child process would inherit them. Capture what this script needs into an
+# unexported shell variable, scrub the rest, and reinject per call site.
+CAPTURED_GITHUB_PAT=""
+capture_and_scrub_secrets() {
+    CAPTURED_GITHUB_PAT="${GITHUB_PAT:-}"
+    unset GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY ASC_PRIVATE_KEY_PATH
+}
 
 # Keep stdout active so Xcode Cloud's ~30 minute inactivity timeout does not
 # cancel the long, deliberately uncached Rust build.
@@ -62,10 +73,12 @@ ensure_homebrew_formula() {
 
 require_gh_auth() {
     ensure_homebrew_formula gh
-    [ -n "${GITHUB_PAT:-}" ] || fail "GITHUB_PAT secret is required for SQLCipher release verification"
+    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for SQLCipher release verification"
     if ! gh auth status >/dev/null 2>&1; then
         log "authenticating gh"
-        printf '%s' "$GITHUB_PAT" | gh auth login --with-token
+        # After login the token lives in gh's own config store on the ephemeral
+        # CI host; later gh calls need no token in the environment.
+        printf '%s' "$CAPTURED_GITHUB_PAT" | gh auth login --with-token
     fi
 }
 
@@ -152,6 +165,7 @@ release_consumer_workflow() {
 }
 
 main() {
+    capture_and_scrub_secrets
     require_repo_path
     start_heartbeat
     log "workflow=${CI_WORKFLOW:-<unset>} tag=${CI_TAG:-<none>} commit=${CI_COMMIT:-<none>}"

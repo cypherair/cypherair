@@ -3,7 +3,10 @@
 
 set -euo pipefail
 
-unset GH_TOKEN GITHUB_TOKEN
+# Keep release secrets out of every build subprocess (cargo, rustup, curl,
+# codesign helpers). The Xcode Cloud hooks scrub these before calling us;
+# this is the belt for local developer shells.
+unset GH_TOKEN GITHUB_TOKEN GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY ASC_PRIVATE_KEY_PATH
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
