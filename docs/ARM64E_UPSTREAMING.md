@@ -12,7 +12,7 @@
 > Update triggers: A Rust or LLVM rebase, an upstream merge that retires a
 > carried change, a change to the fork topology, or an approved production
 > re-pin.
-> Last reviewed: 2026-07-13.
+> Last reviewed: 2026-07-14.
 
 ## 1. Current Decision
 
@@ -226,24 +226,51 @@ Completed locally:
   `arm64e`. This is supplemental evidence because the local Xcode 26.6 install
   has the visionOS 26.5 SDK files but reports that platform component as
   unavailable for destinations.
+- Clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
+  the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
+  arm64e dependency-freshness check, pinned stable197 download, XCFramework
+  rebuild, packaging, and artifact upload. Its best-effort Apple platform job
+  skipped the actual iOS and visionOS probes because the runner selected Xcode
+  26.6 rather than 26.5. Its best-effort Swift unit job skipped the actual test
+  plan because that Xcode mismatch was joined by a macOS 26.4 host below the
+  app's 26.5 deployment target. Those two successful job conclusions therefore
+  do not replace the local platform and app-test evidence.
 
-Local app-test limitation:
+Local app-test incident and resolution:
 
-- Xcode 26.6 launches both the `arm64e` and control `arm64` unit-test hosts, but
-  this Mac's existing sandboxed CypherAir test container returns
-  `protectedFileWriteFailed` while creating a fresh UI-test Contacts protected
-  domain. The app deliberately traps before XCTest connects, so no unit tests
-  run. The identical cross-architecture failure and Swift-only crash path rule
-  out the stable197 compiler/XCFramework; resetting any shared app-container
-  state requires separate explicit approval.
+- Before XCTest could connect, the locked macOS session caused the sandboxed
+  app to return `protectedFileWriteFailed` while creating a complete-protected
+  UI-test Contacts domain. LLDB captured `errno = EPERM`; a live session check
+  then returned `CGSSessionScreenIsLocked = 1`. The same pre-XCTest trap on
+  `arm64e` and control `arm64`, plus separate UI-runner authentication-session
+  failures, made this host-state evidence rather than a completed test result.
+  This is consistent with Apple's [macOS App Sandbox diagnostics](https://developer.apple.com/documentation/Security/accessing-files-from-the-macos-app-sandbox)
+  for complete protection being unavailable while locked, but the initial
+  evidence alone did not prove that diagnosis.
+- After the user unlocked the macOS session, all three plans were rerun
+  serially with Xcode 26.6 on `My Mac` (MacBook Air), macOS 27.0 build
+  `26A5378j`, using the actual `arm64e` destination:
+  - `CypherAir-UnitTests`: 1,363 passed, zero failed or skipped.
+  - `CypherAir-DeviceTests`: 81 passed, zero failed or skipped.
+  - `CypherAir-MacUITests`: 31 passed, zero failed or skipped.
+  Each result bundle reports `Passed`, and each build action reports
+  `succeeded` with zero errors. The post-unlock results resolve the host-state
+  blocker for this validation run without a product or test-source change and
+  provide no evidence of a stable197 regression.
+- Xcode emitted non-blocking warnings while collecting and merging raw
+  coverage profiles from sandbox paths, plus signed-XCTest-library stripping
+  warnings. These did not prevent any test from running and are distinct from
+  the earlier pre-XCTest app trap and authentication-session failure.
+- No shared app-container data was deleted or reset, and protected-data
+  behavior was not weakened. Issue #651 retains the diagnostic history and
+  non-blocking test-lifecycle follow-up.
 
 Still required to complete the CypherAir production re-pin:
 
-1. Complete the unit, device, and UI validation on a clean app-test container
-   or in pull-request CI, and run the native visionOS 26.5 probe where that
-   platform component is available.
-2. Complete the pull-request checks and the required fresh-context pre-merge
-   review.
+1. Commit this final validation record and recheck pull-request CI on the
+   resulting final PR head.
+2. Before merge, obtain a fresh verification of that exact state using
+   `gpt-5.6-sol` at maximum effort with fork context disabled.
 
 ## 7. Release And Upstream Gates
 
