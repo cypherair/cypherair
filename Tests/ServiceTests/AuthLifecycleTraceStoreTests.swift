@@ -594,6 +594,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
             authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            certificatePrimaryFingerprint: { _ in fixture.fingerprint },
             traceStore: store
         )
 
@@ -646,6 +647,7 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
             secureEnclave: TraceFailingUnwrapSecureEnclave(base: secureEnclave),
             bundleStore: bundleStore,
             authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            certificatePrimaryFingerprint: { _ in fixture.fingerprint },
             traceStore: store
         )
 
@@ -684,6 +686,89 @@ final class AuthLifecycleTraceStoreTests: TutorialSandboxDefaultsSerializedTestC
         XCTAssertFalse(metadataKeys.contains("fingerprint"))
         XCTAssertFalse(metadataKeys.contains("privateKey"))
         XCTAssertFalse(metadataValues.contains(fixture.fingerprint))
+    }
+
+    func test_privateKeyAccessService_rejectsUnwrappedCertificateWithForeignFingerprint() async throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let secureEnclave = MockSecureEnclave()
+        let keychain = MockKeychain()
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        let requestedFingerprint = String(repeating: "a", count: 40)
+        let foreignFingerprint = String(repeating: "b", count: 40)
+        // A tampered bundle: sealed and device-bound so the Secure Enclave
+        // unwrap succeeds, but its material belongs to a DIFFERENT identity than
+        // the keychain row it is filed under.
+        let fixture = try saveTraceWrappedPrivateKey(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore,
+            fingerprint: requestedFingerprint
+        )
+        let accessService = PrivateKeyAccessService(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            certificatePrimaryFingerprint: { _ in foreignFingerprint },
+            traceStore: store
+        )
+
+        do {
+            _ = try await accessService.unwrapPrivateKey(fingerprint: fixture.fingerprint)
+            XCTFail("Expected the identity-mismatch gate to reject a forged envelope")
+        } catch let error as CypherAirError {
+            guard case .keyOperationUnavailable(.publicCertificateAssociationMismatch) = error else {
+                XCTFail("Unexpected CypherAirError: \(error)")
+                return
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertTrue(
+            store.recentEntries.contains {
+                $0.name == "privateKey.unwrap.identityMismatch" && $0.metadata["result"] == "mismatch"
+            }
+        )
+        // The forged plaintext must never surface to a consumer.
+        XCTAssertFalse(store.recentEntries.contains { $0.name == "privateKey.unwrap.closure.return" })
+        let metadataValues = store.recentEntries.flatMap { $0.metadata.values }
+        XCTAssertFalse(metadataValues.contains(foreignFingerprint))
+    }
+
+    func test_privateKeyAccessService_rejectsUnparseableUnwrappedCertificate() async throws {
+        let store = TraceAuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+        let secureEnclave = MockSecureEnclave()
+        let keychain = MockKeychain()
+        let bundleStore = KeyBundleStore(keychain: keychain)
+        let fixture = try saveTraceWrappedPrivateKey(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore
+        )
+        struct NotACertificate: Error {}
+        let accessService = PrivateKeyAccessService(
+            secureEnclave: secureEnclave,
+            bundleStore: bundleStore,
+            authenticationPromptCoordinator: TraceAuthenticationPromptCoordinator(traceStore: store),
+            certificatePrimaryFingerprint: { _ in throw NotACertificate() },
+            traceStore: store
+        )
+
+        do {
+            _ = try await accessService.unwrapPrivateKey(fingerprint: fixture.fingerprint)
+            XCTFail("Expected unparseable unwrapped material to fail closed")
+        } catch let error as CypherAirError {
+            guard case .keyOperationUnavailable(.publicCertificateAssociationMismatch) = error else {
+                XCTFail("Unexpected CypherAirError: \(error)")
+                return
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+
+        XCTAssertTrue(
+            store.recentEntries.contains {
+                $0.name == "privateKey.unwrap.identityMismatch" && $0.metadata["result"] == "unparseable"
+            }
+        )
     }
 
     func test_authenticationManager_evaluateAppSessionIgnoresBypassKeyByDefault() async throws {

@@ -86,7 +86,13 @@ pub enum MessageQuantumSafety {
 ///
 /// The caller may pass a truncated prefix of a large message (streamed
 /// file output): parsing stops at the first encrypted-container packet,
-/// which follows all PKESKs.
+/// which follows all PKESKs. That container is therefore the proof that
+/// every session-key packet has been seen — so this function fails closed
+/// (returns `CorruptData`) if it reaches the end of the input without
+/// observing the container. Otherwise a prefix truncated *before* some
+/// PKESKs could silently downgrade the verdict (e.g. report `NonePostQuantum`
+/// or `Mixed` for a message that is actually fully post-quantum). Callers
+/// map the error to "no badge" rather than a misleading one.
 pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety, PgpError> {
     use openpgp::types::PublicKeyAlgorithm;
 
@@ -98,6 +104,7 @@ pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety,
 
     let mut total = 0usize;
     let mut post_quantum = 0usize;
+    let mut saw_container = false;
 
     while let openpgp::parse::PacketParserResult::Some(pp) = ppr {
         match pp.packet {
@@ -115,13 +122,28 @@ pub fn message_quantum_safety(ciphertext: &[u8]) -> Result<MessageQuantumSafety,
                     post_quantum += 1;
                 }
             }
-            openpgp::Packet::SEIP(_) => break,
+            openpgp::Packet::SEIP(_) => {
+                // The encrypted container follows all session-key packets;
+                // reaching it means every PKESK has been counted. Padding and
+                // Marker packets deliberately fall through to `_` so they never
+                // stand in for the container.
+                saw_container = true;
+                break;
+            }
             _ => {}
         }
         let (_, next) = pp.recurse().map_err(|e| PgpError::CorruptData {
             reason: format!("Failed to parse message: {e}"),
         })?;
         ppr = next;
+    }
+
+    if !saw_container {
+        return Err(PgpError::CorruptData {
+            reason: "Encrypted container not found before end of input; cannot classify \
+                     quantum-safety from a truncated prefix"
+                .to_string(),
+        });
     }
 
     Ok(if total == 0 || post_quantum == 0 {
