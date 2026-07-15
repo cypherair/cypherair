@@ -189,29 +189,85 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     }
 
     @MainActor
-    func test_appAccessPolicySelection_updatesConfigAfterSwitchAction() async {
+    func test_appAccessPolicySelection_biometricsOnly_gatesOnConfirmationBeforeSwitching() async {
+        var switchActionCalled = false
+        let model = makeModel(appAccessPolicySwitchAction: { _ in
+            switchActionCalled = true
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+
+        // The lockout warning is presented and NOTHING has switched yet.
+        XCTAssertNotNil(model.presentedAppAccessConfirmation)
+        XCTAssertFalse(switchActionCalled)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    @MainActor
+    func test_appAccessPolicySelection_biometricsOnly_confirmSwitches() async {
         var receivedPolicy: AppSessionAuthenticationPolicy?
         let model = makeModel(appAccessPolicySwitchAction: { policy in
             receivedPolicy = policy
         })
 
         model.handleAppAccessPolicySelection(.biometricsOnly)
+        let request = model.presentedAppAccessConfirmation
+        XCTAssertNotNil(request)
+        request?.onConfirm()
 
         await waitUntil("app access policy switch to finish") {
             model.isSwitchingAppAccessPolicy == false
         }
 
+        XCTAssertNil(model.presentedAppAccessConfirmation)
         XCTAssertEqual(receivedPolicy, .biometricsOnly)
         XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
     }
 
     @MainActor
-    func test_appAccessPolicySelection_failureSurfacesErrorAndKeepsConfig() async {
+    func test_appAccessPolicySelection_biometricsOnly_cancelDoesNotSwitch() async {
+        var switchActionCalled = false
+        let model = makeModel(appAccessPolicySwitchAction: { _ in
+            switchActionCalled = true
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+        model.presentedAppAccessConfirmation?.onCancel()
+
+        XCTAssertNil(model.presentedAppAccessConfirmation)
+        XCTAssertFalse(switchActionCalled)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    @MainActor
+    func test_appAccessPolicySelection_userPresence_switchesDirectlyWithoutConfirmation() async {
+        config.appSessionAuthenticationPolicy = .biometricsOnly
+        var receivedPolicy: AppSessionAuthenticationPolicy?
+        let model = makeModel(appAccessPolicySwitchAction: { policy in
+            receivedPolicy = policy
+        })
+
+        // Switching back to the safe direction (passcode fallback restored) needs
+        // no lockout warning.
+        model.handleAppAccessPolicySelection(.userPresence)
+
+        await waitUntil("app access policy switch to finish") {
+            model.isSwitchingAppAccessPolicy == false
+        }
+
+        XCTAssertNil(model.presentedAppAccessConfirmation)
+        XCTAssertEqual(receivedPolicy, .userPresence)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .userPresence)
+    }
+
+    @MainActor
+    func test_appAccessPolicySelection_biometricsOnly_confirmFailureSurfacesErrorAndKeepsConfig() async {
         let model = makeModel(appAccessPolicySwitchAction: { _ in
             throw SettingsScreenModelTestError(message: "App access switch failed")
         })
 
         model.handleAppAccessPolicySelection(.biometricsOnly)
+        model.presentedAppAccessConfirmation?.onConfirm()
 
         await waitUntil("failed app access policy switch to finish") {
             model.isSwitchingAppAccessPolicy == false
