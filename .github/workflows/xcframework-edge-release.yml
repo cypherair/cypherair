@@ -186,6 +186,10 @@ jobs:
             --freshness-level error
       - name: Download arm64e stage1 toolchain
         run: scripts/download_arm64e_stage1_toolchain.sh "$RUNNER_TEMP/arm64e-stage1"
+      - name: Verify arm64e stage1 release provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify_arm64e_stage1_release.sh "$RUNNER_TEMP/arm64e-stage1/download"
       - name: Build XCFramework and generated bindings
         env:
           ARM64E_STAGE1_FORCE_DOWNLOAD: "0"
