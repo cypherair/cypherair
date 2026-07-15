@@ -241,7 +241,7 @@ Completed validation, publication, and readback evidence:
   local app plans all completed against that superseded artifact. They remain
   useful pipeline and app baselines but do not validate the corrected compiler
   package.
-- Corrected-artifact consumer acceptance completed across signed heads
+- Initial corrected-artifact consumer acceptance completed across signed heads
   `b33d347cf5a2` and `d93b26f15b92`, both descendants of provenance/re-pin
   commit `8aee8304462c`:
   - At `b33d347`, a forced fresh download of the corrected immutable stable197
@@ -270,6 +270,29 @@ Completed validation, publication, and readback evidence:
   - Xcode 27 beta build `27A5218g` built the corrected app for generic visionOS
     27 with minimum OS 26.5. Both executable slices are present: `arm64` and
     `arm64e`.
+- Final-current-main acceptance advanced that corrected-artifact evidence
+  through three later signed heads:
+  - Main `4693901ca62e` was merged as `e3d73a1859f`. Because that merge changed
+    `pgp-mobile`, the corrected stage1 package was downloaded and semantically
+    reverified before use, the full release XCFramework was rebuilt, and the
+    complete Cargo suite plus all 48 focused Python tests passed. Generated
+    UniFFI Swift remained unchanged.
+  - Main `ddc867e25a0d` was then merged as `1ab21fa0b4e`. Its three-file delta
+    was Swift/test-only and did not change the rebuilt Rust, UniFFI, or
+    XCFramework artifact.
+  - The first full Unit run after that merge exposed test-harness issue #668:
+    18 `EncryptScreenModelTests` teardowns deleted the shared temporary root
+    instead of their test-owned contacts directory. Signed test-only commit
+    `ae27eb8d29fe` narrows those cleanups to the owned directory. A focused
+    reproduction passed 34/34, then both the explicit-serial and canonical
+    Unit runs passed 1,375/1,375. The canonical run is the acceptance result;
+    no local-only flag is required.
+  - At validated code head `ae27eb8`, serialized Xcode 26.6 acceptance passed
+    1,375 Unit, 81 Device, and 31 Mac UI tests with zero failures or skips.
+    Xcode 27 beta build `27A5218g` also rebuilt the generic visionOS app; its
+    `arm64` and `arm64e` slices both record minimum OS 26.5 and SDK 27.0.
+  - The signed documentation-only successor to `ae27eb8` records this evidence;
+    it does not alter the locally accepted code or packaged artifact.
 - Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
   the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
   arm64e dependency-freshness check, pinned stable197 download, XCFramework
@@ -303,6 +326,11 @@ Local app-test incident and resolution:
   blocker for that historical run without a product or test-source change.
   Because the packaged toolchain was later superseded, these counts are the
   baseline for — not a substitute for — corrected-artifact acceptance.
+- Corrected-artifact exact-head PR run `29406375343` targeted pushed evidence
+  head `07c2dfc` but was cancelled before completion; all six jobs concluded
+  cancelled. It is audit history only and does not satisfy the merge gate. The
+  replacement must be the run GitHub creates from the final pushed evidence
+  head.
 - Xcode emitted non-blocking warnings while collecting and merging raw
   coverage profiles from sandbox paths, plus signed-XCTest-library stripping
   warnings. These did not prevent any test from running and are distinct from
@@ -313,7 +341,8 @@ Local app-test incident and resolution:
 
 Final merge gates for the CypherAir production re-pin:
 
-1. Pull-request CI must pass on the exact final PR head.
+1. Pull-request CI must pass on the final pushed evidence head; cancelled run
+   `29406375343` is not acceptance evidence.
 2. Before merge, obtain a fresh verification of that exact final state using
    `gpt-5.6-sol` at maximum effort with fork context disabled.
 
