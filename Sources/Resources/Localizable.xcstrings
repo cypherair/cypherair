@@ -13029,6 +13029,86 @@
         }
       }
     },
+    "settings.appAccessPolicy.biometricsOnlyWarning.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch Protection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换保护方式"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.biometricsOnlyWarning.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WARNING: With Biometrics Only, the app unlocks with Face ID / Touch ID and no passcode fallback. If biometrics become unavailable, you will be locked out of all protected data, and switching back, opening the app, and resetting local data all require biometrics. There is no recovery. Proceed at your own risk."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "警告：使用“仅生物识别”时，App 仅通过面容 ID / 触控 ID 解锁，且没有密码回退。如果生物识别不可用，你将被锁定，无法访问所有受保护的数据；切换回其他方式、打开 App 以及重置本地数据都需要生物识别。无法恢复。请自行承担风险。"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.biometricsOnlyWarning.message.mac" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WARNING: With Biometrics Only, the app unlocks with Touch ID and no passcode fallback. If Touch ID becomes unavailable, you will be locked out of all protected data, and switching back, opening the app, and resetting local data all require Touch ID. There is no recovery. Proceed at your own risk."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "警告：使用“仅生物识别”时，App 仅通过触控 ID 解锁，且没有密码回退。如果触控 ID 不可用，你将被锁定，无法访问所有受保护的数据；切换回其他方式、打开 App 以及重置本地数据都需要触控 ID。无法恢复。请自行承担风险。"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.biometricsOnlyWarning.riskAck" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I understand that if biometrics become unavailable, I will be locked out of my protected data with no recovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我了解如果生物识别不可用，我将被锁定，无法访问我的受保护数据，且无法恢复"
+          }
+        }
+      }
+    },
+    "settings.appAccessPolicy.biometricsOnlyWarning.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Biometrics Only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用仅生物识别"
+          }
+        }
+      }
+    },
     "settings.appAccessPolicy.change.reason" : {
       "localizations" : {
         "en" : {
