@@ -48,6 +48,22 @@ private struct SettingsScreenPresentations: ViewModifier {
                     #endif
                 }
             }
+            .sheet(isPresented: Binding(
+                get: { model.presentedAppAccessConfirmation != nil },
+                set: { if !$0 { model.dismissAppAccessConfirmation() } }
+            )) {
+                if let request = model.presentedAppAccessConfirmation {
+                    NavigationStack {
+                        SettingsAppAccessPolicyConfirmationSheetView(request: request)
+                    }
+                    #if os(macOS)
+                    .frame(minWidth: 500, idealWidth: 540, minHeight: 360, idealHeight: 420)
+                    #endif
+                    #if canImport(UIKit)
+                    .presentationDetents([.medium, .large])
+                    #endif
+                }
+            }
             .alert(
                 String(localized: "settings.mode.error.title", defaultValue: "Protection Change Failed"),
                 isPresented: Binding(

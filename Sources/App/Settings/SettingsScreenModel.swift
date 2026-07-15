@@ -34,6 +34,7 @@ final class SettingsScreenModel {
     var pendingMode: AuthenticationMode?
     private var pendingModeRequestID: UUID?
     var presentedAuthModeRequest: AuthModeChangeConfirmationRequest?
+    var presentedAppAccessConfirmation: AppAccessPolicyChangeConfirmationRequest?
     var isSwitching = false
     var isSwitchingAppAccessPolicy = false
     var switchError: String?
@@ -246,6 +247,57 @@ final class SettingsScreenModel {
             return
         }
 
+        // "Biometrics Only" re-wraps the root secret with no passcode fallback:
+        // if biometrics later become unavailable, the protected-data layer is
+        // irrecoverable and every recovery avenue re-requires that same policy.
+        // Gate it behind a lockout warning + risk-acknowledgement, mirroring the
+        // High Security key switch. "User Presence" (the safe direction, passcode
+        // fallback restored) switches directly.
+        guard newPolicy == .biometricsOnly else {
+            performAppAccessPolicySwitch(newPolicy)
+            return
+        }
+
+        let requestID = UUID()
+        presentedAppAccessConfirmation = nil
+        presentedAppAccessConfirmation = SettingsAppAccessPolicyRequestBuilder.makeBiometricsOnlyRequest(
+            id: requestID,
+            onConfirm: { [weak self] in
+                self?.confirmPendingAppAccessPolicySwitch(requestID: requestID, newPolicy: newPolicy)
+            },
+            onCancel: { [weak self] in
+                self?.cancelPendingAppAccessPolicySwitch(requestID: requestID)
+            }
+        )
+    }
+
+    private func confirmPendingAppAccessPolicySwitch(
+        requestID: UUID,
+        newPolicy: AppSessionAuthenticationPolicy
+    ) {
+        // Switch unconditionally with the captured policy (mirrors
+        // confirmPendingModeChange): the sheet's confirm button calls dismiss()
+        // first, which drives the isPresented binding to nil this request before
+        // onConfirm() runs, so guarding the switch on the request still being
+        // present would drop every confirmation. The id-match governs only
+        // whether this call also clears the pending state.
+        if presentedAppAccessConfirmation?.id == requestID {
+            presentedAppAccessConfirmation = nil
+        }
+        performAppAccessPolicySwitch(newPolicy)
+    }
+
+    private func cancelPendingAppAccessPolicySwitch(requestID: UUID) {
+        guard presentedAppAccessConfirmation?.id == requestID else { return }
+        presentedAppAccessConfirmation = nil
+    }
+
+    func dismissAppAccessConfirmation() {
+        guard let request = presentedAppAccessConfirmation else { return }
+        cancelPendingAppAccessPolicySwitch(requestID: request.id)
+    }
+
+    private func performAppAccessPolicySwitch(_ newPolicy: AppSessionAuthenticationPolicy) {
         isSwitchingAppAccessPolicy = true
         Task {
             do {
