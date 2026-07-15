@@ -463,7 +463,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         let envelope = try ProtectedDomainEnvelopeCodec.decode(data)
         guard envelope.generationIdentifier == nextGenerationIdentifier else {
             throw ProtectedDataError.invalidEnvelope(
-                "Key metadata current generation is missing."
+                "Key metadata current generation is missing and the pending envelope cannot complete it."
             )
         }
         var plaintext = try ProtectedDomainEnvelopeCodec.open(
@@ -481,10 +481,14 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     }
 
     private func expectedCurrentGenerationIdentifier() throws -> Int {
+        // The upper bound keeps the +1 successor computed by the read gate
+        // from trapping on a tampered watermark; legitimate generations
+        // increment from 1 and can never approach it.
         guard let metadata = try bootstrapStore.loadMetadata(for: Self.domainID),
               let value = metadata.expectedCurrentGenerationIdentifier,
               let generationIdentifier = Int(value),
-              generationIdentifier > 0 else {
+              generationIdentifier > 0,
+              generationIdentifier < Int.max else {
             throw ProtectedDataError.invalidEnvelope(
                 "Key metadata bootstrap metadata is missing expected current generation."
             )
