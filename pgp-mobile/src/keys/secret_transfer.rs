@@ -177,6 +177,11 @@ pub fn import_secret_key(armored_data: &[u8], passphrase: &str) -> Result<Vec<u8
         reason: e.to_string(),
     })?;
 
+    // Bound the Argon2 time cost before running the (uninterruptible) KDF, so a
+    // malicious key file cannot make a single import attempt run arbitrarily
+    // long. Memory is bounded Swift-side via `parse_s2k_params`.
+    super::s2k::reject_excessive_import_argon2_passes(&cert)?;
+
     let password = openpgp::crypto::Password::from(passphrase);
 
     // Decrypt each secret key with the passphrase and collect the decrypted packets.

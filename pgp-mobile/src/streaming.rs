@@ -52,10 +52,12 @@ const STREAM_BUFFER_SIZE: usize = 64 * 1024; // 64 KB
 /// can expand without bound and fill the device volume (storage pressure can
 /// jetsam other apps). The effective ceiling is `max(input * ratio, floor)`:
 /// the ratio bounds the decompression bomb while the floor lets small
-/// legitimate inputs expand fully. A ratio of 1000 is far above any real
-/// OpenPGP compression ratio, and the 256 MiB floor mirrors the in-memory
-/// decrypt cap.
-const MAX_STREAMING_DECOMPRESSION_RATIO: u64 = 1000;
+/// legitimate inputs expand fully. DEFLATE's maximum ratio is 1032:1 (only
+/// `compression-deflate` is enabled — no bzip2), so 2048 sits safely above any
+/// legitimate deflate expansion (a zero-padded file from default GnuPG hits the
+/// deflate edge) while still bounding a bomb at ~2 KiB output per input byte.
+/// The 256 MiB floor mirrors the in-memory decrypt cap.
+const MAX_STREAMING_DECOMPRESSION_RATIO: u64 = 2048;
 const MIN_STREAMING_DECRYPT_OUTPUT_CEILING: u64 = 256 * 1024 * 1024;
 
 fn streaming_decrypt_output_ceiling(input_bytes: u64) -> u64 {
@@ -1212,24 +1214,29 @@ mod tests {
 
     #[test]
     fn decrypt_copy_reports_clamped_progress_and_succeeds_under_ceiling() {
-        let data = vec![7u8; STREAM_BUFFER_SIZE + 512];
+        // Output is larger than the reported input size (a compressed input that
+        // expands), so the clamp branch is exercised: reported progress must
+        // never exceed total_bytes even though more output bytes are written.
+        let data = vec![7u8; STREAM_BUFFER_SIZE * 3];
         let mut reader = &data[..];
         let mut sink: Vec<u8> = Vec::new();
         let reporter = TestReporter::new(u64::MAX); // never cancels
-        let total = data.len() as u64;
+        let output_len = data.len() as u64;
+        let reported_total = STREAM_BUFFER_SIZE as u64; // input smaller than output
         let copied = zeroing_copy_decrypt(
             &mut reader,
             &mut sink,
             STREAM_BUFFER_SIZE,
             u64::MAX,
-            total,
+            reported_total,
             Some(&(reporter.clone() as Arc<dyn StreamingProgressReporter>)),
         )
         .expect("copy under ceiling succeeds");
-        assert_eq!(copied, total);
+        assert_eq!(copied, output_len);
         assert_eq!(sink, data);
-        // Progress is clamped to total_bytes, never above 100%.
-        assert!(reporter.last_processed.load(Ordering::SeqCst) <= total);
-        assert_eq!(reporter.last_total.load(Ordering::SeqCst), total);
+        // Progress is clamped to total_bytes, never above 100%, even though
+        // output_len > reported_total.
+        assert_eq!(reporter.last_processed.load(Ordering::SeqCst), reported_total);
+        assert_eq!(reporter.last_total.load(Ordering::SeqCst), reported_total);
     }
 }
