@@ -21,7 +21,7 @@ final class PrivateKeyContactCertificationService: ContactCertificationSigning, 
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         certificateAdapter: PGPCertificateOperationAdapter,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
+        compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess

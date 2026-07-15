@@ -46,7 +46,7 @@ final class KeyManagementService: @unchecked Sendable {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         memoryInfo: any MemoryInfoProvidable = SystemMemoryInfo(),
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
         expiryAuthenticator: KeyMutationService.ExpiryAuthenticator? = nil,
         secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
@@ -77,6 +77,7 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
+            certificatePrimaryFingerprint: keyAdapter.certificatePrimaryFingerprintInspector(),
             traceStore: authLifecycleTraceStore
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore

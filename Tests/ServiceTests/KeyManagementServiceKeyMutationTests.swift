@@ -272,6 +272,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )
@@ -303,6 +304,7 @@ final class KeyManagementServiceKeyMutationTests: KeyManagementServiceTestCase {
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: mockSE,
             keychain: mockKC,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: metadataPersistence
         )

@@ -34,6 +34,24 @@ SQLCIPHER_PIN_FILE="third_party/sqlcipher-xcframework.pin.json"
 log() { echo "[ci_post_xcodebuild] $*"; }
 fail() { echo "[ci_post_xcodebuild] error: $*" >&2; exit 1; }
 
+# Xcode Cloud exports workflow secrets into the hook environment, where every
+# child process would inherit them (brew, pip, packaging helpers). Capture
+# them into unexported shell variables, scrub the environment, and reinject
+# per call site (gh auth, tag revalidation, asc_start_build.py).
+CAPTURED_GITHUB_PAT=""
+CAPTURED_ASC_ISSUER_ID=""
+CAPTURED_ASC_KEY_ID=""
+CAPTURED_ASC_PRIVATE_KEY=""
+CAPTURED_ASC_PRIVATE_KEY_PATH=""
+capture_and_scrub_secrets() {
+    CAPTURED_GITHUB_PAT="${GITHUB_PAT:-}"
+    CAPTURED_ASC_ISSUER_ID="${ASC_ISSUER_ID:-}"
+    CAPTURED_ASC_KEY_ID="${ASC_KEY_ID:-}"
+    CAPTURED_ASC_PRIVATE_KEY="${ASC_PRIVATE_KEY:-}"
+    CAPTURED_ASC_PRIVATE_KEY_PATH="${ASC_PRIVATE_KEY_PATH:-}"
+    unset GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY ASC_PRIVATE_KEY_PATH
+}
+
 require_repo_path() {
     [ -n "${CI_PRIMARY_REPOSITORY_PATH:-}" ] || fail "CI_PRIMARY_REPOSITORY_PATH is not set"
     cd "$CI_PRIMARY_REPOSITORY_PATH"
@@ -47,9 +65,11 @@ require_build_succeeded() {
 }
 
 require_gh_auth() {
-    [ -n "${GITHUB_PAT:-}" ] || fail "GITHUB_PAT secret is required"
+    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required"
     command -v gh >/dev/null 2>&1 || brew install gh
-    printf '%s' "$GITHUB_PAT" | gh auth login --with-token
+    # After login the token lives in gh's own config store on the ephemeral
+    # CI host; later gh calls need no token in the environment.
+    printf '%s' "$CAPTURED_GITHUB_PAT" | gh auth login --with-token
 }
 
 project_setting() {
@@ -63,7 +83,7 @@ project_setting() {
 # stable-build-release.yml.
 revalidate_signed_tag() {
     local tag="$1" commit="$2"
-    GITHUB_TOKEN="$GITHUB_PAT" python3 - "$GITHUB_REPOSITORY_SLUG" "$tag" "$commit" <<'PY'
+    GITHUB_TOKEN="$CAPTURED_GITHUB_PAT" python3 - "$GITHUB_REPOSITORY_SLUG" "$tag" "$commit" <<'PY'
 import json
 import subprocess
 import sys
@@ -217,6 +237,10 @@ EOF
 
     log "WF1: starting '$RELEASE_WORKFLOW_NAME' for $CI_TAG via App Store Connect API"
     python3 -m pip install --user --quiet 'pyjwt[crypto]>=2.8'
+    ASC_ISSUER_ID="$CAPTURED_ASC_ISSUER_ID" \
+    ASC_KEY_ID="$CAPTURED_ASC_KEY_ID" \
+    ASC_PRIVATE_KEY="$CAPTURED_ASC_PRIVATE_KEY" \
+    ASC_PRIVATE_KEY_PATH="$CAPTURED_ASC_PRIVATE_KEY_PATH" \
     python3 scripts/asc_start_build.py \
         --workflow-name "$RELEASE_WORKFLOW_NAME" \
         --git-tag "$CI_TAG"
@@ -271,6 +295,7 @@ attach_app_artifact_and_maybe_publish() {
 }
 
 main() {
+    capture_and_scrub_secrets
     require_repo_path
     log "workflow=${CI_WORKFLOW:-<unset>} platform=${CI_PRODUCT_PLATFORM:-<none>} action=${CI_XCODEBUILD_ACTION:-<none>}"
     case "${CI_WORKFLOW:-}" in

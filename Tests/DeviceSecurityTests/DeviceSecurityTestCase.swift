@@ -78,7 +78,8 @@ class DeviceSecurityTestCase: XCTestCase {
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            defaults: defaults
+            defaults: defaults,
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator()
         )
         authManager.configurePrivateKeyControlStore(privateKeyControlStore)
         return authManager

@@ -23,11 +23,11 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     private(set) var frameworkState: ProtectedDataFrameworkState = .sessionLocked
 
     init(
-        rootSecretStore: any ProtectedDataRootSecretStoreProtocol = KeychainProtectedDataRootSecretStore(),
+        rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
         appSessionPolicyProvider: @escaping () -> AppSessionAuthenticationPolicy = { .userPresence },
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.domainKeyManager = domainKeyManager

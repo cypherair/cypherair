@@ -31,8 +31,7 @@ final class PrivateKeyStreamingFileDecryptionService: StreamingFileDecrypting, @
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
         keyAgreement: any SecureEnclaveCustodyKeyAgreement,
-        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating =
-            SystemSecureEnclaveCompositeOperations()
+        compositeDecapsulator: any SecureEnclaveCompositeDecapsulating
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess

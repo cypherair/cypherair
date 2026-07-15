@@ -140,7 +140,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         keychain: any KeychainManageable,
         defaults: UserDefaults = .standard,
         allowsUITestAuthenticationBypass: Bool = false,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator = AuthenticationPromptCoordinator(),
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
         traceStore: AuthLifecycleTraceStore? = nil,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
         localAuthenticationPolicyEvaluator: @escaping (

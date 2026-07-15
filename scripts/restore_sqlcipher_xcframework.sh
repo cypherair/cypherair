@@ -192,8 +192,71 @@ verify_attestation() {
         --deny-self-hosted-runners >/dev/null
 }
 
+# The zip's sha256 is pinned, but extraction still runs with full filesystem
+# privileges: reject archives whose entry names could write outside the
+# staging directory (absolute paths, .. components) or outside the single
+# expected SQLCipher.xcframework/ root before extracting anything.
+validate_zip_entries() {
+    local zip_path="$1"
+    python3 - "$zip_path" <<'PY'
+import sys
+import zipfile
+
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    names = archive.namelist()
+
+errors = []
+if not names:
+    errors.append("archive has no entries")
+for name in names:
+    if name.startswith("/"):
+        errors.append(f"absolute path entry: {name!r}")
+    elif ".." in name.split("/"):
+        errors.append(f"parent-directory entry: {name!r}")
+    elif name.rstrip("/") != "SQLCipher.xcframework" and not name.startswith("SQLCipher.xcframework/"):
+        errors.append(f"entry outside SQLCipher.xcframework/: {name!r}")
+if errors:
+    raise SystemExit("error: rejecting SQLCipher zip: " + "; ".join(errors[:10]))
+PY
+}
+
+# Symlinks are legitimate inside an xcframework (macOS framework bundles use
+# versioned-layout links); reject only links whose resolved target escapes
+# the extracted tree.
+validate_extracted_symlinks() {
+    local tree="$1"
+    python3 - "$tree" <<'PY'
+import os
+import sys
+
+root = os.path.realpath(sys.argv[1])
+errors = []
+for dirpath, dirnames, filenames in os.walk(root):
+    for entry in dirnames + filenames:
+        path = os.path.join(dirpath, entry)
+        if not os.path.islink(path):
+            continue
+        resolved = os.path.realpath(path)
+        if resolved != root and not resolved.startswith(root + os.sep):
+            errors.append(
+                f"symlink escapes the xcframework: {os.path.relpath(path, root)} -> {os.readlink(path)}"
+            )
+if errors:
+    raise SystemExit("error: rejecting SQLCipher zip: " + "; ".join(errors[:10]))
+PY
+}
+
+STAGING_DIR=""
+cleanup_staging_dir() {
+    if [ -n "$STAGING_DIR" ]; then
+        rm -rf "$STAGING_DIR"
+        STAGING_DIR=""
+    fi
+}
+trap cleanup_staging_dir EXIT
+
 mkdir -p "$WORK_DIR"
-rm -f "$WORK_DIR"/*
+rm -rf "$WORK_DIR"/*
 
 if [ -n "$LOCAL_BUILD_DIR" ]; then
     log "copying pinned assets from local build: $LOCAL_BUILD_DIR"
@@ -224,8 +287,20 @@ if [ "$REQUIRE_ATTESTATION" -eq 1 ]; then
 fi
 
 log "extracting SQLCipher.xcframework"
+validate_zip_entries "$WORK_DIR/SQLCipher.xcframework.zip"
+# Extract into a staging directory on the same volume and move the framework
+# into place only after every check passes, so a bad archive can neither
+# write into the repository root nor destroy the previously restored copy.
+STAGING_DIR="$(mktemp -d "$WORK_DIR/extract.XXXXXX")"
+ditto -x -k "$WORK_DIR/SQLCipher.xcframework.zip" "$STAGING_DIR"
+[ -d "$STAGING_DIR/SQLCipher.xcframework" ] || {
+    echo "error: archive did not produce SQLCipher.xcframework" >&2
+    exit 1
+}
+validate_extracted_symlinks "$STAGING_DIR/SQLCipher.xcframework"
+
 rm -rf "$REPO_ROOT/SQLCipher.xcframework"
-ditto -x -k "$WORK_DIR/SQLCipher.xcframework.zip" "$REPO_ROOT"
+mv "$STAGING_DIR/SQLCipher.xcframework" "$REPO_ROOT/SQLCipher.xcframework"
 
 cp "$WORK_DIR/SQLCipher.arm64e-build-manifest.json" "$REPO_ROOT/SQLCipher.arm64e-build-manifest.json"
 cp "$WORK_DIR/SQLCipher-PrivacyInfo.xcprivacy" "$REPO_ROOT/SQLCipher-PrivacyInfo.xcprivacy"

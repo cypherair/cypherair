@@ -22,7 +22,7 @@ final class PrivateKeyPasswordMessageEncryptionService: PasswordMessageEncryptin
         softwarePrivateKeyAccess: any SoftwareSecretCertificateUnwrapping,
         messageAdapter: PGPMessageOperationAdapter,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
+        compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.router = router
         self.softwarePrivateKeyAccess = softwarePrivateKeyAccess

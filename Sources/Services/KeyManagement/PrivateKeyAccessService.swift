@@ -8,15 +8,23 @@ final class PrivateKeyAccessService {
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
     private let traceStore: AuthLifecycleTraceStore?
 
+    /// Returns the primary-key fingerprint (lowercase hex) of unwrapped
+    /// secret-certificate material. Injected so the service stays free of the
+    /// UniFFI engine and remains mock-testable; production wires it to
+    /// `PGPKeyOperationAdapter.certificatePrimaryFingerprintInspector()`.
+    private let certificatePrimaryFingerprint: @Sendable (Data) throws -> String
+
     init(
         secureEnclave: any SecureEnclaveManageable,
         bundleStore: KeyBundleStore,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
+        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.secureEnclave = secureEnclave
         self.bundleStore = bundleStore
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
+        self.certificatePrimaryFingerprint = certificatePrimaryFingerprint
         self.traceStore = traceStore
     }
 
@@ -73,6 +81,7 @@ final class PrivateKeyAccessService {
                     bundle: bundle,
                     fingerprint: fingerprint,
                     authenticationContext: AuthenticationContextCarrier(context: authenticationContext),
+                    certificatePrimaryFingerprint: certificatePrimaryFingerprint,
                     traceStore: traceStore
                 )
                 traceStore?.record(
@@ -118,6 +127,7 @@ final class PrivateKeyAccessService {
         bundle: WrappedKeyBundle,
         fingerprint: String,
         authenticationContext: AuthenticationContextCarrier,
+        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String,
         traceStore: AuthLifecycleTraceStore?
     ) async throws -> Data {
         traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
@@ -146,14 +156,14 @@ final class PrivateKeyAccessService {
         }
 
         traceStore?.record(category: .operation, name: "privateKey.unwrap.seUnwrap.call.start")
+        var unwrapped: Data
         do {
-            let unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
+            unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
             traceStore?.record(
                 category: .operation,
                 name: "privateKey.unwrap.seUnwrap.call.finish",
                 metadata: ["result": "success"]
             )
-            return unwrapped
         } catch {
             traceStore?.record(
                 category: .operation,
@@ -161,6 +171,45 @@ final class PrivateKeyAccessService {
                 metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failure"])
             )
             throw error
+        }
+
+        // Custody-integrity gate: the envelope's AES-GCM tag and device binding
+        // prove the wrapped bytes were sealed by this device, but NOT that they
+        // hold the certificate the caller asked for. A tampered bundle (its
+        // envelope re-sealing a DIFFERENT identity's secret certificate under
+        // the requested fingerprint's keychain row) would unwrap cleanly here
+        // and then be handed to a signing/decryption/export consumer as if it
+        // were `fingerprint`. Bind the unwrapped material's own primary
+        // fingerprint to the requested identity before returning; on mismatch —
+        // or if the material does not parse as a certificate at all — zeroize
+        // and fail closed. This is the single chokepoint every software
+        // secret-certificate consumer funnels through.
+        do {
+            let unwrappedFingerprint = try certificatePrimaryFingerprint(unwrapped)
+            guard unwrappedFingerprint.caseInsensitiveCompare(fingerprint) == .orderedSame else {
+                unwrapped.resetBytes(in: 0..<unwrapped.count)
+                traceStore?.record(
+                    category: .operation,
+                    name: "privateKey.unwrap.identityMismatch",
+                    metadata: ["result": "mismatch"]
+                )
+                throw CypherAirError.keyOperationUnavailable(
+                    category: .publicCertificateAssociationMismatch
+                )
+            }
+            return unwrapped
+        } catch let error as CypherAirError {
+            throw error
+        } catch {
+            unwrapped.resetBytes(in: 0..<unwrapped.count)
+            traceStore?.record(
+                category: .operation,
+                name: "privateKey.unwrap.identityMismatch",
+                metadata: ["result": "unparseable"]
+            )
+            throw CypherAirError.keyOperationUnavailable(
+                category: .publicCertificateAssociationMismatch
+            )
         }
     }
 }

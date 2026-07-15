@@ -193,7 +193,7 @@ final class ProtectedDomainKeyManager {
 
     init(
         storageRoot: ProtectedDataStorageRoot,
-        keychain: any KeychainManageable = SystemKeychain(),
+        keychain: any KeychainManageable,
         account: String = KeychainConstants.defaultAccount
     ) {
         self.storageRoot = storageRoot

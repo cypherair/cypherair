@@ -34,7 +34,7 @@ final class PrivateKeySelectiveRevocationService: PrivateKeySelectiveRevocationR
         router: any PrivateKeyOperationRouting,
         certificateAdapter: PGPCertificateOperationAdapter,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
-        compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
+        compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.router = router
         self.certificateAdapter = certificateAdapter

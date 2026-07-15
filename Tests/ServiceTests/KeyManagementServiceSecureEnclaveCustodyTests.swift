@@ -113,6 +113,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -141,6 +142,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -315,6 +317,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             metadataPersistence: metadataPersistence,
             secureEnclaveCustodyRecoveryService: recoveryClassifier
@@ -539,6 +542,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             certificateAdapter: PGPCertificateOperationAdapter(engine: engine),
             secureEnclave: MockSecureEnclave(),
             keychain: MockKeychain(),
+            authenticationPromptCoordinator: AuthenticationPromptCoordinator(),
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),

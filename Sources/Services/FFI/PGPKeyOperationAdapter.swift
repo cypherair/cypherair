@@ -42,6 +42,20 @@ final class PGPKeyOperationAdapter: @unchecked Sendable {
         self.zeroizeSecretData = zeroizeSecretData
     }
 
+    /// A `@Sendable` inspector that returns the primary-key fingerprint
+    /// (lowercase hex) of a certificate. The private-key unwrap chokepoint
+    /// uses it off the main actor to bind unwrapped secret-certificate material
+    /// to the requested identity before any consumer signs, decrypts, or
+    /// exports with it. Parsing an unwrapped secret cert here reuses the same
+    /// `parseKeyInfo` FFI the adapter already relies on, so the access service
+    /// stays FFI-free and mock-testable.
+    func certificatePrimaryFingerprintInspector() -> @Sendable (Data) throws -> String {
+        let engine = self.engine
+        return { certificateData in
+            try engine.parseKeyInfo(keyData: certificateData).fingerprint
+        }
+    }
+
     func generateKey(
         name: String,
         email: String?,
