@@ -13,8 +13,12 @@
 #       extract it for linking, and run the App Store candidate gate.
 #
 # The arm64e stage1 toolchain pin is owned by build_apple_arm64e_xcframework.sh
-# (DEFAULT_ARM64E_STAGE1_RELEASE_TAG) and docs/ARM64E_STATUS.md; this script does
-# not re-pin it. Workflow secrets (GITHUB_PAT, ASC_*) are captured and scrubbed
+# (DEFAULT_ARM64E_STAGE1_RELEASE_TAG), the digest pin file
+# third_party/arm64e-stage1-toolchain.pin.json, and docs/ARM64E_STATUS.md; this
+# script does not re-pin it. WF1 downloads the stage1 token-free (digest-pinned
+# in the download script), then verifies release immutability and asset
+# attestations with gh before the stage1 compiler executes.
+# Workflow secrets (GITHUB_PAT, ASC_*) are captured and scrubbed
 # from the environment at the top of main(), so brew/rustup/curl/cargo and the
 # Rust/xcframework build subprocesses never inherit them; the build script also
 # unsets GitHub tokens itself as a second belt.
@@ -73,7 +77,7 @@ ensure_homebrew_formula() {
 
 require_gh_auth() {
     ensure_homebrew_formula gh
-    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for SQLCipher release verification"
+    [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for stage1/SQLCipher release verification"
     if ! gh auth status >/dev/null 2>&1; then
         log "authenticating gh"
         # After login the token lives in gh's own config store on the ephemeral
@@ -116,13 +120,29 @@ build_xcframework_workflow() {
         --output arm64e-dependency-chain.json \
         --freshness-level "${ARM64E_DEPENDENCY_FRESHNESS_LEVEL:-error}"
 
-    log "WF1: building xcframework (force-download pinned stage1, no Cargo cache)"
-    ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
+    log "WF1: downloading pinned arm64e stage1 toolchain (token-free, digest-pinned)"
+    local stage1_env_file
+    stage1_env_file="$(mktemp)"
+    GITHUB_ENV="$stage1_env_file" scripts/download_arm64e_stage1_toolchain.sh \
+        "$PWD/pgp-mobile/target/apple-arm64e-stage1"
+
+    log "WF1: verifying stage1 release immutability and asset attestations"
+    require_gh_auth
+    scripts/verify_arm64e_stage1_release.sh "$PWD/pgp-mobile/target/apple-arm64e-stage1/download"
+
+    log "WF1: building xcframework (verified pinned stage1, no Cargo cache)"
+    # The download script emits ARM64E_STAGE1_DIR / ARM64E_RUST_STAGE1_MANIFEST /
+    # ARM64E_STAGE1_FORCE_DOWNLOAD=0 in GITHUB_ENV format (KEY=VALUE lines, no
+    # quoting; the Xcode Cloud workspace path contains no spaces). Export them
+    # so the build consumes the exact verified bytes instead of re-downloading.
+    # shellcheck disable=SC1090
+    set -a; . "$stage1_env_file"; set +a
+    rm -f "$stage1_env_file"
+    ./build-xcframework.sh --release
 
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
     [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
     log "WF1: restoring pinned SQLCipher.xcframework for app link preflight"
-    require_gh_auth
     scripts/restore_sqlcipher_xcframework.sh --require-attestation
     log "WF1: xcframework build complete"
 }

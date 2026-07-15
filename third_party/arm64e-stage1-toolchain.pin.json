@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "dependencyName": "rust-arm64e-stage1-toolchain",
+  "repository": "cypherair/rust",
+  "release": {
+    "tag": "rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1",
+    "url": "https://github.com/cypherair/rust/releases/tag/rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1",
+    "channel": "prerelease",
+    "isImmutable": true,
+    "isPrerelease": true,
+    "sourceRef": "refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96",
+    "commitSha": "abeb8459f2b459704c1d698c01d8b8c0df8ffffd",
+    "publishedAt": "2026-06-18T15:24:42Z",
+    "signerWorkflow": "cypherair/rust/.github/workflows/arm64e-stage1-prerelease.yml",
+    "runId": "27765229620"
+  },
+  "assets": {
+    "rust-stage1-for-arm64e-aarch64-apple-darwin.tar.zst": {
+      "sha256": "4fdb45da4a4808a1d50510fd4246468b9a7bf91d3692e6d2fb030dc7463d4e4a",
+      "size": 260774619
+    },
+    "rust-stage1-for-arm64e-aarch64-apple-darwin.sha256": {
+      "sha256": "88e68e3cdbdf90764cf76454b3c0029db61091e210221c0cb3d7c39bfdcf5b25",
+      "size": 118
+    },
+    "rust-stage1-for-arm64e-aarch64-apple-darwin.json": {
+      "sha256": "2d92f01d5e6dfb1588d99afd25e40fc4f8f963233c31860c742f5ccf74449886",
+      "size": 1739
+    },
+    "rust-stage1-for-arm64e-x86_64-apple-darwin.tar.zst": {
+      "sha256": "5b01129be209b2d4e078abed778c6c313fa90f18e965bc57f7398e598d576e96",
+      "size": 268499252
+    },
+    "rust-stage1-for-arm64e-x86_64-apple-darwin.sha256": {
+      "sha256": "b01c0687e17ca65b3443faa2021571ff1ac9fb145b22639a033508656050df5c",
+      "size": 117
+    },
+    "rust-stage1-for-arm64e-x86_64-apple-darwin.json": {
+      "sha256": "62acf8685640bd8bb358b141ae0979c5db69ec6002ffae50ac382240326c03ea",
+      "size": 1733
+    }
+  }
+}

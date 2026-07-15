@@ -19,7 +19,8 @@
 - **Pinned prerelease tag:** `rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1`
 - Pinned source ref/commit: `refs/heads/carry/cypherair-arm64e-toolchain-stable-1.96` @ `abeb8459f2b459704c1d698c01d8b8c0df8ffffd` (workflow run `27765229620`).
 - The prerelease publishes host-specific `rust-stage1-for-arm64e-<host-triple>.*` asset sets (`aarch64-apple-darwin` and `x86_64-apple-darwin`); downloaders select the asset matching the build host and verify the packaged checksum and manifest (`requiresBuildStd: false`, arm64e std targets for Darwin, iOS, tvOS, visionOS).
-- CI and local packaging force-download this pinned prerelease via direct release-asset URLs with token variables scrubbed. **`latest` is never allowed** — `scripts/download_arm64e_stage1_toolchain.sh` rejects it. `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate Rust-compiler testing only.
+- CI and local packaging force-download this pinned prerelease via direct release-asset URLs with token variables scrubbed. **`latest` is never allowed** — `scripts/download_arm64e_stage1_toolchain.sh` rejects it. `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate Rust-compiler testing only, and `ARM64E_STAGE1_PIN_FILE` (which relocates the digest-pin source for those same testing flows) is never set in CI.
+- **Consumer integrity contract** (mirrors the SQLCipher pin): `third_party/arm64e-stage1-toolchain.pin.json` commits the per-asset SHA-256 digests for both host triples plus the release identity (tag, fork commit, source ref, signer workflow). `scripts/download_arm64e_stage1_toolchain.sh` enforces the digest pin unconditionally (token-free) before extraction and rejects tag/repository values that disagree with the pin. `scripts/verify_arm64e_stage1_release.sh` additionally verifies — with gh auth, before the stage1 compiler executes in CI — release immutability, tag→commit binding (`targetCommitish` == pinned fork commit), the GitHub release attestation, and per-asset SLSA build provenance (`gh attestation verify --signer-workflow --source-ref --source-digest --deny-self-hosted-runners`). The immutability check is prerelease-tolerant: the stage1 channel is a prerelease by design, so `isPrerelease` is asserted against the pin, not rejected.
 - App-side Rust or UniFFI changes never require a new stage1 prerelease; only changes to the Rust compiler fork itself do.
 - Carry-set strategy — a patch-by-patch enumeration of the fork's carried commits, the LLVM/rustc/keep upstreaming assessment, and the minimization + rebase plan — lives in [ARM64E_UPSTREAMING.md](ARM64E_UPSTREAMING.md). That companion is planning-only; this file stays the status source of truth.
 
@@ -30,6 +31,7 @@
 3. This file (the pin lines above)
 4. `CLAUDE.md` Build Commands and `AGENTS.md` Build And Validation
 5. `docs/TESTING.md` §2.4 workflow C
+6. `third_party/arm64e-stage1-toolchain.pin.json` — refresh the full release identity (tag, url, commit, source ref, run id, publishedAt) **and every per-asset SHA-256 for both host triples**. Take digests from `gh api repos/cypherair/rust/releases/tags/<tag>` and confirm them against a real download; then run `scripts/verify_arm64e_stage1_release.sh` against the downloaded assets so the attestation chain is proven before the pin lands.
 
 After rotating: the old tag greps to zero hits, the new tag greps to exactly these locations, and one pinned rebuild plus the macOS unit lane passes.
 

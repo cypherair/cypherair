@@ -1,11 +1,23 @@
 #!/bin/bash
 # Download the CypherAir Rust arm64e stage1 toolchain for CI before builds run.
+#
+# Integrity contract: the release tag, repository, and per-asset SHA-256
+# digests must match the committed consumer pin in
+# third_party/arm64e-stage1-toolchain.pin.json. The digest check needs no
+# GitHub token, so it is enforced unconditionally on every path, including
+# token-scrubbed CI fetches. Release-level immutability, tag→commit binding,
+# and build-provenance attestation checks (which need gh auth) live in
+# scripts/verify_arm64e_stage1_release.sh and run in CI after this download.
 
 set -euo pipefail
 
 unset GH_TOKEN GITHUB_TOKEN
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 OUTPUT_ROOT="${1:?usage: download_arm64e_stage1_toolchain.sh <output-root>}"
+PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
 DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
@@ -19,13 +31,57 @@ require_command() {
     fi
 }
 
+pin_value() {
+    python3 - "$PIN_FILE" "$1" <<'PY'
+import json
+import sys
+
+pin_path, dotted_path = sys.argv[1:3]
+with open(pin_path, encoding="utf-8") as handle:
+    value = json.load(handle)
+for part in dotted_path.split("."):
+    value = value[part]
+print("" if value is None else str(value))
+PY
+}
+
+pin_asset_hash() {
+    python3 - "$PIN_FILE" "$1" <<'PY'
+import json
+import sys
+
+pin_path, asset_name = sys.argv[1:3]
+with open(pin_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+asset = payload["assets"].get(asset_name)
+if asset is None:
+    print(f"error: asset {asset_name!r} is not in the stage1 pin file", file=sys.stderr)
+    sys.exit(1)
+print(asset["sha256"])
+PY
+}
+
 download_stage1_release() {
     local release_base_url asset_name
     release_base_url="https://github.com/${ARM64E_RUST_REPOSITORY}/releases/download/${tag}"
     for asset_name in "${EXPECTED_STAGE1_ASSETS[@]}"; do
         curl --fail --silent --show-error --location \
+            --proto '=https' --tlsv1.2 \
             --output "$download_dir/$asset_name" \
             "$release_base_url/$asset_name"
+    done
+}
+
+verify_assets_against_pin() {
+    local asset_name expected actual
+    for asset_name in "${EXPECTED_STAGE1_ASSETS[@]}"; do
+        expected="$(pin_asset_hash "$asset_name")"
+        actual="$(shasum -a 256 "$download_dir/$asset_name" | awk '{print $1}')"
+        if [ "$actual" != "$expected" ]; then
+            echo "error: $asset_name sha256 $actual != pinned $expected" >&2
+            echo "       the downloaded stage1 asset does not match third_party/arm64e-stage1-toolchain.pin.json" >&2
+            exit 1
+        fi
     done
 }
 
@@ -34,11 +90,30 @@ require_command shasum
 require_command zstd
 require_command bsdtar
 require_command rustc
+require_command python3
+
+if [ ! -f "$PIN_FILE" ]; then
+    echo "error: stage1 consumer pin file is missing: $PIN_FILE" >&2
+    exit 1
+fi
 
 tag="$ARM64E_STAGE1_RELEASE_TAG"
 if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
     echo "error: ARM64E_STAGE1_RELEASE_TAG must be an explicit ${ARM64E_STAGE1_RELEASE_PREFIX}-* tag; 'latest' is not allowed" >&2
     echo "       current default: $DEFAULT_ARM64E_STAGE1_RELEASE_TAG" >&2
+    exit 1
+fi
+
+PINNED_REPOSITORY="$(pin_value repository)"
+PINNED_TAG="$(pin_value release.tag)"
+if [ "$ARM64E_RUST_REPOSITORY" != "$PINNED_REPOSITORY" ]; then
+    echo "error: ARM64E_RUST_REPOSITORY '$ARM64E_RUST_REPOSITORY' != pinned repository '$PINNED_REPOSITORY'" >&2
+    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/ARM64E_STATUS.md)" >&2
+    exit 1
+fi
+if [ "$tag" != "$PINNED_TAG" ]; then
+    echo "error: ARM64E_STAGE1_RELEASE_TAG '$tag' != pinned tag '$PINNED_TAG'" >&2
+    echo "       update third_party/arm64e-stage1-toolchain.pin.json via the re-pin rule (docs/ARM64E_STATUS.md)" >&2
     exit 1
 fi
 
@@ -63,6 +138,9 @@ rm -rf "$OUTPUT_ROOT"
 mkdir -p "$download_dir" "$toolchain_root"
 
 download_stage1_release
+
+echo "Verifying downloaded assets against third_party/arm64e-stage1-toolchain.pin.json..."
+verify_assets_against_pin
 
 (
     cd "$download_dir"
