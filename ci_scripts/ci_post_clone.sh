@@ -52,8 +52,17 @@ capture_and_scrub_secrets() {
 
 # gh credentials live only in this throwaway config dir, never in gh's default
 # store or the host keyring, so clear_gh_auth can destroy every on-disk trace
-# of the PAT before untrusted-adjacent subprocesses run.
+# of the PAT before untrusted-adjacent subprocesses run. Defined before the
+# EXIT/INT/TERM trap below installs, so the handler never references an
+# undefined function.
 GH_SCOPED_CONFIG_DIR=""
+clear_gh_auth() {
+    if [ -n "$GH_SCOPED_CONFIG_DIR" ]; then
+        rm -rf "$GH_SCOPED_CONFIG_DIR"
+        GH_SCOPED_CONFIG_DIR=""
+        unset GH_CONFIG_DIR
+    fi
+}
 
 # Keep stdout active so Xcode Cloud's ~30 minute inactivity timeout does not
 # cancel the long, deliberately uncached Rust build.
@@ -101,14 +110,6 @@ require_gh_auth() {
         # instead of the runner's keyring, where rm -rf could not reach it and
         # the PAT would silently outlive its intended window.
         printf '%s' "$CAPTURED_GITHUB_PAT" | gh auth login --with-token --insecure-storage
-    fi
-}
-
-clear_gh_auth() {
-    if [ -n "$GH_SCOPED_CONFIG_DIR" ]; then
-        rm -rf "$GH_SCOPED_CONFIG_DIR"
-        GH_SCOPED_CONFIG_DIR=""
-        unset GH_CONFIG_DIR
     fi
 }
 
