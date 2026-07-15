@@ -3,7 +3,10 @@ use openpgp::parse::Parse;
 use openpgp::policy::StandardPolicy;
 use sequoia_openpgp as openpgp;
 
-use crate::decrypt::{is_expired_error, parse_verification_certs};
+use crate::decrypt::{
+    is_expired_error, parse_verification_certs, read_capped_zeroizing,
+    MAX_IN_MEMORY_PLAINTEXT_BYTES,
+};
 use crate::error::PgpError;
 use crate::signature_details::{
     SignatureCollector, SignatureVerificationState, SummaryFoldMode, VerifyDetailedResult,
@@ -47,10 +50,14 @@ pub fn verify_cleartext_detailed(
         }
     };
 
+    // Sequoia transparently decompresses an embedded CompressedData packet
+    // while streaming, so a few-KB signed message can expand without bound.
+    // Cap the read at the same 256 MiB in-memory ceiling the decrypt path
+    // uses, bounding the decompression-bomb OOM. The OOM would otherwise
+    // occur before the trailing signature is checked at EOF, so no valid
+    // attacker signature is even required.
     let mut content = Vec::new();
-    std::io::Read::read_to_end(&mut verifier, &mut content).map_err(|e| PgpError::CorruptData {
-        reason: format!("Read failed: {e}"),
-    })?;
+    read_capped_zeroizing(&mut verifier, &mut content, MAX_IN_MEMORY_PLAINTEXT_BYTES)?;
 
     let helper = verifier.into_helper();
     let (summary_state, summary_entry_index, signatures) = helper.collector.into_parts();

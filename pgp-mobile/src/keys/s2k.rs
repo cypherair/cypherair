@@ -32,7 +32,10 @@ pub fn parse_s2k_params(armored_data: &[u8]) -> Result<S2kInfo, PgpError> {
             let info = match encrypted.s2k() {
                 openpgp::crypto::S2K::Argon2 { m, .. } => S2kInfo {
                     s2k_type: "argon2id".to_string(),
-                    memory_kib: 1u64 << (*m as u64),
+                    // RFC 9580 memory cost is `2^m` KiB; guard the shift so a
+                    // malformed `m >= 64` saturates instead of panicking in
+                    // debug/test builds (mirrors password::validate_s2k_memory).
+                    memory_kib: 1u64.checked_shl(*m as u32).unwrap_or(u64::MAX),
                 },
                 openpgp::crypto::S2K::Iterated { .. } => S2kInfo {
                     s2k_type: "iterated-salted".to_string(),

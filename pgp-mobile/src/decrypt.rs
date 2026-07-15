@@ -294,7 +294,8 @@ pub fn decrypt_detailed<K: AsRef<[u8]>>(
 /// in RAM. A small, highly-compressed OpenPGP message can otherwise expand
 /// without bound and OOM / Jetsam-kill the app — a decompression bomb. Files are
 /// decrypted through the streaming path (`streaming::decrypt_file_with_helper`),
-/// which is disk-backed and not subject to this cap. 256 MiB is far above any
+/// which is disk-backed and so not subject to *this* RAM cap — it enforces its
+/// own output-side ceiling against disk exhaustion. 256 MiB is far above any
 /// legitimate pasted/typed message while bounding peak allocation well under the
 /// 8 GB minimum-device budget.
 pub(crate) const MAX_IN_MEMORY_PLAINTEXT_BYTES: usize = 256 * 1024 * 1024;
@@ -341,7 +342,7 @@ where
 /// classified and returned, so the caller still enforces the AEAD hard-fail
 /// contract before the plaintext is used. The chunk buffer is `Zeroizing`, so no
 /// plaintext fragment survives in the scratch allocation.
-fn read_capped_zeroizing<R: Read>(
+pub(crate) fn read_capped_zeroizing<R: Read>(
     reader: &mut R,
     sink: &mut Vec<u8>,
     max_bytes: usize,
