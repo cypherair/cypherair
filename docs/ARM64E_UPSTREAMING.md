@@ -240,13 +240,36 @@ Completed validation, publication, and readback evidence:
 - The first consumer rebuild, Rust tests, slice inspection, visionOS build, and
   local app plans all completed against that superseded artifact. They remain
   useful pipeline and app baselines but do not validate the corrected compiler
-  package; final acceptance reruns the consumer and app lanes on the corrected
-  immutable release.
-- Xcode 27 beta's eligible generic visionOS destination also built the app for
-  visionOS 27 with minimum OS 26.5; its executable contains both `arm64` and
-  `arm64e`. This is supplemental evidence because the local Xcode 26.6 install
-  has the visionOS 26.5 SDK files but reports that platform component as
-  unavailable for destinations.
+  package.
+- Corrected-artifact consumer acceptance completed across signed heads
+  `b33d347cf5a2` and `d93b26f15b92`, both descendants of provenance/re-pin
+  commit `8aee8304462c`:
+  - At `b33d347`, a forced fresh download of the corrected immutable stable197
+    prerelease from run `29390775624` passed the pinned outer digests,
+    immutable-release and SLSA checks, and the schema-v3 semantic validator
+    before any downloaded compiler executed. The selected package resolves to
+    Rust source `c405db8`, stable base `2d8144b`, bundled LLVM gitlink
+    `08c84e69`, `downloadCiLlvm: false`, and LLVM 22.1.6.
+  - The full release XCFramework rebuild passed. Its generated manifest records
+    the exact corrected release and `requiredSlicesPresent: true`; iOS, macOS,
+    and visionOS device libraries contain `arm64` plus `arm64e`, while both
+    simulator libraries remain `arm64`. Generated UniFFI Swift stayed unchanged
+    at SHA-256
+    `a240ad826bd4be04a4128c9130a91529067d09225a6d9b1f3b8ae701377077d2`.
+  - After merging main `4f30409` as `d93b26f`, the full `pgp-mobile` Cargo
+    suite and 48 focused downloader, release, provenance, App Store candidate,
+    build-phase, and workflow tests passed.
+  - Serialized Xcode 26.6 validation on macOS 27.0 build `26A5378n`, using
+    isolated build directories and the actual `arm64e` destination, passed
+    1,372 Unit, 81 Device, and 31 Mac UI tests with zero failures or skips.
+    The first Unit attempt used Xcode's shared default DerivedData; that tree
+    disappeared beneath its signed host and resources mid-run, producing
+    `errSecCSStaticCodeNotFound` plus missing-file failures. That attempt is not
+    acceptance evidence. A dedicated-DerivedData rerun produced the counted
+    1,372/1,372 result without a product, test, Keychain, or container change.
+  - Xcode 27 beta build `27A5218g` built the corrected app for generic visionOS
+    27 with minimum OS 26.5. Both executable slices are present: `arm64` and
+    `arm64e`.
 - Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
   the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
   arm64e dependency-freshness check, pinned stable197 download, XCFramework

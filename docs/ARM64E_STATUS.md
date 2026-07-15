@@ -22,7 +22,7 @@
 - CI and local packaging force-download this pin via HTTPS with release-token variables scrubbed. **`latest` is never allowed.** Before extraction, `scripts/download_arm64e_stage1_toolchain.sh` requires the exact repository/tag and per-asset SHA-256 values committed in `third_party/arm64e-stage1-toolchain.pin.json`. Before executing the compiler, `scripts/verify_arm64e_stage1_release.sh` verifies release immutability, tag-to-commit binding, the GitHub release attestation, and per-asset SLSA provenance; the official build path then validates the exact outer manifest and packaged LLVM identity and executes the selected `rustc` and its host `llc` to confirm LLVM 22.1.6. `ARM64E_STAGE1_PIN_FILE`, `ARM64E_RUSTC`, `ARM64E_STAGE1_DIR`, and a locally linked `stage1-arm64e-patch` are deliberate testing overrides and are never set in CI.
 - Historical warning: the first stable197 publication (source `027700f412b05d0148e6eb4e865d618582cbb63f`, run `29277996466`) used schema 2 and Rust CI LLVM 22.1.8. It is marked superseded and is prohibited as a CypherAir input.
 - App-side Rust or UniFFI changes never require a new stage1 prerelease; only changes to the Rust compiler fork itself do.
-- Carry-set strategy — a patch-by-patch enumeration of the fork's carried commits, the LLVM/rustc/keep upstreaming assessment, and the minimization + rebase plan — lives in [ARM64E_UPSTREAMING.md](ARM64E_UPSTREAMING.md). That companion is planning-only; this file stays the status source of truth.
+- Carry-set strategy — a patch-by-patch enumeration of the fork's carried commits, the LLVM/rustc/keep upstreaming assessment, and the minimization + rebase plan — lives in [ARM64E_UPSTREAMING.md](ARM64E_UPSTREAMING.md). That companion records ownership, carried history, and validation evidence; this file remains the production pin source of truth.
 
 **Re-pin rule.** When a new stage1 prerelease becomes the official input, update every pinned location in the same PR (agent checklist: `.claude/skills/repin-arm64e`):
 
@@ -34,7 +34,7 @@
 6. `third_party/arm64e-stage1-toolchain.pin.json` — refresh the full release identity (tag, url, commit, source ref, run id, publishedAt) **and every per-asset SHA-256 for both host triples**. Take digests from `gh api repos/cypherair/rust/releases/tags/<tag>` and confirm them against a real download; then run `scripts/verify_arm64e_stage1_release.sh` against the downloaded assets so the attestation chain is proven before the pin lands.
 7. `scripts/validate_arm64e_stage1_toolchain.py` — release repository/ref/commit come from the machine pin, but review its stable-series prefix, stable base, schema, bundled-LLVM gitlink/version, and tests whenever the new release changes any semantic contract rather than only rotating the build identity.
 
-After rotating: the old tag greps to zero hits, the new tag greps to exactly these locations, and one pinned rebuild plus the macOS unit lane passes.
+After rotating: the old tag greps to zero hits, the new tag greps to exactly these locations, the selected package passes release and semantic verification before the compiler executes, and one pinned rebuild plus the macOS unit lane passes.
 
 ## OpenSSL Carry Chain
 
