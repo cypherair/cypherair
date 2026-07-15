@@ -7,7 +7,10 @@ docs/ARM64E_STATUS.md owns the pin and enumerates every pinned location —
 follow its re-pin rule and update ALL locations it lists in one commit. That
 includes `third_party/arm64e-stage1-toolchain.pin.json`: refresh the release
 identity and all per-asset SHA-256 digests (both host triples), confirming
-API-reported digests against a real download.
+API-reported digests against a real download. The semantic validator reads the
+release repository/ref/commit from that machine pin; if the re-pin changes the
+stable series/base, schema, or bundled LLVM identity, update the corresponding
+constants and tests in `scripts/validate_arm64e_stage1_toolchain.py` too.
 
 **Verify:**
 
@@ -16,5 +19,8 @@ API-reported digests against a real download.
 - `scripts/download_arm64e_stage1_toolchain.sh <tmp-dir>` succeeds against the
   refreshed pin, and `scripts/verify_arm64e_stage1_release.sh <tmp-dir>/download`
   passes (immutability + tag→commit binding + asset attestations).
+- The App Store candidate gate cross-checks the human pin in
+  `docs/ARM64E_STATUS.md` against the machine pin and accepts the new semantic
+  manifest identity.
 - One pinned rebuild (`./build-xcframework.sh --release` with the new tag)
   completes and the macOS unit lane passes against the produced artifact.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -14,9 +15,27 @@ import urllib.request
 from pathlib import Path
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from validate_arm64e_stage1_toolchain import (  # noqa: E402
+    Stage1ReleasePin,
+    Stage1ValidationError,
+    load_stage1_release_pin,
+    validate_stage1_manifest_payload,
+)
+
+
 DEFAULT_REPOSITORY = "cypherair/cypherair"
 ARM64E_MANIFEST_ASSET_NAME = "PgpMobile.arm64e-build-manifest.json"
+ARM64E_STATUS_RELATIVE_PATH = Path("docs/ARM64E_STATUS.md")
+ARM64E_STAGE1_PIN_RELATIVE_PATH = Path("third_party/arm64e-stage1-toolchain.pin.json")
 SQLCIPHER_PIN_RELATIVE_PATH = Path("third_party/sqlcipher-xcframework.pin.json")
+PINNED_RUST_STAGE1_TAG_PATTERN = re.compile(
+    r"^- \*\*Pinned prerelease tag:\*\* `([^`\r\n]+)`\s*$",
+    flags=re.MULTILINE,
+)
 
 
 class CandidateValidationError(RuntimeError):
@@ -61,6 +80,38 @@ def stable_release_url(repository_full_name: str, release_tag: str) -> str:
 
 def canonical_repository_url(repository_full_name: str) -> str:
     return f"https://github.com/{repository_full_name}.git"
+
+
+def pinned_rust_stage1_release(repo_root: Path) -> Stage1ReleasePin:
+    pin_path = repo_root / ARM64E_STAGE1_PIN_RELATIVE_PATH
+    try:
+        expected_release = load_stage1_release_pin(pin_path)
+    except Stage1ValidationError as error:
+        raise CandidateValidationError(
+            f"Unable to read canonical Rust stage1 machine pin: {pin_path}: {error}"
+        ) from error
+
+    status_path = repo_root / ARM64E_STATUS_RELATIVE_PATH
+    try:
+        status_text = status_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise CandidateValidationError(
+            f"Unable to read canonical arm64e status document: {status_path}"
+        ) from error
+
+    matches = PINNED_RUST_STAGE1_TAG_PATTERN.findall(status_text)
+    if len(matches) != 1:
+        raise CandidateValidationError(
+            "Canonical arm64e status must contain exactly one pinned Rust stage1 "
+            f"prerelease tag; found {len(matches)} in {status_path}."
+        )
+    if matches[0] != expected_release.tag:
+        raise CandidateValidationError(
+            "Canonical arm64e status and Rust stage1 machine pin disagree.\n"
+            f"Status tag: {matches[0]}\n"
+            f"Machine pin tag: {expected_release.tag}"
+        )
+    return expected_release
 
 
 def write_candidate_release_metadata(
@@ -276,7 +327,10 @@ def load_release_asset(repository_full_name: str, release_tag: str, asset_name: 
     )
 
 
-def validate_arm64e_manifest_payload(payload: dict[str, object]) -> None:
+def validate_arm64e_manifest_payload(
+    payload: dict[str, object],
+    expected_rust_stage1_release: Stage1ReleasePin,
+) -> None:
     dependency_chain = payload.get("dependencyChain")
     if not isinstance(dependency_chain, dict):
         raise CandidateValidationError("arm64e manifest is missing dependencyChain.")
@@ -289,8 +343,15 @@ def validate_arm64e_manifest_payload(payload: dict[str, object]) -> None:
         raise CandidateValidationError("arm64e manifest is missing OpenSSL submodule commit.")
 
     rust_stage1 = payload.get("rustStage1")
-    if not isinstance(rust_stage1, dict) or not rust_stage1.get("releaseTag"):
-        raise CandidateValidationError("arm64e manifest is missing Rust stage1 release tag.")
+    try:
+        validate_stage1_manifest_payload(
+            rust_stage1,
+            expected_rust_stage1_release,
+        )
+    except Stage1ValidationError as error:
+        raise CandidateValidationError(
+            f"arm64e manifest has invalid Rust stage1 provenance: {error}"
+        ) from error
 
     xcframework = payload.get("xcframework")
     if not isinstance(xcframework, dict) or not xcframework.get("requiredSlicesPresent"):
@@ -328,16 +389,22 @@ def validate_arm64e_manifest_payload(payload: dict[str, object]) -> None:
 def validate_stable_release_arm64e_manifest(
     repository_full_name: str,
     release_tag: str,
+    expected_rust_stage1_release: Stage1ReleasePin,
 ) -> None:
     raw_asset = load_release_asset(
         repository_full_name,
         release_tag,
         ARM64E_MANIFEST_ASSET_NAME,
     )
-    payload = json.loads(raw_asset.decode("utf-8"))
+    try:
+        payload = json.loads(raw_asset.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CandidateValidationError(
+            "arm64e release manifest must contain valid UTF-8 JSON."
+        ) from error
     if not isinstance(payload, dict):
         raise CandidateValidationError("arm64e release manifest must contain a JSON object.")
-    validate_arm64e_manifest_payload(payload)
+    validate_arm64e_manifest_payload(payload, expected_rust_stage1_release)
 
 
 def validate_sqlcipher_dependency(repo_root: Path) -> None:
@@ -435,7 +502,11 @@ def validate_candidate_release(
         )
 
     if require_arm64e_release_manifest:
-        validate_stable_release_arm64e_manifest(repository_full_name, release_tag)
+        validate_stable_release_arm64e_manifest(
+            repository_full_name,
+            release_tag,
+            pinned_rust_stage1_release(repo_root),
+        )
 
     if require_sqlcipher_release_pin:
         validate_sqlcipher_dependency(repo_root)

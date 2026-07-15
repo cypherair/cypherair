@@ -1,8 +1,8 @@
 # CypherAir arm64e Toolchain Upstreaming Plan
 
-> Status: Active Rust 1.97 / LLVM ownership split. The stable197 stage1 is
-> published and selected for the CypherAir production re-pin. This document is
-> not the production pin source of truth.
+> Status: Active Rust 1.97 / LLVM ownership split. The corrected stable197
+> stage1 is selected on the CypherAir production re-pin branch. This document
+> is not the production pin source of truth.
 > Purpose: Record which arm64e changes belong in Rust, which belong in LLVM,
 > and how the owned-fork carry is validated, published, and consumed.
 > Source of truth for the production stage1 pin:
@@ -12,7 +12,7 @@
 > Update triggers: A Rust or LLVM rebase, an upstream merge that retires a
 > carried change, a change to the fork topology, or an approved production
 > re-pin.
-> Last reviewed: 2026-07-14.
+> Last reviewed: 2026-07-15.
 
 ## 1. Current Decision
 
@@ -42,12 +42,14 @@ Rust's `src/llvm-project` is not repointed, no second Rust-LLVM fork is
 introduced, and the canonical LLVM patches are replayed local-only for
 compatibility. No upstream pull request, release, or production re-pin was
 authorized by the ownership decision itself; the owned-fork publication and
-CypherAir re-pin were subsequently approved and executed as separate steps.
+preparation of the CypherAir re-pin were subsequently approved and executed as
+separate steps.
 
-The production app now uses the stable197 stage1 tag recorded in
-[ARM64E_STATUS.md](ARM64E_STATUS.md). Candidate validation alone did not change
-that pin: publication, provenance readback, and the explicit re-pin were
-separate gates.
+The production re-pin branch uses the stable197 stage1 tag recorded in
+[ARM64E_STATUS.md](ARM64E_STATUS.md); the app's main line retains its predecessor
+until that pull request passes all gates and merges. Candidate validation alone
+does not change the pin: publication, provenance readback, and the explicit
+re-pin remain separate gates.
 
 ## 2. Repository And Branch State
 
@@ -63,10 +65,14 @@ snapshots, not the Rust stable-tag or LLVM work-branch bases:
 The Rust 1.97 carry is based exactly on the `1.97.0` tag commit
 `2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`. Its twelve-commit signed logical
 compiler/CI series ends at `c3a04d4e4ff987b59aacb8d42b66c853db74c02a`.
-The signed publication tip is
-`027700f412b05d0148e6eb4e865d618582cbb63f`; its additional commit fixes the
-owned-fork workflow's attestation source-ref comparison and does not change
-compiler behavior.
+The first signed publication tip was
+`027700f412b05d0148e6eb4e865d618582cbb63f`; its additional commit fixed the
+owned-fork workflow's attestation source-ref comparison. The final signed
+publication tip is `c405db836704af8307c5c41d6dbdc92068dec0d6`. Its three
+intermediate/final workflow commits force source-built bundled LLVM, make the
+packaged LLVM identity independently attestable, canonicalize the manifest
+source ref, and allow the longer Intel source build to finish. They do not
+change Rust compiler-source behavior.
 
 The issue's stable-1.96 pre-step is also resolved: after fetching the owned
 Rust fork, `carry/cypherair-arm64e-toolchain-stable-1.96` includes the pinned
@@ -97,8 +103,9 @@ perform optimizer repair or serialized-output rewriting.
 
 The former 29-patch stable-1.96 history was reconstructed as twelve signed,
 logical compiler/carry commits on Rust 1.97. The history was rebuilt so the
-output stripper does not exist at any intermediate commit. A thirteenth signed
-commit contains only the later publication-workflow fix.
+output stripper does not exist at any intermediate commit. Four later signed
+commits harden publication, packaged LLVM provenance, canonical source
+identity, and the Intel source-build timeout.
 
 | Commit | Purpose | Owner |
 | --- | --- | --- |
@@ -115,6 +122,9 @@ commit contains only the later publication-workflow fix.
 | `92e1dbfed5a2` | Carry safe, opt-in stage1 workflows for stable 1.97 | Fork CI |
 | `c3a04d4e4ff9` | Close frontend pointer-authentication IR emission gaps | Rust |
 | `027700f412b0` | Verify publication attestations against the canonical GitHub source ref | Fork CI |
+| `9e0e9424851b` | Force and attest the bundled LLVM gitlink used by packaged stage1 tools | Fork CI |
+| `97f3fa184d22` | Canonicalize the stage1 manifest's owned-branch source ref | Fork CI |
+| `c405db836704` | Allow the source-built bundled LLVM lane to finish on Intel | Fork CI |
 
 The old Mach-O metadata-subtype patch is absent because Rust 1.97 already
 contains the equivalent upstream change (`8c029d5f456775294204a8c28b24d6ba19865d79`).
@@ -162,14 +172,15 @@ series are version-context adjustments rather than different behavior:
 
 This lane is compatibility evidence only. Its fresh LLVM 22.1.6 optimized
 assertions build passed the five focused tests and the external-consumption
-component/tool readiness checks. Normal stage1 builds continue to consume the
-unmodified `08c84e69a84d95936296dfcab0e38b34100725d5`; neither the Rust gitlink
+component/tool readiness checks. Production stage1 builds force source-built
+bundled LLVM at the unmodified
+`08c84e69a84d95936296dfcab0e38b34100725d5` gitlink; neither the Rust gitlink
 nor `.gitmodules` points to a CypherAir LLVM fork. A Rust stage1 compiler check
 against the external replay also passed, as recorded below.
 
 ## 6. Validation Status
 
-Completed locally:
+Completed validation, publication, and readback evidence:
 
 - `x.py check compiler/rustc_codegen_ssa compiler/rustc_codegen_llvm --stage 1`
   passed on the Rust 1.97 candidate.
@@ -180,7 +191,7 @@ Completed locally:
 - `x.py fmt --check` passed for 6,874 files using the available nightly
   rustfmt with a temporary bootstrap configuration. The ordinary tidy entry
   point was unavailable only because the downloaded stage0 lacked rustfmt.
-- All thirteen Rust-branch commits and all three canonical LLVM commits have
+- All sixteen Rust-branch commits and all three canonical LLVM commits have
   valid SSH signatures; both ranges pass `git diff --check`.
 - The canonical LLVM 23.0.0git optimized assertions build passed five focused
   lit tests plus direct InstCombine, verifier, `llc`, and Mach-O relocation
@@ -206,27 +217,37 @@ Completed locally:
   publish job compared a raw branch name with the canonical attestation source
   ref. Cleanup confirmed that no partial tag or release remained.
 - Signed workflow fix `027700f412b0` made the source-ref contract explicit.
-  Retry run `29277996466` passed both host builds, created and published the
-  stable197 prerelease, and completed post-publication asset-attestation
-  verification. The release tag resolves to the exact signed source tip.
-- Independent release readback confirmed the expected eight uploaded assets,
-  both schema-v2 manifests, both packaged-tar checksum digests, and the four
-  small release-asset attestations. Each manifest records Rust 1.97.0 base
-  `2d8144b`, source tip `027700f`, no build-std requirement, included Rust
-  source, and all four Apple arm64e targets.
-- The CypherAir Rust test suite passed under stable Rust 1.97.0. A forced fresh
-  consumer build then downloaded the published aarch64 host artifact, verified
-  its checksum and manifest, rebuilt every app XCFramework slice, and regenerated
-  byte-identical UniFFI bindings. The emitted build manifest binds the package
-  to source tip `027700f`, Rust 1.97.0 base `2d8144b`, and workflow
-  `29277996466`; the iOS, macOS, and visionOS device libraries each contain
-  both `arm64` and `arm64e`, and `requiredSlicesPresent` is true.
+  Retry run `29277996466` passed both host builds and publication, but later
+  inspection showed that its schema-v2 artifacts had selected downloaded Rust
+  CI LLVM 22.1.8 rather than the Rust 1.97 gitlink's LLVM 22.1.6. That release
+  is marked superseded and is not production evidence.
+- Correction run `29333736646` at `97f3fa1` proved the Apple Silicon artifact
+  but reached the former 240-minute job timeout while Intel was still building
+  LLVM from source; no publication was requested. Signed workflow commit
+  `c405db8` raised that bound to 360 minutes. Fork validation run `29364945389`
+  then passed both macOS lanes at the final tip. Stage1 dry run `29364945460`
+  passed both host builds and uploaded both artifact bundles; its publisher
+  remained skipped.
+- Approved publication run `29390775624` passed both host builds, published the
+  corrected immutable schema-v3 prerelease, and completed post-publication
+  release and build-attestation verification. The tag, release target, source
+  branch, and both manifests resolve to `c405db8`; both packaged compilers use
+  source-built bundled LLVM gitlink `08c84e69` with `downloadCiLlvm: false` and
+  report LLVM 22.1.6. Independent Apple Silicon, Intel, and release-surface
+  readbacks verified all eight assets, their exact digests, embedded LLVM
+  identities, target/std payloads, executable `rustc`/`llc` tools, release
+  immutability, and SLSA provenance.
+- The first consumer rebuild, Rust tests, slice inspection, visionOS build, and
+  local app plans all completed against that superseded artifact. They remain
+  useful pipeline and app baselines but do not validate the corrected compiler
+  package; final acceptance reruns the consumer and app lanes on the corrected
+  immutable release.
 - Xcode 27 beta's eligible generic visionOS destination also built the app for
   visionOS 27 with minimum OS 26.5; its executable contains both `arm64` and
   `arm64e`. This is supplemental evidence because the local Xcode 26.6 install
   has the visionOS 26.5 SDK files but reports that platform component as
   unavailable for destinations.
-- Clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
+- Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
   the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
   arm64e dependency-freshness check, pinned stable197 download, XCFramework
   rebuild, packaging, and artifact upload. Its best-effort Apple platform job
@@ -234,7 +255,8 @@ Completed locally:
   26.6 rather than 26.5. Its best-effort Swift unit job skipped the actual test
   plan because that Xcode mismatch was joined by a macOS 26.4 host below the
   app's 26.5 deployment target. Those two successful job conclusions therefore
-  do not replace the local platform and app-test evidence.
+  do not replace the local platform and app-test evidence, and its XCFramework
+  lane consumed the now-superseded schema-v2 toolchain.
 
 Local app-test incident and resolution:
 
@@ -255,8 +277,9 @@ Local app-test incident and resolution:
   - `CypherAir-MacUITests`: 31 passed, zero failed or skipped.
   Each result bundle reports `Passed`, and each build action reports
   `succeeded` with zero errors. The post-unlock results resolve the host-state
-  blocker for this validation run without a product or test-source change and
-  provide no evidence of a stable197 regression.
+  blocker for that historical run without a product or test-source change.
+  Because the packaged toolchain was later superseded, these counts are the
+  baseline for — not a substitute for — corrected-artifact acceptance.
 - Xcode emitted non-blocking warnings while collecting and merging raw
   coverage profiles from sandbox paths, plus signed-XCTest-library stripping
   warnings. These did not prevent any test from running and are distinct from

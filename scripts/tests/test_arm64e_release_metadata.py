@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +16,55 @@ module = load_script_module(
 
 
 class Arm64eReleaseMetadataTests(unittest.TestCase):
+    def test_xcframework_metadata_requires_real_rust_stage1_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            temp_dir = Path(temp_dir_name)
+            output_path = temp_dir / "manifest.json"
+            args = argparse.Namespace(
+                cargo_lock=temp_dir / "Cargo.lock",
+                xcframework=temp_dir / "PgpMobile.xcframework",
+                rust_stage1_manifest=None,
+                output=output_path,
+                freshness_level="off",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args):
+                with mock.patch.object(module, "collect_dependency_chain", return_value={}):
+                    with mock.patch.object(module, "collect_xcframework_metadata", return_value={}):
+                        with self.assertRaisesRegex(
+                            module.MetadataError,
+                            "--rust-stage1-manifest is required",
+                        ):
+                            module.main()
+
+            self.assertFalse(output_path.exists())
+
+    def test_dependency_only_metadata_preserves_local_stage1_fallback(self) -> None:
+        with mock.patch.dict(
+            module.os.environ,
+            {
+                "ARM64E_RUSTC": "/tmp/local-arm64e-rustc",
+                "ARM64E_RUST_STAGE1_RELEASE_TAG": "local-test-tag",
+            },
+            clear=False,
+        ):
+            payload = module.load_rust_stage1_manifest(None)
+
+        self.assertEqual(
+            payload,
+            {
+                "source": "local",
+                "releaseTag": "local-test-tag",
+                "rustc": "/tmp/local-arm64e-rustc",
+            },
+        )
+
+    def test_explicit_missing_rust_stage1_manifest_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            missing_path = Path(temp_dir_name) / "missing.json"
+            with self.assertRaisesRegex(module.MetadataError, "manifest is missing"):
+                module.load_rust_stage1_manifest(missing_path)
+
     def test_parse_openssl_src_lock_extracts_branch_and_commit(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_name:
             lock_path = Path(temp_dir_name) / "Cargo.lock"

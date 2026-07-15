@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUTPUT_ROOT="${1:?usage: download_arm64e_stage1_toolchain.sh <output-root>}"
 PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
 ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable197}"
 STAGE1_ASSET_PREFIX="${STAGE1_ASSET_PREFIX:-rust-stage1-for-arm64e}"
@@ -103,6 +103,13 @@ if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
     echo "       current default: $DEFAULT_ARM64E_STAGE1_RELEASE_TAG" >&2
     exit 1
 fi
+case "$tag" in
+    "${ARM64E_STAGE1_RELEASE_PREFIX}"-*) ;;
+    *)
+        echo "error: ARM64E_STAGE1_RELEASE_TAG must start with ${ARM64E_STAGE1_RELEASE_PREFIX}-" >&2
+        exit 1
+        ;;
+esac
 
 PINNED_REPOSITORY="$(pin_value repository)"
 PINNED_TAG="$(pin_value release.tag)"

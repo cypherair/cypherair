@@ -13,7 +13,7 @@ env:
   XCFRAMEWORK_ARTIFACT_NAME: pgpmobile-xcframework
   XCFRAMEWORK_ZIP: PgpMobile.xcframework.zip
   ARM64E_MANIFEST: PgpMobile.arm64e-build-manifest.json
-  ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1
+  ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1
 
 jobs:
   rust-dependency-audit:
@@ -52,6 +52,11 @@ jobs:
       - name: Check text hygiene
         run: |
           python3 scripts/check_text_hygiene.py
+      - name: Test arm64e provenance gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_arm64e_release_metadata.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_validate_arm64e_stage1_toolchain.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_validate_app_store_candidate_release.py'
       - name: Report localization catalog health
         continue-on-error: true
         run: |

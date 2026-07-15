@@ -267,12 +267,23 @@ def collect_xcframework_metadata(xcframework_path: Path | None) -> dict[str, obj
     }
 
 
-def load_rust_stage1_manifest(path: Path | None) -> dict[str, object]:
-    if path is not None and path.exists():
+def load_rust_stage1_manifest(
+    path: Path | None,
+    *,
+    required: bool = False,
+) -> dict[str, object]:
+    if path is not None:
+        if not path.is_file():
+            raise MetadataError(f"Rust stage1 manifest is missing: {path}")
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise MetadataError("Rust stage1 manifest must contain a JSON object")
         return payload
+
+    if required:
+        raise MetadataError(
+            "--rust-stage1-manifest is required when --xcframework is provided"
+        )
 
     rustc = os.environ.get("ARM64E_RUSTC", "").strip()
     release_tag = os.environ.get("ARM64E_RUST_STAGE1_RELEASE_TAG", "").strip()
@@ -290,7 +301,10 @@ def main() -> None:
         "schemaVersion": 1,
         "generatedBy": "scripts/arm64e_release_metadata.py",
         "dependencyChain": dependency_chain,
-        "rustStage1": load_rust_stage1_manifest(args.rust_stage1_manifest),
+        "rustStage1": load_rust_stage1_manifest(
+            args.rust_stage1_manifest,
+            required=args.xcframework is not None,
+        ),
         "xcframework": collect_xcframework_metadata(args.xcframework),
     }
 

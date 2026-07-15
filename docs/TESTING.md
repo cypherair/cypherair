@@ -155,11 +155,19 @@ Run after any Rust or UniFFI change that can affect Swift-visible behavior (deci
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260713T191930Z-027700f-r29277996466-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1 \
     ./build-xcframework.sh --release
 ```
 
-Force-download matches GitHub Actions: it consumes the pinned `cypherair/rust` stage1 prerelease instead of trusting local rustup state, refreshes the stable `arm64` archives, builds `arm64e` archives with the stage1 compiler, regenerates bindings from an `arm64e-apple-darwin` host dylib (whitespace-normalized — never hand-edit generated bindings; rerun the sync), recreates `PgpMobile.xcframework`, and writes the build manifest. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; pin rotation follows the re-pin rule in [ARM64E_STATUS.md](ARM64E_STATUS.md) (agent checklist: `.claude/skills/repin-arm64e`). `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate compiler testing only.
+Force-download matches GitHub Actions: it consumes the pinned `cypherair/rust` stage1 prerelease instead of trusting local rustup state, refreshes the stable `arm64` archives, builds `arm64e` archives with the stage1 compiler, regenerates bindings from an `arm64e-apple-darwin` host dylib (whitespace-normalized — never hand-edit generated bindings; rerun the sync), recreates `PgpMobile.xcframework`, and writes the build manifest. Before executing downloaded tools, packaging requires the exact schema-v3 manifest and checksum-bound bundled-LLVM identity; it then confirms that the selected `rustc` and packaged host `llc` both report LLVM 22.1.6. The semantic validator takes the release repository/ref/commit from `third_party/arm64e-stage1-toolchain.pin.json`, and the App Store candidate gate cross-checks that machine tag against [ARM64E_STATUS.md](ARM64E_STATUS.md) before applying the same exact source/base/LLVM contract to embedded release metadata. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; pin rotation follows the re-pin rule in [ARM64E_STATUS.md](ARM64E_STATUS.md) (agent checklist: `.claude/skills/repin-arm64e`). `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate compiler testing only; official XCFramework packaging additionally requires `ARM64E_RUST_STAGE1_MANIFEST`.
+
+The PR and nightly workflows run the focused release-metadata, stage1-toolchain, and App Store candidate provenance tests before building. Locally, the same gate is:
+
+```bash
+python3 -m unittest discover -s scripts/tests -p 'test_arm64e_release_metadata.py'
+python3 -m unittest discover -s scripts/tests -p 'test_validate_arm64e_stage1_toolchain.py'
+python3 -m unittest discover -s scripts/tests -p 'test_validate_app_store_candidate_release.py'
+```
 
 Manual bindgen must run from `pgp-mobile/` — the repo root has no `Cargo.toml`:
 
