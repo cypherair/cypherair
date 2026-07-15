@@ -46,6 +46,26 @@ use crate::verify::VerifyHelper;
 /// Buffer size for streaming copy operations.
 const STREAM_BUFFER_SIZE: usize = 64 * 1024; // 64 KB
 
+/// Ceiling on decrypted output relative to encrypted input for the streaming
+/// file path. Sequoia transparently decompresses an embedded CompressedData
+/// packet while writing plaintext to the temp file, so a small crafted input
+/// can expand without bound and fill the device volume (storage pressure can
+/// jetsam other apps). The effective ceiling is `max(input * ratio, floor)`:
+/// the ratio bounds the decompression bomb while the floor lets small
+/// legitimate inputs expand fully. DEFLATE's maximum ratio is 1032:1 (only
+/// `compression-deflate` is enabled — no bzip2), so 2048 sits safely above any
+/// legitimate deflate expansion (a zero-padded file from default GnuPG hits the
+/// deflate edge) while still bounding a bomb at ~2 KiB output per input byte.
+/// The 256 MiB floor mirrors the in-memory decrypt cap.
+const MAX_STREAMING_DECOMPRESSION_RATIO: u64 = 2048;
+const MIN_STREAMING_DECRYPT_OUTPUT_CEILING: u64 = 256 * 1024 * 1024;
+
+fn streaming_decrypt_output_ceiling(input_bytes: u64) -> u64 {
+    input_bytes
+        .saturating_mul(MAX_STREAMING_DECOMPRESSION_RATIO)
+        .max(MIN_STREAMING_DECRYPT_OUTPUT_CEILING)
+}
+
 // ── Progress Reporting ─────────────────────────────────────────────────
 
 /// Foreign trait for progress reporting across the FFI boundary.
@@ -176,6 +196,8 @@ enum CopyError {
     Write(std::io::Error),
     /// Operation cancelled by user (progress callback returned false)
     Cancelled,
+    /// Decrypted output exceeded the streaming decompression ceiling.
+    OutputCeilingExceeded,
 }
 
 /// Copy data from `reader` to `writer` using a zeroizing buffer.
@@ -212,6 +234,64 @@ fn zeroing_copy<R: Read, W: Write>(
         }
         writer.write_all(&buf[..n]).map_err(CopyError::Write)?;
         total += n as u64;
+    }
+
+    Ok(total)
+}
+
+/// Copy decrypted plaintext to the output file with an output-side ceiling and
+/// output-side cancellation.
+///
+/// The input-side `ProgressReader` only polls cancellation as ciphertext is
+/// read. Once a small compressed input is consumed, Sequoia's transparent
+/// decompressor emits plaintext with no further input reads, so input-side
+/// cancellation goes inert and the progress bar freezes while the temp file
+/// grows unbounded. This loop bounds the written output at `max_output_bytes`
+/// (fail-closed before the breaching chunk is written, so the temp file never
+/// exceeds the ceiling) and re-polls the reporter per chunk so Cancel stays
+/// responsive during decompression expansion. Progress is reported as output
+/// bytes clamped to `total_bytes`, keeping the bar monotonic and never above
+/// 100% for a compressed input.
+fn zeroing_copy_decrypt<R: Read, W: Write>(
+    reader: &mut R,
+    writer: &mut W,
+    buf_size: usize,
+    max_output_bytes: u64,
+    total_bytes: u64,
+    reporter: Option<&Arc<dyn StreamingProgressReporter>>,
+) -> Result<u64, CopyError> {
+    let mut buf = Zeroizing::new(vec![0u8; buf_size]);
+    let mut total: u64 = 0;
+
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::Interrupted
+                || e.get_ref()
+                    .and_then(|inner| inner.downcast_ref::<StreamingCancelled>())
+                    .is_some()
+            {
+                CopyError::Cancelled
+            } else {
+                CopyError::Read(e)
+            }
+        })?;
+        if n == 0 {
+            break;
+        }
+        // Fail closed before writing a chunk that would breach the ceiling, so
+        // the temp file is never allowed to exceed it.
+        if n as u64 > max_output_bytes - total {
+            return Err(CopyError::OutputCeilingExceeded);
+        }
+        writer.write_all(&buf[..n]).map_err(CopyError::Write)?;
+        total += n as u64;
+
+        if let Some(reporter) = reporter {
+            let processed = total.min(total_bytes);
+            if !reporter.on_progress(processed, total_bytes) {
+                return Err(CopyError::Cancelled);
+            }
+        }
     }
 
     Ok(total)
@@ -523,6 +603,11 @@ fn write_streaming_encrypted_file(
                 reason: format!("Write failed: {io_err}"),
             },
             CopyError::Cancelled => PgpError::OperationCancelled,
+            // Not producible by zeroing_copy on the encrypt path; mapped
+            // defensively rather than panicking.
+            CopyError::OutputCeilingExceeded => PgpError::EncryptionFailed {
+                reason: "Output exceeded the streaming ceiling".to_string(),
+            },
         });
     }
 
@@ -625,6 +710,11 @@ where
         reason: format!("Cannot open input file '{}': {e}", input_path),
     })?;
     let total_bytes = input_file.metadata().map(|m| m.len()).unwrap_or(0);
+    let output_ceiling = streaming_decrypt_output_ceiling(total_bytes);
+    // Clone the reporter for the output side; the input-side ProgressReader
+    // consumes the original. Both share the same foreign reporter, so
+    // cancellation is polled on whichever side is active.
+    let output_progress = progress.clone();
     let progress_reader = ProgressReader::new(input_file, total_bytes, progress);
 
     // Build decryptor from file reader. Both stages route through
@@ -657,7 +747,14 @@ where
     // CopyError preserves the original io::Error so we can extract and reclassify
     // Sequoia decryption errors (AEAD/MDC/wrong-key) that are wrapped inside io::Error
     // by the Decryptor's Read impl. This is the core fix for security finding M2.
-    if let Err(e) = zeroing_copy(&mut decryptor, &mut temp_file, STREAM_BUFFER_SIZE) {
+    if let Err(e) = zeroing_copy_decrypt(
+        &mut decryptor,
+        &mut temp_file,
+        STREAM_BUFFER_SIZE,
+        output_ceiling,
+        total_bytes,
+        output_progress.as_ref(),
+    ) {
         drop(temp_file);
         secure_delete_file(temp_path_ref);
         return Err(match e {
@@ -672,6 +769,11 @@ where
                 reason: format!("Write failed: {io_err}"),
             },
             CopyError::Cancelled => PgpError::OperationCancelled,
+            CopyError::OutputCeilingExceeded => PgpError::CorruptData {
+                reason: "Decrypted output exceeds the maximum expansion for this input \
+                         (possible decompression bomb)"
+                    .to_string(),
+            },
         });
     }
 
@@ -818,6 +920,11 @@ where
                 reason: format!("Write failed: {io_err}"),
             },
             CopyError::Cancelled => PgpError::OperationCancelled,
+            // Not producible by zeroing_copy on the signing path; mapped
+            // defensively rather than panicking.
+            CopyError::OutputCeilingExceeded => PgpError::SigningFailed {
+                reason: "Output exceeded the streaming ceiling".to_string(),
+            },
         });
     }
 
@@ -1004,4 +1111,132 @@ pub fn match_recipients_from_file(
     }
 
     Ok(matched_fingerprints)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// Reporter that continues for `cancel_after` calls, then cancels. Records
+    /// the last reported (bytes_processed, total_bytes) for assertions.
+    struct TestReporter {
+        calls: AtomicU64,
+        cancel_after: u64,
+        last_processed: AtomicU64,
+        last_total: AtomicU64,
+    }
+
+    impl TestReporter {
+        fn new(cancel_after: u64) -> Arc<Self> {
+            Arc::new(Self {
+                calls: AtomicU64::new(0),
+                cancel_after,
+                last_processed: AtomicU64::new(0),
+                last_total: AtomicU64::new(0),
+            })
+        }
+    }
+
+    impl StreamingProgressReporter for TestReporter {
+        fn on_progress(&self, bytes_processed: u64, total_bytes: u64) -> bool {
+            self.last_processed.store(bytes_processed, Ordering::SeqCst);
+            self.last_total.store(total_bytes, Ordering::SeqCst);
+            let n = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            n <= self.cancel_after
+        }
+    }
+
+    #[test]
+    fn output_ceiling_uses_floor_for_small_inputs() {
+        assert_eq!(
+            streaming_decrypt_output_ceiling(0),
+            MIN_STREAMING_DECRYPT_OUTPUT_CEILING
+        );
+        assert_eq!(
+            streaming_decrypt_output_ceiling(1024),
+            MIN_STREAMING_DECRYPT_OUTPUT_CEILING
+        );
+    }
+
+    #[test]
+    fn output_ceiling_scales_with_large_inputs() {
+        let input = 1024 * 1024 * 1024; // 1 GiB input
+        assert_eq!(
+            streaming_decrypt_output_ceiling(input),
+            input * MAX_STREAMING_DECOMPRESSION_RATIO
+        );
+    }
+
+    #[test]
+    fn output_ceiling_saturates_instead_of_overflowing() {
+        // A near-u64::MAX reported input size must not overflow the ratio mul.
+        assert_eq!(streaming_decrypt_output_ceiling(u64::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn decrypt_copy_halts_at_output_ceiling() {
+        // Simulates a decompression bomb: an effectively infinite reader with a
+        // small ceiling. The copy must fail closed and never write past the cap.
+        let mut reader = std::io::repeat(0u8);
+        let mut sink: Vec<u8> = Vec::new();
+        let ceiling = 4 * STREAM_BUFFER_SIZE as u64;
+        let result = zeroing_copy_decrypt(
+            &mut reader,
+            &mut sink,
+            STREAM_BUFFER_SIZE,
+            ceiling,
+            0,
+            None,
+        );
+        assert!(matches!(result, Err(CopyError::OutputCeilingExceeded)));
+        assert!(sink.len() as u64 <= ceiling);
+    }
+
+    #[test]
+    fn decrypt_copy_cancels_on_output_side_without_input_progress() {
+        // The whole input is already available (no input-side stalling), yet the
+        // output-side poll must still observe the reporter's cancellation.
+        let data = vec![0u8; STREAM_BUFFER_SIZE * 4];
+        let mut reader = &data[..];
+        let mut sink: Vec<u8> = Vec::new();
+        let reporter = TestReporter::new(1); // continue once, then cancel
+        let result = zeroing_copy_decrypt(
+            &mut reader,
+            &mut sink,
+            STREAM_BUFFER_SIZE,
+            u64::MAX,
+            data.len() as u64,
+            Some(&(reporter.clone() as Arc<dyn StreamingProgressReporter>)),
+        );
+        assert!(matches!(result, Err(CopyError::Cancelled)));
+    }
+
+    #[test]
+    fn decrypt_copy_reports_clamped_progress_and_succeeds_under_ceiling() {
+        // Output is larger than the reported input size (a compressed input that
+        // expands), so the clamp branch is exercised: reported progress must
+        // never exceed total_bytes even though more output bytes are written.
+        let data = vec![7u8; STREAM_BUFFER_SIZE * 3];
+        let mut reader = &data[..];
+        let mut sink: Vec<u8> = Vec::new();
+        let reporter = TestReporter::new(u64::MAX); // never cancels
+        let output_len = data.len() as u64;
+        let reported_total = STREAM_BUFFER_SIZE as u64; // input smaller than output
+        let copied = zeroing_copy_decrypt(
+            &mut reader,
+            &mut sink,
+            STREAM_BUFFER_SIZE,
+            u64::MAX,
+            reported_total,
+            Some(&(reporter.clone() as Arc<dyn StreamingProgressReporter>)),
+        )
+        .expect("copy under ceiling succeeds");
+        assert_eq!(copied, output_len);
+        assert_eq!(sink, data);
+        // Progress is clamped to total_bytes, never above 100%, even though
+        // output_len > reported_total.
+        assert_eq!(reporter.last_processed.load(Ordering::SeqCst), reported_total);
+        assert_eq!(reporter.last_total.load(Ordering::SeqCst), reported_total);
+    }
 }
