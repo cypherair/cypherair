@@ -271,7 +271,7 @@ Completed validation, publication, and readback evidence:
     27 with minimum OS 26.5. Both executable slices are present: `arm64` and
     `arm64e`.
 - Final-current-main acceptance advanced that corrected-artifact evidence
-  through three later signed heads:
+  through successive signed heads:
   - Main `4693901ca62e` was merged as `e3d73a1859f`. Because that merge changed
     `pgp-mobile`, the corrected stage1 package was downloaded and semantically
     reverified before use, the full release XCFramework was rebuilt, and the
@@ -304,8 +304,23 @@ Completed validation, publication, and readback evidence:
     visionOS app; both `arm64` and `arm64e` executable slices record minimum OS
     26.5 and SDK 27.0. The additional four Unit tests are the coverage inherited
     from current main.
-  - The signed documentation-only successor to `b33c615` records this final
-    local evidence; it does not alter the accepted code or packaged artifact.
+  - Signed documentation-only head `e648de54d3c7` records that local evidence;
+    it does not alter the accepted code or packaged artifact.
+  - Main `469d63f2c75d`, containing pull request #671, was then merged as signed
+    head `87569537592a`. Its only product inputs are 23 PNG assets with
+    authoring metadata removed plus their repository checker; it does not
+    change source behavior, tests, Rust, UniFFI, the stage1 pin, or the rebuilt
+    XCFramework.
+  - At `8756953`, all 23 PNGs were verified as the exact metadata-only transform
+    of their parent blobs with every rendering chunk unchanged, and the full
+    repository metadata scan passed. Fresh macOS `arm64e`, generic iOS, and
+    generic visionOS builds passed. Both iOS and visionOS executables contain
+    `arm64` and `arm64e` slices with minimum OS 26.5 and SDK 27.0. The prior
+    1,379 Unit, 81 Device, and 31 Mac UI results remain the behavioral
+    acceptance because every source and test blob is preserved byte-for-byte.
+  - The signed documentation-only successor to `8756953` records this final
+    current-main evidence; it does not alter the accepted code or packaged
+    artifact.
 - Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
   the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
   arm64e dependency-freshness check, pinned stable197 download, XCFramework
@@ -347,8 +362,11 @@ Local app-test incident and resolution:
 - Replacement run `29411751060` targeted pushed evidence head `0456863` but
   was likewise cancelled after main advanced to `77c548d`; one dependency
   audit job passed and the other five jobs concluded cancelled. It is also
+  audit history only.
+- Replacement run `29413325008` targeted pushed evidence head `e648de5` but
+  was cancelled while still queued after main advanced to `469d63f`. It is
   audit history only. The merge gate remains the run created from the final
-  pushed documentation successor to `b33c615`.
+  pushed documentation successor to `8756953`.
 - Xcode emitted non-blocking warnings while collecting and merging raw
   coverage profiles from sandbox paths, plus signed-XCTest-library stripping
   warnings. These did not prevent any test from running and are distinct from
@@ -360,8 +378,8 @@ Local app-test incident and resolution:
 Final merge gates for the CypherAir production re-pin:
 
 1. Pull-request CI must pass on the final pushed evidence head; cancelled run
-   `29406375343` and superseded replacement `29411751060` are not acceptance
-   evidence.
+   `29406375343` and superseded replacements `29411751060` and `29413325008`
+   are not acceptance evidence.
 2. Before merge, obtain a fresh verification of that exact final state using
    `gpt-5.6-sol` at maximum effort with fork context disabled.
 
