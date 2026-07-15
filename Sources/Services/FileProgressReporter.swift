@@ -43,8 +43,13 @@ final class FileProgressReporter: @unchecked Sendable {
     /// Returns `false` to signal cancellation.
     func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool {
         Task { @MainActor [weak self] in
-            self?.bytesProcessed = bytesProcessed
-            self?.totalBytes = totalBytes
+            guard let self else { return }
+            // Streaming decryption reports progress from both the input
+            // (ciphertext consumed) and output (plaintext written) sides, which
+            // interleave; clamp to a non-decreasing value so the displayed bar
+            // never jumps backward. `reset()` zeroes both before reuse.
+            self.bytesProcessed = max(self.bytesProcessed, bytesProcessed)
+            self.totalBytes = max(self.totalBytes, totalBytes)
         }
         return !isCancelled
     }
