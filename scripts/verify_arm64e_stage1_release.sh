@@ -166,17 +166,16 @@ is_pinned_asset() {
 }
 
 verified_count=0
-for path in "$DOWNLOAD_DIR"/*; do
-    [ -f "$path" ] || continue
+while IFS= read -r path; do
     asset="$(basename "$path")"
     if ! is_pinned_asset "$asset"; then
-        echo "error: unexpected file in stage1 download directory: $asset" >&2
+        echo "error: unexpected entry in stage1 download directory: $asset" >&2
         exit 1
     fi
     log "verifying asset attestations: $asset"
     verify_asset "$asset"
     verified_count=$((verified_count + 1))
-done
+done < <(find "$DOWNLOAD_DIR" -mindepth 1 -maxdepth 1)
 
 if [ "$verified_count" -eq 0 ]; then
     echo "error: no pinned stage1 assets found in $DOWNLOAD_DIR" >&2
