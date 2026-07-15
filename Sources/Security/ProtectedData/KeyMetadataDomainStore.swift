@@ -378,12 +378,6 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         let expectedCurrentGenerationIdentifier = try expectedCurrentGenerationIdentifier()
-        let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
-        guard try storageRoot.managedItemExists(at: currentURL) else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Key metadata current generation is missing."
-            )
-        }
 
         var domainMasterKey = try domainKeyManager.unwrapDomainMasterKey(
             from: wrappedRecord,
@@ -395,9 +389,32 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
                 domainMasterKey.protectedDataZeroize()
             }
         }
+
+        let currentURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .current)
+        if try !storageRoot.managedItemExists(at: currentURL) {
+            // A commit interrupted between the current→previous and
+            // pending→current promotions leaves no current slot but a fully
+            // sealed next-generation pending envelope. Complete that commit;
+            // anything else stays fail-closed.
+            try promotePendingAfterInterruptedCommit(
+                nextGenerationIdentifier: expectedCurrentGenerationIdentifier + 1,
+                domainMasterKey: domainMasterKey,
+                currentURL: currentURL
+            )
+        }
+
         let data = try storageRoot.readManagedData(at: currentURL)
         let envelope = try ProtectedDomainEnvelopeCodec.decode(data)
-        guard envelope.generationIdentifier == expectedCurrentGenerationIdentifier else {
+        // The bootstrap watermark is anti-rollback: generations behind it are
+        // rejected outright. Exactly one generation ahead is the signature of
+        // a commit interrupted between the pending→current promotion and the
+        // bootstrap write; the envelope must still authenticate under the
+        // domain master key below before the watermark is healed forward.
+        switch envelope.generationIdentifier {
+        case expectedCurrentGenerationIdentifier,
+             expectedCurrentGenerationIdentifier + 1:
+            break
+        default:
             throw ProtectedDataError.invalidEnvelope(
                 "Key metadata current generation does not match bootstrap metadata."
             )
@@ -413,6 +430,15 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             plaintext: plaintext,
             schemaVersion: envelope.schemaVersion
         )
+        if envelope.generationIdentifier != expectedCurrentGenerationIdentifier {
+            try bootstrapStore.saveMetadata(
+                ProtectedDomainBootstrapMetadata(
+                    schemaVersion: Payload.currentSchemaVersion,
+                    expectedCurrentGenerationIdentifier: String(envelope.generationIdentifier)
+                ),
+                for: Self.domainID
+            )
+        }
         let snapshot = OpenedSnapshot(
             payload: decodedPayload,
             generationIdentifier: envelope.generationIdentifier
@@ -420,6 +446,38 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
 
         shouldReturnDomainMasterKey = true
         return (snapshot, domainMasterKey)
+    }
+
+    private func promotePendingAfterInterruptedCommit(
+        nextGenerationIdentifier: Int,
+        domainMasterKey: Data,
+        currentURL: URL
+    ) throws {
+        let pendingURL = storageRoot.domainEnvelopeURL(for: Self.domainID, slot: .pending)
+        guard try storageRoot.managedItemExists(at: pendingURL) else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata current generation is missing."
+            )
+        }
+        let data = try storageRoot.readManagedData(at: pendingURL)
+        let envelope = try ProtectedDomainEnvelopeCodec.decode(data)
+        guard envelope.generationIdentifier == nextGenerationIdentifier else {
+            throw ProtectedDataError.invalidEnvelope(
+                "Key metadata current generation is missing."
+            )
+        }
+        var plaintext = try ProtectedDomainEnvelopeCodec.open(
+            envelope: envelope,
+            domainMasterKey: domainMasterKey
+        )
+        defer {
+            plaintext.protectedDataZeroize()
+        }
+        _ = try decodePayload(
+            plaintext: plaintext,
+            schemaVersion: envelope.schemaVersion
+        )
+        try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
     }
 
     private func expectedCurrentGenerationIdentifier() throws -> Int {
