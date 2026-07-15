@@ -11,6 +11,9 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     // (audit #661 C5). These two tests lock the correct routing.
     fileprivate static let compositeSigningPublicKey = Data(repeating: 0xA1, count: 1952)
     fileprivate static let compositeKeyAgreementPublicKey = Data(repeating: 0xB2, count: 1184)
+    // PQ-High tier component lengths (ML-DSA-87 / ML-KEM-1024).
+    fileprivate static let compositeHighSigningPublicKey = Data(repeating: 0xC3, count: 2592)
+    fileprivate static let compositeHighKeyAgreementPublicKey = Data(repeating: 0xD4, count: 1568)
 
     func test_recoveryReportMarksHealthyDeviceBoundPostQuantumIdentityAvailable() throws {
         let keyStore = InMemoryCompositeKeyStore()
@@ -38,6 +41,47 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(report.assessments.count, 1)
         XCTAssertEqual(report.assessments[0].publicMaterialAvailability, .available)
         XCTAssertEqual(report.assessments[0].revocationArtifactAvailability, .available)
+        XCTAssertEqual(report.assessments[0].handleAvailability, .available)
+    }
+
+    func test_recoveryReportMarksHealthyDeviceBoundPostQuantumHighIdentityAvailable() throws {
+        // Locks the PQ-High tier arm so a future swap of the tier→store switch
+        // cannot silently recur C5 on the High tier: the base-tier store would
+        // shape-reject 2592/1568-byte components and mis-grade the key.
+        let keyStore = InMemoryCompositeKeyStore(tier: .postQuantumHigh)
+        try keyStore.seed(
+            handleSetIdentifier: "beef1234",
+            signing: Self.compositeHighSigningPublicKey,
+            keyAgreement: Self.compositeHighKeyAgreementPublicKey
+        )
+        let identity = Self.identity(
+            fingerprint: "device-bound-pq-high",
+            keyVersion: 6,
+            configurationIdentity: .deviceBoundPostQuantumHighV6,
+            publicKeyData: Data("device-bound-pq-high-cert".utf8),
+            revocationCert: Data("device-bound-pq-high-revocation".utf8)
+        )
+        let service = SecureEnclaveCustodyGenerationRecoveryService(
+            publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
+                error: CypherAirError.invalidKeyData(reason: "p256 inspector must not be called")
+            ),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore()),
+            compositeBindingInspector: MockSecureEnclaveCompositeBindingInspector(
+                inspection: Self.compositeInspection(
+                    identity: identity,
+                    signingComponentPublicKey: Self.compositeHighSigningPublicKey,
+                    keyAgreementComponentPublicKey: Self.compositeHighKeyAgreementPublicKey
+                )
+            ),
+            compositeHighHandleStore: SecureEnclaveCompositeHandleStore(
+                keyStore: keyStore,
+                tier: .postQuantumHigh
+            )
+        )
+
+        let report = service.classify(identities: [identity])
+
+        XCTAssertEqual(report.assessments[0].publicMaterialAvailability, .available)
         XCTAssertEqual(report.assessments[0].handleAvailability, .available)
     }
 
@@ -391,7 +435,12 @@ private final class MockSecureEnclaveCompositeBindingInspector: SecureEnclaveCom
 /// Minimal in-memory `SecureEnclaveCompositeKeyStoring` for the `.postQuantum`
 /// tier: only `inventoryBindings()` is exercised by handle location.
 private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring, @unchecked Sendable {
+    private let tier: SecureEnclaveCompositeTier
     private var rows: [String: Data] = [:]
+
+    init(tier: SecureEnclaveCompositeTier = .postQuantum) {
+        self.tier = tier
+    }
 
     private func key(_ reference: SecureEnclaveCompositeHandleReference) -> String {
         "\(reference.handleSetIdentifier).\(reference.role.rawValue)"
@@ -421,7 +470,8 @@ private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring,
             }
             let reference = try SecureEnclaveCompositeHandleReference(
                 handleSetIdentifier: String(parts[0]),
-                role: role
+                role: role,
+                tier: tier
             )
             return try SecureEnclaveCompositeHandlePublicBinding(
                 reference: reference,
@@ -436,17 +486,23 @@ private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring,
         }
     }
 
-    func seed(handleSetIdentifier: String) throws {
-        let signing = try SecureEnclaveCompositeHandleReference(
+    func seed(
+        handleSetIdentifier: String,
+        signing: Data = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeSigningPublicKey,
+        keyAgreement: Data = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeKeyAgreementPublicKey
+    ) throws {
+        let signingReference = try SecureEnclaveCompositeHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .signing
+            role: .signing,
+            tier: tier
         )
-        let keyAgreement = try SecureEnclaveCompositeHandleReference(
+        let keyAgreementReference = try SecureEnclaveCompositeHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: tier
         )
-        rows[key(signing)] = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeSigningPublicKey
-        rows[key(keyAgreement)] = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeKeyAgreementPublicKey
+        rows[key(signingReference)] = signing
+        rows[key(keyAgreementReference)] = keyAgreement
     }
 }
 
