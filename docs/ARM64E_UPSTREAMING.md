@@ -318,7 +318,21 @@ Completed validation, publication, and readback evidence:
     `arm64` and `arm64e` slices with minimum OS 26.5 and SDK 27.0. The prior
     1,379 Unit, 81 Device, and 31 Mac UI results remain the behavioral
     acceptance because every source and test blob is preserved byte-for-byte.
-  - The signed documentation-only successor to `8756953` records this final
+  - Signed documentation-only head `dc0149c6853b` records that current-main
+    evidence; it does not alter the accepted code or packaged artifact.
+  - Main `4e0d4a81147a`, containing pull request #672, was then merged as signed
+    head `109c8fb659c6`. Its only changed file is
+    `ci_scripts/ci_post_clone.sh`: Xcode Cloud now confines the release PAT to a
+    throwaway `GH_CONFIG_DIR`, removes that directory before the WF1 compiler
+    and Cargo build, reauthenticates only for the post-build SQLCipher restore,
+    and includes credential cleanup in the existing exit/signal trap. It does
+    not change app source, tests, Rust, UniFFI, the stage1 pin, or packaged
+    artifacts.
+  - At `109c8fb`, Bash syntax validation, a mocked scoped-auth lifecycle, and
+    actual exit-trap cleanup all passed. The merged script blob matches main
+    exactly, while every issue #622/#668 topic blob is preserved. The prior
+    product test and platform-build results therefore remain applicable.
+  - The signed documentation-only successor to `109c8fb` records this final
     current-main evidence; it does not alter the accepted code or packaged
     artifact.
 - Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
@@ -365,8 +379,13 @@ Local app-test incident and resolution:
   audit history only.
 - Replacement run `29413325008` targeted pushed evidence head `e648de5` but
   was cancelled while still queued after main advanced to `469d63f`. It is
-  audit history only. The merge gate remains the run created from the final
-  pushed documentation successor to `8756953`.
+  audit history only.
+- Exact-head run `29414077433` passed all six jobs at pushed evidence head
+  `dc0149c`: the Rust suite, dependency audit, GnuPG + sq interoperability,
+  XCFramework packaging, hosted Swift preview, and Apple platform probes all
+  succeeded. Main then advanced to `4e0d4a8`, so this is a clean validation
+  checkpoint rather than the final merge run. The merge gate remains the run
+  created from the final pushed documentation successor to `109c8fb`.
 - Xcode emitted non-blocking warnings while collecting and merging raw
   coverage profiles from sandbox paths, plus signed-XCTest-library stripping
   warnings. These did not prevent any test from running and are distinct from
@@ -379,7 +398,8 @@ Final merge gates for the CypherAir production re-pin:
 
 1. Pull-request CI must pass on the final pushed evidence head; cancelled run
    `29406375343` and superseded replacements `29411751060` and `29413325008`
-   are not acceptance evidence.
+   are not acceptance evidence, while successful run `29414077433` validates
+   only the superseded `dc0149c` checkpoint.
 2. Before merge, obtain a fresh verification of that exact final state using
    `gpt-5.6-sol` at maximum effort with fork context disabled.
 
