@@ -24,7 +24,12 @@ private struct CosmeticPrivacyCoverModifier: ViewModifier {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                         .ignoresSafeArea()
-                        .transition(.opacity)
+                        // Asymmetric by design (PRD §4.9): the cover must be
+                        // inserted INSTANTLY on backgrounding so it is already
+                        // present in the app-switcher snapshot — a fade-in would
+                        // let the snapshot capture the in-flight, partly-clear
+                        // frame. Removal may fade for a smooth reveal on return.
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
                         .onAppear {
                             authLifecycleTraceStore?.record(category: .lifecycle, name: "cover.shown")
                         }
