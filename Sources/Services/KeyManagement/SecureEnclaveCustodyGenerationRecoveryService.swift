@@ -9,13 +9,22 @@ protocol SecureEnclaveCustodyGenerationRecoveryClassifying: Sendable {
 final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyGenerationRecoveryClassifying, @unchecked Sendable {
     private let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     private let handleStore: SecureEnclaveCustodyHandleStore
+    private let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
+    private let compositeHandleStore: SecureEnclaveCompositeHandleStore?
+    private let compositeHighHandleStore: SecureEnclaveCompositeHandleStore?
 
     init(
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
-        handleStore: SecureEnclaveCustodyHandleStore
+        handleStore: SecureEnclaveCustodyHandleStore,
+        compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
+        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
+        compositeHighHandleStore: SecureEnclaveCompositeHandleStore? = nil
     ) {
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
+        self.compositeBindingInspector = compositeBindingInspector
+        self.compositeHandleStore = compositeHandleStore
+        self.compositeHighHandleStore = compositeHighHandleStore
     }
 
     func classify(
@@ -70,6 +79,20 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             identity.revocationCert.isEmpty
                 ? .unavailable(.revocationArtifactUnavailable)
                 : .available
+
+        // Composite (split-custody Device-Bound Post-Quantum) families share the
+        // `.appleSecureEnclavePrivateOperations` custody kind with P-256 but carry
+        // an ML-DSA/ML-KEM suite, so they must route through the composite handle
+        // path (the P-256 `algorithmSuite == .p256` gate below would otherwise
+        // false-flag every healthy composite key as invalid custody).
+        if let tier = identity.openPGPConfiguration.identity.deviceBoundCompositeTier {
+            return classifyCompositeIdentity(
+                identity,
+                ordinal: ordinal,
+                tier: tier,
+                revocationAvailability: revocationAvailability
+            )
+        }
 
         let configuration = identity.openPGPConfiguration
         guard configuration.algorithmSuite == .p256,
@@ -134,6 +157,107 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             revocationArtifactAvailability: revocationAvailability,
             handleAvailability: handleAvailability
         )
+    }
+
+    private func classifyCompositeIdentity(
+        _ identity: PGPKeyIdentity,
+        ordinal: Int,
+        tier: SecureEnclaveCompositeTier,
+        revocationAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
+    ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
+        guard identity.openPGPConfiguration.keyVersion == identity.keyVersion else {
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(.invalidConfigurationCustody),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(.invalidConfigurationCustody)
+            )
+        }
+
+        guard !identity.publicKeyData.isEmpty else {
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(.publicMaterialUnavailable),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(.publicMaterialUnavailable)
+            )
+        }
+
+        // Each tier shape-checks handles against its own ML-DSA/ML-KEM parameter
+        // set, so the store is selected by tier (exhaustive: a new tier fails to
+        // compile until wired here).
+        let tierHandleStore: SecureEnclaveCompositeHandleStore?
+        switch tier {
+        case .postQuantum:
+            tierHandleStore = compositeHandleStore
+        case .postQuantumHigh:
+            tierHandleStore = compositeHighHandleStore
+        }
+        guard let compositeBindingInspector,
+              let tierHandleStore else {
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(.operationUnavailableByPolicy),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(.operationUnavailableByPolicy)
+            )
+        }
+
+        let inspection: PGPSecureEnclaveCompositeBindingInspection
+        do {
+            inspection = try compositeBindingInspector.inspectCompositeBindings(
+                publicKeyData: identity.publicKeyData,
+                tier: tier
+            )
+        } catch {
+            let category = PGPKeyOperationFailureMapper.publicCertificateAssociationCategory(for: error)
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(category),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(category)
+            )
+        }
+
+        guard inspection.fingerprint.caseInsensitiveCompare(identity.fingerprint) == .orderedSame,
+              inspection.keyVersion == identity.keyVersion else {
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(.metadataAssociationMismatch),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(.metadataAssociationMismatch)
+            )
+        }
+
+        return assessment(
+            identity: identity,
+            ordinal: ordinal,
+            publicMaterialAvailability: .available,
+            revocationArtifactAvailability: revocationAvailability,
+            handleAvailability: locateCompositeHandlePair(inspection, store: tierHandleStore)
+        )
+    }
+
+    private func locateCompositeHandlePair(
+        _ inspection: PGPSecureEnclaveCompositeBindingInspection,
+        store: SecureEnclaveCompositeHandleStore
+    ) -> SecureEnclaveCustodyHandleAvailability {
+        do {
+            _ = try store.locateHandlePair(
+                signingPublicKeyRaw: inspection.signingComponentPublicKey,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementComponentPublicKey
+            )
+            return .available
+        } catch let error as SecureEnclaveCustodyHandleError {
+            return .unavailable(error.failureCategory)
+        } catch {
+            return .unavailable(.privateHandleInaccessible)
+        }
     }
 
     private func locateHandlePair(

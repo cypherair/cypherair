@@ -737,7 +737,10 @@ final class AppContainer: @unchecked Sendable {
         let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
         let secureEnclaveCustodyRecoveryService = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: secureEnclaveCustodyPublicBindingInspector,
-            handleStore: secureEnclaveCustodyHandleStore
+            handleStore: secureEnclaveCustodyHandleStore,
+            compositeBindingInspector: secureEnclaveCompositeBindingInspector,
+            compositeHandleStore: secureEnclaveCompositeHandleStore,
+            compositeHighHandleStore: secureEnclaveCompositeHighHandleStore
         )
         let contactImportAdapter = PGPContactImportAdapter(engine: engine)
         let selfTestAdapter = PGPSelfTestOperationAdapter(engine: engine)
