@@ -293,6 +293,19 @@ Completed validation, publication, and readback evidence:
     `arm64` and `arm64e` slices both record minimum OS 26.5 and SDK 27.0.
   - The signed documentation-only successor to `ae27eb8` records this evidence;
     it does not alter the locally accepted code or packaged artifact.
+  - Main `77c548dc7401`, containing pull requests #669 and #670, was then
+    merged as signed head `b33c615b40c1`. Its eight-file delta is limited to
+    Swift settings and privacy-cover UI, localization, project membership, and
+    `SettingsScreenModelTests`; it does not change Rust, UniFFI, the stage1 pin,
+    or the rebuilt XCFramework.
+  - At `b33c615`, serialized Xcode 26.6 acceptance on the actual macOS `arm64e`
+    destination passed 1,379 Unit, 81 Device, and 31 Mac UI tests with zero
+    failures or skips. Xcode 27 beta build `27A5218g` also rebuilt the generic
+    visionOS app; both `arm64` and `arm64e` executable slices record minimum OS
+    26.5 and SDK 27.0. The additional four Unit tests are the coverage inherited
+    from current main.
+  - The signed documentation-only successor to `b33c615` records this final
+    local evidence; it does not alter the accepted code or packaged artifact.
 - Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
   the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
   arm64e dependency-freshness check, pinned stable197 download, XCFramework
@@ -331,6 +344,11 @@ Local app-test incident and resolution:
   cancelled. It is audit history only and does not satisfy the merge gate. The
   replacement must be the run GitHub creates from the final pushed evidence
   head.
+- Replacement run `29411751060` targeted pushed evidence head `0456863` but
+  was likewise cancelled after main advanced to `77c548d`; one dependency
+  audit job passed and the other five jobs concluded cancelled. It is also
+  audit history only. The merge gate remains the run created from the final
+  pushed documentation successor to `b33c615`.
 - Xcode emitted non-blocking warnings while collecting and merging raw
   coverage profiles from sandbox paths, plus signed-XCTest-library stripping
   warnings. These did not prevent any test from running and are distinct from
@@ -342,7 +360,8 @@ Local app-test incident and resolution:
 Final merge gates for the CypherAir production re-pin:
 
 1. Pull-request CI must pass on the final pushed evidence head; cancelled run
-   `29406375343` is not acceptance evidence.
+   `29406375343` and superseded replacement `29411751060` are not acceptance
+   evidence.
 2. Before merge, obtain a fresh verification of that exact final state using
    `gpt-5.6-sol` at maximum effort with fork context disabled.
 
