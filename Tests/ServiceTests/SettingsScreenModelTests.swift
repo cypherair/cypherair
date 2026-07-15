@@ -225,6 +225,32 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     }
 
     @MainActor
+    func test_appAccessPolicySelection_biometricsOnly_confirmAfterDismissStillSwitches() async {
+        // Reproduces the real confirm-button sequence: the sheet calls dismiss()
+        // first, which drives the isPresented binding to nil the request
+        // (dismissAppAccessConfirmation) BEFORE onConfirm() runs. The switch must
+        // still happen — guarding it on the request still being present dropped
+        // every confirmation (audit C11 regression).
+        var receivedPolicy: AppSessionAuthenticationPolicy?
+        let model = makeModel(appAccessPolicySwitchAction: { policy in
+            receivedPolicy = policy
+        })
+
+        model.handleAppAccessPolicySelection(.biometricsOnly)
+        let request = model.presentedAppAccessConfirmation
+        XCTAssertNotNil(request)
+        model.dismissAppAccessConfirmation() // the dismiss()-driven binding cancel
+        request?.onConfirm() // then the button's onConfirm
+
+        await waitUntil("app access policy switch to finish") {
+            model.isSwitchingAppAccessPolicy == false
+        }
+
+        XCTAssertEqual(receivedPolicy, .biometricsOnly)
+        XCTAssertEqual(config.appSessionAuthenticationPolicy, .biometricsOnly)
+    }
+
+    @MainActor
     func test_appAccessPolicySelection_biometricsOnly_cancelDoesNotSwitch() async {
         var switchActionCalled = false
         let model = makeModel(appAccessPolicySwitchAction: { _ in

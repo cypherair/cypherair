@@ -275,8 +275,15 @@ final class SettingsScreenModel {
         requestID: UUID,
         newPolicy: AppSessionAuthenticationPolicy
     ) {
-        guard presentedAppAccessConfirmation?.id == requestID else { return }
-        presentedAppAccessConfirmation = nil
+        // Switch unconditionally with the captured policy (mirrors
+        // confirmPendingModeChange): the sheet's confirm button calls dismiss()
+        // first, which drives the isPresented binding to nil this request before
+        // onConfirm() runs, so guarding the switch on the request still being
+        // present would drop every confirmation. The id-match governs only
+        // whether this call also clears the pending state.
+        if presentedAppAccessConfirmation?.id == requestID {
+            presentedAppAccessConfirmation = nil
+        }
         performAppAccessPolicySwitch(newPolicy)
     }
 
