@@ -21,7 +21,12 @@
 # Workflow secrets (GITHUB_PAT, ASC_*) are captured and scrubbed
 # from the environment at the top of main(), so brew/rustup/curl/cargo and the
 # Rust/xcframework build subprocesses never inherit them; the build script also
-# unsets GitHub tokens itself as a second belt.
+# unsets GitHub tokens itself as a second belt. gh authentication is scoped the
+# same way: the token is written only to a throwaway GH_CONFIG_DIR, and WF1
+# wipes it after the pre-build stage1 verification, so the PAT is neither in
+# the environment nor on disk while the stage1 compiler and cargo build
+# subprocesses execute. WF1 re-authenticates after the build for the SQLCipher
+# restore, matching the pre-verification flow where gh auth was post-build only.
 
 set -euo pipefail
 
@@ -45,6 +50,20 @@ capture_and_scrub_secrets() {
     unset GITHUB_PAT ASC_ISSUER_ID ASC_KEY_ID ASC_PRIVATE_KEY ASC_PRIVATE_KEY_PATH
 }
 
+# gh credentials live only in this throwaway config dir, never in gh's default
+# store or the host keyring, so clear_gh_auth can destroy every on-disk trace
+# of the PAT before untrusted-adjacent subprocesses run. Defined before the
+# EXIT/INT/TERM trap below installs, so the handler never references an
+# undefined function.
+GH_SCOPED_CONFIG_DIR=""
+clear_gh_auth() {
+    if [ -n "$GH_SCOPED_CONFIG_DIR" ]; then
+        rm -rf "$GH_SCOPED_CONFIG_DIR"
+        GH_SCOPED_CONFIG_DIR=""
+        unset GH_CONFIG_DIR
+    fi
+}
+
 # Keep stdout active so Xcode Cloud's ~30 minute inactivity timeout does not
 # cancel the long, deliberately uncached Rust build.
 HEARTBEAT_PID=""
@@ -58,7 +77,11 @@ stop_heartbeat() {
         HEARTBEAT_PID=""
     fi
 }
-trap stop_heartbeat EXIT INT TERM
+cleanup_on_exit() {
+    stop_heartbeat
+    clear_gh_auth
+}
+trap cleanup_on_exit EXIT INT TERM
 
 require_repo_path() {
     [ -n "${CI_PRIMARY_REPOSITORY_PATH:-}" ] || fail "CI_PRIMARY_REPOSITORY_PATH is not set"
@@ -78,11 +101,15 @@ ensure_homebrew_formula() {
 require_gh_auth() {
     ensure_homebrew_formula gh
     [ -n "$CAPTURED_GITHUB_PAT" ] || fail "GITHUB_PAT secret is required for stage1/SQLCipher release verification"
-    if ! gh auth status >/dev/null 2>&1; then
-        log "authenticating gh"
-        # After login the token lives in gh's own config store on the ephemeral
-        # CI host; later gh calls need no token in the environment.
-        printf '%s' "$CAPTURED_GITHUB_PAT" | gh auth login --with-token
+    if [ -z "$GH_SCOPED_CONFIG_DIR" ]; then
+        GH_SCOPED_CONFIG_DIR="$(mktemp -d)"
+        export GH_CONFIG_DIR="$GH_SCOPED_CONFIG_DIR"
+        log "authenticating gh (scoped config dir)"
+        # --insecure-storage is deliberate: it forces the token into hosts.yml
+        # inside the scoped dir (deterministically removable by clear_gh_auth)
+        # instead of the runner's keyring, where rm -rf could not reach it and
+        # the PAT would silently outlive its intended window.
+        printf '%s' "$CAPTURED_GITHUB_PAT" | gh auth login --with-token --insecure-storage
     fi
 }
 
@@ -129,6 +156,10 @@ build_xcframework_workflow() {
     log "WF1: verifying stage1 release immutability and asset attestations"
     require_gh_auth
     scripts/verify_arm64e_stage1_release.sh "$PWD/pgp-mobile/target/apple-arm64e-stage1/download"
+    # Last pre-build step that needs the PAT. Wipe the gh credential store so
+    # the stage1 compiler and cargo build scripts/proc-macros below cannot read
+    # the token from disk (the environment was already scrubbed in main()).
+    clear_gh_auth
 
     log "WF1: building xcframework (verified pinned stage1, no Cargo cache)"
     # The download script emits ARM64E_STAGE1_DIR / ARM64E_RUST_STAGE1_MANIFEST /
@@ -143,6 +174,7 @@ build_xcframework_workflow() {
     [ -f "PgpMobile.xcframework/Info.plist" ] || fail "xcframework build did not produce PgpMobile.xcframework"
     [ -f "$ARM64E_MANIFEST" ] || fail "xcframework build did not produce $ARM64E_MANIFEST"
     log "WF1: restoring pinned SQLCipher.xcframework for app link preflight"
+    require_gh_auth
     scripts/restore_sqlcipher_xcframework.sh --require-attestation
     log "WF1: xcframework build complete"
 }
