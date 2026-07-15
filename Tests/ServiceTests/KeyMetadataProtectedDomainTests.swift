@@ -228,6 +228,177 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
     }
 
+    func test_keyMetadataDomain_bootstrapLagFromInterruptedCommitHealsForward() async throws {
+        // Simulates a kill between the pending→current promotion and the
+        // bootstrap write: current holds sealed generation N+1 while the
+        // bootstrap watermark still reads N. The open must accept the
+        // authenticated next generation and heal the watermark forward
+        // instead of bricking the domain.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataBootstrapLagHeals")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+            userId: "Healed <healed@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try harness.store.save(identity)
+        try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: 2,
+                expectedCurrentGenerationIdentifier: "1"
+            ),
+            for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+        )
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        let payload = try await reopenedStore.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        XCTAssertEqual(reopenedStore.domainState, .loaded)
+        XCTAssertEqual(payload.identities, [identity])
+        let healedMetadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).loadMetadata(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+            )
+        )
+        XCTAssertEqual(healedMetadata.expectedCurrentGenerationIdentifier, "2")
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedDataTestAppKeyMetadataDomainStore.domainID],
+            .active
+        )
+    }
+
+    func test_keyMetadataDomain_missingCurrentWithSealedNextPendingCompletesCommit() async throws {
+        // Simulates a kill between the current→previous and pending→current
+        // promotions: the current slot is gone but a fully sealed
+        // next-generation pending envelope exists. The open must complete
+        // the interrupted commit and land on the new generation.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataPendingCompletesCommit")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let committedIdentity = makeMetadataIdentity(
+            fingerprint: "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            userId: "Committed <committed@example.invalid>"
+        )
+        let pendingIdentity = makeMetadataIdentity(
+            fingerprint: "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+            userId: "Pending <pending-commit@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        _ = try await harness.store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try harness.store.save(committedIdentity)
+        try writeKeyMetadataPendingEnvelope(
+            payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(
+                identities: [committedIdentity, pendingIdentity]
+            ),
+            schemaVersion: 2,
+            generationIdentifier: 3,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try harness.storageRoot.removeItemIfPresent(
+            at: harness.storageRoot.domainEnvelopeURL(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID,
+                slot: .current
+            )
+        )
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        let payload = try await reopenedStore.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        XCTAssertEqual(reopenedStore.domainState, .loaded)
+        XCTAssertEqual(
+            payload.identities.map(\.fingerprint),
+            [committedIdentity.fingerprint, pendingIdentity.fingerprint]
+        )
+        XCTAssertTrue(
+            try harness.storageRoot.managedItemExists(
+                at: harness.storageRoot.domainEnvelopeURL(
+                    for: ProtectedDataTestAppKeyMetadataDomainStore.domainID,
+                    slot: .current
+                )
+            )
+        )
+        let healedMetadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).loadMetadata(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+            )
+        )
+        XCTAssertEqual(healedMetadata.expectedCurrentGenerationIdentifier, "3")
+    }
+
+    func test_keyMetadataDomain_currentGenerationTooFarAheadRequiresRecovery() async throws {
+        // Exactly one generation ahead of the bootstrap watermark is the only
+        // healable state; a wider gap cannot come from a single interrupted
+        // commit and must stay fail-closed.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataTooFarAhead")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let identity = makeMetadataIdentity(
+            fingerprint: "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+            userId: "Too Far <too-far@example.invalid>"
+        )
+        try await harness.store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try writeKeyMetadataEnvelope(
+            payload: ProtectedDataTestAppKeyMetadataDomainStore.Payload.initial(identities: [identity]),
+            schemaVersion: 2,
+            generationIdentifier: 4,
+            storageRoot: harness.storageRoot,
+            domainKeyManager: harness.domainKeyManager,
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        try ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: 2,
+                expectedCurrentGenerationIdentifier: "2"
+            ),
+            for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+        )
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+
+        do {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey
+            )
+            XCTFail("Expected a current generation two ahead of bootstrap metadata to require recovery.")
+        } catch {
+        }
+
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+        XCTAssertEqual(
+            try harness.registryStore.loadRegistry().committedMembership[ProtectedDataTestAppKeyMetadataDomainStore.domainID],
+            .recoveryNeeded
+        )
+    }
+
     func test_keyMetadataDomain_stalePendingGenerationDoesNotOverrideCurrent() async throws {
         let harness = try await makeKeyMetadataDomainHarness("KeyMetadataStalePendingNoOverride")
         defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
