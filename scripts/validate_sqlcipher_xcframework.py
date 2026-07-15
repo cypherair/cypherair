@@ -277,12 +277,12 @@ def validate_manifest(path: Path, privacy_path: Path, pin: dict) -> dict:
     if smoke.get("status") != "passed":
         raise ValidationError("manifest smoke test did not pass")
 
-    validate_privacy_payload(load_plist(privacy_path))
-    validate_privacy_payload(privacy_artifact.get("payload") or {})
+    validate_framework_privacy_payload(load_plist(privacy_path))
+    validate_framework_privacy_payload(privacy_artifact.get("payload") or {})
     return manifest
 
 
-def validate_privacy_payload(payload: dict) -> None:
+def validate_privacy_payload(payload: dict) -> dict:
     if payload.get("NSPrivacyTracking") is not False:
         raise ValidationError("privacy manifest must declare NSPrivacyTracking=false")
     if payload.get("NSPrivacyTrackingDomains") != []:
@@ -293,18 +293,36 @@ def validate_privacy_payload(payload: dict) -> None:
     accessed = payload.get("NSPrivacyAccessedAPITypes")
     if not isinstance(accessed, list):
         raise ValidationError("privacy manifest accessed API list is missing")
-    normalized = {
+    return {
         str(entry.get("NSPrivacyAccessedAPIType")): list(entry.get("NSPrivacyAccessedAPITypeReasons") or [])
         for entry in accessed
     }
+
+
+def validate_framework_privacy_payload(payload: dict) -> None:
+    normalized = validate_privacy_payload(payload)
     if normalized != EXPECTED_PRIVACY_ACCESSED_APIS:
         raise ValidationError(f"privacy accessed API declarations {normalized!r} != {EXPECTED_PRIVACY_ACCESSED_APIS!r}")
 
 
 def validate_app_privacy_manifest(root: Path) -> None:
+    # Static linking attributes SQLCipher's required-reason API use to the
+    # app binary, so the app manifest must cover every category and reason
+    # SQLCipher declares. The app legitimately declares additional categories
+    # for its own API use (e.g. UserDefaults / CA92.1), so this is a coverage
+    # check, not the exact-match contract applied to the framework manifest.
     app_privacy = root / "Sources" / "Resources" / "PrivacyInfo.xcprivacy"
     payload = load_plist(app_privacy)
-    validate_privacy_payload(payload)
+    normalized = validate_privacy_payload(payload)
+    for category, reasons in EXPECTED_PRIVACY_ACCESSED_APIS.items():
+        declared = normalized.get(category)
+        if declared is None:
+            raise ValidationError(f"app privacy manifest is missing SQLCipher category {category}")
+        missing = [reason for reason in reasons if reason not in declared]
+        if missing:
+            raise ValidationError(
+                f"app privacy manifest category {category} is missing SQLCipher reasons {missing!r}"
+            )
 
 
 def validate_xcframework(root: Path, manifest: dict, pin: dict) -> None:
