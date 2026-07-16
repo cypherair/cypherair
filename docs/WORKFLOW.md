@@ -36,17 +36,17 @@ Docs-only changes that touch no code, generated files, project files, entitlemen
 
 The hard constraints — zero network, AEAD hard-fail (never partial plaintext), no key material in logs, memory zeroing, secure random only, MIE enabled, profile-correct message format — are canonical in [CLAUDE.md](../CLAUDE.md) and [SECURITY.md](SECURITY.md) §10. They are never violated.
 
-A change is **security-critical** when it touches the areas listed in [SECURITY.md](SECURITY.md) §10 (`Sources/Security/`, `DecryptionService.swift`, `QRService.swift`, the memory-zeroing utilities, `DiskSpaceChecker.swift`, `pgp-mobile/src/`, entitlements/Info.plist/Xcode project files). For those changes:
+A change is **security-critical** when it touches the areas listed in [SECURITY.md](SECURITY.md) §10. For those changes:
 
 - Call out every security-critical edit explicitly — file, what changed, why — in both the work summary and the PR description.
-- Add a test when it guards something a later edit could quietly break; skip it when there's nothing real to protect (SECURITY.md §10).
+- Add a test when it guards something a later edit could quietly break — in security code that is usually the invariant itself (decryption aborts on a bad tag, a revoked key is refused, memory is zeroed), not the happy path; skip it when there's nothing real to protect.
 - Human review is required before merge.
 
 The maintainer's independent Codex security review (run outside this repository, tracked via CSV + issues) and the per-phase stage-verify are the backstops; this gate is what the authoring session owes them.
 
 ## 4. Documentation contract
 
-Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRD, TDD, SECURITY, ARCHITECTURE, TESTING, SECURE_ENCLAVE_CUSTODY, PERSISTED_STATE_INVENTORY, RELEASE, this doc), and **roadmap** (future-facing; must say so explicitly and not describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
+Docs are classed as **entry** (`README.md`, `CLAUDE.md`, `AGENTS.md` — orient and point to canon), **canonical current-state** (must match shipped code — PRD, TDD, SECURITY, ARCHITECTURE, TESTING, SECURE_ENCLAVE_CUSTODY, PERSISTED_STATE_INVENTORY, RELEASE, ARM64E_STATUS, APP_STORE_LISTING, this doc), **decision records** (a recorded choice plus the triggers that reopen it — FFI_ARTIFACT_DECISION, ARM64E_UPSTREAMING), and **roadmap/rationale** (future-facing or design-why — POST_QUANTUM; must say so explicitly and not describe shipped behavior). Canonical docs carry a short metadata header (status, purpose, audience, update triggers). Agent skills under `.claude/skills/` are workflow choreography, not documentation — they defer to the canonical docs they cite and never become the sole home of a rule.
 
 **Keep docs load-bearing.** Record the project-specific contracts a reader genuinely needs; do not narrate stage history, restate what the code already shows, or spell out what a capable model knows by default. When a durable fact ships, move it into the canonical doc that owns it and let the roadmap doc shrink toward rationale.
 

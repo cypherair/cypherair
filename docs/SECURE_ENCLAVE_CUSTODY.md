@@ -5,7 +5,7 @@
 > Audience: Security reviewers, release owners, Swift/Rust implementers, test owners, and AI coding tools.
 > Source of truth: This document, the code under `Sources/Security/SecureEnclaveCustody*` / `Sources/Security/SecureEnclaveComposite*` / `Sources/Services/KeyManagement/` / `pgp-mobile/src/`, and the companion canonical docs cited below.
 > Update triggers: Any change to the custody model, access-control policy, red lines, operation surface, persisted-state classification, Rust/UniFFI boundary, or evidence matrix.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. Overview
 
@@ -18,7 +18,7 @@ The product presents it as four of the nine key families ([PRD.md](PRD.md) §3 o
 - **Device-Bound Post-Quantum** — RFC 9980 composite split custody (ML-DSA-65/ML-KEM-768), v6 certificate (§4.1).
 - **Device-Bound Post-Quantum · High** — RFC 9980 composite split custody (ML-DSA-87/ML-KEM-1024), v6 certificate (§4.1).
 
-All three are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and shipped in the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
+All four are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and ship through the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
 
 ## 2. Architecture and ownership
 

@@ -18,16 +18,14 @@ stage1 toolchain policy.
   release.
 - **OpenPGP:** Sequoia PGP 2.4.1 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
-- **Key families:** Nine families combining message compatibility with
-  private-key custody — Portable Legacy (Ed25519 v4, GnuPG-compatible), Portable
-  Modern (Ed25519+X25519 v6), Portable Modern · High (Ed448+X448 v6), Portable
-  Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Portable Post-Quantum · High (RFC
-  9980 ML-DSA-87/ML-KEM-1024), Device-Bound Legacy (Secure Enclave P-256 v4),
-  Device-Bound Modern (Secure Enclave P-256 v6), Device-Bound Post-Quantum (RFC
-  9980 split custody), and Device-Bound Post-Quantum · High (RFC 9980 split
-  custody). The descriptive family names are the technical vocabulary; the retired
-  "Profile A"/"Profile B" labels mapped onto Portable Legacy (universal) and
-  Portable Modern · High (advanced).
+- **Key families:** Nine, chosen at key generation and immutable per key.
+  Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible),
+  Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum
+  (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024).
+  Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern
+  (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody).
+  Per-family specs: `docs/TDD.md` Section 1.3; product exposure: `docs/PRD.md`
+  Section 3.
 - **Security:** CryptoKit Secure Enclave P-256 key wrapping, Keychain, local
   authentication modes, ProtectedData app-data domains, Argon2id memory guard,
   and explicit memory zeroing.
@@ -55,10 +53,10 @@ Detailed module breakdown: `docs/ARCHITECTURE.md`.
 ## Build And Validation
 
 ```bash
-# Full Rust + UniFFI + packaged-artifact sync; matches GitHub Actions.
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1 \
-    ./build-xcframework.sh --release
+# Full Rust + UniFFI + packaged-artifact sync; force-download matches GitHub
+# Actions (the script defaults to the current pin, owned by
+# docs/ARM64E_STATUS.md — never pass `latest`).
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
 # Run Rust tests.
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
@@ -67,11 +65,10 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
 
-# Run device-only tests (Secure Enclave, biometrics, MIE). These need a real
-# Secure Enclave, not a specific iPhone: an Apple Silicon Mac runs the whole lane
-# locally (the `platform=macOS` host has a Secure Enclave), and so does a physical
-# iPhone/iPad. Only the iOS Simulator cannot run them. Biometric steps use Touch ID
-# / the system auth prompt; biometric-gated tests skip when no biometric is enrolled.
+# Run device-only tests (Secure Enclave, biometrics, MIE). Any real Secure
+# Enclave works — an Apple Silicon Mac runs the full lane locally; only the iOS
+# Simulator cannot. Biometric-gated tests skip when nothing is enrolled
+# (docs/TESTING.md Section 1).
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=macOS,arch=arm64e'          # Apple Silicon Mac (full lane, local)
 # or a physical iOS device:
@@ -89,9 +86,7 @@ xcodebuild build -scheme CypherAir \
 For Rust changes under `pgp-mobile/src` that can affect Swift-visible behavior,
 refresh the XCFramework and generated UniFFI bindings before Xcode validation.
 Per-target cargo commands, stale-artifact troubleshooting, CI lanes, and docs-only
-validation rules live in `docs/TESTING.md`. The pinned
-`ARM64E_STAGE1_RELEASE_TAG` value is owned by `docs/ARM64E_STATUS.md` and rotates
-with each stage1 re-pin.
+validation rules live in `docs/TESTING.md`.
 
 Use your judgment on tests — you don't need to justify each one or test
 everything. A test worth writing guards behavior a later change could quietly

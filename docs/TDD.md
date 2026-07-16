@@ -4,7 +4,7 @@
 > Purpose: Exact technical values and project-specific contracts — profiles, format selection, FFI rules, key wrapping values, storage contracts.
 > Audience: Developers, security auditors, and AI coding tools.
 > Update triggers: Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. OpenPGP Engine
 
@@ -18,7 +18,7 @@
 
 ### 1.3 Software Profile Configuration
 
-The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36). Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
+The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36) at NIST security level 5. Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
 
 | Setting | Legacy (Universal) | Modern | Modern · High (Advanced) | Post-Quantum |
 |---------|--------------------|--------|--------------------------|--------------|
@@ -77,10 +77,7 @@ The Secure Enclave natively holds only some key types (P-256, and on current OS 
 
 ### 3.2 Access Control (dual mode)
 
-| Mode | Flags | Behavior |
-|------|-------|----------|
-| Standard (default) | `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]` | Biometrics with passcode fallback (≈ `deviceOwnerAuthentication`) |
-| High Security | `[.privateKeyUsage, .biometryAny]` | Biometrics only; key inaccessible while biometrics are unavailable |
+Standard and High Security modes bake different access-control flag sets into the folded SE key at creation. The exact `SecAccessControlCreateWithFlags` flag sets, the LAPolicy mapping, and the mode-switch re-wrap and crash-recovery procedure are owned by [SECURITY.md](SECURITY.md) §4.
 
 ### 3.3 Keychain Layout
 

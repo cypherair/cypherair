@@ -4,76 +4,18 @@
 > Purpose: The encryption scheme, key lifecycle, wrapping and authentication contracts, security invariants, and the AI coding red lines.
 > Audience: Human developers, security auditors, and AI coding tools.
 > Update triggers: Changes to crypto/profile behavior, key lifecycle, Secure Enclave wrapping, authentication modes, the ProtectedData model, tutorial isolation, MIE posture, or the Section 10 red lines.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. Encryption Scheme
 
 All cryptographic operations use Sequoia PGP 2.4.1 (`crypto-openssl` backend). Five software profiles with different algorithm suites; the two composite Post-Quantum suites each also back a device-bound split-custody family — the ML-DSA-65/ML-KEM-768 suite backs Portable Post-Quantum and Device-Bound Post-Quantum, and the ML-DSA-87/ML-KEM-1024 suite backs Portable Post-Quantum · High and Device-Bound Post-Quantum · High.
 
-### Legacy (Universal)
-
-| Purpose | Algorithm | Notes |
-|---------|-----------|-------|
-| Primary key (sign/certify) | Ed25519 (legacy EdDSA) | v4 key format |
-| Encryption subkey | X25519 (legacy ECDH) | v4 key format |
-| Symmetric encryption | AES-256 | |
-| Message format | SEIPDv1 (MDC) | Non-AEAD; GnuPG compatible |
-| Hash | SHA-512 | Accepts SHA-256 for legacy verification |
-| S2K (key export) | Iterated+Salted (mode 3) | GnuPG compatible |
-| Compression | DEFLATE (read-only) | Outgoing messages never compressed |
-| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
-
-### Modern
-
-| Purpose | Algorithm | Notes |
-|---------|-----------|-------|
-| Primary key (sign/certify) | Ed25519 | v6 key format; ~128-bit security |
-| Encryption subkey | X25519 | v6 key format |
-| Symmetric encryption | AES-256 | |
-| AEAD | OCB (primary), GCM (secondary) | SEIPDv2; OCB mandatory per RFC 9580 |
-| Hash | SHA-512 | |
-| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Memory-hard |
-| Compression | DEFLATE (read-only) | Outgoing messages never compressed |
-| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
-
-Modern shares the Curve25519 algorithms of Legacy but uses the v6 key format (RFC 9580) with SEIPDv2 AEAD and Argon2id export S2K.
-
-### Modern · High (Advanced)
-
-| Purpose | Algorithm | Notes |
-|---------|-----------|-------|
-| Primary key (sign/certify) | Ed448 | v6 key format; ~224-bit security |
-| Encryption subkey | X448 | v6 key format; inherent AES-256 key wrap |
-| Symmetric encryption | AES-256 | |
-| AEAD | OCB (primary), GCM (secondary) | SEIPDv2; OCB mandatory per RFC 9580 |
-| Hash | SHA-512 | |
-| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Memory-hard |
-| Compression | DEFLATE (read-only) | Outgoing messages never compressed |
-| Random | SecRandomCopyBytes | Via `getrandom` crate on Apple platforms |
-
-### Post-Quantum (RFC 9980)
-
-| Purpose | Algorithm | Notes |
-|---------|-----------|-------|
-| Primary key (sign/certify) | ML-DSA-65+Ed25519 (composite, algo 30) | v6 key format; ~192-bit, quantum-resistant |
-| Encryption subkey | ML-KEM-768+X25519 (composite, algo 35) | v6 key format; AES-256 floor for any PQ recipient |
-| Symmetric encryption | AES-256 | RFC 9980 floor |
-| AEAD | OCB | SEIPDv2 |
-| Hash | SHA-512 | |
-| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Portable family only; device-bound is never exportable |
-
-### Post-Quantum · High (RFC 9980)
-
-| Purpose | Algorithm | Notes |
-|---------|-----------|-------|
-| Primary key (sign/certify) | ML-DSA-87+Ed448 (composite, algo 31) | v6 key format; NIST level 5, quantum-resistant |
-| Encryption subkey | ML-KEM-1024+X448 (composite, algo 36) | v6 key format; AES-256 floor for any PQ recipient |
-| Symmetric encryption | AES-256 | RFC 9980 floor |
-| AEAD | OCB | SEIPDv2 |
-| Hash | SHA-512 | |
-| S2K (key export) | Argon2id (512 MB / p=4 / ~3s) | Portable family only; device-bound is never exportable |
-
-Full profile table and classification rule: [TDD.md](TDD.md) §1.3. Split custody for the device-bound variant: [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1.
+The per-family algorithm matrix — key format and version, signing and
+encryption algorithms, hash, symmetric cipher, message format and AEAD, S2K,
+compression, and security level — is owned by [TDD.md](TDD.md) §1.3, with
+format auto-selection (including the AES-256 post-quantum floor) in §1.4.
+Split custody for the device-bound post-quantum variants:
+[SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1.
 
 **Interoperability:** per-profile compatibility exposure (which external tools each family works with) is product canon in [PRD.md](PRD.md) §3. The security-owned read-support contract: the App reads v4 keys, v6 keys, SEIPDv1, SEIPDv2 (OCB/GCM), Iterated+Salted S2K, and Argon2id S2K. Compression (`deflate`) is read-only for compatibility; outgoing messages are never compressed. Bzip2 is excluded (extra C dependency).
 
@@ -262,7 +204,7 @@ Shipped mitigations: the passphrase `String` lives only for the duration of the 
 
 ## 10. AI Coding Red Lines
 
-The following files and functions are security-critical. Coding agents may edit them directly, but every security-sensitive edit must be **explicitly called out — file, what changed, and why — in the task summary and PR description**, and requires human review before merge (see [WORKFLOW.md](WORKFLOW.md)); for tests, see the guidance at the end of this section. Never merge such a change autonomously.
+The following files and functions are security-critical. Coding agents may edit them directly; the process this obligates — the explicit call-out (file, what changed, why) in the task summary and PR description, the testing judgment, and human review before merge — is stated once in [WORKFLOW.md](WORKFLOW.md) §3.
 
 ### Absolute Coding Invariants
 
@@ -309,7 +251,3 @@ These hold for every change, independent of which file is touched:
 - Any Rust function marked `pub` in `pgp-mobile/src/lib.rs`
 - URL parsing logic in `QRService` that handles `cypherair://` scheme input
 - Profile/CipherSuite selection in key generation
-
-### Testing for Security Changes
-
-Same judgment, and security-critical code is where a test most often pays off: a good one guards an invariant a later edit could quietly drop — decryption aborting on a bad tag, a revoked key refused, memory zeroed — and aims at that guarantee, not the happy path. Write those without hesitation; skip the ones that only exercise the code or chase coverage. Human review before merge is the backstop either way.
