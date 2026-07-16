@@ -333,7 +333,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let preferred = try stack.engine.generateKey(
             name: "Preferred Recipient",
@@ -401,7 +401,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let first = try stack.engine.generateKey(
             name: "Tag First",
@@ -468,7 +468,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let selectable = try stack.engine.generateKey(
             name: "Selectable Tag Member",
@@ -519,7 +519,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let tagged = try stack.engine.generateKey(
             name: "Tagged Member",
@@ -566,7 +566,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let member = try stack.engine.generateKey(
             name: "Filter Member",
@@ -604,7 +604,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let first = try stack.engine.generateKey(
             name: "Summary First",
@@ -647,7 +647,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let pqOne = try stack.engine.generateKey(
             name: "PQ One",
@@ -737,7 +737,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let valid = try stack.engine.generateKey(
             name: "Available Recipient",
@@ -773,7 +773,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let valid = try stack.engine.generateKey(
             name: "Valid Recipient",
@@ -811,7 +811,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let alpha = try stack.engine.generateKey(
             name: "Stable Alpha",
@@ -857,7 +857,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let encryptable = try stack.engine.generateKey(
             name: "Active Member",
@@ -908,7 +908,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let only = try stack.engine.generateKey(
             name: "Solo Recipient",
@@ -935,7 +935,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let shown = try stack.engine.generateKey(
             name: "Shown Recipient",
@@ -991,7 +991,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let member = try stack.engine.generateKey(
             name: "Prune Member",
@@ -1022,7 +1022,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let visible = try stack.engine.generateKey(
             name: "Visible Alpha",
@@ -1064,7 +1064,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let retained = try stack.engine.generateKey(
             name: "Retained Direct Recipient",
@@ -1110,7 +1110,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let unverified = try stack.engine.generateKey(
             name: "Unverified Tag Member",
@@ -1149,7 +1149,7 @@ final class EncryptScreenModelTests: XCTestCase {
             try? FileManager.default.removeItem(
                 at: opened.harness.storageRoot.rootURL.deletingLastPathComponent()
             )
-            try? FileManager.default.removeItem(at: opened.contactsDirectory.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: opened.contactsDirectory)
         }
         let unverified = try stack.engine.generateKey(
             name: "Warning Removed Tag Member",

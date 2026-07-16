@@ -1,148 +1,469 @@
 # CypherAir arm64e Toolchain Upstreaming Plan
 
-> Status: Planning / strategy companion to [ARM64E_STATUS.md](ARM64E_STATUS.md). Not the source of truth.
-> Purpose: Enumerate every patch carried by the forked Rust stage1 toolchain, assess where each belongs upstream (LLVM / rustc / keep-carrying), and give a carry-set minimization plan, a rebase strategy, and a first-upstream-candidate shortlist.
-> Audience: Toolchain maintainers weighing the long-term maintenance risk tracked in issue #504.
-> Scope boundary: This document covers the **Rust compiler fork only** (`cypherair/rust`, branch `carry/cypherair-arm64e-toolchain-stable-1.96`). The separate `openssl-src` / `openssl` arm64e carry chain is owned by [ARM64E_STATUS.md](ARM64E_STATUS.md) §OpenSSL Carry Chain and is out of scope here.
-> Update triggers: A rebase onto a new Rust stable base, an upstream (LLVM or rust-lang) merge that lets a carried patch be dropped, or a re-pin that changes the carried commit set.
-> Last reviewed: 2026-07-11.
+> Status: Active Rust 1.97 / LLVM ownership split. The corrected stable197
+> stage1 is selected on the CypherAir production re-pin branch. This document
+> is not the production pin source of truth.
+> Purpose: Record which arm64e changes belong in Rust, which belong in LLVM,
+> and how the owned-fork carry is validated, published, and consumed.
+> Source of truth for the production stage1 pin:
+> [ARM64E_STATUS.md](ARM64E_STATUS.md).
+> Scope boundary: The OpenSSL carry chain remains owned by
+> [ARM64E_STATUS.md](ARM64E_STATUS.md) and is out of scope here.
+> Update triggers: A Rust or LLVM rebase, an upstream merge that retires a
+> carried change, a change to the fork topology, or an approved production
+> re-pin.
+> Last reviewed: 2026-07-15.
 
-## 1. Scope and Method
+## 1. Current Decision
 
-The fork's stable base is Rust `1.96.0` (`ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`), as recorded in [ARM64E_STATUS.md](ARM64E_STATUS.md) §Pinned Rust stage1 Toolchain. The carry-set is the commit range `ac68faa20c58..<carry tip>`, enumerated with `git log --reverse` and classified by reading each `git show`.
+Issue #622 is being carried as a structural update rather than a mechanical
+Rust 1.96-to-1.97 rebase:
 
-`git merge-base carry/cypherair-arm64e-toolchain-stable-1.96 1.96.0` resolves to exactly `ac68faa20c58`, confirming a clean linear stack on the stable tag with no upstream drift folded in.
+- Rust-owned behavior remains in `cypherair/rust`.
+- LLVM-owned optimizer and verifier fixes, plus object-format regression
+  coverage for existing AArch64/Mach-O lowering, live and are tested in
+  `cypherair/llvm-project-upstream`.
+- The Rust output-time `ptrauth` operand-bundle stripper is removed. It is not
+  moved into another Rust wrapper file and is not represented by a patch file
+  hidden in the Rust repository.
+- A semantically equivalent LLVM series is replayed locally onto Rust's pinned
+  LLVM revision to test compatibility. That replay stays local-only under the
+  LLVM workspace fork-topology policy.
+- No upstream Rust or LLVM pull request is part of this work. The Rust stage1
+  prerelease and CypherAir production re-pin were separately approved for the
+  CypherAir-owned repositories.
 
-**Carry tip vs. pinned commit — a discrepancy to reconcile.** As checked out, both the local and `origin`-tracking `carry/cypherair-arm64e-toolchain-stable-1.96` tip is `f6367e3754b3` ("Merge pull request #17 … host-specific stage1 assets"), which carries **28 non-merge patches**. The pinned stage1 source commit named in [ARM64E_STATUS.md](ARM64E_STATUS.md) — `abeb8459f2b459704c1d698c01d8b8c0df8ffffd` — is **two commits ahead** of that tip: it adds one more CI patch (`2759c050dc34` "ci: verify stage1 release attestations after publish") plus its merge (PR #18), for **29 non-merge patches** total. `abeb845` is currently **not reachable from any local or origin branch ref** (detached). Either the local mirror predates the branch's advance to `abeb845`, or the branch was rolled back after the pin was cut. This must be resolved before the next re-pin so the pinned artifact is always reachable from the carry branch (see §6). This document enumerates the **full 29-patch pinned superset**, marking the pinned-only patch.
+Decision update (2026-07-13): this supersedes the 2026-07-12 issue comment only
+in its conclusion to retain the Rust serialized-output stripper. Reconstructing
+the 1.97 series showed that stripping was entangled with earlier frontend
+commits and could be removed completely once Rust's frontend emission was
+narrowed and regression-covered. The no-consumed-fork decision remains:
+Rust's `src/llvm-project` is not repointed, no second Rust-LLVM fork is
+introduced, and the canonical LLVM patches are replayed local-only for
+compatibility. No upstream pull request, release, or production re-pin was
+authorized by the ownership decision itself; the owned-fork publication and
+preparation of the CypherAir re-pin were subsequently approved and executed as
+separate steps.
 
-## 2. Classification Summary
+The production re-pin branch uses the stable197 stage1 tag recorded in
+[ARM64E_STATUS.md](ARM64E_STATUS.md); the app's main line retains its predecessor
+until that pull request passes all gates and merges. Candidate validation alone
+does not change the pin: publication, provenance readback, and the explicit
+re-pin remain separate gates.
 
-"Where the fix belongs" is the repository where the durable upstream change would land, not merely the file a patch touches:
+## 2. Repository And Branch State
 
-- **rustc** — belongs in `rust-lang/rust` (target specs, target-feature validation, codegen front-end in `rustc_codegen_llvm`, bootstrap robustness, compiler test suite).
-- **LLVM** — the durable fix belongs in upstream LLVM (AArch64 ptrauth lowering / operand-bundle canonicalization); the fork carries a downstream compensation in `llvm-wrapper/`.
-- **keep** — fork-only release automation with no upstream home (stage1 packaging/publish CI, fork-shape validation workflows).
+Before rebuilding the candidate, the owned fork mainlines were synchronized
+with their read-only upstreams. These are the 2026-07-12 synchronization
+snapshots, not the Rust stable-tag or LLVM work-branch bases:
 
-| Bucket | Count | Patches |
+| Repository line | Synchronized base | Candidate branch |
 | --- | --- | --- |
-| rustc  | 15 | target specs (3), ptrauth feature model + codegen (6), bootstrap (2), Mach-O subtype (1), ptrauth IR-gap fixes (1), tests (2) |
-| LLVM   | 2  | serialized-output ptrauth-bundle strip/keep pair |
-| keep   | 12 | stage1 publish + fork validation CI (incl. 1 pinned-only) |
-| **Total** | **29** | |
+| `cypherair/rust` | `rust-lang/rust` `main` at `d39561c2d2b55985d3b6331cc52403e038e7fc8b` | `carry/cypherair-arm64e-toolchain-stable-1.97` |
+| `cypherair/llvm-project-upstream` | `llvm/llvm-project` `main` at `171ba71128eec9f1859bb995c597dcff296ee730` | `cypherair-arm64e-ptrauth-canonical` |
 
-Caveat: ~6 of the 15 rustc-bucket patches are the arm64e ptrauth **codegen** group. They land in rustc mechanically, but their *near-term* upstream feasibility is low (arm64e is a Tier-3/experimental ABI upstream) and each has an LLVM-facing dimension. They are counted rustc but discussed as the carry heart in §3.2 and §4.
+The Rust 1.97 carry is based exactly on the `1.97.0` tag commit
+`2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`. Its twelve-commit signed logical
+compiler/CI series ends at `c3a04d4e4ff987b59aacb8d42b66c853db74c02a`.
+The first signed publication tip was
+`027700f412b05d0148e6eb4e865d618582cbb63f`; its additional commit fixed the
+owned-fork workflow's attestation source-ref comparison. The final signed
+publication tip is `c405db836704af8307c5c41d6dbdc92068dec0d6`. Its three
+intermediate/final workflow commits force source-built bundled LLVM, make the
+packaged LLVM identity independently attestable, canonicalize the manifest
+source ref, and allow the longer Intel source build to finish. They do not
+change Rust compiler-source behavior.
 
-## 3. Per-Patch Enumeration
+The issue's stable-1.96 pre-step is also resolved: after fetching the owned
+Rust fork, `carry/cypherair-arm64e-toolchain-stable-1.96` includes the pinned
+source commit `abeb8459f2b459704c1d698c01d8b8c0df8ffffd`. The earlier discrepancy
+was a stale local mirror, not a missing carry commit.
 
-Commits are listed in stack order (base → tip). Effort is upstream-review effort, not lines changed. "Feas." = near-term upstream feasibility.
+## 3. Ownership Boundary
 
-### 3.1 Target definitions — rustc, high feasibility
+The durable ownership test is who decides the behavior, not whether a thin C
+API shim happens to live in `llvm-wrapper/`.
 
-Adds the `arm64e-apple-visionos` Tier-3 target, mirroring the already-upstream `arm64e-apple-ios` / `arm64e-apple-tvos` Tier-3 targets. Internal order: `1b3d8853` is the substantive add; `b34d21ad` and `46da820b` are fixups of it (maintainer-entry correction and a tidy trailing newline) and should squash into it before upstreaming.
+| Rust owns | LLVM owns |
+| --- | --- |
+| Apple target specifications, including `arm64e-apple-visionos` | Whether optimization may expose a direct callee while retaining a `ptrauth` operand bundle |
+| Default arm64e target features and ABI predicates | IR legality for `ptrauth` operand bundles on `callbr` |
+| ABI-mandatory feature diagnostics | AArch64/Mach-O lowering and authenticated relocation behavior |
+| Clang-compatible ptrauth module flags and entry-point attributes | Focused optimizer, verifier, codegen, and object-format regression tests |
+| Frontend emission of authenticated indirect calls and invokes | |
+| Frontend `ConstantPtrAuth` emission for function pointers used as data | |
+| Avoiding `ptrauth` bundles on inline assembly and `callbr` | |
+| Rust bootstrap robustness, compiler tests, and owned-fork CI | |
 
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `1b3d8853` | target: add arm64e-apple-visionos | No upstream arm64e visionOS target spec | rustc | High · Low |
-| `b34d21ad` | target: correct arm64e visionOS maintainer and docs | Fixup of `1b3d8853` (unagreed maintainer) | rustc | — (squash) |
-| `46da820b` | target: add trailing newline required by tidy | Fixup of `1b3d8853` (tidy) | rustc | — (squash) |
+Rust still uses small LLVM C API shims for APIs that LLVM's public C interface
+does not expose. Those shims express Rust frontend decisions; they do not
+perform optimizer repair or serialized-output rewriting.
 
-(d) Self-contained (`rustc_target` spec + `bootstrap/sanity.rs` + platform-support docs); depends only on committing a target maintainer. Independent of the ptrauth codegen group.
+## 4. Rust 1.97 Carry
 
-### 3.2 Ptrauth feature model + codegen — rustc (the carry heart), low near-term feasibility
+The former 29-patch stable-1.96 history was reconstructed as twelve signed,
+logical compiler/carry commits on Rust 1.97. The history was rebuilt so the
+output stripper does not exist at any intermediate commit. Four later signed
+commits harden publication, packaged LLVM provenance, canonical source
+identity, and the Intel source-build timeout.
 
-The substantive work: teaching `rustc_codegen_llvm` to emit Apple arm64e pointer authentication the way clang's front-end does, because Rust has no other front-end to emit it. Internal order is strict — `e5eeab87` models the feature defaults and the `is_apple_arm64e()` predicate everything else keys off; `1a4c19c5` sets the clang-compatible module flag; `98c04c76` / `e2009504` add the actual signing of calls and function-pointer data; `88546cd4` / `e63ffa3e` reject disabling the ABI-mandatory features.
-
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `e5eeab87` | arm64e: model default Apple ptrauth features | rustc doesn't model `+v8.3a,+paca,+pacg` as arm64e defaults; no `is_apple_arm64e()` | rustc | Med · Low |
-| `1a4c19c5` | arm64e: emit clang-compatible ptrauth metadata | rustc emits no `ptrauth.abi-version` module flag; loader/ABI mismatch vs clang | rustc | Med · Low |
-| `98c04c76` | arm64e: authenticate indirect function calls | rustc emits no `ptrauth` call operand bundles for indirect calls | rustc | Low · High |
-| `e2009504` | arm64e: authenticate function pointers used as data | Function pointers stored as data aren't signed (`LLVMConstantPtrAuth`) | rustc | Low · High |
-| `88546cd4` | arm64e: reject incompatible ptrauth flag overrides | `-Ctarget-feature=-paca/-pacg` silently produces a broken ABI | rustc | High · Low |
-| `e63ffa3e` | Reject -Ctarget-feature=-pauth on Apple arm64e | Same, via the LLVM `pauth` spelling that `flag_to_backend_features` still forwarded | rustc | High · Low |
-
-(b) nuance: `1a4c19c5` and the two signing patches reach LLVM through thin `llvm-wrapper/RustWrapper.cpp` C-API shims (e.g. `LLVMRustAddModuleFlagMetadata`), but the logic — *decide what to sign, emit the bundle/constant* — is front-end work that belongs in `rustc_codegen_llvm`. (c) nuance: `98c04c76` / `e2009504` are the hardest to upstream: rust-lang has historically deferred arm64e ptrauth codegen as experimental, so landing them needs design buy-in and a committed target maintainer, not just review. (d) `88546cd4` → `e63ffa3e` is a hard dependency (the second extends the first's forbidden-disable check); both depend on `e5eeab87` for the feature model but **not** on the signing patches, which is what makes them separable (see §7). The signing patches (`98c04c76`, `e2009504`) additionally depend on `ba4f1852` (§3.4) for correctness.
-
-### 3.3 Bootstrap robustness — rustc, medium feasibility
-
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `edd113bf` | bootstrap: handle fork shallow upstream detection | `build_helper::git` upstream detection breaks on shallow fork clones | rustc | Med · Low |
-| `55651c15` | bootstrap: tolerate missing upstream in shallow fork CI | Missing `origin/main` falls through to a panic instead of `MissingUpstream` | rustc | Med · Low |
-
-(d) `55651c15` refines `edd113bf`. Fork-motivated but framable as general `build_helper::git` robustness (handle shallow clones / absent upstream conservatively), which is how upstream would want them. Both carry regression tests already.
-
-### 3.4 Ptrauth IR-gap fixes + Mach-O metadata — rustc
-
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `ba4f1852` | arm64e: fix ptrauth prep IR gaps | §3.2 paths miss InlineAsm exclusion, `@main`/`__rust_try` attrs, metadata preservation on rebuilt calls | rustc | Low · Med |
-| `ecc85bfa` | arm64e: version metadata Mach-O subtype | rmeta Mach-O object carries the wrong CPU subtype for arm64e | rustc | Med · Low |
-
-(d) `ba4f1852` is a correctness dependency of the §3.2 signing patches and must travel with them upstream. `ecc85bfa` (a 5-line `rustc_codegen_ssa/back/metadata.rs` change) is nearly standalone — it only needs the `is_apple_arm64e()` predicate from `e5eeab87`.
-
-### 3.5 Compiler tests — rustc (ride-along)
-
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `df93416f` | arm64e: cover visionOS ptrauth integration | visionOS not exercised by the ptrauth codegen/UI tests | rustc | — (with feature) |
-| `c6de391a` | test: update visionOS arm64e ptrauth diagnostic | Snapshot refresh for `df93416f` | rustc | — (squash) |
-
-(d) Not independently upstreamable — they extend the test suites introduced by §3.1/§3.2 to visionOS and are upstreamed together with whichever feature they cover. `c6de391a` squashes into `df93416f`.
-
-### 3.6 Serialized-output ptrauth-bundle compensation — LLVM, low near-term feasibility
-
-| Commit | Subject | (a) Gap | (b) Home | (c) Feas. · Effort |
-| --- | --- | --- | --- | --- |
-| `6f895c2d` | Strip `ptrauth` operand bundles before serialized output | LLVM doesn't canonicalize/lower `ptrauth` operand bundles on the affected call shapes, so they leak into serialized output and break consumers | LLVM (AArch64 ptrauth canonicalization/lowering) | Low · Med |
-| `394813b6` | Keep direct-call bundles out of serialization (follow-up) | Same root cause on direct calls; its own commit message names the durable fix — prevention by LLVM canonicalization, not downstream repair | LLVM | Low · Med |
-
-(d) The pair is interdependent (the follow-up extends the strip pass) and is carried as a downstream compensation in `llvm-wrapper/`. Both drop the moment upstream LLVM canonicalizes the bundles (§4 step 3), but LLVM's release cadence means that fix reaches the Rust fork only with a much later LLVM bump — keep-carrying until then.
-
-### 3.7 Fork release + validation CI — keep (no upstream home)
-
-All twelve are fork-only automation: they build, package, attest, smoke-test, and publish the `rust-arm64e-stage1-*` prerelease the app pins ([ARM64E_STATUS.md](ARM64E_STATUS.md) §Pinned Rust stage1 Toolchain), and run fork-shape arm64e validation. None has an upstream destination; "minimization" here means consolidating history, not shrinking carry surface (§4).
-
-| Commit | Subject | (b) Home |
+| Commit | Purpose | Owner |
 | --- | --- | --- |
-| `fb7c18e2` | ci: add fork arm64e validation workflow | keep |
-| `39c5fdb6` | ci: publish arm64e stage1 prereleases | keep |
-| `a69fecf2` | ci: fix arm64e stage1 attestation | keep (fixup of `39c5fdb6`) |
-| `0e3a0bde` | ci: avoid stage1 release tag fetch | keep (fixup of `39c5fdb6`) |
-| `5beb3daa` | ci: package rust-src in arm64e stage1 | keep |
-| `967d9bbc` | ci: retarget arm64e workflows to carry branch | keep |
-| `04cbb277` | ci: broaden fork arm64e validation | keep |
-| `12f074a3` | ci: smoke test packaged arm64e stage1 cargo builds | keep |
-| `34eefe0e` | ci: smoke test arm64e stage1 apple targets | keep |
-| `4e505e37` | ci: publish stable 1.96 arm64e stage1 | keep |
-| `a5c65009` | ci: publish host-specific arm64e stage1 assets | keep |
-| `2759c050` | ci: verify stage1 release attestations after publish | keep · **pinned-only** (§1) |
+| `f6f0b28920eb` | Add the Apple arm64e visionOS target | Rust |
+| `acd9bbd79335` | Model default Apple pointer-authentication features | Rust |
+| `69be3054de1f` | Emit Clang-compatible pointer-authentication metadata | Rust |
+| `701aa4548eb4` | Authenticate indirect function calls and avoid unsupported `callbr` bundles | Rust |
+| `3026427dab1e` | Authenticate function pointers used as data | Rust |
+| `8d2ee46cf833` | Reject incompatible pointer-authentication flag overrides | Rust |
+| `3d4d7458ed47` | Reject disabling ABI-mandatory pointer-authentication features | Rust |
+| `def17bd149bd` | Handle shallow-fork upstream detection in bootstrap | Rust |
+| `ed9539c2e21d` | Add owned-fork arm64e validation CI | Fork CI |
+| `23f3f80209af` | Cover visionOS pointer-authentication integration | Rust |
+| `92e1dbfed5a2` | Carry safe, opt-in stage1 workflows for stable 1.97 | Fork CI |
+| `c3a04d4e4ff9` | Close frontend pointer-authentication IR emission gaps | Rust |
+| `027700f412b0` | Verify publication attestations against the canonical GitHub source ref | Fork CI |
+| `9e0e9424851b` | Force and attest the bundled LLVM gitlink used by packaged stage1 tools | Fork CI |
+| `97f3fa184d22` | Canonicalize the stage1 manifest's owned-branch source ref | Fork CI |
+| `c405db836704` | Allow the source-built bundled LLVM lane to finish on Intel | Fork CI |
 
-(d) A single interdependent workflow chain (mostly edits to `arm64e-stage1-prerelease.yml` and `fork-arm64e.yml`); several are fixups of `39c5fdb6`. `2759c050` is present in the pinned artifact but not on the current carry tip.
+The old Mach-O metadata-subtype patch is absent because Rust 1.97 already
+contains the equivalent upstream change (`8c029d5f456775294204a8c28b24d6ba19865d79`).
+The LLVM gitlink remains Rust 1.97's upstream value
+`08c84e69a84d95936296dfcab0e38b34100725d5`, and `.gitmodules` remains
+unchanged.
 
-## 4. Carry-Set Minimization Plan
+### Why the old stripper is not retained
 
-1. **Squash the bookkeeping.** Fold each fixup into its parent before the next rebase: `b34d21ad` + `46da820b` → `1b3d8853`; `c6de391a` → `df93416f`; `a69fecf2` + `0e3a0bde` → `39c5fdb6`. This collapses 29 commits to roughly a dozen logically-distinct patches. It reduces rebase and review friction, not runtime risk.
-2. **Retire the self-contained rustc patches by upstreaming them.** The flag-rejection pair (`88546cd4` + `e63ffa3e`), the visionOS target (`1b3d8853` squashed), the bootstrap pair (`edd113bf` + `55651c15`), and `ecc85bfa` each leave the carry-set permanently once merged upstream and a stable release containing them becomes the new base. None depends on the contentious codegen group.
-3. **Push the LLVM-bucket pair to its root cause.** `6f895c2d` + `394813b6` strip `ptrauth` operand bundles before serialized output because LLVM doesn't canonicalize/lower them on the affected call shapes. `394813b6`'s own commit message states the durable fix: *"Direct-call bundles should be prevented by LLVM canonicalization instead of repaired here before serialization."* Upstreaming the canonicalization/lowering to LLVM's AArch64 ptrauth path eliminates both carry patches — but LLVM's release cadence means the fix won't reach the Rust fork until a much later LLVM bump, so keep the strip pass until then.
-4. **Accept the irreducible remainder.** After steps 2–3 the carry surface is: the arm64e ptrauth **codegen** group (`e5eeab87`, `1a4c19c5`, `98c04c76`, `e2009504`, `ba4f1852`, + tests) until rust-lang accepts arm64e ptrauth codegen, plus the entire **keep** CI set. Consolidate the CI history into the two maintained workflow files so the *surface* (not the commit count) is what the maintainer reasons about.
+The stable-1.96 history mixed frontend emission and serialized-output repair
+across several commits. Dropping only the final strip/keep pair would have
+silently resurrected an earlier, broader stripper. Reconstructing the logical
+series avoids that trap: no `PtrauthUtils`, strip FFI, serialization hook, or
+SSA strip state is introduced anywhere in the 1.97 candidate range.
 
-Realistic end state: from 29 carried commits down to a codegen core of ~5–6 patches + fork CI, with every self-contained rustc patch and (eventually) the LLVM pair upstreamed.
+Rust now avoids attaching a `ptrauth` bundle to `callbr`, while LLVM defines
+that unsupported shape as verifier-invalid. LLVM's InstCombine guard prevents
+the separate case where optimization exposes a direct callee but preserves an
+indirect-call-only bundle. Each layer therefore enforces its own contract.
 
-## 5. Rebase Strategy for Future Rust Releases
+## 5. Canonical LLVM Candidate
 
-- **Ordered patch series on the stable tag.** Keep the carry branch as a rebased series on top of each new stable tag, following the naming already in use (`carry/cypherair-arm64e-toolchain-stable-<major.minor>`). For 1.97: branch from the `1.97.0` tag and re-apply the series in the §3 order (targets → feature model → codegen → IR-gap fixes → Mach-O → tests → bootstrap → CI). Dependency order matters so an early conflict doesn't cascade.
-- **Keep the subsystem prefixes.** The existing `target:` / `arm64e:` / `bootstrap:` / `ci:` prefixes let a whole group be dropped in one step once it lands upstream — grep the prefix, drop the range.
-- **Expect conflicts to concentrate in two files.** `compiler/rustc_codegen_llvm/src/**` and `compiler/rustc_llvm/llvm-wrapper/RustWrapper.cpp` are the highest-churn surfaces because the codegen patches call LLVM C++ APIs directly; every Rust stable pulls a new bundled LLVM, so the `llvm-wrapper` C++ (`RustWrapper.cpp`, `PtrauthUtils.h`, `PassWrapper.cpp`) is where an LLVM bump breaks first. Rebase those groups first and build early.
-- **Drop-on-upstream discipline.** When a carried patch (or the LLVM canonicalization behind `6f895c2d`/`394813b6`) lands in the new base, delete it from the series in the same rebase and record the removal here. When the bundled LLVM gains native arm64e ptrauth handling, delete the corresponding codegen carry.
-- **Re-pin reconciliation.** After each rebase, cut a new stage1 prerelease and re-pin per `.claude/skills/repin-arm64e`; [ARM64E_STATUS.md](ARM64E_STATUS.md) remains the pin's source of truth. Before cutting, reconcile the branch-tip/pinned-commit gap noted in §1 so the pinned source commit is always an ancestor of the carry tip.
+The canonical branch is based on synchronized LLVM main and contains three
+signed commits:
 
-## 6. Recommended First Upstream Candidates
+| Commit | Change |
+| --- | --- |
+| `cde471330089` | InstCombine refuses to form a direct call that retains a `ptrauth` operand bundle |
+| `ec9476ea9f6e` | The verifier rejects `ptrauth` operand bundles on `callbr` |
+| `35721a3b9819` | AArch64 tests `ConstantPtrAuth` function-pointer Mach-O authenticated relocations |
 
-The two best first proposals maximize (feasibility × low effort × zero LLVM entanglement × already test/doc-complete) and are independent of the contentious codegen heart:
+The branch is pushed only to
+`cypherair/llvm-project-upstream:cypherair-arm64e-ptrauth-canonical`. That
+repository was re-verified as a true fork whose immediate parent is
+`llvm/llvm-project`. Canonical upstream is fetch-only locally, and no upstream
+pull request has been opened.
 
-1. **`88546cd4` + `e63ffa3e` — reject disabling ptrauth (`-paca` / `-pacg` / `-pauth`) on Apple arm64e.** Self-contained in `rustc_codegen_ssa` / `rustc_session`, no LLVM dependency, and shipped with full UI-test coverage and stderr snapshots across Darwin/iOS/tvOS/visionOS. It is pure fail-closed hardening — it prevents silently building an arm64e binary with the ABI-mandatory authentication turned off. The Darwin/iOS/tvOS targets it protects already exist upstream; the **visionOS stderr snapshots reference `arm64e-apple-visionos`, which does not** — trim those snapshots from the upstream proposal (or sequence it after candidate 2) so the PR stands on its own without either the codegen group or the target addition. Low-controversy diagnostics like this are what upstream accepts without a design discussion; merging it removes two patches from carry at near-zero cost.
+A semantically equivalent three-patch series is replayed, without publishing,
+on the Rust-consumed LLVM line. Small diff-size differences from the canonical
+series are version-context adjustments rather than different behavior:
 
-2. **`1b3d8853` (squashed with `b34d21ad` + `46da820b`) — add the `arm64e-apple-visionos` Tier-3 target.** It mechanically mirrors the upstream `arm64e-apple-ios` / `arm64e-apple-tvos` Tier-3 targets — a spec file, a `sanity.rs` entry, and platform-support docs, with no codegen and no LLVM surface. Tier-3 has the lowest upstream bar (no CI guarantee required, just a target maintainer plus the docs already written in the patch), and it retires a whole target definition from the carry-set. The only prerequisite is committing a target maintainer — the `b34d21ad` fixup exists precisely because the maintainer slot must be filled by someone who agrees.
+- base: `08c84e69a84d95936296dfcab0e38b34100725d5`
+- local branch: `cypherair-arm64e-ptrauth-rust-llvm`
+- replay tip: `3fb59b3c7`
 
-`e5eeab87` (model default ptrauth features) is the natural third: a clean `rustc_target` change that unblocks the codegen group's upstream story, though it reads best alongside at least the module-flag patch. The codegen signing patches (`98c04c76`, `e2009504`) are explicitly **not** first candidates — highest value to upstream, lowest near-term feasibility — and should follow only after a target maintainer and a design agreement are in hand.
+This lane is compatibility evidence only. Its fresh LLVM 22.1.6 optimized
+assertions build passed the five focused tests and the external-consumption
+component/tool readiness checks. Production stage1 builds force source-built
+bundled LLVM at the unmodified
+`08c84e69a84d95936296dfcab0e38b34100725d5` gitlink; neither the Rust gitlink
+nor `.gitmodules` points to a CypherAir LLVM fork. A Rust stage1 compiler check
+against the external replay also passed, as recorded below.
+
+## 6. Validation Status
+
+Completed validation, publication, and readback evidence:
+
+- `x.py check compiler/rustc_codegen_ssa compiler/rustc_codegen_llvm --stage 1`
+  passed on the Rust 1.97 candidate.
+- The Rust `callbr` codegen regression passed all four revisions: macOS, iOS,
+  tvOS, and visionOS.
+- The serialized-output regression passed against Rust 1.97's default bundled
+  LLVM 22.1.6, including LLVM IR, bitcode, and embedded-bitcode paths.
+- `x.py fmt --check` passed for 6,874 files using the available nightly
+  rustfmt with a temporary bootstrap configuration. The ordinary tidy entry
+  point was unavailable only because the downloaded stage0 lacked rustfmt.
+- All sixteen Rust-branch commits and all three canonical LLVM commits have
+  valid SSH signatures; both ranges pass `git diff --check`.
+- The canonical LLVM 23.0.0git optimized assertions build passed five focused
+  lit tests plus direct InstCombine, verifier, `llc`, and Mach-O relocation
+  checks. The suite covers `Transforms/InstCombine/ptrauth-call.ll`, both
+  `callbr` tests, `CodeGen/AArch64/ptrauth-fnptr-data-macho-reloc.ll`, and the
+  neighboring verifier operand-bundle coverage.
+- The local Rust-pinned LLVM 22.1.6 optimized assertions replay passed the same
+  five-file suite, direct InstCombine checks, and all LLVM archive/tool
+  readiness checks needed by Rust's external-LLVM bootstrap path.
+- An isolated Rust 1.97 stage1 built against that external LLVM replay passed
+  the serialized-output test (`1/1`) and all four Apple-target revisions of the
+  `callbr` codegen test (`4/4`). This proves compatibility; normal stage1 builds
+  still use the unchanged bundled-LLVM gitlink.
+- Owned-fork arm64e validation run `29268159861` passed on both macOS 15 and
+  macOS 26 from signed Rust tip `c3a04d4`.
+- Owned-fork stage1 dry run `29268161888` passed for both
+  `aarch64-apple-darwin` and `x86_64-apple-darwin`; `publish-stage1` was
+  skipped. Both uploaded artifact checksums verify, and their manifests record
+  source tip `c3a04d4`, Rust 1.97.0 base `2d8144b`, Rust source, and all four
+  Apple arm64e targets.
+- The first approved publication run, `29273772623`, again built and tested
+  both host artifacts but failed before creating a tag or release because its
+  publish job compared a raw branch name with the canonical attestation source
+  ref. Cleanup confirmed that no partial tag or release remained.
+- Signed workflow fix `027700f412b0` made the source-ref contract explicit.
+  Retry run `29277996466` passed both host builds and publication, but later
+  inspection showed that its schema-v2 artifacts had selected downloaded Rust
+  CI LLVM 22.1.8 rather than the Rust 1.97 gitlink's LLVM 22.1.6. That release
+  is marked superseded and is not production evidence.
+- Correction run `29333736646` at `97f3fa1` proved the Apple Silicon artifact
+  but reached the former 240-minute job timeout while Intel was still building
+  LLVM from source; no publication was requested. Signed workflow commit
+  `c405db8` raised that bound to 360 minutes. Fork validation run `29364945389`
+  then passed both macOS lanes at the final tip. Stage1 dry run `29364945460`
+  passed both host builds and uploaded both artifact bundles; its publisher
+  remained skipped.
+- Approved publication run `29390775624` passed both host builds, published the
+  corrected immutable schema-v3 prerelease, and completed post-publication
+  release and build-attestation verification. The tag, release target, source
+  branch, and both manifests resolve to `c405db8`; both packaged compilers use
+  source-built bundled LLVM gitlink `08c84e69` with `downloadCiLlvm: false` and
+  report LLVM 22.1.6. Independent Apple Silicon, Intel, and release-surface
+  readbacks verified all eight assets, their exact digests, embedded LLVM
+  identities, target/std payloads, executable `rustc`/`llc` tools, release
+  immutability, and SLSA provenance.
+- The first consumer rebuild, Rust tests, slice inspection, visionOS build, and
+  local app plans all completed against that superseded artifact. They remain
+  useful pipeline and app baselines but do not validate the corrected compiler
+  package.
+- Initial corrected-artifact consumer acceptance completed across signed heads
+  `b33d347cf5a2` and `d93b26f15b92`, both descendants of provenance/re-pin
+  commit `8aee8304462c`:
+  - At `b33d347`, a forced fresh download of the corrected immutable stable197
+    prerelease from run `29390775624` passed the pinned outer digests,
+    immutable-release and SLSA checks, and the schema-v3 semantic validator
+    before any downloaded compiler executed. The selected package resolves to
+    Rust source `c405db8`, stable base `2d8144b`, bundled LLVM gitlink
+    `08c84e69`, `downloadCiLlvm: false`, and LLVM 22.1.6.
+  - The full release XCFramework rebuild passed. Its generated manifest records
+    the exact corrected release and `requiredSlicesPresent: true`; iOS, macOS,
+    and visionOS device libraries contain `arm64` plus `arm64e`, while both
+    simulator libraries remain `arm64`. Generated UniFFI Swift stayed unchanged
+    at SHA-256
+    `a240ad826bd4be04a4128c9130a91529067d09225a6d9b1f3b8ae701377077d2`.
+  - After merging main `4f30409` as `d93b26f`, the full `pgp-mobile` Cargo
+    suite and 48 focused downloader, release, provenance, App Store candidate,
+    build-phase, and workflow tests passed.
+  - Serialized Xcode 26.6 validation on macOS 27.0 build `26A5378n`, using
+    isolated build directories and the actual `arm64e` destination, passed
+    1,372 Unit, 81 Device, and 31 Mac UI tests with zero failures or skips.
+    The first Unit attempt used Xcode's shared default DerivedData; that tree
+    disappeared beneath its signed host and resources mid-run, producing
+    `errSecCSStaticCodeNotFound` plus missing-file failures. That attempt is not
+    acceptance evidence. A dedicated-DerivedData rerun produced the counted
+    1,372/1,372 result without a product, test, Keychain, or container change.
+  - Xcode 27 beta build `27A5218g` built the corrected app for generic visionOS
+    27 with minimum OS 26.5. Both executable slices are present: `arm64` and
+    `arm64e`.
+- Final-current-main acceptance advanced that corrected-artifact evidence
+  through successive signed heads:
+  - Main `4693901ca62e` was merged as `e3d73a1859f`. Because that merge changed
+    `pgp-mobile`, the corrected stage1 package was downloaded and semantically
+    reverified before use, the full release XCFramework was rebuilt, and the
+    complete Cargo suite plus all 48 focused Python tests passed. Generated
+    UniFFI Swift remained unchanged.
+  - Main `ddc867e25a0d` was then merged as `1ab21fa0b4e`. Its three-file delta
+    was Swift/test-only and did not change the rebuilt Rust, UniFFI, or
+    XCFramework artifact.
+  - The first full Unit run after that merge exposed test-harness issue #668:
+    18 `EncryptScreenModelTests` teardowns deleted the shared temporary root
+    instead of their test-owned contacts directory. Signed test-only commit
+    `ae27eb8d29fe` narrows those cleanups to the owned directory. A focused
+    reproduction passed 34/34, then both the explicit-serial and canonical
+    Unit runs passed 1,375/1,375. The canonical run is the acceptance result;
+    no local-only flag is required.
+  - At validated code head `ae27eb8`, serialized Xcode 26.6 acceptance passed
+    1,375 Unit, 81 Device, and 31 Mac UI tests with zero failures or skips.
+    Xcode 27 beta build `27A5218g` also rebuilt the generic visionOS app; its
+    `arm64` and `arm64e` slices both record minimum OS 26.5 and SDK 27.0.
+  - The signed documentation-only successor to `ae27eb8` records this evidence;
+    it does not alter the locally accepted code or packaged artifact.
+  - Main `77c548dc7401`, containing pull requests #669 and #670, was then
+    merged as signed head `b33c615b40c1`. Its eight-file delta is limited to
+    Swift settings and privacy-cover UI, localization, project membership, and
+    `SettingsScreenModelTests`; it does not change Rust, UniFFI, the stage1 pin,
+    or the rebuilt XCFramework.
+  - At `b33c615`, serialized Xcode 26.6 acceptance on the actual macOS `arm64e`
+    destination passed 1,379 Unit, 81 Device, and 31 Mac UI tests with zero
+    failures or skips. Xcode 27 beta build `27A5218g` also rebuilt the generic
+    visionOS app; both `arm64` and `arm64e` executable slices record minimum OS
+    26.5 and SDK 27.0. The additional four Unit tests are the coverage inherited
+    from current main.
+  - Signed documentation-only head `e648de54d3c7` records that local evidence;
+    it does not alter the accepted code or packaged artifact.
+  - Main `469d63f2c75d`, containing pull request #671, was then merged as signed
+    head `87569537592a`. Its only product inputs are 23 PNG assets with
+    authoring metadata removed plus their repository checker; it does not
+    change source behavior, tests, Rust, UniFFI, the stage1 pin, or the rebuilt
+    XCFramework.
+  - At `8756953`, all 23 PNGs were verified as the exact metadata-only transform
+    of their parent blobs with every rendering chunk unchanged, and the full
+    repository metadata scan passed. Fresh macOS `arm64e`, generic iOS, and
+    generic visionOS builds passed. Both iOS and visionOS executables contain
+    `arm64` and `arm64e` slices with minimum OS 26.5 and SDK 27.0. The prior
+    1,379 Unit, 81 Device, and 31 Mac UI results remain the behavioral
+    acceptance because every source and test blob is preserved byte-for-byte.
+  - Signed documentation-only head `dc0149c6853b` records that current-main
+    evidence; it does not alter the accepted code or packaged artifact.
+  - Main `4e0d4a81147a`, containing pull request #672, was then merged as signed
+    head `109c8fb659c6`. Its only changed file is
+    `ci_scripts/ci_post_clone.sh`: Xcode Cloud now confines the release PAT to a
+    throwaway `GH_CONFIG_DIR`, removes that directory before the WF1 compiler
+    and Cargo build, reauthenticates only for the post-build SQLCipher restore,
+    and includes credential cleanup in the existing exit/signal trap. It does
+    not change app source, tests, Rust, UniFFI, the stage1 pin, or packaged
+    artifacts.
+  - At `109c8fb`, Bash syntax validation, a mocked scoped-auth lifecycle, and
+    actual exit-trap cleanup all passed. The merged script blob matches main
+    exactly, while every issue #622/#668 topic blob is preserved. The prior
+    product test and platform-build results therefore remain applicable.
+  - The signed documentation-only successor to `109c8fb` records this final
+    current-main evidence; it does not alter the accepted code or packaged
+    artifact.
+- Historical clean-runner PR run `29285509956` on signed CypherAir commit `93c48f0` passed
+  the full Rust suite, dependency audit, GnuPG + sq interoperability lane,
+  arm64e dependency-freshness check, pinned stable197 download, XCFramework
+  rebuild, packaging, and artifact upload. Its best-effort Apple platform job
+  skipped the actual iOS and visionOS probes because the runner selected Xcode
+  26.6 rather than 26.5. Its best-effort Swift unit job skipped the actual test
+  plan because that Xcode mismatch was joined by a macOS 26.4 host below the
+  app's 26.5 deployment target. Those two successful job conclusions therefore
+  do not replace the local platform and app-test evidence, and its XCFramework
+  lane consumed the now-superseded schema-v2 toolchain.
+
+Local app-test incident and resolution:
+
+- Before XCTest could connect, the locked macOS session caused the sandboxed
+  app to return `protectedFileWriteFailed` while creating a complete-protected
+  UI-test Contacts domain. LLDB captured `errno = EPERM`; a live session check
+  then returned `CGSSessionScreenIsLocked = 1`. The same pre-XCTest trap on
+  `arm64e` and control `arm64`, plus separate UI-runner authentication-session
+  failures, made this host-state evidence rather than a completed test result.
+  This is consistent with Apple's [macOS App Sandbox diagnostics](https://developer.apple.com/documentation/Security/accessing-files-from-the-macos-app-sandbox)
+  for complete protection being unavailable while locked, but the initial
+  evidence alone did not prove that diagnosis.
+- After the user unlocked the macOS session, all three plans were rerun
+  serially with Xcode 26.6 on `My Mac` (MacBook Air), macOS 27.0 build
+  `26A5378j`, using the actual `arm64e` destination:
+  - `CypherAir-UnitTests`: 1,363 passed, zero failed or skipped.
+  - `CypherAir-DeviceTests`: 81 passed, zero failed or skipped.
+  - `CypherAir-MacUITests`: 31 passed, zero failed or skipped.
+  Each result bundle reports `Passed`, and each build action reports
+  `succeeded` with zero errors. The post-unlock results resolve the host-state
+  blocker for that historical run without a product or test-source change.
+  Because the packaged toolchain was later superseded, these counts are the
+  baseline for — not a substitute for — corrected-artifact acceptance.
+- Corrected-artifact exact-head PR run `29406375343` targeted pushed evidence
+  head `07c2dfc` but was cancelled before completion; all six jobs concluded
+  cancelled. It is audit history only and does not satisfy the merge gate. The
+  replacement must be the run GitHub creates from the final pushed evidence
+  head.
+- Replacement run `29411751060` targeted pushed evidence head `0456863` but
+  was likewise cancelled after main advanced to `77c548d`; one dependency
+  audit job passed and the other five jobs concluded cancelled. It is also
+  audit history only.
+- Replacement run `29413325008` targeted pushed evidence head `e648de5` but
+  was cancelled while still queued after main advanced to `469d63f`. It is
+  audit history only.
+- Exact-head run `29414077433` passed all six jobs at pushed evidence head
+  `dc0149c`: the Rust suite, dependency audit, GnuPG + sq interoperability,
+  XCFramework packaging, hosted Swift preview, and Apple platform probes all
+  succeeded. Main then advanced to `4e0d4a8`, so this is a clean validation
+  checkpoint rather than the final merge run. The merge gate remains the run
+  created from the final pushed documentation successor to `109c8fb`.
+- Xcode emitted non-blocking warnings while collecting and merging raw
+  coverage profiles from sandbox paths, plus signed-XCTest-library stripping
+  warnings. These did not prevent any test from running and are distinct from
+  the earlier pre-XCTest app trap and authentication-session failure.
+- No shared app-container data was deleted or reset, and protected-data
+  behavior was not weakened. Issue #651 retains the diagnostic history and
+  non-blocking test-lifecycle follow-up.
+
+Final merge gates for the CypherAir production re-pin:
+
+1. Pull-request CI must pass on the final pushed evidence head; cancelled run
+   `29406375343` and superseded replacements `29411751060` and `29413325008`
+   are not acceptance evidence, while successful run `29414077433` validates
+   only the superseded `dc0149c` checkpoint.
+2. Before merge, obtain a fresh verification of that exact final state using
+   `gpt-5.6-sol` at maximum effort with fork context disabled.
+
+## 7. Release And Upstream Gates
+
+The stable-1.97 workflow is safe by default:
+
+- branch pushes and schedules may build validation artifacts but force
+  `create_release=false`;
+- manual dispatch also defaults `create_release=false`;
+- publication requires explicit manual opt-in, either by dispatching the
+  stage1 workflow with `create_release=true`, or by dispatching upstream-sync
+  prep with both `create_refresh_pr=true` and
+  `dispatch_stage1_prerelease=true`; all defaults are false.
+
+The stable197 prerelease publication and CypherAir re-pin received that
+separate maintainer approval. The exact production pin is therefore the one in
+[ARM64E_STATUS.md](ARM64E_STATUS.md). Opening any upstream Rust or LLVM pull
+request remains outside this approval and requires a new explicit decision;
+all upstream-facing work remains on CypherAir-owned branches.
+
+## 8. Stable-1.96 To Stable-1.97 Lineage
+
+The reconstruction preserves the useful archaeology from the former 29-patch
+analysis while removing stale carry advice:
+
+| Stable-1.96 source | Stable-1.97 result |
+| --- | --- |
+| `1b3d8853` + `b34d21ad` + `46da820b` | Squashed into target commit `f6f0b28920eb` |
+| `e5eeab87` | Rebuilt as feature-model commit `acd9bbd79335` |
+| `1a4c19c5` | Rebuilt as module-metadata commit `69be3054de1f` |
+| `98c04c76` | Frontend call emission retained in `701aa4548eb4`; stripper logic deleted |
+| `e2009504` | Rebuilt as function-pointer-data commit `3026427dab1e` |
+| `88546cd4` + `e63ffa3e` | Rebuilt as diagnostics commits `8d2ee46cf833` + `3d4d7458ed47` |
+| `edd113bf` + `55651c15` | Consolidated into bootstrap commit `def17bd149bd` |
+| `ba4f1852` | Frontend IR fixes retained in `c3a04d4e4ff9`; stripper bookkeeping deleted |
+| `ecc85bfa` | Dropped because Rust 1.97 contains upstream equivalent `8c029d5f456775294204a8c28b24d6ba19865d79` |
+| `df93416f` + `c6de391a` | Consolidated into test commit `23f3f80209af` |
+| Twelve stable-1.96 fork-CI commits | Consolidated into `ed9539c2e21d` + `92e1dbfed5a2` |
+| `6f895c2d` + `394813b6` | Deleted, not relocated; LLVM root-cause contracts are represented by `cde471330089` + `ec9476ea9f6e` |
+
+The sequencing matters. `98c04c76` originally introduced frontend call
+emission together with the broad late stripper; `ba4f1852` mixed genuine
+frontend fixes with stripper bookkeeping; `6f895c2d` refactored stripping into
+`PtrauthUtils` and serialization/pass hooks; and `394813b6` narrowed it to
+`callbr`. Dropping only the final pair would therefore resurrect the earlier,
+broader stripper. The stable-1.97 history was rebuilt so no stripper exists in
+any intermediate commit.
+
+## 9. Future Rebase And Upstream Guidance
+
+For a future stable Rust rebase, start at the exact stable tag and replay the
+logical order: target definition, feature/ABI model, frontend metadata and
+emission, diagnostics, bootstrap, tests, then fork CI. Expect conflicts to
+concentrate in `rustc_codegen_llvm`, its thin C API surface in `llvm-wrapper/`,
+and Apple target definitions. Drop a carry commit in the same rebase that first
+contains its upstream equivalent; never retain a no-op copy for history.
+
+Potential future Rust-facing proposals, if the maintainer separately
+authorizes upstream work, remain:
+
+1. the fail-closed feature diagnostics (`8d2ee46cf833` + `3d4d7458ed47`);
+2. the standalone arm64e visionOS target (`f6f0b28920eb`);
+3. the default arm64e feature model (`acd9bbd79335`).
+
+This ordering is planning guidance only. It does not authorize an upstream
+pull request or name any maintainer, reviewer, owner, or assignee.

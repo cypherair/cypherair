@@ -100,13 +100,13 @@ PR Checks and the nightly run are the blocking release-readiness signal. Jobs:
 - `rust-dependency-audit` — `cargo audit --deny warnings` against `pgp-mobile/Cargo.lock`, as an independent failure signal.
 - `rust-full-tests` — the default Rust suite plus the slow targets.
 - `rust-gnupg-interop` — installs gpg, asserts the `>= 2.4.0` floor (`scripts/assert_min_gpg_version.sh`), and runs `secure_enclave_gnupg_interop_tests` plus `gnupg_binary_tests` under `CYPHERAIR_REQUIRE_GPG=1`, so a missing gpg fails the lane instead of skipping. Runs parallel to `rust-full-tests`; needs no XCFramework.
-- `xcframework-package` — checks OpenSSL carry-chain freshness, downloads the pinned arm64e stage1 toolchain in a token-free pre-build step (digest-pinned against `third_party/arm64e-stage1-toolchain.pin.json`), verifies release immutability and asset attestations (`scripts/verify_arm64e_stage1_release.sh`), runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days.
+- `xcframework-package` — checks OpenSSL carry-chain freshness, downloads the pinned arm64e stage1 toolchain in a token-free pre-build step (SHA-256- and byte-size-pinned against `third_party/arm64e-stage1-toolchain.pin.json`), verifies release immutability and asset attestations (`scripts/verify_arm64e_stage1_release.sh`), runs `./build-xcframework.sh --release`, and uploads the `pgpmobile-xcframework` artifact plus `PgpMobile.arm64e-build-manifest.json` for 5 days.
 - `apple-platform-probes` — restores the XCFramework artifact and the pinned SQLCipher dependency (attestation-verified), then runs unsigned `generic/platform=iOS` and `generic/platform=visionOS` build probes when the hosted install of the pinned Xcode (26.6, which ships the 26.5 SDKs and simulator runtimes — the two expectations are pinned separately in `scripts/ci_xcode_platform_preflight.sh`) is healthy. Hosted runners intentionally carry no CypherAir signing material; signed app builds stay local and on Xcode Cloud.
 - `swift-unit-tests-hosted-preview` — hosted macOS `CypherAir-UnitTests` on `platform=macOS,arch=arm64e` after a readiness preflight; hosted-environment mismatches warn-skip (§2.2), while real build/link/test failures fail the job.
 
 `XCFramework Edge Release` (main pushes and manual dispatch) audits, rebuilds, probes, then publishes a unique `pgpmobile-edge-*` prerelease; non-main manual runs must use `pgpmobile-drill-*` prefixes. The stable release path runs on Xcode Cloud and is owned by [RELEASE.md](RELEASE.md); `.github/workflows/stable-release-attest.yml` re-verifies the signed tag, checksums, and SQLCipher record on `release.published` and attests the SDK/compliance assets.
 
-arm64e toolchain consumption: CI force-downloads the pinned `cypherair/rust` stage1 prerelease (tag, slice policy, and toolchain contract owned by [ARM64E_STATUS.md](ARM64E_STATUS.md)) via direct release-asset URLs with token variables scrubbed; every downloaded asset must match the committed digests in `third_party/arm64e-stage1-toolchain.pin.json`, CI additionally verifies release immutability and build-provenance attestations before the stage1 compiler runs, and `latest` is never allowed. Two TESTING-specific rules on top:
+arm64e toolchain consumption: CI force-downloads the pinned `cypherair/rust` stage1 prerelease (tag, slice policy, and toolchain contract owned by [ARM64E_STATUS.md](ARM64E_STATUS.md)) via direct release-asset URLs with token variables scrubbed; every downloaded asset must match the committed SHA-256 and byte size in `third_party/arm64e-stage1-toolchain.pin.json`, CI additionally verifies release immutability and build-provenance attestations before the stage1 compiler runs, and `latest` is never allowed. Two TESTING-specific rules on top:
 
 - Rust/XCFramework jobs deliberately use no Cargo cache actions: restored `target/` artifacts can mix compiler generations and break proc-macro builds. Prefer slower clean CI builds.
 - App-side Rust or UniFFI changes never wait for a new stage1 prerelease; only changes to the Rust compiler fork itself do.
@@ -155,11 +155,19 @@ Run after any Rust or UniFFI change that can affect Swift-visible behavior (deci
 
 ```bash
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1 \
     ./build-xcframework.sh --release
 ```
 
-Force-download matches GitHub Actions: it consumes the pinned `cypherair/rust` stage1 prerelease instead of trusting local rustup state, refreshes the stable `arm64` archives, builds `arm64e` archives with the stage1 compiler, regenerates bindings from an `arm64e-apple-darwin` host dylib (whitespace-normalized — never hand-edit generated bindings; rerun the sync), recreates `PgpMobile.xcframework`, and writes the build manifest. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; pin rotation follows the re-pin rule in [ARM64E_STATUS.md](ARM64E_STATUS.md) (agent checklist: `.claude/skills/repin-arm64e`). `ARM64E_RUSTC` / `ARM64E_STAGE1_DIR` / a locally linked `stage1-arm64e-patch` toolchain are for deliberate compiler testing only.
+Force-download matches GitHub Actions: it consumes the pinned `cypherair/rust` stage1 prerelease instead of trusting local rustup state, refreshes the stable `arm64` archives, builds `arm64e` archives with the stage1 compiler, regenerates bindings from an `arm64e-apple-darwin` host dylib (whitespace-normalized — never hand-edit generated bindings; rerun the sync), recreates `PgpMobile.xcframework`, and writes the build manifest. Before executing downloaded tools, packaging requires the exact schema-v3 manifest and checksum-bound bundled-LLVM identity; it then confirms that the selected `rustc` and packaged host `llc` both report LLVM 22.1.6. The semantic validator takes the release repository/ref/commit from `third_party/arm64e-stage1-toolchain.pin.json`, and the App Store candidate gate cross-checks that machine tag against [ARM64E_STATUS.md](ARM64E_STATUS.md) before applying the same exact source/base/LLVM contract to embedded release metadata. The downloader rejects `ARM64E_STAGE1_RELEASE_TAG=latest`; pin rotation follows the re-pin rule in [ARM64E_STATUS.md](ARM64E_STATUS.md) (agent checklist: `.claude/skills/repin-arm64e`). A plain build ignores rustup-linked arm64e toolchains and downloads the pin. Reusing an extracted stage1 through `ARM64E_RUSTC` or `ARM64E_STAGE1_DIR`, or opting into a rustup link through `LOCAL_ARM64E_TOOLCHAIN`, must be paired with its exact `ARM64E_RUST_STAGE1_MANIFEST` and matching packaged LLVM identity. Arbitrary local compilers are suitable for compiler-side testing, but cannot produce an official CypherAir XCFramework.
+
+The PR and nightly workflows run the focused release-metadata, stage1-toolchain, and App Store candidate provenance tests before building. Locally, the same gate is:
+
+```bash
+python3 -m unittest discover -s scripts/tests -p 'test_arm64e_release_metadata.py'
+python3 -m unittest discover -s scripts/tests -p 'test_validate_arm64e_stage1_toolchain.py'
+python3 -m unittest discover -s scripts/tests -p 'test_validate_app_store_candidate_release.py'
+```
 
 Manual bindgen must run from `pgp-mobile/` — the repo root has no `Cargo.toml`:
 

@@ -2,9 +2,9 @@
 # Download the CypherAir Rust arm64e stage1 toolchain for CI before builds run.
 #
 # Integrity contract: the release tag, repository, and per-asset SHA-256
-# digests must match the committed consumer pin in
-# third_party/arm64e-stage1-toolchain.pin.json. The digest check needs no
-# GitHub token, so it is enforced unconditionally on every path, including
+# digests and byte sizes must match the committed consumer pin in
+# third_party/arm64e-stage1-toolchain.pin.json. These checks need no GitHub
+# token, so they are enforced unconditionally on every path, including
 # token-scrubbed CI fetches. Release-level immutability, tag→commit binding,
 # and build-provenance attestation checks (which need gh auth) live in
 # scripts/verify_arm64e_stage1_release.sh and run in CI after this download.
@@ -19,9 +19,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUTPUT_ROOT="${1:?usage: download_arm64e_stage1_toolchain.sh <output-root>}"
 PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
-ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
+ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable197}"
 STAGE1_ASSET_PREFIX="${STAGE1_ASSET_PREFIX:-rust-stage1-for-arm64e}"
 
 require_command() {
@@ -61,6 +61,38 @@ print(asset["sha256"])
 PY
 }
 
+pin_asset_size() {
+    python3 - "$PIN_FILE" "$1" <<'PY'
+import json
+import sys
+
+pin_path, asset_name = sys.argv[1:3]
+with open(pin_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+asset = payload["assets"].get(asset_name)
+if asset is None:
+    print(f"error: asset {asset_name!r} is not in the stage1 pin file", file=sys.stderr)
+    sys.exit(1)
+size = asset.get("size")
+if type(size) is not int or size <= 0:
+    print(
+        f"error: pinned size for asset {asset_name!r} must be a positive integer",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+print(size)
+PY
+}
+
+file_size_bytes() {
+    python3 - "$1" <<'PY'
+import os
+import sys
+
+print(os.path.getsize(sys.argv[1]))
+PY
+}
+
 download_stage1_release() {
     local release_base_url asset_name
     release_base_url="https://github.com/${ARM64E_RUST_REPOSITORY}/releases/download/${tag}"
@@ -73,12 +105,19 @@ download_stage1_release() {
 }
 
 verify_assets_against_pin() {
-    local asset_name expected actual
+    local asset_name expected_size actual_size expected_hash actual_hash
     for asset_name in "${EXPECTED_STAGE1_ASSETS[@]}"; do
-        expected="$(pin_asset_hash "$asset_name")"
-        actual="$(shasum -a 256 "$download_dir/$asset_name" | awk '{print $1}')"
-        if [ "$actual" != "$expected" ]; then
-            echo "error: $asset_name sha256 $actual != pinned $expected" >&2
+        expected_size="$(pin_asset_size "$asset_name")"
+        actual_size="$(file_size_bytes "$download_dir/$asset_name")"
+        if [ "$actual_size" != "$expected_size" ]; then
+            echo "error: $asset_name size $actual_size != pinned $expected_size" >&2
+            echo "       the downloaded stage1 asset does not match third_party/arm64e-stage1-toolchain.pin.json" >&2
+            exit 1
+        fi
+        expected_hash="$(pin_asset_hash "$asset_name")"
+        actual_hash="$(shasum -a 256 "$download_dir/$asset_name" | awk '{print $1}')"
+        if [ "$actual_hash" != "$expected_hash" ]; then
+            echo "error: $asset_name sha256 $actual_hash != pinned $expected_hash" >&2
             echo "       the downloaded stage1 asset does not match third_party/arm64e-stage1-toolchain.pin.json" >&2
             exit 1
         fi
@@ -103,6 +142,13 @@ if [ -z "$tag" ] || [ "$tag" = "latest" ] || [ "$tag" = "null" ]; then
     echo "       current default: $DEFAULT_ARM64E_STAGE1_RELEASE_TAG" >&2
     exit 1
 fi
+case "$tag" in
+    "${ARM64E_STAGE1_RELEASE_PREFIX}"-*) ;;
+    *)
+        echo "error: ARM64E_STAGE1_RELEASE_TAG must start with ${ARM64E_STAGE1_RELEASE_PREFIX}-" >&2
+        exit 1
+        ;;
+esac
 
 PINNED_REPOSITORY="$(pin_value repository)"
 PINNED_TAG="$(pin_value release.tag)"

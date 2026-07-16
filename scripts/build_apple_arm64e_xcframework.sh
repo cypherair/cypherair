@@ -22,11 +22,12 @@ STAGE1_CACHE_DIR="$CARGO_TARGET_DIR/apple-arm64e-stage1"
 
 STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
+LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
-DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1"
+ARM64E_STAGE1_PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
+DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1"
 ARM64E_STAGE1_RELEASE_TAG="${ARM64E_STAGE1_RELEASE_TAG:-$DEFAULT_ARM64E_STAGE1_RELEASE_TAG}"
-ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable196}"
+ARM64E_STAGE1_RELEASE_PREFIX="${ARM64E_STAGE1_RELEASE_PREFIX:-rust-arm64e-stage1-stable197}"
 ARM64E_STAGE1_FORCE_DOWNLOAD="${ARM64E_STAGE1_FORCE_DOWNLOAD:-0}"
 ARM64E_STAGE1_DIR="${ARM64E_STAGE1_DIR:-}"
 ARM64E_RUSTC="${ARM64E_RUSTC:-}"
@@ -76,6 +77,7 @@ require_command() {
 download_stage1_release_assets() {
     env -u GH_TOKEN -u GITHUB_TOKEN \
         ARM64E_RUST_REPOSITORY="$ARM64E_RUST_REPOSITORY" \
+        ARM64E_STAGE1_PIN_FILE="$ARM64E_STAGE1_PIN_FILE" \
         ARM64E_STAGE1_RELEASE_TAG="$ARM64E_STAGE1_RELEASE_TAG" \
         ARM64E_STAGE1_RELEASE_PREFIX="$ARM64E_STAGE1_RELEASE_PREFIX" \
         "$SCRIPT_DIR/download_arm64e_stage1_toolchain.sh" "$STAGE1_CACHE_DIR"
@@ -128,81 +130,30 @@ download_stage1_toolchain() {
 }
 
 validate_stage1_manifest() {
-    local stage1_host_triple
-
     if [ -z "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
-        return
+        echo "error: ARM64E_RUST_STAGE1_MANIFEST is required for official XCFramework packaging" >&2
+        echo "       use ARM64E_STAGE1_FORCE_DOWNLOAD=1 with the pinned prerelease" >&2
+        exit 1
     fi
     if [ ! -f "$ARM64E_RUST_STAGE1_MANIFEST" ]; then
         echo "error: arm64e stage1 manifest is missing: $ARM64E_RUST_STAGE1_MANIFEST" >&2
         exit 1
     fi
-    stage1_host_triple="$("$ARM64E_RUSTC" -vV | sed -n 's/^host: //p')"
-    if [ -z "$stage1_host_triple" ]; then
-        echo "error: unable to determine arm64e stage1 host triple from $ARM64E_RUSTC" >&2
-        exit 1
-    fi
+
+    local validation_args=(
+        --manifest "$ARM64E_RUST_STAGE1_MANIFEST"
+        --rustc "$ARM64E_RUSTC"
+        --pin-file "$ARM64E_STAGE1_PIN_FILE"
+        --release-tag "$ARM64E_STAGE1_RELEASE_TAG"
+    )
+    local target
+    for target in "${ARM64E_PREBUILT_STD_TARGETS[@]}"; do
+        validation_args+=(--required-target "$target")
+    done
 
     env -u GH_TOKEN -u GITHUB_TOKEN \
-        "$PYTHON_BIN" - "$ARM64E_RUST_STAGE1_MANIFEST" "$ARM64E_STAGE1_RELEASE_PREFIX" "$stage1_host_triple" "${ARM64E_PREBUILT_STD_TARGETS[@]}" <<'PY'
-import json
-import sys
-
-manifest_path = sys.argv[1]
-release_prefix = sys.argv[2]
-current_host_triple = sys.argv[3]
-required_targets = set(sys.argv[4:])
-
-with open(manifest_path, encoding="utf-8") as handle:
-    payload = json.load(handle)
-
-errors = []
-if payload.get("stableBaseRelease") != "1.96.0":
-    errors.append("stableBaseRelease must be 1.96.0")
-if payload.get("stableBaseCommit") != "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96":
-    errors.append("stableBaseCommit must be ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96")
-if payload.get("requiresBuildStd") is not False:
-    errors.append("requiresBuildStd must be false")
-if payload.get("asset", {}).get("purpose") != "rust-stage1-for-arm64e":
-    errors.append("asset.purpose must be rust-stage1-for-arm64e")
-
-release_tag = str(payload.get("releaseTag") or "")
-if release_tag and not release_tag.startswith(release_prefix):
-    errors.append(f"releaseTag must start with {release_prefix}")
-
-host_triple = str(payload.get("hostTriple") or "")
-included_host_target = str(payload.get("includedHostStdTarget") or "")
-if not host_triple:
-    errors.append("hostTriple must be present")
-elif host_triple != current_host_triple:
-    errors.append(f"hostTriple must be {current_host_triple}")
-if included_host_target != host_triple:
-    errors.append("includedHostStdTarget must match hostTriple")
-
-included_targets = payload.get("includedPrebuiltStdTargets")
-if not isinstance(included_targets, list):
-    errors.append("includedPrebuiltStdTargets must be present")
-else:
-    included_target_set = set(str(target) for target in included_targets)
-    missing = sorted(required_targets.difference(included_target_set))
-    if missing:
-        errors.append("includedPrebuiltStdTargets missing: " + ", ".join(missing))
-    if host_triple and host_triple not in included_target_set:
-        errors.append("includedPrebuiltStdTargets missing host target: " + host_triple)
-
-included_arm64e_targets = payload.get("includedAppleArm64eTargets")
-if not isinstance(included_arm64e_targets, list):
-    errors.append("includedAppleArm64eTargets must be present")
-else:
-    missing_arm64e = sorted(required_targets.difference(str(target) for target in included_arm64e_targets))
-    if missing_arm64e:
-        errors.append("includedAppleArm64eTargets missing: " + ", ".join(missing_arm64e))
-
-if errors:
-    for error in errors:
-        print(f"error: {error}", file=sys.stderr)
-    sys.exit(1)
-PY
+        "$PYTHON_BIN" "$SCRIPT_DIR/validate_arm64e_stage1_toolchain.py" \
+        "${validation_args[@]}"
 }
 
 resolve_arm64e_rustc() {
@@ -214,7 +165,8 @@ resolve_arm64e_rustc() {
         ARM64E_RUSTC="$ARM64E_STAGE1_DIR/bin/rustc"
     fi
 
-    if [ -z "$ARM64E_RUSTC" ] && rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc >/dev/null 2>&1; then
+    if [ -z "$ARM64E_RUSTC" ] && [ -n "$LOCAL_ARM64E_TOOLCHAIN" ] && \
+        rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc >/dev/null 2>&1; then
         ARM64E_RUSTC="$(rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc)"
     fi
 
@@ -230,6 +182,7 @@ resolve_arm64e_rustc() {
 
     export ARM64E_RUSTC
     export ARM64E_RUST_STAGE1_MANIFEST
+    validate_stage1_manifest
     echo "arm64e rustc: $ARM64E_RUSTC"
     "$ARM64E_RUSTC" -vV
 }
@@ -266,12 +219,11 @@ EOF
         target_libdir="$("$ARM64E_RUSTC" --print target-libdir --target "$target")"
         if ! compgen -G "$target_libdir/libstd-*.rlib" >/dev/null; then
             echo "error: arm64e stage1 toolchain is missing prebuilt std for ${target} at ${target_libdir}" >&2
-            echo "       republish the stable196 Rust fork stage1 with prebuilt std payloads." >&2
+            echo "       republish the stable197 Rust fork stage1 with prebuilt std payloads." >&2
             exit 1
         fi
     done
 
-    validate_stage1_manifest
 }
 
 normalize_generated_text_file() {

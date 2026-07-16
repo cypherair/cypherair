@@ -57,7 +57,7 @@ Detailed module breakdown: `docs/ARCHITECTURE.md`.
 ```bash
 # Full Rust + UniFFI + packaged-artifact sync; matches GitHub Actions.
 ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable196-20260618T140657Z-abeb845-r27765229620-a1 \
+ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1 \
     ./build-xcframework.sh --release
 
 # Run Rust tests.
