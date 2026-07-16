@@ -37,5 +37,5 @@ A PQ public certificate armors to ~30 KB — an order of magnitude beyond single
 ## 5. Remaining scope (tracked on issue #567)
 
 - **`sq` interop pack (landed):** cross-implementation RFC 9580/9980 fixtures plus live `sq` lanes, preserved under `pgp-mobile/tests/` and documented in [TESTING.md](TESTING.md) §5. The vendored-combiner cross-implementation check decrypts the committed `sq`-encapsulated post-quantum fixtures through the split-custody path — real-`sq` sample messages stand in for RFC-appendix sample-message vectors.
-- Oldest-supported-iPhone Secure Enclave probe on maintainer hardware.
 - Watch sequoia issue #1249 (`multi_key_combine` export) to delete the vendored combiner.
+- First-party constant-time / side-channel auditing of the PQ dependency chain (Sequoia's composite code, `ossl`, vendored OpenSSL) is declined by decision: CypherAir consumes pinned upstream releases and carries no cryptographic delta beyond the byte-verified combiner (§3); side-channel posture belongs to the upstreams.
