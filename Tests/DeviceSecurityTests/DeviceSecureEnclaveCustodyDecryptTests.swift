@@ -22,8 +22,12 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
     func test_secureEnclaveRouteDecryptsV4AndV6MessagesWithRealKeyAgreementHandle_onDevice() async throws {
         try requireSecureEnclaveCustodyHardware()
 
-        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore())
-        let pair = try handleStore.createHandlePair()
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         defer {
             try? handleStore.deleteHandlePair(pair)
         }
@@ -35,7 +39,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             context.invalidate()
         }
 
-        let loadedPair = try loadHandlePair(pair, context: context)
+        let loadedPair = try loadHandlePair(pair, store: handleStore, context: context)
         let messageAdapter = PGPMessageOperationAdapter(engine: PgpEngine())
 
         for configuration in [PGPKeyConfiguration.Identity.compatibleP256V4, .modernP256V6] {
@@ -81,8 +85,12 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
     func test_secureEnclaveRouteDecryptsMixedRecipientFileAndHardFailsOnTamper_onDevice() async throws {
         try requireSecureEnclaveCustodyHardware()
 
-        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore())
-        let pair = try handleStore.createHandlePair()
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         defer {
             try? handleStore.deleteHandlePair(pair)
         }
@@ -94,7 +102,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
             context.invalidate()
         }
 
-        let loadedPair = try loadHandlePair(pair, context: context)
+        let loadedPair = try loadHandlePair(pair, store: handleStore, context: context)
         let prepared = try await prepareSecureEnclaveDecryptRoute(
             configuration: .compatibleP256V4,
             loadedPair: loadedPair
@@ -241,24 +249,19 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
 
     private func loadHandlePair(
         _ pair: SecureEnclaveCustodyHandlePair,
+        store: SecureEnclaveCustodyHandleStore,
         context: LAContext
     ) throws -> SecureEnclaveCustodyLoadedHandlePair {
-        let signingKey = try loadPrivateKey(
-            reference: pair.signing.reference,
-            authenticationContext: context
-        )
-        let keyAgreementKey = try loadPrivateKey(
-            reference: pair.keyAgreement.reference,
-            authenticationContext: context
-        )
-        return try SecureEnclaveCustodyLoadedHandlePair(
-            signing: SecureEnclaveCustodyLoadedHandle(
-                binding: pair.signing,
-                privateKey: signingKey
+        try SecureEnclaveCustodyLoadedHandlePair(
+            signing: store.loadHandle(
+                reference: pair.signing.reference,
+                expectedPublicKeyRaw: pair.signing.publicKeyRaw,
+                authenticationContext: context
             ),
-            keyAgreement: SecureEnclaveCustodyLoadedHandle(
-                binding: pair.keyAgreement,
-                privateKey: keyAgreementKey
+            keyAgreement: store.loadHandle(
+                reference: pair.keyAgreement.reference,
+                expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
+                authenticationContext: context
             )
         )
     }

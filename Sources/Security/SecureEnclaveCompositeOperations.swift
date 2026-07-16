@@ -11,7 +11,7 @@ protocol SecureEnclaveCompositeSigning: Sendable {
     /// signature digest with the Secure Enclave-resident signing component.
     func signMlDsa65Digest(
         _ digest: Data,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data
 
     /// Produce the 4627-byte pure ML-DSA-87 signature over an OpenPGP
@@ -19,7 +19,7 @@ protocol SecureEnclaveCompositeSigning: Sendable {
     /// (Device-Bound Post-Quantum · High).
     func signMlDsa87Digest(
         _ digest: Data,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data
 }
 
@@ -28,7 +28,7 @@ protocol SecureEnclaveCompositeDecapsulating: Sendable {
     /// key share with the Secure Enclave-resident key-agreement component.
     func decapsulateMlKem768(
         request: ExternalMlKem768DecapsulationRequest,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data
 
     /// Decapsulate the 1568-byte ML-KEM-1024 ciphertext into the raw 32-byte
@@ -36,7 +36,7 @@ protocol SecureEnclaveCompositeDecapsulating: Sendable {
     /// (Device-Bound Post-Quantum · High).
     func decapsulateMlKem1024(
         request: ExternalMlKem1024DecapsulationRequest,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data
 }
 
@@ -51,7 +51,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
 
     func signMlDsa65Digest(
         _ digest: Data,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data {
         guard handle.role == .signing else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
@@ -63,7 +63,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
         guard (32...64).contains(digest.count) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
-        guard case .mldsa65Signing(let privateKey) = handle.privateKey else {
+        guard case .mldsa65Signing(let privateKey)? = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
 
@@ -81,7 +81,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
 
     func decapsulateMlKem768(
         request: ExternalMlKem768DecapsulationRequest,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data {
         guard handle.role == .keyAgreement else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
@@ -95,7 +95,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
         guard request.mlkemCiphertext.count == Self.mlkem768CiphertextLength else {
             throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
-        guard case .mlkem768KeyAgreement(let privateKey) = handle.privateKey else {
+        guard case .mlkem768KeyAgreement(let privateKey)? = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
 
@@ -116,7 +116,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
 
     func signMlDsa87Digest(
         _ digest: Data,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data {
         guard handle.role == .signing else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
@@ -128,7 +128,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
         guard (32...64).contains(digest.count) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
-        guard case .mldsa87Signing(let privateKey) = handle.privateKey else {
+        guard case .mldsa87Signing(let privateKey)? = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
 
@@ -146,7 +146,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
 
     func decapsulateMlKem1024(
         request: ExternalMlKem1024DecapsulationRequest,
-        using handle: SecureEnclaveCompositeLoadedHandle
+        using handle: SecureEnclaveCustodyLoadedHandle
     ) throws -> Data {
         guard handle.role == .keyAgreement else {
             throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
@@ -160,7 +160,7 @@ struct SystemSecureEnclaveCompositeOperations: SecureEnclaveCompositeSigning,
         guard request.mlkemCiphertext.count == Self.mlkem1024CiphertextLength else {
             throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
-        guard case .mlkem1024KeyAgreement(let privateKey) = handle.privateKey else {
+        guard case .mlkem1024KeyAgreement(let privateKey)? = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
         }
 

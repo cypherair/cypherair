@@ -18,7 +18,7 @@ struct PGPSecureEnclaveCompositeBindingInspection: Equatable, Sendable {
 protocol SecureEnclaveCompositeBindingInspecting: Sendable {
     func inspectCompositeBindings(
         publicKeyData: Data,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection
 }
 
@@ -32,10 +32,14 @@ final class PGPSecureEnclaveCompositeBindingInspector: SecureEnclaveCompositeBin
 
     func inspectCompositeBindings(
         publicKeyData: Data,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection {
         do {
             switch tier {
+            case .classicalP256:
+                throw CypherAirError.invalidKeyData(
+                    reason: "The classical custody tier carries no composite bindings."
+                )
             case .postQuantum:
                 return try Self.performInspect(
                     engine: engine,

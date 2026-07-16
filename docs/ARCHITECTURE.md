@@ -107,9 +107,8 @@ All hardware-backed security operations. The most sensitive module — see [SECU
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE re-wrap, `LAContext` evaluation, post-unlock auth-mode crash recovery |
 | `PrivateKeyModeSwitchAuthenticator` / `PrivateKeyRewrapWorkflow` / `PrivateKeyRewrapRecoveryCoordinator` | Current-mode gate, two-phase rewrap workflow (pending rows → verify → promote), and phase-aware interrupted-rewrap recovery |
 | `KeyBundleStore` / `KeyMigrationCoordinator` | Single-row envelope storage (permanent/pending namespaces, rollback, replace-from-pending) and the shared migration state machine (safe/retryable/unrecoverable outcomes) |
-| `SecureEnclaveCustodyHandleStore` | Lifecycle boundary for the two role-separated P-256 custody handles (`kSecClassKey`): public-binding/role checks, rollback, inventory, lookup, idempotent delete, local-reset cleanup, sanitized failure mapping |
-| `SecureEnclaveCustodyKeyAgreement` | ECDH bridge for the external P-256 key-agreement route; validates handles, bindings, and ephemeral-key shape; returns only the raw shared secret |
-| `SecureEnclaveCompositeHandleStore` | Lifecycle boundary for the enclave-resident ML-DSA/ML-KEM component blobs of Device-Bound Post-Quantum identities — ML-DSA-65/ML-KEM-768 for the base tier and ML-DSA-87/ML-KEM-1024 for the · High tier (store/load/locate/delete by handle-set id and public binding) |
+| `SecureEnclaveCustodyHandleStore` | Tier-scoped lifecycle boundary for the role-separated device-bound custody handles (CryptoKit `dataRepresentation` blob rows; P-256 for the classical tier, ML-DSA/ML-KEM components for the post-quantum tiers): public-binding/role checks, rollback, non-prompting locate/inspect, idempotent delete, cross-tier inventory and local-reset cleanup, sanitized failure mapping |
+| `SecureEnclaveCustodyKeyAgreement` | CryptoKit ECDH bridge for the external P-256 key-agreement route; validates handles, bindings, and ephemeral-key shape; returns only the raw shared secret |
 | `SecureEnclaveCompositeClassicalComponentStore` | Fixed-access `CAPKEV1` envelope custody for the classical components — Ed25519+X25519 for the base tier, Ed448+X448 for the · High tier (exempt from mode-switch re-wrap) |
 | `SecureEnclaveCompositeOperations` | In-enclave ML-DSA signing and ML-KEM decapsulation primitives (ML-DSA-65/ML-KEM-768 and ML-DSA-87/ML-KEM-1024) consumed by the composite provider bridges |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K requirements before key import; 75% threshold ([SECURITY.md](SECURITY.md) §7) |
@@ -250,11 +249,9 @@ Keychain (kSecClassGenericPassword, data-protection Keychain, default account):
 │                                                              (single self-contained row, SE binding key folded in)
 ├── com.cypherair.v1.protected-data.domain-key.<domainID>          → committed CADMKV2 wrapped domain master key
 ├── com.cypherair.v1.protected-data.domain-key.staged.<domainID>   → staged row during validation/promotion
-└── com.cypherair.v1.secure-enclave-composite.<role> (account = handle-set id)
-                                                              → enclave ML-DSA-65 / ML-KEM-768 component blob rows
-
-Keychain (kSecClassKey, Secure Enclave token):
-└── com.cypherair.v1.secure-enclave-custody.<random-id>.<role>   → distinct P-256 signing / keyAgreement handles
+└── com.cypherair.v1.secure-enclave-custody.<tier>.<role> (account = handle-set id)
+                                                              → enclave key blob rows for every device-bound tier
+                                                                (p256 / post-quantum / post-quantum-high)
 
 App Sandbox:
 ├── Application Support/ProtectedData/

@@ -7,11 +7,11 @@ import Foundation
 /// AES key unwrap stay in Rust (Device-Bound Post-Quantum · High).
 final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024DecapsulationProvider,
     @unchecked Sendable {
-    private let handle: SecureEnclaveCompositeLoadedHandle
+    private let handle: SecureEnclaveCustodyLoadedHandle
     private let decapsulator: any SecureEnclaveCompositeDecapsulating
 
     init(
-        handle: SecureEnclaveCompositeLoadedHandle,
+        handle: SecureEnclaveCustodyLoadedHandle,
         decapsulator: any SecureEnclaveCompositeDecapsulating
     ) {
         self.handle = handle

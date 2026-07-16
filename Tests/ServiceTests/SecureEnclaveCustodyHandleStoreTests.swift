@@ -1,765 +1,441 @@
+import LocalAuthentication
 import XCTest
-import Security
 @testable import CypherAir
 
 final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
-    func test_createHandlePair_generatesDistinctSigningAndAgreementHandles() throws {
+    func test_createLoadedHandlePair_generatesDistinctSigningAndAgreementHandles() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "phase3a")
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
 
-        let pair = try store.createHandlePair()
+        let pair = try store.createLoadedHandlePair(authenticationContext: nil)
 
-        XCTAssertEqual(pair.handleSetIdentifier, "phase3a")
         XCTAssertEqual(pair.signing.role, .signing)
         XCTAssertEqual(pair.keyAgreement.role, .keyAgreement)
-        XCTAssertNotEqual(pair.signing.publicKeyX963, pair.keyAgreement.publicKeyX963)
-        XCTAssertEqual(keyStore.storedHandleCount(), 2)
         XCTAssertEqual(
-            Set(keyStore.applicationTagStrings()),
-            [
-                "com.cypherair.v1.secure-enclave-custody.phase3a.signing",
-                "com.cypherair.v1.secure-enclave-custody.phase3a.keyAgreement"
-            ]
+            pair.signing.reference.handleSetIdentifier,
+            pair.keyAgreement.reference.handleSetIdentifier
         )
+        XCTAssertEqual(pair.signing.reference.tier, .classicalP256)
+        XCTAssertNotEqual(pair.signing.binding.publicKeyRaw, pair.keyAgreement.binding.publicKeyRaw)
+        XCTAssertEqual(keyStore.createRequests.count, 2)
     }
 
-    func test_createHandlePair_requestsCustodySpecificAccessPolicy() throws {
+    func test_createLoadedHandlePair_requestsCustodySpecificAccessPolicy() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "policy")
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
 
-        _ = try store.createHandlePair()
+        _ = try store.createLoadedHandlePair(authenticationContext: nil)
 
         XCTAssertEqual(keyStore.createRequests.count, 2)
-        XCTAssertEqual(
-            keyStore.createRequests.map { $0.accessPolicy },
-            [
-                .privateKeyUsageBiometryAny,
-                .privateKeyUsageBiometryAny
-            ]
-        )
-        let policy = try XCTUnwrap(keyStore.createRequests.first?.accessPolicy)
-        XCTAssertTrue(policy.requiresPrivateKeyUsage)
-        XCTAssertTrue(policy.requiresBiometryAny)
-        XCTAssertFalse(policy.permitsDevicePasscodeFallback)
+        for request in keyStore.createRequests {
+            XCTAssertEqual(request.accessPolicy, .privateKeyUsageBiometryAny)
+        }
     }
 
-    func test_systemKeyCreationAttributesUseAppleSecureEnclaveCreationContract() throws {
-        let accessControl = try SecureEnclaveCustodyAccessControlPolicy
-            .privateKeyUsageBiometryAny
-            .makeSecAccessControl()
-        let signingReference = try reference("attributes", .signing)
-        let keyAgreementReference = try reference("attributes", .keyAgreement)
-
-        let signingAttributes = SystemSecureEnclaveCustodyKeyStore.keyCreationAttributes(
-            reference: signingReference,
-            accessControl: accessControl
-        )
-        let signingPrivateAttributes = try XCTUnwrap(
-            signingAttributes[kSecPrivateKeyAttrs as String] as? [String: Any]
-        )
-        XCTAssertEqual(signingAttributes[kSecAttrKeyType as String] as? String, kSecAttrKeyTypeECSECPrimeRandom as String)
-        XCTAssertEqual(signingAttributes[kSecAttrKeySizeInBits as String] as? Int, 256)
-        XCTAssertEqual(signingAttributes[kSecAttrTokenID as String] as? String, kSecAttrTokenIDSecureEnclave as String)
-        XCTAssertEqual(signingAttributes[kSecUseDataProtectionKeychain as String] as? Bool, true)
-        XCTAssertEqual(signingPrivateAttributes[kSecAttrIsPermanent as String] as? Bool, true)
-        XCTAssertEqual(signingPrivateAttributes[kSecAttrApplicationTag as String] as? Data, signingReference.applicationTagData)
-        XCTAssertNotNil(signingPrivateAttributes[kSecAttrAccessControl as String])
-        XCTAssertNil(signingPrivateAttributes[kSecAttrCanSign as String])
-        XCTAssertNil(signingPrivateAttributes[kSecAttrCanDerive as String])
-
-        let keyAgreementAttributes = SystemSecureEnclaveCustodyKeyStore.keyCreationAttributes(
-            reference: keyAgreementReference,
-            accessControl: accessControl
-        )
-        let keyAgreementPrivateAttributes = try XCTUnwrap(
-            keyAgreementAttributes[kSecPrivateKeyAttrs as String] as? [String: Any]
-        )
-        XCTAssertEqual(keyAgreementAttributes[kSecUseDataProtectionKeychain as String] as? Bool, true)
-        XCTAssertEqual(
-            keyAgreementPrivateAttributes[kSecAttrApplicationTag as String] as? Data,
-            keyAgreementReference.applicationTagData
-        )
-        XCTAssertNotNil(keyAgreementPrivateAttributes[kSecAttrAccessControl as String])
-        XCTAssertNil(keyAgreementPrivateAttributes[kSecAttrCanSign as String])
-        XCTAssertNil(keyAgreementPrivateAttributes[kSecAttrCanDerive as String])
-    }
-
-    func test_createHandlePair_secondCreateFailureRollsBackBothReferences() throws {
+    func test_createLoadedHandlePair_secondCreateFailureRollsBackBothReferences() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failCreateRole = .keyAgreement
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "rollback")
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
 
-        XCTAssertThrowsError(try store.createHandlePair()) { error in
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .privateHandleInaccessible
-            )
-        }
+        XCTAssertThrowsError(try store.createLoadedHandlePair(authenticationContext: nil))
 
+        XCTAssertEqual(keyStore.deleteRequests.count, 2)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
     }
 
-    func test_createHandlePair_pairAssemblyFailureRollsBackBothCreatedHandles() throws {
+    func test_createLoadedHandlePair_pairAssemblyFailureRollsBackBothCreatedHandles() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let duplicatePublicKey = makePublicKey(byte: 0x31)
-        keyStore.publicKeyResponses = [duplicatePublicKey, duplicatePublicKey]
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "pairfail")
+        // Identical public keys make the pair invariant fail after both
+        // creations succeed.
+        let sharedPublicKey = Data([0x04]) + Data(repeating: 0x7F, count: 64)
+        keyStore.publicKeyResponses = [sharedPublicKey, sharedPublicKey]
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
 
-        XCTAssertThrowsError(try store.createHandlePair()) { error in
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .handlePublicKeyBindingMismatch
-            )
-        }
-
-        XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing, .keyAgreement])
-    }
-
-    func test_loadHandlePair_requiresRoleAndPublicKeyBinding() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "load")
-        let pair = try store.createHandlePair()
-
-        let loaded = try store.loadHandlePair(expected: pair, authenticationContext: nil)
-
-        XCTAssertEqual(loaded.signing.binding, pair.signing)
-        XCTAssertEqual(loaded.keyAgreement.binding, pair.keyAgreement)
-    }
-
-    func test_loadHandlePairThreadsSameAuthenticationContextToBothRoles() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "loadcontext")
-        let pair = try store.createHandlePair()
-        keyStore.resetCallHistory()
-        let authenticationContext = RecordingLAContext()
-
-        _ = try store.loadHandlePair(expected: pair, authenticationContext: authenticationContext)
-
-        XCTAssertEqual(keyStore.loadRequests.count, 2)
-        XCTAssertEqual(keyStore.loadRequests.map(\.reference.role), [.signing, .keyAgreement])
-        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext === authenticationContext })
-    }
-
-    func test_inspectClassifyAndLocatePathsLoadWithoutAuthenticationContext() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "contextfree")
-        let pair = try store.createHandlePair()
-        keyStore.resetCallHistory()
-
-        _ = store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier)
-        _ = store.classifyHandleAvailability(expected: pair)
-        _ = try store.locateHandlePair(
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
-        )
-
-        XCTAssertFalse(keyStore.loadRequests.isEmpty)
-        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
-    }
-
-    func test_loadSigningHandleLocatesCompletePairAndReturnsSigningHandle() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "signlookup")
-        let pair = try store.createHandlePair()
-
-        let signing = try store.loadSigningHandle(
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963,
-            authenticationContext: nil
-        )
-
-        XCTAssertEqual(signing.role, .signing)
-        XCTAssertEqual(signing.binding, pair.signing)
-    }
-
-    func test_loadKeyAgreementHandleLocatesCompletePairAndReturnsAgreementHandle() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "agreementlookup")
-        let pair = try store.createHandlePair()
-
-        let keyAgreement = try store.loadKeyAgreementHandle(
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963,
-            authenticationContext: nil
-        )
-
-        XCTAssertEqual(keyAgreement.role, .keyAgreement)
-        XCTAssertEqual(keyAgreement.binding, pair.keyAgreement)
-    }
-
-    func test_loadSigningHandleFailsClosedForMissingAgreementPeer() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let signingReference = try reference("partialsigninglookup", .signing)
-        let signingHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(signingReference, byte: 0x61),
-            privateKey: nil
-        )
-        keyStore.insert(signingHandle)
-
-        XCTAssertThrowsError(
-            try store.loadSigningHandle(
-                signingPublicKeyX963: signingHandle.binding.publicKeyX963,
-                keyAgreementPublicKeyX963: makePublicKey(byte: 0x62),
-                authenticationContext: nil
-            )
-        ) { error in
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .migrationOrRecoveryRequired
-            )
-        }
-    }
-
-    func test_loadHandleFailsClosedForWrongRole() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let signingReference = try reference("wrongrole", .signing)
-        let keyAgreementReference = try reference("wrongrole", .keyAgreement)
-        let wrongRoleBinding = try binding(keyAgreementReference, byte: 0x21)
-        let wrongRoleHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: wrongRoleBinding,
-            privateKey: nil
-        )
-        keyStore.insert(wrongRoleHandle, for: signingReference)
-
-        XCTAssertThrowsError(
-            try store.loadHandle(
-                reference: signingReference,
-                expectedPublicKeyX963: wrongRoleBinding.publicKeyX963,
-                authenticationContext: nil
-            )
-        ) { error in
+        XCTAssertThrowsError(try store.createLoadedHandlePair(authenticationContext: nil)) { error in
             XCTAssertEqual(
                 error as? SecureEnclaveCustodyHandleError,
-                .privateOperationRoleMismatch(expected: .signing, actual: .keyAgreement)
+                .handlePublicKeyBindingMismatch(.keyAgreement)
             )
+        }
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+    }
+
+    func test_loadHandle_threadsAuthenticationContextToKeyStore() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let pair = try store.createLoadedHandlePair(authenticationContext: nil)
+        let context = LAContext()
+
+        _ = try store.loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyRaw: pair.signing.binding.publicKeyRaw,
+            authenticationContext: context
+        )
+
+        XCTAssertEqual(keyStore.loadRequests.count, 1)
+        XCTAssertTrue(keyStore.loadRequests[0].authenticationContext === context)
+    }
+
+    func test_loadHandle_failsClosedForMissingHandle() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let reference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .signing,
+            tier: .classicalP256
+        )
+
+        XCTAssertThrowsError(try store.loadHandle(
+            reference: reference,
+            expectedPublicKeyRaw: Data([0x04]) + Data(repeating: 0x11, count: 64),
+            authenticationContext: nil
+        )) { error in
             XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .privateOperationRoleMismatch
+                error as? SecureEnclaveCustodyHandleError,
+                .privateHandleMissing(.signing)
             )
         }
     }
 
-    func test_loadHandleFailsClosedForWrongPublicKeyBinding() throws {
+    func test_loadHandle_failsClosedForWrongPublicKeyBinding() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "pubbinding")
-        let pair = try store.createHandlePair()
-        let expectedWrongPublicKey = makePublicKey(byte: 0xEE)
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let pair = try store.createLoadedHandlePair(authenticationContext: nil)
 
-        XCTAssertThrowsError(
-            try store.loadHandle(
-                reference: pair.signing.reference,
-                expectedPublicKeyX963: expectedWrongPublicKey,
-                authenticationContext: nil
-            )
-        ) { error in
+        XCTAssertThrowsError(try store.loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyRaw: Data([0x04]) + Data(repeating: 0x55, count: 64),
+            authenticationContext: nil
+        )) { error in
             XCTAssertEqual(
                 error as? SecureEnclaveCustodyHandleError,
                 .handlePublicKeyBindingMismatch(.signing)
             )
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .handlePublicKeyBindingMismatch
-            )
         }
     }
 
-    func test_publicBindingUsesUncompressedP256X963ShapeCheckOnly() {
-        XCTAssertTrue(
-            SecureEnclaveCustodyHandlePublicBinding
-                .hasUncompressedP256X963PublicKeyShape(makePublicKey(byte: 0x17))
+    func test_loadHandle_rejectsMalformedExpectedPublicKeyShape() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let reference = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .keyAgreement,
+            tier: .classicalP256
         )
-        XCTAssertFalse(
-            SecureEnclaveCustodyHandlePublicBinding
-                .hasUncompressedP256X963PublicKeyShape(Data(repeating: 0x17, count: 65))
-        )
-        XCTAssertFalse(
-            SecureEnclaveCustodyHandlePublicBinding
-                .hasUncompressedP256X963PublicKeyShape(Data([UInt8(0x04)] + Array(repeating: UInt8(0x00), count: 64)))
-        )
-        XCTAssertFalse(
-            SecureEnclaveCustodyHandlePublicBinding
-                .hasUncompressedP256X963PublicKeyShape(Data([UInt8(0x04)] + Array(repeating: UInt8(0x17), count: 63)))
-        )
+
+        XCTAssertThrowsError(try store.loadHandle(
+            reference: reference,
+            expectedPublicKeyRaw: Data(repeating: 0x11, count: 64),
+            authenticationContext: nil
+        )) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .invalidPublicKey(.keyAgreement)
+            )
+        }
+        XCTAssertTrue(keyStore.loadRequests.isEmpty)
     }
 
-    func test_missingAndPartialHandlePairsAreClassified() throws {
+    func test_publicBindingShapeChecksPerTierAndRole() {
+        var validX963 = Data([0x04])
+        validX963.append(Data(repeating: 0x21, count: 64))
+        XCTAssertTrue(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            validX963, role: .signing, tier: .classicalP256
+        ))
+        XCTAssertFalse(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            Data(repeating: 0x21, count: 65), role: .signing, tier: .classicalP256
+        ))
+        XCTAssertFalse(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            Data([0x04]) + Data(repeating: 0, count: 64), role: .signing, tier: .classicalP256
+        ))
+        XCTAssertTrue(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            Data(repeating: 0x21, count: 1952), role: .signing, tier: .postQuantum
+        ))
+        XCTAssertTrue(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            Data(repeating: 0x21, count: 1568), role: .keyAgreement, tier: .postQuantumHigh
+        ))
+        XCTAssertFalse(SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            Data(repeating: 0x21, count: 1184), role: .keyAgreement, tier: .postQuantumHigh
+        ))
+    }
+
+    func test_inspectHandlePair_classifiesMissingPartialCompleteAndInvalid() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let signingReference = try reference("partial", .signing)
-        let signingHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(signingReference, byte: 0x41),
-            privateKey: nil
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+
+        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: "0badc0de"), .missing)
+        XCTAssertEqual(
+            store.inspectHandlePair(handleSetIdentifier: "NOT-VALID"),
+            .invalid(.invalidHandleSetIdentifier)
         )
 
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: "missing"), .missing)
+        let pair = try store.createLoadedHandlePair(authenticationContext: nil)
+        let identifier = pair.signing.reference.handleSetIdentifier
+        guard case .complete(let inspected) = store.inspectHandlePair(handleSetIdentifier: identifier) else {
+            return XCTFail("Expected complete state")
+        }
+        XCTAssertEqual(inspected.handleSetIdentifier, identifier)
 
-        keyStore.insert(signingHandle)
-
+        try keyStore.deleteKey(reference: pair.keyAgreement.reference)
         XCTAssertEqual(
-            store.inspectHandlePair(handleSetIdentifier: "partial"),
+            store.inspectHandlePair(handleSetIdentifier: identifier),
             .partial(presentRoles: [.signing])
         )
-        XCTAssertThrowsError(
-            try store.loadHandle(
-                reference: try reference("missing", .signing),
-                expectedPublicKeyX963: makePublicKey(byte: 0x99),
-                authenticationContext: nil
-            )
-        ) { error in
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .privateHandleMissing
-            )
-        }
     }
 
-    func test_duplicateHandleMatchFailsClosedAsInaccessible() throws {
+    func test_locateHandlePair_findsUniqueExactPublicBinding() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let signingReference = try reference("duplicate", .signing)
-        let firstHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(signingReference, byte: 0x51),
-            privateKey: nil
-        )
-        let secondHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(signingReference, byte: 0x52),
-            privateKey: nil
-        )
-        keyStore.insert(firstHandle)
-        keyStore.insert(secondHandle, allowingDuplicate: true)
-
-        XCTAssertThrowsError(
-            try store.loadHandle(
-                reference: signingReference,
-                expectedPublicKeyX963: firstHandle.binding.publicKeyX963,
-                authenticationContext: nil
-            )
-        ) { error in
-            XCTAssertEqual(
-                error as? SecureEnclaveCustodyHandleError,
-                .ambiguousPrivateHandle(.signing)
-            )
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .privateHandleInaccessible
-            )
-        }
-        XCTAssertEqual(
-            store.inspectHandlePair(handleSetIdentifier: "duplicate"),
-            .invalid(.ambiguousPrivateHandle(.signing))
-        )
-    }
-
-    func test_deleteHandlePairIsIdempotentForMissingAndReportsCleanupFailure() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "delete")
-        let pair = try store.createHandlePair()
-
-        try store.deleteHandlePair(pair)
-        XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertNoThrow(try store.deleteHandlePair(pair))
-
-        let failingKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let failingStore = makeStore(keyStore: failingKeyStore, handleSetIdentifier: "deletefail")
-        let failingPair = try failingStore.createHandlePair()
-        failingKeyStore.failDeleteRole = .signing
-
-        XCTAssertThrowsError(try failingStore.deleteHandlePair(failingPair)) { error in
-            XCTAssertEqual(
-                error as? SecureEnclaveCustodyHandleError,
-                .cleanupOrRollbackFailed
-            )
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .cleanupOrRollbackFailure
-            )
-        }
-    }
-
-    func test_inventorySummaryClassifiesCompletePartialAmbiguousAndMalformedHandles() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "complete")
-        _ = try store.createHandlePair()
-
-        let partialReference = try reference("partial", .signing)
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(partialReference, byte: 0x61),
-                privateKey: nil
-            )
-        )
-
-        let ambiguousReference = try reference("ambiguous", .signing)
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(ambiguousReference, byte: 0x62),
-                privateKey: nil
-            )
-        )
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(ambiguousReference, byte: 0x63),
-                privateKey: nil
-            ),
-            allowingDuplicate: true
-        )
-        keyStore.insertMalformedApplicationTag(
-            "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).malformed"
-        )
-
-        let summary = try store.inventorySummaryForLocalRecovery()
-
-        XCTAssertEqual(summary.totalHandleCount, 6)
-        XCTAssertEqual(summary.completeSetCount, 1)
-        XCTAssertEqual(summary.partialSetCount, 1)
-        XCTAssertEqual(summary.ambiguousSetCount, 1)
-        XCTAssertEqual(summary.malformedHandleCount, 1)
-    }
-
-    func test_cleanupAllHandlesForLocalDataResetDeletesKnownPartialAndMalformedHandles() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "cleanup")
-        _ = try store.createHandlePair()
-        let partialReference = try reference("cleanup-partial", .signing)
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(partialReference, byte: 0x71),
-                privateKey: nil
-            )
-        )
-        keyStore.insertMalformedApplicationTag(
-            "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).cleanup-malformed"
-        )
-
-        let result = store.cleanupAllHandlesForLocalDataReset()
-
-        XCTAssertTrue(result.succeeded)
-        XCTAssertEqual(result.inspectedHandleCount, 4)
-        XCTAssertEqual(result.deletedHandleCount, 4)
-        XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertTrue(store.cleanupAllHandlesForLocalDataReset().succeeded)
-    }
-
-    func test_inventoryAndCleanupIncludeRawOwnedNonUTF8MalformedTags() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let applicationTagData = nonUTF8OwnedApplicationTagData()
-        keyStore.insertMalformedApplicationTagData(applicationTagData)
-
-        let summary = try store.inventorySummaryForLocalRecovery()
-
-        XCTAssertEqual(summary.totalHandleCount, 1)
-        XCTAssertEqual(summary.malformedHandleCount, 1)
-
-        let result = store.cleanupAllHandlesForLocalDataReset()
-
-        XCTAssertTrue(result.succeeded)
-        XCTAssertEqual(result.inspectedHandleCount, 1)
-        XCTAssertEqual(result.deletedHandleCount, 1)
-        XCTAssertFalse(keyStore.containsMalformedApplicationTagData(applicationTagData))
-    }
-
-    func test_cleanupAllHandlesForLocalDataResetCountsDuplicateRowsButDeletesUniqueTagsOnce() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let signingReference = try reference("duplicatecleanup", .signing)
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(signingReference, byte: 0x81),
-                privateKey: nil
-            )
-        )
-        keyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(signingReference, byte: 0x82),
-                privateKey: nil
-            ),
-            allowingDuplicate: true
-        )
-
-        let result = store.cleanupAllHandlesForLocalDataReset()
-
-        XCTAssertTrue(result.succeeded)
-        XCTAssertEqual(result.inspectedHandleCount, 2)
-        XCTAssertEqual(result.deletedHandleCount, 2)
-        XCTAssertEqual(keyStore.deleteRequests.map(\.role), [.signing])
-        XCTAssertEqual(keyStore.storedHandleCount(), 0)
-    }
-
-    func test_cleanupAllHandlesForLocalDataResetFailsClosedForListOrDeleteFailure() throws {
-        let inventoryFailureKeyStore = MockSecureEnclaveCustodyKeyStore()
-        inventoryFailureKeyStore.failInventory = true
-        let inventoryFailureStore = SecureEnclaveCustodyHandleStore(keyStore: inventoryFailureKeyStore)
-
-        XCTAssertEqual(
-            inventoryFailureStore.cleanupAllHandlesForLocalDataReset().failureCategory,
-            .cleanupOrRollbackFailure
-        )
-
-        let deleteFailureKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let deleteFailureStore = makeStore(keyStore: deleteFailureKeyStore, handleSetIdentifier: "deletefailure")
-        _ = try deleteFailureStore.createHandlePair()
-        deleteFailureKeyStore.failDeleteRole = .signing
-
-        let result = deleteFailureStore.cleanupAllHandlesForLocalDataReset()
-
-        XCTAssertEqual(result.failureCategory, .cleanupOrRollbackFailure)
-        XCTAssertEqual(try deleteFailureStore.remainingHandleCountForLocalDataReset(), 1)
-    }
-
-    func test_classifyHandleAvailabilityMapsMetadataHandleDisagreement() throws {
-        let availableKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let availableStore = makeStore(keyStore: availableKeyStore, handleSetIdentifier: "available")
-        let availablePair = try availableStore.createHandlePair()
-        XCTAssertEqual(availableStore.classifyHandleAvailability(expected: availablePair), .available)
-
-        try availableStore.deleteHandlePair(availablePair)
-        XCTAssertEqual(
-            availableStore.classifyHandleAvailability(expected: availablePair),
-            .unavailable(.privateHandleMissing)
-        )
-
-        let partialKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let partialStore = makeStore(keyStore: partialKeyStore, handleSetIdentifier: "partialclass")
-        let partialPair = try partialStore.createHandlePair()
-        try partialKeyStore.deleteKey(reference: partialPair.keyAgreement.reference)
-        XCTAssertEqual(
-            partialStore.classifyHandleAvailability(expected: partialPair),
-            .unavailable(.migrationOrRecoveryRequired)
-        )
-
-        let publicMismatchKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let publicMismatchStore = makeStore(keyStore: publicMismatchKeyStore, handleSetIdentifier: "publicmismatch")
-        let publicMismatchPair = try publicMismatchStore.createHandlePair()
-        let wrongPublicPair = try SecureEnclaveCustodyHandlePair(
-            signing: try binding(publicMismatchPair.signing.reference, byte: 0xE1),
-            keyAgreement: publicMismatchPair.keyAgreement
-        )
-        XCTAssertEqual(
-            publicMismatchStore.classifyHandleAvailability(expected: wrongPublicPair),
-            .unavailable(.handlePublicKeyBindingMismatch)
-        )
-
-        let ambiguousKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let ambiguousStore = makeStore(keyStore: ambiguousKeyStore, handleSetIdentifier: "ambiguousclass")
-        let ambiguousPair = try ambiguousStore.createHandlePair()
-        ambiguousKeyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try binding(ambiguousPair.signing.reference, byte: 0xE2),
-                privateKey: nil
-            ),
-            allowingDuplicate: true
-        )
-        XCTAssertEqual(
-            ambiguousStore.classifyHandleAvailability(expected: ambiguousPair),
-            .unavailable(.privateHandleInaccessible)
-        )
-
-        let wrongRoleKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let wrongRoleStore = SecureEnclaveCustodyHandleStore(keyStore: wrongRoleKeyStore)
-        let signingReference = try reference("wrongroleclass", .signing)
-        let keyAgreementReference = try reference("wrongroleclass", .keyAgreement)
-        let wrongRoleSigning = try binding(keyAgreementReference, byte: 0xE3)
-        let expectedPair = try SecureEnclaveCustodyHandlePair(
-            signing: try binding(signingReference, byte: 0xE4),
-            keyAgreement: try binding(keyAgreementReference, byte: 0xE5)
-        )
-        wrongRoleKeyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(binding: wrongRoleSigning, privateKey: nil),
-            for: signingReference
-        )
-        wrongRoleKeyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(binding: expectedPair.keyAgreement, privateKey: nil)
-        )
-        XCTAssertEqual(
-            wrongRoleStore.classifyHandleAvailability(expected: expectedPair),
-            .unavailable(.privateOperationRoleMismatch)
-        )
-
-        try assertAvailabilityClassification(
-            loadError: .hardwareUnavailable,
-            expectedCategory: .hardwareUnavailable,
-            handleSetIdentifier: "hardwareclass"
-        )
-        try assertAvailabilityClassification(
-            loadError: .localAuthenticationFailed(.signing),
-            expectedCategory: .localAuthenticationFailed,
-            handleSetIdentifier: "authclass"
-        )
-        try assertAvailabilityClassification(
-            loadError: .privateHandleInaccessible(.signing),
-            expectedCategory: .privateHandleInaccessible,
-            handleSetIdentifier: "inaccessibleclass"
-        )
-    }
-
-    func test_locateHandlePairFindsUniqueExactPublicBinding() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: "lookup")
-        let pair = try store.createHandlePair()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        _ = try store.createLoadedHandlePair(authenticationContext: nil)
 
         let located = try store.locateHandlePair(
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            signingPublicKeyRaw: created.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: created.keyAgreement.binding.publicKeyRaw
         )
 
-        XCTAssertEqual(located, pair)
+        XCTAssertEqual(located.signing, created.signing.binding)
+        XCTAssertEqual(located.keyAgreement, created.keyAgreement.binding)
     }
 
-    func test_locateHandlePairFailsClosedForMissingPartialWrongPublicAndAmbiguousMatches() throws {
-        let missingStore = SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
-        XCTAssertThrowsError(
-            try missingStore.locateHandlePair(
-                signingPublicKeyX963: makePublicKey(byte: 0xA1),
-                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA2)
-            )
-        ) { error in
+    func test_locateHandlePair_failsClosedForMissingMismatchedAndPartialMatches() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let unknownKey = Data([0x04]) + Data(repeating: 0x66, count: 64)
+
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: unknownKey,
+            keyAgreementPublicKeyRaw: Data([0x04]) + Data(repeating: 0x67, count: 64)
+        )) { error in
             XCTAssertEqual(
                 error as? SecureEnclaveCustodyHandleError,
                 .privateHandleMissing(.signing)
             )
         }
 
-        let partialKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let partialStore = SecureEnclaveCustodyHandleStore(keyStore: partialKeyStore)
-        let partialSigningReference = try reference("lookuppartial", .signing)
-        let partialSigningBinding = try binding(partialSigningReference, byte: 0xA3)
-        partialKeyStore.insert(SecureEnclaveCustodyLoadedHandle(
-            binding: partialSigningBinding,
-            privateKey: nil
-        ))
-        XCTAssertThrowsError(
-            try partialStore.locateHandlePair(
-                signingPublicKeyX963: partialSigningBinding.publicKeyX963,
-                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA4)
-            )
-        ) { error in
-            XCTAssertEqual(error as? SecureEnclaveCustodyHandleError, .partialHandlePair)
-            XCTAssertEqual(
-                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
-                .migrationOrRecoveryRequired
-            )
-        }
-
-        let wrongPublicKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let wrongPublicStore = makeStore(
-            keyStore: wrongPublicKeyStore,
-            handleSetIdentifier: "lookupwrongpublic"
-        )
-        let wrongPublicPair = try wrongPublicStore.createHandlePair()
-        XCTAssertThrowsError(
-            try wrongPublicStore.locateHandlePair(
-                signingPublicKeyX963: wrongPublicPair.signing.publicKeyX963,
-                keyAgreementPublicKeyX963: makePublicKey(byte: 0xA5)
-            )
-        ) { error in
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: created.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: unknownKey
+        )) { error in
             XCTAssertEqual(
                 error as? SecureEnclaveCustodyHandleError,
                 .handlePublicKeyBindingMismatch(.keyAgreement)
             )
         }
 
-        let ambiguousKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let ambiguousStore = makeStore(
-            keyStore: ambiguousKeyStore,
-            handleSetIdentifier: "lookupambiguous"
-        )
-        let ambiguousPair = try ambiguousStore.createHandlePair()
-        let duplicateSigningHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(ambiguousPair.signing.reference, byte: 0xA6),
-            privateKey: nil
-        )
-        ambiguousKeyStore.insert(duplicateSigningHandle, allowingDuplicate: true)
-        XCTAssertThrowsError(
-            try ambiguousStore.locateHandlePair(
-                signingPublicKeyX963: ambiguousPair.signing.publicKeyX963,
-                keyAgreementPublicKeyX963: ambiguousPair.keyAgreement.publicKeyX963
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: unknownKey,
+            keyAgreementPublicKeyRaw: created.keyAgreement.binding.publicKeyRaw
+        )) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .handlePublicKeyBindingMismatch(.signing)
             )
-        ) { error in
-            XCTAssertEqual(error as? SecureEnclaveCustodyHandleError, .ambiguousPrivateHandle(.signing))
+        }
+
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: Data(repeating: 0x01, count: 10),
+            keyAgreementPublicKeyRaw: created.keyAgreement.binding.publicKeyRaw
+        )) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .invalidPublicKey(.signing)
+            )
+        }
+
+        try keyStore.deleteKey(reference: created.keyAgreement.reference)
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: created.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: unknownKey
+        )) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .partialHandlePair
+            )
         }
     }
 
-    func test_authTraceMetadataSanitizesSecureEnclaveCustodyHandleTags() throws {
-        let signingReference = try reference("traceid", .signing)
-        let keyAgreementReference = try reference("traceid", .keyAgreement)
+    func test_locateHandlePair_ignoresOtherTierBindings() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let classicalStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let compositeStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantum)
+        let compositePair = try compositeStore.createLoadedHandlePair(authenticationContext: nil)
 
+        XCTAssertThrowsError(try classicalStore.locateHandlePair(
+            signingPublicKeyRaw: Data([0x04]) + Data(repeating: 0x66, count: 64),
+            keyAgreementPublicKeyRaw: Data([0x04]) + Data(repeating: 0x67, count: 64)
+        )) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .privateHandleMissing(.signing)
+            )
+        }
+        _ = try compositeStore.locateHandlePair(
+            signingPublicKeyRaw: compositePair.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: compositePair.keyAgreement.binding.publicKeyRaw
+        )
+    }
+
+    func test_deleteHandlePair_isIdempotentForMissingAndReportsCleanupFailure() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
+
+        try store.deleteHandlePair(pair)
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        // Missing handles are tolerated so deletion converges.
+        try store.deleteHandlePair(pair)
+
+        let failing = try store.createLoadedHandlePair(authenticationContext: nil)
+        let failingPair = try SecureEnclaveCustodyHandlePair(
+            signing: failing.signing.binding,
+            keyAgreement: failing.keyAgreement.binding
+        )
+        keyStore.failDeleteRole = .signing
+        XCTAssertThrowsError(try store.deleteHandlePair(failingPair)) { error in
+            XCTAssertEqual(
+                error as? SecureEnclaveCustodyHandleError,
+                .cleanupOrRollbackFailed
+            )
+        }
+    }
+
+    func test_deleteHandles_convergesAcrossTiersByPublicKeyBytes() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let baseStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantum)
+        let highStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantumHigh)
+        let highPair = try highStore.createLoadedHandlePair(authenticationContext: nil)
+
+        // The identity-deletion path holds one store instance; matching runs on
+        // raw public-key bytes across the full inventory, so it converges for
+        // either tier's handles.
+        try baseStore.deleteHandles(
+            signingPublicKeyRaw: highPair.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: highPair.keyAgreement.binding.publicKeyRaw
+        )
+
+        XCTAssertEqual(keyStore.storedHandleCount(), 0)
+        // No matches left: deletion stays converged.
+        try baseStore.deleteHandles(
+            signingPublicKeyRaw: highPair.signing.binding.publicKeyRaw,
+            keyAgreementPublicKeyRaw: highPair.keyAgreement.binding.publicKeyRaw
+        )
+    }
+
+    func test_inventorySummaryClassifiesCompletePartialAndMalformedAcrossTiers() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let classicalStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let compositeStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantum)
+
+        _ = try classicalStore.createLoadedHandlePair(authenticationContext: nil)
+        let partial = try compositeStore.createLoadedHandlePair(authenticationContext: nil)
+        try keyStore.deleteKey(reference: partial.keyAgreement.reference)
+        keyStore.insertMalformedRow()
+
+        let summary = try classicalStore.inventorySummaryForLocalRecovery()
+
+        XCTAssertEqual(summary.totalHandleCount, 4)
+        XCTAssertEqual(summary.completeSetCount, 1)
+        XCTAssertEqual(summary.partialSetCount, 1)
+        XCTAssertEqual(summary.malformedHandleCount, 1)
+    }
+
+    func test_cleanupForLocalDataResetSweepsAllTiersIncludingMalformedRows() throws {
+        let keyStore = MockSecureEnclaveCustodyKeyStore()
+        let classicalStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let highStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantumHigh)
+        _ = try classicalStore.createLoadedHandlePair(authenticationContext: nil)
+        _ = try highStore.createLoadedHandlePair(authenticationContext: nil)
+        keyStore.insertMalformedRow(tier: .postQuantum, role: .signing)
+
+        let result = classicalStore.cleanupAllHandlesForLocalDataReset()
+
+        XCTAssertTrue(result.succeeded)
+        XCTAssertEqual(result.inspectedHandleCount, 5)
+        XCTAssertEqual(result.deletedHandleCount, 5)
+        XCTAssertEqual(try classicalStore.remainingHandleCountForLocalDataReset(), 0)
+    }
+
+    func test_cleanupForLocalDataResetFailsClosedForInventoryOrSweepFailure() throws {
+        let inventoryFailing = MockSecureEnclaveCustodyKeyStore()
+        inventoryFailing.failInventory = true
+        let inventoryFailingStore = SecureEnclaveCustodyHandleStore(
+            keyStore: inventoryFailing,
+            tier: .classicalP256
+        )
+        let inventoryResult = inventoryFailingStore.cleanupAllHandlesForLocalDataReset()
+        XCTAssertEqual(inventoryResult.failureCategory, .cleanupOrRollbackFailure)
+
+        let sweepFailing = MockSecureEnclaveCustodyKeyStore()
+        let sweepFailingStore = SecureEnclaveCustodyHandleStore(
+            keyStore: sweepFailing,
+            tier: .classicalP256
+        )
+        _ = try sweepFailingStore.createLoadedHandlePair(authenticationContext: nil)
+        sweepFailing.failDeleteAllKeys = true
+        let sweepResult = sweepFailingStore.cleanupAllHandlesForLocalDataReset()
+        XCTAssertEqual(sweepResult.failureCategory, .cleanupOrRollbackFailure)
+    }
+
+    func test_handleSetIdentifierGeneratorEmitsValidLowercaseHex() throws {
+        let identifier = try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
+        XCTAssertEqual(identifier.count, 32)
+        XCTAssertTrue(SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier(identifier))
+        XCTAssertFalse(SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier("UPPER"))
+        XCTAssertFalse(SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier("with-dash"))
+        XCTAssertFalse(SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier(""))
+    }
+
+    func test_referenceServiceStringsAreTierAndRoleNamespaced() throws {
+        let signing = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .signing,
+            tier: .classicalP256
+        )
+        let keyAgreement = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .keyAgreement,
+            tier: .postQuantumHigh
+        )
         XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(for: signingReference.applicationTagString),
+            signing.serviceString,
+            "com.cypherair.v1.secure-enclave-custody.p256.signing"
+        )
+        XCTAssertEqual(
+            keyAgreement.serviceString,
+            "com.cypherair.v1.secure-enclave-custody.post-quantum-high.keyAgreement"
+        )
+    }
+
+    func test_authTraceMetadataSanitizesSecureEnclaveCustodyServices() throws {
+        let signing = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .signing,
+            tier: .classicalP256
+        )
+        let keyAgreement = try SecureEnclaveCustodyHandleReference(
+            handleSetIdentifier: "0badc0de",
+            role: .keyAgreement,
+            tier: .postQuantum
+        )
+        XCTAssertEqual(
+            AuthTraceMetadata.keychainServiceKind(for: signing.serviceString),
             "secureEnclaveCustodySigningHandle"
         )
         XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(for: keyAgreementReference.applicationTagString),
+            AuthTraceMetadata.keychainServiceKind(for: keyAgreement.serviceString),
             "secureEnclaveCustodyKeyAgreementHandle"
         )
         XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(forPrefix: SecureEnclaveCustodyHandleReference.applicationTagPrefix),
+            AuthTraceMetadata.keychainServiceKind(
+                forPrefix: SecureEnclaveCustodyHandleReference.servicePrefix
+            ),
             "secureEnclaveCustodyHandle"
         )
-        XCTAssertFalse(
-            AuthTraceMetadata.keychainServiceKind(for: signingReference.applicationTagString).contains("traceid")
-        )
-    }
-
-    private func makeStore(
-        keyStore: MockSecureEnclaveCustodyKeyStore,
-        handleSetIdentifier: String
-    ) -> SecureEnclaveCustodyHandleStore {
-        SecureEnclaveCustodyHandleStore(
-            keyStore: keyStore,
-            handleSetIdentifierGenerator: { handleSetIdentifier }
-        )
-    }
-
-    private func assertAvailabilityClassification(
-        loadError: SecureEnclaveCustodyHandleError,
-        expectedCategory: PGPKeyOperationFailureCategory,
-        handleSetIdentifier: String
-    ) throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = makeStore(keyStore: keyStore, handleSetIdentifier: handleSetIdentifier)
-        let pair = try store.createHandlePair()
-        keyStore.failLoadError = loadError
-
-        XCTAssertEqual(
-            store.classifyHandleAvailability(expected: pair),
-            .unavailable(expectedCategory)
-        )
-    }
-
-    private func reference(
-        _ handleSetIdentifier: String,
-        _ role: PGPPrivateOperationRole
-    ) throws -> SecureEnclaveCustodyHandleReference {
-        try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: role
-        )
-    }
-
-    private func binding(
-        _ reference: SecureEnclaveCustodyHandleReference,
-        byte: UInt8
-    ) throws -> SecureEnclaveCustodyHandlePublicBinding {
-        try SecureEnclaveCustodyHandlePublicBinding(
-            reference: reference,
-            publicKeyX963: makePublicKey(byte: byte)
-        )
-    }
-
-    private func makePublicKey(byte: UInt8) -> Data {
-        var data = Data([0x04])
-        data.append(Data(repeating: byte, count: 64))
-        return data
-    }
-
-    private func nonUTF8OwnedApplicationTagData() -> Data {
-        var data = Data("\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).".utf8)
-        data.append(contentsOf: [0xFF, 0x00])
-        return data
     }
 }

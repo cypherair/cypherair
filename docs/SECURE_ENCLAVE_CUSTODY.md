@@ -25,7 +25,7 @@ All four are implemented, production-exposed wherever Secure Enclave hardware is
 The integration separates three concepts the software-key model partly compressed — OpenPGP **configuration** (version/algorithm/format/interop target), private-key **custody** (software secret certificate vs Secure Enclave private operations), and **operation capability** (what a key can do now, or an explicit unsupported state). The durable boundary:
 
 - **Service layer** owns user workflows; it asks `PGPKeyCapabilityResolver` for availability and `PrivateKeyOperationRouter` for a private-operation route, and never touches Keychain rows or Secure Enclave access-control flags directly.
-- **Security layer** (`Sources/Security/SecureEnclaveCustody*`, `SecureEnclaveComposite*`) owns the Apple primitives: role-tagged handle creation/loading, Keychain handle storage and deletion, access-control enforcement, role + public-key binding checks, and cleanup / local-reset participation.
+- **Security layer** (`Sources/Security/SecureEnclaveCustody*`, `SecureEnclaveComposite*`) owns the Apple primitives through one CryptoKit custody stack: every device-bound tier (classical P-256, ML-DSA/ML-KEM components) persists its enclave keys as `dataRepresentation` blobs in tier/role-namespaced generic-password rows, behind one handle store per tier for role-separated creation/loading, non-prompting locate by public binding, access-control enforcement, and cleanup / local-reset participation.
 - **Rust/OpenPGP layer** (`pgp-mobile/src/`, Sequoia) owns OpenPGP semantics: certificate construction/parsing, packet construction, ECDH KDF, AES Key Wrap, session-key validation, streaming payload decrypt, and MDC/AEAD hard-fail.
 
 Secure Enclave private operations cross the Rust boundary through the **external signer / key-agreement seams** (P-256) and the **external composite signer / decryptor seams** (ML-DSA/ML-KEM): Rust delegates only the private primitive and never receives private scalars or a complete secret certificate. The software-custody route is unchanged and is the only route that unwraps and zeroizes a secret certificate.
@@ -71,7 +71,7 @@ Signing and key agreement route to **distinct** handles by required role; wrong-
 
 Device-Bound Post-Quantum applies the same custody model to RFC 9980 composite keys (ML-DSA-65+Ed25519 signing, ML-KEM-768+X25519 encryption) with the same operation surface. Because CryptoKit's Secure Enclave offers ML-DSA/ML-KEM but no Ed25519/X25519, custody is **split**:
 
-- **Post-quantum components** are generated and held in the Secure Enclave as CryptoKit `dataRepresentation` blobs (`kSecClassGenericPassword` rows, this-device-only; the blob is useless off-device), gated by the same fixed `privateKeyUsage` + `biometryAny` access control baked in at creation.
+- **Post-quantum components** are generated and held in the Secure Enclave through the shared custody handle store (their tiers of the same blob-row model every device-bound tier uses; the blob is useless off-device), gated by the same fixed `privateKeyUsage` + `biometryAny` access control baked in at creation.
 - **Classical components** (one 32-byte Ed25519 seed + one 32-byte X25519 scalar, generated inside Rust) are sealed as a single payload under a dedicated fixed-access Secure Enclave `CAPKEV1` envelope, stored per fingerprint. The fixed policy — never the mode-dependent app wrapping policy — keeps every device-bound key exempt from Standard/High Security mode-switch re-wrap.
 
 Invariants ([POST_QUANTUM.md](POST_QUANTUM.md) §2–§3): every composite signature or decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt; the key is never exportable in any operable form. The Rust engine owns all OpenPGP derivation — the RFC 9980 KEM combiner, AES-256 key unwrap, packet assembly, and composite self-verification before any signature is released — while Swift performs exactly the enclave primitive through the external composite provider seams, mirroring the external P-256 seams.
@@ -101,6 +101,8 @@ Evidence is captured by the device test plans (real Secure Enclave, biometric) a
 ### 8.1 Real-hardware Secure Enclave evidence
 
 Real SE private operations via `CypherAir-DeviceTests` (and the destructive `CypherAir-DangerousDeviceTests`), one biometric approval per run.
+
+> **Recapture pending (issue #683).** The P-256 rows below were captured against the retired SecKey custody implementation; the CryptoKit consolidation requires re-attestation. macOS recapture runs before the consolidation PR merges; the iPhone rows are recaptured or explicitly re-deferred at that point.
 
 | Scenario | macOS | iPhone | iPad | visionOS |
 | --- | --- | --- | --- | --- |

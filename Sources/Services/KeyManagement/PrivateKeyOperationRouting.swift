@@ -35,8 +35,8 @@ struct PrivateKeyOperationRequest: Equatable, Sendable {
 /// load validates the shape against the correct parameter set.
 struct CompositeCustodyRouterContext {
     let bindingInspector: any SecureEnclaveCompositeBindingInspecting
-    let handleStore: SecureEnclaveCompositeHandleStore
-    let highHandleStore: SecureEnclaveCompositeHandleStore
+    let handleStore: SecureEnclaveCustodyHandleStore
+    let highHandleStore: SecureEnclaveCustodyHandleStore
     let classicalComponentStore: SecureEnclaveCompositeClassicalComponentStore
 }
 
@@ -101,7 +101,7 @@ struct SecureEnclaveCompositeSignerRoute {
     let identity: PGPKeyIdentity
     let operation: PGPPrivateOperationKind
     let compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection
-    let signingHandle: SecureEnclaveCompositeLoadedHandle
+    let signingHandle: SecureEnclaveCustodyLoadedHandle
     let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
     let operationAuthorization: SecureEnclaveCustodyOperationAuthorization?
 
@@ -109,7 +109,7 @@ struct SecureEnclaveCompositeSignerRoute {
         identity: PGPKeyIdentity,
         operation: PGPPrivateOperationKind,
         compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection,
-        signingHandle: SecureEnclaveCompositeLoadedHandle,
+        signingHandle: SecureEnclaveCustodyLoadedHandle,
         classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent,
         operationAuthorization: SecureEnclaveCustodyOperationAuthorization? = nil
     ) {
@@ -129,14 +129,14 @@ struct SecureEnclaveCompositeSignerRoute {
 struct SecureEnclaveCompositeKeyAgreementRoute {
     let identity: PGPKeyIdentity
     let compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection
-    let keyAgreementHandle: SecureEnclaveCompositeLoadedHandle
+    let keyAgreementHandle: SecureEnclaveCustodyLoadedHandle
     let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
     let operationAuthorization: SecureEnclaveCustodyOperationAuthorization?
 
     init(
         identity: PGPKeyIdentity,
         compositeBindingInspection: PGPSecureEnclaveCompositeBindingInspection,
-        keyAgreementHandle: SecureEnclaveCompositeLoadedHandle,
+        keyAgreementHandle: SecureEnclaveCustodyLoadedHandle,
         classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent,
         operationAuthorization: SecureEnclaveCustodyOperationAuthorization? = nil
     ) {

@@ -388,9 +388,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyCleartextSigningService {
         PrivateKeyCleartextSigningService(
@@ -412,9 +413,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement(),
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SoftwareP256CustodyProvider.shared.keyAgreement,
         compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
@@ -436,9 +438,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement(),
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SoftwareP256CustodyProvider.shared.keyAgreement,
         compositeDecapsulator: any SecureEnclaveCompositeDecapsulating = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyStreamingFileDecryptionService {
         PrivateKeyStreamingFileDecryptionService(
@@ -460,9 +463,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyTextEncryptionService {
         PrivateKeyTextEncryptionService(
@@ -484,9 +488,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyStreamingFileEncryptionService {
         PrivateKeyStreamingFileEncryptionService(
@@ -508,9 +513,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyPasswordMessageEncryptionService {
         PrivateKeyPasswordMessageEncryptionService(
@@ -532,9 +538,10 @@ enum TestHelpers {
         messageAdapter: PGPMessageOperationAdapter,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyDetachedFileSigningService {
         PrivateKeyDetachedFileSigningService(
@@ -556,9 +563,10 @@ enum TestHelpers {
         keyAdapter: PGPKeyOperationAdapter? = nil,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyExpiryMutationService {
         PrivateKeyExpiryMutationService(
@@ -579,9 +587,10 @@ enum TestHelpers {
         certificateAdapter: PGPCertificateOperationAdapter? = nil,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeySelectiveRevocationService {
         PrivateKeySelectiveRevocationService(
@@ -602,9 +611,10 @@ enum TestHelpers {
         certificateAdapter: PGPCertificateOperationAdapter? = nil,
         resolver: PGPKeyCapabilityResolver = PGPKeyCapabilityResolver(),
         handleStore: SecureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: MockSecureEnclaveCustodyKeyStore()
+            keyStore: MockSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         ),
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner(),
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner,
         compositeSigner: any SecureEnclaveCompositeSigning = SystemSecureEnclaveCompositeOperations()
     ) -> PrivateKeyContactCertificationService {
         PrivateKeyContactCertificationService(

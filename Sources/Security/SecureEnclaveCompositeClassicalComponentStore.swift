@@ -5,7 +5,7 @@ import Security
 /// Custody for the classical component secrets (Ed25519 + X25519, or Ed448 +
 /// X448 for the · High tier) of a Device-Bound Post-Quantum identity. The
 /// post-quantum halves live in the Secure Enclave
-/// (`SecureEnclaveCompositeHandleStore`); this store holds the classical
+/// (`SecureEnclaveCustodyHandleStore`); this store holds the classical
 /// halves, which alone can neither sign nor decrypt anything — every composite
 /// operation additionally requires the enclave-resident ML-DSA/ML-KEM component
 /// (docs/POST_QUANTUM.md §3).
@@ -40,23 +40,22 @@ struct SecureEnclaveCompositeClassicalComponentStore {
         fingerprint: String,
         eddsaSecret: inout Data,
         ecdhSecret: inout Data,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) throws -> KeyBundleWriteReceipt {
         defer {
             eddsaSecret.resetBytes(in: 0..<eddsaSecret.count)
             ecdhSecret.resetBytes(in: 0..<ecdhSecret.count)
         }
-        guard eddsaSecret.count == tier.classicalSigningSecretLength,
-              ecdhSecret.count == tier.classicalKeyAgreementSecretLength else {
+        guard let lengths = tier.splitCustodyClassicalSecretLengths,
+              eddsaSecret.count == lengths.signing,
+              ecdhSecret.count == lengths.keyAgreement else {
             throw CypherAirError.invalidKeyData(
                 reason: "Composite classical component secrets have an unexpected length."
             )
         }
 
         var concatenated = Data()
-        concatenated.reserveCapacity(
-            tier.classicalSigningSecretLength + tier.classicalKeyAgreementSecretLength
-        )
+        concatenated.reserveCapacity(lengths.signing + lengths.keyAgreement)
         concatenated.append(eddsaSecret)
         concatenated.append(ecdhSecret)
         defer { concatenated.resetBytes(in: 0..<concatenated.count) }
@@ -85,8 +84,13 @@ struct SecureEnclaveCompositeClassicalComponentStore {
     func load(
         fingerprint: String,
         authenticationContext: LAContext?,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) throws -> ClassicalComponent {
+        guard let lengths = tier.splitCustodyClassicalSecretLengths else {
+            throw CypherAirError.invalidKeyData(
+                reason: "The requested custody tier has no classical component."
+            )
+        }
         let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
         let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
             from: bundle.envelope,
@@ -102,8 +106,8 @@ struct SecureEnclaveCompositeClassicalComponentStore {
             fingerprint: fingerprint
         )
         defer { concatenated.resetBytes(in: 0..<concatenated.count) }
-        let eddsaLength = tier.classicalSigningSecretLength
-        let ecdhLength = tier.classicalKeyAgreementSecretLength
+        let eddsaLength = lengths.signing
+        let ecdhLength = lengths.keyAgreement
         let concatenatedLength = eddsaLength + ecdhLength
         guard concatenated.count == concatenatedLength else {
             throw CypherAirError.invalidKeyData(

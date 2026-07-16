@@ -169,7 +169,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         let pair = try seedCustodyHandles(
             fixture: fixture,
             keyStore: keyStore,
-            handleSetIdentifier: "delete-success"
+            handleSetIdentifier: "de1e7e00"
         )
         let metadataPersistence = RecordingKeyMetadataPersistence()
         metadataPersistence.seed([fixture.identity])
@@ -184,7 +184,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         XCTAssertTrue(targetService.keys.isEmpty)
         XCTAssertTrue(metadataPersistence.identities.isEmpty)
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        XCTAssertEqual(keyStore.deleteRequests, pair.references)
+        XCTAssertEqual(Set(keyStore.deleteRequests), Set(pair.references))
     }
 
     func test_deleteSecureEnclaveCustodyKeyHandleFailureStillRemovesMetadataAndReportsPartialDeletion() async throws {
@@ -195,7 +195,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         let pair = try seedCustodyHandles(
             fixture: fixture,
             keyStore: keyStore,
-            handleSetIdentifier: "delete-failure"
+            handleSetIdentifier: "de1e7e01"
         )
         keyStore.failDeleteRole = .signing
         let metadataPersistence = RecordingKeyMetadataPersistence()
@@ -244,7 +244,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
         _ = try seedCustodyHandles(
             fixture: fixture,
             keyStore: keyStore,
-            handleSetIdentifier: "delete-mismatch"
+            handleSetIdentifier: "de1e7e02"
         )
         // Desync the stored identity from its public-binding inspection: same public-key
         // bytes and fingerprint, but a key version the inspector will not match → the
@@ -546,7 +546,7 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
             privateKeyControlStore: InMemoryPrivateKeyControlStore(mode: .standard),
             secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext(
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
             ),
             metadataPersistence: metadataPersistence
         )
@@ -559,19 +559,21 @@ final class KeyManagementServiceSecureEnclaveCustodyTests: KeyManagementServiceT
     ) throws -> SecureEnclaveCustodyHandlePair {
         let signingReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .signing
+            role: .signing,
+            tier: .classicalP256
         )
         let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: .classicalP256
         )
         let signingBinding = try SecureEnclaveCustodyHandlePublicBinding(
             reference: signingReference,
-            publicKeyX963: fixture.signingPublicKeyX963
+            publicKeyRaw: fixture.signingPublicKeyX963
         )
         let keyAgreementBinding = try SecureEnclaveCustodyHandlePublicBinding(
             reference: keyAgreementReference,
-            publicKeyX963: fixture.keyAgreementPublicKeyX963
+            publicKeyRaw: fixture.keyAgreementPublicKeyX963
         )
         keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: signingBinding, privateKey: nil))
         keyStore.insert(SecureEnclaveCustodyLoadedHandle(binding: keyAgreementBinding, privateKey: nil))

@@ -1,40 +1,36 @@
 import Foundation
 import Security
 
+/// Identity of one Secure Enclave custody private-key blob in the
+/// data-protection keychain: service encodes tier and role, account is the
+/// handle-set identifier. One set identifier binds the signing and
+/// key-agreement keys of a single device-bound identity.
 struct SecureEnclaveCustodyHandleReference: Hashable, Sendable {
-    static let applicationTagPrefix = "\(KeychainConstants.prefix).secure-enclave-custody"
+    static let servicePrefix = "\(KeychainConstants.prefix).secure-enclave-custody"
 
     let handleSetIdentifier: String
     let role: PGPPrivateOperationRole
+    let tier: SecureEnclaveCustodyTier
 
-    init(handleSetIdentifier: String, role: PGPPrivateOperationRole) throws {
+    init(
+        handleSetIdentifier: String,
+        role: PGPPrivateOperationRole,
+        tier: SecureEnclaveCustodyTier
+    ) throws {
         guard Self.isValidHandleSetIdentifier(handleSetIdentifier) else {
             throw SecureEnclaveCustodyHandleError.invalidHandleSetIdentifier
         }
         self.handleSetIdentifier = handleSetIdentifier
         self.role = role
+        self.tier = tier
     }
 
-    init(applicationTagString: String) throws {
-        let prefix = "\(Self.applicationTagPrefix)."
-        guard applicationTagString.hasPrefix(prefix) else {
-            throw SecureEnclaveCustodyHandleError.invalidApplicationTag
-        }
-        let remainder = String(applicationTagString.dropFirst(prefix.count))
-        let components = remainder.split(separator: ".", omittingEmptySubsequences: false)
-        guard components.count == 2,
-              let role = PGPPrivateOperationRole(rawValue: String(components[1])) else {
-            throw SecureEnclaveCustodyHandleError.invalidApplicationTag
-        }
-        try self.init(handleSetIdentifier: String(components[0]), role: role)
+    var serviceString: String {
+        "\(Self.servicePrefix).\(tier.serviceNamespaceSegment).\(role.rawValue)"
     }
 
-    var applicationTagString: String {
-        "\(Self.applicationTagPrefix).\(handleSetIdentifier).\(role.rawValue)"
-    }
-
-    var applicationTagData: Data {
-        Data(applicationTagString.utf8)
+    var accountString: String {
+        handleSetIdentifier
     }
 
     static func generateHandleSetIdentifier(byteCount: Int = 16) throws -> String {
@@ -46,15 +42,12 @@ struct SecureEnclaveCustodyHandleReference: Hashable, Sendable {
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func isValidHandleSetIdentifier(_ value: String) -> Bool {
+    static func isValidHandleSetIdentifier(_ value: String) -> Bool {
         guard !value.isEmpty, value.utf8.count <= 64 else {
             return false
         }
         return value.utf8.allSatisfy { byte in
-            (byte >= 0x30 && byte <= 0x39)
-                || (byte >= 0x61 && byte <= 0x7A)
-                || byte == 0x2D
-                || byte == 0x5F
+            (byte >= 0x30 && byte <= 0x39) || (byte >= 0x61 && byte <= 0x66)
         }
     }
 }

@@ -1,418 +1,294 @@
+import CryptoKit
 import Foundation
 import LocalAuthentication
 import Security
 
+/// Production custody key store: one `kSecClassGenericPassword` row per
+/// (tier/role service, handle-set account) in the data-protection keychain.
+/// `kSecValueData` holds the CryptoKit Secure Enclave `dataRepresentation`;
+/// `kSecAttrGeneric` carries the role's public key so lookup and binding
+/// verification never require reconstruction with an authenticated context.
+///
+/// The use-authorization policy lives INSIDE the enclave key (baked in via
+/// `SecAccessControl` at creation); the keychain row itself is a plain
+/// this-device-only protected blob.
 struct SystemSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring {
-    private let traceStore: AuthLifecycleTraceStore?
-
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
-        self.traceStore = traceStore
-    }
-
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy
+        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
+        authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: reference.applicationTagString)
-        traceStore?.record(
-            category: .operation,
-            name: "secureEnclaveCustody.createKey.start",
-            metadata: ["serviceKind": serviceKind]
-        )
+        guard try loadRow(reference: reference) == nil else {
+            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(reference.role)
+        }
+
         let accessControl = try accessPolicy.makeSecAccessControl()
-        let attributes = Self.keyCreationAttributes(
+        let privateKey: SecureEnclaveCustodyLoadedHandle.PrivateKey
+        let publicKeyRaw: Data
+        let blob: Data
+        do {
+            switch (reference.tier, reference.role) {
+            case (.classicalP256, .signing):
+                let key = try SecureEnclave.P256.Signing.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .p256Signing(key)
+                publicKeyRaw = key.publicKey.x963Representation
+                blob = key.dataRepresentation
+            case (.classicalP256, .keyAgreement):
+                let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .p256KeyAgreement(key)
+                publicKeyRaw = key.publicKey.x963Representation
+                blob = key.dataRepresentation
+            case (.postQuantum, .signing):
+                let key = try SecureEnclave.MLDSA65.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa65Signing(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            case (.postQuantum, .keyAgreement):
+                let key = try SecureEnclave.MLKEM768.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem768KeyAgreement(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            case (.postQuantumHigh, .signing):
+                let key = try SecureEnclave.MLDSA87.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa87Signing(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            case (.postQuantumHigh, .keyAgreement):
+                let key = try SecureEnclave.MLKEM1024.PrivateKey(
+                    accessControl: accessControl,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem1024KeyAgreement(key)
+                publicKeyRaw = key.publicKey.rawRepresentation
+                blob = key.dataRepresentation
+            }
+        } catch {
+            throw SecureEnclaveCustodyHandleError.hardwareUnavailable
+        }
+
+        let binding = try SecureEnclaveCustodyHandlePublicBinding(
             reference: reference,
-            accessControl: accessControl
+            publicKeyRaw: publicKeyRaw
         )
 
-        var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            let mappedError = Self.mapCFError(error, role: reference.role)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.createKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw mappedError
-        }
-        do {
-            let loaded = try loadedHandle(reference: reference, privateKey: privateKey)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.createKey.finish",
-                metadata: ["serviceKind": serviceKind, "result": "success"]
-            )
-            return loaded
-        } catch {
-            let finalError = cleanupCreatedKeyAfterValidationFailure(
-                reference: reference,
-                originalError: error
-            )
-            let mappedError = finalError as? SecureEnclaveCustodyHandleError
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.createKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw finalError
-        }
-    }
-
-    static func keyCreationAttributes(
-        reference: SecureEnclaveCustodyHandleReference,
-        accessControl: SecAccessControl
-    ) -> [String: Any] {
-        var privateKeyAttributes: [String: Any] = [
-            kSecAttrIsPermanent as String: true,
-            kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecAttrAccessControl as String: accessControl
-        ]
-
+        var attributes = Self.baseQuery(reference: reference)
+        attributes[kSecValueData as String] = blob
+        attributes[kSecAttrGeneric as String] = publicKeyRaw
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         #if os(macOS)
-        privateKeyAttributes[kSecAttrSynchronizable as String] = false
+        attributes[kSecAttrSynchronizable as String] = false
         #endif
 
-        return [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecPrivateKeyAttrs as String: privateKeyAttributes
-        ]
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: reference.role)
+        }
+
+        return SecureEnclaveCustodyLoadedHandle(binding: binding, privateKey: privateKey)
     }
 
-    func loadKeys(
+    func loadKey(
         reference: SecureEnclaveCustodyHandleReference,
         authenticationContext: LAContext?
-    ) throws -> [SecureEnclaveCustodyLoadedHandle] {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: reference.applicationTagString)
-        traceStore?.record(
-            category: .operation,
-            name: "secureEnclaveCustody.loadKeys.start",
-            metadata: ["serviceKind": serviceKind]
-        )
-        var query = baseQuery(reference: reference)
-        query[kSecReturnRef as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitAll
-        if let authenticationContext {
-            query[kSecUseAuthenticationContext as String] = authenticationContext
-        }
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        switch status {
-        case errSecSuccess:
-            do {
-                let loaded: [SecureEnclaveCustodyLoadedHandle]
-                if let privateKeys = result as? [SecKey] {
-                    loaded = try privateKeys.map { try loadedHandle(reference: reference, privateKey: $0) }
-                } else if let result, CFGetTypeID(result) == SecKeyGetTypeID() {
-                    loaded = [try loadedHandle(reference: reference, privateKey: result as! SecKey)]
-                } else {
-                    throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-                }
-                traceStore?.record(
-                    category: .operation,
-                    name: "secureEnclaveCustody.loadKeys.finish",
-                    metadata: [
-                        "serviceKind": serviceKind,
-                        "result": "success",
-                        "count": String(loaded.count)
-                    ]
-                )
-                return loaded
-            } catch {
-                let mappedError = error as? SecureEnclaveCustodyHandleError
-                    ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-                traceStore?.record(
-                    category: .operation,
-                    name: "secureEnclaveCustody.loadKeys.finish",
-                    metadata: [
-                        "serviceKind": serviceKind,
-                        "result": "failed",
-                        "failureCategory": mappedError.failureCategory.rawValue
-                    ]
-                )
-                throw error
-            }
-        case errSecItemNotFound:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.loadKeys.finish",
-                metadata: ["serviceKind": serviceKind, "result": "success", "count": "0"]
-            )
-            return []
-        default:
-            let mappedError = Self.mapStatus(status, role: reference.role)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.loadKeys.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw mappedError
-        }
-    }
-
-    func deleteKey(reference: SecureEnclaveCustodyHandleReference) throws {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: reference.applicationTagString)
-        traceStore?.record(
-            category: .operation,
-            name: "secureEnclaveCustody.deleteKey.start",
-            metadata: ["serviceKind": serviceKind]
-        )
-        let status = SecItemDelete(baseQuery(reference: reference) as CFDictionary)
-        switch status {
-        case errSecSuccess:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteKey.finish",
-                metadata: ["serviceKind": serviceKind, "result": "success"]
-            )
-            return
-        case errSecItemNotFound:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": PGPKeyOperationFailureCategory.privateHandleMissing.rawValue
-                ]
-            )
-            throw SecureEnclaveCustodyHandleError.privateHandleMissing(reference.role)
-        default:
-            let mappedError = Self.mapStatus(status, role: reference.role)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw mappedError
-        }
-    }
-
-    func inventoryKeys() throws -> [SecureEnclaveCustodyHandleInventoryItem] {
-        traceStore?.record(
-            category: .operation,
-            name: "secureEnclaveCustody.inventory.start",
-            metadata: ["serviceKind": "secureEnclaveCustodyHandle"]
-        )
-        var query = baseInventoryQuery()
-        query[kSecReturnAttributes as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitAll
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        switch status {
-        case errSecSuccess:
-            guard let attributes = result as? [[String: Any]] else {
-                traceStore?.record(
-                    category: .operation,
-                    name: "secureEnclaveCustody.inventory.finish",
-                    metadata: [
-                        "serviceKind": "secureEnclaveCustodyHandle",
-                        "result": "failed",
-                        "failureCategory": PGPKeyOperationFailureCategory.privateHandleInaccessible.rawValue
-                    ]
-                )
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            let items = attributes.compactMap { attribute -> SecureEnclaveCustodyHandleInventoryItem? in
-                Self.applicationTagData(from: attribute).flatMap(SecureEnclaveCustodyHandleInventoryItem.init)
-            }
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.inventory.finish",
-                metadata: [
-                    "serviceKind": "secureEnclaveCustodyHandle",
-                    "result": "success",
-                    "count": String(items.count)
-                ]
-            )
-            return items
-        case errSecItemNotFound:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.inventory.finish",
-                metadata: [
-                    "serviceKind": "secureEnclaveCustodyHandle",
-                    "result": "success",
-                    "count": "0"
-                ]
-            )
-            return []
-        default:
-            let mappedError = Self.mapStatus(status, role: .signing)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.inventory.finish",
-                metadata: [
-                    "serviceKind": "secureEnclaveCustodyHandle",
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw mappedError
-        }
-    }
-
-    func deleteKey(
-        applicationTagData: Data,
-        roleHint: PGPPrivateOperationRole?
-    ) throws {
-        let serviceKind = Self.serviceKind(forApplicationTagData: applicationTagData)
-        traceStore?.record(
-            category: .operation,
-            name: "secureEnclaveCustody.deleteInventoryKey.start",
-            metadata: ["serviceKind": serviceKind]
-        )
-        var query = baseInventoryQuery()
-        query[kSecAttrApplicationTag as String] = applicationTagData
-        let status = SecItemDelete(query as CFDictionary)
-        switch status {
-        case errSecSuccess:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteInventoryKey.finish",
-                metadata: ["serviceKind": serviceKind, "result": "success"]
-            )
-            return
-        case errSecItemNotFound:
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteInventoryKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": PGPKeyOperationFailureCategory.privateHandleMissing.rawValue
-                ]
-            )
-            throw SecureEnclaveCustodyHandleError.privateHandleMissing(roleHint ?? .signing)
-        default:
-            let mappedError = Self.mapStatus(status, role: roleHint ?? .signing)
-            traceStore?.record(
-                category: .operation,
-                name: "secureEnclaveCustody.deleteInventoryKey.finish",
-                metadata: [
-                    "serviceKind": serviceKind,
-                    "result": "failed",
-                    "failureCategory": mappedError.failureCategory.rawValue
-                ]
-            )
-            throw mappedError
-        }
-    }
-
-    private func baseQuery(reference: SecureEnclaveCustodyHandleReference) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecUseDataProtectionKeychain as String: true
-        ]
-    }
-
-    private func baseInventoryQuery() -> [String: Any] {
-        [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecUseDataProtectionKeychain as String: true
-        ]
-    }
-
-    private func loadedHandle(
-        reference: SecureEnclaveCustodyHandleReference,
-        privateKey: SecKey
-    ) throws -> SecureEnclaveCustodyLoadedHandle {
-        try validatePrivateKeyAttributes(privateKey, role: reference.role)
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-        }
-
-        var error: Unmanaged<CFError>?
-        guard let publicData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw Self.mapCFError(error, role: reference.role)
+    ) throws -> SecureEnclaveCustodyLoadedHandle? {
+        guard let row = try loadRow(reference: reference) else {
+            return nil
         }
         let binding = try SecureEnclaveCustodyHandlePublicBinding(
             reference: reference,
-            publicKeyX963: publicData
+            publicKeyRaw: row.publicKeyRaw
         )
-        return SecureEnclaveCustodyLoadedHandle(
-            binding: binding,
-            privateKey: privateKey
-        )
-    }
 
-    private func cleanupCreatedKeyAfterValidationFailure(
-        reference: SecureEnclaveCustodyHandleReference,
-        originalError: Error
-    ) -> Error {
+        let privateKey: SecureEnclaveCustodyLoadedHandle.PrivateKey
+        let reconstructedPublicKeyRaw: Data
         do {
-            try deleteKey(reference: reference)
-            return originalError
-        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
-            return originalError
+            switch (reference.tier, reference.role) {
+            case (.classicalP256, .signing):
+                let key = try SecureEnclave.P256.Signing.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .p256Signing(key)
+                reconstructedPublicKeyRaw = key.publicKey.x963Representation
+            case (.classicalP256, .keyAgreement):
+                let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .p256KeyAgreement(key)
+                reconstructedPublicKeyRaw = key.publicKey.x963Representation
+            case (.postQuantum, .signing):
+                let key = try SecureEnclave.MLDSA65.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa65Signing(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            case (.postQuantum, .keyAgreement):
+                let key = try SecureEnclave.MLKEM768.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem768KeyAgreement(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            case (.postQuantumHigh, .signing):
+                let key = try SecureEnclave.MLDSA87.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mldsa87Signing(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            case (.postQuantumHigh, .keyAgreement):
+                let key = try SecureEnclave.MLKEM1024.PrivateKey(
+                    dataRepresentation: row.blob,
+                    authenticationContext: authenticationContext
+                )
+                privateKey = .mlkem1024KeyAgreement(key)
+                reconstructedPublicKeyRaw = key.publicKey.rawRepresentation
+            }
         } catch {
-            return SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
+            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
+        }
+
+        // The stored binding is advisory lookup state; the reconstructed key is
+        // authoritative. A divergence means a corrupted or substituted row.
+        guard reconstructedPublicKeyRaw == binding.publicKeyRaw else {
+            throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(reference.role)
+        }
+
+        return SecureEnclaveCustodyLoadedHandle(binding: binding, privateKey: privateKey)
+    }
+
+    func inventory() throws -> SecureEnclaveCustodyHandleInventory {
+        var bindings: [SecureEnclaveCustodyHandlePublicBinding] = []
+        var malformedRowCount = 0
+        for tier in SecureEnclaveCustodyTier.allCases {
+            for role in [PGPPrivateOperationRole.signing, .keyAgreement] {
+                var query = Self.namespaceQuery(tier: tier, role: role)
+                query[kSecReturnAttributes as String] = true
+                query[kSecMatchLimit as String] = kSecMatchLimitAll
+
+                var result: AnyObject?
+                let status = SecItemCopyMatching(query as CFDictionary, &result)
+                switch status {
+                case errSecSuccess:
+                    guard let attributesList = result as? [[String: Any]] else {
+                        throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
+                    }
+                    for attributes in attributesList {
+                        guard let account = attributes[kSecAttrAccount as String] as? String,
+                              let publicKeyRaw = attributes[kSecAttrGeneric as String] as? Data,
+                              let reference = try? SecureEnclaveCustodyHandleReference(
+                                  handleSetIdentifier: account,
+                                  role: role,
+                                  tier: tier
+                              ),
+                              let binding = try? SecureEnclaveCustodyHandlePublicBinding(
+                                  reference: reference,
+                                  publicKeyRaw: publicKeyRaw
+                              ) else {
+                            malformedRowCount += 1
+                            continue
+                        }
+                        bindings.append(binding)
+                    }
+                case errSecItemNotFound:
+                    continue
+                default:
+                    throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
+                }
+            }
+        }
+        return SecureEnclaveCustodyHandleInventory(
+            bindings: bindings,
+            malformedRowCount: malformedRowCount
+        )
+    }
+
+    func deleteKey(reference: SecureEnclaveCustodyHandleReference) throws {
+        let status = SecItemDelete(Self.baseQuery(reference: reference) as CFDictionary)
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            throw SecureEnclaveCustodyHandleError.privateHandleMissing(reference.role)
+        default:
+            throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: reference.role)
         }
     }
 
-    private func validatePrivateKeyAttributes(_ privateKey: SecKey, role: PGPPrivateOperationRole) throws {
-        guard let attributes = SecKeyCopyAttributes(privateKey) as? [String: Any] else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
-        }
-        guard attributes[kSecAttrKeyType as String] as? String == (kSecAttrKeyTypeECSECPrimeRandom as String),
-              attributes[kSecAttrKeySizeInBits as String] as? Int == 256,
-              attributes[kSecAttrTokenID as String] as? String == (kSecAttrTokenIDSecureEnclave as String) else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
+    func deleteAllKeys(tier: SecureEnclaveCustodyTier, role: PGPPrivateOperationRole) throws {
+        let status = SecItemDelete(Self.namespaceQuery(tier: tier, role: role) as CFDictionary)
+        switch status {
+        case errSecSuccess, errSecItemNotFound:
+            return
+        default:
+            throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
         }
     }
 
-    private static func mapCFError(
-        _ error: Unmanaged<CFError>?,
+    private struct StoredRow {
+        let blob: Data
+        let publicKeyRaw: Data
+    }
+
+    private func loadRow(reference: SecureEnclaveCustodyHandleReference) throws -> StoredRow? {
+        var query = Self.baseQuery(reference: reference)
+        query[kSecReturnData as String] = true
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let attributes = result as? [String: Any],
+                  let blob = attributes[kSecValueData as String] as? Data,
+                  let publicKeyRaw = attributes[kSecAttrGeneric as String] as? Data else {
+                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
+            }
+            return StoredRow(blob: blob, publicKeyRaw: publicKeyRaw)
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: reference.role)
+        }
+    }
+
+    private static func baseQuery(reference: SecureEnclaveCustodyHandleReference) -> [String: Any] {
+        var query = namespaceQuery(tier: reference.tier, role: reference.role)
+        query[kSecAttrAccount as String] = reference.accountString
+        return query
+    }
+
+    private static func namespaceQuery(
+        tier: SecureEnclaveCustodyTier,
         role: PGPPrivateOperationRole
-    ) -> SecureEnclaveCustodyHandleError {
-        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: role)
-    }
-
-    private static func mapStatus(_ status: OSStatus, role: PGPPrivateOperationRole) -> SecureEnclaveCustodyHandleError {
-        SecureEnclaveCustodyOSStatusMapper.handleError(for: status, role: role)
-    }
-
-    private static func applicationTagData(from attributes: [String: Any]) -> Data? {
-        if let data = attributes[kSecAttrApplicationTag as String] as? Data {
-            return data
-        }
-        if let string = attributes[kSecAttrApplicationTag as String] as? String {
-            return Data(string.utf8)
-        }
-        return nil
-    }
-
-    private static func serviceKind(forApplicationTagData data: Data) -> String {
-        guard let applicationTagString = String(data: data, encoding: .utf8) else {
-            return "secureEnclaveCustodyHandle"
-        }
-        return AuthTraceMetadata.keychainServiceKind(for: applicationTagString)
+    ) -> [String: Any] {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String:
+                "\(SecureEnclaveCustodyHandleReference.servicePrefix).\(tier.serviceNamespaceSegment).\(role.rawValue)",
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        #if os(macOS)
+        query[kSecAttrSynchronizable as String] = false
+        #endif
+        return query
     }
 }

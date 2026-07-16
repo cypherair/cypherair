@@ -1,44 +1,67 @@
 import Foundation
 import LocalAuthentication
 
+/// Pair-level lifecycle for Secure Enclave custody handles, scoped to one tier:
+/// create-with-rollback, authenticated load, non-prompting locate and inspect by
+/// the certificate's public keys, and converging deletion. The maintenance
+/// surface (inventory summary, local-data-reset cleanup) is deliberately
+/// tier-independent: it sweeps every device-bound custody row so reset and
+/// recovery never depend on which tier instance performs them.
+///
+/// `loadHandle` reconstructs the private blob and belongs inside an authorized
+/// operation window; every other member works on stored bindings only and
+/// never prompts.
 struct SecureEnclaveCustodyHandleStore {
     private let keyStore: any SecureEnclaveCustodyKeyStoring
+    private let tier: SecureEnclaveCustodyTier
     private let handleSetIdentifierGenerator: () throws -> String
 
     init(
         keyStore: any SecureEnclaveCustodyKeyStoring,
+        tier: SecureEnclaveCustodyTier,
         handleSetIdentifierGenerator: @escaping () throws -> String = {
             try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
         }
     ) {
         self.keyStore = keyStore
+        self.tier = tier
         self.handleSetIdentifierGenerator = handleSetIdentifierGenerator
     }
 
-    func createHandlePair() throws -> SecureEnclaveCustodyHandlePair {
+    /// Create both Secure Enclave keys under the fixed device-bound access
+    /// policy. Device-bound handles use `privateKeyUsageBiometryAny` regardless
+    /// of the app authentication mode, so they are exempt from mode-switch
+    /// re-wrap.
+    func createLoadedHandlePair(
+        authenticationContext: LAContext?
+    ) throws -> SecureEnclaveCustodyLoadedHandlePair {
         let handleSetIdentifier = try handleSetIdentifierGenerator()
         let signingReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .signing
+            role: .signing,
+            tier: tier
         )
         let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: tier
         )
         let policy = SecureEnclaveCustodyAccessControlPolicy.privateKeyUsageBiometryAny
 
         let signing = try keyStore.createKey(
             reference: signingReference,
-            accessPolicy: policy
+            accessPolicy: policy,
+            authenticationContext: authenticationContext
         )
         do {
             let keyAgreement = try keyStore.createKey(
                 reference: keyAgreementReference,
-                accessPolicy: policy
+                accessPolicy: policy,
+                authenticationContext: authenticationContext
             )
-            return try SecureEnclaveCustodyHandlePair(
-                signing: signing.binding,
-                keyAgreement: keyAgreement.binding
+            return try SecureEnclaveCustodyLoadedHandlePair(
+                signing: signing,
+                keyAgreement: keyAgreement
             )
         } catch {
             do {
@@ -50,99 +73,108 @@ struct SecureEnclaveCustodyHandleStore {
         }
     }
 
-    func loadHandlePair(
-        expected pair: SecureEnclaveCustodyHandlePair,
-        authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCustodyLoadedHandlePair {
-        let signing = try loadHandle(
-            reference: pair.signing.reference,
-            expectedPublicKeyX963: pair.signing.publicKeyX963,
-            authenticationContext: authenticationContext
-        )
-        let keyAgreement = try loadHandle(
-            reference: pair.keyAgreement.reference,
-            expectedPublicKeyX963: pair.keyAgreement.publicKeyX963,
-            authenticationContext: authenticationContext
-        )
-        return try SecureEnclaveCustodyLoadedHandlePair(
-            signing: signing,
-            keyAgreement: keyAgreement
-        )
-    }
-
     func loadHandle(
         reference: SecureEnclaveCustodyHandleReference,
-        expectedPublicKeyX963: Data,
+        expectedPublicKeyRaw: Data,
         authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(expectedPublicKeyX963) else {
+        guard SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            expectedPublicKeyRaw,
+            role: reference.role,
+            tier: reference.tier
+        ) else {
             throw SecureEnclaveCustodyHandleError.invalidPublicKey(reference.role)
         }
 
-        let candidates = try keyStore.loadKeys(
+        guard let handle = try keyStore.loadKey(
             reference: reference,
             authenticationContext: authenticationContext
-        )
-        guard !candidates.isEmpty else {
+        ) else {
             throw SecureEnclaveCustodyHandleError.privateHandleMissing(reference.role)
         }
-        guard candidates.count == 1 else {
-            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(reference.role)
-        }
-
-        let candidate = candidates[0]
-        guard candidate.reference == reference else {
-            if candidate.role != reference.role {
-                throw SecureEnclaveCustodyHandleError.privateOperationRoleMismatch(
-                    expected: reference.role,
-                    actual: candidate.role
-                )
-            }
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
-        }
-        guard candidate.binding.publicKeyX963 == expectedPublicKeyX963 else {
+        guard handle.binding.publicKeyRaw == expectedPublicKeyRaw else {
             throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(reference.role)
         }
+        return handle
+    }
 
-        return candidate
+    /// Locate the unique handle pair whose stored public bindings match the
+    /// certificate's public keys. Non-prompting: matches on the stored binding
+    /// attributes only. A set matching one role but not the other fails closed
+    /// as a binding mismatch; a partial set matching its present role surfaces
+    /// as `partialHandlePair` so recovery can classify interrupted generation.
+    func locateHandlePair(
+        signingPublicKeyRaw: Data,
+        keyAgreementPublicKeyRaw: Data
+    ) throws -> SecureEnclaveCustodyHandlePair {
+        guard SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            signingPublicKeyRaw,
+            role: .signing,
+            tier: tier
+        ) else {
+            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.signing)
+        }
+        guard SecureEnclaveCustodyHandlePublicBinding.hasExpectedPublicKeyShape(
+            keyAgreementPublicKeyRaw,
+            role: .keyAgreement,
+            tier: tier
+        ) else {
+            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
+        }
+
+        var matches: [SecureEnclaveCustodyHandlePair] = []
+        for group in try tierGroups().values {
+            let signingBinding = group.first { $0.role == .signing }
+            let keyAgreementBinding = group.first { $0.role == .keyAgreement }
+
+            switch (signingBinding, keyAgreementBinding) {
+            case (.some(let signing), .some(let keyAgreement)):
+                let signingMatches = signing.publicKeyRaw == signingPublicKeyRaw
+                let keyAgreementMatches = keyAgreement.publicKeyRaw == keyAgreementPublicKeyRaw
+                switch (signingMatches, keyAgreementMatches) {
+                case (true, true):
+                    matches.append(try SecureEnclaveCustodyHandlePair(
+                        signing: signing,
+                        keyAgreement: keyAgreement
+                    ))
+                case (true, false):
+                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
+                case (false, true):
+                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.signing)
+                case (false, false):
+                    continue
+                }
+            case (.some(let signing), nil):
+                if signing.publicKeyRaw == signingPublicKeyRaw {
+                    throw SecureEnclaveCustodyHandleError.partialHandlePair
+                }
+            case (nil, .some(let keyAgreement)):
+                if keyAgreement.publicKeyRaw == keyAgreementPublicKeyRaw {
+                    throw SecureEnclaveCustodyHandleError.partialHandlePair
+                }
+            case (nil, nil):
+                continue
+            }
+        }
+
+        guard !matches.isEmpty else {
+            throw SecureEnclaveCustodyHandleError.privateHandleMissing(.signing)
+        }
+        guard matches.count == 1 else {
+            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
+        }
+        return matches[0]
     }
 
     func inspectHandlePair(handleSetIdentifier: String) -> SecureEnclaveCustodyHandleState {
-        let signingReference: SecureEnclaveCustodyHandleReference
-        let keyAgreementReference: SecureEnclaveCustodyHandleReference
-        do {
-            signingReference = try SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .signing
-            )
-            keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .keyAgreement
-            )
-        } catch let error as SecureEnclaveCustodyHandleError {
-            return .invalid(error)
-        } catch {
-            return .invalid(.privateHandleInaccessible(.signing))
+        guard SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier(handleSetIdentifier) else {
+            return .invalid(.invalidHandleSetIdentifier)
         }
 
         do {
-            let signingCandidates = try keyStore.loadKeys(
-                reference: signingReference,
-                authenticationContext: nil
-            )
-            let keyAgreementCandidates = try keyStore.loadKeys(
-                reference: keyAgreementReference,
-                authenticationContext: nil
-            )
-            if signingCandidates.count > 1 {
-                return .invalid(.ambiguousPrivateHandle(.signing))
-            }
-            if keyAgreementCandidates.count > 1 {
-                return .invalid(.ambiguousPrivateHandle(.keyAgreement))
-            }
-
-            let signing = signingCandidates.first
-            let keyAgreement = keyAgreementCandidates.first
+            let group = try tierGroups()[handleSetIdentifier] ?? []
+            let signing = group.first { $0.role == .signing }
+            let keyAgreement = group.first { $0.role == .keyAgreement }
             switch (signing, keyAgreement) {
             case (nil, nil):
                 return .missing
@@ -153,8 +185,8 @@ struct SecureEnclaveCustodyHandleStore {
             case (.some(let signing), .some(let keyAgreement)):
                 do {
                     let pair = try SecureEnclaveCustodyHandlePair(
-                        signing: signing.binding,
-                        keyAgreement: keyAgreement.binding
+                        signing: signing,
+                        keyAgreement: keyAgreement
                     )
                     return .complete(pair)
                 } catch let error as SecureEnclaveCustodyHandleError {
@@ -170,166 +202,53 @@ struct SecureEnclaveCustodyHandleStore {
         }
     }
 
-    func classifyHandleAvailability(
-        expected pair: SecureEnclaveCustodyHandlePair
-    ) -> SecureEnclaveCustodyHandleAvailability {
-        switch inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier) {
-        case .missing:
-            return .unavailable(.privateHandleMissing)
-        case .partial:
-            return .unavailable(.migrationOrRecoveryRequired)
-        case .invalid(let error):
-            return .unavailable(error.failureCategory)
-        case .complete:
-            do {
-                _ = try loadHandlePair(expected: pair, authenticationContext: nil)
-                return .available
-            } catch let error as SecureEnclaveCustodyHandleError {
-                return .unavailable(error.failureCategory)
-            } catch {
-                return .unavailable(.privateHandleInaccessible)
-            }
-        }
+    func deleteHandlePair(_ pair: SecureEnclaveCustodyHandlePair) throws {
+        try deleteReferences(pair.references)
     }
 
-    func locateHandlePair(
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data
-    ) throws -> SecureEnclaveCustodyHandlePair {
-        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(
-            signingPublicKeyX963
-        ) else {
-            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.signing)
-        }
-        guard SecureEnclaveCustodyHandlePublicBinding.hasUncompressedP256X963PublicKeyShape(
-            keyAgreementPublicKeyX963
-        ) else {
-            throw SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
-        }
-
-        let items = try keyStore.inventoryKeys()
-        var grouped: [String: [SecureEnclaveCustodyHandleInventoryItem]] = [:]
-        for item in items {
-            guard let reference = item.reference else {
-                continue
-            }
-            grouped[reference.handleSetIdentifier, default: []].append(item)
-        }
-
-        var matches: [SecureEnclaveCustodyHandlePair] = []
-        for (handleSetIdentifier, group) in grouped {
-            let signingCount = group.filter { $0.role == .signing }.count
-            let keyAgreementCount = group.filter { $0.role == .keyAgreement }.count
-            if signingCount > 1 {
-                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
-            }
-            if keyAgreementCount > 1 {
-                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.keyAgreement)
-            }
-
-            switch inspectHandlePair(handleSetIdentifier: handleSetIdentifier) {
-            case .missing:
-                continue
-            case .invalid(let error):
-                throw error
-            case .partial(let presentRoles):
-                try failIfPartialSetMatchesExpectedPublicKey(
-                    handleSetIdentifier: handleSetIdentifier,
-                    presentRoles: presentRoles,
-                    signingPublicKeyX963: signingPublicKeyX963,
-                    keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-                )
-            case .complete(let pair):
-                let signingMatches = pair.signing.publicKeyX963 == signingPublicKeyX963
-                let keyAgreementMatches = pair.keyAgreement.publicKeyX963 == keyAgreementPublicKeyX963
-                if signingMatches, keyAgreementMatches {
-                    matches.append(pair)
-                } else if signingMatches {
-                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
-                } else if keyAgreementMatches {
-                    throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.signing)
+    /// Delete whatever handles match the certificate's public keys, tolerating
+    /// already-missing and partial sets — the identity-deletion path must
+    /// converge even after interrupted rollbacks. Tier-independent: matches raw
+    /// public-key bytes across the full inventory (tier key shapes are
+    /// disjoint), so one store instance converges deletion for any tier.
+    func deleteHandles(
+        signingPublicKeyRaw: Data,
+        keyAgreementPublicKeyRaw: Data
+    ) throws {
+        let references = try keyStore.inventory().bindings
+            .filter { binding in
+                switch binding.role {
+                case .signing:
+                    return binding.publicKeyRaw == signingPublicKeyRaw
+                case .keyAgreement:
+                    return binding.publicKeyRaw == keyAgreementPublicKeyRaw
                 }
             }
-        }
-
-        guard !matches.isEmpty else {
-            throw SecureEnclaveCustodyHandleError.privateHandleMissing(.signing)
-        }
-        guard matches.count == 1 else {
-            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
-        }
-        return matches[0]
+            .map(\.reference)
+        try deleteReferences(references)
     }
 
-    func loadSigningHandle(
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data,
-        authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCustodyLoadedHandle {
-        try loadHandle(
-            forRole: .signing,
-            signingPublicKeyX963: signingPublicKeyX963,
-            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963,
-            authenticationContext: authenticationContext
-        )
-    }
-
-    func loadKeyAgreementHandle(
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data,
-        authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCustodyLoadedHandle {
-        try loadHandle(
-            forRole: .keyAgreement,
-            signingPublicKeyX963: signingPublicKeyX963,
-            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963,
-            authenticationContext: authenticationContext
-        )
-    }
-
-    private func loadHandle(
-        forRole role: PGPPrivateOperationRole,
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data,
-        authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCustodyLoadedHandle {
-        let pair = try locateHandlePair(
-            signingPublicKeyX963: signingPublicKeyX963,
-            keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-        )
-        let binding = role == .signing ? pair.signing : pair.keyAgreement
-        return try loadHandle(
-            reference: binding.reference,
-            expectedPublicKeyX963: binding.publicKeyX963,
-            authenticationContext: authenticationContext
-        )
-    }
-
+    /// Cross-tier: counts every stored custody handle row for the local
+    /// recovery report, so handle-only orphans (from interrupted or partial
+    /// generation) surface regardless of tier.
     func inventorySummaryForLocalRecovery() throws -> SecureEnclaveCustodyHandleInventorySummary {
-        let items = try keyStore.inventoryKeys()
-        guard !items.isEmpty else {
+        let inventory = try keyStore.inventory()
+        guard inventory.totalRowCount > 0 else {
             return .empty
         }
 
-        var malformedCount = 0
-        var grouped: [String: [SecureEnclaveCustodyHandleInventoryItem]] = [:]
-        for item in items {
-            guard let reference = item.reference else {
-                malformedCount += 1
-                continue
-            }
-            grouped[reference.handleSetIdentifier, default: []].append(item)
+        var grouped: [String: [SecureEnclaveCustodyHandlePublicBinding]] = [:]
+        for binding in inventory.bindings {
+            grouped["\(binding.reference.tier.rawValue).\(binding.reference.handleSetIdentifier)", default: []]
+                .append(binding)
         }
 
         var completeCount = 0
         var partialCount = 0
-        var ambiguousCount = 0
         for group in grouped.values {
-            let signingCount = group.filter { $0.role == .signing }.count
-            let keyAgreementCount = group.filter { $0.role == .keyAgreement }.count
-            if signingCount > 1 || keyAgreementCount > 1 {
-                ambiguousCount += 1
-            } else if signingCount == 1 && keyAgreementCount == 1 {
+            let hasSigning = group.contains { $0.role == .signing }
+            let hasKeyAgreement = group.contains { $0.role == .keyAgreement }
+            if hasSigning && hasKeyAgreement {
                 completeCount += 1
             } else {
                 partialCount += 1
@@ -337,18 +256,19 @@ struct SecureEnclaveCustodyHandleStore {
         }
 
         return SecureEnclaveCustodyHandleInventorySummary(
-            totalHandleCount: items.count,
+            totalHandleCount: inventory.totalRowCount,
             completeSetCount: completeCount,
             partialSetCount: partialCount,
-            ambiguousSetCount: ambiguousCount,
-            malformedHandleCount: malformedCount
+            malformedHandleCount: inventory.malformedRowCount
         )
     }
 
+    /// Cross-tier: removes every device-bound custody row, including rows whose
+    /// attributes no longer decode, via per-namespace sweeps.
     func cleanupAllHandlesForLocalDataReset() -> SecureEnclaveCustodyHandleCleanupResult {
-        let items: [SecureEnclaveCustodyHandleInventoryItem]
+        let inspectedCount: Int
         do {
-            items = try keyStore.inventoryKeys()
+            inspectedCount = try keyStore.inventory().totalRowCount
         } catch {
             return SecureEnclaveCustodyHandleCleanupResult(
                 inspectedHandleCount: 0,
@@ -357,57 +277,40 @@ struct SecureEnclaveCustodyHandleStore {
             )
         }
 
-        let groupedByTag = Dictionary(grouping: items, by: \.applicationTagData)
-        var deletedCount = 0
         var cleanupFailed = false
-        for (applicationTagData, tagItems) in groupedByTag {
-            do {
-                try keyStore.deleteKey(
-                    applicationTagData: applicationTagData,
-                    roleHint: tagItems.compactMap(\.role).first
-                )
-                deletedCount += tagItems.count
-            } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
-                continue
-            } catch {
-                cleanupFailed = true
+        for tier in SecureEnclaveCustodyTier.allCases {
+            for role in [PGPPrivateOperationRole.signing, .keyAgreement] {
+                do {
+                    try keyStore.deleteAllKeys(tier: tier, role: role)
+                } catch {
+                    cleanupFailed = true
+                }
             }
         }
 
+        let remainingCount = (try? keyStore.inventory().totalRowCount) ?? 0
         return SecureEnclaveCustodyHandleCleanupResult(
-            inspectedHandleCount: items.count,
-            deletedHandleCount: deletedCount,
+            inspectedHandleCount: inspectedCount,
+            deletedHandleCount: max(0, inspectedCount - remainingCount),
             failureCategory: cleanupFailed ? .cleanupOrRollbackFailure : nil
         )
     }
 
+    /// Cross-tier: rows still present after a reset cleanup, for verification.
     func remainingHandleCountForLocalDataReset() throws -> Int {
-        try keyStore.inventoryKeys().count
+        try keyStore.inventory().totalRowCount
     }
 
-    func deleteHandlePair(_ pair: SecureEnclaveCustodyHandlePair) throws {
-        try deleteReferences(pair.references)
+    private func tierBindings() throws -> [SecureEnclaveCustodyHandlePublicBinding] {
+        try keyStore.inventory().bindings.filter { $0.reference.tier == tier }
     }
 
-    func deleteHandlePair(
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data
-    ) throws {
-        do {
-            let pair = try locateHandlePair(
-                signingPublicKeyX963: signingPublicKeyX963,
-                keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-            )
-            try deleteHandlePair(pair)
-        } catch let error as SecureEnclaveCustodyHandleError where error == .partialHandlePair {
-            let partialReferences = try locateMatchingPartialReferences(
-                signingPublicKeyX963: signingPublicKeyX963,
-                keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-            )
-            try deleteReferences(partialReferences)
-        } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
-            return
+    private func tierGroups() throws -> [String: [SecureEnclaveCustodyHandlePublicBinding]] {
+        var grouped: [String: [SecureEnclaveCustodyHandlePublicBinding]] = [:]
+        for binding in try tierBindings() {
+            grouped[binding.reference.handleSetIdentifier, default: []].append(binding)
         }
+        return grouped
     }
 
     private func deleteReferences(_ references: [SecureEnclaveCustodyHandleReference]) throws {
@@ -423,109 +326,6 @@ struct SecureEnclaveCustodyHandleStore {
         }
         if cleanupFailed {
             throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-        }
-    }
-
-    private func locateMatchingPartialReferences(
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data
-    ) throws -> [SecureEnclaveCustodyHandleReference] {
-        let items = try keyStore.inventoryKeys()
-        var grouped: [String: [SecureEnclaveCustodyHandleInventoryItem]] = [:]
-        for item in items {
-            guard let reference = item.reference else {
-                continue
-            }
-            grouped[reference.handleSetIdentifier, default: []].append(item)
-        }
-
-        var matchingReferences: [SecureEnclaveCustodyHandleReference] = []
-        var matchingHandleSetIdentifiers: Set<String> = []
-        for (handleSetIdentifier, group) in grouped {
-            let signingCount = group.filter { $0.role == .signing }.count
-            let keyAgreementCount = group.filter { $0.role == .keyAgreement }.count
-            if signingCount > 1 {
-                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
-            }
-            if keyAgreementCount > 1 {
-                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.keyAgreement)
-            }
-
-            switch inspectHandlePair(handleSetIdentifier: handleSetIdentifier) {
-            case .missing, .complete:
-                continue
-            case .invalid(let error):
-                throw error
-            case .partial(let presentRoles):
-                let references = try matchingPartialReferences(
-                    handleSetIdentifier: handleSetIdentifier,
-                    presentRoles: presentRoles,
-                    signingPublicKeyX963: signingPublicKeyX963,
-                    keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
-                )
-                if !references.isEmpty {
-                    matchingReferences.append(contentsOf: references)
-                    matchingHandleSetIdentifiers.insert(handleSetIdentifier)
-                }
-            }
-        }
-
-        guard matchingHandleSetIdentifiers.count <= 1 else {
-            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(.signing)
-        }
-        return matchingReferences
-    }
-
-    private func matchingPartialReferences(
-        handleSetIdentifier: String,
-        presentRoles: Set<PGPPrivateOperationRole>,
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data
-    ) throws -> [SecureEnclaveCustodyHandleReference] {
-        var references: [SecureEnclaveCustodyHandleReference] = []
-        for role in presentRoles {
-            let reference = try SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: role
-            )
-            let candidates = try keyStore.loadKeys(
-                reference: reference,
-                authenticationContext: nil
-            )
-            guard candidates.count <= 1 else {
-                throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(role)
-            }
-            guard let candidate = candidates.first else {
-                continue
-            }
-
-            let expectedPublicKey = role == .signing ? signingPublicKeyX963 : keyAgreementPublicKeyX963
-            if candidate.binding.publicKeyX963 == expectedPublicKey {
-                references.append(reference)
-            }
-        }
-        return references
-    }
-
-    private func failIfPartialSetMatchesExpectedPublicKey(
-        handleSetIdentifier: String,
-        presentRoles: Set<PGPPrivateOperationRole>,
-        signingPublicKeyX963: Data,
-        keyAgreementPublicKeyX963: Data
-    ) throws {
-        for role in presentRoles {
-            let reference = try SecureEnclaveCustodyHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: role
-            )
-            let candidates = try keyStore.loadKeys(
-                reference: reference,
-                authenticationContext: nil
-            )
-            let expectedPublicKey = role == .signing ? signingPublicKeyX963 : keyAgreementPublicKeyX963
-            if candidates.contains(where: { $0.binding.publicKeyX963 == expectedPublicKey }) {
-                throw SecureEnclaveCustodyHandleError.partialHandlePair
-            }
         }
     }
 }

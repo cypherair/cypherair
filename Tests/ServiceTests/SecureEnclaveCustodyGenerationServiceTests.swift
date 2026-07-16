@@ -271,7 +271,7 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         }
     }
 
-    func test_generationAuthenticatesOnceAndThreadsContextIntoBothHandleLoads() async throws {
+    func test_generationAuthenticatesOnceAndThreadsContextIntoBothHandleCreations() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let stub = StubGenerationCustodyOperationAuthenticator()
         let service = makeService(
@@ -292,9 +292,9 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
 
         XCTAssertEqual(stub.calls, 1, "Exactly one custody authentication per generation.")
         XCTAssertFalse(stub.reasons[0].isEmpty)
-        XCTAssertEqual(keyStore.loadRequests.count, 2)
-        XCTAssertEqual(keyStore.loadRequests.map(\.reference.role), [.signing, .keyAgreement])
-        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext === stub.context })
+        XCTAssertEqual(keyStore.createRequests.count, 2)
+        XCTAssertEqual(keyStore.createRequests.map(\.reference.role), [.signing, .keyAgreement])
+        XCTAssertTrue(keyStore.createRequests.allSatisfy { $0.authenticationContext === stub.context })
         XCTAssertEqual(
             stub.context.invalidateCount,
             1,
@@ -408,8 +408,8 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             invalidationToken: KeyProvisioningInvalidationGate().makeToken()
         )
 
-        XCTAssertFalse(keyStore.loadRequests.isEmpty)
-        XCTAssertTrue(keyStore.loadRequests.allSatisfy { $0.authenticationContext == nil })
+        XCTAssertFalse(keyStore.createRequests.isEmpty)
+        XCTAssertTrue(keyStore.createRequests.allSatisfy { $0.authenticationContext == nil })
     }
 
     private func makeService(
@@ -429,7 +429,8 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
             ),
             handleStore: SecureEnclaveCustodyHandleStore(
                 keyStore: keyStore,
-                handleSetIdentifierGenerator: { "hidden-generation" }
+                tier: .classicalP256,
+                handleSetIdentifierGenerator: { "68696464656e2d67656e65726174696f6e" }
             ),
             digestSigner: MockSecureEnclaveCustodyDigestSigner(),
             catalogStore: catalogStore,
@@ -445,12 +446,12 @@ final class SecureEnclaveCustodyGenerationServiceTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let store = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
+            tier: .classicalP256,
             handleSetIdentifierGenerator: {
                 try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
             }
         )
-        let pair = try store.createHandlePair()
-        return try store.loadHandlePair(expected: pair, authenticationContext: nil)
+        return try store.createLoadedHandlePair(authenticationContext: nil)
     }
 
     private static func material(

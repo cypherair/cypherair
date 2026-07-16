@@ -9,13 +9,13 @@ struct SecureEnclaveCustodyDeletionContext {
     // wires the composite stores (the classical component envelope itself is
     // removed by the shared keychain-material path, keyed by fingerprint).
     let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
-    let compositeHandleStore: SecureEnclaveCompositeHandleStore?
+    let compositeHandleStore: SecureEnclaveCustodyHandleStore?
 
     init(
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore,
         compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil
+        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) {
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
@@ -469,11 +469,17 @@ final class KeyMutationService {
         guard let secureEnclaveCustodyDeletionContext else {
             return []
         }
-        if let compositeTier = identity.openPGPConfiguration.identity.deviceBoundCompositeTier {
+        guard let tier = identity.openPGPConfiguration.identity.deviceBoundCustodyTier else {
+            return [CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)]
+        }
+        switch tier {
+        case .classicalP256:
+            break
+        case .postQuantum, .postQuantumHigh:
             return deleteSecureEnclaveCompositeHandles(
                 for: identity,
                 context: secureEnclaveCustodyDeletionContext,
-                tier: compositeTier
+                tier: tier
             )
         }
 
@@ -486,9 +492,9 @@ final class KeyMutationService {
                 return [CypherAirError.keyOperationUnavailable(category: .metadataAssociationMismatch)]
             }
 
-            try secureEnclaveCustodyDeletionContext.handleStore.deleteHandlePair(
-                signingPublicKeyX963: inspection.signingPublicKeyX963,
-                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+            try secureEnclaveCustodyDeletionContext.handleStore.deleteHandles(
+                signingPublicKeyRaw: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
             return []
         } catch let error as SecureEnclaveCustodyHandleError where error.isMissing {
@@ -501,7 +507,7 @@ final class KeyMutationService {
     private func deleteSecureEnclaveCompositeHandles(
         for identity: PGPKeyIdentity,
         context: SecureEnclaveCustodyDeletionContext,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) -> [Error] {
         guard let compositeBindingInspector = context.compositeBindingInspector,
               let compositeHandleStore = context.compositeHandleStore else {

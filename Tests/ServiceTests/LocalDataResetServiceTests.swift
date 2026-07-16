@@ -165,12 +165,18 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let handleStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "resetcleanup" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "7265736574636c65616e7570" }
         )
-        _ = try handleStore.createHandlePair()
-        keyStore.insertMalformedApplicationTag(
-            "\(SecureEnclaveCustodyHandleReference.applicationTagPrefix).reset-malformed"
+        _ = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        // The unified sweep also removes composite-tier rows and rows whose
+        // attributes no longer decode.
+        let compositeStore = SecureEnclaveCustodyHandleStore(
+            keyStore: keyStore,
+            tier: .postQuantum
         )
+        _ = try compositeStore.createLoadedHandlePair(authenticationContext: nil)
+        keyStore.insertMalformedRow()
         let resetService = makeResetService(
             from: container,
             secureEnclaveCustodyHandleStore: handleStore
@@ -186,7 +192,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         )
         XCTAssertEqual(cleanupEntry.metadata["serviceKind"], "secureEnclaveCustodyHandle")
         XCTAssertEqual(cleanupEntry.metadata["result"], "success")
-        XCTAssertEqual(cleanupEntry.metadata["deletedHandleCount"], "3")
+        XCTAssertEqual(cleanupEntry.metadata["deletedHandleCount"], "5")
         XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("resetcleanup") })
         XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("secure-enclave-custody") })
     }
@@ -199,9 +205,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let handleStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "sensitive-reset-id" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "73656e7369746976652d72657365742d6964" }
         )
-        _ = try handleStore.createHandlePair()
+        _ = try handleStore.createLoadedHandlePair(authenticationContext: nil)
         keyStore.failDeleteRole = .signing
         let resetService = makeResetService(
             from: container,
@@ -222,7 +229,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         }
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         keyStore.failInventory = true
-        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
         let resetService = makeResetService(
             from: container,
             secureEnclaveCustodyHandleStore: handleStore
@@ -365,8 +372,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         keychain: (any KeychainManageable)? = nil,
         temporaryArtifactStore: CypherAir.AppTemporaryArtifactStore? = nil,
         protectedDataRootSecretExists: @escaping () -> Bool = { false },
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil,
-        secureEnclaveCompositeHandleStore: SecureEnclaveCompositeHandleStore? = nil
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) -> LocalDataResetService {
         let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
@@ -387,112 +393,8 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             temporaryArtifactStore: temporaryArtifactStore,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveCompositeHandleStore: secureEnclaveCompositeHandleStore,
             traceStore: container.authLifecycleTraceStore
         )
-    }
-
-    /// In-memory composite key store for reset-cleanup coverage: records blobs
-    /// per reference without touching the real Secure Enclave. Public keys are
-    /// synthetic but shape-valid (1952 / 1184 bytes).
-    private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring, @unchecked Sendable {
-        private struct Row {
-            let publicKeyRaw: Data
-        }
-        private var rows: [String: Row] = [:]
-
-        private func key(_ reference: SecureEnclaveCompositeHandleReference) -> String {
-            "\(reference.handleSetIdentifier).\(reference.role.rawValue)"
-        }
-
-        func createKey(
-            reference: SecureEnclaveCompositeHandleReference,
-            accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
-            authenticationContext: LAContext?
-        ) throws -> SecureEnclaveCompositeLoadedHandle {
-            throw SecureEnclaveCustodyHandleError.hardwareUnavailable
-        }
-
-        func loadKey(
-            reference: SecureEnclaveCompositeHandleReference,
-            authenticationContext: LAContext?
-        ) throws -> SecureEnclaveCompositeLoadedHandle? {
-            nil
-        }
-
-        func inventoryBindings() throws -> [SecureEnclaveCompositeHandlePublicBinding] {
-            try rows.values.compactMap { row in
-                guard let reference = referenceForPublicKey(row.publicKeyRaw) else {
-                    return nil
-                }
-                return try SecureEnclaveCompositeHandlePublicBinding(
-                    reference: reference,
-                    publicKeyRaw: row.publicKeyRaw
-                )
-            }
-        }
-
-        func deleteKey(reference: SecureEnclaveCompositeHandleReference) throws {
-            guard rows.removeValue(forKey: key(reference)) != nil else {
-                throw SecureEnclaveCustodyHandleError.privateHandleMissing(reference.role)
-            }
-        }
-
-        func seed(handleSetIdentifier: String) throws {
-            let signing = try SecureEnclaveCompositeHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .signing
-            )
-            let keyAgreement = try SecureEnclaveCompositeHandleReference(
-                handleSetIdentifier: handleSetIdentifier,
-                role: .keyAgreement
-            )
-            rows[key(signing)] = Row(publicKeyRaw: Data(repeating: 0xA1, count: 1952))
-            rows[key(keyAgreement)] = Row(publicKeyRaw: Data(repeating: 0xB2, count: 1184))
-        }
-
-        var storedRowCount: Int { rows.count }
-
-        private func referenceForPublicKey(_ publicKeyRaw: Data) -> SecureEnclaveCompositeHandleReference? {
-            rows.first { $0.value.publicKeyRaw == publicKeyRaw }.flatMap { entry -> SecureEnclaveCompositeHandleReference? in
-                let parts = entry.key.split(separator: ".")
-                guard parts.count == 2,
-                      let role = PGPPrivateOperationRole(rawValue: String(parts[1])) else {
-                    return nil
-                }
-                return try? SecureEnclaveCompositeHandleReference(
-                    handleSetIdentifier: String(parts[0]),
-                    role: role
-                )
-            }
-        }
-    }
-
-    func test_resetAllLocalData_removesSecureEnclaveCompositeHandles() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
-        defer {
-            cleanup(container)
-        }
-        let compositeKeyStore = InMemoryCompositeKeyStore()
-        try compositeKeyStore.seed(handleSetIdentifier: "abcdef01")
-        let compositeHandleStore = SecureEnclaveCompositeHandleStore(keyStore: compositeKeyStore)
-        let resetService = makeResetService(
-            from: container,
-            secureEnclaveCompositeHandleStore: compositeHandleStore
-        )
-
-        let summary = try await resetService.resetAllLocalData()
-        _ = summary
-
-        XCTAssertEqual(compositeKeyStore.storedRowCount, 0)
-        let cleanupEntry = try XCTUnwrap(
-            container.authLifecycleTraceStore?.recentEntries.last {
-                $0.name == "localDataReset.secureEnclaveComposite.cleanup.finish"
-            }
-        )
-        XCTAssertEqual(cleanupEntry.metadata["serviceKind"], "secureEnclaveCompositeHandle")
-        XCTAssertEqual(cleanupEntry.metadata["result"], "success")
-        XCTAssertEqual(cleanupEntry.metadata["deletedHandleCount"], "2")
     }
 
     private func makePhase7TemporaryArtifacts(in temporaryDirectory: URL) throws {

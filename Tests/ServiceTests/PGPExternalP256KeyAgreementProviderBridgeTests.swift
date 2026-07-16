@@ -1,40 +1,34 @@
-import Security
+import CryptoKit
 import XCTest
 @testable import CypherAir
 
 final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
-    func test_systemKeyAgreementDerivesP256SharedSecretAndChecksRecipientBinding() throws {
-        let localPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let localPublicKey = try Self.publicKeyX963(from: localPrivateKey)
-        let peerPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let peerPublicKey = try Self.publicKeyX963(from: peerPrivateKey)
-        let handle = try Self.handle(
-            role: .keyAgreement,
-            publicKeyX963: localPublicKey,
-            privateKey: localPrivateKey
-        )
+    func test_keyAgreementDerivesP256SharedSecretAndChecksRecipientBinding() throws {
+        let material = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let localPublicKey = material.keyAgreementPublicKeyX963
+        let peerPrivateKey = P256.KeyAgreement.PrivateKey()
+        let handle = try Self.handle(role: .keyAgreement, publicKeyX963: localPublicKey)
         let request = ExternalP256KeyAgreementRequest(
             recipientPublicKey: localPublicKey,
-            ephemeralPublicKey: peerPublicKey
+            ephemeralPublicKey: peerPrivateKey.publicKey.x963Representation
         )
 
-        let sharedSecret = try SystemSecureEnclaveCustodyKeyAgreement()
+        let sharedSecret = try SoftwareP256CustodyProvider.shared.keyAgreement
             .deriveSharedSecret(request: request, using: handle)
-        let expected = try Self.deriveSharedSecret(
-            privateKey: peerPrivateKey,
-            peerPublicKeyX963: localPublicKey
-        )
+        let expected = try peerPrivateKey.sharedSecretFromKeyAgreement(
+            with: P256.KeyAgreement.PublicKey(x963Representation: localPublicKey)
+        ).withUnsafeBytes { Data($0) }
 
         XCTAssertEqual(sharedSecret.raw, expected)
         XCTAssertEqual(sharedSecret.raw.count, 32)
         XCTAssertTrue(sharedSecret.raw.contains(where: { $0 != 0 }))
 
         let mismatchedRequest = ExternalP256KeyAgreementRequest(
-            recipientPublicKey: try Self.publicKeyX963(from: try Self.makeEphemeralP256PrivateKey()),
-            ephemeralPublicKey: peerPublicKey
+            recipientPublicKey: SoftwareP256CustodyProvider.shared.makeMaterial().keyAgreementPublicKeyX963,
+            ephemeralPublicKey: peerPrivateKey.publicKey.x963Representation
         )
         XCTAssertThrowsError(
-            try SystemSecureEnclaveCustodyKeyAgreement()
+            try SoftwareP256CustodyProvider.shared.keyAgreement
                 .deriveSharedSecret(request: mismatchedRequest, using: handle)
         ) { error in
             XCTAssertEqual(
@@ -47,11 +41,10 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
     func test_providerBridgeMapsCancellationAndStableFailureCategories() throws {
         let handle = try Self.handle(
             role: .keyAgreement,
-            publicKeyX963: Self.publicKey(byte: 0x21),
-            privateKey: nil
+            publicKeyX963: Self.publicKey(byte: 0x21)
         )
         let request = ExternalP256KeyAgreementRequest(
-            recipientPublicKey: handle.binding.publicKeyX963,
+            recipientPublicKey: handle.binding.publicKeyRaw,
             ephemeralPublicKey: Self.publicKey(byte: 0x22)
         )
 
@@ -89,20 +82,16 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
     }
 
     func test_providerBridgeRejectsShapeValidOffCurveEphemeralPublicKey() throws {
-        let localPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let localPublicKey = try Self.publicKeyX963(from: localPrivateKey)
-        let handle = try Self.handle(
-            role: .keyAgreement,
-            publicKeyX963: localPublicKey,
-            privateKey: localPrivateKey
-        )
+        let material = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let localPublicKey = material.keyAgreementPublicKeyX963
+        let handle = try Self.handle(role: .keyAgreement, publicKeyX963: localPublicKey)
         let request = ExternalP256KeyAgreementRequest(
             recipientPublicKey: localPublicKey,
             ephemeralPublicKey: Self.shapeValidOffCurvePublicKey()
         )
         let bridge = PGPExternalP256KeyAgreementProviderBridge(
             handle: handle,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement()
+            keyAgreement: SoftwareP256CustodyProvider.shared.keyAgreement
         )
 
         XCTAssertThrowsError(try bridge.deriveSharedSecret(request: request)) { error in
@@ -113,84 +102,21 @@ final class PGPExternalP256KeyAgreementProviderBridgeTests: XCTestCase {
         }
     }
 
-
-    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-        return privateKey
-    }
-
-    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-        return data
-    }
-
-    private static func deriveSharedSecret(
-        privateKey: SecKey,
-        peerPublicKeyX963: Data
-    ) throws -> Data {
-        let peerPublicKey = try importP256PublicKey(peerPublicKeyX963)
-        var error: Unmanaged<CFError>?
-        guard let sharedSecret = SecKeyCopyKeyExchangeResult(
-            privateKey,
-            .ecdhKeyExchangeStandard,
-            peerPublicKey,
-            [:] as CFDictionary,
-            &error
-        ) as Data? else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-        return sharedSecret
-    }
-
-    private static func importP256PublicKey(_ publicKeyX963: Data) throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let publicKey = SecKeyCreateWithData(
-            publicKeyX963 as CFData,
-            attributes as CFDictionary,
-            &error
-        ) else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
-        }
-        return publicKey
-    }
-
     private static func handle(
         role: PGPPrivateOperationRole,
-        publicKeyX963: Data,
-        privateKey: SecKey?
+        publicKeyX963: Data
     ) throws -> SecureEnclaveCustodyLoadedHandle {
         let reference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: "key-agreement-bridge",
-            role: role
+            handleSetIdentifier: "a9bcd0e1",
+            role: role,
+            tier: .classicalP256
         )
         return SecureEnclaveCustodyLoadedHandle(
             binding: try SecureEnclaveCustodyHandlePublicBinding(
                 reference: reference,
-                publicKeyX963: publicKeyX963
+                publicKeyRaw: publicKeyX963
             ),
-            privateKey: privateKey
+            privateKey: nil
         )
     }
 

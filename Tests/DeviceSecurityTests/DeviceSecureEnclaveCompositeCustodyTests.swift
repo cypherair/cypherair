@@ -28,10 +28,11 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
             context.invalidate()
         }
 
-        let handleStore = SecureEnclaveCompositeHandleStore(
-            keyStore: SystemSecureEnclaveCompositeKeyStore()
+        let handleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: SystemSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         )
-        let loadedPair: SecureEnclaveCompositeLoadedHandlePair
+        let loadedPair: SecureEnclaveCustodyLoadedHandlePair
         do {
             loadedPair = try handleStore.createLoadedHandlePair(authenticationContext: context)
         } catch SecureEnclaveCustodyHandleError.hardwareUnavailable {
@@ -147,11 +148,11 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
             context.invalidate()
         }
 
-        let handleStore = SecureEnclaveCompositeHandleStore(
-            keyStore: SystemSecureEnclaveCompositeKeyStore(),
+        let handleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: SystemSecureEnclaveCustodyKeyStore(),
             tier: .postQuantumHigh
         )
-        let loadedPair: SecureEnclaveCompositeLoadedHandlePair
+        let loadedPair: SecureEnclaveCustodyLoadedHandlePair
         do {
             loadedPair = try handleStore.createLoadedHandlePair(authenticationContext: context)
         } catch SecureEnclaveCustodyHandleError.hardwareUnavailable {

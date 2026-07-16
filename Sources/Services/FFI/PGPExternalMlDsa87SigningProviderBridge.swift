@@ -6,11 +6,11 @@ import Foundation
 /// signature digest; the Ed448 half and all composite assembly stay in Rust
 /// (Device-Bound Post-Quantum · High).
 final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCompositeLoadedHandle
+    private let handle: SecureEnclaveCustodyLoadedHandle
     private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
-        handle: SecureEnclaveCompositeLoadedHandle,
+        handle: SecureEnclaveCustodyLoadedHandle,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.handle = handle

@@ -61,6 +61,10 @@ final class PrivateKeyExpiryMutationService: PrivateKeyExpiryMutationRouting, @u
         newExpirySeconds: UInt64?
     ) async throws -> PGPPublicModifiedExpiryKeyMaterial {
         switch route.signingHandle.reference.tier {
+        case .classicalP256:
+            // A classical handle can never ride a composite route; the
+            // router dispatches by tier before building route values.
+            throw CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)
         case .postQuantum:
             return try await keyAdapter.modifyExpiryWithExternalCompositeSigner(
                 publicCert: route.identity.publicKeyData,

@@ -18,7 +18,7 @@ protocol SecureEnclaveCompositeCertificateBuilding: Sendable {
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        handlePair: SecureEnclaveCompositeLoadedHandlePair,
+        handlePair: SecureEnclaveCustodyLoadedHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial
 }
@@ -39,11 +39,15 @@ final class PGPSecureEnclaveCompositeGenerationAdapter: SecureEnclaveCompositeCe
         name: String,
         email: String?,
         expirySeconds: UInt64?,
-        handlePair: SecureEnclaveCompositeLoadedHandlePair,
+        handlePair: SecureEnclaveCustodyLoadedHandlePair,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) async throws -> PGPSecureEnclaveCompositeGeneratedMaterial {
         do {
             switch handlePair.signing.reference.tier {
+            case .classicalP256:
+                throw CypherAirError.invalidKeyData(
+                    reason: "Composite generation requires a post-quantum custody tier."
+                )
             case .postQuantum:
                 return try await Self.performGenerateCompositeCertificate(
                     engine: engine,

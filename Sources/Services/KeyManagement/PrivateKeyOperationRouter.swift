@@ -7,8 +7,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     private let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     private let handleStore: SecureEnclaveCustodyHandleStore
     private let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
-    private let compositeHandleStore: SecureEnclaveCompositeHandleStore?
-    private let compositeHighHandleStore: SecureEnclaveCompositeHandleStore?
+    private let compositeHandleStore: SecureEnclaveCustodyHandleStore?
+    private let compositeHighHandleStore: SecureEnclaveCustodyHandleStore?
     private let compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore?
     private let custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator?
@@ -19,8 +19,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore,
         compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
-        compositeHighHandleStore: SecureEnclaveCompositeHandleStore? = nil,
+        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil,
+        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore? = nil,
         custodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator? = nil
@@ -104,15 +104,30 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         identity: PGPKeyIdentity
     ) async -> PrivateKeyOperationRoute {
         let configuration = identity.openPGPConfiguration
-        if let compositeTier = configuration.identity.deviceBoundCompositeTier {
+        guard let tier = configuration.identity.deviceBoundCustodyTier else {
+            return .blocked(.unsupported(.invalidConfigurationCustody))
+        }
+        switch tier {
+        case .classicalP256:
+            return await routeSecureEnclaveClassicalOperation(
+                request: request,
+                identity: identity
+            )
+        case .postQuantum, .postQuantumHigh:
             return await routeSecureEnclaveCompositeOperation(
                 request: request,
                 identity: identity,
-                tier: compositeTier
+                tier: tier
             )
         }
-        guard configuration.algorithmSuite == .p256,
-              configuration.keyVersion == identity.keyVersion else {
+    }
+
+    private func routeSecureEnclaveClassicalOperation(
+        request: PrivateKeyOperationRequest,
+        identity: PGPKeyIdentity
+    ) async -> PrivateKeyOperationRoute {
+        let configuration = identity.openPGPConfiguration
+        guard configuration.keyVersion == identity.keyVersion else {
             return .blocked(.unsupported(.invalidConfigurationCustody))
         }
         guard !identity.publicKeyData.isEmpty else {
@@ -161,8 +176,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
             // a missing/mismatched handle blocks without a biometric sheet,
             // and the authenticated context covers exactly one handle load.
             let pair = try handleStore.locateHandlePair(
-                signingPublicKeyX963: inspection.signingPublicKeyX963,
-                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+                signingPublicKeyRaw: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
             let authorized = try await withOperationPromptIfConfigured(
                 source: "privateKeyOperation.sign.authorize"
@@ -171,7 +186,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 do {
                     let signingHandle = try handleStore.loadHandle(
                         reference: pair.signing.reference,
-                        expectedPublicKeyX963: pair.signing.publicKeyX963,
+                        expectedPublicKeyRaw: pair.signing.publicKeyRaw,
                         authenticationContext: authorization?.authenticationContext
                     )
                     return AuthorizedSigningHandle(
@@ -209,8 +224,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     ) async -> PrivateKeyOperationRoute {
         do {
             let pair = try handleStore.locateHandlePair(
-                signingPublicKeyX963: inspection.signingPublicKeyX963,
-                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+                signingPublicKeyRaw: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
             let authorized = try await withOperationPromptIfConfigured(
                 source: "privateKeyOperation.keyAgreement.authorize"
@@ -219,7 +234,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 do {
                     let keyAgreementHandle = try handleStore.loadHandle(
                         reference: pair.keyAgreement.reference,
-                        expectedPublicKeyX963: pair.keyAgreement.publicKeyX963,
+                        expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
                         authenticationContext: authorization?.authenticationContext
                     )
                     return AuthorizedKeyAgreementHandle(
@@ -253,7 +268,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     private func routeSecureEnclaveCompositeOperation(
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) async -> PrivateKeyOperationRoute {
         let configuration = identity.openPGPConfiguration
         guard configuration.keyVersion == identity.keyVersion else {
@@ -265,8 +280,10 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         // Each tier loads and shape-checks handles against its own parameter
         // set, so the store is selected by tier (exhaustive: a new tier fails to
         // compile until it is wired here).
-        let tierHandleStore: SecureEnclaveCompositeHandleStore?
+        let tierHandleStore: SecureEnclaveCustodyHandleStore?
         switch tier {
+        case .classicalP256:
+            tierHandleStore = nil
         case .postQuantum:
             tierHandleStore = compositeHandleStore
         case .postQuantumHigh:
@@ -321,8 +338,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity,
         inspection: PGPSecureEnclaveCompositeBindingInspection,
-        tier: SecureEnclaveCompositeTier,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore,
+        tier: SecureEnclaveCustodyTier,
+        compositeHandleStore: SecureEnclaveCustodyHandleStore,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore
     ) async -> PrivateKeyOperationRoute {
         do {
@@ -383,8 +400,8 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         request: PrivateKeyOperationRequest,
         identity: PGPKeyIdentity,
         inspection: PGPSecureEnclaveCompositeBindingInspection,
-        tier: SecureEnclaveCompositeTier,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore,
+        tier: SecureEnclaveCustodyTier,
+        compositeHandleStore: SecureEnclaveCustodyHandleStore,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore
     ) async -> PrivateKeyOperationRoute {
         do {
@@ -476,7 +493,7 @@ private struct AuthorizedSigningHandle {
 }
 
 private struct AuthorizedCompositeHandle {
-    let handle: SecureEnclaveCompositeLoadedHandle
+    let handle: SecureEnclaveCustodyLoadedHandle
     let classicalComponent: SecureEnclaveCompositeClassicalComponentStore.ClassicalComponent
     let authorization: SecureEnclaveCustodyOperationAuthorization?
 }

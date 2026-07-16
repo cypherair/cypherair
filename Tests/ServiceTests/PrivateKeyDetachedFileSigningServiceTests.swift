@@ -62,7 +62,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             router: router,
             unwrapper: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
 
         let signature = try await service.signDetachedFile(
@@ -96,7 +96,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             router: router,
             unwrapper: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
 
         let signature = try await service.signDetachedFile(
@@ -130,8 +130,8 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
             resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
         defer { TestHelpers.cleanupTempDir(contactsDirectory) }
@@ -179,7 +179,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
             resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
         )
         let input = try makeTemporaryFile(Data("blocked detached file".utf8))
         defer { try? FileManager.default.removeItem(at: input) }
@@ -208,7 +208,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: PGPMessageOperationAdapter(engine: engine),
             resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
         )
         let input = try makeTemporaryFile(Data("missing handle detached file".utf8))
         defer { try? FileManager.default.removeItem(at: input) }
@@ -402,7 +402,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         router: StaticDetachedPrivateKeyOperationRouter,
         unwrapper: RecordingDetachedSoftwareSecretCertificateUnwrapper,
         messageAdapter: PGPMessageOperationAdapter? = nil,
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner
     ) -> PrivateKeyDetachedFileSigningService {
         PrivateKeyDetachedFileSigningService(
             router: router,
@@ -466,32 +466,33 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
     private func makeSecureEnclaveRouteFixture(
         configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
     ) async throws -> DetachedSecureEnclaveRouteFixture {
-        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
-        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
-        let handleSetIdentifier = "detached-file-\(UUID().uuidString.lowercased())"
+        let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let signingPublicKeyX963 = custodyMaterial.signingPublicKeyX963
+        let keyAgreementPublicKeyX963 = custodyMaterial.keyAgreementPublicKeyX963
+        let handleSetIdentifier = try SecureEnclaveCustodyHandleReference.generateHandleSetIdentifier()
         let signingReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .signing
+            role: .signing,
+            tier: .classicalP256
         )
         let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
+            role: .keyAgreement,
+            tier: .classicalP256
         )
         let signingHandle = SecureEnclaveCustodyLoadedHandle(
             binding: try SecureEnclaveCustodyHandlePublicBinding(
                 reference: signingReference,
-                publicKeyX963: signingPublicKeyX963
+                publicKeyRaw: signingPublicKeyX963
             ),
-            privateKey: signingPrivateKey
+            privateKey: nil
         )
         let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
             binding: try SecureEnclaveCustodyHandlePublicBinding(
                 reference: keyAgreementReference,
-                publicKeyX963: keyAgreementPublicKeyX963
+                publicKeyRaw: keyAgreementPublicKeyX963
             ),
-            privateKey: keyAgreementPrivateKey
+            privateKey: nil
         )
         let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
             signing: signingHandle,
@@ -506,7 +507,7 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
             expirySeconds: 3600,
             configuration: configurationIdentity.configuration,
             handlePair: handlePair,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
@@ -541,34 +542,6 @@ final class PrivateKeyDetachedFileSigningServiceTests: XCTestCase {
         )
     }
 
-    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to create test P-256 key."
-            )
-        }
-        return key
-    }
-
-    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw CypherAirError.keyGenerationFailed(reason: "Missing test public key.")
-        }
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to export test P-256 public key."
-            )
-        }
-        return data
-    }
 }
 
 private struct DetachedSecureEnclaveRouteFixture {
