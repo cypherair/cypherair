@@ -376,9 +376,14 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             // is already committed — a silent encrypt-to-self orphan —
             // while the lagging watermark merely heals on the next read.
             // Swallow the failure only when the on-disk watermark verifiably
-            // sits in that heal-able state; anything else stays fail-closed.
-            guard let staleMetadata = try? bootstrapStore.loadMetadata(for: Self.domainID),
-                  staleMetadata.expectedCurrentGenerationIdentifier == String(generationIdentifier - 1) else {
+            // sits in a state the read gate accepts: exactly one generation
+            // behind (heal-able lag), or already at the new generation (the
+            // failed save landed durably before throwing, so the commit is
+            // complete and needs no heal). Anything else stays fail-closed.
+            guard let storedWatermark = (try? bootstrapStore.loadMetadata(for: Self.domainID))?
+                    .expectedCurrentGenerationIdentifier,
+                  storedWatermark == String(generationIdentifier - 1)
+                      || storedWatermark == String(generationIdentifier) else {
                 throw error
             }
         }

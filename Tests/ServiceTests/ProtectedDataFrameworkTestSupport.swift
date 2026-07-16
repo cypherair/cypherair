@@ -178,6 +178,7 @@ final class FailureInjectingProtectedDomainBootstrapStore: ProtectedDomainBootst
     private let base: ProtectedDomainBootstrapStore
     var saveError: Error?
     var removesRecordBeforeFailing = false
+    var writesRecordBeforeFailing = false
 
     init(base: ProtectedDomainBootstrapStore) {
         self.base = base
@@ -191,6 +192,9 @@ final class FailureInjectingProtectedDomainBootstrapStore: ProtectedDomainBootst
         if let saveError {
             if removesRecordBeforeFailing {
                 try base.removeMetadata(for: domainID)
+            }
+            if writesRecordBeforeFailing {
+                try base.saveMetadata(metadata, for: domainID)
             }
             throw saveError
         }
