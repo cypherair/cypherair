@@ -5,7 +5,7 @@
 > **Audience:** Human developers, product reviewers, and AI coding tools.<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, or roadmap change.<br>
-> **Last reviewed:** 2026-07-05.
+> **Last reviewed:** 2026-07-16.
 
 ## 1. Product Overview
 

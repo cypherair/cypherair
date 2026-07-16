@@ -18,7 +18,7 @@
 
 ### 1.3 Software Profile Configuration
 
-The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36). Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
+The two composite Post-Quantum suites each back two families: the ML-DSA-65/ML-KEM-768 suite backs the **Portable Post-Quantum** software key below and **Device-Bound Post-Quantum** split custody, and the ML-DSA-87/ML-KEM-1024 suite backs **Portable Post-Quantum · High** and **Device-Bound Post-Quantum · High** ([SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1). The table below shows the base Post-Quantum tier; the · High tier uses the same RFC 9580/9980 configuration with ML-DSA-87+Ed448 (composite, algo 31) / ML-KEM-1024+X448 (composite, algo 36) at NIST security level 5. Family taxonomy and product exposure: [PRD.md](PRD.md) §3.
 
 | Setting | Legacy (Universal) | Modern | Modern · High (Advanced) | Post-Quantum |
 |---------|--------------------|--------|--------------------------|--------------|

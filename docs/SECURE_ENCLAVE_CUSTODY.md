@@ -5,7 +5,7 @@
 > Audience: Security reviewers, release owners, Swift/Rust implementers, test owners, and AI coding tools.
 > Source of truth: This document, the code under `Sources/Security/SecureEnclaveCustody*` / `Sources/Security/SecureEnclaveComposite*` / `Sources/Services/KeyManagement/` / `pgp-mobile/src/`, and the companion canonical docs cited below.
 > Update triggers: Any change to the custody model, access-control policy, red lines, operation surface, persisted-state classification, Rust/UniFFI boundary, or evidence matrix.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. Overview
 

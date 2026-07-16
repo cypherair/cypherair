@@ -4,7 +4,7 @@
 > Purpose: Test layers, test plans, CI lanes, and the build/validation workflows that connect Rust artifacts to Swift testing.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Test plans, CI lanes, validation commands, or the Rust↔Xcode artifact contract change.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. Test Layers
 

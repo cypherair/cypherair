@@ -151,7 +151,8 @@ component/tool readiness checks. Production stage1 builds force source-built
 bundled LLVM at the unmodified
 `08c84e69a84d95936296dfcab0e38b34100725d5` gitlink; neither the Rust gitlink
 nor `.gitmodules` points to a CypherAir LLVM fork. A Rust stage1 compiler check
-against the external replay also passed, as recorded below.
+against the external replay also passed (serialized-output regression 1/1,
+`callbr` codegen 4/4); the broader evidence trail is §6.
 
 ## 6. Validation Contract
 
