@@ -29,10 +29,10 @@
 1. `.github/workflows/pr-checks.yml`, `nightly-full.yml`, `xcframework-edge-release.yml` (env values)
 2. `scripts/build_apple_arm64e_xcframework.sh` and `scripts/download_arm64e_stage1_toolchain.sh` (defaults)
 3. This file (the pin lines above)
-4. `CLAUDE.md` Build Commands and `AGENTS.md` Build And Validation
-5. `docs/TESTING.md` §2.4 workflow C
-6. `third_party/arm64e-stage1-toolchain.pin.json` — refresh the full release identity (tag, url, commit, source ref, run id, publishedAt) **and every per-asset SHA-256 and byte size for both host triples**. Take digests and sizes from `gh api repos/cypherair/rust/releases/tags/<tag>` and confirm them against a real download; then run `scripts/verify_arm64e_stage1_release.sh` against the downloaded assets so the attestation chain is proven before the pin lands.
-7. `scripts/validate_arm64e_stage1_toolchain.py` — release repository/ref/commit come from the machine pin, but review its stable-series prefix, stable base, schema, bundled-LLVM gitlink/version, and tests whenever the new release changes any semantic contract rather than only rotating the build identity.
+4. `third_party/arm64e-stage1-toolchain.pin.json` — refresh the full release identity (tag, url, commit, source ref, run id, publishedAt) **and every per-asset SHA-256 and byte size for both host triples**. Take digests and sizes from `gh api repos/cypherair/rust/releases/tags/<tag>` and confirm them against a real download; then run `scripts/verify_arm64e_stage1_release.sh` against the downloaded assets so the attestation chain is proven before the pin lands.
+5. `scripts/validate_arm64e_stage1_toolchain.py` — release repository/ref/commit come from the machine pin, but review its stable-series prefix, stable base, schema, bundled-LLVM gitlink/version, and tests whenever the new release changes any semantic contract rather than only rotating the build identity.
+
+The entry docs and `docs/TESTING.md` deliberately carry no tag literal — their build commands rely on the script defaults, so they never rotate.
 
 After rotating: the old tag greps to zero hits, the new tag greps to exactly these locations, the selected package passes release and semantic verification before the compiler executes, and one pinned rebuild plus the macOS unit lane passes.
 

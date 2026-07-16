@@ -1,9 +1,12 @@
 # App Store Listing — CypherAir X
 
-Canonical copy for the App Store Connect product page. Enter these values
-manually in App Store Connect; nothing here is read by the build. Field limits
-are noted per field. Price ($2.99 USD tier) is configured in App Store Connect
-Pricing and Availability and is never shown inside the app.
+> Status: Canonical current-state.
+> Purpose: The App Store Connect product-page copy — entered manually in App Store Connect; nothing here is read by the build.
+> Audience: Maintainer, release owners, and AI coding tools.
+> Update triggers: Product-page copy, keywords, reviewer notes, or listing metadata change.
+
+Field limits are noted per field. Price ($2.99 USD tier) is configured in App
+Store Connect Pricing and Availability and is never shown inside the app.
 
 Positioning in one line: **CypherAir X is a fully offline OpenPGP encryption
 app** — one app offering all nine key families, from portable software keys to

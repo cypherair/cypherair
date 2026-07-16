@@ -80,11 +80,10 @@ The repository ships a project-level `.mcp.json` configuring an `xcode` MCP serv
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 
 # 2. Refresh the XCFramework artifact and generated bindings used by Xcode.
-# build-xcframework.sh consumes a pinned arm64e stage1 prerelease; `latest` is
-# rejected. Use the pinned ARM64E_STAGE1_RELEASE_TAG value from CLAUDE.md
-# (Build Commands) or docs/ARM64E_STATUS.md (the arm64e source of truth).
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 ARM64E_STAGE1_RELEASE_TAG=<pinned-tag> \
-    ./build-xcframework.sh --release
+# build-xcframework.sh consumes the pinned arm64e stage1 prerelease; the script
+# defaults to the current pin (owned by docs/ARM64E_STATUS.md, the arm64e
+# source of truth) and rejects `latest`.
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
 # 3. Restore the pinned SQLCipher external dependency (git-ignored artifact;
 # backs the protected Contacts database).
@@ -141,6 +140,9 @@ For the complete security specification, see [docs/SECURITY.md](docs/SECURITY.md
 | [WORKFLOW](docs/WORKFLOW.md) | Development loop, "done" requirements, security gate, documentation contract |
 | [RELEASE](docs/RELEASE.md) | Stable releases, Xcode Cloud flow, asset contract, SDK channels |
 | [ARM64E_STATUS](docs/ARM64E_STATUS.md) | Pinned arm64e stage1 toolchain and re-pin rule |
+| [ARM64E_UPSTREAMING](docs/ARM64E_UPSTREAMING.md) | arm64e fork-carry ownership split, validation contract, rebase guidance |
+| [FFI_ARTIFACT_DECISION](docs/FFI_ARTIFACT_DECISION.md) | FFI artifact shape — decision record and revisit triggers |
+| [APP_STORE_LISTING](docs/APP_STORE_LISTING.md) | Canonical App Store product-page copy |
 
 ## License
 

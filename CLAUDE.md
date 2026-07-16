@@ -9,7 +9,7 @@ This file is the Claude-facing agent guide. `AGENTS.md` is maintained separately
 - **Platform:** iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+. Minimum device: 8 GB RAM.
 - **Language:** Apple Swift — 6.4 beta on the development toolchain, 6.3.3 on the release toolchain (see Build) — SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere). UIKit only for system pickers. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler release.
 - **OpenPGP:** Sequoia PGP 2.4.1 (Rust, LGPL-2.0-or-later) with `crypto-openssl` backend (vendored static linking). Stable build release ordering, the source/compliance asset contract, and the XCFramework SDK channels are documented in docs/RELEASE.md.
-- **Key families:** Key generation uses nine families — Portable Legacy (Ed25519 v4 software key, GnuPG-compatible), Portable Modern (Ed25519+X25519 v6 software key, RFC 9580), Portable Modern · High (Ed448+X448 v6 software key, RFC 9580), Portable Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768 software key), Portable Post-Quantum · High (RFC 9980 ML-DSA-87/ML-KEM-1024 software key, NIST level 5), Device-Bound Legacy (Secure Enclave custody, P-256 v4, non-exportable), Device-Bound Modern (Secure Enclave custody, P-256 v6, non-exportable), Device-Bound Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768 split custody, non-exportable), and Device-Bound Post-Quantum · High (RFC 9980 ML-DSA-87/ML-KEM-1024 split custody, non-exportable). The descriptive family names are the technical vocabulary; the retired "Profile A"/"Profile B" labels mapped onto Portable Legacy (the universal classical configuration) and Portable Modern · High (the advanced Ed448+X448 configuration), with the baseline Portable/Device-Bound Modern families as the Ed25519/P-256 v6 tier between them. Product exposure: docs/PRD.md Section 3; custody: docs/SECURE_ENCLAVE_CUSTODY.md; post-quantum design: docs/POST_QUANTUM.md.
+- **Key families:** nine, chosen at key generation and immutable per key. Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible), Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum (RFC 9980 ML-DSA-65/ML-KEM-768), Post-Quantum · High (ML-DSA-87/ML-KEM-1024). Device-Bound (Secure Enclave custody, non-exportable): Legacy and Modern (P-256 v4/v6), Post-Quantum and Post-Quantum · High (RFC 9980 split custody). Per-family specs: docs/TDD.md Section 1.3; product exposure: docs/PRD.md Section 3; custody: docs/SECURE_ENCLAVE_CUSTODY.md; post-quantum design: docs/POST_QUANTUM.md.
 - **FFI:** Mozilla UniFFI 0.31.x. Rust wrapper crate `pgp-mobile` generates Swift bindings and packaged outputs, while Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap`.
 - **Security:** CryptoKit (Secure Enclave P-256 key wrapping), Security framework (Keychain), ProtectedData app-data domains opened after app privacy authentication.
 - **Build:** development on Xcode 27.0 beta (27A5218g, `/Applications/Xcode-beta 2.app` — quote the space in shell commands); release toolchain Xcode 26.6 / Swift 6.3.3 for stable and App Store builds; CI platform probes pin Xcode 26.6 while separately requiring its bundled 26.5 SDKs and simulator runtimes via `scripts/ci_xcode_platform_preflight.sh`. Rust stable (latest, MSRV follows sequoia-openpgp requirements), targets `aarch64-apple-ios` + `aarch64-apple-ios-sim` + `aarch64-apple-darwin` + `aarch64-apple-visionos` + `aarch64-apple-visionos-sim`.
@@ -38,11 +38,11 @@ Detailed module breakdown: docs/ARCHITECTURE.md
 ## Build Commands
 
 ```bash
-# Full Rust + UniFFI + packaged-artifact sync; matches the GitHub Actions
-# pinned stage1 path. When it is required: .claude/skills/rust-sync.
-ARM64E_STAGE1_FORCE_DOWNLOAD=1 \
-ARM64E_STAGE1_RELEASE_TAG=rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1 \
-    ./build-xcframework.sh --release
+# Full Rust + UniFFI + packaged-artifact sync; force-download matches the
+# GitHub Actions pinned stage1 path (the script defaults to the current pin,
+# owned by docs/ARM64E_STATUS.md — never pass `latest`). When it is required:
+# .claude/skills/rust-sync.
+ARM64E_STAGE1_FORCE_DOWNLOAD=1 ./build-xcframework.sh --release
 
 # Run Rust tests
 cargo +stable test --manifest-path pgp-mobile/Cargo.toml
@@ -51,11 +51,9 @@ cargo +stable test --manifest-path pgp-mobile/Cargo.toml
 xcodebuild test -scheme CypherAir -testPlan CypherAir-UnitTests \
     -destination 'platform=macOS,arch=arm64e'
 
-# Run device-only tests (SE, biometrics, MIE). These need a real Secure Enclave,
-# not a specific iPhone: an Apple Silicon Mac runs the whole lane locally (the
-# `platform=macOS` host has a Secure Enclave), and so does a physical iPhone/iPad.
-# Only the iOS Simulator cannot run them. Biometric steps use Touch ID / the
-# system auth prompt; biometric-gated tests skip when no biometric is enrolled.
+# Run device-only tests (SE, biometrics, MIE). Any real Secure Enclave works —
+# an Apple Silicon Mac runs the full lane locally; only the iOS Simulator
+# cannot. Biometric-gated tests skip when nothing is enrolled (docs/TESTING.md §1).
 xcodebuild test -scheme CypherAir -testPlan CypherAir-DeviceTests \
     -destination 'platform=macOS,arch=arm64e'          # Apple Silicon Mac (full lane, local)
 # or a physical iOS device:
@@ -70,7 +68,7 @@ xcodebuild build -scheme CypherAir \
     -destination 'generic/platform=visionOS'
 ```
 
-Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. The pinned `ARM64E_STAGE1_RELEASE_TAG` value is owned by docs/ARM64E_STATUS.md and rotates with each stage1 re-pin. When the `xcode` MCP server is available (setup: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
+Per-target `cargo build` commands, the full Rust↔Xcode validation workflow, and stale-artifact troubleshooting live in docs/TESTING.md Section 2.4. When the `xcode` MCP server is available (setup: README.md "Xcode MCP"), use `DocumentationSearch` for Apple API behavior instead of memory.
 
 ## Hard Constraints — NEVER Violate
 
@@ -89,7 +87,7 @@ You may edit security-critical areas directly, but every such edit must be expli
 
 ## Encryption Profiles & Authentication Modes
 
-Profiles are selected at key generation and immutable per key; multiple keys of different profiles are allowed, and message format is auto-selected by recipient key version (docs/TDD.md Section 1.4). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all SE-protected keys. Details: docs/PRD.md Section 3 and docs/SECURITY.md Sections 1 and 4.
+Multiple keys of different families are allowed; message format is auto-selected by recipient key version (docs/TDD.md Section 1.4). Standard Mode and High Security Mode are selectable in Settings; switching modes re-wraps all software-custody keys (device-bound keys are exempt). Details: docs/PRD.md Section 3 and docs/SECURITY.md Section 4.
 
 ## Code Style
 
