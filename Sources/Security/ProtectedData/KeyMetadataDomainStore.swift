@@ -76,19 +76,20 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
-    private let bootstrapStore: ProtectedDomainBootstrapStore
+    private let bootstrapStore: ProtectedDomainBootstrapPersisting
     private let currentWrappingRootKey: (() throws -> Data)?
 
     private(set) var payload: Payload?
     private(set) var domainState: KeyMetadataLoadState = .locked
 
     private var unlockedGenerationIdentifier: Int?
+    private var watermarkNeedsHeal = false
 
     init(
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
-        bootstrapStore: ProtectedDomainBootstrapStore? = nil,
+        bootstrapStore: ProtectedDomainBootstrapPersisting? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
         self.storageRoot = storageRoot
@@ -283,6 +284,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
+        try healLaggingWatermarkIfNeeded()
         try writePayloadGeneration(
             updatedPayload,
             generationIdentifier: nextGenerationIdentifier,
@@ -359,13 +361,61 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
         try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
 
+        do {
+            try bootstrapStore.saveMetadata(
+                ProtectedDomainBootstrapMetadata(
+                    schemaVersion: Payload.currentSchemaVersion,
+                    expectedCurrentGenerationIdentifier: String(generationIdentifier)
+                ),
+                for: Self.domainID
+            )
+        } catch {
+            // The pending→current promotion above already made this
+            // generation durable and authoritative, and the read gate heals
+            // a watermark that is exactly one generation behind. Propagating
+            // a watermark-only failure would tell provisioning callers to
+            // roll back private key material for an identity whose metadata
+            // is already committed — a silent encrypt-to-self orphan —
+            // while the lagging watermark merely heals on the next read.
+            // Swallow the failure only when the on-disk watermark verifiably
+            // sits in a state the read gate accepts: exactly one generation
+            // behind (heal-able lag), or already at the new generation (the
+            // failed save landed durably before throwing, so the commit is
+            // complete and needs no heal). Anything else stays fail-closed.
+            guard let storedWatermark = (try? bootstrapStore.loadMetadata(for: Self.domainID))?
+                    .expectedCurrentGenerationIdentifier else {
+                throw error
+            }
+            switch storedWatermark {
+            case String(generationIdentifier - 1):
+                watermarkNeedsHeal = true
+            case String(generationIdentifier):
+                break
+            default:
+                throw error
+            }
+        }
+    }
+
+    private func healLaggingWatermarkIfNeeded() throws {
+        guard watermarkNeedsHeal, let unlockedGenerationIdentifier else {
+            return
+        }
+        // A previously swallowed watermark failure left the on-disk
+        // watermark one generation behind the durable current envelope.
+        // It must be re-written before another generation is staged:
+        // promoting again over the lag would put current two generations
+        // ahead — past what the read gate accepts — so a persistent
+        // watermark failure has to surface here, before the mutation,
+        // while the domain is still in the heal-able state.
         try bootstrapStore.saveMetadata(
             ProtectedDomainBootstrapMetadata(
                 schemaVersion: Payload.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier)
+                expectedCurrentGenerationIdentifier: String(unlockedGenerationIdentifier)
             ),
             for: Self.domainID
         )
+        watermarkNeedsHeal = false
     }
 
     private func readAuthoritativeSnapshot(
@@ -555,6 +605,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
+        watermarkNeedsHeal = false
     }
 }
 

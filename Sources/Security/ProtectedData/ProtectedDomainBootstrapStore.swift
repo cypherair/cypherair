@@ -5,7 +5,13 @@ struct ProtectedDomainBootstrapMetadata: Codable, Equatable, Sendable {
     let expectedCurrentGenerationIdentifier: String?
 }
 
-struct ProtectedDomainBootstrapStore {
+protocol ProtectedDomainBootstrapPersisting {
+    func loadMetadata(for domainID: ProtectedDataDomainID) throws -> ProtectedDomainBootstrapMetadata?
+    func saveMetadata(_ metadata: ProtectedDomainBootstrapMetadata, for domainID: ProtectedDataDomainID) throws
+    func removeMetadata(for domainID: ProtectedDataDomainID) throws
+}
+
+struct ProtectedDomainBootstrapStore: ProtectedDomainBootstrapPersisting {
     private let storageRoot: ProtectedDataStorageRoot
 
     init(storageRoot: ProtectedDataStorageRoot) {
