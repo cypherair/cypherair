@@ -20,12 +20,34 @@ module = load_script_module(
 )
 
 
+STAGE1_HOST = "aarch64-apple-darwin"
+STAGE1_ASSET_BASE = f"{stage1_module.EXPECTED_ASSET_PREFIX}-{STAGE1_HOST}"
+STAGE1_TAR_ASSET_NAME = f"{STAGE1_ASSET_BASE}.tar.zst"
+STAGE1_SHA256_ASSET_NAME = f"{STAGE1_ASSET_BASE}.sha256"
+STAGE1_MANIFEST_ASSET_NAME = f"{STAGE1_ASSET_BASE}.json"
+STAGE1_TAR_ASSET_SIZE = 12345
+
+
 def test_stage1_pin(release_tag: str) -> object:
     return stage1_module.Stage1ReleasePin(
         tag=release_tag,
         repository="cypherair/rust",
         source_ref="refs/heads/carry/test-stable-1.97",
         source_commit="a" * 40,
+        assets={
+            STAGE1_TAR_ASSET_NAME: stage1_module.Stage1AssetPin(
+                sha256="b" * 64,
+                size=STAGE1_TAR_ASSET_SIZE,
+            ),
+            STAGE1_SHA256_ASSET_NAME: stage1_module.Stage1AssetPin(
+                sha256="c" * 64,
+                size=118,
+            ),
+            STAGE1_MANIFEST_ASSET_NAME: stage1_module.Stage1AssetPin(
+                sha256="d" * 64,
+                size=4024,
+            ),
+        },
     )
 
 
@@ -44,6 +66,10 @@ def write_stage1_pin(repo_root: Path, release_tag: str) -> object:
                     "sourceRef": pin.source_ref,
                     "commitSha": pin.source_commit,
                 },
+                "assets": {
+                    name: {"sha256": asset.sha256, "size": asset.size}
+                    for name, asset in pin.assets.items()
+                },
             }
         )
         + "\n",
@@ -53,7 +79,7 @@ def write_stage1_pin(repo_root: Path, release_tag: str) -> object:
 
 
 def valid_rust_stage1_manifest(release_tag: str) -> dict[str, object]:
-    host_triple = "aarch64-apple-darwin"
+    host_triple = STAGE1_HOST
     pin = test_stage1_pin(release_tag)
     return {
         "schemaVersion": stage1_module.EXPECTED_SCHEMA_VERSION,
@@ -95,7 +121,12 @@ def valid_rust_stage1_manifest(release_tag: str) -> dict[str, object]:
                 stage1_module.EXPECTED_LLVM_IDENTITY_RELATIVE_PATH
             ),
         },
-        "asset": {"purpose": stage1_module.EXPECTED_ASSET_PURPOSE},
+        "asset": {
+            "purpose": stage1_module.EXPECTED_ASSET_PURPOSE,
+            "fileName": STAGE1_TAR_ASSET_NAME,
+            "sha256FileName": STAGE1_SHA256_ASSET_NAME,
+            "sizeBytes": STAGE1_TAR_ASSET_SIZE,
+        },
     }
 
 
@@ -485,6 +516,9 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             (("rustStage1", "sourceRef"), "carry/cypherair-arm64e-toolchain-stable-1.97"),
             (("rustStage1", "sourceCommit"), "0" * 40),
             (("rustStage1", "stableBaseCommit"), "0" * 40),
+            (("rustStage1", "asset", "fileName"), "wrong.tar.zst"),
+            (("rustStage1", "asset", "sha256FileName"), "wrong.sha256"),
+            (("rustStage1", "asset", "sizeBytes"), STAGE1_TAR_ASSET_SIZE + 1),
             (("rustStage1", "llvmProvenance", "sourceKind"), "download-ci-llvm"),
             (("rustStage1", "llvmProvenance", "downloadCiLlvm"), True),
             (("rustStage1", "llvmProvenance", "gitlinkCommit"), "0" * 40),

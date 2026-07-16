@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verify the pinned arm64e stage1 release contract with GitHub-authenticated
-# checks, complementing the token-free digest pin that
+# checks, complementing the token-free digest and byte-size pin that
 # scripts/download_arm64e_stage1_toolchain.sh enforces on every download:
 #
 #   1. Release integrity: the pinned tag resolves to a non-draft, immutable
@@ -70,6 +70,38 @@ print(payload["assets"][asset_name]["sha256"])
 PY
 }
 
+pin_asset_size() {
+    python3 - "$PIN_FILE" "$1" <<'PY'
+import json
+import sys
+
+pin_path, asset_name = sys.argv[1:3]
+with open(pin_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+asset = payload["assets"].get(asset_name)
+if asset is None:
+    print(f"error: asset {asset_name!r} is not in the stage1 pin file", file=sys.stderr)
+    sys.exit(1)
+size = asset.get("size")
+if type(size) is not int or size <= 0:
+    print(
+        f"error: pinned size for asset {asset_name!r} must be a positive integer",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+print(size)
+PY
+}
+
+file_size_bytes() {
+    python3 - "$1" <<'PY'
+import os
+import sys
+
+print(os.path.getsize(sys.argv[1]))
+PY
+}
+
 require_command gh
 require_command python3
 require_command shasum
@@ -124,11 +156,17 @@ PY
 
 verify_asset() {
     local asset="$1"
-    local expected actual
-    expected="$(pin_asset_hash "$asset")"
-    actual="$(shasum -a 256 "$DOWNLOAD_DIR/$asset" | awk '{print $1}')"
-    if [ "$actual" != "$expected" ]; then
-        echo "error: $asset sha256 $actual != pinned $expected" >&2
+    local expected_size actual_size expected_hash actual_hash
+    expected_size="$(pin_asset_size "$asset")"
+    actual_size="$(file_size_bytes "$DOWNLOAD_DIR/$asset")"
+    if [ "$actual_size" != "$expected_size" ]; then
+        echo "error: $asset size $actual_size != pinned $expected_size" >&2
+        exit 1
+    fi
+    expected_hash="$(pin_asset_hash "$asset")"
+    actual_hash="$(shasum -a 256 "$DOWNLOAD_DIR/$asset" | awk '{print $1}')"
+    if [ "$actual_hash" != "$expected_hash" ]; then
+        echo "error: $asset sha256 $actual_hash != pinned $expected_hash" >&2
         exit 1
     fi
     (

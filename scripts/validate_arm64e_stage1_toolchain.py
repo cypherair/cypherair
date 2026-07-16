@@ -21,7 +21,8 @@ EXPECTED_LLVM_SOURCE_KIND = "bundled-gitlink"
 EXPECTED_LLVM_GITLINK_COMMIT = "08c84e69a84d95936296dfcab0e38b34100725d5"
 EXPECTED_LLVM_VERSION = "22.1.6"
 EXPECTED_LLVM_IDENTITY_RELATIVE_PATH = "lib/rustlib/arm64e-stage1-llvm-provenance.json"
-EXPECTED_ASSET_PURPOSE = "rust-stage1-for-arm64e"
+EXPECTED_ASSET_PREFIX = "rust-stage1-for-arm64e"
+EXPECTED_ASSET_PURPOSE = EXPECTED_ASSET_PREFIX
 PROJECT_REQUIRED_ARM64E_TARGETS = (
     "arm64e-apple-darwin",
     "arm64e-apple-ios",
@@ -35,11 +36,18 @@ class Stage1ValidationError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class Stage1AssetPin:
+    sha256: str
+    size: int
+
+
+@dataclass(frozen=True)
 class Stage1ReleasePin:
     tag: str
     repository: str
     source_ref: str
     source_commit: str
+    assets: dict[str, Stage1AssetPin]
 
 
 @dataclass(frozen=True)
@@ -92,11 +100,42 @@ def load_stage1_release_pin(pin_path: Path) -> Stage1ReleasePin:
         raise Stage1ValidationError(
             "Rust stage1 pin release.commitSha must be a lowercase 40-character Git commit"
         )
+
+    raw_assets = _require_object(pin.get("assets"), "Rust stage1 pin assets")
+    if not raw_assets:
+        raise Stage1ValidationError("Rust stage1 pin assets must not be empty")
+    assets: dict[str, Stage1AssetPin] = {}
+    for asset_name, raw_asset in raw_assets.items():
+        if not isinstance(asset_name, str) or not asset_name:
+            raise Stage1ValidationError(
+                "Rust stage1 pin asset names must be non-empty strings"
+            )
+        asset = _require_object(
+            raw_asset,
+            f"Rust stage1 pin assets[{asset_name!r}]",
+        )
+        sha256 = _require_string(
+            asset.get("sha256"),
+            f"Rust stage1 pin assets[{asset_name!r}].sha256",
+        )
+        if re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
+            raise Stage1ValidationError(
+                f"Rust stage1 pin assets[{asset_name!r}].sha256 must be a "
+                "lowercase 64-character SHA-256 digest"
+            )
+        size = asset.get("size")
+        if type(size) is not int or size <= 0:
+            raise Stage1ValidationError(
+                f"Rust stage1 pin assets[{asset_name!r}].size must be a positive integer"
+            )
+        assets[asset_name] = Stage1AssetPin(sha256=sha256, size=size)
+
     return Stage1ReleasePin(
         tag=tag,
         repository=repository,
         source_ref=source_ref,
         source_commit=source_commit,
+        assets=assets,
     )
 
 
@@ -197,8 +236,34 @@ def validate_stage1_manifest_payload(
     if host not in prebuilt_targets:
         raise Stage1ValidationError("includedPrebuiltStdTargets must include hostTriple")
 
+    asset_base = f"{EXPECTED_ASSET_PREFIX}-{host}"
+    asset_file_name = f"{asset_base}.tar.zst"
+    asset_sha256_file_name = f"{asset_base}.sha256"
+    asset_manifest_file_name = f"{asset_base}.json"
+    for required_asset_name in (
+        asset_file_name,
+        asset_sha256_file_name,
+        asset_manifest_file_name,
+    ):
+        if required_asset_name not in expected_release.assets:
+            raise Stage1ValidationError(
+                "Rust stage1 pin assets is missing required host asset: "
+                f"{required_asset_name}"
+            )
+
     asset = _require_object(manifest.get("asset"), "asset")
     _require_equal(asset.get("purpose"), EXPECTED_ASSET_PURPOSE, "asset.purpose")
+    _require_equal(asset.get("fileName"), asset_file_name, "asset.fileName")
+    _require_equal(
+        asset.get("sha256FileName"),
+        asset_sha256_file_name,
+        "asset.sha256FileName",
+    )
+    _require_equal(
+        asset.get("sizeBytes"),
+        expected_release.assets[asset_file_name].size,
+        "asset.sizeBytes",
+    )
 
     rustc_verbose = _require_string(manifest.get("stage1RustcVersionVerbose"), "stage1RustcVersionVerbose")
     llc_verbose = _require_string(manifest.get("packagedLlcVersionVerbose"), "packagedLlcVersionVerbose")
