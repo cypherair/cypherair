@@ -84,6 +84,39 @@ print(payload["assets"][asset_name]["sha256"])
 PY
 }
 
+pin_asset_size() {
+    local asset="$1"
+    python3 - "$PIN_FILE" "$asset" <<'PY'
+import json
+import sys
+
+pin_path, asset_name = sys.argv[1:3]
+with open(pin_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+asset = payload["assets"].get(asset_name)
+if asset is None:
+    print(f"error: asset {asset_name!r} is not in the SQLCipher pin file", file=sys.stderr)
+    sys.exit(1)
+size = asset.get("size")
+if type(size) is not int or size <= 0:
+    print(
+        f"error: pinned size for asset {asset_name!r} must be a positive integer",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+print(size)
+PY
+}
+
+file_size_bytes() {
+    python3 - "$1" <<'PY'
+import os
+import sys
+
+print(os.path.getsize(sys.argv[1]))
+PY
+}
+
 [ -f "$PIN_FILE" ] || {
     echo "error: SQLCipher pin file is missing: $PIN_FILE" >&2
     exit 1
@@ -96,7 +129,6 @@ RELEASE_SOURCE_REF="$(pin_value release.sourceRef)"
 RELEASE_SIGNER_WORKFLOW="$(pin_value release.signerWorkflow)"
 RELEASE_CHANNEL="$(pin_value release.channel)"
 RELEASE_BASE_URL="https://github.com/${RELEASE_REPOSITORY}/releases/download/${RELEASE_TAG}"
-EXPECTED_ZIP_SHA="$(pin_asset_hash "SQLCipher.xcframework.zip")"
 EXPECTED_ASSET_NAMES=()
 while IFS= read -r asset; do
     EXPECTED_ASSET_NAMES+=("$asset")
@@ -142,6 +174,17 @@ verify_asset_hash() {
     actual="$(shasum -a 256 "$WORK_DIR/$asset" | awk '{print $1}')"
     if [ "$actual" != "$expected" ]; then
         echo "error: $asset sha256 $actual != expected $expected" >&2
+        exit 1
+    fi
+}
+
+verify_asset_size() {
+    local asset="$1"
+    local expected="$2"
+    local actual
+    actual="$(file_size_bytes "$WORK_DIR/$asset")"
+    if [ "$actual" != "$expected" ]; then
+        echo "error: $asset size $actual != expected $expected" >&2
         exit 1
     fi
 }
@@ -266,14 +309,14 @@ fi
 
 for asset in "${EXPECTED_ASSET_NAMES[@]}"; do
     copy_or_download_asset "$asset"
+    verify_asset_size "$asset" "$(pin_asset_size "$asset")"
+    verify_asset_hash "$asset" "$(pin_asset_hash "$asset")"
 done
 
 (
     cd "$WORK_DIR"
     shasum -a 256 -c SQLCipher.xcframework.sha256
 )
-verify_asset_hash "SQLCipher.xcframework.zip" "$EXPECTED_ZIP_SHA"
-
 if [ "$REQUIRE_ATTESTATION" -eq 1 ]; then
     command -v gh >/dev/null 2>&1 || {
         echo "error: gh is required for SQLCipher attestation verification" >&2

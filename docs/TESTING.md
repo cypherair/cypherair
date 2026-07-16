@@ -185,7 +185,7 @@ scripts/restore_sqlcipher_xcframework.sh                        # local
 scripts/restore_sqlcipher_xcframework.sh --require-attestation  # CI / Xcode Cloud
 ```
 
-The script reads `third_party/sqlcipher-xcframework.pin.json`, rejects `latest` and non-stable pins, verifies the zip checksum, release metadata, expected slices/headers/flags, and smoke-tests raw-key good-key read/write plus wrong-key rejection (`scripts/validate_sqlcipher_xcframework.py`). To refresh SQLCipher, publish a new stable immutable release from `cypherair/sqlcipher-xcframework` first, then update the pin file, docs, and tests here.
+The script reads `third_party/sqlcipher-xcframework.pin.json`, rejects `latest` and non-stable pins, verifies every release asset's exact pinned byte size and SHA-256 before interpreting or extracting it, checks release metadata plus expected bundle versions/slices/headers/flags, and smoke-tests the exact SQLCipher/SQLite runtime versions, raw-key good-key read/write, and exact `SQLITE_NOTADB` wrong-key rejection (`scripts/validate_sqlcipher_xcframework.py`). To refresh SQLCipher, publish a new stable immutable release from `cypherair/sqlcipher-xcframework` first, then update the pin file, docs, notices, and tests here.
 
 ### Local Xcode validation
 

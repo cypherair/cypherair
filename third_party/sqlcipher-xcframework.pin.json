@@ -3,34 +3,34 @@
   "dependencyName": "SQLCipher.xcframework",
   "repository": "cypherair/sqlcipher-xcframework",
   "release": {
-    "tag": "sqlcipher-xcframework-v4.16.0-cypherair.1",
-    "url": "https://github.com/cypherair/sqlcipher-xcframework/releases/tag/sqlcipher-xcframework-v4.16.0-cypherair.1",
+    "tag": "sqlcipher-xcframework-v4.17.0-cypherair.1",
+    "url": "https://github.com/cypherair/sqlcipher-xcframework/releases/tag/sqlcipher-xcframework-v4.17.0-cypherair.1",
     "channel": "stable",
     "isImmutable": true,
     "isPrerelease": false,
-    "sourceRef": "refs/tags/sqlcipher-xcframework-v4.16.0-cypherair.1",
-    "commitSha": "aee70b13ddf0eb262ac1283930760cac44dbe873",
-    "publishedAt": "2026-06-27T20:59:03Z",
+    "sourceRef": "refs/tags/sqlcipher-xcframework-v4.17.0-cypherair.1",
+    "commitSha": "9d8c3627ad67b521a5bd5145bdea98632c80a22b",
+    "publishedAt": "2026-07-16T13:17:06Z",
     "signerWorkflow": "cypherair/sqlcipher-xcframework/.github/workflows/stable-release.yml",
-    "runId": "28301592523"
+    "runId": "29501460869"
   },
   "upstream": {
     "repository": "https://github.com/sqlcipher/sqlcipher.git",
-    "tag": "v4.16.0",
-    "commit": "e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc",
-    "sqliteVersion": "3.53.1"
+    "tag": "v4.17.0",
+    "commit": "810db22f575ee7cf94ea96a3e91622b5fcece3dc",
+    "sqliteVersion": "3.53.3"
   },
   "assets": {
     "SQLCipher.xcframework.zip": {
-      "sha256": "3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e",
-      "size": 5655372
+      "sha256": "51b0c197d4c06461fd3484a7a8577731eba6ef49c77272bd76db703431d3c4da",
+      "size": 5681989
     },
     "SQLCipher.xcframework.sha256": {
-      "sha256": "1121b4047fc980478fab2d577d99cd96ddb51f9490b972748d7ca7056df112df",
+      "sha256": "6bc5236f65e96d885f20c3beb961fe62e403d31f484ab23ab903051dc2c54940",
       "size": 92
     },
     "SQLCipher.arm64e-build-manifest.json": {
-      "sha256": "c6c332387ef2c409e9b4e9876b4de45288a06a40eb641876845d8eb4a02b573d",
+      "sha256": "aaaa3ae67b113c9393583ad847ecc6e4f4cadbaa2a8c3d63820afc030f73bff1",
       "size": 4689
     },
     "SQLCipher-PrivacyInfo.xcprivacy": {
@@ -38,7 +38,7 @@
       "size": 840
     },
     "SQLCipher.xcframework.release.json": {
-      "sha256": "09f2d3d0cc88fa36264636370dead5e54affd273ef19b4446ef1271c8dec6b89",
+      "sha256": "3a9656587de4f981ad3c99d37ca271d9def00cb64c85a4eb0d8d1fba9aa4e1a2",
       "size": 1084
     }
   },
@@ -47,31 +47,31 @@
       "platform": "ios",
       "variant": null,
       "architectures": ["arm64", "arm64e"],
-      "sha256": "c0c0744bfc1c58cff446bfbf8c9000b87b79292cf82865a3177057bf56a67438"
+      "sha256": "267ae5dc3de0a8a53d1e9a8816c0dc97de63fded83ac9c098b2b3967cc8d66d2"
     },
     "macos-arm64_arm64e": {
       "platform": "macos",
       "variant": null,
       "architectures": ["arm64", "arm64e"],
-      "sha256": "32bca8f42cb98c03ec16a5d8aeabc88360c5288a39f403b5eafe34e2cda93bdc"
+      "sha256": "e26b39ae353426221ddc0008495ec5859e9f3ea44267dc0063c62db663c869ce"
     },
     "xros-arm64_arm64e": {
       "platform": "xros",
       "variant": null,
       "architectures": ["arm64", "arm64e"],
-      "sha256": "e7d689553353128a6ac6c5d502d85c340d18c919501e95fa0763a459fd47e8c7"
+      "sha256": "3277f9cea1f9ffd871e7f4061bbf6868903b4fafe2539b6d3c885d5c3b1639fa"
     },
     "ios-arm64-simulator": {
       "platform": "ios",
       "variant": "simulator",
       "architectures": ["arm64"],
-      "sha256": "4be3bab597e1ee69ff39492ac3b93033dda1d160968f768e649f11a22d422bfb"
+      "sha256": "0516715d5eb37d051edc383bac841660ecf98a7c0761d4165a4d28d766964b95"
     },
     "xros-arm64-simulator": {
       "platform": "xros",
       "variant": "simulator",
       "architectures": ["arm64"],
-      "sha256": "bd3cb3f52d465b6d9ba040d99e7b8042bf08815983c2ff911c50988024bcc53e"
+      "sha256": "452e73512f312ba721dda478637667acfa67cb13d695de2781357c91162ceb80"
     }
   }
 }
