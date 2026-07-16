@@ -48,7 +48,7 @@ fn sq_is_required() -> bool {
 ///
 /// Homebrew's sequoia-sq 1.3.1 embeds sequoia-openpgp 2.0.0, whose
 /// post-quantum wire format predates the final RFC 9980 encoding this engine
-/// (sequoia-openpgp 2.4.0) emits, so it rejects engine ML-DSA certificates
+/// (sequoia-openpgp 2.4.1) emits, so it rejects engine ML-DSA certificates
 /// as malformed. The probe is functional rather than version-sniffing: the
 /// engine generates a throwaway post-quantum key and `sq key import` — the
 /// same operation the live tests perform — must accept it. The result is

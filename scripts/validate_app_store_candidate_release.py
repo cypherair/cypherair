@@ -337,10 +337,13 @@ def validate_arm64e_manifest_payload(
 
     openssl_src = dependency_chain.get("opensslSrc")
     openssl = dependency_chain.get("openssl")
+    ctor = dependency_chain.get("ctor")
     if not isinstance(openssl_src, dict) or not openssl_src.get("resolvedCommit"):
         raise CandidateValidationError("arm64e manifest is missing openssl-src resolved commit.")
     if not isinstance(openssl, dict) or not openssl.get("submoduleCommit"):
         raise CandidateValidationError("arm64e manifest is missing OpenSSL submodule commit.")
+    if not isinstance(ctor, dict) or not ctor.get("resolvedCommit"):
+        raise CandidateValidationError("arm64e manifest is missing ctor resolved commit.")
 
     rust_stage1 = payload.get("rustStage1")
     try:

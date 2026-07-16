@@ -135,6 +135,7 @@ def valid_arm64e_manifest(release_tag: str) -> dict[str, object]:
         "dependencyChain": {
             "opensslSrc": {"resolvedCommit": "be17d917"},
             "openssl": {"submoduleCommit": "d228bf84"},
+            "ctor": {"resolvedCommit": "1aa46c01"},
         },
         "rustStage1": valid_rust_stage1_manifest(release_tag),
         "xcframework": {
@@ -492,6 +493,20 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
             valid_arm64e_manifest(release_tag),
             make_stage1_release_pin(release_tag),
         )
+
+    def test_arm64e_manifest_rejects_missing_ctor_provenance(self) -> None:
+        release_tag = "rust-arm64e-stage1-stable197-test"
+        payload = valid_arm64e_manifest(release_tag)
+        del payload["dependencyChain"]["ctor"]
+
+        with self.assertRaisesRegex(
+            module.CandidateValidationError,
+            "missing ctor resolved commit",
+        ):
+            module.validate_arm64e_manifest_payload(
+                payload,
+                make_stage1_release_pin(release_tag),
+            )
 
     def test_arm64e_manifest_rejects_missing_rust_stage1_provenance(self) -> None:
         release_tag = "rust-arm64e-stage1-stable197-test"

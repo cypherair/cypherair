@@ -7,8 +7,8 @@
 > and how the owned-fork carry is validated, published, and consumed.
 > Source of truth for the production stage1 pin:
 > [ARM64E_STATUS.md](ARM64E_STATUS.md).
-> Scope boundary: The OpenSSL carry chain remains owned by
-> [ARM64E_STATUS.md](ARM64E_STATUS.md) and is out of scope here.
+> Scope boundary: The OpenSSL and `ctor` carry chains remain owned by
+> [ARM64E_STATUS.md](ARM64E_STATUS.md) and are out of scope here.
 > Update triggers: A Rust or LLVM rebase, an upstream merge that retires a
 > carried change, a change to the fork topology, or an approved production
 > re-pin.

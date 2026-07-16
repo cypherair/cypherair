@@ -14,7 +14,7 @@ name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
 [dependencies]
-sequoia-openpgp = { version = "=2.4.0", default-features = false, features = [
+sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
@@ -26,7 +26,7 @@ thiserror = "2"
 
 [dev-dependencies]
 tempfile = "3"
-sequoia-openpgp = { version = "=2.4.0", default-features = false, features = [
+sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
@@ -47,9 +47,11 @@ codegen-units = 1
 # Temporary downstream carry for Apple arm64e experiments:
 # pgp-mobile -> cypherair/openssl-src-rs (carry/apple-arm64e-openssl-fork)
 #            -> cypherair/openssl (carry/apple-arm64e-targets)
+# sequoia-openpgp -> cypherair/linktime/ctor (carry/apple-ctor-1.0.9)
 # The openssl-src-rs carry branch intentionally tracks a CypherAir OpenSSL fork
-# branch. Cargo.lock records the resolved commit for reproducibility, but the
-# manifest tracks the carry branch so branch-local status/docs updates are not
-# left behind.
+# branch. The ctor carry aligns its Apple archive-retention pointer for ld64.
+# Cargo.lock records resolved commits for reproducibility, while the manifest
+# tracks carry branches so branch-local fixes are not left behind.
 [patch.crates-io]
+ctor = { git = "https://github.com/cypherair/linktime", branch = "carry/apple-ctor-1.0.9" }
 openssl-src = { git = "https://github.com/cypherair/openssl-src-rs", branch = "carry/apple-arm64e-openssl-fork" }

@@ -18,8 +18,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OPENSSL_SRC_BRANCH = "carry/apple-arm64e-openssl-fork"
 DEFAULT_OPENSSL_BRANCH = "carry/apple-arm64e-targets"
+DEFAULT_CTOR_BRANCH = "carry/apple-ctor-1.0.9"
 DEFAULT_OPENSSL_SRC_REPO = "https://github.com/cypherair/openssl-src-rs"
 DEFAULT_OPENSSL_REPO = "https://github.com/cypherair/openssl"
+DEFAULT_CTOR_REPO = "https://github.com/cypherair/linktime"
 
 
 class MetadataError(RuntimeError):
@@ -38,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         "--freshness-level",
         choices=("off", "warn", "error"),
         default="warn",
-        help="How to report branch freshness drift for the OpenSSL carry chain.",
+        help="How to report branch freshness drift for owned dependency carry branches.",
     )
     return parser.parse_args()
 
@@ -54,26 +56,46 @@ def run_git(*args: str, cwd: Path | None = None) -> str:
     return completed.stdout.strip()
 
 
-def parse_openssl_src_lock(cargo_lock_path: Path) -> dict[str, str]:
+def parse_git_package_lock(
+    cargo_lock_path: Path,
+    package_name: str,
+    expected_repository: str,
+    default_branch: str,
+) -> dict[str, str]:
     text = cargo_lock_path.read_text(encoding="utf-8")
     match = re.search(
-        r'\[\[package\]\]\s+name = "openssl-src"\s+version = "([^"]+)"\s+source = "([^"]+)"',
+        rf'\[\[package\]\]\s+name = "{re.escape(package_name)}"\s+version = "([^"]+)"\s+source = "([^"]+)"',
         text,
         flags=re.MULTILINE,
     )
     if match is None:
-        raise MetadataError("openssl-src package source was not found in Cargo.lock")
+        raise MetadataError(f"{package_name} package source was not found in Cargo.lock")
 
     version = match.group(1)
     source = match.group(2)
     source_match = re.match(r"git\+([^?#]+)(?:\?([^#]+))?#([0-9a-fA-F]+)$", source)
     if source_match is None:
-        raise MetadataError(f"openssl-src source is not a git source with a resolved commit: {source}")
+        raise MetadataError(
+            f"{package_name} source is not a git source with a resolved commit: {source}"
+        )
 
     repository = source_match.group(1)
+    if repository != expected_repository:
+        raise MetadataError(
+            f"{package_name} repository {repository} does not match "
+            f"the required owned fork {expected_repository}"
+        )
     query = urllib.parse.parse_qs(source_match.group(2) or "")
-    branch = query.get("branch", [DEFAULT_OPENSSL_SRC_BRANCH])[0]
+    branch_values = query.get("branch")
+    if not branch_values:
+        raise MetadataError(f"{package_name} source does not name the required carry branch")
+    branch = branch_values[0]
     branch = branch.replace("%2F", "/")
+    if branch != default_branch:
+        raise MetadataError(
+            f"{package_name} branch {branch} does not match "
+            f"the required carry branch {default_branch}"
+        )
     return {
         "version": version,
         "source": source,
@@ -81,6 +103,24 @@ def parse_openssl_src_lock(cargo_lock_path: Path) -> dict[str, str]:
         "branch": branch,
         "resolvedCommit": source_match.group(3),
     }
+
+
+def parse_openssl_src_lock(cargo_lock_path: Path) -> dict[str, str]:
+    return parse_git_package_lock(
+        cargo_lock_path,
+        "openssl-src",
+        DEFAULT_OPENSSL_SRC_REPO,
+        DEFAULT_OPENSSL_SRC_BRANCH,
+    )
+
+
+def parse_ctor_lock(cargo_lock_path: Path) -> dict[str, str]:
+    return parse_git_package_lock(
+        cargo_lock_path,
+        "ctor",
+        DEFAULT_CTOR_REPO,
+        DEFAULT_CTOR_BRANCH,
+    )
 
 
 def remote_branch_head(repository: str, branch: str) -> str:
@@ -117,9 +157,12 @@ def openssl_submodule_pointer(openssl_src_repository: str, openssl_src_commit: s
 
 def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dict[str, object]:
     openssl_src = parse_openssl_src_lock(cargo_lock_path)
+    ctor = parse_ctor_lock(cargo_lock_path)
     if freshness_level == "off":
         openssl_src["remoteBranchHead"] = None
         openssl_src["isFresh"] = None
+        ctor["remoteBranchHead"] = None
+        ctor["isFresh"] = None
         return {
             "opensslSrc": openssl_src,
             "openssl": {
@@ -129,6 +172,7 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
                 "remoteBranchHead": None,
                 "isFresh": None,
             },
+            "ctor": ctor,
             "freshness": {
                 "level": freshness_level,
                 "lookupPerformed": False,
@@ -144,6 +188,11 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
     openssl_src["isFresh"] = (
         openssl_src["resolvedCommit"] == openssl_src["remoteBranchHead"]
     )
+    ctor["remoteBranchHead"] = remote_branch_head(
+        ctor["repository"],
+        ctor["branch"],
+    )
+    ctor["isFresh"] = ctor["resolvedCommit"] == ctor["remoteBranchHead"]
 
     openssl_submodule_commit = openssl_submodule_pointer(
         openssl_src["repository"],
@@ -171,6 +220,12 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
             f"{openssl_submodule_commit} is not the current "
             f"{DEFAULT_OPENSSL_BRANCH} head {openssl_remote_head}"
         )
+    if not ctor["isFresh"]:
+        stale_messages.append(
+            "ctor Cargo.lock commit "
+            f"{ctor['resolvedCommit']} is not the current "
+            f"{ctor['branch']} head {ctor['remoteBranchHead']}"
+        )
 
     if stale_messages and freshness_level != "off":
         prefix = "error" if freshness_level == "error" else "warning"
@@ -182,6 +237,7 @@ def collect_dependency_chain(cargo_lock_path: Path, freshness_level: str) -> dic
     return {
         "opensslSrc": openssl_src,
         "openssl": openssl,
+        "ctor": ctor,
         "freshness": {
             "level": freshness_level,
             "lookupPerformed": True,
