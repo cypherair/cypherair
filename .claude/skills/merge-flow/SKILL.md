@@ -11,10 +11,8 @@ Safe to delegate to a cheaper sub-agent — every step is mechanical.
 2. Delete the topic branch, remote and local, then `git fetch --prune`. Delete
    other leftover branches only when the maintainer asked and `git cherry` /
    `git log main..<branch>` shows nothing unmerged.
-3. If the branch lived in a `.claude/worktrees/` checkout: copy regenerable
-   untracked artifacts the main checkout needs (the `.worktreeinclude` set —
-   e.g. `PgpMobile.xcframework`, generated bindings, SQLCipher artifacts) back
-   to the main checkout if newer, then remove the worktree.
+3. If the branch lived in a `.claude/worktrees/` checkout, remove the
+   worktree.
 4. Sync local `main` (`git checkout main && git pull --ff-only`).
 5. Update or close the linked issue as instructed (progress comment or close).
 
