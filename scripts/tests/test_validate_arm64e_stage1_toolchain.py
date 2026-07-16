@@ -531,6 +531,63 @@ EOF
             with self.assertRaisesRegex(module.Stage1ValidationError, "arm64e-apple-visionos"):
                 self.validate(fixture)
 
+    def test_plain_build_ignores_implicit_rustup_stage1_link(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        script_path = repo_root / "scripts" / "build_apple_arm64e_xcframework.sh"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            linked_rustc = root / "stage1-arm64e-patch" / "bin" / "rustc"
+            rustc_marker = root / "linked-rustc-executed"
+
+            self.write_executable(
+                linked_rustc,
+                f"#!/bin/sh\ntouch {shlex.quote(str(rustc_marker))}\n",
+            )
+            self.write_executable(
+                fake_bin / "rustup",
+                f"""#!/bin/sh
+if [ "$1" = "toolchain" ] && [ "$2" = "list" ]; then
+  printf '%s\\n' 'stable-aarch64-apple-darwin (active, default)'
+  printf '%s\\n' 'stage1-arm64e-patch'
+  exit 0
+fi
+if [ "$1" = "which" ] && [ "$2" = "--toolchain" ] && [ "$3" = "stage1-arm64e-patch" ]; then
+  printf '%s\\n' {shlex.quote(str(linked_rustc))}
+  exit 0
+fi
+exit 1
+""",
+            )
+            for command in ("cargo", "curl", "lipo", "xcodebuild", "bsdtar", "zstd"):
+                self.write_executable(fake_bin / command, "#!/bin/sh\nexit 0\n")
+
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            environment["ARM64E_STAGE1_RELEASE_TAG"] = "latest"
+            environment["ARM64E_STAGE1_FORCE_DOWNLOAD"] = "0"
+            for name in (
+                "LOCAL_ARM64E_TOOLCHAIN",
+                "ARM64E_RUSTC",
+                "ARM64E_STAGE1_DIR",
+                "ARM64E_RUST_STAGE1_MANIFEST",
+            ):
+                environment.pop(name, None)
+
+            completed = subprocess.run(
+                ["bash", str(script_path), "--release"],
+                text=True,
+                capture_output=True,
+                env=environment,
+                check=False,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("'latest' is not allowed", completed.stderr)
+            self.assertNotIn("ARM64E_RUST_STAGE1_MANIFEST is required", completed.stderr)
+            self.assertFalse(rustc_marker.exists())
+
     def test_downloader_rejects_correct_hash_with_wrong_size_before_extraction(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         script_path = repo_root / "scripts" / "download_arm64e_stage1_toolchain.sh"

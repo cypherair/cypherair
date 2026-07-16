@@ -28,7 +28,7 @@ STAGE1_MANIFEST_ASSET_NAME = f"{STAGE1_ASSET_BASE}.json"
 STAGE1_TAR_ASSET_SIZE = 12345
 
 
-def test_stage1_pin(release_tag: str) -> object:
+def make_stage1_release_pin(release_tag: str) -> object:
     return stage1_module.Stage1ReleasePin(
         tag=release_tag,
         repository="cypherair/rust",
@@ -52,7 +52,7 @@ def test_stage1_pin(release_tag: str) -> object:
 
 
 def write_stage1_pin(repo_root: Path, release_tag: str) -> object:
-    pin = test_stage1_pin(release_tag)
+    pin = make_stage1_release_pin(release_tag)
     pin_path = repo_root / "third_party" / "arm64e-stage1-toolchain.pin.json"
     pin_path.parent.mkdir(parents=True, exist_ok=True)
     pin_path.write_text(
@@ -80,7 +80,7 @@ def write_stage1_pin(repo_root: Path, release_tag: str) -> object:
 
 def valid_rust_stage1_manifest(release_tag: str) -> dict[str, object]:
     host_triple = STAGE1_HOST
-    pin = test_stage1_pin(release_tag)
+    pin = make_stage1_release_pin(release_tag)
     return {
         "schemaVersion": stage1_module.EXPECTED_SCHEMA_VERSION,
         "releaseTag": release_tag,
@@ -428,7 +428,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 with mock.patch.object(
                     module,
                     "pinned_rust_stage1_release",
-                    return_value=test_stage1_pin(
+                    return_value=make_stage1_release_pin(
                         "rust-arm64e-stage1-stable197-test"
                     ),
                 ):
@@ -490,7 +490,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
         release_tag = "rust-arm64e-stage1-stable197-test"
         module.validate_arm64e_manifest_payload(
             valid_arm64e_manifest(release_tag),
-            test_stage1_pin(release_tag),
+            make_stage1_release_pin(release_tag),
         )
 
     def test_arm64e_manifest_rejects_missing_rust_stage1_provenance(self) -> None:
@@ -504,7 +504,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
         ):
             module.validate_arm64e_manifest_payload(
                 payload,
-                test_stage1_pin(release_tag),
+                make_stage1_release_pin(release_tag),
             )
 
     def test_arm64e_manifest_rejects_weakened_or_mismatched_stage1_provenance(self) -> None:
@@ -542,7 +542,7 @@ class ValidateAppStoreCandidateReleaseTests(unittest.TestCase):
                 ):
                     module.validate_arm64e_manifest_payload(
                         payload,
-                        test_stage1_pin(release_tag),
+                        make_stage1_release_pin(release_tag),
                     )
 
     def test_main_writes_candidate_release_metadata_on_success(self) -> None:

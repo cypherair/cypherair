@@ -22,7 +22,7 @@ STAGE1_CACHE_DIR="$CARGO_TARGET_DIR/apple-arm64e-stage1"
 
 STABLE_TOOLCHAIN="${STABLE_TOOLCHAIN:-stable}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-stage1-arm64e-patch}"
+LOCAL_ARM64E_TOOLCHAIN="${LOCAL_ARM64E_TOOLCHAIN:-}"
 ARM64E_RUST_REPOSITORY="${ARM64E_RUST_REPOSITORY:-cypherair/rust}"
 ARM64E_STAGE1_PIN_FILE="${ARM64E_STAGE1_PIN_FILE:-$REPO_ROOT/third_party/arm64e-stage1-toolchain.pin.json}"
 DEFAULT_ARM64E_STAGE1_RELEASE_TAG="rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1"
@@ -165,7 +165,8 @@ resolve_arm64e_rustc() {
         ARM64E_RUSTC="$ARM64E_STAGE1_DIR/bin/rustc"
     fi
 
-    if [ -z "$ARM64E_RUSTC" ] && rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc >/dev/null 2>&1; then
+    if [ -z "$ARM64E_RUSTC" ] && [ -n "$LOCAL_ARM64E_TOOLCHAIN" ] && \
+        rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc >/dev/null 2>&1; then
         ARM64E_RUSTC="$(rustup which --toolchain "$LOCAL_ARM64E_TOOLCHAIN" rustc)"
     fi
 
