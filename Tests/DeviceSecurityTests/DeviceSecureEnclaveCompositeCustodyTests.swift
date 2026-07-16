@@ -30,7 +30,7 @@ final class DeviceSecureEnclaveCompositeCustodyTests: SecureEnclaveCustodyDevice
 
         let handleStore = SecureEnclaveCustodyHandleStore(
             keyStore: SystemSecureEnclaveCustodyKeyStore(),
-            tier: .classicalP256
+            tier: .postQuantum
         )
         let loadedPair: SecureEnclaveCustodyLoadedHandlePair
         do {
