@@ -24,12 +24,12 @@ class GenerateSourceComplianceInfoTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         entry = entries[0]
         self.assertEqual(entry["name"], "SQLCipher.xcframework")
-        self.assertEqual(entry["releaseTag"], "sqlcipher-xcframework-v4.16.0-cypherair.1")
+        self.assertEqual(entry["releaseTag"], "sqlcipher-xcframework-v4.17.0-cypherair.1")
         self.assertEqual(entry["releaseChannel"], "stable")
         self.assertTrue(entry["releaseIsImmutable"])
         self.assertFalse(entry["releaseIsPrerelease"])
         self.assertFalse(entry["mirroredInCypherAirRelease"])
-        self.assertEqual(entry["upstreamTag"], "v4.16.0")
+        self.assertEqual(entry["upstreamTag"], "v4.17.0")
 
     def test_regular_build_allows_unknown_when_commit_is_missing(self) -> None:
         self.assertEqual(

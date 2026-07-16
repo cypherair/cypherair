@@ -29,12 +29,12 @@ APP_LICENSE_TEXT_PATHS = [
 APP_REPOSITORY_URL = "https://github.com/cypherair/cypherair"
 EXTERNAL_NOTICE_RECORDS = [
     {
-        "id": "sqlcipher@4.16.0",
+        "id": "sqlcipher@4.17.0",
         "displayName": "SQLCipher",
-        "version": "4.16.0 community",
+        "version": "4.17.0 community",
         "repositoryURL": "https://github.com/sqlcipher/sqlcipher",
         "licenseName": "BSD-3-Clause",
-        "licenseFileResourceName": "SQLCipher-4.16.0.txt",
+        "licenseFileResourceName": "SQLCipher-4.17.0.txt",
         "kind": "thirdParty",
         "isDirectDependency": True,
         "licenseSourceKind": "projectFile",
@@ -43,12 +43,12 @@ EXTERNAL_NOTICE_RECORDS = [
         ],
     },
     {
-        "id": "sqlite@3.53.1",
+        "id": "sqlite@3.53.3",
         "displayName": "SQLite",
-        "version": "3.53.1",
+        "version": "3.53.3",
         "repositoryURL": "https://sqlite.org",
         "licenseName": "Public Domain",
-        "licenseFileResourceName": "SQLite-3.53.1.txt",
+        "licenseFileResourceName": "SQLite-3.53.3.txt",
         "kind": "thirdParty",
         "isDirectDependency": True,
         "licenseSourceKind": "projectFile",

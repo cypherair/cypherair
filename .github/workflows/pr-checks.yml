@@ -17,6 +17,22 @@ env:
   ARM64E_STAGE1_RELEASE_TAG: rust-arm64e-stage1-stable197-20260715T051054Z-c405db8-r29390775624-a1
 
 jobs:
+  sqlcipher-release-input:
+    name: SQLCipher immutable release input
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Test SQLCipher pin and restore gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_sqlcipher_xcframework_validation.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_restore_sqlcipher_xcframework.py'
+      - name: Restore and validate attested SQLCipher XCFramework
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/restore_sqlcipher_xcframework.sh --require-attestation
+
   rust-dependency-audit:
     runs-on: macos-26
     steps:

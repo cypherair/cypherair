@@ -44,8 +44,8 @@ Sequoia 2.4.1 also introduces an early OpenSSL constructor through `ctor` 1.0.9.
 
 ## SQLCipher Formal External Dependency
 
-- Wrapper repository: `cypherair/sqlcipher-xcframework`; pinned release `sqlcipher-xcframework-v4.16.0-cypherair.1` (wrapper commit `aee70b13ddf0eb262ac1283930760cac44dbe873`).
-- Upstream SQLCipher `v4.16.0`, peeled commit `e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc`.
-- Zip SHA-256: `3544554bcf947fb9329f2ab083cd42f0c7ae9179e98b7f36f26859e2c573062e`; consumer pin file: `third_party/sqlcipher-xcframework.pin.json`.
+- Wrapper repository: `cypherair/sqlcipher-xcframework`; pinned release `sqlcipher-xcframework-v4.17.0-cypherair.1` (wrapper commit `9d8c3627ad67b521a5bd5145bdea98632c80a22b`).
+- Upstream SQLCipher `v4.17.0`, peeled commit `810db22f575ee7cf94ea96a3e91622b5fcece3dc`, embedding SQLite `3.53.3`.
+- Zip SHA-256: `51b0c197d4c06461fd3484a7a8577731eba6ef49c77272bd76db703431d3c4da`; consumer pin file: `third_party/sqlcipher-xcframework.pin.json`.
 - Release shape: SSH-signed annotated tag on a non-prerelease immutable GitHub Release, verified with `gh release verify`, `gh release verify-asset`, and `gh attestation verify`. Slices mirror the app policy (device `arm64`+`arm64e`, simulator `arm64`), each a static `SQLCipher.framework`.
 - Restore/validation mechanics: [TESTING.md](TESTING.md) §2.4. Refreshes publish a new stable immutable wrapper release first, then re-pin here; never commit the restored artifact or downloaded assets.

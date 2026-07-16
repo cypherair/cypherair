@@ -16,10 +16,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PIN_PATH = ROOT / "third_party" / "sqlcipher-xcframework.pin.json"
 SOURCE_REPOSITORY = "https://github.com/sqlcipher/sqlcipher.git"
-SOURCE_TAG = "v4.16.0"
-SOURCE_COMMIT = "e2a6040f2ae5cfff2b3e08eb3320007d93cdf3fc"
-EXPECTED_CIPHER_VERSION_PREFIX = "4.16.0"
-EXPECTED_SQLITE_VERSION = "3.53.1"
+SOURCE_TAG = "v4.17.0"
+SOURCE_COMMIT = "810db22f575ee7cf94ea96a3e91622b5fcece3dc"
+EXPECTED_FRAMEWORK_VERSION = "4.17.0"
+EXPECTED_CIPHER_RUNTIME_VERSION = "4.17.0 community"
+EXPECTED_SQLITE_VERSION = "3.53.3"
 RELEASE_METADATA_NAME = "SQLCipher.xcframework.release.json"
 EXPECTED_ASSET_NAMES = [
     "SQLCipher.xcframework.zip",
@@ -152,6 +153,9 @@ def validate_pin(pin: dict) -> None:
     for asset_name, entry in assets.items():
         if not isinstance(entry, dict) or not str(entry.get("sha256") or ""):
             raise ValidationError(f"SQLCipher pin asset {asset_name} is missing sha256")
+        size = entry.get("size")
+        if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
+            raise ValidationError(f"SQLCipher pin asset {asset_name} must have a positive integer size")
 
     slices = pin.get("slices")
     if not isinstance(slices, dict):
@@ -177,6 +181,10 @@ def asset_sha(pin: dict, name: str) -> str:
     return str(((pin.get("assets") or {}).get(name) or {}).get("sha256") or "")
 
 
+def asset_size(pin: dict, name: str) -> int:
+    return int(((pin.get("assets") or {}).get(name) or {}).get("size") or 0)
+
+
 def validate_release_assets(assets: Path, pin: dict) -> None:
     zip_path = assets / "SQLCipher.xcframework.zip"
     checksum_path = assets / "SQLCipher.xcframework.sha256"
@@ -186,11 +194,10 @@ def validate_release_assets(assets: Path, pin: dict) -> None:
     for path in (zip_path, checksum_path, manifest_path, privacy_path, metadata_path):
         require_file(path)
 
-    expect_sha(zip_path, asset_sha(pin, "SQLCipher.xcframework.zip"))
-    expect_sha(checksum_path, asset_sha(pin, "SQLCipher.xcframework.sha256"))
-    expect_sha(manifest_path, asset_sha(pin, "SQLCipher.arm64e-build-manifest.json"))
-    expect_sha(privacy_path, asset_sha(pin, "SQLCipher-PrivacyInfo.xcprivacy"))
-    expect_sha(metadata_path, asset_sha(pin, RELEASE_METADATA_NAME))
+    for asset_name in EXPECTED_ASSET_NAMES:
+        asset_path = assets / asset_name
+        expect_size(asset_path, asset_size(pin, asset_name))
+        expect_sha(asset_path, asset_sha(pin, asset_name))
 
     checksum_text = checksum_path.read_text(encoding="utf-8").strip()
     expected_checksum_text = f"{asset_sha(pin, 'SQLCipher.xcframework.zip')}  SQLCipher.xcframework.zip"
@@ -204,6 +211,12 @@ def expect_sha(path: Path, expected: str) -> None:
         raise ValidationError(f"{path.name} sha256 {actual} != expected {expected}")
 
 
+def expect_size(path: Path, expected: int) -> None:
+    actual = path.stat().st_size
+    if actual != expected:
+        raise ValidationError(f"{path.name} size {actual} != expected {expected}")
+
+
 def validate_release_metadata(path: Path, pin: dict) -> None:
     metadata = load_json(path)
     release = pin["release"]
@@ -215,6 +228,7 @@ def validate_release_metadata(path: Path, pin: dict) -> None:
         "source_ref": release["sourceRef"],
         "release_channel": "stable",
         "signer_workflow": release["signerWorkflow"],
+        "run_id": release["runId"],
         "sqlcipher_source_repository": upstream["repository"],
         "sqlcipher_source_tag": upstream["tag"],
         "sqlcipher_source_commit": upstream["commit"],
@@ -385,6 +399,10 @@ def validate_xcframework(root: Path, manifest: dict, pin: dict) -> None:
             raise ValidationError(f"{identifier}: SQLCipher.framework Info.plist must declare CFBundlePackageType=FMWK")
         if framework_info.get("CFBundleExecutable") != "SQLCipher":
             raise ValidationError(f"{identifier}: SQLCipher.framework Info.plist must declare CFBundleExecutable=SQLCipher")
+        if framework_info.get("CFBundleShortVersionString") != EXPECTED_FRAMEWORK_VERSION:
+            raise ValidationError(f"{identifier}: SQLCipher.framework short version mismatch")
+        if framework_info.get("CFBundleVersion") != EXPECTED_FRAMEWORK_VERSION:
+            raise ValidationError(f"{identifier}: SQLCipher.framework bundle version mismatch")
         modulemap = (framework / "Modules" / "module.modulemap").read_text(encoding="utf-8")
         if "framework module SQLCipher" not in modulemap or 'umbrella header "SQLCipher.h"' not in modulemap:
             raise ValidationError(f"{identifier}: module.modulemap does not declare framework module SQLCipher")
@@ -470,11 +488,12 @@ int main(int argc, char **argv) {
 
   if (sqlite3_open(":memory:", &db) != SQLITE_OK) return 10;
   if (query_value(db, "PRAGMA cipher_version;", value, sizeof(value)) != SQLITE_OK) return 11;
-  if (strncmp(value, "4.16.0", 6) != 0 || strstr(value, "community") == NULL) return 12;
+  if (strcmp(value, EXPECTED_CIPHER_RUNTIME_VERSION) != 0) return 12;
   sqlite3_close(db);
 
   if (!sqlite3_compileoption_used("SQLITE_HAS_CODEC")) return 13;
   if (!sqlite3_compileoption_used("SQLITE_TEMP_STORE=2")) return 14;
+  if (strcmp(sqlite3_libversion(), EXPECTED_SQLITE_VERSION) != 0) return 15;
 
   remove(path);
   if (sqlite3_open(path, &db) != SQLITE_OK) return 20;
@@ -491,10 +510,10 @@ int main(int argc, char **argv) {
 
   if (sqlite3_open(path, &db) != SQLITE_OK) return 40;
   if (apply_key(db, bad_key) != SQLITE_OK) return 41;
-  int wrong_key_rc = query_value(db, "SELECT v FROM t;", value, sizeof(value));
+  int wrong_key_rc = exec_sql(db, "CREATE TABLE wrong_key_probe(v INTEGER);");
   sqlite3_close(db);
   remove(path);
-  if (wrong_key_rc == SQLITE_OK) return 42;
+  if (wrong_key_rc != SQLITE_NOTADB) return 42;
 
   return 0;
 }
@@ -514,6 +533,8 @@ int main(int argc, char **argv) {
                 "arm64",
                 str(source_path),
                 "-DSQLITE_HAS_CODEC",
+                f'-DEXPECTED_CIPHER_RUNTIME_VERSION="{EXPECTED_CIPHER_RUNTIME_VERSION}"',
+                f'-DEXPECTED_SQLITE_VERSION="{EXPECTED_SQLITE_VERSION}"',
                 "-F",
                 str(framework_parent),
                 "-framework",

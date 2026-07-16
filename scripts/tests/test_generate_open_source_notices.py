@@ -78,16 +78,16 @@ class GenerateOpenSourceNoticesTests(unittest.TestCase):
 
     def test_external_sqlcipher_notices_are_project_file_records(self) -> None:
         notices = module.build_notice_manifest([], {})
-        sqlcipher = next(notice for notice in notices if notice["id"] == "sqlcipher@4.16.0")
-        sqlite = next(notice for notice in notices if notice["id"] == "sqlite@3.53.1")
+        sqlcipher = next(notice for notice in notices if notice["id"] == "sqlcipher@4.17.0")
+        sqlite = next(notice for notice in notices if notice["id"] == "sqlite@3.53.3")
 
         self.assertEqual(sqlcipher["licenseName"], "BSD-3-Clause")
         self.assertEqual(sqlcipher["licenseSourceKind"], "projectFile")
-        self.assertEqual(sqlcipher["licenseFileResourceName"], "SQLCipher-4.16.0.txt")
+        self.assertEqual(sqlcipher["licenseFileResourceName"], "SQLCipher-4.17.0.txt")
         self.assertTrue(sqlcipher["isDirectDependency"])
         self.assertEqual(sqlite["licenseName"], "Public Domain")
         self.assertEqual(sqlite["licenseSourceKind"], "projectFile")
-        self.assertEqual(sqlite["licenseFileResourceName"], "SQLite-3.53.1.txt")
+        self.assertEqual(sqlite["licenseFileResourceName"], "SQLite-3.53.3.txt")
         self.assertTrue(sqlite["isDirectDependency"])
 
     def metadata(
