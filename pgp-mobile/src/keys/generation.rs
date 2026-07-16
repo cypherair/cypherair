@@ -18,7 +18,7 @@ pub fn generate_key_with_profile(
     match profile {
         KeyProfile::Universal => {
             // Explicitly set RFC4880 profile and strip SEIPDv2 feature.
-            // Sequoia 2.2.0 defaults to advertising SEIPDv2 support in the
+            // Sequoia defaults to advertising SEIPDv2 support in the
             // Features subpacket (because the library itself supports it).
             // For Portable Legacy (GnuPG-compatible), we must advertise only SEIPDv1
             // so that other implementations send SEIPDv1 messages to this key.

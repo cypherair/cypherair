@@ -34,7 +34,7 @@ Message format is selected automatically by recipient key version; any post-quan
 |-------|------------|
 | Platform | iOS 26.5+ / iPadOS 26.5+ / macOS 26.5+ / visionOS 26.5+, minimum 8 GB RAM |
 | Language | Apple Swift (6.4 beta development toolchain; 6.3.3 release toolchain), SwiftUI (iOS 26 Liquid Glass conventions where applicable; native platform chrome elsewhere), UIKit for system pickers |
-| OpenPGP Engine | Sequoia PGP 2.4.0 (Rust), `crypto-openssl` backend (vendored) |
+| OpenPGP Engine | Sequoia PGP 2.4.1 (Rust), `crypto-openssl` backend (vendored) |
 | FFI Bridge | Mozilla UniFFI 0.31.x; Xcode links the locally generated `PgpMobile.xcframework` plus `bindings/module.modulemap` |
 | SQLCipher | Pinned external `SQLCipher.xcframework` from `cypherair/sqlcipher-xcframework`, restored as a git-ignored artifact and verified against `third_party/sqlcipher-xcframework.pin.json` |
 | Security | CryptoKit (Secure Enclave), Security.framework (Keychain) |

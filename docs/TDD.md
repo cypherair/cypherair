@@ -10,11 +10,11 @@
 
 ### 1.1 Library
 
-`sequoia-openpgp` (version pinned in `pgp-mobile/Cargo.toml`, currently `=2.4.0`; LGPL-2.0-or-later) — the only Rust OpenPGP implementation with complete RFC 9580 support plus production RFC 9980 (post-quantum) support. Release ordering and the compliance-asset contract: [RELEASE.md](RELEASE.md).
+`sequoia-openpgp` (version pinned in `pgp-mobile/Cargo.toml`, currently `=2.4.1`; LGPL-2.0-or-later) — the only Rust OpenPGP implementation with complete RFC 9580 support plus production RFC 9980 (post-quantum) support. Release ordering and the compliance-asset contract: [RELEASE.md](RELEASE.md).
 
 ### 1.2 Backend: crypto-openssl (vendored)
 
-`crypto-openssl`, vendored via `openssl-src`: battle-tested, constant-time, no experimental opt-in flags, PQC-capable. The `openssl-src` override for the arm64e chain must stay explicit — the checked-in fork branch plus `Cargo.lock`, never a machine-local `path` dependency ([ARM64E_STATUS.md](ARM64E_STATUS.md)). Feature set: `compression-deflate` is enabled for **reading** compressed messages only; outgoing messages are never compressed; bzip2 is excluded. Release-profile gotcha: LTO and strip stay **disabled** (`lto = false`, `strip = "none"`) — enabling either causes linker failures with vendored OpenSSL; binary size is managed via `codegen-units = 1` and Xcode dead-code elimination instead.
+`crypto-openssl`, vendored via `openssl-src`: battle-tested, constant-time, no experimental opt-in flags, PQC-capable. The `openssl-src` and Apple `ctor` overrides for the arm64e chain must stay explicit — checked-in fork branches plus `Cargo.lock`, never machine-local `path` dependencies ([ARM64E_STATUS.md](ARM64E_STATUS.md)). Feature set: `compression-deflate` is enabled for **reading** compressed messages only; outgoing messages are never compressed; bzip2 is excluded. Release-profile gotcha: LTO and strip stay **disabled** (`lto = false`, `strip = "none"`) — enabling either causes linker failures with vendored OpenSSL; binary size is managed via `codegen-units = 1` and Xcode dead-code elimination instead.
 
 ### 1.3 Software Profile Configuration
 

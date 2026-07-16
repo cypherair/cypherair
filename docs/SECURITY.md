@@ -8,7 +8,7 @@
 
 ## 1. Encryption Scheme
 
-All cryptographic operations use Sequoia PGP 2.4.0 (`crypto-openssl` backend). Five software profiles with different algorithm suites; the two composite Post-Quantum suites each also back a device-bound split-custody family — the ML-DSA-65/ML-KEM-768 suite backs Portable Post-Quantum and Device-Bound Post-Quantum, and the ML-DSA-87/ML-KEM-1024 suite backs Portable Post-Quantum · High and Device-Bound Post-Quantum · High.
+All cryptographic operations use Sequoia PGP 2.4.1 (`crypto-openssl` backend). Five software profiles with different algorithm suites; the two composite Post-Quantum suites each also back a device-bound split-custody family — the ML-DSA-65/ML-KEM-768 suite backs Portable Post-Quantum and Device-Bound Post-Quantum, and the ML-DSA-87/ML-KEM-1024 suite backs Portable Post-Quantum · High and Device-Bound Post-Quantum · High.
 
 ### Legacy (Universal)
 

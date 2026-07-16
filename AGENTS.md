@@ -16,7 +16,7 @@ stage1 toolchain policy.
   toolchain; 6.3.3 on the Xcode 26.6 release toolchain), SwiftUI, and Rust
   stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler
   release.
-- **OpenPGP:** Sequoia PGP 2.4.0 through the Rust `pgp-mobile` wrapper and
+- **OpenPGP:** Sequoia PGP 2.4.1 through the Rust `pgp-mobile` wrapper and
   Mozilla UniFFI 0.31.x.
 - **Key families:** Nine families combining message compatibility with
   private-key custody — Portable Legacy (Ed25519 v4, GnuPG-compatible), Portable

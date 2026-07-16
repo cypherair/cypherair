@@ -359,6 +359,21 @@
     ]
   },
   {
+    "id": "ctor@1.0.9",
+    "displayName": "ctor",
+    "version": "1.0.9",
+    "repositoryURL": "https://github.com/mmastrac/linktime",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "ctor-1.0.9.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
     "id": "digest@0.10.7",
     "displayName": "digest",
     "version": "0.10.7",
@@ -784,6 +799,21 @@
     ]
   },
   {
+    "id": "link-section@0.19.0",
+    "displayName": "link-section",
+    "version": "0.19.0",
+    "repositoryURL": "https://github.com/mmastrac/linktime",
+    "licenseName": "Apache-2.0 OR MIT",
+    "licenseFileResourceName": "link-section-0.19.0.txt",
+    "kind": "thirdParty",
+    "isDirectDependency": false,
+    "licenseSourceKind": "cratePackage",
+    "licenseSourceItems": [
+      "LICENSE-APACHE",
+      "LICENSE-MIT"
+    ]
+  },
+  {
     "id": "litemap@0.8.2",
     "displayName": "litemap",
     "version": "0.8.2",
@@ -915,12 +945,12 @@
     ]
   },
   {
-    "id": "openssl-src@300.6.0+3.6.2",
+    "id": "openssl-src@300.6.1+3.6.3",
     "displayName": "openssl-src",
-    "version": "300.6.0+3.6.2",
+    "version": "300.6.1+3.6.3",
     "repositoryURL": "https://github.com/alexcrichton/openssl-src-rs",
     "licenseName": "MIT/Apache-2.0",
-    "licenseFileResourceName": "openssl-src-300.6.0-3.6.2.txt",
+    "licenseFileResourceName": "openssl-src-300.6.1-3.6.3.txt",
     "kind": "thirdParty",
     "isDirectDependency": false,
     "licenseSourceKind": "cratePackage",
@@ -1121,12 +1151,12 @@
     ]
   },
   {
-    "id": "sequoia-openpgp@2.4.0",
+    "id": "sequoia-openpgp@2.4.1",
     "displayName": "sequoia-openpgp",
-    "version": "2.4.0",
+    "version": "2.4.1",
     "repositoryURL": "https://gitlab.com/sequoia-pgp/sequoia",
     "licenseName": "LGPL-2.0-or-later",
-    "licenseFileResourceName": "sequoia-openpgp-2.4.0.txt",
+    "licenseFileResourceName": "sequoia-openpgp-2.4.1.txt",
     "kind": "thirdParty",
     "isDirectDependency": true,
     "licenseSourceKind": "cratePackage",

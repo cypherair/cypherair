@@ -3,15 +3,15 @@
 > Status: Canonical current-state — source of truth for Apple arm64e support.
 > Purpose: The pinned arm64e Rust stage1 toolchain, the packaging policy, and the external SQLCipher pin.
 > Audience: Human developers, release owners, and AI coding tools.
-> Update triggers: The pinned stage1 tag or its source ref/commit, the stage1 consumption policy, the `openssl-src` patch target or the OpenSSL forks' role, the dual-arch packaging policy or build-manifest contract, or the SQLCipher wrapper pin.
-> Last reviewed: 2026-07-15.
+> Update triggers: The pinned stage1 tag or its source ref/commit, the stage1 consumption policy, the `openssl-src` or `ctor` patch target or those forks' role, the dual-arch packaging policy or build-manifest contract, or the SQLCipher wrapper pin.
+> Last reviewed: 2026-07-16.
 
 ## Packaging Policy
 
 - `./build-xcframework.sh --release` is the official app-side build entrypoint (delegates to `scripts/build_apple_arm64e_xcframework.sh`). Build mechanics and the local packaging workflow live in [TESTING.md](TESTING.md) §2.4 workflow C.
 - iOS, macOS, and visionOS **device** artifacts ship dual `arm64` + `arm64e` slices because Apple distribution requires `arm64` whenever a bundle contains `arm64e`. iOS/visionOS **simulator** artifacts remain `arm64`-only. UniFFI bindgen uses an `arm64e-apple-darwin` host dylib.
 - `arm64` slices build with official stable Rust; `arm64e` slices use stable Cargo with `RUSTC` pointing at the pinned stage1 compiler and its prebuilt std payloads — never nightly Cargo or `-Zbuild-std`. The repo has no `rust-toolchain.toml` override; ordinary validation uses explicit `cargo +stable`.
-- Every build emits `PgpMobile.arm64e-build-manifest.json` (schema-v3 Rust stage1 and bundled-LLVM provenance, OpenSSL carry-chain commits, verified slice metadata). Edge and stable releases publish it; App Store candidate validation requires the exact pinned Rust source/LLVM identity in the stable-release manifest before archiving ([RELEASE.md](RELEASE.md)).
+- Every build emits `PgpMobile.arm64e-build-manifest.json` (schema-v3 Rust stage1 and bundled-LLVM provenance, owned OpenSSL and `ctor` carry commits, verified slice metadata). Edge and stable releases publish it; App Store candidate validation requires the exact pinned Rust source/LLVM identity and dependency-carry provenance in the stable-release manifest before archiving ([RELEASE.md](RELEASE.md)).
 
 ## Pinned Rust stage1 Toolchain
 
@@ -36,9 +36,11 @@
 
 After rotating: the old tag greps to zero hits, the new tag greps to exactly these locations, the selected package passes release and semantic verification before the compiler executes, and one pinned rebuild plus the macOS unit lane passes.
 
-## OpenSSL Carry Chain
+## Owned Dependency Carry Chains
 
 `pgp-mobile/Cargo.toml` patches `openssl-src` to the `cypherair/openssl-src-rs` fork (branch `carry/apple-arm64e-openssl-fork`), whose submodule points at the `cypherair/openssl` fork carrying the Apple arm64e target definitions. `Cargo.lock` records the resolved commits — the lockfile, not this file, is the machine-checked truth for the current heads. The carry branches remain downstream until equivalent arm64e support lands upstream.
+
+Sequoia 2.4.1 also introduces an early OpenSSL constructor through `ctor` 1.0.9. The published crate emits its Apple archive-retention pointer with one-byte section alignment, which ld64 rejects when producing the final arm64e app image. The manifest therefore patches `ctor` to the `cypherair/linktime` fork (branch `carry/apple-ctor-1.0.9`), where the owning assembly aligns that pointer to eight bytes. Keep this carry isolated to `ctor`; the real constructor record is already correct, so no LLVM, Rust, `link-section`, Sequoia, or downstream linker-suppression change belongs in the workaround. Remove the patch after an equivalent upstream crate release is adopted.
 
 ## SQLCipher Formal External Dependency
 
