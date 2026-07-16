@@ -4,7 +4,7 @@
 > Purpose: Exact technical values and project-specific contracts — profiles, format selection, FFI rules, key wrapping values, storage contracts.
 > Audience: Developers, security auditors, and AI coding tools.
 > Update triggers: Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-16.
 
 ## 1. OpenPGP Engine
 
@@ -77,10 +77,7 @@ The Secure Enclave natively holds only some key types (P-256, and on current OS 
 
 ### 3.2 Access Control (dual mode)
 
-| Mode | Flags | Behavior |
-|------|-------|----------|
-| Standard (default) | `[.privateKeyUsage, .biometryAny, .or, .devicePasscode]` | Biometrics with passcode fallback (≈ `deviceOwnerAuthentication`) |
-| High Security | `[.privateKeyUsage, .biometryAny]` | Biometrics only; key inaccessible while biometrics are unavailable |
+Standard and High Security modes bake different access-control flag sets into the folded SE key at creation. The exact `SecAccessControlCreateWithFlags` flag sets, the LAPolicy mapping, and the mode-switch re-wrap and crash-recovery procedure are owned by [SECURITY.md](SECURITY.md) §4.
 
 ### 3.3 Keychain Layout
 

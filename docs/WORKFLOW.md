@@ -36,10 +36,10 @@ Docs-only changes that touch no code, generated files, project files, entitlemen
 
 The hard constraints — zero network, AEAD hard-fail (never partial plaintext), no key material in logs, memory zeroing, secure random only, MIE enabled, profile-correct message format — are canonical in [CLAUDE.md](../CLAUDE.md) and [SECURITY.md](SECURITY.md) §10. They are never violated.
 
-A change is **security-critical** when it touches the areas listed in [SECURITY.md](SECURITY.md) §10 (`Sources/Security/`, `DecryptionService.swift`, `QRService.swift`, the memory-zeroing utilities, `DiskSpaceChecker.swift`, `pgp-mobile/src/`, entitlements/Info.plist/Xcode project files). For those changes:
+A change is **security-critical** when it touches the areas listed in [SECURITY.md](SECURITY.md) §10. For those changes:
 
 - Call out every security-critical edit explicitly — file, what changed, why — in both the work summary and the PR description.
-- Add a test when it guards something a later edit could quietly break; skip it when there's nothing real to protect (SECURITY.md §10).
+- Add a test when it guards something a later edit could quietly break — in security code that is usually the invariant itself (decryption aborts on a bad tag, a revoked key is refused, memory is zeroed), not the happy path; skip it when there's nothing real to protect.
 - Human review is required before merge.
 
 The maintainer's independent Codex security review (run outside this repository, tracked via CSV + issues) and the per-phase stage-verify are the backstops; this gate is what the authoring session owes them.

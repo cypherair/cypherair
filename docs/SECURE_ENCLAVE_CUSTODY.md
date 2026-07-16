@@ -18,7 +18,7 @@ The product presents it as four of the nine key families ([PRD.md](PRD.md) §3 o
 - **Device-Bound Post-Quantum** — RFC 9980 composite split custody (ML-DSA-65/ML-KEM-768), v6 certificate (§4.1).
 - **Device-Bound Post-Quantum · High** — RFC 9980 composite split custody (ML-DSA-87/ML-KEM-1024), v6 certificate (§4.1).
 
-All three are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and shipped in the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
+All four are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and ship through the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
 
 ## 2. Architecture and ownership
 

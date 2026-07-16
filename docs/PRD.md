@@ -53,13 +53,13 @@ The post-quantum families ([POST_QUANTUM](POST_QUANTUM.md), [TDD](TDD.md) §1.3)
 
 ### 3.1 Legacy tier (RFC 4880): Universal (Default)
 
-The **Portable Legacy** and **Device-Bound Legacy** families. Maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security. Algorithm suite: [SECURITY.md](SECURITY.md) §1.
+The **Portable Legacy** and **Device-Bound Legacy** families. Maximum interoperability with all major PGP implementations, including GnuPG. v4 key format (RFC 4880), Ed25519+X25519, SEIPDv1, ~128-bit security. Algorithm suite: [TDD.md](TDD.md) §1.3.
 
 **Compatible with:** GnuPG 2.1+, Sequoia, OpenPGP.js, GopenPGP, Thunderbird, Bouncy Castle — virtually all PGP tools.
 
 ### 3.2 Modern tier (RFC 9580): baseline and · High
 
-The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bound Modern** and **Portable Modern · High** families). **Modern** uses Ed25519+X25519 v6 with SEIPDv2 AEAD (~128-bit) — the widely supported modern default. **Modern · High** uses the stronger Ed448+X448 v6 (~224-bit), which some tools do not yet support. Algorithm suites: [SECURITY.md](SECURITY.md) §1.
+The v6 RFC 9580 classical tier ships in two strengths (the **Portable/Device-Bound Modern** and **Portable Modern · High** families). **Modern** uses Ed25519+X25519 v6 with SEIPDv2 AEAD (~128-bit) — the widely supported modern default. **Modern · High** uses the stronger Ed448+X448 v6 (~224-bit), which some tools do not yet support. Algorithm suites: [TDD.md](TDD.md) §1.3.
 
 **Compatible with:** Sequoia 2.0+, OpenPGP.js 6.0+, GopenPGP 3.0+, Bouncy Castle 1.82+, PGPainless 2.0+ (Ed448 requires the newer releases). **Not compatible with GnuPG.**
 
@@ -184,7 +184,7 @@ Format-downgrade situations are surfaced *before* encryption as a compatibility 
 - **Standard Mode (default):** biometrics with device-passcode fallback.
 - **High Security Mode:** biometrics only; no passcode fallback for private-key operations. While biometrics are unavailable (sensor damage, lockout), decrypt/sign/export stay blocked.
 
-Activation safeguards for High Security: a warning that losing biometric access means losing private-key access and that a current backup is needed (exact copy in the String Catalog), a backup check over software-custody keys (stronger warning + explicit acknowledgment when none is backed up; device-bound keys carry no backup obligation), and a biometric confirmation of the change. Device-bound keys always require biometrics — the enforcement is fixed and unaffected by this setting. Flag-level detail: [TDD](TDD.md) §3, [SECURITY](SECURITY.md) §4.
+Activation safeguards for High Security: a warning that losing biometric access means losing private-key access and that a current backup is needed (exact copy in the String Catalog), a backup check over software-custody keys (stronger warning + explicit acknowledgment when none is backed up; device-bound keys carry no backup obligation), and a biometric confirmation of the change. Device-bound keys always require biometrics — the enforcement is fixed and unaffected by this setting. Flag-level detail: [SECURITY](SECURITY.md) §4.
 
 ### 4.10 Self-Test
 
