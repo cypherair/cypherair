@@ -76,7 +76,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private let storageRoot: ProtectedDataStorageRoot
     private let registryStore: ProtectedDataRegistryStore
     private let domainKeyManager: ProtectedDomainKeyManager
-    private let bootstrapStore: ProtectedDomainBootstrapStore
+    private let bootstrapStore: ProtectedDomainBootstrapPersisting
     private let currentWrappingRootKey: (() throws -> Data)?
 
     private(set) var payload: Payload?
@@ -88,7 +88,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         storageRoot: ProtectedDataStorageRoot,
         registryStore: ProtectedDataRegistryStore,
         domainKeyManager: ProtectedDomainKeyManager,
-        bootstrapStore: ProtectedDomainBootstrapStore? = nil,
+        bootstrapStore: ProtectedDomainBootstrapPersisting? = nil,
         currentWrappingRootKey: (() throws -> Data)? = nil
     ) {
         self.storageRoot = storageRoot
@@ -359,13 +359,29 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
         try storageRoot.promoteStagedFile(from: pendingURL, to: currentURL)
 
-        try bootstrapStore.saveMetadata(
-            ProtectedDomainBootstrapMetadata(
-                schemaVersion: Payload.currentSchemaVersion,
-                expectedCurrentGenerationIdentifier: String(generationIdentifier)
-            ),
-            for: Self.domainID
-        )
+        do {
+            try bootstrapStore.saveMetadata(
+                ProtectedDomainBootstrapMetadata(
+                    schemaVersion: Payload.currentSchemaVersion,
+                    expectedCurrentGenerationIdentifier: String(generationIdentifier)
+                ),
+                for: Self.domainID
+            )
+        } catch {
+            // The pending→current promotion above already made this
+            // generation durable and authoritative, and the read gate heals
+            // a watermark that is exactly one generation behind. Propagating
+            // a watermark-only failure would tell provisioning callers to
+            // roll back private key material for an identity whose metadata
+            // is already committed — a silent encrypt-to-self orphan —
+            // while the lagging watermark merely heals on the next read.
+            // Swallow the failure only when the on-disk watermark verifiably
+            // sits in that heal-able state; anything else stays fail-closed.
+            guard let staleMetadata = try? bootstrapStore.loadMetadata(for: Self.domainID),
+                  staleMetadata.expectedCurrentGenerationIdentifier == String(generationIdentifier - 1) else {
+                throw error
+            }
+        }
     }
 
     private func readAuthoritativeSnapshot(

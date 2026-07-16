@@ -174,6 +174,34 @@ enum ProtectedDataTestInterruption: Error {
     case injectedPendingCreateInterruption
 }
 
+final class FailureInjectingProtectedDomainBootstrapStore: ProtectedDomainBootstrapPersisting, @unchecked Sendable {
+    private let base: ProtectedDomainBootstrapStore
+    var saveError: Error?
+    var removesRecordBeforeFailing = false
+
+    init(base: ProtectedDomainBootstrapStore) {
+        self.base = base
+    }
+
+    func loadMetadata(for domainID: ProtectedDataDomainID) throws -> ProtectedDomainBootstrapMetadata? {
+        try base.loadMetadata(for: domainID)
+    }
+
+    func saveMetadata(_ metadata: ProtectedDomainBootstrapMetadata, for domainID: ProtectedDataDomainID) throws {
+        if let saveError {
+            if removesRecordBeforeFailing {
+                try base.removeMetadata(for: domainID)
+            }
+            throw saveError
+        }
+        try base.saveMetadata(metadata, for: domainID)
+    }
+
+    func removeMetadata(for domainID: ProtectedDataDomainID) throws {
+        try base.removeMetadata(for: domainID)
+    }
+}
+
 final class MockProtectedDomainRecoveryHandler: ProtectedDataTestAppProtectedDomainRecoveryHandler, @unchecked Sendable {
     let protectedDataDomainID: ProtectedDataDomainID
     private(set) var continuedCreatePhases: [CreateDomainPhase] = []

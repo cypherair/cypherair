@@ -279,6 +279,112 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         )
     }
 
+    func test_keyMetadataDomain_watermarkWriteFailureAfterPromotionKeepsCommit() async throws {
+        // A bootstrap-watermark write that fails after the pending→current
+        // promotion must not fail the commit: the new generation is already
+        // durable, and the read gate heals a watermark that is exactly one
+        // generation behind. Propagating the error would make provisioning
+        // callers roll back private key material for an identity whose
+        // metadata is already committed — a silent encrypt-to-self orphan.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataWatermarkFailureKeepsCommit")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let bootstrapStore = FailureInjectingProtectedDomainBootstrapStore(
+            base: ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot)
+        )
+        let store = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            bootstrapStore: bootstrapStore,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let identity = makeMetadataIdentity(
+            fingerprint: "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            userId: "Kept <kept@example.invalid>"
+        )
+        try await store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        _ = try await store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        bootstrapStore.saveError = CocoaError(.fileWriteOutOfSpace)
+        try store.save(identity)
+        bootstrapStore.saveError = nil
+
+        XCTAssertEqual(try store.loadAll(), [identity])
+        let staleMetadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).loadMetadata(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+            )
+        )
+        XCTAssertEqual(staleMetadata.expectedCurrentGenerationIdentifier, "1")
+
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let payload = try await reopenedStore.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        XCTAssertEqual(payload.identities, [identity])
+        let healedMetadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).loadMetadata(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+            )
+        )
+        XCTAssertEqual(healedMetadata.expectedCurrentGenerationIdentifier, "2")
+    }
+
+    func test_keyMetadataDomain_watermarkFailureWithoutHealableWatermarkStaysFailClosed() async throws {
+        // The post-promotion swallow is guarded: when the failed watermark
+        // write leaves no readable one-generation-behind record, the commit
+        // error must propagate — the read gate cannot heal that state, and
+        // a blanket swallow would hide it.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataWatermarkFailureFailsClosed")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let bootstrapStore = FailureInjectingProtectedDomainBootstrapStore(
+            base: ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot)
+        )
+        let store = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            bootstrapStore: bootstrapStore,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let identity = makeMetadataIdentity(
+            fingerprint: "f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5",
+            userId: "Closed <fail-closed@example.invalid>"
+        )
+        try await store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        _ = try await store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        bootstrapStore.saveError = CocoaError(.fileWriteOutOfSpace)
+        bootstrapStore.removesRecordBeforeFailing = true
+        XCTAssertThrowsError(try store.save(identity))
+
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        await XCTAssertThrowsErrorAsync {
+            _ = try await reopenedStore.openDomainIfNeeded(
+                wrappingRootKey: harness.wrappingRootKey
+            )
+        }
+        XCTAssertEqual(reopenedStore.domainState, .recoveryNeeded)
+    }
+
     func test_keyMetadataDomain_missingCurrentWithSealedNextPendingCompletesCommit() async throws {
         // Simulates a kill between the current→previous and pending→current
         // promotions: the current slot is gone but a fully sealed
