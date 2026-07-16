@@ -83,6 +83,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private(set) var domainState: KeyMetadataLoadState = .locked
 
     private var unlockedGenerationIdentifier: Int?
+    private var watermarkNeedsHeal = false
 
     init(
         storageRoot: ProtectedDataStorageRoot,
@@ -283,6 +284,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
         }
 
         let nextGenerationIdentifier = max(unlockedGenerationIdentifier ?? 0, 0) + 1
+        try healLaggingWatermarkIfNeeded()
         try writePayloadGeneration(
             updatedPayload,
             generationIdentifier: nextGenerationIdentifier,
@@ -381,12 +383,39 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
             // failed save landed durably before throwing, so the commit is
             // complete and needs no heal). Anything else stays fail-closed.
             guard let storedWatermark = (try? bootstrapStore.loadMetadata(for: Self.domainID))?
-                    .expectedCurrentGenerationIdentifier,
-                  storedWatermark == String(generationIdentifier - 1)
-                      || storedWatermark == String(generationIdentifier) else {
+                    .expectedCurrentGenerationIdentifier else {
+                throw error
+            }
+            switch storedWatermark {
+            case String(generationIdentifier - 1):
+                watermarkNeedsHeal = true
+            case String(generationIdentifier):
+                break
+            default:
                 throw error
             }
         }
+    }
+
+    private func healLaggingWatermarkIfNeeded() throws {
+        guard watermarkNeedsHeal, let unlockedGenerationIdentifier else {
+            return
+        }
+        // A previously swallowed watermark failure left the on-disk
+        // watermark one generation behind the durable current envelope.
+        // It must be re-written before another generation is staged:
+        // promoting again over the lag would put current two generations
+        // ahead — past what the read gate accepts — so a persistent
+        // watermark failure has to surface here, before the mutation,
+        // while the domain is still in the heal-able state.
+        try bootstrapStore.saveMetadata(
+            ProtectedDomainBootstrapMetadata(
+                schemaVersion: Payload.currentSchemaVersion,
+                expectedCurrentGenerationIdentifier: String(unlockedGenerationIdentifier)
+            ),
+            for: Self.domainID
+        )
+        watermarkNeedsHeal = false
     }
 
     private func readAuthoritativeSnapshot(
@@ -576,6 +605,7 @@ final class KeyMetadataDomainStore: KeyMetadataPersistence, ProtectedDataRelockP
     private func clearUnlockedState() {
         payload = nil
         unlockedGenerationIdentifier = nil
+        watermarkNeedsHeal = false
     }
 }
 

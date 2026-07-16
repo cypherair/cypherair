@@ -393,6 +393,68 @@ final class KeyMetadataProtectedDomainTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(payload.identities, [identity])
     }
 
+    func test_keyMetadataDomain_persistentWatermarkFailureFailsBeforeSecondPromotion() async throws {
+        // After a swallowed watermark failure, the store must heal the
+        // lagging watermark before staging another generation: promoting
+        // again over the lag would put current two generations ahead —
+        // past what the read gate accepts — so a persistent watermark
+        // failure has to surface before the second mutation, while the
+        // domain is still in the heal-able state, and the session must
+        // recover in place once the failure clears.
+        let harness = try await makeKeyMetadataDomainHarness("KeyMetadataPersistentWatermarkFailure")
+        defer { try? FileManager.default.removeItem(at: harness.storageRoot.rootURL.deletingLastPathComponent()) }
+        let bootstrapStore = FailureInjectingProtectedDomainBootstrapStore(
+            base: ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot)
+        )
+        let store = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            bootstrapStore: bootstrapStore,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let firstIdentity = makeMetadataIdentity(
+            fingerprint: "b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7",
+            userId: "First <first@example.invalid>"
+        )
+        let secondIdentity = makeMetadataIdentity(
+            fingerprint: "c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7",
+            userId: "Second <second@example.invalid>"
+        )
+        try await store.ensureCommittedIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        _ = try await store.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+
+        bootstrapStore.saveError = CocoaError(.fileWriteOutOfSpace)
+        try store.save(firstIdentity)
+        XCTAssertThrowsError(try store.save(secondIdentity))
+        XCTAssertEqual(try store.loadAll(), [firstIdentity])
+
+        bootstrapStore.saveError = nil
+        try store.save(secondIdentity)
+        XCTAssertEqual(try store.loadAll(), [firstIdentity, secondIdentity])
+        let recoveredMetadata = try XCTUnwrap(
+            ProtectedDomainBootstrapStore(storageRoot: harness.storageRoot).loadMetadata(
+                for: ProtectedDataTestAppKeyMetadataDomainStore.domainID
+            )
+        )
+        XCTAssertEqual(recoveredMetadata.expectedCurrentGenerationIdentifier, "3")
+
+        let reopenedStore = ProtectedDataTestAppKeyMetadataDomainStore(
+            storageRoot: harness.storageRoot,
+            registryStore: harness.registryStore,
+            domainKeyManager: harness.domainKeyManager,
+            currentWrappingRootKey: { harness.wrappingRootKey }
+        )
+        let payload = try await reopenedStore.openDomainIfNeeded(
+            wrappingRootKey: harness.wrappingRootKey
+        )
+        XCTAssertEqual(payload.identities, [firstIdentity, secondIdentity])
+    }
+
     func test_keyMetadataDomain_watermarkFailureWithoutHealableWatermarkStaysFailClosed() async throws {
         // The post-promotion swallow is guarded: when the failed watermark
         // write leaves no readable one-generation-behind record, the commit
