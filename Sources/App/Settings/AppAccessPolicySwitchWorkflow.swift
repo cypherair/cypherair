@@ -22,7 +22,6 @@ final class AppAccessPolicySwitchWorkflow {
     ) throws -> Void
     private let discardHandoffContextForPolicyChange: () -> Void
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let traceStore: AuthLifecycleTraceStore?
 
     init(
         currentPolicy: @escaping () -> AppSessionAuthenticationPolicy,
@@ -39,8 +38,7 @@ final class AppAccessPolicySwitchWorkflow {
             LAContext?
         ) throws -> Void,
         discardHandoffContextForPolicyChange: @escaping () -> Void,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore?
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator
     ) {
         self.currentPolicy = currentPolicy
         self.hasPersistedRootSecret = hasPersistedRootSecret
@@ -49,7 +47,6 @@ final class AppAccessPolicySwitchWorkflow {
         self.reprotectPersistedRootSecret = reprotectPersistedRootSecret
         self.discardHandoffContextForPolicyChange = discardHandoffContextForPolicyChange
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.traceStore = traceStore
     }
 
     func run(to newPolicy: AppSessionAuthenticationPolicy) async throws {
@@ -65,85 +62,27 @@ final class AppAccessPolicySwitchWorkflow {
         from currentPolicy: AppSessionAuthenticationPolicy,
         to newPolicy: AppSessionAuthenticationPolicy
     ) async throws {
-        var didTraceFinish = false
-        do {
-            if hasPersistedRootSecret() {
-                let authenticationPolicy = AppSessionAuthenticationPolicy
-                    .strictestPolicyForRootSecretReprotection(
-                        from: currentPolicy,
-                        to: newPolicy
-                    )
-                traceStore?.record(
-                    category: .operation,
-                    name: "appAccessPolicy.switch.start",
-                    metadata: [
-                        "currentPolicy": currentPolicy.rawValue,
-                        "newPolicy": newPolicy.rawValue,
-                        "authPolicy": authenticationPolicy.rawValue,
-                        "hasRootSecret": "true"
-                    ]
+        if hasPersistedRootSecret() {
+            let authenticationPolicy = AppSessionAuthenticationPolicy
+                .strictestPolicyForRootSecretReprotection(
+                    from: currentPolicy,
+                    to: newPolicy
                 )
-                let result = try await authenticateAndReprotectRootSecret(
-                    currentPolicy: currentPolicy,
-                    newPolicy: newPolicy,
-                    authenticationPolicy: authenticationPolicy
-                )
-                defer {
-                    result.context?.invalidate()
-                }
+            let result = try await authenticateAndReprotectRootSecret(
+                currentPolicy: currentPolicy,
+                newPolicy: newPolicy,
+                authenticationPolicy: authenticationPolicy
+            )
+            defer {
+                result.context?.invalidate()
+            }
 
-                discardHandoffContextForPolicyChange()
-                traceStore?.record(
-                    category: .operation,
-                    name: "appAccessPolicy.switch.finish",
-                    metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "true"]
-                )
-                didTraceFinish = true
-            } else {
-                traceStore?.record(
-                    category: .operation,
-                    name: "appAccessPolicy.switch.start",
-                    metadata: [
-                        "currentPolicy": currentPolicy.rawValue,
-                        "newPolicy": newPolicy.rawValue,
-                        "authPolicy": newPolicy.rawValue,
-                        "hasRootSecret": "false"
-                    ]
-                )
-                guard canEvaluate(newPolicy) else {
-                    traceStore?.record(
-                        category: .operation,
-                        name: "appAccessPolicy.switch.finish",
-                        metadata: [
-                            "result": "biometricsUnavailable",
-                            "newPolicy": newPolicy.rawValue,
-                            "hasRootSecret": "false"
-                        ]
-                    )
-                    didTraceFinish = true
-                    throw AuthenticationError.appAccessBiometricsUnavailable
-                }
-                discardHandoffContextForPolicyChange()
-                traceStore?.record(
-                    category: .operation,
-                    name: "appAccessPolicy.switch.finish",
-                    metadata: ["result": "success", "newPolicy": newPolicy.rawValue, "hasRootSecret": "false"]
-                )
-                didTraceFinish = true
+            discardHandoffContextForPolicyChange()
+        } else {
+            guard canEvaluate(newPolicy) else {
+                throw AuthenticationError.appAccessBiometricsUnavailable
             }
-        } catch {
-            if !didTraceFinish {
-                traceStore?.record(
-                    category: .operation,
-                    name: "appAccessPolicy.switch.finish",
-                    metadata: [
-                        "result": "error",
-                        "newPolicy": newPolicy.rawValue,
-                        "errorType": String(describing: type(of: error))
-                    ]
-                )
-            }
-            throw error
+            discardHandoffContextForPolicyChange()
         }
     }
 

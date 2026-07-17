@@ -412,30 +412,4 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         )
     }
 
-    func test_authTraceMetadataSanitizesSecureEnclaveCustodyServices() throws {
-        let signing = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: "0badc0de",
-            role: .signing,
-            tier: .classicalP256
-        )
-        let keyAgreement = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: "0badc0de",
-            role: .keyAgreement,
-            tier: .postQuantum
-        )
-        XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(for: signing.serviceString),
-            "secureEnclaveCustodySigningHandle"
-        )
-        XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(for: keyAgreement.serviceString),
-            "secureEnclaveCustodyKeyAgreementHandle"
-        )
-        XCTAssertEqual(
-            AuthTraceMetadata.keychainServiceKind(
-                forPrefix: SecureEnclaveCustodyHandleReference.servicePrefix
-            ),
-            "secureEnclaveCustodyHandle"
-        )
-    }
 }

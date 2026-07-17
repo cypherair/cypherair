@@ -23,100 +23,48 @@ enum ProtectedDataDeviceBindingConstants {
 struct HardwareProtectedDataDeviceBindingProvider: ProtectedDataDeviceBindingProvider {
     let keyIdentifier = ProtectedDataDeviceBindingConstants.keyIdentifier
 
-    private let traceStore: AuthLifecycleTraceStore?
-
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
-        self.traceStore = traceStore
-    }
-
     func sealRootSecret(
         _ rootSecret: Data,
         sharedRightIdentifier: String
     ) throws -> ProtectedDataRootSecretEnvelope {
-        traceStore?.record(
-            category: .operation,
-            name: "protectedData.deviceBinding.seal.start",
-            metadata: ["keyIdentifier": "protectedData"]
+        let key = try createBindingKey()
+        return try ProtectedDataRootSecretEnvelopeCodec.seal(
+            rootSecret: rootSecret,
+            sharedRightIdentifier: sharedRightIdentifier,
+            deviceBindingKeyIdentifier: keyIdentifier,
+            deviceBindingKeyData: key.dataRepresentation,
+            deviceBindingPublicKeyX963: key.publicKey.x963Representation
         )
-        do {
-            let key = try createBindingKey()
-            let envelope = try ProtectedDataRootSecretEnvelopeCodec.seal(
-                rootSecret: rootSecret,
-                sharedRightIdentifier: sharedRightIdentifier,
-                deviceBindingKeyIdentifier: keyIdentifier,
-                deviceBindingKeyData: key.dataRepresentation,
-                deviceBindingPublicKeyX963: key.publicKey.x963Representation
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.deviceBinding.seal.finish",
-                metadata: [
-                    "result": "success",
-                    "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
-                ]
-            )
-            return envelope
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.deviceBinding.seal.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
-            )
-            throw error
-        }
     }
 
     func openRootSecret(
         envelope: ProtectedDataRootSecretEnvelope,
         expectedSharedRightIdentifier: String
     ) throws -> Data {
-        traceStore?.record(
-            category: .operation,
-            name: "protectedData.deviceBinding.open.start",
-            metadata: ["envelopeVersion": String(envelope.formatVersion)]
-        )
-        do {
-            guard SecureEnclave.isAvailable else {
-                throw SecureEnclaveError.notAvailable
-            }
-            guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
-                throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
-            }
-            // Reconstruct the Secure Enclave handle from the folded key material in the
-            // envelope itself — no separate persisted key item. Fail closed unless the
-            // reconstructed public key matches the bound public key before any ECDH.
-            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
-                dataRepresentation: envelope.deviceBindingKeyData
-            )
-            guard envelope.deviceBindingPublicKeyX963 == key.publicKey.x963Representation else {
-                throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
-            }
-            let ephemeralPublicKey = try P256.KeyAgreement.PublicKey(
-                x963Representation: envelope.ephemeralPublicKeyX963
-            )
-            let sharedSecret = try key.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
-            let rootSecret = try ProtectedDataRootSecretEnvelopeCodec.open(
-                envelope: envelope,
-                sharedSecret: sharedSecret,
-                expectedSharedRightIdentifier: expectedSharedRightIdentifier
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.deviceBinding.open.finish",
-                metadata: ["result": "success", "envelopeVersion": String(envelope.formatVersion)]
-            )
-            return rootSecret
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.deviceBinding.open.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["result": "failed", "envelopeVersion": String(envelope.formatVersion)]
-                )
-            )
-            throw error
+        guard SecureEnclave.isAvailable else {
+            throw SecureEnclaveError.notAvailable
         }
+        guard envelope.deviceBindingKeyIdentifier == keyIdentifier else {
+            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding key identifier mismatch.")
+        }
+        // Reconstruct the Secure Enclave handle from the folded key material in the
+        // envelope itself — no separate persisted key item. Fail closed unless the
+        // reconstructed public key matches the bound public key before any ECDH.
+        let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
+            dataRepresentation: envelope.deviceBindingKeyData
+        )
+        guard envelope.deviceBindingPublicKeyX963 == key.publicKey.x963Representation else {
+            throw ProtectedDataError.invalidEnvelope("Root-secret envelope device-binding public key mismatch.")
+        }
+        let ephemeralPublicKey = try P256.KeyAgreement.PublicKey(
+            x963Representation: envelope.ephemeralPublicKeyX963
+        )
+        let sharedSecret = try key.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
+        return try ProtectedDataRootSecretEnvelopeCodec.open(
+            envelope: envelope,
+            sharedSecret: sharedSecret,
+            expectedSharedRightIdentifier: expectedSharedRightIdentifier
+        )
     }
 
     /// Creates a fresh ProtectedData device-binding Secure Enclave key. The key is not

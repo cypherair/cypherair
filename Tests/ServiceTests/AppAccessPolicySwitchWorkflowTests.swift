@@ -64,8 +64,7 @@ final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
             discardHandoffContextForPolicyChange: {
                 spy.discard()
             },
-            authenticationPromptCoordinator: coordinator,
-            traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+            authenticationPromptCoordinator: coordinator
         )
     }
 

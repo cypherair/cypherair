@@ -33,7 +33,6 @@ final class LocalDataResetService {
     private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let protectedDataRootSecretExists: () -> Bool
     private let secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore?
-    private let traceStore: AuthLifecycleTraceStore?
 
     init(
         keychain: any KeychainManageable,
@@ -52,8 +51,7 @@ final class LocalDataResetService {
         temporaryArtifactStore: AppTemporaryArtifactStore? = nil,
         fileManager: FileManager = .default,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
-        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil,
-        traceStore: AuthLifecycleTraceStore? = nil
+        secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) {
         self.keychain = keychain
         self.protectedDataStorageRoot = protectedDataStorageRoot
@@ -78,17 +76,11 @@ final class LocalDataResetService {
             )
         }
         self.secureEnclaveCustodyHandleStore = secureEnclaveCustodyHandleStore
-        self.traceStore = traceStore
     }
 
     func resetAllLocalData(
         authenticationContext: LAContext? = nil
     ) async throws -> LocalDataResetSummary {
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.start",
-            metadata: ["hasAuthenticationContext": authenticationContext == nil ? "false" : "true"]
-        )
         await protectedDataSessionCoordinator.relockCurrentSession()
 
         var failures: [String] = []
@@ -150,23 +142,9 @@ final class LocalDataResetService {
         )
 
         guard failures.isEmpty else {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.finish",
-                metadata: ["result": "failed", "failureCount": String(failures.count)]
-            )
             throw LocalDataResetError()
         }
 
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.finish",
-            metadata: [
-                "result": "success",
-                "deletedKeychainItemCount": String(deletedKeychainItemCount),
-                "removedDirectoryCount": String(removedDirectoryCount)
-            ]
-        )
         return LocalDataResetSummary(
             deletedKeychainItemCount: deletedKeychainItemCount
         )
@@ -183,22 +161,12 @@ final class LocalDataResetService {
         authenticationContext: LAContext?,
         failures: inout [String]
     ) -> Int {
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.keychain.list.start",
-            metadata: ["accountKind": accountKind]
-        )
+        let accountKind = Self.keychainAccountKind(for: account)
         do {
             let services = try keychain.listItems(
                 servicePrefix: KeychainConstants.prefix,
                 account: account,
                 authenticationContext: authenticationContext
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.keychain.list.finish",
-                metadata: ["accountKind": accountKind, "result": "success", "count": String(services.count)]
             )
             var deletedCount = 0
             for service in services {
@@ -206,20 +174,12 @@ final class LocalDataResetService {
                     service: service,
                     account: account,
                     authenticationContext: authenticationContext,
-                    failureKey: "keychain.\(accountKind).\(AuthTraceMetadata.keychainServiceKind(for: service))",
+                    failureKey: "keychain.\(accountKind).\(Self.keychainServiceKind(for: service))",
                     failures: &failures
                 )
             }
             return deletedCount
         } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.keychain.list.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["accountKind": accountKind, "result": "failed"]
-                )
-            )
             failures.append("keychain.list.\(accountKind).\(String(describing: type(of: error)))")
             return 0
         }
@@ -232,36 +192,16 @@ final class LocalDataResetService {
         failureKey: String,
         failures: inout [String]
     ) -> Int {
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
         do {
             try keychain.delete(
                 service: service,
                 account: account,
                 authenticationContext: authenticationContext
             )
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.keychain.delete.finish",
-                metadata: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "success"]
-            )
             return 1
         } catch where Self.isItemNotFound(error) {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.keychain.delete.finish",
-                metadata: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "missing"]
-            )
             return 0
         } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.keychain.delete.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["accountKind": accountKind, "serviceKind": serviceKind, "result": "failed"]
-                )
-            )
             failures.append("\(failureKey).\(String(describing: type(of: error)))")
             return 0
         }
@@ -273,38 +213,16 @@ final class LocalDataResetService {
         failures: inout [String]
     ) -> Int {
         let existedBefore = fileManager.fileExists(atPath: directory.path)
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.directory.remove.start",
-            metadata: ["name": directory.lastPathComponent, "existsBefore": existedBefore ? "true" : "false"]
-        )
         do {
             if existedBefore {
                 try fileManager.removeItem(at: directory)
             }
             let existsAfter = fileManager.fileExists(atPath: directory.path)
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.directory.remove.finish",
-                metadata: [
-                    "name": directory.lastPathComponent,
-                    "result": existsAfter ? "remaining" : "removedOrMissing",
-                    "existsAfter": existsAfter ? "true" : "false"
-                ]
-            )
             if existsAfter {
                 failures.append("\(failurePrefix).\(directory.lastPathComponent).remaining")
             }
             return existedBefore && !existsAfter ? 1 : 0
         } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.directory.remove.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["name": directory.lastPathComponent, "result": "failed"]
-                )
-            )
             failures.append("\(failurePrefix).\(directory.lastPathComponent).\(String(describing: type(of: error)))")
             return 0
         }
@@ -316,7 +234,6 @@ final class LocalDataResetService {
     ) {
         do {
             let hasProtectedArtifacts = try protectedDataStorageRoot.hasProtectedDataArtifacts()
-            let rootExists = fileManager.fileExists(atPath: protectedDataStorageRoot.rootURL.path)
             let hasRootSecret = protectedDataRootSecretExists()
             let remainingDefaultAccountServices = remainingKeychainServices(
                 account: KeychainConstants.defaultAccount,
@@ -328,28 +245,6 @@ final class LocalDataResetService {
             )
             let remainingTemporaryTargets = temporaryResetTargetsRemaining()
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
-            let hasRemainingData = hasProtectedArtifacts
-                || hasRootSecret
-                || !remainingDefaultAccountServices.isEmpty
-                || remainingSecureEnclaveCustodyHandleCount > 0
-                || !remainingTemporaryTargets.isEmpty
-                || !keyManagement.keys.isEmpty
-                || remainingContactRuntimeCount > 0
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.validation.finish",
-                metadata: [
-                    "result": hasRemainingData ? "remainingData" : "clean",
-                    "protectedDataRootExists": rootExists ? "true" : "false",
-                    "hasProtectedDataArtifacts": hasProtectedArtifacts ? "true" : "false",
-                    "hasProtectedDataRootSecret": hasRootSecret ? "true" : "false",
-                    "remainingDefaultKeychainItemCount": String(remainingDefaultAccountServices.count),
-                    "remainingSecureEnclaveCustodyHandleCount": String(remainingSecureEnclaveCustodyHandleCount),
-                    "remainingTemporaryTargetCount": String(remainingTemporaryTargets.count),
-                    "keyCount": String(keyManagement.keys.count),
-                    "contactCount": String(remainingContactRuntimeCount)
-                ]
-            )
             if hasProtectedArtifacts {
                 failures.append("protectedData.artifactsRemaining")
             }
@@ -372,14 +267,6 @@ final class LocalDataResetService {
                 failures.append("memory.contacts.remaining.\(remainingContactRuntimeCount)")
             }
         } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "localDataReset.validation.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["result": "storageContractFailed"]
-                )
-            )
             failures.append("protectedData.storageContract.\(Self.failureName(for: error))")
         }
     }
@@ -391,28 +278,11 @@ final class LocalDataResetService {
         guard let secureEnclaveCustodyHandleStore else {
             return
         }
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.secureEnclaveCustody.cleanup.start",
-            metadata: ["serviceKind": "secureEnclaveCustodyHandle"]
-        )
         let result = secureEnclaveCustodyHandleStore.cleanupAllHandlesForLocalDataReset()
         deletedKeychainItemCount += result.deletedHandleCount
-        var metadata = [
-            "serviceKind": "secureEnclaveCustodyHandle",
-            "result": result.succeeded ? "success" : "failed",
-            "inspectedHandleCount": String(result.inspectedHandleCount),
-            "deletedHandleCount": String(result.deletedHandleCount)
-        ]
         if let failureCategory = result.failureCategory {
-            metadata["failureCategory"] = failureCategory.rawValue
             failures.append("keychain.secureEnclaveCustodyHandle.\(failureCategory.rawValue)")
         }
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.secureEnclaveCustody.cleanup.finish",
-            metadata: metadata
-        )
     }
 
     private func remainingKeychainServices(
@@ -427,7 +297,7 @@ final class LocalDataResetService {
                 authenticationContext: authenticationContext
             )
         } catch {
-            failures.append("keychain.remaining.\(AuthTraceMetadata.keychainAccountKind(for: account)).\(String(describing: type(of: error)))")
+            failures.append("keychain.remaining.\(Self.keychainAccountKind(for: account)).\(String(describing: type(of: error)))")
             return []
         }
     }
@@ -475,6 +345,46 @@ final class LocalDataResetService {
             .replacingOccurrences(of: ".", with: "_")
             .replacingOccurrences(of: " ", with: "_")
         return "\(domain).\(nsError.code)"
+    }
+
+    /// Classifies a managed Keychain service string into a stable failure-key
+    /// token so reset failures identify which item class could not be removed
+    /// without exposing the raw service identifier.
+    private static func keychainServiceKind(for service: String) -> String {
+        if service.hasPrefix("\(SecureEnclaveCustodyHandleReference.servicePrefix).") {
+            if service.hasSuffix(".signing") {
+                return "secureEnclaveCustodySigningHandle"
+            }
+            if service.hasSuffix(".keyAgreement") {
+                return "secureEnclaveCustodyKeyAgreementHandle"
+            }
+            return "secureEnclaveCustodyHandle"
+        }
+        if service.hasPrefix(KeychainConstants.protectedDataDomainKeyServicePrefix) {
+            if service.hasPrefix("\(KeychainConstants.protectedDataDomainKeyServicePrefix)staged.") {
+                return "protectedDataStagedDomainKey"
+            }
+            return "protectedDataDomainKey"
+        }
+        if service.hasPrefix("\(KeychainConstants.prefix).pending-privkey-envelope.") {
+            return "pendingPrivateKeyEnvelope"
+        }
+        if service.hasPrefix("\(KeychainConstants.prefix).privkey-envelope.") {
+            return "privateKeyEnvelope"
+        }
+        if service == ProtectedDataRightIdentifiers.productionSharedRightIdentifier {
+            return "protectedDataRootSecret"
+        }
+        return "unknown"
+    }
+
+    private static func keychainAccountKind(for account: String) -> String {
+        switch account {
+        case KeychainConstants.defaultAccount:
+            "default"
+        default:
+            "unknown"
+        }
     }
 }
 

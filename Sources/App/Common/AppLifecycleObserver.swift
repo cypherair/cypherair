@@ -20,18 +20,12 @@ import AppKit
 ///   stays signal-only — every resign is still routed; the controller decides.
 struct AppLifecycleObserverModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     let appLockController: AppLockController
 
     func body(content: Content) -> some View {
         content
         #if canImport(UIKit)
             .onChange(of: scenePhase) { _, newPhase in
-                authLifecycleTraceStore?.record(
-                    category: .lifecycle,
-                    name: "observer.scenePhase",
-                    metadata: ["phase": Self.scenePhaseName(newPhase)]
-                )
                 switch newPhase {
                 case .active:
                     appLockController.noteForegroundActive(true)
@@ -49,39 +43,21 @@ struct AppLifecycleObserverModifier: ViewModifier {
             }
         #elseif os(macOS)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-                authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.macResign")
                 appLockController.noteForegroundActive(false)
                 appLockController.handleAwayEvent(source: "macResignActive")
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.macActive")
                 appLockController.noteForegroundActive(true)
                 Task { await appLockController.handleForegroundActive(source: "macBecomeActive") }
             }
             .onReceive(
                 DistributedNotificationCenter.default().publisher(for: Notification.Name("com.apple.screenIsLocked"))
             ) { _ in
-                authLifecycleTraceStore?.record(category: .lifecycle, name: "observer.screenLock")
                 appLockController.noteForegroundActive(false)
                 appLockController.lockNow(source: "screenLock")
             }
         #endif
     }
-
-    #if canImport(UIKit)
-    private static func scenePhaseName(_ phase: ScenePhase) -> String {
-        switch phase {
-        case .active:
-            "active"
-        case .inactive:
-            "inactive"
-        case .background:
-            "background"
-        @unknown default:
-            "unknown"
-        }
-    }
-    #endif
 }
 
 extension View {

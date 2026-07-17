@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCase {
     func test_resetAllLocalData_removesStorageAndClearsMemoryState() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             try? FileManager.default.removeItem(
                 at: container.protectedDataStorageRoot.rootURL.deletingLastPathComponent()
@@ -78,15 +78,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertNil(container.selfTestService.latestReport)
         XCTAssertTrue(container.keyManagement.keys.isEmpty)
         XCTAssertTrue(container.contactService.testContactKeyRecords.isEmpty)
-
-        let traceNames = container.authLifecycleTraceStore?.recentEntries.map(\.name) ?? []
-        XCTAssertTrue(traceNames.contains("localDataReset.start"))
-        XCTAssertTrue(traceNames.contains("localDataReset.finish"))
-        XCTAssertTrue(traceNames.contains("localDataReset.validation.finish"))
     }
 
     func test_resetAllLocalData_missingProtectedDataBaseValidatesCleanAndPreservesResetAuth() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetMissingBase-\(UUID().uuidString)", isDirectory: true)
         let temporaryArtifactStore = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
@@ -113,17 +108,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: container.protectedDataStorageRoot.rootURL.path))
         XCTAssertNotNil(container.appSessionOrchestrator.lastAuthenticationDate)
-        let validationEntry = try XCTUnwrap(
-            container.authLifecycleTraceStore?.recentEntries.last {
-                $0.name == "localDataReset.validation.finish"
-            }
-        )
-        XCTAssertEqual(validationEntry.metadata["result"], "clean")
-        XCTAssertEqual(validationEntry.metadata["hasProtectedDataArtifacts"], "false")
     }
 
     func test_resetAllLocalData_cleansPhase7TemporaryArtifactsAndTutorialDefaultsSuites() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
         let store = CypherAir.AppTemporaryArtifactStore(temporaryDirectory: temporaryDirectory)
@@ -158,7 +146,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
     }
 
     func test_resetAllLocalData_removesSecureEnclaveCustodyHandles() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
@@ -185,20 +173,10 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         let summary = try await resetService.resetAllLocalData()
 
         XCTAssertEqual(keyStore.storedHandleCount(), 0)
-        let cleanupEntry = try XCTUnwrap(
-            container.authLifecycleTraceStore?.recentEntries.last {
-                $0.name == "localDataReset.secureEnclaveCustody.cleanup.finish"
-            }
-        )
-        XCTAssertEqual(cleanupEntry.metadata["serviceKind"], "secureEnclaveCustodyHandle")
-        XCTAssertEqual(cleanupEntry.metadata["result"], "success")
-        XCTAssertEqual(cleanupEntry.metadata["deletedHandleCount"], "5")
-        XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("resetcleanup") })
-        XCTAssertFalse(cleanupEntry.metadata.values.contains { $0.contains("secure-enclave-custody") })
     }
 
     func test_resetAllLocalData_failsClosedWhenSecureEnclaveCustodyCleanupFails() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
@@ -223,7 +201,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
     }
 
     func test_resetAllLocalData_failsClosedWhenSecureEnclaveCustodyInventoryFails() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
@@ -243,7 +221,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
     }
 
     func test_resetAllLocalData_failsWhenRootSecretStillExistsAfterReset() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
@@ -260,7 +238,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
     }
 
     func test_resetAllLocalData_failsWhenKeychainPrefixItemsRemain() async throws {
-        let container = AppContainer.makeUITest(authTraceEnabled: true)
+        let container = AppContainer.makeUITest()
         defer {
             cleanup(container)
         }
@@ -392,8 +370,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             appLockController: container.appLockController,
             temporaryArtifactStore: temporaryArtifactStore,
             protectedDataRootSecretExists: protectedDataRootSecretExists,
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            traceStore: container.authLifecycleTraceStore
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
         )
     }
 

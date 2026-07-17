@@ -9,27 +9,15 @@ struct AppStartupCoordinator {
     }
 
     func performPreAuthBootstrap(using container: AppContainer) -> AppStartupBootstrapSnapshot {
-        let traceStore = container.authLifecycleTraceStore
-        let errors: [String] = []
         var recoveryDiagnostics: [String] = []
         var bootstrapOutcome: ProtectedDataBootstrapOutcome = .frameworkRecoveryNeeded
         var protectedDataFrameworkState: ProtectedDataFrameworkState = .sessionLocked
 
-        traceStore?.record(category: .lifecycle, name: "startup.protectedDataBootstrap.start")
         do {
             let protectedDataBootstrapResult = try container.protectedDomainRecoveryCoordinator
                 .performPreAuthBootstrapClassification()
             bootstrapOutcome = protectedDataBootstrapResult.bootstrapOutcome
             protectedDataFrameworkState = protectedDataBootstrapResult.frameworkState
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.protectedDataBootstrap.finish",
-                metadata: [
-                    "result": "success",
-                    "bootstrapOutcome": traceValue(for: bootstrapOutcome),
-                    "frameworkState": traceValue(for: protectedDataFrameworkState)
-                ]
-            )
             if protectedDataBootstrapResult.frameworkState == .frameworkRecoveryNeeded {
                 recoveryDiagnostics.append(
                     String(
@@ -49,14 +37,6 @@ struct AppStartupCoordinator {
         } catch {
             bootstrapOutcome = .frameworkRecoveryNeeded
             protectedDataFrameworkState = .frameworkRecoveryNeeded
-            traceStore?.record(
-                category: .lifecycle,
-                name: "startup.protectedDataBootstrap.finish",
-                metadata: AuthTraceMetadata.errorMetadata(
-                    error,
-                    extra: ["result": "failed"]
-                )
-            )
             recoveryDiagnostics.append(
                 String(
                     localized: "startup.protectedData.recoveryNeeded",
@@ -65,42 +45,12 @@ struct AppStartupCoordinator {
             )
         }
 
-        traceStore?.record(
-            category: .lifecycle,
-            name: "startup.keyMetadata.load.deferred",
-            metadata: [
-                "reason": "protectedDataPostUnlock",
-                "state": "\(container.keyManagement.metadataLoadState)"
-            ]
-        )
-
-        traceStore?.record(
-            category: .lifecycle,
-            name: "startup.contacts.load.deferred",
-            metadata: [
-                "reason": "protectedDataPostUnlock",
-                "availability": container.contactService.contactsAvailability.rawValue
-            ]
-        )
-
-        traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.start")
         cleanupTemporaryFiles(
             temporaryArtifactStore: container.temporaryArtifactStore
         )
-        traceStore?.record(category: .lifecycle, name: "startup.temporaryCleanup.finish")
 
         let loadError = mergedStartupMessages(
-            loadErrors: errors,
             recoveryDiagnostics: recoveryDiagnostics
-        )
-        traceStore?.record(
-            category: .lifecycle,
-            name: "startup.loadWarning.computed",
-            metadata: [
-                "hasLoadWarning": loadError == nil ? "false" : "true",
-                "loadErrorCount": String(errors.count),
-                "recoveryDiagnosticCount": String(recoveryDiagnostics.count)
-            ]
         )
 
         return AppStartupBootstrapSnapshot(
@@ -120,51 +70,13 @@ struct AppStartupCoordinator {
     }
 
     func mergedStartupMessages(
-        loadErrors: [String],
         recoveryDiagnostics: [String]
     ) -> String? {
         var messages: [String] = []
-        messages.append(contentsOf: loadErrors)
-
         for diagnostic in recoveryDiagnostics where !messages.contains(diagnostic) {
             messages.append(diagnostic)
         }
 
         return messages.isEmpty ? nil : messages.joined(separator: "\n")
-    }
-
-    private func traceValue(for outcome: ProtectedDataBootstrapOutcome) -> String {
-        switch outcome {
-        case .emptySteadyState(_, let didBootstrap):
-            didBootstrap ? "emptySteadyState.bootstrapped" : "emptySteadyState.existing"
-        case .loadedRegistry(_, let recoveryDisposition):
-            "loadedRegistry.\(traceValue(for: recoveryDisposition))"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
-    }
-
-    private func traceValue(for recoveryDisposition: ProtectedDataRecoveryDisposition) -> String {
-        switch recoveryDisposition {
-        case .resumeSteadyState:
-            "resumeSteadyState"
-        case .continuePendingMutation:
-            "continuePendingMutation"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
-    }
-
-    private func traceValue(for state: ProtectedDataFrameworkState) -> String {
-        switch state {
-        case .sessionLocked:
-            "sessionLocked"
-        case .sessionAuthorized:
-            "sessionAuthorized"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        case .restartRequired:
-            "restartRequired"
-        }
     }
 }

@@ -12,7 +12,6 @@ import SwiftUI
 /// a security overlay, not a Liquid Glass UI element).
 private struct CosmeticPrivacyCoverModifier: ViewModifier {
     let isCovered: Bool
-    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
 
     func body(content: Content) -> some View {
         content
@@ -27,12 +26,6 @@ private struct CosmeticPrivacyCoverModifier: ViewModifier {
                         // let the snapshot capture the in-flight, partly-clear
                         // frame. Removal may fade for a smooth reveal on return.
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
-                        .onAppear {
-                            authLifecycleTraceStore?.record(category: .lifecycle, name: "cover.shown")
-                        }
-                        .onDisappear {
-                            authLifecycleTraceStore?.record(category: .lifecycle, name: "cover.hidden")
-                        }
                 }
             }
             .animation(.easeOut(duration: 0.2), value: isCovered)

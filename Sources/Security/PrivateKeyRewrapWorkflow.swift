@@ -6,18 +6,15 @@ final class PrivateKeyRewrapWorkflow {
     private let secureEnclave: any SecureEnclaveManageable
     private let bundleStore: KeyBundleStore
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let traceStore: AuthLifecycleTraceStore?
 
     init(
         secureEnclave: any SecureEnclaveManageable,
         bundleStore: KeyBundleStore,
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore? = nil
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator
     ) {
         self.secureEnclave = secureEnclave
         self.bundleStore = bundleStore
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.traceStore = traceStore
     }
 
     func run(
@@ -51,19 +48,9 @@ final class PrivateKeyRewrapWorkflow {
         // Phase A: Create all pending items. If anything fails here, old items
         // are intact, so pending artifacts can be cleaned up.
         do {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.start",
-                metadata: ["keyCount": String(fingerprints.count), "targetMode": targetMode.rawValue]
-            )
             let newAccessControl = try targetMode.createAccessControl()
 
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseA.key.start",
-                    metadata: ["index": String(index), "keyCount": String(fingerprints.count)]
-                )
+            for fingerprint in fingerprints {
                 let existingBundle = try bundleStore.loadBundle(fingerprint: fingerprint)
                 let newBundle = try await rewrapBundleForModeSwitch(
                     existingBundle: existingBundle,
@@ -77,11 +64,6 @@ final class PrivateKeyRewrapWorkflow {
                     fingerprint: fingerprint,
                     namespace: .pending
                 )
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseA.key.finish",
-                    metadata: ["index": String(index), "result": "success"]
-                )
             }
 
             for fingerprint in fingerprints {
@@ -94,24 +76,9 @@ final class PrivateKeyRewrapWorkflow {
             // From this point forward Phase B may delete permanent items, so the
             // target mode must survive even if the final protected write fails.
             try privateKeyControlStore.markRewrapCommitRequired()
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.finish",
-                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
-            )
         } catch {
             fingerprints.forEach { bundleStore.cleanupPendingBundle(fingerprint: $0) }
             try? privateKeyControlStore.clearRewrapJournal()
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseA.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "phaseAFailed"])
-            )
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
     }
@@ -164,70 +131,17 @@ final class PrivateKeyRewrapWorkflow {
         // Phase B may delete permanent items. If it fails, pending items must be
         // preserved so interrupted-rewrap recovery can finish or fail closed.
         do {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.start",
-                metadata: ["keyCount": String(fingerprints.count), "targetMode": targetMode.rawValue]
-            )
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.delete.start",
-                    metadata: ["index": String(index)]
-                )
+            for fingerprint in fingerprints {
                 try bundleStore.deleteBundle(fingerprint: fingerprint)
             }
 
-            for (index, fingerprint) in fingerprints.enumerated() {
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.promote.start",
-                    metadata: ["index": String(index)]
-                )
+            for fingerprint in fingerprints {
                 try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKeyProtection.switch.phaseB.promote.finish",
-                    metadata: ["index": String(index), "result": "success"]
-                )
             }
 
             try privateKeyControlStore.completeRewrap(targetMode: targetMode)
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.finish",
-                metadata: ["result": "success", "keyCount": String(fingerprints.count)]
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "success", "targetMode": targetMode.rawValue]
-            )
         } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.phaseB.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "failed"])
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: traceErrorMetadata(error, extra: ["result": "phaseBFailed"])
-            )
             throw AuthenticationError.modeSwitchFailed(underlying: error)
         }
-    }
-
-    private func traceErrorMetadata(
-        _ error: Error,
-        extra: [String: String] = [:]
-    ) -> [String: String] {
-        var metadata = extra
-        metadata["errorType"] = String(describing: type(of: error))
-        if let laError = error as? LAError {
-            metadata["laCode"] = String(laError.errorCode)
-            metadata["laCodeName"] = String(describing: laError.code)
-        }
-        return metadata
     }
 }

@@ -11,7 +11,6 @@ struct ProtectedDataAuthorizationContextResult: @unchecked Sendable {
 final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     private let domainKeyManager: ProtectedDomainKeyManager
     private let appSessionPolicyProvider: () -> AppSessionAuthenticationPolicy
-    private let traceStore: AuthLifecycleTraceStore?
     private let rootSecretCoordinator: ProtectedDataRootSecretCoordinator
 
     /// Session wrapping root key, guarded by an unfair lock (issue #610) —
@@ -27,18 +26,15 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
         domainKeyManager: ProtectedDomainKeyManager,
         sharedRightIdentifier: String,
         appSessionPolicyProvider: @escaping () -> AppSessionAuthenticationPolicy = { .userPresence },
-        authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore? = nil
+        authenticationPromptCoordinator: AuthenticationPromptCoordinator
     ) {
         self.domainKeyManager = domainKeyManager
         self.appSessionPolicyProvider = appSessionPolicyProvider
-        self.traceStore = traceStore
         self.rootSecretCoordinator = ProtectedDataRootSecretCoordinator(
             rootSecretStore: rootSecretStore,
             rootSecretIdentifier: sharedRightIdentifier,
             appSessionPolicyProvider: appSessionPolicyProvider,
-            authenticationPromptCoordinator: authenticationPromptCoordinator,
-            traceStore: traceStore
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
     }
 
@@ -91,44 +87,17 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
         context: LAContext,
         usesHandoffContext: Bool
     ) async -> ProtectedDataAuthorizationResult {
-        traceStore?.record(
-            category: .operation,
-            name: "protectedSettings.authorization.start",
-            metadata: [
-                "frameworkState": String(describing: frameworkState),
-                "sharedResourceState": registry.sharedResourceLifecycleState.rawValue
-            ]
-        )
         if frameworkState == .restartRequired {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "frameworkRecoveryNeeded", "reason": "restartRequired"]
-            )
             return .frameworkRecoveryNeeded
         }
 
         guard registry.sharedResourceLifecycleState == .ready else {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "frameworkRecoveryNeeded", "reason": "sharedResourceNotReady"]
-            )
             return .frameworkRecoveryNeeded
         }
 
         if usesHandoffContext {
             context.interactionNotAllowed = true
         }
-        traceStore?.record(
-            category: .operation,
-            name: "protectedSettings.authorization.context",
-            metadata: [
-                "source": usesHandoffContext ? "handoff" : "interactive",
-                "interactionNotAllowed": context.interactionNotAllowed ? "true" : "false",
-                "policy": appSessionPolicyProvider().rawValue
-            ]
-        )
 
         do {
             var rootSecret = try await rootSecretCoordinator.loadRootSecretForAuthorization(
@@ -147,29 +116,14 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
             clearSessionSecrets()
             wrappingRootKeyLock.withLock { $0 = derivedWrappingRootKey }
             frameworkState = .sessionAuthorized
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "authorized"]
-            )
             return .authorized
         } catch {
             clearSessionSecrets()
             if isAuthorizationCancellationOrDenial(error) {
-                traceStore?.record(
-                    category: .operation,
-                    name: "protectedSettings.authorization.finish",
-                    metadata: ["result": "cancelledOrDenied", "reason": "rootSecretAccessDenied"]
-                )
                 return .cancelledOrDenied
             }
 
             frameworkState = .frameworkRecoveryNeeded
-            traceStore?.record(
-                category: .operation,
-                name: "protectedSettings.authorization.finish",
-                metadata: ["result": "frameworkRecoveryNeeded", "reason": "secretReadFailed"]
-            )
             return .frameworkRecoveryNeeded
         }
     }
@@ -225,11 +179,6 @@ final class ProtectedDataSessionCoordinator: @unchecked Sendable {
     func resetAfterLocalDataReset() {
         clearSessionSecrets()
         frameworkState = .sessionLocked
-        traceStore?.record(
-            category: .session,
-            name: "protectedData.session.localDataReset",
-            metadata: ["frameworkState": String(describing: frameworkState)]
-        )
     }
 
     private func clearSessionSecrets() {

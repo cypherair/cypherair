@@ -83,7 +83,6 @@ struct DecryptView: View {
 
     @Environment(DecryptionService.self) private var decryptionService
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
 
     let configuration: Configuration
 
@@ -95,7 +94,6 @@ struct DecryptView: View {
         DecryptScreenHostView(
             decryptionService: decryptionService,
             appSessionOrchestrator: appSessionOrchestrator,
-            authLifecycleTraceStore: authLifecycleTraceStore,
             configuration: configuration
         )
     }
@@ -111,7 +109,6 @@ private struct DecryptScreenHostView: View {
     init(
         decryptionService: DecryptionService,
         appSessionOrchestrator: AppSessionOrchestrator,
-        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         configuration: DecryptView.Configuration
     ) {
         self.appSessionOrchestrator = appSessionOrchestrator
@@ -119,7 +116,6 @@ private struct DecryptScreenHostView: View {
         _model = State(
             initialValue: DecryptScreenModel(
                 decryptionService: decryptionService,
-                authLifecycleTraceStore: authLifecycleTraceStore,
                 configuration: configuration
             )
         )

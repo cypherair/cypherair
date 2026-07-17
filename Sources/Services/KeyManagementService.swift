@@ -31,7 +31,6 @@ final class KeyManagementService: @unchecked Sendable {
     private let relockInvalidationCheckpoint: KeyProvisioningService.ProvisioningCheckpoint?
     private let secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator?
     private let compositeCustodyRouterContext: CompositeCustodyRouterContext?
-    private let traceStore: AuthLifecycleTraceStore?
     private(set) var secureEnclaveCustodyRecoveryReport: SecureEnclaveCustodyGenerationRecoveryReport = .empty
 
     /// Whether device-bound Secure Enclave custody generation is wired for this
@@ -52,7 +51,6 @@ final class KeyManagementService: @unchecked Sendable {
         secureEnclaveCustodyOperationAuthenticator: SecureEnclaveCustodyOperationAuthenticator? = nil,
         compositeCustodyRouterContext: CompositeCustodyRouterContext? = nil,
         secureEnclaveCustodyDeletionContext: SecureEnclaveCustodyDeletionContext? = nil,
-        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         metadataPersistence: any KeyMetadataPersistence,
         beforeAuthModeReadCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
         provisioningCheckpoint: KeyProvisioningService.ProvisioningCheckpoint? = nil,
@@ -77,8 +75,7 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
-            certificatePrimaryFingerprint: keyAdapter.certificatePrimaryFingerprintInspector(),
-            traceStore: authLifecycleTraceStore
+            certificatePrimaryFingerprint: keyAdapter.certificatePrimaryFingerprintInspector()
         )
         let effectivePrivateKeyControlStore = privateKeyControlStore
         let provisioningInvalidationGate = KeyProvisioningInvalidationGate()
@@ -141,7 +138,6 @@ final class KeyManagementService: @unchecked Sendable {
             expiryAuthenticator: expiryAuthenticator,
             secureEnclaveCustodyDeletionContext: secureEnclaveCustodyDeletionContext
         )
-        self.traceStore = authLifecycleTraceStore
     }
 
     // MARK: - Key Enumeration
@@ -184,14 +180,6 @@ final class KeyManagementService: @unchecked Sendable {
         source: String
     ) throws {
         try loadKeys()
-        traceStore?.record(
-            category: .operation,
-            name: "keyMetadata.protectedDomain.sessionUpdate",
-            metadata: [
-                "source": source,
-                "keyCount": String(keys.count)
-            ]
-        )
     }
 
     func resetInMemoryStateAfterLocalDataReset() {

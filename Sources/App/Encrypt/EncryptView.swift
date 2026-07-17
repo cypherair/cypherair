@@ -109,7 +109,6 @@ struct EncryptView: View {
     @Environment(AppConfiguration.self) private var config
     @Environment(ProtectedOrdinarySettingsCoordinator.self) private var protectedOrdinarySettings
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     let configuration: Configuration
@@ -126,7 +125,6 @@ struct EncryptView: View {
             config: config,
             protectedOrdinarySettings: protectedOrdinarySettings,
             appSessionOrchestrator: appSessionOrchestrator,
-            authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
         )

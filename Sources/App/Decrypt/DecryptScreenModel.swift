@@ -39,7 +39,6 @@ final class DecryptScreenModel {
     private let ciphertextFileInspectionAction: CiphertextFileInspectionAction
     private let textDecryptionAction: TextDecryptionAction
     private let fileDecryptionAction: FileOperationAction<FileDecryptionRequest, FileDecryptionResult>
-    private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private var fileImportRequestGate = FileImportRequestGate()
 
     private struct PendingTextModeImport {
@@ -70,7 +69,6 @@ final class DecryptScreenModel {
 
     init(
         decryptionService: DecryptionService,
-        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         configuration: DecryptView.Configuration,
         operation: OperationController = OperationController(),
         exportController: FileExportController = FileExportController(),
@@ -84,7 +82,6 @@ final class DecryptScreenModel {
         self.configuration = configuration
         self.operation = operation
         self.exportController = exportController
-        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.parseTextRecipientsAction = parseTextRecipientsAction ?? { ciphertext in
             try await decryptionService.parseRecipients(ciphertext: ciphertext)
         }
@@ -265,11 +262,6 @@ final class DecryptScreenModel {
     }
 
     func handleContentClearGenerationChange() {
-        authLifecycleTraceStore?.record(
-            category: .operation,
-            name: "decrypt.contentClearObserved",
-            metadata: ["mode": decryptMode.rawValue]
-        )
         operation.cancelAndInvalidate()
         clearTransientInput()
     }
@@ -376,7 +368,6 @@ final class DecryptScreenModel {
     func decryptText() {
         guard let phase1Result else { return }
         let onDecrypted = configuration.onDecrypted
-        authLifecycleTraceStore?.record(category: .operation, name: "decrypt.text.start", metadata: ["mode": "text"])
 
         operation.run(mapError: mapDecryptError) { [self] in
             var (plaintext, verification) = try await self.textDecryptionAction(phase1Result)
@@ -392,11 +383,6 @@ final class DecryptScreenModel {
                 )
             }
             onDecrypted?(plaintext, verification)
-            self.authLifecycleTraceStore?.record(
-                category: .operation,
-                name: "decrypt.text.finish",
-                metadata: ["result": "success"]
-            )
         }
     }
 
@@ -405,8 +391,6 @@ final class DecryptScreenModel {
               let filePhase1Result else {
             return
         }
-
-        authLifecycleTraceStore?.record(category: .operation, name: "decrypt.file.start", metadata: ["mode": "file"])
 
         operation.runFileOperation(mapError: mapDecryptError) { [self] progress in
             let result = try await self.fileDecryptionAction(
@@ -423,11 +407,6 @@ final class DecryptScreenModel {
             try Task.checkCancellation()
             self.adoptFileDecryptionResult(result)
             pendingOutput = nil
-            self.authLifecycleTraceStore?.record(
-                category: .operation,
-                name: "decrypt.file.finish",
-                metadata: ["result": "success"]
-            )
         }
     }
 

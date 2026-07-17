@@ -126,21 +126,6 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         assertSanitizedText(text, pair: pair, file: file, line: line)
     }
 
-    final func assertTraceIsSanitized(
-        _ entries: [AuthLifecycleTraceStore.Entry],
-        pair: SecureEnclaveCustodyHandlePair,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertFalse(entries.isEmpty, file: file, line: line)
-        let text = entries
-            .flatMap { entry in
-                [entry.name] + entry.metadata.flatMap { [$0.key, $0.value] }
-            }
-            .joined(separator: " ")
-        assertSanitizedText(text, pair: pair, file: file, line: line)
-    }
-
     final func assertSanitizedText(
         _ text: String,
         pair: SecureEnclaveCustodyHandlePair,

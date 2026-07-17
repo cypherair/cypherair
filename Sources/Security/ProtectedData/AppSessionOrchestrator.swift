@@ -20,7 +20,6 @@ import LocalAuthentication
 @MainActor
 final class AppSessionOrchestrator {
     private let protectedDataAccessGateClassifier: ProtectedDataAccessGateClassifier
-    private let traceStore: AuthLifecycleTraceStore?
 
     private var pendingAuthenticatedContext: LAContext?
     private(set) var contentClearGeneration = 0
@@ -29,8 +28,7 @@ final class AppSessionOrchestrator {
 
     init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        traceStore: AuthLifecycleTraceStore? = nil
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     ) {
         self.protectedDataAccessGateClassifier = ProtectedDataAccessGateClassifier(
             currentRegistryProvider: currentRegistryProvider,
@@ -38,18 +36,12 @@ final class AppSessionOrchestrator {
                 protectedDataSessionCoordinator.frameworkState
             }
         )
-        self.traceStore = traceStore
     }
 
     // MARK: - App-session authentication record
 
     func recordAuthentication() {
         lastAuthenticationDate = Date()
-        traceStore?.record(
-            category: .session,
-            name: "session.recordAuthentication",
-            metadata: ["hasPendingContext": pendingAuthenticatedContext == nil ? "false" : "true"]
-        )
     }
 
     /// Store the handoff context a successful app-session unlock produced and record
@@ -65,11 +57,6 @@ final class AppSessionOrchestrator {
     /// the controller's post-authentication handler.
     func recordPostAuthenticationCompletion() {
         postAuthenticationGeneration += 1
-        traceStore?.record(
-            category: .session,
-            name: "session.postAuthentication.complete",
-            metadata: ["generation": String(postAuthenticationGeneration)]
-        )
     }
 
     // MARK: - Content clear (the view-observed relock signal)
@@ -80,25 +67,12 @@ final class AppSessionOrchestrator {
     func requestContentClear() {
         discardPendingAuthenticatedContext(reason: "contentClear")
         contentClearGeneration += 1
-        traceStore?.record(
-            category: .session,
-            name: "session.requestContentClear",
-            metadata: ["generation": String(contentClearGeneration)]
-        )
     }
 
     func resetAfterLocalDataReset(preserveAuthentication: Bool = false) {
         discardPendingAuthenticatedContext(reason: "localDataReset")
         lastAuthenticationDate = preserveAuthentication ? Date() : nil
         contentClearGeneration += 1
-        traceStore?.record(
-            category: .session,
-            name: "session.localDataReset",
-            metadata: [
-                "contentClearGeneration": String(contentClearGeneration),
-                "preservedAuthentication": preserveAuthentication ? "true" : "false"
-            ]
-        )
     }
 
     // MARK: - Authenticated-context handoff custody
@@ -120,14 +94,6 @@ final class AppSessionOrchestrator {
     func consumeAuthenticatedContextForProtectedData() -> LAContext? {
         let context = pendingAuthenticatedContext
         pendingAuthenticatedContext = nil
-        traceStore?.record(
-            category: .session,
-            name: "session.consumeAuthenticatedContext",
-            metadata: [
-                "hadContext": context == nil ? "false" : "true",
-                "remainingContext": pendingAuthenticatedContext == nil ? "false" : "true"
-            ]
-        )
         return context
     }
 
@@ -146,28 +112,12 @@ final class AppSessionOrchestrator {
     // MARK: - Private helpers
 
     private func replacePendingAuthenticatedContext(with context: LAContext?, reason: String) {
-        let hadExistingContext = pendingAuthenticatedContext != nil
         pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = context
-        traceStore?.record(
-            category: .session,
-            name: "session.pendingContext.store",
-            metadata: [
-                "reason": reason,
-                "hasContext": context == nil ? "false" : "true",
-                "replacedExisting": hadExistingContext ? "true" : "false"
-            ]
-        )
     }
 
     private func discardPendingAuthenticatedContext(reason: String) {
-        let hadContext = pendingAuthenticatedContext != nil
         pendingAuthenticatedContext?.invalidate()
         pendingAuthenticatedContext = nil
-        traceStore?.record(
-            category: .session,
-            name: "session.pendingContext.discard",
-            metadata: ["reason": reason, "hadContext": hadContext ? "true" : "false"]
-        )
     }
 }

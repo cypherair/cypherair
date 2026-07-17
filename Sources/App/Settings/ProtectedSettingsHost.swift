@@ -87,7 +87,6 @@ final class ProtectedSettingsHost {
 
     let mode: Mode
     private let liveDependencies: ProtectedSettingsAccessCoordinator.Dependencies?
-    private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var sectionState: SectionState
 
@@ -109,11 +108,9 @@ final class ProtectedSettingsHost {
         recoverPendingMutation: @escaping @MainActor () async throws -> RecoveryOutcome,
         recoverPendingMutationWithContext: (@MainActor (_ authenticationContext: LAContext?) async throws -> RecoveryOutcome)? = nil,
         resetAuthorizationRequirement: @escaping @MainActor () -> MutationAuthorizationRequirement = { .notRequired },
-        resetDomain: @escaping @MainActor () async throws -> Void,
-        traceStore: AuthLifecycleTraceStore? = nil
+        resetDomain: @escaping @MainActor () async throws -> Void
     ) {
         self.mode = .mainWindowLive
-        self.traceStore = traceStore
         let liveDependencies = ProtectedSettingsAccessCoordinator.Dependencies(
             evaluateAccessGate: evaluateAccessGate,
             hasAuthorizationHandoffContext: hasAuthorizationHandoffContext,
@@ -139,12 +136,10 @@ final class ProtectedSettingsHost {
     }
 
     init(
-        mode: Mode,
-        traceStore: AuthLifecycleTraceStore? = nil
+        mode: Mode
     ) {
         self.mode = mode
         self.liveDependencies = nil
-        self.traceStore = traceStore
         self.accessCoordinator = nil
         switch mode {
         case .mainWindowLive:
@@ -174,43 +169,21 @@ final class ProtectedSettingsHost {
                 },
                 syncSectionStateAfterOperationError: { [weak self] in
                     self?.syncSectionStateAfterOperationError(liveDependencies)
-                },
-                stateMetadata: { [weak self] domainState in
-                    self?.stateMetadata(liveDependencies, domainState: domainState) ?? [:]
                 }
-            ),
-            traceEvent: { [weak self] name, metadata in
-                self?.traceHostEvent(name, metadata: metadata)
-            }
+            )
         )
     }
 
     func refreshSettingsSection() async {
-        traceHostEvent("protectedSettings.refresh.start")
         guard let liveDependencies, let accessCoordinator else {
-            traceHostEvent("protectedSettings.refresh.finish", metadata: ["result": "noLiveDependencies"])
             return
         }
 
         let preAuthorizationState = syncPreAuthorizationSectionState(liveDependencies)
-        traceHostEvent(
-            "protectedSettings.refresh.preAuthorization",
-            metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
-        )
         switch preAuthorizationState {
         case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
-            traceHostEvent(
-                "protectedSettings.refresh.finish",
-                metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
-                    .merging(["result": "blockedByDomainState"], uniquingKeysWith: { _, new in new })
-            )
             return
         case .unlocked:
-            traceHostEvent(
-                "protectedSettings.refresh.finish",
-                metadata: stateMetadata(liveDependencies, domainState: preAuthorizationState)
-                    .merging(["result": "alreadyUnlocked"], uniquingKeysWith: { _, new in new })
-            )
             return
         case .locked:
             break
@@ -229,40 +202,12 @@ final class ProtectedSettingsHost {
         case .authorizationRequired:
             let hasHandoff = liveDependencies.hasAuthorizationHandoffContext()
             if hasHandoff {
-                traceHostEvent(
-                    "protectedSettings.refresh.autoOpenHandoff",
-                    metadata: [
-                        "gateDecision": accessGateTraceValue(decision),
-                        "hasHandoff": "true",
-                        "result": "start"
-                    ]
-                )
-                let didOpen = await accessCoordinator.openProtectedSettings(
+                _ = await accessCoordinator.openProtectedSettings(
                     localizedReason: settingsLocalizedReason,
                     authorizationMode: .handoffOnly
                 )
-                traceHostEvent(
-                    "protectedSettings.refresh.autoOpenHandoff",
-                    metadata: stateMetadata(liveDependencies)
-                        .merging(
-                            [
-                                "gateDecision": accessGateTraceValue(decision),
-                                "hasHandoff": "true",
-                                "result": didOpen ? "opened" : "notOpened"
-                            ],
-                            uniquingKeysWith: { _, new in new }
-                        )
-                )
             } else {
                 sectionState = .locked
-                traceHostEvent(
-                    "protectedSettings.refresh.autoOpenHandoff",
-                    metadata: [
-                        "gateDecision": accessGateTraceValue(decision),
-                        "hasHandoff": "false",
-                        "result": "skipped"
-                    ]
-                )
             }
         case .alreadyAuthorized:
             _ = await accessCoordinator.openProtectedSettings(
@@ -270,27 +215,15 @@ final class ProtectedSettingsHost {
                 authorizationMode: .requireExistingAuthorization
             )
         }
-        traceHostEvent(
-            "protectedSettings.refresh.finish",
-            metadata: stateMetadata(liveDependencies)
-                .merging(["result": "gateEvaluated", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-        )
     }
 
     func unlockForSettings() async {
-        traceHostEvent("protectedSettings.unlock.start")
-        guard let liveDependencies, let accessCoordinator else {
-            traceHostEvent("protectedSettings.unlock.finish", metadata: ["result": "noLiveDependencies"])
+        guard let accessCoordinator else {
             return
         }
 
-        let didOpen = await accessCoordinator.openProtectedSettings(
+        _ = await accessCoordinator.openProtectedSettings(
             localizedReason: settingsLocalizedReason
-        )
-        traceHostEvent(
-            "protectedSettings.unlock.finish",
-            metadata: stateMetadata(liveDependencies)
-                .merging(["result": didOpen ? "opened" : "notOpened"], uniquingKeysWith: { _, new in new })
         )
     }
 
@@ -320,46 +253,20 @@ final class ProtectedSettingsHost {
     }
 
     func invalidateForContentClearGeneration(_ generation: Int) async {
-        traceHostEvent(
-            "protectedSettings.invalidateForContentClear.start",
-            metadata: ["generation": String(generation)]
-        )
-        guard let liveDependencies else {
-            traceHostEvent(
-                "protectedSettings.invalidateForContentClear.finish",
-                metadata: ["result": "noLiveDependencies", "generation": String(generation)]
-            )
+        guard liveDependencies != nil else {
             return
         }
 
         await Task.yield()
         await refreshSettingsSection()
-        traceHostEvent(
-            "protectedSettings.invalidateForContentClear.finish",
-            metadata: stateMetadata(liveDependencies)
-                .merging(["result": "refreshed", "generation": String(generation)], uniquingKeysWith: { _, new in new })
-        )
     }
 
     func refreshAfterAppAuthenticationGeneration(_ generation: Int) async {
-        traceHostEvent(
-            "protectedSettings.postAuthenticationRefresh.start",
-            metadata: ["generation": String(generation)]
-        )
-        guard let liveDependencies else {
-            traceHostEvent(
-                "protectedSettings.postAuthenticationRefresh.finish",
-                metadata: ["result": "noLiveDependencies", "generation": String(generation)]
-            )
+        guard liveDependencies != nil else {
             return
         }
 
         await refreshSettingsSection()
-        traceHostEvent(
-            "protectedSettings.postAuthenticationRefresh.finish",
-            metadata: stateMetadata(liveDependencies)
-                .merging(["result": "refreshed", "generation": String(generation)], uniquingKeysWith: { _, new in new })
-        )
     }
 
     private func syncSectionStateFromStore(_ liveDependencies: ProtectedSettingsAccessCoordinator.Dependencies) {
@@ -379,10 +286,6 @@ final class ProtectedSettingsHost {
         case .frameworkUnavailable:
             sectionState = .frameworkUnavailable
         }
-        traceHostEvent(
-            "protectedSettings.rowState.synced",
-            metadata: stateMetadata(liveDependencies)
-        )
     }
 
     private func syncSectionStateAfterOperationError(
@@ -395,10 +298,6 @@ final class ProtectedSettingsHost {
         case .unlocked, .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
             syncSectionStateFromStore(liveDependencies)
         }
-        traceHostEvent(
-            "protectedSettings.rowState.errorSynced",
-            metadata: stateMetadata(liveDependencies)
-        )
     }
 
     @discardableResult
@@ -409,89 +308,6 @@ final class ProtectedSettingsHost {
         let domainState = liveDependencies.currentDomainState()
         syncSectionStateFromStore(liveDependencies)
         return domainState
-    }
-
-    private func traceHostEvent(
-        _ name: String,
-        metadata: [String: String] = [:]
-    ) {
-        traceStore?.record(
-            category: .operation,
-            name: name,
-            metadata: metadata.merging(["mode": modeTraceValue(mode)], uniquingKeysWith: { _, new in new })
-        )
-    }
-
-    private func stateMetadata(
-        _ liveDependencies: ProtectedSettingsAccessCoordinator.Dependencies,
-        domainState: DomainState? = nil
-    ) -> [String: String] {
-        [
-            "domainState": domainStateTraceValue(domainState ?? liveDependencies.currentDomainState()),
-            "sectionState": sectionStateTraceValue(sectionState)
-        ]
-    }
-
-    private func modeTraceValue(_ mode: Mode) -> String {
-        switch mode {
-        case .mainWindowLive:
-            "mainWindowLive"
-        case .tutorialSandbox:
-            "tutorialSandbox"
-        }
-    }
-
-    private func accessGateTraceValue(_ decision: AccessGateDecision) -> String {
-        switch decision {
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        case .pendingMutationRecoveryRequired:
-            "pendingMutationRecoveryRequired"
-        case .noProtectedDomainPresent:
-            "noProtectedDomainPresent"
-        case .authorizationRequired:
-            "authorizationRequired"
-        case .alreadyAuthorized:
-            "alreadyAuthorized"
-        }
-    }
-
-    private func domainStateTraceValue(_ state: DomainState) -> String {
-        switch state {
-        case .locked:
-            "locked"
-        case .unlocked:
-            "unlocked"
-        case .recoveryNeeded:
-            "recoveryNeeded"
-        case .pendingRetryRequired:
-            "pendingRetryRequired"
-        case .pendingResetRequired:
-            "pendingResetRequired"
-        case .frameworkUnavailable:
-            "frameworkUnavailable"
-        }
-    }
-
-    private func sectionStateTraceValue(_ state: SectionState) -> String {
-        switch state {
-        case .loading:
-            "loading"
-        case .locked:
-            "locked"
-        case .available:
-            "available"
-        case .recoveryNeeded:
-            "recoveryNeeded"
-        case .pendingRetryRequired:
-            "pendingRetryRequired"
-        case .pendingResetRequired:
-            "pendingResetRequired"
-        case .frameworkUnavailable:
-            "frameworkUnavailable"
-        case .tutorialSandbox:
-            "tutorialSandbox"
-        }
     }
 
     private var settingsLocalizedReason: String {

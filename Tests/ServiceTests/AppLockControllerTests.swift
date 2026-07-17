@@ -103,8 +103,7 @@ final class AppLockControllerTests: XCTestCase {
             postAuthenticationHandler: { await spy.postAuth($0, $1) },
             contentClearHandler: { spy.contentClear() },
             shouldBypassAuthentication: { spy.bypass },
-            operationPromptInProgressProvider: operationPromptInProgressProvider,
-            traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+            operationPromptInProgressProvider: operationPromptInProgressProvider
         )
     }
 
