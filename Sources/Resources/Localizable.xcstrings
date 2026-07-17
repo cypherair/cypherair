@@ -6341,6 +6341,22 @@
         }
       }
     },
+    "guidedTutorial.error.contactsRootKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not prepare isolated tutorial contacts protection."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法准备隔离的教程联系人保护。"
+          }
+        }
+      }
+    },
     "guidedTutorial.error.defaults" : {
       "localizations" : {
         "en" : {
@@ -6714,13 +6730,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Check recipients, authenticate, and verify the signed message."
+            "value" : "Check recipients, then decrypt and verify the signed message."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查收件人、完成认证并验证签名消息。"
+            "value" : "检查收件人、解密并验证签名消息。"
           }
         }
       }

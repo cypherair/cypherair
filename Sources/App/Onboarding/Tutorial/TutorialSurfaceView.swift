@@ -211,14 +211,12 @@ struct TutorialSettingsTaskView: View {
     @Environment(AppConfiguration.self) private var config
 
     var body: some View {
-        TutorialTaskHostView {
-            SettingsView(configuration: tutorialStore.configurationFactory.settingsConfiguration())
-                .onChange(of: config.authModeIfUnlocked) { _, newMode in
-                    if let newMode, newMode == .highSecurity {
-                        tutorialStore.noteHighSecurityEnabled(newMode)
-                    }
+        SettingsView(configuration: tutorialStore.configurationFactory.settingsConfiguration())
+            .onChange(of: config.authModeIfUnlocked) { _, newMode in
+                if let newMode, newMode == .highSecurity {
+                    tutorialStore.noteHighSecurityEnabled(newMode)
                 }
-        }
+            }
     }
 }
 

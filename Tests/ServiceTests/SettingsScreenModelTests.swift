@@ -27,7 +27,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
+        protectedOrdinarySettings.loadFromUngatedEphemeralPersistence()
         config.privateKeyControlState = .unlocked(.standard)
         authManager = AuthenticationManager(
             secureEnclave: stack.mockSE,

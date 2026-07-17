@@ -59,7 +59,7 @@ enum TutorialModuleID: Int, CaseIterable, Hashable, Identifiable {
         case .encryptDemoMessage:
             String(localized: "guidedTutorial.module.encrypt.detail", defaultValue: "Use the real encrypt page to protect a demo message.")
         case .decryptAndVerify:
-            String(localized: "guidedTutorial.module.decrypt.detail", defaultValue: "Check recipients, authenticate, and verify the signed message.")
+            String(localized: "guidedTutorial.module.decrypt.detail", defaultValue: "Check recipients, then decrypt and verify the signed message.")
         case .backupKey:
             String(localized: "guidedTutorial.module.backup.detail", defaultValue: "Create a passphrase-protected backup artifact inside the sandbox.")
         case .enableHighSecurity:

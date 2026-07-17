@@ -64,7 +64,7 @@ final class EncryptScreenModelTests: XCTestCase {
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
+        protectedOrdinarySettings.loadFromUngatedEphemeralPersistence()
     }
 
     override func tearDown() {

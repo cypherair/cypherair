@@ -45,7 +45,7 @@ private final class TutorialContactsOpenGate {
 
 @MainActor
 final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase {
-    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() async throws {
+    func test_tutorialSandboxContainer_usesIsolatedSandboxStorage() async throws {
         let container = try TutorialSandboxContainer()
         defer { container.cleanup() }
 
@@ -360,7 +360,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             to: .highSecurity,
             fingerprints: container.keyManagement.keys.map(\.fingerprint),
             hasBackup: true,
-            authenticator: container.mockAuthenticator
+            authenticator: MockAuthenticator()
         )
         container.config.privateKeyControlState = .unlocked(.highSecurity)
         store.noteHighSecurityEnabled(.highSecurity)
@@ -442,7 +442,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let coordinator = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        coordinator.loadForAuthenticatedTestBypass()
+        coordinator.loadFromUngatedEphemeralPersistence()
         return coordinator
     }
 
