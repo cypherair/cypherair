@@ -6,7 +6,6 @@ import LocalAuthentication
 final class AuthenticationPromptCoordinator: @unchecked Sendable {
     struct OperationPromptToken: Equatable, Sendable {
         let promptID: UInt64
-        let source: String
     }
 
     struct OperationAuthenticationPromptSnapshot: Equatable, Sendable {
@@ -97,8 +96,8 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     @discardableResult
-    func beginPrivacyPrompt(source: String = "unspecified") -> OperationPromptToken {
-        adjustPromptDepth(for: .privacy, delta: 1, source: source)
+    func beginPrivacyPrompt() -> OperationPromptToken {
+        adjustPromptDepth(for: .privacy, delta: 1)
     }
 
     func endPrivacyPrompt(_ context: OperationPromptToken? = nil) {
@@ -106,8 +105,8 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     @discardableResult
-    func beginOperationPrompt(source: String = "unspecified") -> OperationPromptToken {
-        adjustPromptDepth(for: .operation, delta: 1, source: source)
+    func beginOperationPrompt() -> OperationPromptToken {
+        adjustPromptDepth(for: .operation, delta: 1)
     }
 
     func endOperationPrompt(_ context: OperationPromptToken? = nil) {
@@ -115,19 +114,17 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     func withPrivacyPrompt<T>(
-        source: String = "unspecified",
         _ operation: () async throws -> T
     ) async rethrows -> T {
-        try await withPrivacyPrompt(source: source) { _ in
+        try await withPrivacyPrompt { _ in
             try await operation()
         }
     }
 
     func withPrivacyPrompt<T>(
-        source: String = "unspecified",
         _ operation: (OperationPromptToken) async throws -> T
     ) async rethrows -> T {
-        let context = beginPrivacyPrompt(source: source)
+        let context = beginPrivacyPrompt()
         await Task.yield()
         do {
             let result = try await operation(context)
@@ -140,19 +137,17 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     func withOperationPrompt<T>(
-        source: String = "unspecified",
         _ operation: () async throws -> T
     ) async rethrows -> T {
-        try await withOperationPrompt(source: source) { _ in
+        try await withOperationPrompt { _ in
             try await operation()
         }
     }
 
     func withOperationPrompt<T>(
-        source: String = "unspecified",
         _ operation: (OperationPromptToken) async throws -> T
     ) async rethrows -> T {
-        let context = beginOperationPrompt(source: source)
+        let context = beginOperationPrompt()
         await Task.yield()
         do {
             let result = try await operation(context)
@@ -168,7 +163,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private func adjustPromptDepth(
         for kind: PromptKind,
         delta: Int,
-        source: String = "unspecified",
         context: OperationPromptToken? = nil
     ) -> OperationPromptToken {
         let timestamp = now()
@@ -187,7 +181,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             switch kind {
             case .privacy:
                 if delta > 0 {
-                    resolvedContext = makeOperationPromptToken(source: source)
+                    resolvedContext = makeOperationPromptToken()
                     privacyPromptStack.append(resolvedContext)
                 } else {
                     resolvedContext = popOperationPromptToken(
@@ -199,7 +193,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             case .operation:
                 if delta > 0 {
                     let startsNewOperationSession = operationPromptStack.isEmpty
-                    resolvedContext = makeOperationPromptToken(source: source)
+                    resolvedContext = makeOperationPromptToken()
                     operationPromptStack.append(resolvedContext)
                     operationPromptAttemptGenerationValue &+= 1
                     if startsNewOperationSession {
@@ -241,12 +235,9 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         return snapshot.context
     }
 
-    private func makeOperationPromptToken(source: String) -> OperationPromptToken {
+    private func makeOperationPromptToken() -> OperationPromptToken {
         defer { nextPromptID &+= 1 }
-        return OperationPromptToken(
-            promptID: nextPromptID,
-            source: source
-        )
+        return OperationPromptToken(promptID: nextPromptID)
     }
 
     private func popOperationPromptToken(
@@ -254,10 +245,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         matching context: OperationPromptToken?
     ) -> OperationPromptToken {
         guard let context else {
-            return stack.popLast() ?? OperationPromptToken(
-                promptID: 0,
-                source: "missing"
-            )
+            return stack.popLast() ?? OperationPromptToken(promptID: 0)
         }
 
         if stack.last?.promptID == context.promptID {

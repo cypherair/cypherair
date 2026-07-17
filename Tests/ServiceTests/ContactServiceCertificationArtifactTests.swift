@@ -2,15 +2,15 @@ import XCTest
 @testable import CypherAir
 
 final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
-    func test_pr6ProtectedCertificationArtifactSaveDeduplicatesExportsAndPersists() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6CertificationSave")
+    func test_protectedCertificationArtifactSaveDeduplicatesExportsAndPersists() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsCertificationSave")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Certified Contact",
-            email: "pr6-certified@example.invalid",
+            name: "Certified Contact",
+            email: "certified@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -22,7 +22,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let (artifact, duplicateArtifact) = try await makeVerifiedCertificationArtifacts(
             service: service,
             keyRecord: keyRecord,
-            exportFilenames: ("artifact-pr6-save.asc", "artifact-pr6-duplicate.asc")
+            exportFilenames: ("artifact-save.asc", "artifact-duplicate.asc")
         )
 
         let saved = try service.saveCertificationArtifact(artifact)
@@ -38,7 +38,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(projectedKey.certificationProjection.status, .certified)
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [saved.artifactId])
         XCTAssertTrue(String(data: export.data, encoding: .utf8)?.contains("BEGIN PGP SIGNATURE") == true)
-        XCTAssertEqual(export.filename, "artifact-pr6-save.asc")
+        XCTAssertEqual(export.filename, "artifact-save.asc")
 
         try await service.relockProtectedData()
         let reopened = await reopenProtectedContactService(
@@ -54,15 +54,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
     }
 
-    func test_pr6CertificationProjectionDoesNotChangeManualVerification() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6ManualSeparate")
+    func test_certificationProjectionDoesNotChangeManualVerification() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsManualSeparate")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Manual Separate",
-            email: "pr6-manual@example.invalid",
+            name: "Manual Separate",
+            email: "manual@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -79,7 +79,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             try await makeVerifiedCertificationArtifact(
                 service: service,
                 keyRecord: keyRecord,
-                exportFilename: "artifact-pr6-manual-separate.asc"
+                exportFilename: "artifact-manual-separate.asc"
             )
         )
         let summary = try XCTUnwrap(service.availableKey(keyId: keyRecord.keyId))
@@ -88,15 +88,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(summary.certificationProjection.status, .certified)
     }
 
-    func test_pr6CertificationArtifactSaveRejectsStaleTargetDigest() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6StaleDigest")
+    func test_certificationArtifactSaveRejectsStaleTargetDigest() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsStaleDigest")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Stale Digest",
-            email: "pr6-stale-digest@example.invalid",
+            name: "Stale Digest",
+            email: "stale-digest@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -108,7 +108,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let before = try service.currentContactsDomainSnapshot()
         var snapshot = before
         let staleArtifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-stale-target",
+            artifactId: "artifact-stale-target",
             keyRecord: keyRecord,
             signatureData: Data([0xde, 0xad])
         ) {
@@ -126,15 +126,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(snapshot, before)
     }
 
-    func test_pr6CertificationArtifactSaveBackfillsMissingTargetDigest() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6BackfillDigest")
+    func test_certificationArtifactSaveBackfillsMissingTargetDigest() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsBackfillDigest")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Backfill Digest",
-            email: "pr6-backfill@example.invalid",
+            name: "Backfill Digest",
+            email: "backfill@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -145,7 +145,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
         var snapshot = try service.currentContactsDomainSnapshot()
         let artifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-backfilled-target",
+            artifactId: "artifact-backfilled-target",
             keyRecord: keyRecord,
             signatureData: Data([0xca, 0xfe])
         ) {
@@ -166,15 +166,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
     }
 
-    func test_pr6CertificationArtifactDedupeRefreshesValidatedMetadata() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6DedupeRefresh")
+    func test_certificationArtifactDedupeRefreshesValidatedMetadata() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsDedupeRefresh")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Dedupe Refresh",
-            email: "pr6-dedupe@example.invalid",
+            name: "Dedupe Refresh",
+            email: "dedupe@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -187,7 +187,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let oldCreatedAt = Date(timeIntervalSince1970: 1_000)
         let signatureData = Data([0x5a, 0x5b])
         let staleArtifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-refresh-existing",
+            artifactId: "artifact-refresh-existing",
             keyRecord: keyRecord,
             signatureData: signatureData
         ) {
@@ -206,7 +206,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             in: &snapshot
         )
         let refreshedCandidate = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-refresh-candidate",
+            artifactId: "artifact-refresh-candidate",
             keyRecord: keyRecord,
             signatureData: signatureData
         ) {
@@ -224,7 +224,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
             in: &snapshot
         )
 
-        XCTAssertEqual(mutation.output.artifactId, "artifact-pr6-refresh-existing")
+        XCTAssertEqual(mutation.output.artifactId, "artifact-refresh-existing")
         XCTAssertEqual(mutation.output.createdAt, oldCreatedAt)
         XCTAssertEqual(mutation.output.validationStatus, .valid)
         XCTAssertEqual(
@@ -238,15 +238,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(snapshot.certificationArtifacts.count, 1)
     }
 
-    func test_pr6CertificationProjectionRecomputeMarksStaleDigestInvalidOrStale() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeStaleDigest")
+    func test_certificationProjectionRecomputeMarksStaleDigestInvalidOrStale() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeStaleDigest")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Recompute Stale Digest",
-            email: "pr6-recompute-stale@example.invalid",
+            name: "Recompute Stale Digest",
+            email: "recompute-stale@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -259,7 +259,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let lastValidatedAt = Date(timeIntervalSince1970: 10)
         let updatedAt = Date(timeIntervalSince1970: 20)
         let artifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-recompute-stale-digest",
+            artifactId: "artifact-recompute-stale-digest",
             keyRecord: keyRecord,
             signatureData: Data([0x44, 0x55])
         ) {
@@ -289,15 +289,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(projectedKey.certificationProjection.artifactIds, [artifact.artifactId])
     }
 
-    func test_pr6CertificationProjectionRecomputeReturnsTrueWhenOnlyArtifactStatusChanges() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeArtifactOnly")
+    func test_certificationProjectionRecomputeReturnsTrueWhenOnlyArtifactStatusChanges() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeArtifactOnly")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Recompute Artifact Only",
-            email: "pr6-recompute-artifact@example.invalid",
+            name: "Recompute Artifact Only",
+            email: "recompute-artifact@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -310,7 +310,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         let lastValidatedAt = Date(timeIntervalSince1970: 30)
         let updatedAt = Date(timeIntervalSince1970: 40)
         let artifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-recompute-artifact-only",
+            artifactId: "artifact-recompute-artifact-only",
             keyRecord: keyRecord,
             signatureData: Data([0x66, 0x77])
         ) {
@@ -340,15 +340,15 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         XCTAssertEqual(snapshot.certificationArtifacts.first?.updatedAt, updatedAt)
     }
 
-    func test_pr6CertificationProjectionRecomputeKeepsCurrentDigestValidCertified() async throws {
-        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsPR6RecomputeValidDigest")
+    func test_certificationProjectionRecomputeKeepsCurrentDigestValidCertified() async throws {
+        let opened = try await makeOpenedProtectedContactService(prefix: "ContactsRecomputeValidDigest")
         defer {
             try? FileManager.default.removeItem(at: opened.harness.storageRoot.rootURL.deletingLastPathComponent())
         }
         let service = opened.service
         let generated = try engine.generateKey(
-            name: "PR6 Recompute Valid Digest",
-            email: "pr6-recompute-valid@example.invalid",
+            name: "Recompute Valid Digest",
+            email: "recompute-valid@example.invalid",
             expirySeconds: nil,
             suite: .ed25519LegacyCurve25519Legacy
         )
@@ -359,7 +359,7 @@ final class ContactServiceCertificationArtifactTests: ContactServiceTestCase {
         )
         var snapshot = try service.currentContactsDomainSnapshot()
         let artifact = makeValidCertificationArtifact(
-            artifactId: "artifact-pr6-recompute-valid-digest",
+            artifactId: "artifact-recompute-valid-digest",
             keyRecord: keyRecord,
             signatureData: Data([0x88, 0x99])
         )

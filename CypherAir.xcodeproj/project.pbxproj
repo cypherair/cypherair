@@ -361,7 +361,6 @@
 				Security/SecureEnclaveCustodyHandlePair.swift,
 				Security/SecureEnclaveCustodyHandlePublicBinding.swift,
 				Security/SecureEnclaveCustodyHandleReference.swift,
-				Security/SecureEnclaveCustodyHandleState.swift,
 				Security/SecureEnclaveCustodyHandleStore.swift,
 				Security/SecureEnclaveCustodyKeyAgreement.swift,
 				Security/SecureEnclaveCustodyKeyStoring.swift,

@@ -13,19 +13,10 @@ final class PrivateKeyModeSwitchAuthenticator {
         _ currentMode: AuthenticationMode,
         authenticator: any AuthenticationEvaluable
     ) async throws {
-        let authenticated: Bool
-        if let authManager = authenticator as? AuthenticationManager {
-            authenticated = try await authManager.evaluate(
-                mode: currentMode,
-                reason: PrivateKeyModeSwitchAuthStrings.reason,
-                source: "privateKeyProtection.switch"
-            )
-        } else {
-            authenticated = try await authenticator.evaluate(
-                mode: currentMode,
-                reason: PrivateKeyModeSwitchAuthStrings.reason
-            )
-        }
+        let authenticated = try await authenticator.evaluate(
+            mode: currentMode,
+            reason: PrivateKeyModeSwitchAuthStrings.reason
+        )
 
         guard authenticated else {
             throw AuthenticationError.failed

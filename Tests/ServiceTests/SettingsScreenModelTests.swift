@@ -659,7 +659,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         let harness = OperationPromptLockHarness(gracePeriod: 0)
         await harness.unlockForTest()
 
-        let prompt = harness.coordinator.beginOperationPrompt(source: "localDataReset")
+        let prompt = harness.coordinator.beginOperationPrompt()
         await harness.settle() // began-hop lands: mirror opens
 
         harness.controller.resetAfterLocalDataReset(preserveAuthentication: true)

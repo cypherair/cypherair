@@ -11,8 +11,8 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
         nonisolated(unsafe) var firedCount = 0
         coordinator.onOperationPromptsEnded = { firedCount += 1 }
 
-        let outer = coordinator.beginOperationPrompt(source: "outer")
-        let inner = coordinator.beginOperationPrompt(source: "inner")
+        let outer = coordinator.beginOperationPrompt()
+        let inner = coordinator.beginOperationPrompt()
         XCTAssertEqual(firedCount, 0)
 
         coordinator.endOperationPrompt(inner)
@@ -21,7 +21,7 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
         coordinator.endOperationPrompt(outer)
         XCTAssertEqual(firedCount, 1, "The hook fires once when the last prompt ends.")
 
-        let next = coordinator.beginOperationPrompt(source: "next")
+        let next = coordinator.beginOperationPrompt()
         coordinator.endOperationPrompt(next)
         XCTAssertEqual(firedCount, 2, "Each completed prompt session fires once.")
     }
@@ -31,14 +31,14 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
         nonisolated(unsafe) var beganCount = 0
         coordinator.onOperationPromptSessionBegan = { beganCount += 1 }
 
-        let outer = coordinator.beginOperationPrompt(source: "outer")
+        let outer = coordinator.beginOperationPrompt()
         XCTAssertEqual(beganCount, 1)
-        let inner = coordinator.beginOperationPrompt(source: "inner")
+        let inner = coordinator.beginOperationPrompt()
         XCTAssertEqual(beganCount, 1, "A nested prompt must not fire the began hook.")
         coordinator.endOperationPrompt(inner)
         coordinator.endOperationPrompt(outer)
 
-        _ = coordinator.beginOperationPrompt(source: "next")
+        _ = coordinator.beginOperationPrompt()
         XCTAssertEqual(beganCount, 2, "Each new session fires the began hook once.")
     }
 
@@ -47,7 +47,7 @@ final class AuthenticationPromptCoordinatorCallbackTests: XCTestCase {
         nonisolated(unsafe) var firedCount = 0
         coordinator.onOperationPromptsEnded = { firedCount += 1 }
 
-        let privacy = coordinator.beginPrivacyPrompt(source: "privacy")
+        let privacy = coordinator.beginPrivacyPrompt()
         coordinator.endPrivacyPrompt(privacy)
 
         XCTAssertEqual(firedCount, 0, "Privacy prompts never fire the operation hook.")

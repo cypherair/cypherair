@@ -311,9 +311,7 @@ final class KeyMutationService {
         guard let expiryAuthenticator else {
             return nil
         }
-        return try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "modifyExpiry.authenticate"
-        ) {
+        return try await authenticationPromptCoordinator.withOperationPrompt {
             try await expiryAuthenticator(
                 accessControl,
                 String(
@@ -330,9 +328,7 @@ final class KeyMutationService {
         accessControl: SecAccessControl,
         authenticationContext: LAContext?
     ) async throws -> WrappedKeyBundle {
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "modifyExpiry.rewrap"
-        ) {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             let seHandle = try secureEnclave.generateWrappingKey(
                 accessControl: accessControl,
                 authenticationContext: authenticationContext

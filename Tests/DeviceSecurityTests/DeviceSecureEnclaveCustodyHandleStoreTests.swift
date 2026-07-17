@@ -55,7 +55,15 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         XCTAssertGreaterThanOrEqual(summary.completeSetCount, 1)
 
         try store.deleteHandlePair(pair)
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: pair.signing.publicKeyRaw,
+            keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw
+        )) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .privateHandleMissing
+            )
+        }
         recordEvidence(
             .handlePairGenerationPersistence,
             handleCount: summary.totalHandleCount,
@@ -192,10 +200,6 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         }
 
         try keyStore.deleteKey(reference: pair.signing.reference)
-        XCTAssertEqual(
-            store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier),
-            .partial(presentRoles: [.keyAgreement])
-        )
         XCTAssertThrowsError(try store.loadHandle(
             reference: pair.signing.reference,
             expectedPublicKeyRaw: pair.signing.publicKeyRaw,
@@ -209,7 +213,6 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         }
 
         try keyStore.deleteKey(reference: pair.keyAgreement.reference)
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         XCTAssertThrowsError(try store.locateHandlePair(
             signingPublicKeyRaw: pair.signing.publicKeyRaw,
             keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw

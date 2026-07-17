@@ -32,7 +32,6 @@ final class DeviceDangerousSecureEnclaveCustodyResetCleanupTests: SecureEnclaveC
         XCTAssertGreaterThanOrEqual(result.inspectedHandleCount, 2)
         XCTAssertGreaterThanOrEqual(result.deletedHandleCount, 2)
         XCTAssertEqual(try store.remainingHandleCountForLocalDataReset(), 0)
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
         recordEvidence(.localResetCleanup, handleCount: result.inspectedHandleCount)
     }
 }

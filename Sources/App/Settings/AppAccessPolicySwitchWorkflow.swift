@@ -12,7 +12,6 @@ final class AppAccessPolicySwitchWorkflow {
     private let canEvaluate: (AppSessionAuthenticationPolicy) -> Bool
     private let evaluateAppSession: (
         AppSessionAuthenticationPolicy,
-        String,
         String
     ) async throws -> AppSessionAuthenticationResult
     private let reprotectPersistedRootSecret: (
@@ -29,7 +28,6 @@ final class AppAccessPolicySwitchWorkflow {
         canEvaluate: @escaping (AppSessionAuthenticationPolicy) -> Bool,
         evaluateAppSession: @escaping (
             AppSessionAuthenticationPolicy,
-            String,
             String
         ) async throws -> AppSessionAuthenticationResult,
         reprotectPersistedRootSecret: @escaping (
@@ -91,16 +89,13 @@ final class AppAccessPolicySwitchWorkflow {
         newPolicy: AppSessionAuthenticationPolicy,
         authenticationPolicy: AppSessionAuthenticationPolicy
     ) async throws -> AppSessionAuthenticationResult {
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "appAccessPolicy.switch.authenticate"
-        ) {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             let result = try await evaluateAppSession(
                 authenticationPolicy,
                 String(
                     localized: "settings.appAccessPolicy.change.reason",
                     defaultValue: "Authenticate to change App Access Protection."
-                ),
-                "appAccessPolicy.switch"
+                )
             )
             guard result.isAuthenticated else {
                 throw AuthenticationError.failed

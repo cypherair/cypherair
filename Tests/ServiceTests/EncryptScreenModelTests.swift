@@ -505,7 +505,7 @@ final class EncryptScreenModelTests: XCTestCase {
         model.toggleRecipientTagFilter(tag.tagId)
 
         // The contact without a preferred encryption key is not a candidate, so
-        // "Add All Shown" adds only the selectable member.
+        // "Select All Shown" adds only the selectable member.
         XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [selectableContactId])
         model.addAllVisibleRecipients()
         XCTAssertEqual(model.effectiveRecipientContactIds, [selectableContactId])
@@ -920,8 +920,7 @@ final class EncryptScreenModelTests: XCTestCase {
         let onlyContactId = try XCTUnwrap(opened.service.contactId(forFingerprint: only.fingerprint))
 
         let model = makeModel(contactService: opened.service)
-        // A single visible candidate — the old "Add All Shown" button hid itself when
-        // only one row remained; "Select All Shown" now covers it.
+        // A single visible candidate is still covered by "Select All Shown".
         XCTAssertEqual(model.filteredRecipientContacts.map(\.contactId), [onlyContactId])
         model.addAllVisibleRecipients()
         XCTAssertEqual(model.effectiveRecipientContactIds, [onlyContactId])

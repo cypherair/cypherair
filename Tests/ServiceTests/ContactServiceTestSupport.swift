@@ -133,8 +133,8 @@ class ContactServiceTestCase: XCTestCase {
         let keyManagement = TestHelpers.makeKeyManagement(engine: engine).service
         let signer = try await TestHelpers.generateLegacyKey(
             service: keyManagement,
-            name: "PR6 Certification Signer",
-            email: "pr6-signer@example.invalid"
+            name: "Certification Signer",
+            email: "signer@example.invalid"
         )
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
         let certificateSignatureService = CertificateSignatureService(

@@ -1,5 +1,0 @@
-gpg: packet(6) with unknown version 6
-gpg: read_block: read error: Invalid packet
-gpg: import from '<fixture-dir>/modern_high_v6_pubkey.gpg' failed: Invalid keyring
-gpg: Total number processed: 0
-gpg_import_exit_code=2

@@ -88,9 +88,7 @@ final class ProtectedDataRootSecretCoordinator: @unchecked Sendable {
             )
         }
 
-        return try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "protectedData.rootSecret.load.interactive"
-        ) {
+        return try await authenticationPromptCoordinator.withOperationPrompt {
             try rootSecretStore.loadRootSecret(
                 identifier: identifier,
                 authenticationContext: authenticationContext

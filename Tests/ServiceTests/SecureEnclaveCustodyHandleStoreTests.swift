@@ -159,30 +159,6 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         ))
     }
 
-    func test_inspectHandlePair_classifiesMissingPartialCompleteAndInvalid() throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
-
-        XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: "0badc0de"), .missing)
-        XCTAssertEqual(
-            store.inspectHandlePair(handleSetIdentifier: "NOT-VALID"),
-            .invalid(.invalidHandleSetIdentifier)
-        )
-
-        let pair = try store.createLoadedHandlePair(authenticationContext: nil)
-        let identifier = pair.signing.reference.handleSetIdentifier
-        guard case .complete(let inspected) = store.inspectHandlePair(handleSetIdentifier: identifier) else {
-            return XCTFail("Expected complete state")
-        }
-        XCTAssertEqual(inspected.handleSetIdentifier, identifier)
-
-        try keyStore.deleteKey(reference: pair.keyAgreement.reference)
-        XCTAssertEqual(
-            store.inspectHandlePair(handleSetIdentifier: identifier),
-            .partial(presentRoles: [.signing])
-        )
-    }
-
     func test_locateHandlePair_findsUniqueExactPublicBinding() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)

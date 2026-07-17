@@ -53,9 +53,8 @@ final class AppAccessPolicySwitchWorkflowTests: XCTestCase {
             currentPolicy: { spy.currentPolicy },
             hasPersistedRootSecret: { spy.hasRootSecret },
             canEvaluate: { _ in spy.canEvaluateResult },
-            evaluateAppSession: { policy, reason, source in
+            evaluateAppSession: { policy, reason in
                 XCTAssertFalse(reason.isEmpty)
-                XCTAssertEqual(source, "appAccessPolicy.switch")
                 return await spy.evaluate(policy)
             },
             reprotectPersistedRootSecret: { from, to, _ in

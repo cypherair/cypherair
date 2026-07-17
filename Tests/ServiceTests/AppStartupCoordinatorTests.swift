@@ -13,7 +13,7 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
             try? FileManager.default.removeItem(at: baseDirectory)
             try? FileManager.default.removeItem(at: preferencesDirectory)
         }
-        try makePhase7TemporaryArtifacts(in: baseDirectory)
+        try makeSweepableTemporaryArtifacts(in: baseDirectory)
         try FileManager.default.createDirectory(at: preferencesDirectory, withIntermediateDirectories: true)
         let fixedTutorialSuiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
         let fixedTutorialPlist = preferencesDirectory.appendingPathComponent("\(fixedTutorialSuiteName).plist")
@@ -69,7 +69,7 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
     }
 
 
-    private func makePhase7TemporaryArtifacts(in temporaryDirectory: URL) throws {
+    private func makeSweepableTemporaryArtifacts(in temporaryDirectory: URL) throws {
         let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
         let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")

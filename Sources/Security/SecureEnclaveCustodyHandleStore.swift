@@ -166,42 +166,6 @@ struct SecureEnclaveCustodyHandleStore {
         return matches[0]
     }
 
-    func inspectHandlePair(handleSetIdentifier: String) -> SecureEnclaveCustodyHandleState {
-        guard SecureEnclaveCustodyHandleReference.isValidHandleSetIdentifier(handleSetIdentifier) else {
-            return .invalid(.invalidHandleSetIdentifier)
-        }
-
-        do {
-            let group = try tierGroups()[handleSetIdentifier] ?? []
-            let signing = group.first { $0.role == .signing }
-            let keyAgreement = group.first { $0.role == .keyAgreement }
-            switch (signing, keyAgreement) {
-            case (nil, nil):
-                return .missing
-            case (.some, nil):
-                return .partial(presentRoles: [.signing])
-            case (nil, .some):
-                return .partial(presentRoles: [.keyAgreement])
-            case (.some(let signing), .some(let keyAgreement)):
-                do {
-                    let pair = try SecureEnclaveCustodyHandlePair(
-                        signing: signing,
-                        keyAgreement: keyAgreement
-                    )
-                    return .complete(pair)
-                } catch let error as SecureEnclaveCustodyHandleError {
-                    return .invalid(error)
-                } catch {
-                    return .invalid(.privateHandleInaccessible(.signing))
-                }
-            }
-        } catch let error as SecureEnclaveCustodyHandleError {
-            return .invalid(error)
-        } catch {
-            return .invalid(.privateHandleInaccessible(.signing))
-        }
-    }
-
     func deleteHandlePair(_ pair: SecureEnclaveCustodyHandlePair) throws {
         try deleteReferences(pair.references)
     }
