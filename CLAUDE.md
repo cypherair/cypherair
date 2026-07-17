@@ -116,7 +116,6 @@ Standard Swift/SwiftUI idiom applies. The rules below are the project-specific o
 
 - Keep changes scoped to the user request. Only make changes directly required to complete the requested task; do not normalize, revert, or clean up unrelated local changes already in the worktree.
 - Prefer the architecturally-correct solution over the smallest patch — this sets the *depth* of a change, not its *scope*. See docs/WORKFLOW.md "The development loop".
-- Maintain existing user-visible behavior unless the task explicitly changes it.
 - Run `cargo +stable test` and the relevant `xcodebuild test` plan before considering a code task complete.
 - Work on a topic branch and submit a PR; do not commit directly to `main` unless the user explicitly asks. Prefer regular merge commits over squash or rebase merges.
 - Commits are SSH-signed and use conventional prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`). If the agent has no signing identity, run `ssh-add --apple-load-keychain` and retry; never create an unsigned commit.
