@@ -4,10 +4,9 @@ import LocalAuthentication
 /// Coordinates transient system-owned authentication prompts so app lifecycle
 /// handlers can distinguish them from real background/resume events.
 final class AuthenticationPromptCoordinator: @unchecked Sendable {
-    struct PromptTraceContext: Equatable, Sendable {
+    struct OperationPromptToken: Equatable, Sendable {
         let promptID: UInt64
         let source: String
-        let kind: String
     }
 
     struct OperationAuthenticationPromptSnapshot: Equatable, Sendable {
@@ -35,15 +34,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private enum PromptKind {
         case privacy
         case operation
-
-        var traceValue: String {
-            switch self {
-            case .privacy:
-                "privacy"
-            case .operation:
-                "operation"
-            }
-        }
     }
 
     private let lock = NSLock()
@@ -70,8 +60,8 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private var lastOperationPromptBeganAt: Date?
     private var lastOperationPromptEndedAt: Date?
     private var nextPromptID: UInt64 = 1
-    private var privacyPromptStack: [PromptTraceContext] = []
-    private var operationPromptStack: [PromptTraceContext] = []
+    private var privacyPromptStack: [OperationPromptToken] = []
+    private var operationPromptStack: [OperationPromptToken] = []
 
     init(
         now: @escaping @Sendable () -> Date = Date.init
@@ -107,20 +97,20 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     }
 
     @discardableResult
-    func beginPrivacyPrompt(source: String = "unspecified") -> PromptTraceContext {
+    func beginPrivacyPrompt(source: String = "unspecified") -> OperationPromptToken {
         adjustPromptDepth(for: .privacy, delta: 1, source: source)
     }
 
-    func endPrivacyPrompt(_ context: PromptTraceContext? = nil) {
+    func endPrivacyPrompt(_ context: OperationPromptToken? = nil) {
         adjustPromptDepth(for: .privacy, delta: -1, context: context)
     }
 
     @discardableResult
-    func beginOperationPrompt(source: String = "unspecified") -> PromptTraceContext {
+    func beginOperationPrompt(source: String = "unspecified") -> OperationPromptToken {
         adjustPromptDepth(for: .operation, delta: 1, source: source)
     }
 
-    func endOperationPrompt(_ context: PromptTraceContext? = nil) {
+    func endOperationPrompt(_ context: OperationPromptToken? = nil) {
         adjustPromptDepth(for: .operation, delta: -1, context: context)
     }
 
@@ -135,7 +125,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
 
     func withPrivacyPrompt<T>(
         source: String = "unspecified",
-        _ operation: (PromptTraceContext) async throws -> T
+        _ operation: (OperationPromptToken) async throws -> T
     ) async rethrows -> T {
         let context = beginPrivacyPrompt(source: source)
         await Task.yield()
@@ -160,7 +150,7 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
 
     func withOperationPrompt<T>(
         source: String = "unspecified",
-        _ operation: (PromptTraceContext) async throws -> T
+        _ operation: (OperationPromptToken) async throws -> T
     ) async rethrows -> T {
         let context = beginOperationPrompt(source: source)
         await Task.yield()
@@ -179,38 +169,37 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         for kind: PromptKind,
         delta: Int,
         source: String = "unspecified",
-        context: PromptTraceContext? = nil
-    ) -> PromptTraceContext {
+        context: OperationPromptToken? = nil
+    ) -> OperationPromptToken {
         let timestamp = now()
         let snapshot = lock.withLock { () -> (
             privacyDepth: Int,
             operationDepth: Int,
             operationGeneration: UInt64,
             operationSessionGeneration: UInt64,
-            context: PromptTraceContext,
+            context: OperationPromptToken,
             operationSessionBegan: Bool,
             operationPromptsEnded: Bool
         ) in
-            let resolvedContext: PromptTraceContext
+            let resolvedContext: OperationPromptToken
             var operationSessionBegan = false
             var operationPromptsEnded = false
             switch kind {
             case .privacy:
                 if delta > 0 {
-                    resolvedContext = makePromptTraceContext(kind: kind, source: source)
+                    resolvedContext = makeOperationPromptToken(source: source)
                     privacyPromptStack.append(resolvedContext)
                 } else {
-                    resolvedContext = popPromptTraceContext(
+                    resolvedContext = popOperationPromptToken(
                         from: &privacyPromptStack,
-                        matching: context,
-                        kind: kind
+                        matching: context
                     )
                 }
                 privacyPromptDepth = privacyPromptStack.count
             case .operation:
                 if delta > 0 {
                     let startsNewOperationSession = operationPromptStack.isEmpty
-                    resolvedContext = makePromptTraceContext(kind: kind, source: source)
+                    resolvedContext = makeOperationPromptToken(source: source)
                     operationPromptStack.append(resolvedContext)
                     operationPromptAttemptGenerationValue &+= 1
                     if startsNewOperationSession {
@@ -221,10 +210,9 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
                     lastOperationPromptEndedAt = nil
                 } else {
                     let wasOperationPromptInProgress = !operationPromptStack.isEmpty
-                    resolvedContext = popPromptTraceContext(
+                    resolvedContext = popOperationPromptToken(
                         from: &operationPromptStack,
-                        matching: context,
-                        kind: kind
+                        matching: context
                     )
                     if wasOperationPromptInProgress, operationPromptStack.isEmpty {
                         lastOperationPromptEndedAt = timestamp
@@ -253,28 +241,22 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         return snapshot.context
     }
 
-    private func makePromptTraceContext(
-        kind: PromptKind,
-        source: String
-    ) -> PromptTraceContext {
+    private func makeOperationPromptToken(source: String) -> OperationPromptToken {
         defer { nextPromptID &+= 1 }
-        return PromptTraceContext(
+        return OperationPromptToken(
             promptID: nextPromptID,
-            source: source,
-            kind: kind.traceValue
+            source: source
         )
     }
 
-    private func popPromptTraceContext(
-        from stack: inout [PromptTraceContext],
-        matching context: PromptTraceContext?,
-        kind: PromptKind
-    ) -> PromptTraceContext {
+    private func popOperationPromptToken(
+        from stack: inout [OperationPromptToken],
+        matching context: OperationPromptToken?
+    ) -> OperationPromptToken {
         guard let context else {
-            return stack.popLast() ?? PromptTraceContext(
+            return stack.popLast() ?? OperationPromptToken(
                 promptID: 0,
-                source: "missing",
-                kind: kind.traceValue
+                source: "missing"
             )
         }
 

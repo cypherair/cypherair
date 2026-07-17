@@ -59,7 +59,7 @@ Three-layer bridge: the `pgp-mobile` wrapper crate (UniFFI proc-macros, `Vec<u8>
 
 ### Durable Rust / FFI Contract Rules
 
-- **API evolution is additive during migration.** New semantics land first as parallel methods, result records, or enums; superseded surfaces are deleted intentionally once migration gates pass, not kept as permanent compatibility APIs.
+- **API evolution is additive.** New semantics land first as parallel methods, result records, or enums; superseded surfaces are deleted intentionally once their replacement's gates pass, not kept as permanent compatibility APIs.
 - **Payload input classes stay explicit.** Byte-oriented OpenPGP payload inputs are classified `binary-only`, `armored-only`, or `dual-format`; new APIs document which class they accept instead of relying on implicit parser behavior.
 - **Cryptographic selectors use bytes, not display strings.** Selector-bearing User ID operations use raw `userIdData + occurrenceIndex`; cryptographically significant payloads stay `Vec<u8>` / `Data`.
 - **Discovery helpers are part of the contract when needed.** If a Swift service cannot safely discover required selectors or metadata from the exported surface, the Rust/FFI boundary grows a bounded helper rather than pushing string inference into Swift.

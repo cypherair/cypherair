@@ -1,4 +1,4 @@
-//! Cross-Profile Interoperability tests.
+//! Cross-Suite Interoperability tests.
 //! Validates format auto-selection by recipient key version.
 
 mod common;
@@ -159,7 +159,7 @@ fn test_modern_high_encrypt_to_self_with_v4_recipient() {
 
 /// Legacy signature verified by Modern High user, and vice versa.
 #[test]
-fn test_cross_profile_signature_verification() {
+fn test_cross_suite_signature_verification() {
     let key_a =
         keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Legacy key gen should succeed");
@@ -168,7 +168,7 @@ fn test_cross_profile_signature_verification() {
         keys::generate_key_with_suite("Bob (B)".to_string(), None, None, KeySuite::Ed448X448)
             .expect("Modern High key gen should succeed");
 
-    let text = b"Cross-profile signature test.";
+    let text = b"Cross-suite signature test.";
 
     // Legacy signs, Modern High verifies
     let signed_a =
@@ -196,7 +196,7 @@ fn test_cross_profile_signature_verification() {
 /// Extended: Legacy sender signs encrypted message for Modern High recipient.
 /// Full round-trip: sign + encrypt + decrypt + verify.
 #[test]
-fn test_cross_profile_signed_encrypted_round_trip() {
+fn test_cross_suite_signed_encrypted_round_trip() {
     let sender_a =
         keys::generate_key_with_suite("Alice (A)".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Sender key gen should succeed");
@@ -238,7 +238,7 @@ fn test_cross_profile_signed_encrypted_round_trip() {
 
 /// Extended: Modern High sender signs encrypted message for Legacy recipient.
 /// Full round-trip: sign + encrypt + decrypt + verify.
-/// Complements test_cross_profile_signed_encrypted_round_trip (which tests A→B).
+/// Complements test_cross_suite_signed_encrypted_round_trip (which tests A→B).
 #[test]
 fn test_cross_modern_high_to_a_signed_encrypted_round_trip() {
     let sender_b =
@@ -367,10 +367,10 @@ fn test_format_selection_mixed_recipients_produces_seipd_v1() {
     assert!(!has_v2, "Mixed v4+v6 recipients should NOT produce SEIPDv2");
 }
 
-// ── Format verification for cross-profile encrypt (sender ≠ recipient profile) ──
+// ── Format verification for cross-suite encrypt (sender ≠ recipient suite) ──
 
 /// Legacy sender encrypts to Modern High recipient → must produce SEIPDv2.
-/// Validates that format selection depends on RECIPIENT key version, not sender's profile.
+/// Validates that format selection depends on RECIPIENT key version, not sender's suite.
 #[test]
 fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
     let sender_a =
@@ -386,7 +386,7 @@ fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
     .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"Cross-profile format check A->B",
+        b"Cross-suite format check A->B",
         &[recipient_b.public_key_data.clone()],
         Some(&sender_a.cert_data),
         None,
@@ -399,7 +399,7 @@ fn test_format_selection_a_sender_to_b_recipient_produces_seipd_v2() {
 }
 
 /// Modern High sender encrypts to Legacy recipient → must produce SEIPDv1.
-/// Validates format downgrade for v4 recipients regardless of sender's profile.
+/// Validates format downgrade for v4 recipients regardless of sender's suite.
 #[test]
 fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
     let sender_b =
@@ -415,7 +415,7 @@ fn test_format_selection_b_sender_to_a_recipient_produces_seipd_v1() {
     .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"Cross-profile format check B->A",
+        b"Cross-suite format check B->A",
         &[recipient_a.public_key_data.clone()],
         Some(&sender_b.cert_data),
         None,
@@ -482,7 +482,7 @@ fn test_legacy_encrypt_to_self_with_v6_recipient() {
 
 /// Revocation cert from Legacy key should not verify against Modern High key (and vice versa).
 #[test]
-fn test_revocation_cert_cross_profile_mismatch() {
+fn test_revocation_cert_cross_suite_mismatch() {
     let key_a =
         keys::generate_key_with_suite("Alice".to_string(), None, None, KeySuite::Ed25519LegacyCurve25519Legacy)
             .expect("Legacy key gen should succeed");
@@ -506,9 +506,9 @@ fn test_revocation_cert_cross_profile_mismatch() {
     );
 }
 
-// ── match_recipients cross-profile tests ────────────────────────────
+// ── match_recipients cross-suite tests ────────────────────────────
 
-/// match_recipients: cross-profile — Modern High sender encrypts to Legacy recipient.
+/// match_recipients: cross-suite — Modern High sender encrypts to Legacy recipient.
 /// Message format is SEIPDv1 (mixed/v4 recipient). match_recipients should still find the match.
 #[test]
 fn test_match_recipients_cross_modern_high_sender_a_recipient() {
@@ -525,7 +525,7 @@ fn test_match_recipients_cross_modern_high_sender_a_recipient() {
     .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"cross profile",
+        b"cross suite",
         &[recipient_a.public_key_data.clone()],
         Some(&sender_b.cert_data),
         None,
@@ -533,13 +533,13 @@ fn test_match_recipients_cross_modern_high_sender_a_recipient() {
     .expect("Encryption should succeed");
 
     let matched = decrypt::match_recipients(&ciphertext, &[recipient_a.public_key_data.clone()])
-        .expect("match_recipients should work cross-profile");
+        .expect("match_recipients should work cross-suite");
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], recipient_a.fingerprint);
 }
 
-/// match_recipients: cross-profile — Legacy sender encrypts to Modern High recipient.
+/// match_recipients: cross-suite — Legacy sender encrypts to Modern High recipient.
 /// Message format is SEIPDv2 (v6 recipient). match_recipients should find the match.
 #[test]
 fn test_match_recipients_cross_legacy_sender_b_recipient() {
@@ -556,7 +556,7 @@ fn test_match_recipients_cross_legacy_sender_b_recipient() {
     .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"cross profile reverse",
+        b"cross suite reverse",
         &[recipient_b.public_key_data.clone()],
         Some(&sender_a.cert_data),
         None,
@@ -564,7 +564,7 @@ fn test_match_recipients_cross_legacy_sender_b_recipient() {
     .expect("Encryption should succeed");
 
     let matched = decrypt::match_recipients(&ciphertext, &[recipient_b.public_key_data.clone()])
-        .expect("match_recipients should work cross-profile");
+        .expect("match_recipients should work cross-suite");
 
     assert_eq!(matched.len(), 1);
     assert_eq!(matched[0], recipient_b.fingerprint);

@@ -67,10 +67,7 @@ final class TutorialSessionStore {
         if session.lifecycleState == .finished {
             return true
         }
-        guard let completionState = protectedOrdinarySettings?.guidedTutorialCompletionState else {
-            return false
-        }
-        return completionState != .neverCompleted
+        return protectedOrdinarySettings?.hasCompletedGuidedTutorial ?? false
     }
 
     var outputInterceptionPolicy: OutputInterceptionPolicy? {
@@ -243,7 +240,7 @@ final class TutorialSessionStore {
     }
 
     func markFinishedTutorial() {
-        protectedOrdinarySettings?.markGuidedTutorialCompletedCurrentVersion()
+        protectedOrdinarySettings?.markGuidedTutorialCompleted()
         session.lifecycleState = .finished
     }
 

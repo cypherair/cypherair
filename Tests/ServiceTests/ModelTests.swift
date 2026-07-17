@@ -264,9 +264,7 @@ final class ModelTests: XCTestCase {
             .keyGenerationFailed(reason: "test"),
             .s2kError(reason: "test"),
             .internalError(reason: "test"),
-            .secureEnclaveUnavailable,
             .authenticationFailed,
-            .authenticationCancelled,
             .keychainError("test"),
             .invalidQRCode,
             .unsupportedQRVersion,
@@ -421,7 +419,7 @@ final class ModelTests: XCTestCase {
 
     func test_pgpKeyOperationFailureCategory_rawValuesCoverSecureEnclaveTaxonomy() throws {
         let expected: [PGPKeyOperationFailureCategory] = [
-            .invalidConfigurationCustody,
+            .invalidFamilyCustody,
             .operationUnsupportedForCustody,
             .operationNotImplementedForCustody,
             .operationUnavailableByPolicy,
@@ -445,9 +443,7 @@ final class ModelTests: XCTestCase {
             .externalOperationInvalidResponse,
             .externalOperationFailed,
             .openPGPSemanticFailure,
-            .payloadAuthenticationFailure,
             .recoveryRequired,
-            .prohibitedFallbackAttempted,
             .cleanupOrRollbackFailure,
         ]
 
@@ -455,7 +451,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(
             expected.map(\.rawValue),
             [
-                "invalidConfigurationCustody",
+                "invalidFamilyCustody",
                 "operationUnsupportedForCustody",
                 "operationNotImplementedForCustody",
                 "operationUnavailableByPolicy",
@@ -479,16 +475,14 @@ final class ModelTests: XCTestCase {
                 "externalOperationInvalidResponse",
                 "externalOperationFailed",
                 "openPGPSemanticFailure",
-                "payloadAuthenticationFailure",
                 "recoveryRequired",
-                "prohibitedFallbackAttempted",
                 "cleanupOrRollbackFailure",
             ]
         )
 
-        let encoded = try JSONEncoder().encode(PGPKeyOperationFailureCategory.payloadAuthenticationFailure)
+        let encoded = try JSONEncoder().encode(PGPKeyOperationFailureCategory.recoveryRequired)
         let decoded = try JSONDecoder().decode(PGPKeyOperationFailureCategory.self, from: encoded)
-        XCTAssertEqual(decoded, .payloadAuthenticationFailure)
+        XCTAssertEqual(decoded, .recoveryRequired)
     }
 
     func test_pgpKeyOperationResolution_factoriesSetSupportAndFailureCategory() throws {
@@ -496,9 +490,9 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(supported.support, .supported)
         XCTAssertNil(supported.failureCategory)
 
-        let unsupported = PGPKeyOperationResolution.unsupported(.invalidConfigurationCustody)
+        let unsupported = PGPKeyOperationResolution.unsupported(.invalidFamilyCustody)
         XCTAssertEqual(unsupported.support, .unsupported)
-        XCTAssertEqual(unsupported.failureCategory, .invalidConfigurationCustody)
+        XCTAssertEqual(unsupported.failureCategory, .invalidFamilyCustody)
 
         let notImplemented = PGPKeyOperationResolution.notImplemented(.operationNotImplementedForCustody)
         XCTAssertEqual(notImplemented.support, .notImplemented)
@@ -529,7 +523,7 @@ final class ModelTests: XCTestCase {
             """
             {
               "support": "supported",
-              "failureCategory": "invalidConfigurationCustody"
+              "failureCategory": "invalidFamilyCustody"
             }
             """.utf8
         )
@@ -795,7 +789,7 @@ final class ModelTests: XCTestCase {
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
                 encryptToSelf: false,
-                guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+                hasCompletedGuidedTutorial: true
             )
         )
         let coordinator = ProtectedOrdinarySettingsCoordinator(
@@ -836,7 +830,7 @@ final class ModelTests: XCTestCase {
                 gracePeriod: 300,
                 hasCompletedOnboarding: true,
                 encryptToSelf: false,
-                guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+                hasCompletedGuidedTutorial: true
             )
         )
         let coordinator = ProtectedOrdinarySettingsCoordinator(
@@ -869,21 +863,21 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(reloaded.appSessionAuthenticationPolicy, .biometricsOnly)
     }
 
-    func test_protectedOrdinarySettings_guidedTutorial_defaultsToNeverCompleted() {
+    func test_protectedOrdinarySettings_guidedTutorial_defaultsToNotCompleted() {
         let coordinator = makeLoadedProtectedOrdinarySettings()
 
-        XCTAssertEqual(coordinator.snapshot?.guidedTutorialCompletedVersion, 0)
-        XCTAssertEqual(coordinator.guidedTutorialCompletionState, .neverCompleted)
+        XCTAssertEqual(coordinator.snapshot?.hasCompletedGuidedTutorial, false)
+        XCTAssertEqual(coordinator.hasCompletedGuidedTutorial, false)
     }
 
-    func test_protectedOrdinarySettings_guidedTutorial_currentVersionPersists() {
+    func test_protectedOrdinarySettings_guidedTutorial_completionPersists() {
         let store = InMemoryOrdinarySettingsStore()
         let coordinator = makeLoadedProtectedOrdinarySettings(store: store)
-        coordinator.markGuidedTutorialCompletedCurrentVersion()
+        coordinator.markGuidedTutorialCompleted()
 
         let reloaded = makeLoadedProtectedOrdinarySettings(store: store)
-        XCTAssertEqual(reloaded.snapshot?.guidedTutorialCompletedVersion, GuidedTutorialVersion.current)
-        XCTAssertEqual(reloaded.guidedTutorialCompletionState, .completedCurrentVersion)
+        XCTAssertEqual(reloaded.snapshot?.hasCompletedGuidedTutorial, true)
+        XCTAssertEqual(reloaded.hasCompletedGuidedTutorial, true)
     }
 
     // MARK: - Factory Helpers

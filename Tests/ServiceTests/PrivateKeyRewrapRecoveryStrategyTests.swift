@@ -22,10 +22,9 @@ final class PrivateKeyRewrapRecoveryStrategyTests: XCTestCase {
         super.tearDown()
     }
 
-    // The single-row envelope makes intra-bundle `.partial` states impossible: a row is
-    // atomically present (`.complete`) or absent (`.missing`). These tests therefore cover
-    // the reachable `(permanent, pending)` state space; the strategy keeps its `.partial`
-    // arms as fail-closed dead-defense.
+    // The single-row envelope makes intra-bundle partial states impossible: a row is
+    // atomically present (`.complete`) or absent (`.missing`). These tests cover the full
+    // `(permanent, pending)` state space over those two states.
 
     func test_recoveryAction_permanentCompleteAndPendingComplete_returnsDeletePending() throws {
         try bundleStore.saveBundle(makeBundle(), fingerprint: fingerprint)

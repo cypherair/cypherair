@@ -249,12 +249,12 @@ final class ProtectedSettingsDomainTests: ProtectedDataFrameworkTestCase {
         coordinator.setGracePeriod(300)
         coordinator.setHasCompletedOnboarding(true)
         coordinator.setEncryptToSelf(false)
-        coordinator.markGuidedTutorialCompletedCurrentVersion()
+        coordinator.markGuidedTutorialCompleted()
         let expectedSnapshot = ProtectedOrdinarySettingsSnapshot(
             gracePeriod: 300,
             hasCompletedOnboarding: true,
             encryptToSelf: false,
-            guidedTutorialCompletedVersion: GuidedTutorialVersion.current
+            hasCompletedGuidedTutorial: true
         )
         XCTAssertEqual(coordinator.snapshot, expectedSnapshot)
 

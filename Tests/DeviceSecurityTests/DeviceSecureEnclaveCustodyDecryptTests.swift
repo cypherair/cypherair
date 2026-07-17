@@ -188,8 +188,7 @@ final class DeviceSecureEnclaveCustodyDecryptTests: SecureEnclaveCustodyDeviceTe
         recordEvidence(.ecdhDecrypt, configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4)
         recordEvidence(
             .payloadTamperHardFail,
-            configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4,
-            observedCategory: .payloadAuthenticationFailure
+            configuration: .deviceBoundEcdsaNistP256EcdhNistP256V4
         )
     }
 

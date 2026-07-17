@@ -44,7 +44,7 @@ Allowed target classes:
 | `hasCompletedOnboarding` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `encryptToSelf` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `clipboardNotice` | `ProtectedData/protected-settings` | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
-| `guidedTutorialCompletedVersion` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
+| `hasCompletedGuidedTutorial` | `ProtectedData/protected-settings` schema v2 | `protected-after-unlock` | `protected-settings` | Implemented | implemented |
 | `uiTestBypassAuthentication` | Test-only `UserDefaults` key | `test-only exception` | Test-only exception | Exception retained | n/a |
 | `rewrapInProgress` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |
 | `rewrapTargetMode` | `ProtectedData/private-key-control` | `private-key-control target` | `private-key-control` | Implemented | implemented |

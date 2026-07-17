@@ -81,7 +81,7 @@ struct PGPKeyCapabilityResolver: Sendable {
             family: family,
             custody: custody
         ) else {
-            return .unsupported(.invalidConfigurationCustody)
+            return .unsupported(.invalidFamilyCustody)
         }
 
         switch custody {

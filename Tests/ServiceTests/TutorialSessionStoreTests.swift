@@ -378,13 +378,13 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         }
 
         XCTAssertEqual(store.lifecycleState, .stepsCompleted)
-        XCTAssertEqual(protectedOrdinarySettings.snapshot?.guidedTutorialCompletedVersion, 0)
+        XCTAssertEqual(protectedOrdinarySettings.snapshot?.hasCompletedGuidedTutorial, false)
 
         store.markFinishedTutorial()
 
         XCTAssertEqual(
-            protectedOrdinarySettings.snapshot?.guidedTutorialCompletedVersion,
-            GuidedTutorialVersion.current
+            protectedOrdinarySettings.snapshot?.hasCompletedGuidedTutorial,
+            true
         )
         XCTAssertEqual(store.lifecycleState, .finished)
     }
@@ -432,7 +432,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertTrue(store.canOpen(.addDemoContact))
         XCTAssertFalse(store.canOpen(.backupKey))
 
-        protectedOrdinarySettings.markGuidedTutorialCompletedCurrentVersion()
+        protectedOrdinarySettings.markGuidedTutorialCompleted()
 
         XCTAssertTrue(store.canOpen(.backupKey))
         XCTAssertTrue(store.canOpen(.enableHighSecurity))

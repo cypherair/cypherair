@@ -55,7 +55,7 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
             return .handlePublicKeyBindingMismatch
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -67,9 +67,7 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
              .externalOperationInvalidRequest,
              .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         }

@@ -99,13 +99,10 @@ final class SettingsScreenModel {
     }
 
     var guidedTutorialEntryTitle: String {
-        switch protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted {
-        case .neverCompleted:
-            String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial")
-        case .completedCurrentVersion:
+        if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
             String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
-        case .completedPreviousVersion:
-            String(localized: "guidedTutorial.updated.entry", defaultValue: "Updated Guided Tutorial Available")
+        } else {
+            String(localized: "guidedTutorial.settings.entry", defaultValue: "Guided Tutorial")
         }
     }
 

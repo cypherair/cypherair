@@ -59,7 +59,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                     custody: custody
                 )
                 XCTAssertEqual(resolution.support, .unsupported)
-                XCTAssertEqual(resolution.failureCategory, .invalidConfigurationCustody)
+                XCTAssertEqual(resolution.failureCategory, .invalidFamilyCustody)
                 XCTAssertEqual(
                     resolver.support(
                         for: operation,
@@ -116,7 +116,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 family: .portableEd25519LegacyCurve25519Legacy,
                 custody: .appleSecureEnclavePrivateOperations
             ),
-            .unsupported(.invalidConfigurationCustody)
+            .unsupported(.invalidFamilyCustody)
         )
         XCTAssertEqual(
             resolver.resolution(
@@ -124,7 +124,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 family: .deviceBoundEcdsaNistP256EcdhNistP256V4,
                 custody: .softwareSecretCertificate
             ),
-            .unsupported(.invalidConfigurationCustody)
+            .unsupported(.invalidFamilyCustody)
         )
     }
 
@@ -204,7 +204,7 @@ final class PGPKeyCapabilityResolverTests: XCTestCase {
                 family: .portableEd25519LegacyCurve25519Legacy,
                 custody: .appleSecureEnclavePrivateOperations
             ),
-            .unsupported(.invalidConfigurationCustody)
+            .unsupported(.invalidFamilyCustody)
         )
         XCTAssertEqual(
             resolver.resolution(

@@ -71,7 +71,7 @@ final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024De
             return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -80,9 +80,7 @@ final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024De
              .publicMaterialUnavailable,
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         }

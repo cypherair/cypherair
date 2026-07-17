@@ -470,7 +470,7 @@ final class KeyMutationService {
             return []
         }
         guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
-            return [CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)]
+            return [CypherAirError.keyOperationUnavailable(category: .invalidFamilyCustody)]
         }
         switch tier {
         case .classicalP256:

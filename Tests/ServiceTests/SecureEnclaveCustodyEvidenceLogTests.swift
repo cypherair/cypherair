@@ -36,8 +36,8 @@ final class SecureEnclaveCustodyEvidenceLogTests: XCTestCase {
     /// value introduced such a character would fail here.
     func test_evidenceLine_isAlphanumericKeyValueTokensOnly() {
         let pattern = "^SE-CUSTODY-EVIDENCE( [a-z][a-zA-Z]*=[A-Za-z0-9]+)+$"
-        let configurations: [SecureEnclaveCustodyEvidenceConfiguration?] =
-            [nil] + SecureEnclaveCustodyEvidenceConfiguration.allCases.map { $0 }
+        let configurations: [SecureEnclaveCustodyEvidenceFamily?] =
+            [nil] + SecureEnclaveCustodyEvidenceFamily.allCases.map { $0 }
 
         for scenario in SecureEnclaveCustodyEvidenceScenario.allCases {
             for outcome in SecureEnclaveCustodyEvidenceOutcome.allCases {

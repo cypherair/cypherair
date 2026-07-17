@@ -1,6 +1,6 @@
 //! Streaming round-trip tests.
 //! Covers successful file encrypt/decrypt, detached signature verification,
-//! recipient matching, and cross-profile streaming behavior.
+//! recipient matching, and cross-suite streaming behavior.
 
 mod common;
 
@@ -11,8 +11,8 @@ use pgp_mobile::streaming;
 use std::fs;
 
 /// Helper to generate a key pair for testing.
-fn gen_key(name: &str, profile: KeySuite) -> keys::GeneratedKey {
-    keys::generate_key_with_suite(name.to_string(), None, None, profile)
+fn gen_key(name: &str, suite: KeySuite) -> keys::GeneratedKey {
+    keys::generate_key_with_suite(name.to_string(), None, None, suite)
         .expect("Key generation should succeed")
 }
 
@@ -320,12 +320,12 @@ fn test_match_recipients_from_file() {
 // ── Cross-Profile Test ─────────────────────────────────────────────────
 
 #[test]
-fn test_encrypt_file_cross_profile() {
+fn test_encrypt_file_cross_suite() {
     let dir = tempfile::tempdir().unwrap();
     let sender_b = gen_key("Bob", KeySuite::Ed448X448);
     let recipient_a = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
-    let plaintext = b"Cross-profile streaming: B sender to A recipient";
+    let plaintext = b"Cross-suite streaming: B sender to A recipient";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -340,13 +340,13 @@ fn test_encrypt_file_cross_profile() {
         None,
         None,
     )
-    .expect("Cross-profile encrypt should succeed");
+    .expect("Cross-suite encrypt should succeed");
 
     // Verify the ciphertext uses SEIPDv1 (because recipient is v4)
     let ciphertext = fs::read(&encrypted_path).unwrap();
     let (has_v1, has_v2) = common::detect_message_format(&ciphertext);
-    assert!(has_v1, "Cross-profile message should use SEIPDv1");
-    assert!(!has_v2, "Cross-profile message should NOT use SEIPDv2");
+    assert!(has_v1, "Cross-suite message should use SEIPDv1");
+    assert!(!has_v2, "Cross-suite message should NOT use SEIPDv2");
 
     // Decrypt with Legacy recipient key
     let result = streaming::decrypt_file_detailed(

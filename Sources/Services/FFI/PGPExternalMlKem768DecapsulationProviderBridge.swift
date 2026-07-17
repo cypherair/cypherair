@@ -71,7 +71,7 @@ final class PGPExternalMlKem768DecapsulationProviderBridge: ExternalMlKem768Deca
             return .externalOperationInvalidResponse
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -80,9 +80,7 @@ final class PGPExternalMlKem768DecapsulationProviderBridge: ExternalMlKem768Deca
              .publicMaterialUnavailable,
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         }

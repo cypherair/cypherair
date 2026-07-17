@@ -154,7 +154,7 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
     /// assertion in the method has failed.
     final func recordEvidence(
         _ scenario: SecureEnclaveCustodyEvidenceScenario,
-        configuration: SecureEnclaveCustodyEvidenceConfiguration? = nil,
+        configuration: SecureEnclaveCustodyEvidenceFamily? = nil,
         observedCategory: PGPKeyOperationFailureCategory? = nil,
         handleCount: Int? = nil,
         completeSetCount: Int? = nil

@@ -46,12 +46,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.fileIoError", defaultValue: "File operation failed: \(reason)")
         case .keyOperationUnavailable(let category):
             Self.keyOperationUnavailableDescription(for: category)
-        case .secureEnclaveUnavailable:
-            String(localized: "error.seUnavailable", defaultValue: "Secure Enclave is not available on this device.")
         case .authenticationFailed:
             String(localized: "error.authFailed", defaultValue: "Authentication failed.")
-        case .authenticationCancelled:
-            String(localized: "error.authCancelled", defaultValue: "Authentication was cancelled.")
         case .keychainError:
             String(localized: "error.keychain", defaultValue: "Failed to access secure storage.")
         case .keyMetadataUnavailable:
@@ -90,8 +86,8 @@ extension CypherAirError: LocalizedError {
         for category: PGPKeyOperationFailureCategory
     ) -> String {
         switch category {
-        case .invalidConfigurationCustody:
-            String(localized: "error.keyOperationUnavailable.invalidConfigurationCustody", defaultValue: "This key's configuration and custody settings don't match, so the operation is unavailable.")
+        case .invalidFamilyCustody:
+            String(localized: "error.keyOperationUnavailable.invalidFamilyCustody", defaultValue: "This key's family and custody settings don't match, so the operation is unavailable.")
         case .operationUnsupportedForCustody:
             String(localized: "error.keyOperationUnavailable.operationUnsupportedForCustody", defaultValue: "This operation is not supported for this key's custody model.")
         case .operationNotImplementedForCustody:
@@ -138,12 +134,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.keyOperationUnavailable.externalOperationFailed", defaultValue: "The Secure Enclave operation failed.")
         case .openPGPSemanticFailure:
             String(localized: "error.keyOperationUnavailable.openPGPSemanticFailure", defaultValue: "The OpenPGP operation failed.")
-        case .payloadAuthenticationFailure:
-            String(localized: "error.keyOperationUnavailable.payloadAuthenticationFailure", defaultValue: "Message authentication failed. The content may have been tampered with.")
         case .recoveryRequired:
             String(localized: "error.keyOperationUnavailable.recoveryRequired", defaultValue: "This key needs recovery before it can be used.")
-        case .prohibitedFallbackAttempted:
-            String(localized: "error.keyOperationUnavailable.prohibitedFallbackAttempted", defaultValue: "A prohibited fallback was blocked. Nothing was changed.")
         case .cleanupOrRollbackFailure:
             String(localized: "error.keyOperationUnavailable.cleanupOrRollbackFailure", defaultValue: "The operation failed and cleanup could not complete.")
         }

@@ -68,7 +68,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
             return .handlePublicKeyBindingMismatch
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -78,9 +78,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
              .publicMaterialUnavailable,
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         // `externalOperationInvalidRequest` is reachable for key agreement:

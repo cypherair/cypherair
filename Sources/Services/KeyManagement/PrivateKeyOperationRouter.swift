@@ -104,7 +104,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
         identity: PGPKeyIdentity
     ) async -> PrivateKeyOperationRoute {
         guard let tier = identity.keyFamily.deviceBoundCustodyTier else {
-            return .blocked(.unsupported(.invalidConfigurationCustody))
+            return .blocked(.unsupported(.invalidFamilyCustody))
         }
         switch tier {
         case .classicalP256:

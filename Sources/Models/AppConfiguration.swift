@@ -1,15 +1,5 @@
 import Foundation
 
-enum GuidedTutorialVersion {
-    static let current = 1
-}
-
-enum GuidedTutorialCompletionState: Equatable {
-    case neverCompleted
-    case completedCurrentVersion
-    case completedPreviousVersion
-}
-
 /// App-wide boot-safe configuration stored in UserDefaults.
 @Observable
 final class AppConfiguration {

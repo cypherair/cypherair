@@ -41,8 +41,8 @@ final class ProtectedOrdinarySettingsCoordinator {
         snapshot?.encryptToSelf
     }
 
-    var guidedTutorialCompletionState: GuidedTutorialCompletionState? {
-        snapshot?.guidedTutorialCompletionState
+    var hasCompletedGuidedTutorial: Bool? {
+        snapshot?.hasCompletedGuidedTutorial
     }
 
     func loadAfterAppAuthentication(
@@ -95,9 +95,9 @@ final class ProtectedOrdinarySettingsCoordinator {
         saveLoadedSnapshot(snapshot)
     }
 
-    func markGuidedTutorialCompletedCurrentVersion() {
+    func markGuidedTutorialCompleted() {
         guard var snapshot else { return }
-        snapshot.guidedTutorialCompletedVersion = GuidedTutorialVersion.current
+        snapshot.hasCompletedGuidedTutorial = true
         saveLoadedSnapshot(snapshot)
     }
 
