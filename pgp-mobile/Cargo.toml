@@ -18,7 +18,7 @@ sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
     "crypto-openssl",
     "compression-deflate",
 ] }
-uniffi = { version = "0.31", features = ["cli"] }
+uniffi = { version = "0.32", features = ["cli"] }
 openssl = { version = "0.10", features = ["vendored"] }
 zeroize = { version = "1", features = ["derive"] }
 base64 = "0.22"
@@ -37,7 +37,7 @@ sequoia-openpgp = { version = "=2.4.1", default-features = false, features = [
 ossl = { version = "1.5.2", default-features = false, features = ["openssl-sys"] }
 
 [build-dependencies]
-uniffi = { version = "0.31", features = ["build"] }
+uniffi = { version = "0.32", features = ["build"] }
 
 [profile.release]
 lto = false

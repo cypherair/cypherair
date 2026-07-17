@@ -103,9 +103,9 @@ final class OpenSourceNoticeStoreTests: XCTestCase {
     func test_noticeSources_captureFallbackAndArchiveOrigins() throws {
         let notices = try store.loadNotices()
 
-        let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.31.2" })
+        let uniffi = try XCTUnwrap(notices.first { $0.id == "uniffi@0.32.0" })
         XCTAssertEqual(uniffi.licenseSourceKind, .repositoryArchive)
-        XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.31.2:LICENSE"))
+        XCTAssertTrue(uniffi.licenseSourceItems.contains("v0.32.0:LICENSE"))
 
         let sequoia = try XCTUnwrap(notices.first { $0.id == "sequoia-openpgp@2.4.1" })
         XCTAssertEqual(sequoia.licenseSourceKind, .cratePackage)

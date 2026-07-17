@@ -72,7 +72,7 @@ fn streaming_decrypt_output_ceiling(input_bytes: u64) -> u64 {
 /// Swift implements this to receive progress updates and support cancellation.
 ///
 /// Return `false` from `on_progress` to cancel the operation.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait StreamingProgressReporter: Send + Sync {
     /// Report progress during a streaming operation.
     ///

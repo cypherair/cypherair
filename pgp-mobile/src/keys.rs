@@ -167,7 +167,7 @@ pub enum ExternalP256SigningError {
 }
 
 /// Foreign signing callback for Secure Enclave-shaped certificate construction and runtime signing.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalP256SigningProvider: Send + Sync {
     /// Sign a SHA-256 digest and return fixed-width ECDSA r/s scalars.
     fn sign_sha256_digest(
@@ -270,7 +270,7 @@ pub enum ExternalP256KeyAgreementError {
 }
 
 /// Foreign key-agreement callback for Secure Enclave runtime decryption.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalP256KeyAgreementProvider: Send + Sync {
     /// Derive a raw P-256 shared secret for the supplied public request.
     fn derive_shared_secret(
@@ -399,7 +399,7 @@ pub enum ExternalCompositeSigningError {
 /// ML-DSA-65 signature over the supplied OpenPGP signature digest. The Ed25519
 /// half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
 /// stay on the Rust side of the boundary.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalMlDsa65SigningProvider: Send + Sync {
     /// Sign an OpenPGP signature digest and return the 3309-byte ML-DSA-65 signature.
     fn sign_mldsa65_digest(
@@ -515,7 +515,7 @@ pub enum ExternalCompositeKeyAgreementError {
 /// ML-KEM-768 decapsulation of the PKESK ciphertext into the 32-byte key
 /// share. The X25519 half, the RFC 9980 KEM combiner, and AES key unwrap
 /// stay on the Rust side of the boundary.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalMlKem768DecapsulationProvider: Send + Sync {
     /// Decapsulate an ML-KEM-768 ciphertext into the raw 32-byte key share.
     fn decapsulate_mlkem768(
@@ -617,7 +617,7 @@ pub struct MlDsa87Signature {
 /// ML-DSA-87 signature over the supplied OpenPGP signature digest. The Ed448
 /// half of the RFC 9980 composite signature, and all OpenPGP packet assembly,
 /// stay on the Rust side of the boundary.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalMlDsa87SigningProvider: Send + Sync {
     /// Sign an OpenPGP signature digest and return the 4627-byte ML-DSA-87 signature.
     fn sign_mldsa87_digest(
@@ -649,7 +649,7 @@ pub struct MlKem1024KeyShare {
 /// ML-KEM-1024 decapsulation of the PKESK ciphertext into the 32-byte key
 /// share. The X448 half, the RFC 9980 KEM combiner, and AES key unwrap stay on
 /// the Rust side of the boundary.
-#[uniffi::export(with_foreign)]
+#[uniffi::export(rust, foreign)]
 pub trait ExternalMlKem1024DecapsulationProvider: Send + Sync {
     /// Decapsulate an ML-KEM-1024 ciphertext into the raw 32-byte key share.
     fn decapsulate_mlkem1024(

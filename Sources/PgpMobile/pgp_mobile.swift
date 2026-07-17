@@ -39,6 +39,52 @@ fileprivate extension ForeignBytes {
     init(bufferPointer: UnsafeBufferPointer<UInt8>) {
         self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
     }
+
+    init(rawBufferPointer: UnsafeRawBufferPointer) {
+        self.init(
+            len: Int32(rawBufferPointer.count),
+            data: rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+        )
+    }
+}
+
+// Converter for `&[u8]` / `[ByRef] bytes` arguments.
+//
+// Conforms to `FfiConverter` so the compiler enforces the full converter
+// method set. Only the scope-bound `lower(_:_body:)` overload is sound —
+// zero-copy byte buffers only flow foreign -> Rust, and only in argument
+// position. The four protocol-witness methods (`lift`, `lower`, `read`,
+// `write`) `fatalError` at runtime if anyone reaches them.
+//
+// The scope-bound `lower` takes a closure because the `ForeignBytes`
+// pointer is only guaranteed valid for the duration of
+// `Data.withUnsafeBytes`. Callers must run the full FFI call inside
+// the closure body.
+fileprivate enum FfiConverterByRefBytes: FfiConverter {
+    typealias SwiftType = Data
+    typealias FfiType = ForeignBytes
+
+    static func lower<R>(_ value: Data, _ body: (ForeignBytes) throws -> R) rethrows -> R {
+        return try value.withUnsafeBytes { rawBuf in
+            try body(ForeignBytes(rawBufferPointer: rawBuf))
+        }
+    }
+
+    static func lower(_ value: Data) -> ForeignBytes {
+        fatalError("ByRef bytes cannot use the plain lower: returning ForeignBytes escapes the Data.withUnsafeBytes scope. Use the scope-bound lower(_:_body:) overload instead.")
+    }
+
+    static func lift(_ value: ForeignBytes) throws -> Data {
+        fatalError("ByRef bytes cannot be lifted: zero-copy &[u8] only flows foreign->Rust")
+    }
+
+    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+        fatalError("ByRef bytes cannot be read from a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
+    }
+
+    static func write(_ value: Data, into buf: inout [UInt8]) {
+        fatalError("ByRef bytes cannot be written to a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
+    }
 }
 
 // For every type used in the interface, we provide helper methods for conveniently
@@ -627,9 +673,10 @@ open class ExternalMlDsa65SigningProviderImpl: ExternalMlDsa65SigningProvider, @
      */
 open func signMldsa65Digest(digest: Data)throws  -> MlDsa65Signature  {
     return try  FfiConverterTypeMlDsa65Signature_lift(try rustCallWithError(FfiConverterTypeExternalCompositeSigningError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalmldsa65signingprovider_sign_mldsa65_digest(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(digest),$0
+        FfiConverterData.lower(digest),uniffiCallStatus
     )
 })
 }
@@ -850,9 +897,10 @@ open class ExternalMlDsa87SigningProviderImpl: ExternalMlDsa87SigningProvider, @
      */
 open func signMldsa87Digest(digest: Data)throws  -> MlDsa87Signature  {
     return try  FfiConverterTypeMlDsa87Signature_lift(try rustCallWithError(FfiConverterTypeExternalCompositeSigningError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalmldsa87signingprovider_sign_mldsa87_digest(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(digest),$0
+        FfiConverterData.lower(digest),uniffiCallStatus
     )
 })
 }
@@ -1073,9 +1121,10 @@ open class ExternalMlKem1024DecapsulationProviderImpl: ExternalMlKem1024Decapsul
      */
 open func decapsulateMlkem1024(request: ExternalMlKem1024DecapsulationRequest)throws  -> MlKem1024KeyShare  {
     return try  FfiConverterTypeMlKem1024KeyShare_lift(try rustCallWithError(FfiConverterTypeExternalCompositeKeyAgreementError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalmlkem1024decapsulationprovider_decapsulate_mlkem1024(
             self.uniffiCloneHandle(),
-        FfiConverterTypeExternalMlKem1024DecapsulationRequest_lower(request),$0
+        FfiConverterTypeExternalMlKem1024DecapsulationRequest_lower(request),uniffiCallStatus
     )
 })
 }
@@ -1294,9 +1343,10 @@ open class ExternalMlKem768DecapsulationProviderImpl: ExternalMlKem768Decapsulat
      */
 open func decapsulateMlkem768(request: ExternalMlKem768DecapsulationRequest)throws  -> MlKem768KeyShare  {
     return try  FfiConverterTypeMlKem768KeyShare_lift(try rustCallWithError(FfiConverterTypeExternalCompositeKeyAgreementError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalmlkem768decapsulationprovider_decapsulate_mlkem768(
             self.uniffiCloneHandle(),
-        FfiConverterTypeExternalMlKem768DecapsulationRequest_lower(request),$0
+        FfiConverterTypeExternalMlKem768DecapsulationRequest_lower(request),uniffiCallStatus
     )
 })
 }
@@ -1505,9 +1555,10 @@ open class ExternalP256KeyAgreementProviderImpl: ExternalP256KeyAgreementProvide
      */
 open func deriveSharedSecret(request: ExternalP256KeyAgreementRequest)throws  -> P256RawSharedSecret  {
     return try  FfiConverterTypeP256RawSharedSecret_lift(try rustCallWithError(FfiConverterTypeExternalP256KeyAgreementError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalp256keyagreementprovider_derive_shared_secret(
             self.uniffiCloneHandle(),
-        FfiConverterTypeExternalP256KeyAgreementRequest_lower(request),$0
+        FfiConverterTypeExternalP256KeyAgreementRequest_lower(request),uniffiCallStatus
     )
 })
 }
@@ -1716,9 +1767,10 @@ open class ExternalP256SigningProviderImpl: ExternalP256SigningProvider, @unchec
      */
 open func signSha256Digest(digest: Data)throws  -> P256EcdsaSignature  {
     return try  FfiConverterTypeP256EcdsaSignature_lift(try rustCallWithError(FfiConverterTypeExternalP256SigningError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_externalp256signingprovider_sign_sha256_digest(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(digest),$0
+        FfiConverterData.lower(digest),uniffiCallStatus
     )
 })
 }
@@ -2419,7 +2471,8 @@ open class PgpEngine: PgpEngineProtocol, @unchecked Sendable {
 public convenience init() {
     let handle =
         try! rustCall() {
-    uniffi_pgp_mobile_fn_constructor_pgpengine_new($0
+        uniffiCallStatus in
+    uniffi_pgp_mobile_fn_constructor_pgpengine_new(uniffiCallStatus
     )
 }
     self.init(unsafeFromHandle: handle)
@@ -2442,10 +2495,11 @@ public convenience init() {
      */
 open func armor(data: Data, kind: ArmorKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_armor(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(data),
-        FfiConverterTypeArmorKind_lower(kind),$0
+        FfiConverterTypeArmorKind_lower(kind),uniffiCallStatus
     )
 })
 }
@@ -2455,9 +2509,10 @@ open func armor(data: Data, kind: ArmorKind)throws  -> Data  {
      */
 open func armorPublicKey(certData: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_armor_public_key(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(certData),$0
+        FfiConverterData.lower(certData),uniffiCallStatus
     )
 })
 }
@@ -2467,9 +2522,10 @@ open func armorPublicKey(certData: Data)throws  -> Data  {
      */
 open func dearmor(armored: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_dearmor(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(armored),$0
+        FfiConverterData.lower(armored),uniffiCallStatus
     )
 })
 }
@@ -2481,9 +2537,10 @@ open func dearmor(armored: Data)throws  -> Data  {
      */
 open func decodeQrUrl(url: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decode_qr_url(
             self.uniffiCloneHandle(),
-        FfiConverterString.lower(url),$0
+        FfiConverterString.lower(url),uniffiCallStatus
     )
 })
 }
@@ -2493,11 +2550,12 @@ open func decodeQrUrl(url: String)throws  -> Data  {
      */
 open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys: [Data])throws  -> DecryptDetailedResult  {
     return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterSequenceData.lower(secretKeys),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -2508,6 +2566,7 @@ open func decryptDetailed(ciphertext: Data, secretKeys: [Data], verificationKeys
      */
 open func decryptDetailedWithExternalCompositeHighKeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data])throws  -> DecryptDetailedResult  {
     return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed_with_external_composite_high_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
@@ -2515,7 +2574,7 @@ open func decryptDetailedWithExternalCompositeHighKeyAgreement(ciphertext: Data,
         FfiConverterString.lower(keyAgreementSubkeyFingerprint),
         FfiConverterData.lower(classicalEcdhSecret),
         FfiConverterTypeExternalMlKem1024DecapsulationProvider_lower(decapsulationProvider),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -2531,6 +2590,7 @@ open func decryptDetailedWithExternalCompositeHighKeyAgreement(ciphertext: Data,
      */
 open func decryptDetailedWithExternalCompositeKeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem768DecapsulationProvider, verificationKeys: [Data])throws  -> DecryptDetailedResult  {
     return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed_with_external_composite_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
@@ -2538,7 +2598,7 @@ open func decryptDetailedWithExternalCompositeKeyAgreement(ciphertext: Data, rec
         FfiConverterString.lower(keyAgreementSubkeyFingerprint),
         FfiConverterData.lower(classicalEcdhSecret),
         FfiConverterTypeExternalMlKem768DecapsulationProvider_lower(decapsulationProvider),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -2549,13 +2609,14 @@ open func decryptDetailedWithExternalCompositeKeyAgreement(ciphertext: Data, rec
      */
 open func decryptDetailedWithExternalP256KeyAgreement(ciphertext: Data, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data])throws  -> DecryptDetailedResult  {
     return try  FfiConverterTypeDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterData.lower(recipientPublicCert),
         FfiConverterString.lower(keyAgreementSubkeyFingerprint),
         FfiConverterTypeExternalP256KeyAgreementProvider_lower(keyAgreementProvider),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -2565,13 +2626,14 @@ open func decryptDetailedWithExternalP256KeyAgreement(ciphertext: Data, recipien
      */
 open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys: [Data], verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterString.lower(outputPath),
         FfiConverterSequenceData.lower(secretKeys),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -2582,6 +2644,7 @@ open func decryptFileDetailed(inputPath: String, outputPath: String, secretKeys:
      */
 open func decryptFileDetailedWithExternalCompositeHighKeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem1024DecapsulationProvider, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_composite_high_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2591,7 +2654,7 @@ open func decryptFileDetailedWithExternalCompositeHighKeyAgreement(inputPath: St
         FfiConverterData.lower(classicalEcdhSecret),
         FfiConverterTypeExternalMlKem1024DecapsulationProvider_lower(decapsulationProvider),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -2608,6 +2671,7 @@ open func decryptFileDetailedWithExternalCompositeHighKeyAgreement(inputPath: St
      */
 open func decryptFileDetailedWithExternalCompositeKeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, classicalEcdhSecret: Data, decapsulationProvider: ExternalMlKem768DecapsulationProvider, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_composite_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2617,7 +2681,7 @@ open func decryptFileDetailedWithExternalCompositeKeyAgreement(inputPath: String
         FfiConverterData.lower(classicalEcdhSecret),
         FfiConverterTypeExternalMlKem768DecapsulationProvider_lower(decapsulationProvider),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -2632,6 +2696,7 @@ open func decryptFileDetailedWithExternalCompositeKeyAgreement(inputPath: String
      */
 open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, outputPath: String, recipientPublicCert: Data, keyAgreementSubkeyFingerprint: String, keyAgreementProvider: ExternalP256KeyAgreementProvider, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileDecryptDetailedResult  {
     return try  FfiConverterTypeFileDecryptDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2640,7 +2705,7 @@ open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, out
         FfiConverterString.lower(keyAgreementSubkeyFingerprint),
         FfiConverterTypeExternalP256KeyAgreementProvider_lower(keyAgreementProvider),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -2650,11 +2715,12 @@ open func decryptFileDetailedWithExternalP256KeyAgreement(inputPath: String, out
      */
 open func decryptWithPassword(ciphertext: Data, password: String, verificationKeys: [Data])throws  -> PasswordDecryptResult  {
     return try  FfiConverterTypePasswordDecryptResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_decrypt_with_password(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
         FfiConverterString.lower(password),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -2664,9 +2730,10 @@ open func decryptWithPassword(ciphertext: Data, password: String, verificationKe
      */
 open func detectSuite(certData: Data)throws  -> KeySuite  {
     return try  FfiConverterTypeKeySuite_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_detect_suite(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(certData),$0
+        FfiConverterData.lower(certData),uniffiCallStatus
     )
 })
 }
@@ -2678,9 +2745,10 @@ open func detectSuite(certData: Data)throws  -> KeySuite  {
      */
 open func discoverCertificateSelectors(certData: Data)throws  -> DiscoveredCertificateSelectors  {
     return try  FfiConverterTypeDiscoveredCertificateSelectors_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_discover_certificate_selectors(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(certData),$0
+        FfiConverterData.lower(certData),uniffiCallStatus
     )
 })
 }
@@ -2694,9 +2762,10 @@ open func discoverCertificateSelectors(certData: Data)throws  -> DiscoveredCerti
      */
 open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encode_qr_url(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(publicKeyData),$0
+        FfiConverterData.lower(publicKeyData),uniffiCallStatus
     )
 })
 }
@@ -2711,12 +2780,13 @@ open func encodeQrUrl(publicKeyData: Data)throws  -> String  {
      */
 open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
-        FfiConverterOptionData.lower(encryptToSelf),$0
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
     )
 })
 }
@@ -2726,12 +2796,13 @@ open func encrypt(plaintext: Data, recipients: [Data], signingKey: Data?, encryp
      */
 open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
-        FfiConverterOptionData.lower(encryptToSelf),$0
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
     )
 })
 }
@@ -2741,12 +2812,13 @@ open func encryptBinary(plaintext: Data, recipients: [Data], signingKey: Data?, 
      */
 open func encryptBinaryWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterString.lower(password),
         FfiConverterTypePasswordMessageFormat_lower(format),
-        FfiConverterOptionData.lower(signingKey),$0
+        FfiConverterOptionData.lower(signingKey),uniffiCallStatus
     )
 })
 }
@@ -2757,6 +2829,7 @@ open func encryptBinaryWithPassword(plaintext: Data, password: String, format: P
      */
 open func encryptBinaryWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password_and_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2765,7 +2838,7 @@ open func encryptBinaryWithPasswordAndExternalCompositeHighSigner(plaintext: Dat
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -2776,6 +2849,7 @@ open func encryptBinaryWithPasswordAndExternalCompositeHighSigner(plaintext: Dat
      */
 open func encryptBinaryWithPasswordAndExternalCompositeSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password_and_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2784,7 +2858,7 @@ open func encryptBinaryWithPasswordAndExternalCompositeSigner(plaintext: Data, p
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -2794,6 +2868,7 @@ open func encryptBinaryWithPasswordAndExternalCompositeSigner(plaintext: Data, p
      */
 open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2801,7 +2876,7 @@ open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, passwo
         FfiConverterTypePasswordMessageFormat_lower(format),
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
-        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -2811,6 +2886,7 @@ open func encryptBinaryWithPasswordAndExternalP256Signer(plaintext: Data, passwo
      * Output is binary (.gpg format). Message format auto-selected by recipient key versions.
      */
 open func encryptFile(inputPath: String, outputPath: String, recipients: [Data], signingKey: Data?, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2818,7 +2894,7 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
         FfiConverterSequenceData.lower(recipients),
         FfiConverterOptionData.lower(signingKey),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 }
 }
@@ -2827,6 +2903,7 @@ open func encryptFile(inputPath: String, outputPath: String, recipients: [Data],
      * Encrypt a file (streaming I/O) and sign with the external · High composite signer.
      */
 open func encryptFileWithExternalCompositeHighSigner(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2837,7 +2914,7 @@ open func encryptFileWithExternalCompositeHighSigner(inputPath: String, outputPa
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 }
 }
@@ -2847,6 +2924,7 @@ open func encryptFileWithExternalCompositeHighSigner(inputPath: String, outputPa
      * plus external split-custody composite signer.
      */
 open func encryptFileWithExternalCompositeSigner(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2857,7 +2935,7 @@ open func encryptFileWithExternalCompositeSigner(inputPath: String, outputPath: 
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 }
 }
@@ -2866,6 +2944,7 @@ open func encryptFileWithExternalCompositeSigner(inputPath: String, outputPath: 
      * Encrypt a file using streaming I/O and sign using a public certificate plus external P-256 signer.
      */
 open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: String, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?, progress: StreamingProgressReporter?)throws   {try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_file_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -2875,7 +2954,7 @@ open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: Strin
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterOptionData.lower(encryptToSelf),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 }
 }
@@ -2885,6 +2964,7 @@ open func encryptFileWithExternalP256Signer(inputPath: String, outputPath: Strin
      */
 open func encryptWithExternalCompositeHighSigner(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2893,7 +2973,7 @@ open func encryptWithExternalCompositeHighSigner(plaintext: Data, recipients: [D
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
-        FfiConverterOptionData.lower(encryptToSelf),$0
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
     )
 })
 }
@@ -2904,6 +2984,7 @@ open func encryptWithExternalCompositeHighSigner(plaintext: Data, recipients: [D
      */
 open func encryptWithExternalCompositeSigner(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2912,7 +2993,7 @@ open func encryptWithExternalCompositeSigner(plaintext: Data, recipients: [Data]
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
-        FfiConverterOptionData.lower(encryptToSelf),$0
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
     )
 })
 }
@@ -2922,6 +3003,7 @@ open func encryptWithExternalCompositeSigner(plaintext: Data, recipients: [Data]
      */
 open func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, encryptToSelf: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2929,7 +3011,7 @@ open func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], sig
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterOptionData.lower(encryptToSelf),$0
+        FfiConverterOptionData.lower(encryptToSelf),uniffiCallStatus
     )
 })
 }
@@ -2939,12 +3021,13 @@ open func encryptWithExternalP256Signer(plaintext: Data, recipients: [Data], sig
      */
 open func encryptWithPassword(plaintext: Data, password: String, format: PasswordMessageFormat, signingKey: Data?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
         FfiConverterString.lower(password),
         FfiConverterTypePasswordMessageFormat_lower(format),
-        FfiConverterOptionData.lower(signingKey),$0
+        FfiConverterOptionData.lower(signingKey),uniffiCallStatus
     )
 })
 }
@@ -2954,6 +3037,7 @@ open func encryptWithPassword(plaintext: Data, password: String, format: Passwor
      */
 open func encryptWithPasswordAndExternalCompositeHighSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password_and_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2962,7 +3046,7 @@ open func encryptWithPasswordAndExternalCompositeHighSigner(plaintext: Data, pas
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -2973,6 +3057,7 @@ open func encryptWithPasswordAndExternalCompositeHighSigner(plaintext: Data, pas
      */
 open func encryptWithPasswordAndExternalCompositeSigner(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password_and_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2981,7 +3066,7 @@ open func encryptWithPasswordAndExternalCompositeSigner(plaintext: Data, passwor
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -2991,6 +3076,7 @@ open func encryptWithPasswordAndExternalCompositeSigner(plaintext: Data, passwor
      */
 open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: String, format: PasswordMessageFormat, signingPublicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_encrypt_with_password_and_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(plaintext),
@@ -2998,7 +3084,7 @@ open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: St
         FfiConverterTypePasswordMessageFormat_lower(format),
         FfiConverterData.lower(signingPublicCert),
         FfiConverterString.lower(signingKeyFingerprint),
-        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3010,10 +3096,11 @@ open func encryptWithPasswordAndExternalP256Signer(plaintext: Data, password: St
      */
 open func exportSecretKey(certData: Data, passphrase: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_export_secret_key(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
-        FfiConverterString.lower(passphrase),$0
+        FfiConverterString.lower(passphrase),uniffiCallStatus
     )
 })
 }
@@ -3032,12 +3119,13 @@ open func exportSecretKey(certData: Data, passphrase: String)throws  -> Data  {
      */
 open func generateKey(name: String, email: String?, expirySeconds: UInt64?, suite: KeySuite)throws  -> GeneratedKey  {
     return try  FfiConverterTypeGeneratedKey_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_key(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(name),
         FfiConverterOptionString.lower(email),
         FfiConverterOptionUInt64.lower(expirySeconds),
-        FfiConverterTypeKeySuite_lower(suite),$0
+        FfiConverterTypeKeySuite_lower(suite),uniffiCallStatus
     )
 })
 }
@@ -3047,9 +3135,10 @@ open func generateKey(name: String, email: String?, expirySeconds: UInt64?, suit
      */
 open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_key_revocation(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(secretCert),$0
+        FfiConverterData.lower(secretCert),uniffiCallStatus
     )
 })
 }
@@ -3059,10 +3148,11 @@ open func generateKeyRevocation(secretCert: Data)throws  -> Data  {
      */
 open func generateSecureEnclaveCompositeHighPublicCertificate(input: SecureEnclaveCompositeHighPublicCertificateInput, signer: ExternalMlDsa87SigningProvider)throws  -> SecureEnclaveCompositeGeneratedCertificate  {
     return try  FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_secure_enclave_composite_high_public_certificate(
             self.uniffiCloneHandle(),
         FfiConverterTypeSecureEnclaveCompositeHighPublicCertificateInput_lower(input),
-        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3078,10 +3168,11 @@ open func generateSecureEnclaveCompositeHighPublicCertificate(input: SecureEncla
      */
 open func generateSecureEnclaveCompositePublicCertificate(input: SecureEnclaveCompositePublicCertificateInput, signer: ExternalMlDsa65SigningProvider)throws  -> SecureEnclaveCompositeGeneratedCertificate  {
     return try  FfiConverterTypeSecureEnclaveCompositeGeneratedCertificate_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_secure_enclave_composite_public_certificate(
             self.uniffiCloneHandle(),
         FfiConverterTypeSecureEnclaveCompositePublicCertificateInput_lower(input),
-        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3095,10 +3186,11 @@ open func generateSecureEnclaveCompositePublicCertificate(input: SecureEnclaveCo
      */
 open func generateSecureEnclavePublicCertificate(input: SecureEnclavePublicCertificateInput, signer: ExternalP256SigningProvider)throws  -> SecureEnclaveGeneratedPublicCertificate  {
     return try  FfiConverterTypeSecureEnclaveGeneratedPublicCertificate_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_secure_enclave_public_certificate(
             self.uniffiCloneHandle(),
         FfiConverterTypeSecureEnclavePublicCertificateInput_lower(input),
-        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3108,10 +3200,11 @@ open func generateSecureEnclavePublicCertificate(input: SecureEnclavePublicCerti
      */
 open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
-        FfiConverterString.lower(subkeyFingerprint),$0
+        FfiConverterString.lower(subkeyFingerprint),uniffiCallStatus
     )
 })
 }
@@ -3121,13 +3214,14 @@ open func generateSubkeyRevocation(secretCert: Data, subkeyFingerprint: String)t
      */
 open func generateSubkeyRevocationWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, subkeyFingerprint: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
-        FfiConverterString.lower(subkeyFingerprint),$0
+        FfiConverterString.lower(subkeyFingerprint),uniffiCallStatus
     )
 })
 }
@@ -3138,13 +3232,14 @@ open func generateSubkeyRevocationWithExternalCompositeHighSigner(publicCert: Da
      */
 open func generateSubkeyRevocationWithExternalCompositeSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, subkeyFingerprint: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
-        FfiConverterString.lower(subkeyFingerprint),$0
+        FfiConverterString.lower(subkeyFingerprint),uniffiCallStatus
     )
 })
 }
@@ -3155,12 +3250,13 @@ open func generateSubkeyRevocationWithExternalCompositeSigner(publicCert: Data, 
      */
 open func generateSubkeyRevocationWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, subkeyFingerprint: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_subkey_revocation_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterString.lower(subkeyFingerprint),$0
+        FfiConverterString.lower(subkeyFingerprint),uniffiCallStatus
     )
 })
 }
@@ -3170,12 +3266,13 @@ open func generateSubkeyRevocationWithExternalP256Signer(publicCert: Data, signi
      */
 open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signerSecretCert),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
-        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+        FfiConverterTypeCertificationKind_lower(certificationKind),uniffiCallStatus
     )
 })
 }
@@ -3186,6 +3283,7 @@ open func generateUserIdCertificationBySelector(signerSecretCert: Data, targetCe
      */
 open func generateUserIdCertificationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
@@ -3194,7 +3292,7 @@ open func generateUserIdCertificationBySelectorWithExternalCompositeHighSigner(p
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
-        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+        FfiConverterTypeCertificationKind_lower(certificationKind),uniffiCallStatus
     )
 })
 }
@@ -3205,6 +3303,7 @@ open func generateUserIdCertificationBySelectorWithExternalCompositeHighSigner(p
      */
 open func generateUserIdCertificationBySelectorWithExternalCompositeSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
@@ -3213,7 +3312,7 @@ open func generateUserIdCertificationBySelectorWithExternalCompositeSigner(publi
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
-        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+        FfiConverterTypeCertificationKind_lower(certificationKind),uniffiCallStatus
     )
 })
 }
@@ -3224,6 +3323,7 @@ open func generateUserIdCertificationBySelectorWithExternalCompositeSigner(publi
      */
 open func generateUserIdCertificationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, targetCert: Data, userIdSelector: UserIdSelectorInput, certificationKind: CertificationKind)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_certification_by_selector_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
@@ -3231,7 +3331,7 @@ open func generateUserIdCertificationBySelectorWithExternalP256Signer(publicCert
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
-        FfiConverterTypeCertificationKind_lower(certificationKind),$0
+        FfiConverterTypeCertificationKind_lower(certificationKind),uniffiCallStatus
     )
 })
 }
@@ -3241,10 +3341,11 @@ open func generateUserIdCertificationBySelectorWithExternalP256Signer(publicCert
      */
 open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: UserIdSelectorInput)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(secretCert),
-        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),uniffiCallStatus
     )
 })
 }
@@ -3254,13 +3355,14 @@ open func generateUserIdRevocationBySelector(secretCert: Data, userIdSelector: U
      */
 open func generateUserIdRevocationBySelectorWithExternalCompositeHighSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, userIdSelector: UserIdSelectorInput)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
-        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),uniffiCallStatus
     )
 })
 }
@@ -3271,13 +3373,14 @@ open func generateUserIdRevocationBySelectorWithExternalCompositeHighSigner(publ
      */
 open func generateUserIdRevocationBySelectorWithExternalCompositeSigner(publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, userIdSelector: UserIdSelectorInput)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
-        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),uniffiCallStatus
     )
 })
 }
@@ -3288,12 +3391,13 @@ open func generateUserIdRevocationBySelectorWithExternalCompositeSigner(publicCe
      */
 open func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, userIdSelector: UserIdSelectorInput)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),$0
+        FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),uniffiCallStatus
     )
 })
 }
@@ -3304,10 +3408,11 @@ open func generateUserIdRevocationBySelectorWithExternalP256Signer(publicCert: D
      */
 open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_import_secret_key(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(armoredData),
-        FfiConverterString.lower(passphrase),$0
+        FfiConverterString.lower(passphrase),uniffiCallStatus
     )
 })
 }
@@ -3321,9 +3426,10 @@ open func importSecretKey(armoredData: Data, passphrase: String)throws  -> Data 
      */
 open func inspectSecureEnclaveCompositeBindings(publicKeyData: Data)throws  -> SecureEnclaveCompositeBindingInspection  {
     return try  FfiConverterTypeSecureEnclaveCompositeBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_composite_bindings(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(publicKeyData),$0
+        FfiConverterData.lower(publicKeyData),uniffiCallStatus
     )
 })
 }
@@ -3333,9 +3439,10 @@ open func inspectSecureEnclaveCompositeBindings(publicKeyData: Data)throws  -> S
      */
 open func inspectSecureEnclaveCompositeHighBindings(publicKeyData: Data)throws  -> SecureEnclaveCompositeHighBindingInspection  {
     return try  FfiConverterTypeSecureEnclaveCompositeHighBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_composite_high_bindings(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(publicKeyData),$0
+        FfiConverterData.lower(publicKeyData),uniffiCallStatus
     )
 })
 }
@@ -3348,9 +3455,10 @@ open func inspectSecureEnclaveCompositeHighBindings(publicKeyData: Data)throws  
      */
 open func inspectSecureEnclavePublicBindings(publicKeyData: Data)throws  -> SecureEnclavePublicBindingInspection  {
     return try  FfiConverterTypeSecureEnclavePublicBindingInspection_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_inspect_secure_enclave_public_bindings(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(publicKeyData),$0
+        FfiConverterData.lower(publicKeyData),uniffiCallStatus
     )
 })
 }
@@ -3366,10 +3474,11 @@ open func inspectSecureEnclavePublicBindings(publicKeyData: Data)throws  -> Secu
      */
 open func matchRecipients(ciphertext: Data, localCerts: [Data])throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_match_recipients(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(ciphertext),
-        FfiConverterSequenceData.lower(localCerts),$0
+        FfiConverterSequenceData.lower(localCerts),uniffiCallStatus
     )
 })
 }
@@ -3381,10 +3490,11 @@ open func matchRecipients(ciphertext: Data, localCerts: [Data])throws  -> [Strin
      */
 open func matchRecipientsFromFile(inputPath: String, localCerts: [Data])throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_match_recipients_from_file(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
-        FfiConverterSequenceData.lower(localCerts),$0
+        FfiConverterSequenceData.lower(localCerts),uniffiCallStatus
     )
 })
 }
@@ -3397,10 +3507,11 @@ open func matchRecipientsFromFile(inputPath: String, localCerts: [Data])throws  
      */
 open func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate: Data)throws  -> CertificateMergeResult  {
     return try  FfiConverterTypeCertificateMergeResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_merge_public_certificate_update(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(existingCert),
-        FfiConverterData.lower(incomingCertOrUpdate),$0
+        FfiConverterData.lower(incomingCertOrUpdate),uniffiCallStatus
     )
 })
 }
@@ -3412,9 +3523,10 @@ open func mergePublicCertificateUpdate(existingCert: Data, incomingCertOrUpdate:
      */
 open func messageQuantumSafety(ciphertext: Data)throws  -> MessageQuantumSafety  {
     return try  FfiConverterTypeMessageQuantumSafety_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_message_quantum_safety(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(ciphertext),$0
+        FfiConverterData.lower(ciphertext),uniffiCallStatus
     )
 })
 }
@@ -3428,10 +3540,11 @@ open func messageQuantumSafety(ciphertext: Data)throws  -> MessageQuantumSafety 
      */
 open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> ModifyExpiryResult  {
     return try  FfiConverterTypeModifyExpiryResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(certData),
-        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+        FfiConverterOptionUInt64.lower(newExpirySeconds),uniffiCallStatus
     )
 })
 }
@@ -3441,13 +3554,14 @@ open func modifyExpiry(certData: Data, newExpirySeconds: UInt64?)throws  -> Modi
      */
 open func modifyExpiryWithExternalCompositeHighSigner(publicCertData: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, newExpirySeconds: UInt64?)throws  -> ModifyExpiryPublicResult  {
     return try  FfiConverterTypeModifyExpiryPublicResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCertData),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
-        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+        FfiConverterOptionUInt64.lower(newExpirySeconds),uniffiCallStatus
     )
 })
 }
@@ -3460,13 +3574,14 @@ open func modifyExpiryWithExternalCompositeHighSigner(publicCertData: Data, sign
      */
 open func modifyExpiryWithExternalCompositeSigner(publicCertData: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, newExpirySeconds: UInt64?)throws  -> ModifyExpiryPublicResult  {
     return try  FfiConverterTypeModifyExpiryPublicResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCertData),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
-        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+        FfiConverterOptionUInt64.lower(newExpirySeconds),uniffiCallStatus
     )
 })
 }
@@ -3480,12 +3595,13 @@ open func modifyExpiryWithExternalCompositeSigner(publicCertData: Data, signingK
      */
 open func modifyExpiryWithExternalP256Signer(publicCertData: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, newExpirySeconds: UInt64?)throws  -> ModifyExpiryPublicResult  {
     return try  FfiConverterTypeModifyExpiryPublicResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_modify_expiry_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(publicCertData),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterOptionUInt64.lower(newExpirySeconds),$0
+        FfiConverterOptionUInt64.lower(newExpirySeconds),uniffiCallStatus
     )
 })
 }
@@ -3495,9 +3611,10 @@ open func modifyExpiryWithExternalP256Signer(publicCertData: Data, signingKeyFin
      */
 open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
     return try  FfiConverterTypeKeyInfo_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_parse_key_info(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(keyData),$0
+        FfiConverterData.lower(keyData),uniffiCallStatus
     )
 })
 }
@@ -3511,9 +3628,10 @@ open func parseKeyInfo(keyData: Data)throws  -> KeyInfo  {
      */
 open func parseRecipients(ciphertext: Data)throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_parse_recipients(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(ciphertext),$0
+        FfiConverterData.lower(ciphertext),uniffiCallStatus
     )
 })
 }
@@ -3525,9 +3643,10 @@ open func parseRecipients(ciphertext: Data)throws  -> [String]  {
      */
 open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
     return try  FfiConverterTypeS2kInfo_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_parse_s2k_params(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(armoredData),$0
+        FfiConverterData.lower(armoredData),uniffiCallStatus
     )
 })
 }
@@ -3537,10 +3656,11 @@ open func parseS2kParams(armoredData: Data)throws  -> S2kInfo  {
      */
 open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
-        FfiConverterData.lower(signerCert),$0
+        FfiConverterData.lower(signerCert),uniffiCallStatus
     )
 })
 }
@@ -3550,13 +3670,14 @@ open func signCleartext(text: Data, signerCert: Data)throws  -> Data  {
      */
 open func signCleartextWithExternalCompositeHighSigner(text: Data, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3567,13 +3688,14 @@ open func signCleartextWithExternalCompositeHighSigner(text: Data, publicCert: D
      */
 open func signCleartextWithExternalCompositeSigner(text: Data, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
-        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3583,12 +3705,13 @@ open func signCleartextWithExternalCompositeSigner(text: Data, publicCert: Data,
      */
 open func signCleartextWithExternalP256Signer(text: Data, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_cleartext_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(text),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
-        FfiConverterTypeExternalP256SigningProvider_lower(signer),$0
+        FfiConverterTypeExternalP256SigningProvider_lower(signer),uniffiCallStatus
     )
 })
 }
@@ -3599,11 +3722,12 @@ open func signCleartextWithExternalP256Signer(text: Data, publicCert: Data, sign
      */
 open func signDetachedFile(inputPath: String, signerCert: Data, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(signerCert),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -3613,6 +3737,7 @@ open func signDetachedFile(inputPath: String, signerCert: Data, progress: Stream
      */
 open func signDetachedFileWithExternalCompositeHighSigner(inputPath: String, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa87SigningProvider, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_composite_high_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -3620,7 +3745,7 @@ open func signDetachedFileWithExternalCompositeHighSigner(inputPath: String, pub
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa87SigningProvider_lower(signer),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -3631,6 +3756,7 @@ open func signDetachedFileWithExternalCompositeHighSigner(inputPath: String, pub
      */
 open func signDetachedFileWithExternalCompositeSigner(inputPath: String, publicCert: Data, signingKeyFingerprint: String, classicalEddsaSecret: Data, signer: ExternalMlDsa65SigningProvider, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_composite_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
@@ -3638,7 +3764,7 @@ open func signDetachedFileWithExternalCompositeSigner(inputPath: String, publicC
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterData.lower(classicalEddsaSecret),
         FfiConverterTypeExternalMlDsa65SigningProvider_lower(signer),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -3648,13 +3774,14 @@ open func signDetachedFileWithExternalCompositeSigner(inputPath: String, publicC
      */
 open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: Data, signingKeyFingerprint: String, signer: ExternalP256SigningProvider, progress: StreamingProgressReporter?)throws  -> Data  {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_sign_detached_file_with_external_p256_signer(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(inputPath),
         FfiConverterData.lower(publicCert),
         FfiConverterString.lower(signingKeyFingerprint),
         FfiConverterTypeExternalP256SigningProvider_lower(signer),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -3666,9 +3793,10 @@ open func signDetachedFileWithExternalP256Signer(inputPath: String, publicCert: 
      */
 open func validatePublicCertificate(certData: Data)throws  -> PublicCertificateValidationResult  {
     return try  FfiConverterTypePublicCertificateValidationResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_validate_public_certificate(
             self.uniffiCloneHandle(),
-        FfiConverterData.lower(certData),$0
+        FfiConverterData.lower(certData),uniffiCallStatus
     )
 })
 }
@@ -3678,10 +3806,11 @@ open func validatePublicCertificate(certData: Data)throws  -> PublicCertificateV
      */
 open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])throws  -> VerifyDetailedResult  {
     return try  FfiConverterTypeVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_verify_cleartext_detailed(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signedMessage),
-        FfiConverterSequenceData.lower(verificationKeys),$0
+        FfiConverterSequenceData.lower(verificationKeys),uniffiCallStatus
     )
 })
 }
@@ -3691,12 +3820,13 @@ open func verifyCleartextDetailed(signedMessage: Data, verificationKeys: [Data])
      */
 open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verificationKeys: [Data], progress: StreamingProgressReporter?)throws  -> FileVerifyDetailedResult  {
     return try  FfiConverterTypeFileVerifyDetailedResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_verify_detached_file_detailed(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dataPath),
         FfiConverterData.lower(signature),
         FfiConverterSequenceData.lower(verificationKeys),
-        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),$0
+        FfiConverterOptionTypeStreamingProgressReporter.lower(progress),uniffiCallStatus
     )
 })
 }
@@ -3706,11 +3836,12 @@ open func verifyDetachedFileDetailed(dataPath: String, signature: Data, verifica
      */
 open func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
     return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_verify_direct_key_signature(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signature),
         FfiConverterData.lower(targetCert),
-        FfiConverterSequenceData.lower(candidateSigners),$0
+        FfiConverterSequenceData.lower(candidateSigners),uniffiCallStatus
     )
 })
 }
@@ -3720,12 +3851,13 @@ open func verifyDirectKeySignature(signature: Data, targetCert: Data, candidateS
      */
 open func verifyUserIdBindingSignatureBySelector(signature: Data, targetCert: Data, userIdSelector: UserIdSelectorInput, candidateSigners: [Data])throws  -> CertificateSignatureResult  {
     return try  FfiConverterTypeCertificateSignatureResult_lift(try rustCallWithError(FfiConverterTypePgpError_lift) {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_pgpengine_verify_user_id_binding_signature_by_selector(
             self.uniffiCloneHandle(),
         FfiConverterData.lower(signature),
         FfiConverterData.lower(targetCert),
         FfiConverterTypeUserIdSelectorInput_lower(userIdSelector),
-        FfiConverterSequenceData.lower(candidateSigners),$0
+        FfiConverterSequenceData.lower(candidateSigners),uniffiCallStatus
     )
 })
 }
@@ -3866,10 +3998,11 @@ open class StreamingProgressReporterImpl: StreamingProgressReporter, @unchecked 
      */
 open func onProgress(bytesProcessed: UInt64, totalBytes: UInt64) -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
+        uniffiCallStatus in
     uniffi_pgp_mobile_fn_method_streamingprogressreporter_on_progress(
             self.uniffiCloneHandle(),
         FfiConverterUInt64.lower(bytesProcessed),
-        FfiConverterUInt64.lower(totalBytes),$0
+        FfiConverterUInt64.lower(totalBytes),uniffiCallStatus
     )
 })
 }
@@ -6995,8 +7128,7 @@ public func FfiConverterTypeVerifyDetailedResult_lower(_ value: VerifyDetailedRe
     return FfiConverterTypeVerifyDetailedResult.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Armor kind for the FFI boundary.
  */
@@ -7090,8 +7222,7 @@ public func FfiConverterTypeArmorKind_lower(_ value: ArmorKind) -> RustBuffer {
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Semantic outcome of a same-fingerprint public certificate merge/update.
  */
@@ -7166,8 +7297,7 @@ public func FfiConverterTypeCertificateMergeOutcome_lower(_ value: CertificateMe
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Status for certificate-signature verification results.
  */
@@ -7243,8 +7373,7 @@ public func FfiConverterTypeCertificateSignatureStatus_lower(_ value: Certificat
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * OpenPGP certification signature kinds preserved across the FFI boundary.
  */
@@ -7327,8 +7456,7 @@ public func FfiConverterTypeCertificationKind_lower(_ value: CertificationKind) 
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Per-signature status preserved by the detailed APIs.
  */
@@ -7415,7 +7543,8 @@ public func FfiConverterTypeDetailedSignatureStatus_lower(_ value: DetailedSigna
 /**
  * Expected error returned by the foreign ML-KEM-768 decapsulation callback.
  */
-public enum ExternalCompositeKeyAgreementError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public
+enum ExternalCompositeKeyAgreementError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
 
 
@@ -7500,8 +7629,7 @@ public func FfiConverterTypeExternalCompositeKeyAgreementError_lower(_ value: Ex
     return FfiConverterTypeExternalCompositeKeyAgreementError.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Sanitized failure categories that may cross the external ML-KEM-768 decapsulation boundary.
  */
@@ -7665,7 +7793,8 @@ public func FfiConverterTypeExternalCompositeKeyAgreementFailureCategory_lower(_
 /**
  * Expected error returned by the foreign ML-DSA-65 signing callback.
  */
-public enum ExternalCompositeSigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public
+enum ExternalCompositeSigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
 
 
@@ -7750,8 +7879,7 @@ public func FfiConverterTypeExternalCompositeSigningError_lower(_ value: Externa
     return FfiConverterTypeExternalCompositeSigningError.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Sanitized failure categories that may cross the external composite signing callback boundary.
  */
@@ -7901,7 +8029,8 @@ public func FfiConverterTypeExternalCompositeSigningFailureCategory_lower(_ valu
 /**
  * Expected error returned by the foreign P-256 key-agreement callback.
  */
-public enum ExternalP256KeyAgreementError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public
+enum ExternalP256KeyAgreementError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
 
 
@@ -7986,8 +8115,7 @@ public func FfiConverterTypeExternalP256KeyAgreementError_lower(_ value: Externa
     return FfiConverterTypeExternalP256KeyAgreementError.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Sanitized failure categories that may cross the external P-256 key-agreement boundary.
  */
@@ -8144,7 +8272,8 @@ public func FfiConverterTypeExternalP256KeyAgreementFailureCategory_lower(_ valu
 /**
  * Expected error returned by the foreign P-256 signing callback.
  */
-public enum ExternalP256SigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public
+enum ExternalP256SigningError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
 
 
@@ -8229,8 +8358,7 @@ public func FfiConverterTypeExternalP256SigningError_lower(_ value: ExternalP256
     return FfiConverterTypeExternalP256SigningError.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Sanitized failure categories that may cross the external P-256 signing callback boundary.
  */
@@ -8369,8 +8497,7 @@ public func FfiConverterTypeExternalP256SigningFailureCategory_lower(_ value: Ex
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Software key-generation suite, named by its RFC 9580/9980 registered
  * signing + encryption algorithms and ordered by ascending security tier.
@@ -8482,8 +8609,7 @@ public func FfiConverterTypeKeySuite_lower(_ value: KeySuite) -> RustBuffer {
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Quantum-safety of a produced message, judged by the artifact itself:
  * the public-key algorithms of its PKESK packets.
@@ -8569,8 +8695,7 @@ public func FfiConverterTypeMessageQuantumSafety_lower(_ value: MessageQuantumSa
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Result status for password-based decryption.
  */
@@ -8646,8 +8771,7 @@ public func FfiConverterTypePasswordDecryptStatus_lower(_ value: PasswordDecrypt
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Message format for password-encrypted messages.
  */
@@ -8722,7 +8846,8 @@ public func FfiConverterTypePasswordMessageFormat_lower(_ value: PasswordMessage
  * Each variant maps 1:1 to a Swift `CypherAirError` enum case (via UniFFI-generated `PgpError`).
  * See PRD Section 4.7 for user-facing error messages.
  */
-public enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public
+enum PgpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
 
 
@@ -9092,8 +9217,7 @@ public func FfiConverterTypePgpError_lower(_ value: PgpError) -> RustBuffer {
     return FfiConverterTypePgpError.lower(value)
 }
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * OpenPGP certificate version for Secure Enclave custody public-certificate construction.
  */
@@ -9168,8 +9292,7 @@ public func FfiConverterTypeSecureEnclaveCertificateVersion_lower(_ value: Secur
 }
 
 
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 /**
  * Certificate-backed verification state for a signature entry or summary.
  */
@@ -9519,265 +9642,265 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor() != 21480) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor() != 6798) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor_public_key() != 42631) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_armor_public_key() != 1873) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_dearmor() != 5898) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_dearmor() != 42356) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url() != 60506) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decode_qr_url() != 27851) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed() != 61958) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed() != 51983) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_high_key_agreement() != 57854) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_high_key_agreement() != 43287) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_key_agreement() != 58990) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_composite_key_agreement() != 65261) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement() != 40270) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_detailed_with_external_p256_key_agreement() != 44904) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 1210) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed() != 18693) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_high_key_agreement() != 11919) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_high_key_agreement() != 15534) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_key_agreement() != 57563) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_composite_key_agreement() != 13020) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement() != 48232) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_file_detailed_with_external_p256_key_agreement() != 24860) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 33951) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_decrypt_with_password() != 20814) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_suite() != 54277) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_detect_suite() != 13409) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors() != 2777) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_discover_certificate_selectors() != 34843) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 4268) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encode_qr_url() != 1608) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 59436) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt() != 14997) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 46131) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary() != 37542) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password() != 45737) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password() != 14835) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_high_signer() != 24046) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_high_signer() != 2652) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_signer() != 21309) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_composite_signer() != 62426) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 2313) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_binary_with_password_and_external_p256_signer() != 25406) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 42541) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file() != 25489) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_high_signer() != 41227) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_high_signer() != 29470) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_signer() != 59001) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_composite_signer() != 55117) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 16230) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_file_with_external_p256_signer() != 13171) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_high_signer() != 64632) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_high_signer() != 39497) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_signer() != 2597) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_composite_signer() != 23843) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_p256_signer() != 51686) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_external_p256_signer() != 57083) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 3472) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password() != 58727) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_high_signer() != 19101) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_high_signer() != 15570) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_signer() != 61792) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_composite_signer() != 31496) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 13100) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_encrypt_with_password_and_external_p256_signer() != 40946) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 12917) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_export_secret_key() != 24803) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 3689) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key() != 13415) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 32937) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_key_revocation() != 26613) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_high_public_certificate() != 11777) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_high_public_certificate() != 50229) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_public_certificate() != 35435) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_composite_public_certificate() != 52127) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_public_certificate() != 11946) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_secure_enclave_public_certificate() != 37254) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 46816) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation() != 61322) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_high_signer() != 25650) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_high_signer() != 47183) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_signer() != 29724) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_composite_signer() != 43605) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_p256_signer() != 60188) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_subkey_revocation_with_external_p256_signer() != 24120) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 9110) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector() != 57636) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_high_signer() != 34634) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_high_signer() != 18150) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_signer() != 43782) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_composite_signer() != 57783) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_p256_signer() != 38799) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_certification_by_selector_with_external_p256_signer() != 41525) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 3390) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector() != 44493) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_high_signer() != 4796) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_high_signer() != 30891) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_signer() != 48974) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_composite_signer() != 46517) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer() != 47447) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_generate_user_id_revocation_by_selector_with_external_p256_signer() != 49136) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 53716) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_import_secret_key() != 45180) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_bindings() != 45311) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_bindings() != 52000) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_high_bindings() != 64852) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_composite_high_bindings() != 43270) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_public_bindings() != 48954) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_inspect_secure_enclave_public_bindings() != 31670) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients() != 28006) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients() != 44756) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients_from_file() != 13204) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_match_recipients_from_file() != 14285) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update() != 44096) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_merge_public_certificate_update() != 15731) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_message_quantum_safety() != 30716) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_message_quantum_safety() != 31350) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 31305) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry() != 41889) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_high_signer() != 37100) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_high_signer() != 12544) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_signer() != 63206) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_composite_signer() != 2378) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_p256_signer() != 59004) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_modify_expiry_with_external_p256_signer() != 28114) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 6277) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_key_info() != 47547) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 20) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_recipients() != 42957) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 26152) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_parse_s2k_params() != 23837) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 29260) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext() != 11671) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_high_signer() != 59394) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_high_signer() != 23486) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_signer() != 15052) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_composite_signer() != 13630) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_p256_signer() != 40306) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_cleartext_with_external_p256_signer() != 65071) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 22541) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file() != 44824) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_high_signer() != 53476) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_high_signer() != 39562) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_signer() != 20999) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_composite_signer() != 15134) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_p256_signer() != 6589) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_sign_detached_file_with_external_p256_signer() != 55860) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate() != 24365) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_validate_public_certificate() != 37484) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed() != 33764) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_cleartext_detailed() != 63141) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 22309) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_detached_file_detailed() != 19210) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 31324) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_direct_key_signature() != 15373) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 18125) {
+    if (uniffi_pgp_mobile_checksum_method_pgpengine_verify_user_id_binding_signature_by_selector() != 42431) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalmldsa65signingprovider_sign_mldsa65_digest() != 10555) {
+    if (uniffi_pgp_mobile_checksum_method_externalmldsa65signingprovider_sign_mldsa65_digest() != 9648) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalmldsa87signingprovider_sign_mldsa87_digest() != 61443) {
+    if (uniffi_pgp_mobile_checksum_method_externalmldsa87signingprovider_sign_mldsa87_digest() != 1881) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalmlkem1024decapsulationprovider_decapsulate_mlkem1024() != 29620) {
+    if (uniffi_pgp_mobile_checksum_method_externalmlkem1024decapsulationprovider_decapsulate_mlkem1024() != 40589) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalmlkem768decapsulationprovider_decapsulate_mlkem768() != 40553) {
+    if (uniffi_pgp_mobile_checksum_method_externalmlkem768decapsulationprovider_decapsulate_mlkem768() != 13106) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalp256keyagreementprovider_derive_shared_secret() != 34642) {
+    if (uniffi_pgp_mobile_checksum_method_externalp256keyagreementprovider_derive_shared_secret() != 26715) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 35195) {
+    if (uniffi_pgp_mobile_checksum_method_externalp256signingprovider_sign_sha256_digest() != 24215) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_method_streamingprogressreporter_on_progress() != 23443) {
+    if (uniffi_pgp_mobile_checksum_method_streamingprogressreporter_on_progress() != 61005) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_pgp_mobile_checksum_constructor_pgpengine_new() != 55978) {
+    if (uniffi_pgp_mobile_checksum_constructor_pgpengine_new() != 14061) {
         return InitializationResult.apiChecksumMismatch
     }
 

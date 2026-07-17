@@ -233,15 +233,6 @@ normalize_generated_text_file() {
     perl -0pi -e 's/[ \t]+$//mg; s/\n+\z/\n/' "$file"
 }
 
-patch_generated_swift_bindings() {
-    local swift_file="$1"
-    if [ ! -f "$swift_file" ]; then
-        return
-    fi
-    perl -0pi -e 's/\n    static let vtablePtr: UnsafePointer<(UniffiVTableCallbackInterface[A-Za-z0-9_]+)> = \{/\n    nonisolated(unsafe) static let vtablePtr: UnsafePointer<$1> = {/g' "$swift_file"
-    normalize_generated_text_file "$swift_file"
-}
-
 normalize_generated_bindings() {
     normalize_generated_text_file "$GENERATED_BINDINGS_DIR/module.modulemap"
     normalize_generated_text_file "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap"
@@ -380,7 +371,6 @@ generate_bindings() {
     )
 
     rm -f "$host_dylib"
-    patch_generated_swift_bindings "$GENERATED_BINDINGS_DIR/pgp_mobile.swift"
 
     if [ -f "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" ]; then
         cp "$GENERATED_BINDINGS_DIR/pgp_mobileFFI.modulemap" "$GENERATED_BINDINGS_DIR/module.modulemap"
