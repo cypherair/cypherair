@@ -733,11 +733,6 @@ final class ProtectedSettingsStore: ProtectedDataRelockParticipant, @unchecked S
                 "Protected settings ordinary settings contain an invalid grace period."
             )
         }
-        guard snapshot.guidedTutorialCompletedVersion >= 0 else {
-            throw ProtectedDataError.invalidEnvelope(
-                "Protected settings ordinary settings contain an invalid guided tutorial version."
-            )
-        }
     }
 
     private func pendingDomainState(

@@ -281,7 +281,7 @@ final class EncryptionServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Cross-Profile
+    // MARK: - Cross-Suite
 
     func test_encryptText_modernHighSender_legacyRecipient_succeeds() async throws {
         let sender = try await generateKeyAndContact(suite: .ed448X448, name: "ModernHigh Sender")

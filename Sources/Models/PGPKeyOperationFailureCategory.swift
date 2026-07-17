@@ -2,7 +2,7 @@ import Foundation
 
 /// Stable, sanitized failure categories for key operation availability.
 enum PGPKeyOperationFailureCategory: String, CaseIterable, Codable, Hashable, Sendable {
-    case invalidConfigurationCustody
+    case invalidFamilyCustody
     case operationUnsupportedForCustody
     case operationNotImplementedForCustody
     case operationUnavailableByPolicy
@@ -26,8 +26,6 @@ enum PGPKeyOperationFailureCategory: String, CaseIterable, Codable, Hashable, Se
     case externalOperationInvalidResponse
     case externalOperationFailed
     case openPGPSemanticFailure
-    case payloadAuthenticationFailure
     case recoveryRequired
-    case prohibitedFallbackAttempted
     case cleanupOrRollbackFailure
 }

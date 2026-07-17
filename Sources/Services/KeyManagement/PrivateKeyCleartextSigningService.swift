@@ -81,7 +81,7 @@ final class PrivateKeyCleartextSigningService: CleartextMessageSigning, @uncheck
             case .classicalP256:
                 // A classical handle can never ride a composite route; the
                 // router dispatches by tier before building route values.
-                throw CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)
+                throw CypherAirError.keyOperationUnavailable(category: .invalidFamilyCustody)
             case .postQuantum:
                 return try await messageAdapter.signCleartextWithExternalCompositeSigner(
                     text: text,

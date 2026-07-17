@@ -7,7 +7,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     // Device-Bound Post-Quantum (composite split custody) shares the
     // `.appleSecureEnclavePrivateOperations` custody kind with P-256 but carries
     // an ML-DSA/ML-KEM suite. Before the composite-aware recovery branch, every
-    // healthy composite key was misclassified `.invalidConfigurationCustody`
+    // healthy composite key was misclassified `.invalidFamilyCustody`
     // (audit #661 C5). These two tests lock the correct routing.
     fileprivate static let compositeSigningPublicKey = Data(repeating: 0xA1, count: 1952)
     fileprivate static let compositeKeyAgreementPublicKey = Data(repeating: 0xB2, count: 1184)

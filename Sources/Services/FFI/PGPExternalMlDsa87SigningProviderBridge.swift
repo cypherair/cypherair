@@ -62,7 +62,7 @@ final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvi
             return .classicalComponentFailed
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -73,9 +73,7 @@ final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvi
              .externalOperationInvalidRequest,
              .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         }

@@ -4485,22 +4485,6 @@
         }
       }
     },
-    "error.authCancelled" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Authentication was cancelled."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "认证已取消。"
-          }
-        }
-      }
-    },
     "error.authFailed" : {
       "localizations" : {
         "en" : {
@@ -4933,18 +4917,18 @@
         }
       }
     },
-    "error.keyOperationUnavailable.invalidConfigurationCustody" : {
+    "error.keyOperationUnavailable.invalidFamilyCustody" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This key's configuration and custody settings don't match, so the operation is unavailable."
+            "value" : "This key's family and custody settings don't match, so the operation is unavailable."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此密钥的配置与托管方式不匹配，无法执行该操作。"
+            "value" : "此密钥的家族与托管方式不匹配，无法执行该操作。"
           }
         }
       }
@@ -5109,22 +5093,6 @@
         }
       }
     },
-    "error.keyOperationUnavailable.payloadAuthenticationFailure" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Message authentication failed. The content may have been tampered with."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "消息认证失败。内容可能已被篡改。"
-          }
-        }
-      }
-    },
     "error.keyOperationUnavailable.privateHandleInaccessible" : {
       "localizations" : {
         "en" : {
@@ -5185,22 +5153,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此密钥无法执行所请求的操作。"
-          }
-        }
-      }
-    },
-    "error.keyOperationUnavailable.prohibitedFallbackAttempted" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A prohibited fallback was blocked. Nothing was changed."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已阻止被禁止的回退操作。未进行任何更改。"
           }
         }
       }
@@ -5505,22 +5457,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密钥保护格式错误：%@"
-          }
-        }
-      }
-    },
-    "error.seUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secure Enclave is not available on this device."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此设备不支持安全隔区。"
           }
         }
       }
@@ -7569,38 +7505,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引导教程"
-          }
-        }
-      }
-    },
-    "guidedTutorial.updated.entry" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Updated Guided Tutorial Available"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "引导教程已有更新"
-          }
-        }
-      }
-    },
-    "guidedTutorial.updated.start" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Updated Guided Tutorial"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始更新后的引导教程"
           }
         }
       }

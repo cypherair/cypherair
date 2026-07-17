@@ -15,12 +15,9 @@ struct KeyBundleWriteReceipt: Equatable, Sendable {
 /// Availability state for a wrapped key bundle.
 ///
 /// The bundle is a single self-contained `PrivateKeyEnvelope` row, so `bundleState`
-/// only ever returns `.missing` or `.complete`. `.partial` is retained so the
-/// interrupted-rewrap recovery coordinators stay exhaustive and fail closed if a
-/// future storage shape can ever observe a partial row.
+/// reports it as atomically present (`.complete`) or absent (`.missing`).
 enum KeyBundleState: Equatable {
     case missing
-    case partial
     case complete
 }
 

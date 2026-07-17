@@ -84,7 +84,7 @@ final class PrivateKeyRewrapRecoveryCoordinator {
         switch (permanentState, pendingState) {
         case (.complete, .missing):
             return .noActionSafe
-        case (.complete, .complete), (.partial, .complete):
+        case (.complete, .complete):
             do {
                 try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
                 return .promotedPendingSafe
@@ -98,12 +98,7 @@ final class PrivateKeyRewrapRecoveryCoordinator {
             } catch {
                 return .retryableFailure
             }
-        case (.complete, .partial):
-            return .retryableFailure
-        case (.partial, .missing),
-             (.partial, .partial),
-             (.missing, .partial),
-             (.missing, .missing):
+        case (.missing, .missing):
             return .unrecoverable
         }
     }

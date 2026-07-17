@@ -43,10 +43,7 @@ enum PGPKeyOperationFailureMapper {
         switch error {
         case .keyOperationUnavailable(let category):
             return category
-        case .secureEnclaveUnavailable:
-            return .hardwareUnavailable
-        case .authenticationCancelled,
-             .operationCancelled:
+        case .operationCancelled:
             return .localAuthenticationCancelled
         case .authenticationFailed:
             return .localAuthenticationFailed

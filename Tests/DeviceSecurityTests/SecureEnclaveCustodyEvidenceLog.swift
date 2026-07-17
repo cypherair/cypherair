@@ -17,8 +17,8 @@ enum SecureEnclaveCustodyEvidenceScenario: String, CaseIterable, Sendable {
     case gnupgInteropV4
 }
 
-/// The OpenPGP configuration a scenario exercised, when relevant.
-enum SecureEnclaveCustodyEvidenceConfiguration: String, CaseIterable, Sendable {
+/// The OpenPGP key family a scenario exercised, when relevant.
+enum SecureEnclaveCustodyEvidenceFamily: String, CaseIterable, Sendable {
     case deviceBoundEcdsaNistP256EcdhNistP256V4
     case deviceBoundEcdsaNistP256EcdhNistP256
 }
@@ -37,7 +37,7 @@ enum SecureEnclaveCustodyEvidenceOutcome: String, CaseIterable, Sendable {
 /// `SecureEnclaveCustodyEvidenceLogTests` pins that property.
 struct SecureEnclaveCustodyEvidenceSummary: Equatable, Sendable {
     let scenario: SecureEnclaveCustodyEvidenceScenario
-    let configuration: SecureEnclaveCustodyEvidenceConfiguration?
+    let configuration: SecureEnclaveCustodyEvidenceFamily?
     let outcome: SecureEnclaveCustodyEvidenceOutcome
     let observedCategory: PGPKeyOperationFailureCategory?
     let handleCount: Int?
@@ -45,7 +45,7 @@ struct SecureEnclaveCustodyEvidenceSummary: Equatable, Sendable {
 
     init(
         scenario: SecureEnclaveCustodyEvidenceScenario,
-        configuration: SecureEnclaveCustodyEvidenceConfiguration? = nil,
+        configuration: SecureEnclaveCustodyEvidenceFamily? = nil,
         outcome: SecureEnclaveCustodyEvidenceOutcome,
         observedCategory: PGPKeyOperationFailureCategory? = nil,
         handleCount: Int? = nil,

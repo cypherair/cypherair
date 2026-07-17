@@ -82,11 +82,10 @@ final class AppLaunchConfigurationTests: XCTestCase {
         XCTAssertNil(configuration.tutorialModule)
     }
 
-    func test_retiredSettingsRoot_fallsBackToMain() {
-        // The standalone macOS settings surface (UITEST_ROOT="settings") was removed in
-        // the single-window unification; the now-unknown value must fall back to .main.
+    func test_unknownRoot_fallsBackToMain() {
+        // An unrecognized UITEST_ROOT value falls back to .main.
         let configuration = AppLaunchConfiguration(
-            environment: ["UITEST_ROOT": "settings"],
+            environment: ["UITEST_ROOT": "unrecognized-root"],
             detectsXCTestHost: false,
             allowsUITestLaunchOverrides: true
         )

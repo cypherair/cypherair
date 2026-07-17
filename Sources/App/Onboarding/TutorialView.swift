@@ -305,14 +305,10 @@ struct TutorialView: View {
                 ? String(localized: "guidedTutorial.reviewCompletion", defaultValue: "Review Completion")
                 : String(localized: "guidedTutorial.continue", defaultValue: "Continue Tutorial")
         case .notStarted, .finished:
-            switch protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted {
-            case .neverCompleted:
-                return String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
-            case .completedCurrentVersion:
+            if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
                 return String(localized: "guidedTutorial.replay", defaultValue: "Replay Guided Tutorial")
-            case .completedPreviousVersion:
-                return String(localized: "guidedTutorial.updated.start", defaultValue: "Start Updated Guided Tutorial")
             }
+            return String(localized: "guidedTutorial.start", defaultValue: "Start Guided Tutorial")
         }
     }
 
@@ -336,7 +332,7 @@ struct TutorialView: View {
                 tutorialStore.showCompletionView()
             }
         case .notStarted, .finished:
-            if (protectedOrdinarySettings.guidedTutorialCompletionState ?? .neverCompleted) != .neverCompleted {
+            if protectedOrdinarySettings.hasCompletedGuidedTutorial ?? false {
                 tutorialStore.resetTutorial()
                 tutorialStore.prepareForPresentation(launchOrigin: presentationContext)
             }

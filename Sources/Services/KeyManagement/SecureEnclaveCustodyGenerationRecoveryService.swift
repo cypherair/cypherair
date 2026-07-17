@@ -84,9 +84,9 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
-                publicMaterialAvailability: .unavailable(.invalidConfigurationCustody),
+                publicMaterialAvailability: .unavailable(.invalidFamilyCustody),
                 revocationArtifactAvailability: revocationAvailability,
-                handleAvailability: .unavailable(.invalidConfigurationCustody)
+                handleAvailability: .unavailable(.invalidFamilyCustody)
             )
         }
         switch tier {

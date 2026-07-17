@@ -61,7 +61,7 @@ final class PGPExternalMlDsa65SigningProviderBridge: ExternalMlDsa65SigningProvi
             return .classicalComponentFailed
         case .externalOperationFailed:
             return .externalOperationFailed
-        case .invalidConfigurationCustody,
+        case .invalidFamilyCustody,
              .operationUnsupportedForCustody,
              .operationNotImplementedForCustody,
              .operationUnavailableByPolicy,
@@ -72,9 +72,7 @@ final class PGPExternalMlDsa65SigningProviderBridge: ExternalMlDsa65SigningProvi
              .externalOperationInvalidRequest,
              .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
-             .payloadAuthenticationFailure,
              .recoveryRequired,
-             .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
         }

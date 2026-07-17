@@ -26,9 +26,7 @@ enum CypherAirError: Error {
     case keyOperationUnavailable(category: PGPKeyOperationFailureCategory)
 
     // Security-layer errors
-    case secureEnclaveUnavailable
     case authenticationFailed
-    case authenticationCancelled
     case keychainError(String)
     case keyMetadataUnavailable
 

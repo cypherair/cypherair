@@ -196,7 +196,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_invalidConfigurationCustodyPairBlocksBeforeInspection() async throws {
+    func test_invalidFamilyCustodyPairBlocksBeforeInspection() async throws {
         let identity = PGPKeyIdentity(
             fingerprint: "3333333333333333333333333333333333333333",
             userId: "Invalid <invalid@example.invalid>",
@@ -226,7 +226,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
                 fingerprint: identity.fingerprint,
                 operation: .sign
             )),
-            .unsupported(.invalidConfigurationCustody)
+            .unsupported(.invalidFamilyCustody)
         )
         XCTAssertEqual(inspector.inspectCallCount, 0)
     }

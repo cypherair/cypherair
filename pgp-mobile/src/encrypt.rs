@@ -298,7 +298,7 @@ fn signer_error(context: &'static str) -> impl FnOnce(String) -> PgpError {
 /// SECURITY NOTE: Format auto-selection is intentionally
 /// delegated to Sequoia's `Encryptor`, which inspects recipient certificates'
 /// Features subpackets to determine the correct message format. This invariant
-/// is verified by packet-level assertions in `pgp-mobile/tests/cross_profile_tests.rs`
+/// is verified by packet-level assertions in `pgp-mobile/tests/cross_suite_tests.rs`
 /// (test_format_selection_*), which parse the raw SEIP version field for every
 /// recipient key version combination. After any Sequoia version bump, these tests
 /// must pass to confirm no regression in format selection behavior.

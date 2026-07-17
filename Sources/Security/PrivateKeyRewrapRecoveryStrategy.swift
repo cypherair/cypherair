@@ -6,7 +6,6 @@ enum PrivateKeyRewrapRecoveryAction: Equatable {
     case none
     case deletePending
     case promotePending
-    case replacePermanentWithPending
     case unrecoverable
 }
 
@@ -97,16 +96,11 @@ struct PrivateKeyRewrapRecoveryStrategy {
         switch (permanentState, pendingState) {
         case (.complete, .missing):
             return .none
-        case (.complete, .complete), (.complete, .partial):
+        case (.complete, .complete):
             return .deletePending
         case (.missing, .complete):
             return .promotePending
-        case (.partial, .complete):
-            return .replacePermanentWithPending
-        case (.partial, .missing),
-             (.partial, .partial),
-             (.missing, .partial),
-             (.missing, .missing):
+        case (.missing, .missing):
             return .unrecoverable
         }
     }
@@ -128,13 +122,6 @@ struct PrivateKeyRewrapRecoveryStrategy {
         case .promotePending:
             do {
                 try bundleStore.promotePendingToPermanent(fingerprint: fingerprint)
-                return .promotedPendingSafe
-            } catch {
-                return .retryableFailure
-            }
-        case .replacePermanentWithPending:
-            do {
-                try bundleStore.replacePermanentWithPending(fingerprint: fingerprint)
                 return .promotedPendingSafe
             } catch {
                 return .retryableFailure
