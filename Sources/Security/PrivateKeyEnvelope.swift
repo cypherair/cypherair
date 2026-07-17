@@ -36,13 +36,13 @@ enum PrivateKeyEnvelopeError: Error, Equatable {
 /// the handle and reopens the material.
 ///
 /// This deliberately does **not** reuse the ProtectedData root-secret envelope:
-/// the two are domain-separated by `magic` (`CAPKEV1` vs `CAPDSEV3`) and by their
+/// the two are domain-separated by `magic` (`CAPKEV5` vs `CAPDSEV5`) and by their
 /// HKDF/AAD prefixes so neither blob can be misread as the other.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
 /// See SECURITY.md Section 3 and Section 10.
 struct PrivateKeyEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPKEV1"
+    static let magic = "CAPKEV5"
     static let currentFormatVersion = 1
     static let currentAADVersion = 1
     static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
@@ -260,7 +260,7 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> SymmetricKey {
         let sharedInfo = try bindingData(
-            prefix: "CAPKKI",
+            prefix: "CAPKKI5",
             fingerprint: fingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,
@@ -283,7 +283,7 @@ enum PrivateKeyEnvelopeCodec {
         plaintextLength: Int
     ) throws -> Data {
         try bindingData(
-            prefix: "CAPKAD",
+            prefix: "CAPKAD5",
             fingerprint: fingerprint,
             seKeyData: seKeyData,
             seKeyPublicKeyX963: seKeyPublicKeyX963,

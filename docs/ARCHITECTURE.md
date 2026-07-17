@@ -102,14 +102,14 @@ All hardware-backed security operations. The most sensitive module — see [SECU
 
 | Component | Responsibility |
 |-----------|---------------|
-| `SecureEnclaveManager` | Software-custody wrapping: P-256 key generation in SE, ephemeral-static ECDH + HKDF + AES-GCM (AAD-bound) `CAPKEV1` envelope seal/open, key deletion. Same scheme for every software-key algorithm. |
+| `SecureEnclaveManager` | Software-custody wrapping: P-256 key generation in SE, ephemeral-static ECDH + HKDF + AES-GCM (AAD-bound) `CAPKEV5` envelope seal/open, key deletion. Same scheme for every software-key algorithm. |
 | `KeychainManager` | CRUD for Keychain items (private-key envelope rows and ProtectedData support rows), access-control flag configuration |
 | `AuthenticationManager` | Standard/High Security mode logic, mode switching with SE re-wrap, `LAContext` evaluation, post-unlock auth-mode crash recovery |
 | `PrivateKeyModeSwitchAuthenticator` / `PrivateKeyRewrapWorkflow` / `PrivateKeyRewrapRecoveryCoordinator` | Current-mode gate, two-phase rewrap workflow (pending rows → verify → promote), and phase-aware interrupted-rewrap recovery |
 | `KeyBundleStore` / `PrivateKeyRewrapRecoveryStrategy` | Single-row envelope storage (permanent/pending namespaces, rollback, replace-from-pending) and the shared rewrap-recovery state machine (safe/retryable/unrecoverable outcomes) |
 | `SecureEnclaveCustodyHandleStore` | Tier-scoped lifecycle boundary for the role-separated device-bound custody handles (CryptoKit `dataRepresentation` blob rows; P-256 for the classical tier, ML-DSA/ML-KEM components for the post-quantum tiers): public-binding/role checks, rollback, non-prompting locate/inspect, idempotent delete, cross-tier inventory and local-reset cleanup, sanitized failure mapping |
 | `SecureEnclaveCustodyKeyAgreement` | CryptoKit ECDH bridge for the external P-256 key-agreement route; validates handles, bindings, and ephemeral-key shape; returns only the raw shared secret |
-| `SecureEnclaveCompositeClassicalComponentStore` | Fixed-access `CAPKEV1` envelope custody for the classical components — Ed25519+X25519 for the base tier, Ed448+X448 for the · High tier (exempt from mode-switch re-wrap) |
+| `SecureEnclaveCompositeClassicalComponentStore` | Fixed-access `CAPKEV5` envelope custody for the classical components — Ed25519+X25519 for the base tier, Ed448+X448 for the · High tier (exempt from mode-switch re-wrap) |
 | `SecureEnclaveCompositeOperations` | In-enclave ML-DSA signing and ML-KEM decapsulation primitives (ML-DSA-65/ML-KEM-768 and ML-DSA-87/ML-KEM-1024) consumed by the composite provider bridges |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K requirements before key import; 75% threshold ([SECURITY.md](SECURITY.md) §7) |
 | `MemoryZeroingUtility` | Extensions on `Data` and `[UInt8]` for secure clearing |
@@ -117,7 +117,7 @@ All hardware-backed security operations. The most sensitive module — see [SECU
 
 ### ProtectedData (`Sources/Security/ProtectedData/`)
 
-The protected app-data framework: registry and storage root (`ProtectedDataRegistry`/`ProtectedDataRegistryStore`, `ProtectedDataStorageRoot`), root-secret custody (`ProtectedDataRootSecretCoordinator`, `ProtectedDataRootSecretEnvelope` — the `CAPDSEV3` codec with the folded SE device-binding key, `KeychainProtectedDataRootSecretStore`, `ProtectedDataDeviceBinding`), session ownership (`ProtectedDataSessionCoordinator`, `AppSessionOrchestrator`, `AppLockController`, relock coordination), per-domain key custody (`ProtectedDomainKeyManager` with the `CADMKV2` wrapped-DMK codec), recovery (`ProtectedDomainRecoveryCoordinator`/handlers), the post-unlock opener (`ProtectedDataPostUnlockCoordinator`), and the domain stores (`PrivateKeyControlStore`, `KeyMetadataDomainStore`, `ProtectedSettingsStore` + ordinary-settings adapters, `ContactsDomainStore` + `ContactsSQLCipherDatabase`, `ProtectedDataFrameworkSentinelStore`).
+The protected app-data framework: registry and storage root (`ProtectedDataRegistry`/`ProtectedDataRegistryStore`, `ProtectedDataStorageRoot`), root-secret custody (`ProtectedDataRootSecretCoordinator`, `ProtectedDataRootSecretEnvelope` — the `CAPDSEV5` codec with the folded SE device-binding key, `KeychainProtectedDataRootSecretStore`, `ProtectedDataDeviceBinding`), session ownership (`ProtectedDataSessionCoordinator`, `AppSessionOrchestrator`, `AppLockController`, relock coordination), per-domain key custody (`ProtectedDomainKeyManager` with the `CADMKV5` wrapped-DMK codec), recovery (`ProtectedDomainRecoveryCoordinator`/handlers), the post-unlock opener (`ProtectedDataPostUnlockCoordinator`), and the domain stores (`PrivateKeyControlStore`, `KeyMetadataDomainStore`, `ProtectedSettingsStore` + ordinary-settings adapters, `ContactsDomainStore` + `ContactsSQLCipherDatabase`, `ProtectedDataFrameworkSentinelStore`).
 
 Ownership facts the file names don't show (security invariants live in [SECURITY.md](SECURITY.md) §3 and §5):
 
@@ -212,7 +212,7 @@ sequenceDiagram
     App->>Post: open registered domains(context)
     Post->>PDS: beginProtectedDataAuthorization(registry, context)
     PDS->>KC: load root-secret envelope with kSecUseAuthenticationContext
-    KC-->>PDS: CAPDSEV3 envelope
+    KC-->>PDS: CAPDSEV5 envelope
     PDS->>SE: unwrap device-bound root secret
     SE-->>PDS: raw root-secret bytes
     PDS->>PDS: derive wrapping root key, zeroize raw root secret
@@ -242,14 +242,14 @@ These pairs must be updated together; a change to one without the other causes b
 
 ```
 Keychain (kSecClassGenericPassword, data-protection Keychain, default account):
-├── com.cypherair.v1.privkey-envelope.<fingerprint>          → CAPKEV1 private-key envelope (software custody;
+├── com.cypherair.v5.privkey-envelope.<fingerprint>          → CAPKEV5 private-key envelope (software custody;
 │                                                              also the composite classical-component envelope)
-├── com.cypherair.v1.pending-privkey-envelope.<fingerprint>  → temporary mode-switch / expiry-recovery row
-├── com.cypherair.protected-data.shared-right.v1             → LA-gated CAPDSEV3 app-data root-secret envelope
+├── com.cypherair.v5.pending-privkey-envelope.<fingerprint>  → temporary mode-switch / expiry-recovery row
+├── com.cypherair.v5.protected-data.shared-right             → LA-gated CAPDSEV5 app-data root-secret envelope
 │                                                              (single self-contained row, SE binding key folded in)
-├── com.cypherair.v1.protected-data.domain-key.<domainID>          → committed CADMKV2 wrapped domain master key
-├── com.cypherair.v1.protected-data.domain-key.staged.<domainID>   → staged row during validation/promotion
-└── com.cypherair.v1.secure-enclave-custody.<tier>.<role> (account = handle-set id)
+├── com.cypherair.v5.protected-data.domain-key.<domainID>          → committed CADMKV5 wrapped domain master key
+├── com.cypherair.v5.protected-data.domain-key.staged.<domainID>   → staged row during validation/promotion
+└── com.cypherair.v5.secure-enclave-custody.<tier>.<role> (account = handle-set id)
                                                               → enclave key blob rows for every device-bound tier
                                                                 (p256 / post-quantum / post-quantum-high)
 
@@ -270,10 +270,10 @@ App Sandbox:
 
 Naming and custody rules:
 
-- Private-key, domain-key, custody, and composite rows are prefixed `com.cypherair.v1.` (the `v1` segment enables future migration); the root-secret row (`com.cypherair.protected-data.shared-right.v1`) and the Preferences keys are the exceptions. `<fingerprint>` is full lowercase hex; temporary rows use the `pending-` prefix.
+- Private-key, domain-key, custody, composite, and root-secret rows are all prefixed `com.cypherair.v5.` (the version segment is the schema generation of the persisted format family, nothing more); only the Preferences keys sit outside it. `<fingerprint>` is full lowercase hex; temporary rows use the `pending-` prefix.
 - Custody handle tags and composite handle-set ids are Security-private local locators — never written to ProtectedData metadata, logs, UI, exports, or Rust. Recovery derives expected handles from public certificate bindings.
 - Domain-key rows carry no per-row biometric access control; unwrapping still requires the post-auth wrapping root key.
-- The ProtectedData device-binding key is a separate SE key that exists only inside the folded `CAPDSEV3` envelope — flags and domain separation: [SECURITY.md](SECURITY.md) §3 "ProtectedData Device-Binding Note".
+- The ProtectedData device-binding key is a separate SE key that exists only inside the folded `CAPDSEV5` envelope — flags and domain separation: [SECURITY.md](SECURITY.md) §3 "ProtectedData Device-Binding Note".
 
 Row-level classification, status, and migration readiness: [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md).
 

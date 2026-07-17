@@ -11,7 +11,7 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
         let envelope = try seal(schemaVersion: 2, generationIdentifier: 7)
 
         XCTAssertEqual(envelope.magic, ProtectedDomainEnvelope.magic)
-        XCTAssertEqual(envelope.magic, "CPDENV2")
+        XCTAssertEqual(envelope.magic, "CPDENV5")
         XCTAssertEqual(envelope.formatVersion, ProtectedDomainEnvelope.currentFormatVersion)
         XCTAssertEqual(envelope.formatVersion, 2)
         XCTAssertEqual(envelope.algorithmID, ProtectedDomainEnvelope.algorithmID)
@@ -90,7 +90,7 @@ final class ProtectedDomainEnvelopeCodecTests: XCTestCase {
     func test_encode_rejectsMalformedContract() throws {
         let envelope = try seal(schemaVersion: 1, generationIdentifier: 1)
 
-        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, magic: "CPDENV1")))
+        XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, magic: "CPDENX5")))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, formatVersion: 1)))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try ProtectedDomainEnvelopeCodec.encode(replacing(envelope, aadVersion: 1)))

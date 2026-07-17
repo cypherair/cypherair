@@ -9,13 +9,13 @@ import os
 /// algorithm identifier, and AAD version are stored and bound into the AES-GCM AAD,
 /// and decoding rejects any unknown or missing field.
 ///
-/// Domain-separated from the ECDH envelopes by its own magic (`CADMKV2`) and AAD
-/// prefix (`CADMKAD2`) so a wrapped-DMK blob can never be misread as another format.
+/// Domain-separated from the ECDH envelopes by its own magic (`CADMKV5`) and AAD
+/// prefix (`CADMKAD5`) so a wrapped-DMK blob can never be misread as another format.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
 /// See SECURITY.md Section 3 and Section 10.
 struct WrappedDomainMasterKeyRecord: Codable, Equatable, Sendable {
-    static let magic = "CADMKV2"
+    static let magic = "CADMKV5"
     static let currentFormatVersion = 2
     static let currentAADVersion = 2
     static let algorithmID = "aes-256-gcm-hkdf-sha256-v1"
@@ -157,7 +157,7 @@ enum WrappedDomainMasterKeyRecordCodec {
             )
         }
 
-        var aad = Data("CADMKAD2".utf8)
+        var aad = Data("CADMKAD5".utf8)
         aad.append(UInt8(WrappedDomainMasterKeyRecord.currentFormatVersion))
         aad.append(UInt8(WrappedDomainMasterKeyRecord.currentAADVersion))
         aad.append(UInt16(magicData.count).bigEndianData)
@@ -208,8 +208,8 @@ final class ProtectedDomainKeyManager {
 
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: rawSecretData),
-            salt: Data("CypherAir.AppData.WrapRoot.Salt.v1".utf8),
-            info: Data("CypherAir.AppData.WrapRoot.Info.v1".utf8),
+            salt: Data("CypherAir.AppData.WrapRoot.Salt.v5".utf8),
+            info: Data("CypherAir.AppData.WrapRoot.Info.v5".utf8),
             outputByteCount: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength
         )
 
@@ -223,7 +223,7 @@ final class ProtectedDomainKeyManager {
         let info = try wrappedDMKKeyInfo(domainID: domainID)
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: wrappingRootKey),
-            salt: Data("CypherAir.AppData.DomainWrap.Salt.v1".utf8),
+            salt: Data("CypherAir.AppData.DomainWrap.Salt.v5".utf8),
             info: info,
             outputByteCount: WrappedDomainMasterKeyRecord.expectedDomainMasterKeyLength
         )
@@ -402,7 +402,7 @@ final class ProtectedDomainKeyManager {
             )
         }
 
-        var info = Data("CADMKKI1".utf8)
+        var info = Data("CADMKKI5".utf8)
         info.append(1)
         info.append(UInt16(domainIDData.count).bigEndianData)
         info.append(domainIDData)

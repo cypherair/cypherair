@@ -9,11 +9,11 @@ final class ProtectedDataDomainKeyKeychainStoreTests: ProtectedDataFrameworkTest
 
         XCTAssertEqual(
             KeychainConstants.protectedDataDomainKeyService(domainID: domainID),
-            "com.cypherair.v1.protected-data.domain-key.contacts"
+            "com.cypherair.v5.protected-data.domain-key.contacts"
         )
         XCTAssertEqual(
             KeychainConstants.stagedProtectedDataDomainKeyService(domainID: domainID),
-            "com.cypherair.v1.protected-data.domain-key.staged.contacts"
+            "com.cypherair.v5.protected-data.domain-key.staged.contacts"
         )
         XCTAssertEqual(KeychainConstants.defaultAccount, "com.cypherair")
     }

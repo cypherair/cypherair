@@ -26,7 +26,7 @@ Generate (family-aware: software families produce a secret certificate;
           device-bound families generate inside the Secure Enclave — see SECURE_ENCLAVE_CUSTODY.md)
     │
     ├──→ Software custody: SE Wrap (P-256 ephemeral-static ECDH + HKDF + AES-GCM, AAD-bound)
-    │       └──→ Store one CAPKEV1 envelope row per identity in Keychain
+    │       └──→ Store one CAPKEV5 envelope row per identity in Keychain
     │
     ├──→ Store PGPKeyIdentity metadata in ProtectedData `key-metadata`
     │       └──→ Opened after app-session authentication; no private-key material
@@ -63,10 +63,10 @@ The Secure Enclave natively holds only some key types (P-256, and on current OS 
 2. Generate a software-ephemeral `P256.KeyAgreement.PrivateKey()` and compute `ECDH(ephemeral private × persistent SE public)`.
 3. Derive an AES-256 key with HKDF-SHA256 over a random salt and `sharedInfo` (prefix `CAPKKI`) binding the magic, algorithmID, lowercase hex fingerprint, SHA-256 hashes of the SE key blob and both public keys, and the plaintext length.
 4. Seal with AES-GCM, authenticating the same binding as AAD under prefix `CAPKAD` (domain-separated from the HKDF info).
-5. Store one Keychain row: the encoded `CAPKEV1` envelope (SE key blob, both public keys, salt, nonce, ciphertext, tag). **Confirm the write succeeds.**
+5. Store one Keychain row: the encoded `CAPKEV5` envelope (SE key blob, both public keys, salt, nonce, ciphertext, tag). **Confirm the write succeeds.**
 6. Only after successful storage: zeroize the raw private key bytes (CryptoKit's `SymmetricKey`/`SharedSecret` clear their own storage).
 
-**Public-parameter binding:** the fingerprint and both public keys are bound through HKDF `sharedInfo` and the AES-GCM AAD, so no public field can be substituted without breaking authentication. **The envelope is the only supported private-key payload** — any row that does not decode as a current `CAPKEV1` envelope fails closed as ordinary undecodable input; there is no legacy wrapping format to migrate.
+**Public-parameter binding:** the fingerprint and both public keys are bound through HKDF `sharedInfo` and the AES-GCM AAD, so no public field can be substituted without breaking authentication. **The envelope is the only supported private-key payload** — any row that does not decode as a current `CAPKEV5` envelope fails closed as ordinary undecodable input; there is no legacy wrapping format to migrate.
 
 **Ordering rationale (steps 5–6):** storage before zeroization. If storage fails or the process crashes first, the raw bytes are still in memory and the operation can retry; the reverse order would permanently lose the key.
 
@@ -100,7 +100,7 @@ The durable red lines below bind all code under `Sources/Security/SecureEnclaveC
 
 ### ProtectedData Device-Binding Note
 
-ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root-secret Keychain payload is a single self-contained `CAPDSEV3` envelope: a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`; never `.userPresence`/`.biometryAny`/`.devicePasscode`, because the user-facing prompt remains the existing app-session Keychain gate) is folded into the envelope and reconstructed at open time. The SE layer is a silent second factor that makes copied Keychain payloads and ProtectedData files useless off-device. `CAPDSEV3` and `CAPKEV1` share the ephemeral-static ECDH construction but are domain-separated by distinct magic values and HKDF/AAD prefixes, so neither blob can be misread as the other. The `CAPDSEV3` envelope is the only supported root-secret payload: anything else fails closed as undecodable input, and if the enclave cannot reconstruct the folded key (or its public key mismatches the bound key), ProtectedData fails closed into framework recovery — there is no fallback that opens ProtectedData without the SE factor.
+ProtectedData uses a separate app-data root-secret model — do not conflate it with private-key envelope wrapping. The root-secret Keychain payload is a single self-contained `CAPDSEV5` envelope: a ProtectedData-only P-256 SE device-binding key (`WhenPasscodeSetThisDeviceOnly + .privateKeyUsage`; never `.userPresence`/`.biometryAny`/`.devicePasscode`, because the user-facing prompt remains the existing app-session Keychain gate) is folded into the envelope and reconstructed at open time. The SE layer is a silent second factor that makes copied Keychain payloads and ProtectedData files useless off-device. `CAPDSEV5` and `CAPKEV5` share the ephemeral-static ECDH construction but are domain-separated by distinct magic values and HKDF/AAD prefixes, so neither blob can be misread as the other. The `CAPDSEV5` envelope is the only supported root-secret payload: anything else fails closed as undecodable input, and if the enclave cannot reconstruct the folded key (or its public key mismatches the bound key), ProtectedData fails closed into framework recovery — there is no fallback that opens ProtectedData without the SE factor.
 
 Protected domain payloads open only after the app privacy gate produced an authenticated `LAContext` (or an already-authorized session). The post-unlock coordinator may reuse that context for registered committed domains but must skip pending-mutation, missing-context, and no-domain states without fetching the root secret or prompting again.
 
@@ -130,7 +130,7 @@ Biometrics only — no passcode fallback. If biometrics are unavailable (sensor 
 
 ### Mode Switching
 
-Switching re-wraps every **software-custody** key under a single authentication: record the target in the `private-key-control.recoveryJournal`, authenticate under the **current** mode, unwrap each key and re-wrap it under the new flags into the pending row (`com.cypherair.v1.pending-privkey-envelope.<fingerprint>`), and only after **all** pending rows are verified stored: delete old rows, promote pending rows, persist the new `authMode`, clear the journal. If switching to High Security with un-backed-up software keys, a stronger warning requires explicit acknowledgment first.
+Switching re-wraps every **software-custody** key under a single authentication: record the target in the `private-key-control.recoveryJournal`, authenticate under the **current** mode, unwrap each key and re-wrap it under the new flags into the pending row (`com.cypherair.v5.pending-privkey-envelope.<fingerprint>`), and only after **all** pending rows are verified stored: delete old rows, promote pending rows, persist the new `authMode`, clear the journal. If switching to High Security with un-backed-up software keys, a stronger warning requires explicit acknowledgment first.
 
 **Crash-recovery invariant:** old rows stay authoritative until every new row is confirmed. Recovery (after unlock opens `private-key-control`) prefers an existing permanent row over a pending one; promotes a complete pending row only when the permanent row is absent or invalid; keeps the journal on retryable Keychain failures so recovery re-runs after the next unlock; treats no-complete-row-anywhere as unrecoverable (clear journal, surface a generic warning that never includes fingerprints); and persists the new auth mode only after a full successful promotion — cleaning stale pending rows alone never changes the mode.
 
@@ -147,7 +147,7 @@ Protected app data is a separate security domain for CypherAir-owned local state
 
 - Protected domains open only after app privacy authentication through the shared ProtectedData authorization path. `appSessionAuthenticationPolicy` remains the documented early-readable boot exception; UserDefaults is otherwise allowed only for documented boot/test/tutorial exceptions.
 - Authorization uses `AppSessionAuthenticationPolicy`, not private-key `AuthenticationMode`. `AppLockController` owns lock state and the away/grace lifecycle; `AppSessionOrchestrator` owns the authentication record and hands the authenticated `LAContext` to `ProtectedDataSessionCoordinator`, which reads the root secret with `kSecUseAuthenticationContext`. Post-unlock domain openers reuse that handoff so committed domains open without a second prompt.
-- The raw root secret exists only to derive the wrapping root key and is immediately zeroized. Each domain has its own random master key, persisted only as a Keychain-backed `CADMKV2` wrapped-DMK envelope under the wrapping root key. Unwrapped DMKs and decrypted payloads are session-local.
+- The raw root secret exists only to derive the wrapping root key and is immediately zeroized. Each domain has its own random master key, persisted only as a Keychain-backed `CADMKV5` wrapped-DMK envelope under the wrapping root key. Unwrapped DMKs and decrypted payloads are session-local.
 - `ProtectedOrdinarySettingsCoordinator` owns ordinary-settings availability, loading grace period, onboarding completion, encrypt-to-self, and tutorial completion from `protected-settings` schema v2 only after an unlocked handoff. Missing or corrupt payloads enter recovery instead of resetting to defaults; while the snapshot is unavailable, resume grace fails closed to immediate authentication, startup/onboarding routing waits for a loaded snapshot, and encryption never silently uses a default encrypt-to-self value.
 - `KeyMetadataDomainStore` stores schema v2 `PGPKeyIdentity` records (configuration identity + custody kind) and stays metadata-only — no handle locators, access-control policy, salts, sealed boxes, or secret bytes. The bootstrap generation watermark is an anti-rollback floor: corrupt metadata, generations behind the watermark, or generations more than one ahead enter recovery; exactly one ahead is the interrupted-commit signature and heals forward only after the envelope AEAD-authenticates under the domain master key and the payload passes contract validation (a missing current slot is completed from a sealed pending envelope under the same authenticated exactly-one-ahead rule).
 - Key-operation failure categories are sanitized app-owned classifications; local-authentication categories stay separate from payload-authentication failure, and none may contain plaintext, key material, shared secrets, session keys, KEKs, locators, stable fingerprints, or capability paths.
@@ -219,7 +219,7 @@ These hold for every change, independent of which file is touched:
 | File | Reason |
 |------|--------|
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
-| `Sources/Security/PrivateKeyEnvelope.swift` | `CAPKEV1` envelope (ephemeral-static ECDH, HKDF/AAD binding, contract validation). Error = keys lost, tamper accepted, or domain separation broken. |
+| `Sources/Security/PrivateKeyEnvelope.swift` | `CAPKEV5` envelope (ephemeral-static ECDH, HKDF/AAD binding, contract validation). Error = keys lost, tamper accepted, or domain separation broken. |
 | `Sources/Security/KeyBundleStore.swift` | Envelope persistence, pending/permanent promotion, interrupted-rewrap state. Error = key material lost or recovery fails open. |
 | `Sources/Security/SecureEnclaveCustody*` | Custody handle lifecycle for every device-bound tier, access-control policy, role/public-key binding, in-enclave P-256 signing/ECDH, sanitized failure mapping. |
 | `Sources/Security/SecureEnclaveComposite*` | Split-custody classical-component store and in-enclave ML-DSA/ML-KEM operations for Device-Bound Post-Quantum. |

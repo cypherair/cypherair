@@ -81,11 +81,11 @@ Standard and High Security modes bake different access-control flag sets into th
 
 ### 3.3 Keychain Layout
 
-One self-contained `CAPKEV1` envelope row per identity (fingerprint = lowercase hex, no separators), plus a transient pending row during mode-switch / modify-expiry recovery:
+One self-contained `CAPKEV5` envelope row per identity (fingerprint = lowercase hex, no separators), plus a transient pending row during mode-switch / modify-expiry recovery:
 
 ```
-com.cypherair.v1.privkey-envelope.<fingerprint>
-com.cypherair.v1.pending-privkey-envelope.<fingerprint>
+com.cypherair.v5.privkey-envelope.<fingerprint>
+com.cypherair.v5.pending-privkey-envelope.<fingerprint>
 ```
 
 Rows are `kSecClassGenericPassword` with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` and **no per-row access control** — the auth-mode policy is baked into the folded SE key at creation, and device authentication triggers when the Secure Enclave reconstructs and uses that key during unseal. (The ProtectedData root-secret and wrapped-DMK rows are a separate model — [SECURITY.md](SECURITY.md) §3 "ProtectedData Device-Binding Note" — and the full row inventory is [PERSISTED_STATE_INVENTORY.md](PERSISTED_STATE_INVENTORY.md).)
@@ -118,8 +118,8 @@ ProtectedData is the shared framework for app-owned local state that opens only 
 
 - `ProtectedDataRegistry` is the plaintext bootstrap authority for committed domain membership, shared-resource lifecycle state, and a single pending create/delete mutation.
 - Pre-auth startup may classify the registry and per-domain bootstrap metadata, but must not load the root secret, unwrap any domain master key, or open protected payload generations.
-- The shared root secret is a single self-contained `CAPDSEV3` Keychain envelope loaded with an authenticated `LAContext` handoff; the ProtectedData-only SE device-binding key is folded into it (no separate row) and reconstructed to silently unwrap it under the same app-session gate.
-- `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret (which is then zeroized) and unwraps per-domain 256-bit master keys from Keychain-backed `CADMKV2` wrapped-DMK records (`com.cypherair.v1.protected-data.domain-key.*`, staged/committed rows).
+- The shared root secret is a single self-contained `CAPDSEV5` Keychain envelope loaded with an authenticated `LAContext` handoff; the ProtectedData-only SE device-binding key is folded into it (no separate row) and reconstructed to silently unwrap it under the same app-session gate.
+- `ProtectedDomainKeyManager` derives a wrapping root key from the raw root secret (which is then zeroized) and unwraps per-domain 256-bit master keys from Keychain-backed `CADMKV5` wrapped-DMK records (`com.cypherair.v5.protected-data.domain-key.*`, staged/committed rows).
 - Registry, bootstrap metadata, scratch writes, and domain payload generations verify explicit file protection where available.
 - Every production domain opens through the post-auth handoff, decodes strictly, enters recovery instead of silently resetting unreadable committed state, and clears decrypted domain-local state on relock. Relock clears the wrapping root key, unwrapped DMKs, and registered domain-local state; a relock-participant failure latches runtime-only `restartRequired`.
 
