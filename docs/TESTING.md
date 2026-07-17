@@ -235,7 +235,7 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 ## 4. Writing Tests
 
 - Name tests `test_<unitOfWork>_<scenario>_<expectedResult>`.
-- Swift service/security tests use protocol-based mocks (`MockKeychain`, `MockSecureEnclave`, `MockAuthenticator` under `Sources/Security/Mocks/`); Rust tests prefer real Sequoia operations. `MockKeychain` supports deterministic delete-failure injection (`deleteError`, `failOnDeleteNumber`) for crash-recovery tests.
+- Swift service/security tests use protocol-based mocks (`MockKeychain`, `MockSecureEnclave`, `MockAuthenticator` under `Tests/Support/SecurityMocks/`, compiled only into the test target); Rust tests prefer real Sequoia operations. `MockKeychain` supports deterministic delete-failure injection (`deleteError`, `failOnDeleteNumber`) for crash-recovery tests.
 - Assert behavior, not source text: no source-scanning XCTest assertions — architecture conformance is review's job, not a test's.
 - Every crypto operation needs a round-trip test per family it supports, a targeted tamper test proving hard-fail with no partial output, and format assertions where the format rule applies (SEIPDv1/v2 selection, AES-256 floor).
 - Crash-recovery coverage exercises all four outcomes of the crash-recovery invariant ([SECURITY.md](SECURITY.md) §4): cleanup-only, promote-pending, retryable (keeps flags set), unrecoverable (generic startup warning, no fingerprints).
