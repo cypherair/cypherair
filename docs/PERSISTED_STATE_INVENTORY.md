@@ -10,7 +10,7 @@
 
 The long-term goal is to protect every CypherAir-owned local data surface unless a documented technical or security reason keeps it outside a protected domain.
 
-This inventory tracks current shipped state plus pending classified surfaces. It is not a roadmap narrative. Archived Contacts-specific documents are historical source material only; current persisted-state classification lives here.
+This inventory tracks current state plus pending classified surfaces. It is not a roadmap narrative.
 
 Every in-scope row must carry:
 
@@ -31,7 +31,6 @@ Allowed target classes:
 - `framework-bootstrap`
 - `ephemeral-with-cleanup`
 - `out-of-app-custody`
-- `unsupported legacy` (outside supported app state: not read, migrated, quarantined, reset-cleaned, or proactively deleted)
 - `test-only exception`
 
 ## 3. Inventory
@@ -65,8 +64,6 @@ Allowed target classes:
 | Framework sentinel payload | `Application Support/ProtectedData/protected-framework-sentinel/` | `framework-bootstrap` | `protected-framework-sentinel` | Implemented | implemented |
 | Contacts payload | `Application Support/ProtectedData/contacts/contacts.sqlite` plus SQLite/SQLCipher sidecars (`contacts.sqlite-wal`, `contacts.sqlite-shm`, `contacts.sqlite-journal`); protected SQLCipher schema v2 relational storage hydrated into `ContactsDomainSnapshot` with `ContactIdentity` records (display name, primary email, tag membership, notes, timestamps), `ContactKeyRecord` records (public certificate bytes, fingerprint/User ID/suite/algorithm metadata, manual verification, usage state, certification projection and artifact references), `ContactTag` records (display and normalized tag names), and `ContactCertificationArtifactReference` records (canonical signature bytes, digest, source, selector, signer metadata, validation status, target certificate digest, export filename). The database uses the `contacts` domain master key directly through SQLCipher raw-key syntax; missing database authority, wrong key, corrupt DB, application-id mismatch, unsupported `user_version`, or integrity failure routes to recovery. | `protected-after-unlock` | Contacts protected domain | Implemented | implemented |
 | Contacts runtime-only search/filter/selection state | In memory only: `ContactsSearchIndex`, screen search/filter values, tag filters, recipient selection, and pending route state | `ephemeral-with-cleanup` | Contacts runtime exception | Implemented; cleared with relock, content clear, or screen lifecycle as applicable | n/a, not persisted |
-| Unsupported legacy contacts public-key files | `Documents/contacts/*.gpg` and historical `Documents/contacts.quarantine/*.gpg` | `unsupported legacy` | Contacts support cutoff | Not read, migrated, quarantined, reset-cleaned, or proactively deleted; existing files may remain on disk but are no longer treated as CypherAir app state | unsupported |
-| Unsupported legacy contacts metadata | `Documents/contacts/contact-metadata.json` and historical quarantine copy | `unsupported legacy` | Contacts support cutoff | Not read, migrated, quarantined, reset-cleaned, or proactively deleted; existing files may remain on disk but are no longer treated as CypherAir app state | unsupported |
 | Self-test reports | In-memory export-only report data | `ephemeral-with-cleanup` | Self-test export-only exception | Implemented | implemented |
 | `tmp/decrypted/` | App temporary directory `tmp/decrypted/op-<UUID>/<sanitized output filename>` | `ephemeral-with-cleanup` | Temporary decrypted artifact cleanup | Implemented | implemented |
 | `tmp/streaming/` | App temporary directory `tmp/streaming/op-<UUID>/<sanitized input filename>.gpg` | `ephemeral-with-cleanup` | Temporary streaming artifact cleanup | Implemented | implemented |
@@ -87,4 +84,4 @@ Every future migration from plaintext, Keychain metadata, or non-uniform local s
 - document cleanup or quarantine behavior explicitly
 - update this inventory and the companion canonical docs per the [WORKFLOW](WORKFLOW.md) documentation contract in the same change
 
-The settings shadow-copy prohibition, Contacts legacy-inactive rule, and Contacts runtime-only-state rule are owned by [TDD](TDD.md) Section 6; this inventory's rows are the authoritative classification they apply to.
+The settings shadow-copy prohibition and Contacts runtime-only-state rule are owned by [TDD](TDD.md) Section 6; this inventory's rows are the authoritative classification they apply to.

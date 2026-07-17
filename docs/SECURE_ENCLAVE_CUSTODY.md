@@ -5,7 +5,7 @@
 > Audience: Security reviewers, release owners, Swift/Rust implementers, test owners, and AI coding tools.
 > Source of truth: This document, the code under `Sources/Security/SecureEnclaveCustody*` / `Sources/Security/SecureEnclaveComposite*` / `Sources/Services/KeyManagement/` / `pgp-mobile/src/`, and the companion canonical docs cited below.
 > Update triggers: Any change to the custody model, access-control policy, red lines, operation surface, persisted-state classification, Rust/UniFFI boundary, or evidence matrix.
-> Last reviewed: 2026-07-16.
+> Last reviewed: 2026-07-17.
 
 ## 1. Overview
 
@@ -18,7 +18,7 @@ The product presents it as four of the nine key families ([PRD.md](PRD.md) §3 o
 - **Device-Bound Post-Quantum** — RFC 9980 composite split custody (ML-DSA-65/ML-KEM-768), v6 certificate (§4.1).
 - **Device-Bound Post-Quantum · High** — RFC 9980 composite split custody (ML-DSA-87/ML-KEM-1024), v6 certificate (§4.1).
 
-All four are implemented, production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated), and ship through the tag-first stable releases — Device-Bound Post-Quantum since `cypherair-v1.5.0-build15000`.
+All four are implemented and production-exposed wherever Secure Enclave hardware is present (capability-resolver-gated).
 
 ## 2. Architecture and ownership
 
@@ -92,7 +92,7 @@ Test lanes, suites, and CI jobs are owned by [TESTING.md](TESTING.md): the custo
 
 ## 7. Release posture
 
-The device-bound families are shipped, user-reachable product surface; stable releases follow [RELEASE.md](RELEASE.md). Custody changes remain security-critical ([SECURITY.md](SECURITY.md) §10) with the hardware-evidence expectations of §8.
+The device-bound families are user-reachable product surface; stable releases follow [RELEASE.md](RELEASE.md). Custody changes remain security-critical ([SECURITY.md](SECURITY.md) §10) with the hardware-evidence expectations of §8.
 
 ## 8. Evidence record
 
@@ -104,23 +104,23 @@ Real SE private operations via `CypherAir-DeviceTests` (and the destructive `Cyp
 
 | Scenario | macOS | iPhone | iPad | visionOS |
 | --- | --- | --- | --- | --- |
-| handle-pair generation + persistence | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| signing (real ECDSA) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| ECDH decrypt v4 (SEIPDv1/MDC) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| ECDH decrypt v6 (SEIPDv2/AEAD) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| hidden generation (v4 cert via real signing handle) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| missing handle fails closed | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| wrong public binding fails closed | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| wrong role fails closed (signer/KA guards) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
-| payload tamper hard-fail (no partial plaintext) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| handle-pair generation + persistence | ✅ captured | deferred | deferred | exposed, no evidence |
+| signing (real ECDSA) | ✅ captured | deferred | deferred | exposed, no evidence |
+| ECDH decrypt v4 (SEIPDv1/MDC) | ✅ captured | deferred | deferred | exposed, no evidence |
+| ECDH decrypt v6 (SEIPDv2/AEAD) | ✅ captured | deferred | deferred | exposed, no evidence |
+| hidden generation (v4 cert via real signing handle) | ✅ captured | deferred | deferred | exposed, no evidence |
+| missing handle fails closed | ✅ captured | deferred | deferred | exposed, no evidence |
+| wrong public binding fails closed | ✅ captured | deferred | deferred | exposed, no evidence |
+| wrong role fails closed (signer/KA guards) | ✅ captured | deferred | deferred | exposed, no evidence |
+| payload tamper hard-fail (no partial plaintext) | ✅ captured | deferred | deferred | exposed, no evidence |
 | local-reset cleanup (dangerous plan) | ✅ captured | deferred | deferred | exposed, no evidence |
-| interaction-not-allowed proxy (fail-closed) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| interaction-not-allowed proxy (fail-closed) | ✅ captured | deferred | deferred | exposed, no evidence |
 | split-custody composite, both tiers (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests` — base ML-DSA-65/ML-KEM-768 and · High ML-DSA-87/ML-KEM-1024, 2026-07-16) | deferred | deferred | exposed, no evidence |
 
 Capture notes:
 
 - **macOS** (arm64e, real Secure Enclave, 2026-07-16): all rows captured against the CryptoKit custody consolidation (issue #683) — non-interactive scenarios, biometric scenarios (Touch ID approved at the sensor), the destructive local-reset proof (dangerous plan), and both split-custody tiers.
-- **iPhone** — recapture deferred. The 2026-06-14 iPhone capture attested the retired SecKey custody implementation and no longer stands; iPhone runs the same CryptoKit `SecureEnclave` substrate the macOS capture exercises, and dedicated recapture is recommended before any iPhone-specific custody claim.
+- **iPhone** — deferred. iPhone runs the same CryptoKit `SecureEnclave` substrate the macOS capture exercises; dedicated capture is recommended before any iPhone-specific custody claim.
 - **iPad** — deferred. iPad runs the same iOS Secure Enclave substrate and LocalAuthentication stack as iPhone; dedicated capture is recommended before any iPad-specific custody claim.
 - **visionOS** — exposed without dedicated evidence (accepted risk, §9).
 
@@ -167,9 +167,8 @@ The v4 interop contract (ECDSA/ECDH P-256, PKESK v3, SEIPDv1/MDC, v6 rejection) 
 
 - **v6 third-party AEAD interop is verified by composition.** RFC 9580 / SEIPDv2 AEAD correctness is validated through the production seam plus packet-shape assertions; interop against a non-Sequoia RFC 9580 implementation is deferred (a committed fixture under `pgp-mobile/tests/fixtures/` would upgrade this to direct interop). v6 carries no GnuPG interop gate.
 - The software-backed CI lanes (§8.2) validate the seam, formats, and gpg interoperability without hardware; they do not substitute for the real-hardware evidence (§8.1) or the manual real-SE↔gpg lane (§8.3).
-- The RFC 9980 `sq` cross-implementation interop pack is the remaining post-quantum evidence scope ([POST_QUANTUM.md](POST_QUANTUM.md) §5).
 
 ## 9. Accepted-risk register
 
-- **visionOS exposed without dedicated evidence (maintainer-accepted, 2026-06-14).** Device-bound generation is gated only by `SecureEnclave.isAvailable`, with no visionOS-specific guard, so Apple Vision Pro offers the device-bound families. No dedicated visionOS hardware evidence exists (no Vision Pro hardware available). Accepted on the basis of the shared CryptoKit `SecureEnclave` substrate, the visionOS build probe, and the captured macOS + iPhone evidence; visionOS capture remains recommended if hardware becomes available.
-- **iPad evidence deferred.** iPad shares the iPhone iOS Secure Enclave substrate; dedicated capture was not run and is not required for the shipped releases.
+- **visionOS exposed without dedicated evidence (maintainer-accepted, 2026-06-14).** Device-bound generation is gated only by `SecureEnclave.isAvailable`, with no visionOS-specific guard, so Apple Vision Pro offers the device-bound families. No dedicated visionOS hardware evidence exists (no Vision Pro hardware available). Accepted on the basis of the shared CryptoKit `SecureEnclave` substrate, the visionOS build probe, and the captured macOS evidence; visionOS capture remains recommended if hardware becomes available.
+- **iPad evidence deferred.** iPad shares the iPhone iOS Secure Enclave substrate; dedicated capture was not run and is not required for release.

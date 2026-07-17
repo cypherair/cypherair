@@ -56,7 +56,7 @@ fn test_generate_key_modern_high_algorithms() {
     assert!(!info.is_revoked);
     assert!(!info.is_expired);
 
-    // T2: Verify algorithms are Ed448 and X448 (not Ed25519/X25519).
+    // Verify algorithms are Ed448 and X448 (not Ed25519/X25519).
     // Require specific algorithm names — generic "EdDSA"/"ECDH" would also match
     // Legacy (Ed25519/X25519) and would fail to catch a cipher suite misconfiguration.
     assert!(

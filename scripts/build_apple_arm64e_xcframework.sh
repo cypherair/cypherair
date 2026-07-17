@@ -38,7 +38,6 @@ MANIFEST_BACKUP_CREATED=0
 ARM64E_PREBUILT_STD_TARGETS=(
     arm64e-apple-darwin
     arm64e-apple-ios
-    arm64e-apple-tvos
     arm64e-apple-visionos
 )
 
@@ -207,7 +206,7 @@ error: arm64e stage1 toolchain is missing host std/proc_macro for ${host_triple}
 Cargo compiles build scripts and proc macros for the host even when the final
 crate target is arm64e. Rebuild or republish the Rust fork stage1 with:
 
-    python3 x.py build compiler/rustc library/std library/proc_macro --stage 1 --target ${host_triple},arm64e-apple-darwin,arm64e-apple-ios,arm64e-apple-tvos,arm64e-apple-visionos
+    python3 x.py build compiler/rustc library/std library/proc_macro --stage 1 --target ${host_triple},arm64e-apple-darwin,arm64e-apple-ios,arm64e-apple-visionos
 
 Then relink the rebuilt stage1 directory or use ARM64E_STAGE1_FORCE_DOWNLOAD=1
 with a prerelease that includes host std.

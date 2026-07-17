@@ -13,7 +13,7 @@ fn test_parse_recipients_valid_message_legacy() {
             .expect("Key gen should succeed");
 
     let ciphertext =
-        encrypt::encrypt_binary(b"Phase 1 test", &[key.public_key_data.clone()], None, None)
+        encrypt::encrypt_binary(b"Recipient parse test", &[key.public_key_data.clone()], None, None)
             .expect("Encrypt should succeed");
 
     let recipients =
@@ -36,7 +36,7 @@ fn test_parse_recipients_valid_message_modern_high() {
             .expect("Key gen should succeed");
 
     let ciphertext = encrypt::encrypt_binary(
-        b"Phase 1 test B",
+        b"Recipient parse test B",
         &[key.public_key_data.clone()],
         None,
         None,

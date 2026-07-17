@@ -4,7 +4,7 @@
 > Purpose: Test layers, test plans, CI lanes, and the build/validation workflows that connect Rust artifacts to Swift testing.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Test plans, CI lanes, validation commands, or the Rust↔Xcode artifact contract change.
-> Last reviewed: 2026-07-16.
+> Last reviewed: 2026-07-17.
 
 ## 1. Test Layers
 
@@ -255,7 +255,7 @@ Password/SKESK round-trips (armored + binary) are recipient-key-independent and 
 
 The `rust-gnupg-interop` CI job runs the first two lanes under `CYPHERAIR_REQUIRE_GPG=1` after asserting the gpg version floor. Real-hardware SE↔gpg evidence is the manual `CypherAir-InteropEvidenceTests` plan; captured evidence lives in [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §8.
 
-**sq (sequoia-sq).** The `sq` pack is the cross-implementation evidence for the RFC 9580/9980 families (issue #567), covering all five portable suites (legacy v4, modern, modern-high, post-quantum, post-quantum-high). Device-bound families share these wire formats; their custody halves are covered by the custody suites and device lanes above. Same two mechanisms:
+**sq (sequoia-sq).** The `sq` pack is the cross-implementation evidence for the RFC 9580/9980 families, covering all five portable suites (legacy v4, modern, modern-high, post-quantum, post-quantum-high). Device-bound families share these wire formats; their custody halves are covered by the custody suites and device lanes above. Same two mechanisms:
 
 - **Fixtures** — `sq`-generated certs, encrypted messages, and signatures committed as test data (`fixtures/generate_sq_fixtures.sh`; tested tool versions recorded in `sq_version.txt`). `sq_interop_tests.rs` runs always-on and CI-safe: family classification, both encryption directions, signature verification, mixed-recipient format rules, and split-custody consumption of the sq post-quantum fixtures — the cross-implementation check for the vendored RFC 9980 KEM combiner.
 - **Live lane** — `sq_live_interop_tests.rs` drives the `sq` binary through `pgp-mobile/tests/common/sq.rs` and its `require_sq_or_skip()` gate (`CYPHERAIR_REQUIRE_SQ=1` forbids skips) for the directions fixtures cannot prove: sq imports engine-generated secret keys, decrypts engine-encrypted messages, and verifies engine cleartext signatures. The post-quantum live tests additionally gate on a functional capability probe (`require_pq_capable_sq_or_skip()`): an sq built on pre-2.4 sequoia-openpgp — Homebrew's sequoia-sq 1.3.1, for example — predates the final RFC 9980 wire format and cannot read engine ML-DSA certificates, so those tests skip loudly even under `CYPHERAIR_REQUIRE_SQ=1` (the flag requires sq's presence, not its newest version) and self-activate once the installed sq can import an engine post-quantum key. Cross-implementation post-quantum coverage meanwhile stays on through the committed fixture suite.
