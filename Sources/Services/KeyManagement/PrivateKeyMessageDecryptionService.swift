@@ -83,6 +83,10 @@ final class PrivateKeyMessageDecryptionService: RecipientMessageDecrypting, @unc
 
         case .secureEnclaveCompositeKeyAgreement(let route):
             switch route.keyAgreementHandle.reference.tier {
+            case .classicalP256:
+                // A classical handle can never ride a composite route; the
+                // router dispatches by tier before building route values.
+                throw CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)
             case .postQuantum:
                 return try await messageAdapter.decryptDetailedWithExternalCompositeKeyAgreement(
                     ciphertext: ciphertext,

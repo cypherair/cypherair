@@ -99,6 +99,10 @@ final class PrivateKeyStreamingFileEncryptionService: StreamingFileEncrypting, @
 
         case .secureEnclaveCompositeSigner(let route):
             switch route.signingHandle.reference.tier {
+            case .classicalP256:
+                // A classical handle can never ride a composite route; the
+                // router dispatches by tier before building route values.
+                throw CypherAirError.keyOperationUnavailable(category: .invalidConfigurationCustody)
             case .postQuantum:
                 return try await messageAdapter.encryptFileWithExternalCompositeSigner(
                     inputPath: inputPath,

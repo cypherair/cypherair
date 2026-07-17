@@ -1,5 +1,5 @@
+import CryptoKit
 import Foundation
-import Security
 
 struct SecureEnclaveP256RawSignature: Equatable, Sendable {
     let r: Data
@@ -34,132 +34,70 @@ struct SystemSecureEnclaveCustodyDigestSigner: SecureEnclaveCustodyDigestSigning
                 actual: handle.role
             )
         }
-        guard digest.count == 32 else {
+        guard let rawDigest = SecureEnclaveP256SHA256Digest(digest) else {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
-        guard let privateKey = handle.privateKey,
-              let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw SecureEnclaveCustodyHandleError.privateHandleMissing(.signing)
+        guard case .p256Signing(let privateKey)? = handle.privateKey else {
+            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
 
-        if SecKeyIsAlgorithmSupported(privateKey, .sign, .ecdsaSignatureDigestRFC4754),
-           SecKeyIsAlgorithmSupported(publicKey, .verify, .ecdsaSignatureDigestRFC4754) {
-            let signature = try makeSignature(
-                digest: digest,
-                privateKey: privateKey,
-                publicKey: publicKey,
-                algorithm: .ecdsaSignatureDigestRFC4754
-            )
-            guard signature.count == 64 else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            return try SecureEnclaveP256RawSignature(
-                r: signature.prefix(32),
-                s: signature.suffix(32)
-            )
+        let signature: P256.Signing.ECDSASignature
+        do {
+            signature = try privateKey.signature(for: rawDigest)
+        } catch {
+            throw Self.mapEnclaveOperationError(error)
+        }
+        guard privateKey.publicKey.isValidSignature(signature, for: rawDigest) else {
+            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
         }
 
-        let derSignature = try makeSignature(
-            digest: digest,
-            privateKey: privateKey,
-            publicKey: publicKey,
-            algorithm: .ecdsaSignatureDigestX962SHA256
+        let raw = signature.rawRepresentation
+        guard raw.count == 64 else {
+            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
+        }
+        return try SecureEnclaveP256RawSignature(
+            r: raw.prefix(32),
+            s: raw.suffix(32)
         )
-        return try Self.rawSignatureFromDER(derSignature)
     }
 
-    private func makeSignature(
-        digest: Data,
-        privateKey: SecKey,
-        publicKey: SecKey,
-        algorithm: SecKeyAlgorithm
-    ) throws -> Data {
-        var error: Unmanaged<CFError>?
-        guard let signature = SecKeyCreateSignature(
-            privateKey,
-            algorithm,
-            digest as CFData,
-            &error
-        ) as Data? else {
-            throw Self.mapCFError(error)
+    private static func mapEnclaveOperationError(_ error: Error) -> SecureEnclaveCustodyHandleError {
+        switch SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error) {
+        case .operationCancelled:
+            return .localAuthenticationCancelled(.signing)
+        case .authenticationFailed:
+            return .localAuthenticationFailed(.signing)
+        default:
+            return .privateHandleUnauthorized(.signing)
         }
-        guard SecKeyVerifySignature(
-            publicKey,
-            algorithm,
-            digest as CFData,
-            signature as CFData,
-            &error
-        ) else {
-            throw Self.mapCFError(error)
+    }
+}
+
+/// Carries the Rust-computed 32-byte OpenPGP SHA-256 signature digest into
+/// CryptoKit's digest-signing entry point verbatim: `signature(for:)` over a
+/// `Digest` signs exactly these bytes as the ECDSA message representative and
+/// never re-hashes them.
+struct SecureEnclaveP256SHA256Digest: Digest {
+    static var byteCount: Int { 32 }
+
+    private let bytes: [UInt8]
+
+    init?(_ digest: Data) {
+        guard digest.count == Self.byteCount else {
+            return nil
         }
-        return signature
+        self.bytes = [UInt8](digest)
     }
 
-    static func rawSignatureFromDER(_ der: Data) throws -> SecureEnclaveP256RawSignature {
-        let bytes = [UInt8](der)
-        var index = 0
-
-        func readByte() throws -> UInt8 {
-            guard index < bytes.count else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            defer { index += 1 }
-            return bytes[index]
-        }
-
-        func readLength() throws -> Int {
-            let first = try readByte()
-            if first < 0x80 {
-                return Int(first)
-            }
-            let lengthByteCount = Int(first & 0x7f)
-            guard lengthByteCount > 0, lengthByteCount <= 2 else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            var length = 0
-            for _ in 0..<lengthByteCount {
-                length = (length << 8) | Int(try readByte())
-            }
-            return length
-        }
-
-        func readInteger() throws -> Data {
-            guard try readByte() == 0x02 else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            let length = try readLength()
-            guard length > 0, index + length <= bytes.count else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            let value = Array(bytes[index..<(index + length)])
-            index += length
-            let stripped = value.drop(while: { $0 == 0 })
-            guard stripped.count <= 32 else {
-                throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-            }
-            var padded = Data(repeating: 0, count: 32 - stripped.count)
-            padded.append(contentsOf: stripped)
-            return padded
-        }
-
-        guard try readByte() == 0x30 else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-        let sequenceLength = try readLength()
-        guard index + sequenceLength == bytes.count else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-        let r = try readInteger()
-        let s = try readInteger()
-        guard index == bytes.count else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-        return try SecureEnclaveP256RawSignature(r: r, s: s)
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try bytes.withUnsafeBytes(body)
     }
 
-    private static func mapCFError(
-        _ error: Unmanaged<CFError>?
-    ) -> SecureEnclaveCustodyHandleError {
-        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: .signing)
+    func makeIterator() -> Array<UInt8>.Iterator {
+        bytes.makeIterator()
+    }
+
+    var description: String {
+        "SecureEnclaveP256SHA256Digest"
     }
 }

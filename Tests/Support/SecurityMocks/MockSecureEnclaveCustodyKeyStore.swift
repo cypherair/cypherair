@@ -3,12 +3,21 @@ import LocalAuthentication
 @testable import CypherAir
 
 final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @unchecked Sendable {
-    private var storage: [SecureEnclaveCustodyHandleReference: [SecureEnclaveCustodyLoadedHandle]] = [:]
-    private var malformedApplicationTags: Set<Data> = []
+    private struct Namespace: Hashable {
+        let tier: SecureEnclaveCustodyTier
+        let role: PGPPrivateOperationRole
+    }
+
+    private var storage: [SecureEnclaveCustodyHandleReference: SecureEnclaveCustodyLoadedHandle] = [:]
+    private var malformedRows: [Namespace: Int] = [:]
     private var publicKeyCounter: UInt8 = 1
 
     private(set) var createRequests: [
-        (reference: SecureEnclaveCustodyHandleReference, accessPolicy: SecureEnclaveCustodyAccessControlPolicy)
+        (
+            reference: SecureEnclaveCustodyHandleReference,
+            accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
+            authenticationContext: LAContext?
+        )
     ] = []
     private(set) var deleteRequests: [SecureEnclaveCustodyHandleReference] = []
     private(set) var loadRequests: [
@@ -19,43 +28,55 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
     var failDeleteRole: PGPPrivateOperationRole?
     var failLoadError: SecureEnclaveCustodyHandleError?
     var failInventory = false
+    var failDeleteAllKeys = false
     var publicKeyResponses: [Data] = []
-    var onLoadKeys: (() -> Void)?
+    var onLoadKey: (() -> Void)?
 
     func createKey(
         reference: SecureEnclaveCustodyHandleReference,
-        accessPolicy: SecureEnclaveCustodyAccessControlPolicy
+        accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
+        authenticationContext: LAContext?
     ) throws -> SecureEnclaveCustodyLoadedHandle {
-        createRequests.append((reference, accessPolicy))
+        createRequests.append((reference, accessPolicy, authenticationContext))
         if failCreateRole == reference.role {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
         }
-        if storage[reference]?.isEmpty == false {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(reference.role)
+        if storage[reference] != nil {
+            throw SecureEnclaveCustodyHandleError.ambiguousPrivateHandle(reference.role)
         }
 
         let binding = try SecureEnclaveCustodyHandlePublicBinding(
             reference: reference,
-            publicKeyX963: nextPublicKey()
+            publicKeyRaw: nextPublicKey(reference: reference)
         )
         let handle = SecureEnclaveCustodyLoadedHandle(
             binding: binding,
             privateKey: nil
         )
-        storage[reference] = [handle]
+        storage[reference] = handle
         return handle
     }
 
-    func loadKeys(
+    func loadKey(
         reference: SecureEnclaveCustodyHandleReference,
         authenticationContext: LAContext?
-    ) throws -> [SecureEnclaveCustodyLoadedHandle] {
-        onLoadKeys?()
+    ) throws -> SecureEnclaveCustodyLoadedHandle? {
+        onLoadKey?()
         loadRequests.append((reference, authenticationContext))
         if let failLoadError {
             throw failLoadError
         }
-        return storage[reference] ?? []
+        return storage[reference]
+    }
+
+    func inventory() throws -> SecureEnclaveCustodyHandleInventory {
+        if failInventory {
+            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
+        }
+        return SecureEnclaveCustodyHandleInventory(
+            bindings: storage.values.map(\.binding),
+            malformedRowCount: malformedRows.values.reduce(0, +)
+        )
     }
 
     func deleteKey(reference: SecureEnclaveCustodyHandleReference) throws {
@@ -68,75 +89,40 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         }
     }
 
-    func inventoryKeys() throws -> [SecureEnclaveCustodyHandleInventoryItem] {
-        if failInventory {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-        let storedItems = storage.flatMap { reference, handles -> [SecureEnclaveCustodyHandleInventoryItem] in
-            handles.compactMap { _ in
-                SecureEnclaveCustodyHandleInventoryItem(applicationTagData: reference.applicationTagData)
-            }
-        }
-        let malformedItems = malformedApplicationTags.compactMap(SecureEnclaveCustodyHandleInventoryItem.init)
-        return storedItems + malformedItems
-    }
-
-    func deleteKey(
-        applicationTagData: Data,
-        roleHint: PGPPrivateOperationRole?
-    ) throws {
-        if let reference = SecureEnclaveCustodyHandleInventoryItem(applicationTagData: applicationTagData)?.reference {
-            try deleteKey(reference: reference)
-            return
-        }
-        let role = roleHint ?? .signing
-        if failDeleteRole == role {
+    func deleteAllKeys(tier: SecureEnclaveCustodyTier, role: PGPPrivateOperationRole) throws {
+        if failDeleteAllKeys || failDeleteRole == role {
             throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(role)
         }
-        guard malformedApplicationTags.remove(applicationTagData) != nil else {
-            throw SecureEnclaveCustodyHandleError.privateHandleMissing(role)
+        for reference in storage.keys where reference.tier == tier && reference.role == role {
+            storage.removeValue(forKey: reference)
         }
+        malformedRows[Namespace(tier: tier, role: role)] = nil
     }
 
     func insert(
         _ handle: SecureEnclaveCustodyLoadedHandle,
-        for reference: SecureEnclaveCustodyHandleReference? = nil,
-        allowingDuplicate: Bool = false
+        for reference: SecureEnclaveCustodyHandleReference? = nil
     ) {
-        let storageReference = reference ?? handle.reference
-        if allowingDuplicate {
-            storage[storageReference, default: []].append(handle)
-        } else {
-            storage[storageReference] = [handle]
-        }
+        storage[reference ?? handle.reference] = handle
     }
 
-    func insertMalformedApplicationTag(_ applicationTagString: String) {
-        insertMalformedApplicationTagData(Data(applicationTagString.utf8))
-    }
-
-    func insertMalformedApplicationTagData(_ applicationTagData: Data) {
-        malformedApplicationTags.insert(applicationTagData)
+    func insertMalformedRow(
+        tier: SecureEnclaveCustodyTier = .classicalP256,
+        role: PGPPrivateOperationRole = .signing
+    ) {
+        malformedRows[Namespace(tier: tier, role: role), default: 0] += 1
     }
 
     func contains(reference: SecureEnclaveCustodyHandleReference) -> Bool {
-        storage[reference]?.isEmpty == false
-    }
-
-    func containsMalformedApplicationTagData(_ applicationTagData: Data) -> Bool {
-        malformedApplicationTags.contains(applicationTagData)
+        storage[reference] != nil
     }
 
     func storedHandleCount() -> Int {
-        storage.values.reduce(0) { $0 + $1.count } + malformedApplicationTags.count
+        storage.count + malformedRows.values.reduce(0, +)
     }
 
-    func applicationTagStrings() -> [String] {
-        (
-            storage.keys.map(\.applicationTagString)
-                + malformedApplicationTags.compactMap { String(data: $0, encoding: .utf8) }
-        )
-        .sorted()
+    func storedReferences() -> [SecureEnclaveCustodyHandleReference] {
+        Array(storage.keys)
     }
 
     func resetCallHistory() {
@@ -145,14 +131,21 @@ final class MockSecureEnclaveCustodyKeyStore: SecureEnclaveCustodyKeyStoring, @u
         loadRequests.removeAll()
     }
 
-    private func nextPublicKey() -> Data {
+    private func nextPublicKey(reference: SecureEnclaveCustodyHandleReference) -> Data {
         if !publicKeyResponses.isEmpty {
             return publicKeyResponses.removeFirst()
         }
         defer { publicKeyCounter = publicKeyCounter &+ 1 }
-        var data = Data([0x04])
-        data.append(Data(repeating: publicKeyCounter, count: 64))
-        return data
+        switch reference.tier {
+        case .classicalP256:
+            var data = Data([0x04])
+            data.append(Data(repeating: publicKeyCounter, count: 64))
+            return data
+        case .postQuantum, .postQuantumHigh:
+            let lengths = reference.tier.postQuantumPublicKeyLengths!
+            let length = reference.role == .signing ? lengths.signing : lengths.keyAgreement
+            return Data(repeating: publicKeyCounter, count: length)
+        }
     }
 }
 

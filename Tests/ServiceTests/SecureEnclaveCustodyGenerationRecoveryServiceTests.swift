@@ -29,11 +29,11 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
                 error: CypherAirError.invalidKeyData(reason: "p256 inspector must not be called")
             ),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore()),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256),
             compositeBindingInspector: MockSecureEnclaveCompositeBindingInspector(
                 inspection: Self.compositeInspection(identity: identity)
             ),
-            compositeHandleStore: SecureEnclaveCompositeHandleStore(keyStore: keyStore)
+            compositeHandleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .postQuantum)
         )
 
         let report = service.classify(identities: [identity])
@@ -65,7 +65,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
                 error: CypherAirError.invalidKeyData(reason: "p256 inspector must not be called")
             ),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore()),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256),
             compositeBindingInspector: MockSecureEnclaveCompositeBindingInspector(
                 inspection: Self.compositeInspection(
                     identity: identity,
@@ -73,7 +73,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
                     keyAgreementComponentPublicKey: Self.compositeHighKeyAgreementPublicKey
                 )
             ),
-            compositeHighHandleStore: SecureEnclaveCompositeHandleStore(
+            compositeHighHandleStore: SecureEnclaveCustodyHandleStore(
                 keyStore: keyStore,
                 tier: .postQuantumHigh
             )
@@ -97,11 +97,11 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
                 error: CypherAirError.invalidKeyData(reason: "p256 inspector must not be called")
             ),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore()),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256),
             compositeBindingInspector: MockSecureEnclaveCompositeBindingInspector(
                 inspection: Self.compositeInspection(identity: identity)
             ),
-            compositeHandleStore: SecureEnclaveCompositeHandleStore(keyStore: InMemoryCompositeKeyStore())
+            compositeHandleStore: SecureEnclaveCustodyHandleStore(keyStore: InMemoryCompositeKeyStore(), tier: .postQuantum)
         )
 
         let report = service.classify(identities: [identity])
@@ -114,8 +114,12 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
 
     func test_recoveryReportMarksCompleteMetadataAndHandlesAvailable() throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let handleStore = makeHandleStore(keyStore: keyStore, handleSetIdentifier: "available")
-        let pair = try handleStore.createHandlePair()
+        let handleStore = makeHandleStore(keyStore: keyStore, handleSetIdentifier: "a1a11ab1e0")
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = Self.identity(
             fingerprint: "available",
             publicKeyData: Data("available-cert".utf8),
@@ -124,8 +128,8 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         let inspector = MockSecureEnclaveCustodyPublicBindingInspector(
             inspection: Self.inspection(
                 identity: identity,
-                signingPublicKeyX963: pair.signing.publicKeyX963,
-                keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+                signingPublicKeyX963: pair.signing.publicKeyRaw,
+                keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyRaw
             )
         )
         let service = SecureEnclaveCustodyGenerationRecoveryService(
@@ -154,7 +158,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         )
         let service = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: inspector,
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
         )
 
         let report = service.classify(identities: [identity])
@@ -172,7 +176,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         )
 
         let partialKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let partialReference = try Self.reference("partial", .signing)
+        let partialReference = try Self.reference("9a57fa10", .signing)
         let partialSigning = try Self.binding(partialReference, byte: 0x31)
         partialKeyStore.insert(
             SecureEnclaveCustodyLoadedHandle(binding: partialSigning, privateKey: nil)
@@ -181,7 +185,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             keyStore: partialKeyStore,
             inspection: Self.inspection(
                 identity: identity,
-                signingPublicKeyX963: partialSigning.publicKeyX963,
+                signingPublicKeyX963: partialSigning.publicKeyRaw,
                 keyAgreementPublicKeyX963: Self.publicKey(byte: 0x32)
             )
         )
@@ -191,38 +195,18 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             .unavailable(.migrationOrRecoveryRequired)
         )
 
-        let ambiguousKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let ambiguousStore = makeHandleStore(keyStore: ambiguousKeyStore, handleSetIdentifier: "ambiguous")
-        let ambiguousPair = try ambiguousStore.createHandlePair()
-        ambiguousKeyStore.insert(
-            SecureEnclaveCustodyLoadedHandle(
-                binding: try Self.binding(ambiguousPair.signing.reference, byte: 0x33),
-                privateKey: nil
-            ),
-            allowingDuplicate: true
-        )
-        partialReport = makeService(
-            keyStore: ambiguousKeyStore,
-            inspection: Self.inspection(
-                identity: identity,
-                signingPublicKeyX963: ambiguousPair.signing.publicKeyX963,
-                keyAgreementPublicKeyX963: ambiguousPair.keyAgreement.publicKeyX963
-            )
-        )
-        .classify(identities: [identity])
-        XCTAssertEqual(
-            partialReport.assessments[0].handleAvailability,
-            .unavailable(.privateHandleInaccessible)
-        )
-
         let wrongPublicKeyStore = MockSecureEnclaveCustodyKeyStore()
-        let wrongPublicStore = makeHandleStore(keyStore: wrongPublicKeyStore, handleSetIdentifier: "wrong-public")
-        let wrongPublicPair = try wrongPublicStore.createHandlePair()
+        let wrongPublicStore = makeHandleStore(keyStore: wrongPublicKeyStore, handleSetIdentifier: "b0b2c0de99")
+        let wrongPublicPairLoaded = try wrongPublicStore.createLoadedHandlePair(authenticationContext: nil)
+        let wrongPublicPair = try SecureEnclaveCustodyHandlePair(
+            signing: wrongPublicPairLoaded.signing.binding,
+            keyAgreement: wrongPublicPairLoaded.keyAgreement.binding
+        )
         let wrongPublicReport = makeService(
             keyStore: wrongPublicKeyStore,
             inspection: Self.inspection(
                 identity: identity,
-                signingPublicKeyX963: wrongPublicPair.signing.publicKeyX963,
+                signingPublicKeyX963: wrongPublicPair.signing.publicKeyRaw,
                 keyAgreementPublicKeyX963: Self.publicKey(byte: 0x34)
             )
         )
@@ -248,7 +232,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         )
         let metadataMismatchReport = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: mismatchedInspector,
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
         )
         .classify(identities: [identity])
         XCTAssertEqual(
@@ -265,7 +249,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         )
         let corruptReport = SecureEnclaveCustodyGenerationRecoveryService(
             publicBindingInspector: corruptInspector,
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
         )
         .classify(identities: [identity])
         XCTAssertEqual(
@@ -312,7 +296,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
             publicBindingInspector: MockSecureEnclaveCustodyPublicBindingInspector(
                 inspection: inspection
             ),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
         )
     }
 
@@ -322,6 +306,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     ) -> SecureEnclaveCustodyHandleStore {
         SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
+            tier: .classicalP256,
             handleSetIdentifierGenerator: { handleSetIdentifier }
         )
     }
@@ -373,7 +358,8 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     ) throws -> SecureEnclaveCustodyHandleReference {
         try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: role
+            role: role,
+            tier: .classicalP256
         )
     }
 
@@ -383,7 +369,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
     ) throws -> SecureEnclaveCustodyHandlePublicBinding {
         try SecureEnclaveCustodyHandlePublicBinding(
             reference: reference,
-            publicKeyX963: publicKey(byte: byte)
+            publicKeyRaw: publicKey(byte: byte)
         )
     }
 
@@ -423,7 +409,7 @@ private final class MockSecureEnclaveCompositeBindingInspector: SecureEnclaveCom
 
     func inspectCompositeBindings(
         publicKeyData: Data,
-        tier: SecureEnclaveCompositeTier
+        tier: SecureEnclaveCustodyTier
     ) throws -> PGPSecureEnclaveCompositeBindingInspection {
         if let error {
             throw error
@@ -432,55 +418,63 @@ private final class MockSecureEnclaveCompositeBindingInspector: SecureEnclaveCom
     }
 }
 
-/// Minimal in-memory `SecureEnclaveCompositeKeyStoring` for the `.postQuantum`
+/// Minimal in-memory `SecureEnclaveCustodyKeyStoring` for the `.postQuantum`
 /// tier: only `inventoryBindings()` is exercised by handle location.
-private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring, @unchecked Sendable {
-    private let tier: SecureEnclaveCompositeTier
+private final class InMemoryCompositeKeyStore: SecureEnclaveCustodyKeyStoring, @unchecked Sendable {
+    private let tier: SecureEnclaveCustodyTier
     private var rows: [String: Data] = [:]
 
-    init(tier: SecureEnclaveCompositeTier = .postQuantum) {
+    init(tier: SecureEnclaveCustodyTier = .postQuantum) {
         self.tier = tier
     }
 
-    private func key(_ reference: SecureEnclaveCompositeHandleReference) -> String {
+    private func key(_ reference: SecureEnclaveCustodyHandleReference) -> String {
         "\(reference.handleSetIdentifier).\(reference.role.rawValue)"
     }
 
     func createKey(
-        reference: SecureEnclaveCompositeHandleReference,
+        reference: SecureEnclaveCustodyHandleReference,
         accessPolicy: SecureEnclaveCustodyAccessControlPolicy,
         authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCompositeLoadedHandle {
+    ) throws -> SecureEnclaveCustodyLoadedHandle {
         throw SecureEnclaveCustodyHandleError.hardwareUnavailable
     }
 
     func loadKey(
-        reference: SecureEnclaveCompositeHandleReference,
+        reference: SecureEnclaveCustodyHandleReference,
         authenticationContext: LAContext?
-    ) throws -> SecureEnclaveCompositeLoadedHandle? {
+    ) throws -> SecureEnclaveCustodyLoadedHandle? {
         nil
     }
 
-    func inventoryBindings() throws -> [SecureEnclaveCompositeHandlePublicBinding] {
-        try rows.compactMap { entry in
+    func inventory() throws -> SecureEnclaveCustodyHandleInventory {
+        let bindings = try rows.compactMap { entry -> SecureEnclaveCustodyHandlePublicBinding? in
             let parts = entry.key.split(separator: ".")
             guard parts.count == 2,
                   let role = PGPPrivateOperationRole(rawValue: String(parts[1])) else {
                 return nil
             }
-            let reference = try SecureEnclaveCompositeHandleReference(
+            let reference = try SecureEnclaveCustodyHandleReference(
                 handleSetIdentifier: String(parts[0]),
                 role: role,
                 tier: tier
             )
-            return try SecureEnclaveCompositeHandlePublicBinding(
+            return try SecureEnclaveCustodyHandlePublicBinding(
                 reference: reference,
                 publicKeyRaw: entry.value
             )
         }
+        return SecureEnclaveCustodyHandleInventory(bindings: bindings, malformedRowCount: 0)
     }
 
-    func deleteKey(reference: SecureEnclaveCompositeHandleReference) throws {
+    func deleteAllKeys(tier: SecureEnclaveCustodyTier, role: PGPPrivateOperationRole) throws {
+        guard tier == self.tier else {
+            return
+        }
+        rows = rows.filter { !$0.key.hasSuffix(".\(role.rawValue)") }
+    }
+
+    func deleteKey(reference: SecureEnclaveCustodyHandleReference) throws {
         guard rows.removeValue(forKey: key(reference)) != nil else {
             throw SecureEnclaveCustodyHandleError.privateHandleMissing(reference.role)
         }
@@ -491,12 +485,12 @@ private final class InMemoryCompositeKeyStore: SecureEnclaveCompositeKeyStoring,
         signing: Data = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeSigningPublicKey,
         keyAgreement: Data = SecureEnclaveCustodyGenerationRecoveryServiceTests.compositeKeyAgreementPublicKey
     ) throws {
-        let signingReference = try SecureEnclaveCompositeHandleReference(
+        let signingReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
             role: .signing,
             tier: tier
         )
-        let keyAgreementReference = try SecureEnclaveCompositeHandleReference(
+        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
             role: .keyAgreement,
             tier: tier

@@ -10,8 +10,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private let handleStore: SecureEnclaveCustodyHandleStore
     private let digestSigner: any SecureEnclaveCustodyDigestSigning
     private let compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)?
-    private let compositeHandleStore: SecureEnclaveCompositeHandleStore?
-    private let compositeHighHandleStore: SecureEnclaveCompositeHandleStore?
+    private let compositeHandleStore: SecureEnclaveCustodyHandleStore?
+    private let compositeHighHandleStore: SecureEnclaveCustodyHandleStore?
     private let compositeSigner: (any SecureEnclaveCompositeSigning)?
     private let compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore?
     private let catalogStore: KeyCatalogStore
@@ -27,8 +27,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         handleStore: SecureEnclaveCustodyHandleStore,
         digestSigner: any SecureEnclaveCustodyDigestSigning,
         compositeCertificateBuilder: (any SecureEnclaveCompositeCertificateBuilding)? = nil,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
-        compositeHighHandleStore: SecureEnclaveCompositeHandleStore? = nil,
+        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil,
+        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil,
         compositeSigner: (any SecureEnclaveCompositeSigning)? = nil,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore? = nil,
         catalogStore: KeyCatalogStore,
@@ -56,7 +56,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         self.afterIdentityCommitCheckpoint = afterIdentityCommitCheckpoint
     }
 
-    /// Only the custody authorization and immediately authorized handle-load
+    /// Only the custody authorization and immediately authorized handle-creation
     /// window is enrolled in an operation-prompt session. Certificate building
     /// and durable metadata commit stay outside that window so a genuine macOS
     /// away still locks immediately when grace period is 0.
@@ -67,38 +67,44 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         configurationIdentity: PGPKeyConfiguration.Identity,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
-        try await performGenerateKey(
-            name: name,
-            email: email,
-            expirySeconds: expirySeconds,
-            configurationIdentity: configurationIdentity,
-            invalidationToken: token
-        )
-    }
-
-    private func performGenerateKey(
-        name: String,
-        email: String?,
-        expirySeconds: UInt64?,
-        configurationIdentity: PGPKeyConfiguration.Identity,
-        invalidationToken token: KeyProvisioningInvalidationGate.Token
-    ) async throws -> PGPKeyIdentity {
         let configuration = configurationIdentity.configuration
-        if let compositeTier = configuration.identity.deviceBoundCompositeTier {
+        guard let tier = configuration.identity.deviceBoundCustodyTier else {
+            throw CypherAirError.invalidKeyData(
+                reason: "Secure Enclave custody generation requires a device-bound configuration."
+            )
+        }
+        switch tier {
+        case .classicalP256:
+            return try await performGenerateClassicalKey(
+                name: name,
+                email: email,
+                expirySeconds: expirySeconds,
+                configuration: configuration,
+                invalidationToken: token
+            )
+        case .postQuantum, .postQuantumHigh:
             return try await performGenerateCompositeKey(
                 name: name,
                 email: email,
                 expirySeconds: expirySeconds,
                 configuration: configuration,
-                tier: compositeTier,
+                tier: tier,
                 invalidationToken: token
             )
         }
-        guard configuration.algorithmSuite == .p256 else {
-            throw CypherAirError.invalidKeyData(
-                reason: "Secure Enclave custody generation requires a P-256 configuration."
-            )
-        }
+    }
+
+    /// Classical (P-256) generation: create the two Secure Enclave keys under
+    /// one authorized window, build the public-only v4/v6 certificate through
+    /// the external P-256 signer, then commit the identity. Every failure path
+    /// tears down the enclave keys and any committed identity.
+    private func performGenerateClassicalKey(
+        name: String,
+        email: String?,
+        expirySeconds: UInt64?,
+        configuration: PGPKeyConfiguration,
+        invalidationToken token: KeyProvisioningInvalidationGate.Token
+    ) async throws -> PGPKeyIdentity {
         let resolution = resolver.resolution(
             for: .generate,
             configuration: configuration,
@@ -113,17 +119,20 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        let authorizedPair = try await createAuthorizedHandlePair()
+        let authorizedPair = try await createAuthorizedHandlePair(handleStore: handleStore)
         let authorizedContext = authorizedPair.authenticationContext
         defer {
             authorizedContext?.invalidate()
         }
 
-        let handlePair = authorizedPair.handlePair
+        let loadedPair = authorizedPair.loadedPair
+        let handlePair = try SecureEnclaveCustodyHandlePair(
+            signing: loadedPair.signing.binding,
+            keyAgreement: loadedPair.keyAgreement.binding
+        )
         var storedFingerprint: String?
         var didRollbackGeneratedState = false
         do {
-            let loadedPair = authorizedPair.loadedPair
             try Task.checkCancellation()
             try invalidationGate.checkValid(token)
 
@@ -174,7 +183,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
                 } catch {
                     do {
                         didRollbackGeneratedState = true
-                        try rollbackGeneratedState(
+                        try rollbackGeneratedClassicalState(
                             handlePair: handlePair,
                             storedFingerprint: storedFingerprint
                         )
@@ -187,7 +196,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         } catch {
             if !didRollbackGeneratedState {
                 do {
-                    try rollbackGeneratedState(
+                    try rollbackGeneratedClassicalState(
                         handlePair: handlePair,
                         storedFingerprint: storedFingerprint
                     )
@@ -211,14 +220,20 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         email: String?,
         expirySeconds: UInt64?,
         configuration: PGPKeyConfiguration,
-        tier: SecureEnclaveCompositeTier,
+        tier: SecureEnclaveCustodyTier,
         invalidationToken token: KeyProvisioningInvalidationGate.Token
     ) async throws -> PGPKeyIdentity {
         // Each tier creates and shape-checks its handles against its own
         // parameter set, so the enclave handle store is selected by tier
         // (exhaustive: a new tier fails to compile until it is wired here).
-        let tierHandleStore: SecureEnclaveCompositeHandleStore?
+        let tierHandleStore: SecureEnclaveCustodyHandleStore?
         switch tier {
+        case .classicalP256:
+            // generateKey dispatches classical tiers to the classical path
+            // before this function; reaching here is a wiring bug. Fail loudly
+            // in debug; the guard below still fails closed in release.
+            assertionFailure("Classical P-256 tier routed to composite generation")
+            tierHandleStore = nil
         case .postQuantum:
             tierHandleStore = compositeHandleStore
         case .postQuantumHigh:
@@ -244,8 +259,8 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
 
-        let authorizedPair = try await createAuthorizedCompositeHandlePair(
-            compositeHandleStore: compositeHandleStore
+        let authorizedPair = try await createAuthorizedHandlePair(
+            handleStore: compositeHandleStore
         )
         let authorizedContext = authorizedPair.authenticationContext
         defer {
@@ -360,9 +375,9 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
     }
 
-    private func createAuthorizedCompositeHandlePair(
-        compositeHandleStore: SecureEnclaveCompositeHandleStore
-    ) async throws -> AuthorizedCompositeGenerationHandlePair {
+    private func createAuthorizedHandlePair(
+        handleStore: SecureEnclaveCustodyHandleStore
+    ) async throws -> AuthorizedCustodyGenerationHandlePair {
         try await withOperationPromptIfConfigured(
             source: "keyProvisioning.generateSecureEnclaveCustody.authorize"
         ) {
@@ -388,10 +403,10 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             }
 
             do {
-                let loadedPair = try compositeHandleStore.createLoadedHandlePair(
+                let loadedPair = try handleStore.createLoadedHandlePair(
                     authenticationContext: authorizedContext
                 )
-                return AuthorizedCompositeGenerationHandlePair(
+                return AuthorizedCustodyGenerationHandlePair(
                     loadedPair: loadedPair,
                     authenticationContext: authorizedContext
                 )
@@ -402,10 +417,20 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         }
     }
 
+    private func rollbackGeneratedClassicalState(
+        handlePair: SecureEnclaveCustodyHandlePair,
+        storedFingerprint: String?
+    ) throws {
+        if let storedFingerprint {
+            try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
+        }
+        try handleStore.deleteHandlePair(handlePair)
+    }
+
     private func rollbackGeneratedCompositeState(
-        compositeHandleStore: SecureEnclaveCompositeHandleStore,
+        compositeHandleStore: SecureEnclaveCustodyHandleStore,
         compositeClassicalComponentStore: SecureEnclaveCompositeClassicalComponentStore,
-        loadedPair: SecureEnclaveCompositeLoadedHandlePair,
+        loadedPair: SecureEnclaveCustodyLoadedHandlePair,
         classicalReceipt: KeyBundleWriteReceipt?,
         storedFingerprint: String?
     ) throws {
@@ -415,66 +440,11 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
         if let classicalReceipt {
             compositeClassicalComponentStore.rollback(classicalReceipt)
         }
-        let pair = try SecureEnclaveCompositeHandlePair(
+        let pair = try SecureEnclaveCustodyHandlePair(
             signing: loadedPair.signing.binding,
             keyAgreement: loadedPair.keyAgreement.binding
         )
         try compositeHandleStore.deleteHandlePair(pair)
-    }
-
-    private func createAuthorizedHandlePair() async throws -> AuthorizedCustodyGenerationHandlePair {
-        try await withOperationPromptIfConfigured(
-            source: "keyProvisioning.generateSecureEnclaveCustody.authorize"
-        ) {
-            var authorizedContext: LAContext?
-            if let custodyOperationAuthenticator {
-                do {
-                    authorizedContext = try await custodyOperationAuthenticator(
-                        String(
-                            localized: "keygen.custody.auth.reason",
-                            defaultValue: "Authenticate to create your device-bound key."
-                        )
-                    )
-                } catch {
-                    authorizedContext?.invalidate()
-                    let normalized = SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error)
-                    throw CypherAirError.keyOperationUnavailable(
-                        category: PGPKeyOperationFailureMapper.category(
-                            for: normalized,
-                            fallback: .localAuthenticationFailed
-                        )
-                    )
-                }
-            }
-
-            do {
-                let handlePair = try handleStore.createHandlePair()
-                do {
-                    let loadedPair = try handleStore.loadHandlePair(
-                        expected: handlePair,
-                        authenticationContext: authorizedContext
-                    )
-                    return AuthorizedCustodyGenerationHandlePair(
-                        handlePair: handlePair,
-                        loadedPair: loadedPair,
-                        authenticationContext: authorizedContext
-                    )
-                } catch {
-                    do {
-                        try rollbackGeneratedState(
-                            handlePair: handlePair,
-                            storedFingerprint: nil
-                        )
-                    } catch {
-                        throw SecureEnclaveCustodyHandleError.cleanupOrRollbackFailed
-                    }
-                    throw error
-                }
-            } catch {
-                authorizedContext?.invalidate()
-                throw error
-            }
-        }
     }
 
     private func withOperationPromptIfConfigured<T>(
@@ -488,25 +458,9 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
             try await operation()
         }
     }
-
-    private func rollbackGeneratedState(
-        handlePair: SecureEnclaveCustodyHandlePair,
-        storedFingerprint: String?
-    ) throws {
-        if let storedFingerprint {
-            try catalogStore.discardCommittedIdentity(fingerprint: storedFingerprint)
-        }
-        try handleStore.deleteHandlePair(handlePair)
-    }
 }
 
 private struct AuthorizedCustodyGenerationHandlePair {
-    let handlePair: SecureEnclaveCustodyHandlePair
     let loadedPair: SecureEnclaveCustodyLoadedHandlePair
-    let authenticationContext: LAContext?
-}
-
-private struct AuthorizedCompositeGenerationHandlePair {
-    let loadedPair: SecureEnclaveCompositeLoadedHandlePair
     let authenticationContext: LAContext?
 }

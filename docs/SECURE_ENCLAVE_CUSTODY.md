@@ -25,7 +25,7 @@ All four are implemented, production-exposed wherever Secure Enclave hardware is
 The integration separates three concepts the software-key model partly compressed — OpenPGP **configuration** (version/algorithm/format/interop target), private-key **custody** (software secret certificate vs Secure Enclave private operations), and **operation capability** (what a key can do now, or an explicit unsupported state). The durable boundary:
 
 - **Service layer** owns user workflows; it asks `PGPKeyCapabilityResolver` for availability and `PrivateKeyOperationRouter` for a private-operation route, and never touches Keychain rows or Secure Enclave access-control flags directly.
-- **Security layer** (`Sources/Security/SecureEnclaveCustody*`, `SecureEnclaveComposite*`) owns the Apple primitives: role-tagged handle creation/loading, Keychain handle storage and deletion, access-control enforcement, role + public-key binding checks, and cleanup / local-reset participation.
+- **Security layer** (`Sources/Security/SecureEnclaveCustody*`, `SecureEnclaveComposite*`) owns the Apple primitives through one CryptoKit custody stack: every device-bound tier (classical P-256, ML-DSA/ML-KEM components) persists its enclave keys as `dataRepresentation` blobs in tier/role-namespaced generic-password rows, behind one handle store per tier for role-separated creation/loading, non-prompting locate by public binding, access-control enforcement, and cleanup / local-reset participation.
 - **Rust/OpenPGP layer** (`pgp-mobile/src/`, Sequoia) owns OpenPGP semantics: certificate construction/parsing, packet construction, ECDH KDF, AES Key Wrap, session-key validation, streaming payload decrypt, and MDC/AEAD hard-fail.
 
 Secure Enclave private operations cross the Rust boundary through the **external signer / key-agreement seams** (P-256) and the **external composite signer / decryptor seams** (ML-DSA/ML-KEM): Rust delegates only the private primitive and never receives private scalars or a complete secret certificate. The software-custody route is unchanged and is the only route that unwraps and zeroizes a secret certificate.
@@ -71,7 +71,7 @@ Signing and key agreement route to **distinct** handles by required role; wrong-
 
 Device-Bound Post-Quantum applies the same custody model to RFC 9980 composite keys (ML-DSA-65+Ed25519 signing, ML-KEM-768+X25519 encryption) with the same operation surface. Because CryptoKit's Secure Enclave offers ML-DSA/ML-KEM but no Ed25519/X25519, custody is **split**:
 
-- **Post-quantum components** are generated and held in the Secure Enclave as CryptoKit `dataRepresentation` blobs (`kSecClassGenericPassword` rows, this-device-only; the blob is useless off-device), gated by the same fixed `privateKeyUsage` + `biometryAny` access control baked in at creation.
+- **Post-quantum components** are generated and held in the Secure Enclave through the shared custody handle store (their tiers of the same blob-row model every device-bound tier uses; the blob is useless off-device), gated by the same fixed `privateKeyUsage` + `biometryAny` access control baked in at creation.
 - **Classical components** (one 32-byte Ed25519 seed + one 32-byte X25519 scalar, generated inside Rust) are sealed as a single payload under a dedicated fixed-access Secure Enclave `CAPKEV1` envelope, stored per fingerprint. The fixed policy — never the mode-dependent app wrapping policy — keeps every device-bound key exempt from Standard/High Security mode-switch re-wrap.
 
 Invariants ([POST_QUANTUM.md](POST_QUANTUM.md) §2–§3): every composite signature or decryption requires an in-enclave ML-DSA/ML-KEM operation; the classical component alone can neither sign nor decrypt; the key is never exportable in any operable form. The Rust engine owns all OpenPGP derivation — the RFC 9980 KEM combiner, AES-256 key unwrap, packet assembly, and composite self-verification before any signature is released — while Swift performs exactly the enclave primitive through the external composite provider seams, mirroring the external P-256 seams.
@@ -104,23 +104,23 @@ Real SE private operations via `CypherAir-DeviceTests` (and the destructive `Cyp
 
 | Scenario | macOS | iPhone | iPad | visionOS |
 | --- | --- | --- | --- | --- |
-| handle-pair generation + persistence | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| signing (real ECDSA) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| ECDH decrypt v4 (SEIPDv1/MDC) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| ECDH decrypt v6 (SEIPDv2/AEAD) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| hidden generation (v4 cert via real signing handle) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| missing handle fails closed | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| wrong public binding fails closed | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| wrong role fails closed (signer/KA guards) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| payload tamper hard-fail (no partial plaintext) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
+| handle-pair generation + persistence | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| signing (real ECDSA) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| ECDH decrypt v4 (SEIPDv1/MDC) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| ECDH decrypt v6 (SEIPDv2/AEAD) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| hidden generation (v4 cert via real signing handle) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| missing handle fails closed | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| wrong public binding fails closed | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| wrong role fails closed (signer/KA guards) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| payload tamper hard-fail (no partial plaintext) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
 | local-reset cleanup (dangerous plan) | ✅ captured | deferred | deferred | exposed, no evidence |
-| interaction-not-allowed proxy (fail-closed) | ✅ captured | ✅ captured | deferred | exposed, no evidence |
-| split-custody composite, both tiers (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests` — base ML-DSA-65/ML-KEM-768 and · High ML-DSA-87/ML-KEM-1024, 2026-07) | deferred | deferred | exposed, no evidence |
+| interaction-not-allowed proxy (fail-closed) | ✅ captured | recapture deferred | deferred | exposed, no evidence |
+| split-custody composite, both tiers (generate / combiner decrypt / sign / wrong-classical fail-closed) | ✅ captured (`DeviceSecureEnclaveCompositeCustodyTests` — base ML-DSA-65/ML-KEM-768 and · High ML-DSA-87/ML-KEM-1024, 2026-07-16) | deferred | deferred | exposed, no evidence |
 
 Capture notes:
 
-- **macOS** (arm64e, real Secure Enclave, gpg 2.5.19, 2026-06-13): all eleven P-256 rows captured — non-interactive scenarios, biometric scenarios (Touch ID approved at the sensor), and the destructive local-reset proof.
-- **iPhone** (iOS 27.0 developer beta, real Secure Enclave, 2026-06-14): the ten non-destructive P-256 rows captured; the local-reset row is covered on macOS.
+- **macOS** (arm64e, real Secure Enclave, 2026-07-16): all rows captured against the CryptoKit custody consolidation (issue #683) — non-interactive scenarios, biometric scenarios (Touch ID approved at the sensor), the destructive local-reset proof (dangerous plan), and both split-custody tiers.
+- **iPhone** — recapture deferred. The 2026-06-14 iPhone capture attested the retired SecKey custody implementation and no longer stands; iPhone runs the same CryptoKit `SecureEnclave` substrate the macOS capture exercises, and dedicated recapture is recommended before any iPhone-specific custody claim.
 - **iPad** — deferred. iPad runs the same iOS Secure Enclave substrate and LocalAuthentication stack as iPhone; dedicated capture is recommended before any iPad-specific custody claim.
 - **visionOS** — exposed without dedicated evidence (accepted risk, §9).
 
@@ -153,11 +153,11 @@ These lanes drive the **production** Secure Enclave seams with a software-P256 s
 | SE signs → gpg verifies | ✅ captured (manual plan) | documented manual cross-device |
 | gpg encrypts → production seam decrypts (real SE ECDH) | ✅ captured (manual plan) | documented manual cross-device |
 
-Captured on real Secure Enclave + gpg 2.5.19 (macOS arm64e, 2026-06-13): both directions passed. The iPhone/iPad cross-device procedure (produce SE artifacts on device, transfer to the Mac for gpg, transfer ciphertext back, decrypt through the production path) is a documented manual step because gpg runs only on the Mac.
+Captured on real Secure Enclave + gpg 2.5.20 (macOS arm64e, 2026-07-16, CryptoKit custody consolidation): both directions passed. The iPhone/iPad cross-device procedure (produce SE artifacts on device, transfer to the Mac for gpg, transfer ciphertext back, decrypt through the production path) is a documented manual step because gpg runs only on the Mac.
 
 ### 8.4 Sanitizer expectations
 
-All evidence output (console summaries, committed matrix entries, attachments) **must exclude**: plaintext, private-key material, ECDH shared secrets, session keys, KEKs, Keychain locators / application tags / handle-set identifiers, stable fingerprints, and temporary capability paths. Allowed: pass/fail, scenario labels, sanitized `PGPKeyOperationFailureCategory` values, algorithm/curve identifiers, packet versions/tags, counts, and the gpg version string. Enforcement: `SecureEnclaveCustodyEvidenceSummary` is sanitized by construction (enums + integer counts only) and pinned by `SecureEnclaveCustodyEvidenceLogTests`; the device tests assert trace/error sanitization; the Rust lanes print only scenario labels.
+All evidence output (console summaries, committed matrix entries, attachments) **must exclude**: plaintext, private-key material, ECDH shared secrets, session keys, KEKs, Keychain locators / handle-set identifiers, stable fingerprints, and temporary capability paths. Allowed: pass/fail, scenario labels, sanitized `PGPKeyOperationFailureCategory` values, algorithm/curve identifiers, packet versions/tags, counts, and the gpg version string. Enforcement: `SecureEnclaveCustodyEvidenceSummary` is sanitized by construction (enums + integer counts only) and pinned by `SecureEnclaveCustodyEvidenceLogTests`; the device tests assert error-text sanitization; the Rust lanes print only scenario labels.
 
 ### 8.5 GnuPG version policy
 

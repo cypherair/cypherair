@@ -3,7 +3,6 @@ import Security
 
 enum SecureEnclaveCustodyHandleError: Error, Equatable {
     case invalidHandleSetIdentifier
-    case invalidApplicationTag
     case invalidPublicKey(PGPPrivateOperationRole)
     case invalidPeerPublicKey(PGPPrivateOperationRole)
     case accessPolicyUnavailable
@@ -22,7 +21,6 @@ enum SecureEnclaveCustodyHandleError: Error, Equatable {
     var failureCategory: PGPKeyOperationFailureCategory {
         switch self {
         case .invalidHandleSetIdentifier,
-             .invalidApplicationTag,
              .invalidPublicKey:
             return .privateHandleInaccessible
         case .invalidPeerPublicKey:
@@ -63,10 +61,10 @@ enum SecureEnclaveCustodyHandleError: Error, Equatable {
     }
 }
 
-/// Maps Security-framework `OSStatus` / `CFError` results to role-tagged
-/// `SecureEnclaveCustodyHandleError` values. Shared by the digest signer,
-/// key-agreement, and key-store paths so status classification stays consistent
-/// across operations rather than being re-implemented per call site.
+/// Maps Security-framework `OSStatus` results to role-tagged
+/// `SecureEnclaveCustodyHandleError` values, so keychain-row status
+/// classification stays consistent across the key-store paths rather than
+/// being re-implemented per call site.
 enum SecureEnclaveCustodyOSStatusMapper {
     static func handleError(
         for status: OSStatus,
@@ -88,16 +86,5 @@ enum SecureEnclaveCustodyOSStatusMapper {
         default:
             return .privateHandleInaccessible(role)
         }
-    }
-
-    static func handleError(
-        for error: Unmanaged<CFError>?,
-        role: PGPPrivateOperationRole
-    ) -> SecureEnclaveCustodyHandleError {
-        guard let error else {
-            return .privateHandleInaccessible(role)
-        }
-        let code = OSStatus(CFErrorGetCode(error.takeRetainedValue()))
-        return handleError(for: code, role: role)
     }
 }

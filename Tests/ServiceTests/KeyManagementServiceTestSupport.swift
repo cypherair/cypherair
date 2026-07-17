@@ -648,7 +648,8 @@ class KeyManagementServiceTestCase: XCTestCase {
                     ),
                     handleStore: SecureEnclaveCustodyHandleStore(
                         keyStore: keyStore,
-                        handleSetIdentifierGenerator: { "hidden-drain" }
+                        tier: .classicalP256,
+                        handleSetIdentifierGenerator: { "68696464656e2d647261696e" }
                     ),
                     digestSigner: HiddenGenerationTestDigestSigner(),
                     catalogStore: catalogStore,
@@ -877,35 +878,10 @@ class KeyManagementServiceTestCase: XCTestCase {
     func generatedHiddenCustodyExportFixture(
         configurationIdentity: PGPKeyConfiguration.Identity
     ) async throws -> HiddenCustodyExportFixture {
-        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
-        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
-        let handleSetIdentifier = "export-\(UUID().uuidString.lowercased())"
-        let signingReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .signing
-        )
-        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
-        )
-        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: SecureEnclaveCustodyLoadedHandle(
-                binding: SecureEnclaveCustodyHandlePublicBinding(
-                    reference: signingReference,
-                    publicKeyX963: signingPublicKeyX963
-                ),
-                privateKey: signingPrivateKey
-            ),
-            keyAgreement: SecureEnclaveCustodyLoadedHandle(
-                binding: SecureEnclaveCustodyHandlePublicBinding(
-                    reference: keyAgreementReference,
-                    publicKeyX963: keyAgreementPublicKeyX963
-                ),
-                privateKey: nil
-            )
-        )
+        let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let signingPublicKeyX963 = custodyMaterial.signingPublicKeyX963
+        let keyAgreementPublicKeyX963 = custodyMaterial.keyAgreementPublicKeyX963
+        let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
         let adapter = PGPSecureEnclaveCustodyGenerationAdapter(engine: engine)
         let material = try await adapter.generatePublicCertificate(
             name: "Hidden Export \(configurationIdentity.rawValue)",
@@ -913,7 +889,7 @@ class KeyManagementServiceTestCase: XCTestCase {
             expirySeconds: 3600,
             configuration: configurationIdentity.configuration,
             handlePair: handlePair,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let metadata = material.metadata
         let identity = PGPKeyIdentity(
@@ -938,35 +914,6 @@ class KeyManagementServiceTestCase: XCTestCase {
             signingPublicKeyX963: signingPublicKeyX963,
             keyAgreementPublicKeyX963: keyAgreementPublicKeyX963
         )
-    }
-
-    static func makeEphemeralP256PrivateKey() throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to create test P-256 key."
-            )
-        }
-        return key
-    }
-
-    static func publicKeyX963(from privateKey: SecKey) throws -> Data {
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw CypherAirError.keyGenerationFailed(reason: "Failed to derive test P-256 public key.")
-        }
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to export test P-256 public key."
-            )
-        }
-        return data
     }
 
     static func hiddenRecoveryReport(

@@ -13,8 +13,12 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
         try requireSecureEnclaveCustodyHardware()
 
         let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try handleStore.createHandlePair()
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         defer {
             try? handleStore.deleteHandlePair(pair)
         }
@@ -26,14 +30,11 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
             context.invalidate()
         }
 
-        let signingKey = try loadPrivateKey(
-            reference: pair.signing.reference,
-            authenticationContext: context
-        )
         let loadedPair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: SecureEnclaveCustodyLoadedHandle(
-                binding: pair.signing,
-                privateKey: signingKey
+            signing: handleStore.loadHandle(
+                reference: pair.signing.reference,
+                expectedPublicKeyRaw: pair.signing.publicKeyRaw,
+                authenticationContext: context
             ),
             keyAgreement: SecureEnclaveCustodyLoadedHandle(
                 binding: pair.keyAgreement,
@@ -58,8 +59,8 @@ final class DeviceSecureEnclaveCustodyHiddenGenerationTests: SecureEnclaveCustod
         XCTAssertFalse(material.keyAgreementSubkeyFingerprint.isEmpty)
 
         let located = try handleStore.locateHandlePair(
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            signingPublicKeyRaw: pair.signing.publicKeyRaw,
+            keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw
         )
         XCTAssertEqual(located, pair)
         recordEvidence(.hiddenGeneration, configuration: .compatibleP256V4)

@@ -41,8 +41,8 @@ final class PGPSecureEnclaveCustodyGenerationAdapter: SecureEnclaveCustodyCertif
                 email: email,
                 expirySeconds: expirySeconds,
                 configuration: configuration,
-                signingPublicKeyX963: handlePair.signing.binding.publicKeyX963,
-                keyAgreementPublicKeyX963: handlePair.keyAgreement.binding.publicKeyX963,
+                signingPublicKeyX963: handlePair.signing.binding.publicKeyRaw,
+                keyAgreementPublicKeyX963: handlePair.keyAgreement.binding.publicKeyRaw,
                 signingProvider: PGPExternalP256SigningProviderBridge(
                     handle: handlePair.signing,
                     digestSigner: digestSigner

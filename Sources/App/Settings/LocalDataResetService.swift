@@ -33,7 +33,6 @@ final class LocalDataResetService {
     private let temporaryArtifactStore: AppTemporaryArtifactStore
     private let protectedDataRootSecretExists: () -> Bool
     private let secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore?
-    private let secureEnclaveCompositeHandleStore: SecureEnclaveCompositeHandleStore?
     private let traceStore: AuthLifecycleTraceStore?
 
     init(
@@ -54,7 +53,6 @@ final class LocalDataResetService {
         fileManager: FileManager = .default,
         protectedDataRootSecretExists: (() -> Bool)? = nil,
         secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore? = nil,
-        secureEnclaveCompositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
         traceStore: AuthLifecycleTraceStore? = nil
     ) {
         self.keychain = keychain
@@ -80,7 +78,6 @@ final class LocalDataResetService {
             )
         }
         self.secureEnclaveCustodyHandleStore = secureEnclaveCustodyHandleStore
-        self.secureEnclaveCompositeHandleStore = secureEnclaveCompositeHandleStore
         self.traceStore = traceStore
     }
 
@@ -112,10 +109,6 @@ final class LocalDataResetService {
             failures: &failures
         )
         cleanupSecureEnclaveCustodyHandles(
-            deletedKeychainItemCount: &deletedKeychainItemCount,
-            failures: &failures
-        )
-        cleanupSecureEnclaveCompositeHandles(
             deletedKeychainItemCount: &deletedKeychainItemCount,
             failures: &failures
         )
@@ -333,16 +326,12 @@ final class LocalDataResetService {
             let remainingSecureEnclaveCustodyHandleCount = remainingSecureEnclaveCustodyHandleCount(
                 failures: &failures
             )
-            let remainingSecureEnclaveCompositeHandleCount = remainingSecureEnclaveCompositeHandleCount(
-                failures: &failures
-            )
             let remainingTemporaryTargets = temporaryResetTargetsRemaining()
             let remainingContactRuntimeCount = contactService.runtimeContactCountForDiagnostics
             let hasRemainingData = hasProtectedArtifacts
                 || hasRootSecret
                 || !remainingDefaultAccountServices.isEmpty
                 || remainingSecureEnclaveCustodyHandleCount > 0
-                || remainingSecureEnclaveCompositeHandleCount > 0
                 || !remainingTemporaryTargets.isEmpty
                 || !keyManagement.keys.isEmpty
                 || remainingContactRuntimeCount > 0
@@ -372,9 +361,6 @@ final class LocalDataResetService {
             }
             if remainingSecureEnclaveCustodyHandleCount > 0 {
                 failures.append("keychain.secureEnclaveCustodyHandle.remaining.\(remainingSecureEnclaveCustodyHandleCount)")
-            }
-            if remainingSecureEnclaveCompositeHandleCount > 0 {
-                failures.append("keychain.secureEnclaveCompositeHandle.remaining.\(remainingSecureEnclaveCompositeHandleCount)")
             }
             if !remainingTemporaryTargets.isEmpty {
                 failures.append("temporary.remaining.\(remainingTemporaryTargets.count)")
@@ -429,37 +415,6 @@ final class LocalDataResetService {
         )
     }
 
-    private func cleanupSecureEnclaveCompositeHandles(
-        deletedKeychainItemCount: inout Int,
-        failures: inout [String]
-    ) {
-        guard let secureEnclaveCompositeHandleStore else {
-            return
-        }
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.secureEnclaveComposite.cleanup.start",
-            metadata: ["serviceKind": "secureEnclaveCompositeHandle"]
-        )
-        let result = secureEnclaveCompositeHandleStore.cleanupAllHandlesForLocalDataReset()
-        deletedKeychainItemCount += result.deletedHandleCount
-        var metadata = [
-            "serviceKind": "secureEnclaveCompositeHandle",
-            "result": result.succeeded ? "success" : "failed",
-            "inspectedHandleCount": String(result.inspectedHandleCount),
-            "deletedHandleCount": String(result.deletedHandleCount)
-        ]
-        if let failureCategory = result.failureCategory {
-            metadata["failureCategory"] = failureCategory.rawValue
-            failures.append("keychain.secureEnclaveCompositeHandle.\(failureCategory.rawValue)")
-        }
-        traceStore?.record(
-            category: .operation,
-            name: "localDataReset.secureEnclaveComposite.cleanup.finish",
-            metadata: metadata
-        )
-    }
-
     private func remainingKeychainServices(
         account: String,
         authenticationContext: LAContext?,
@@ -488,21 +443,6 @@ final class LocalDataResetService {
             return 0
         } catch {
             failures.append("keychain.remaining.secureEnclaveCustodyHandle.\(Self.failureName(for: error))")
-            return 0
-        }
-    }
-
-    private func remainingSecureEnclaveCompositeHandleCount(failures: inout [String]) -> Int {
-        guard let secureEnclaveCompositeHandleStore else {
-            return 0
-        }
-        do {
-            return try secureEnclaveCompositeHandleStore.inventoryHandleCount()
-        } catch let error as SecureEnclaveCustodyHandleError {
-            failures.append("keychain.remaining.secureEnclaveCompositeHandle.\(error.failureCategory.rawValue)")
-            return 0
-        } catch {
-            failures.append("keychain.remaining.secureEnclaveCompositeHandle.\(Self.failureName(for: error))")
             return 0
         }
     }

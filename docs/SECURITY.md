@@ -91,12 +91,12 @@ A second, implemented custody model — the Device-Bound key families — perfor
 
 The durable red lines below bind all code under `Sources/Security/SecureEnclaveCustody*`, `Sources/Security/SecureEnclaveComposite*`, and `pgp-mobile`:
 
-- **Handles & access control.** For the classical device-bound families: two distinct role-tagged SE P-256 `SecKey` rows per identity (`.signing`, `.keyAgreement`), created with `kSecAttrTokenIDSecureEnclave` and access control `WhenUnlockedThisDeviceOnly + .privateKeyUsage + .biometryAny` — no `.devicePasscode`, no `.or`, and never the mode-dependent app helper. Creation sets no `kSecAttrCanSign`/`kSecAttrCanDerive` usage flags — role trust comes only from the role tag, public-key binding, and router policy. Application tags are a random handle-set id plus role, never a fingerprint. Load/inspect fail closed unless the stored role and the 65-byte X9.63 public key both match. (Composite custody uses a different handle shape under the same fixed access policy — [SECURE_ENCLAVE_CUSTODY.md](SECURE_ENCLAVE_CUSTODY.md) §4.1.)
+- **Handles & access control.** Every device-bound tier stores two distinct role-separated CryptoKit Secure Enclave keys per identity (`.signing`, `.keyAgreement`) — P-256 for the classical tier, ML-DSA/ML-KEM components for the split-custody tiers — persisted as `dataRepresentation` blobs in tier/role-namespaced `kSecClassGenericPassword` rows, with access control `WhenUnlockedThisDeviceOnly + .privateKeyUsage + .biometryAny` baked into the enclave key at creation — no `.devicePasscode`, no `.or`, and never the mode-dependent app helper. Role trust comes only from the row's tier/role namespace, public-key binding, and router policy. Row accounts are a random handle-set id, never a fingerprint. Load/locate fail closed unless the stored binding, the reconstructed key's public key, and the expected tier-shaped public key all match.
 - **External operation boundary.** Rust/Sequoia owns all OpenPGP semantics; the enclave performs only the private scalar operation through a narrow callback. Signing: public key + SHA-256 digest in, ECDSA `r/s` out, verified by Rust against that key and digest. Key agreement: recipient + ephemeral public keys in, raw 32-byte shared secret out; Rust owns the ECDH KDF, AES Key Wrap, session-key validation, payload authentication, and verification folding. Swift zeroizes the shared-secret buffers it owns; Rust hard-aborts a malformed or zero shared secret. The callback never carries secret certificate material.
 - **Dispatch & fail-closed.** `PGPKeyCapabilityResolver` gates generation, signing-class, and key-agreement operations independently; `PrivateKeyOperationRouter` returns a Secure Enclave route only after the stored public certificate, fingerprint, key version, role, and public-key bindings agree with the Security-owned handles. A Secure Enclave route **never falls back** to software secret-certificate material. The decrypt Phase 1/Phase 2 boundary is preserved: Phase 1 recipient parsing is unauthenticated and the matched-key guard runs before any private-key access.
-- **Sanitized failure mapping.** All custody error paths expose only stable app-owned categories. Logs, errors, UI, ProtectedData, and Rust never carry fingerprints, application tags, handle-set identifiers, public-binding bytes, Keychain locators, plaintext, private material, shared secrets, session keys, KEKs, digests, or signatures.
+- **Sanitized failure mapping.** All custody error paths expose only stable app-owned categories. Logs, errors, UI, ProtectedData, and Rust never carry fingerprints, handle-set identifiers, public-binding bytes, Keychain locators, plaintext, private material, shared secrets, session keys, KEKs, digests, or signatures.
 - **Storage, export & hard-fail.** Generation stores only the public certificate, the key-level revocation packet, and the custody kind in `key-metadata` — never private material, handle locators, or access-control policy. A missing revocation artifact fails closed and is never regenerated. Private-key backup/export is unsupported and must not touch the `privkey-envelope` row. Payload authentication is unchanged: MDC/AEAD hard-fail with no partial plaintext; streaming decrypt releases output only through the success-only `.tmp`-then-rename contract.
-- **Reset & recovery.** Reset All Local Data inventories and deletes only app-owned custody rows (including malformed app-owned tags); startup classification never deletes orphan handles and produces only an in-memory sanitized report.
+- **Reset & recovery.** Reset All Local Data inventories and deletes only app-owned custody rows (including app-owned rows whose attributes no longer decode); startup classification never deletes orphan handles and produces only an in-memory sanitized report.
 
 ### ProtectedData Device-Binding Note
 
@@ -221,8 +221,8 @@ These hold for every change, independent of which file is touched:
 | `Sources/Security/SecureEnclaveManager.swift` | SE wrapping/unwrapping logic. Error = keys lost or insecure. |
 | `Sources/Security/PrivateKeyEnvelope.swift` | `CAPKEV1` envelope (ephemeral-static ECDH, HKDF/AAD binding, contract validation). Error = keys lost, tamper accepted, or domain separation broken. |
 | `Sources/Security/KeyBundleStore.swift` | Envelope persistence, pending/permanent promotion, interrupted-rewrap state. Error = key material lost or recovery fails open. |
-| `Sources/Security/SecureEnclaveCustody*` | Custody handle lifecycle, access-control policy, role/public-key binding, sanitized failure mapping. |
-| `Sources/Security/SecureEnclaveComposite*` | Split-custody component stores and in-enclave ML-DSA/ML-KEM operations for Device-Bound Post-Quantum. |
+| `Sources/Security/SecureEnclaveCustody*` | Custody handle lifecycle for every device-bound tier, access-control policy, role/public-key binding, in-enclave P-256 signing/ECDH, sanitized failure mapping. |
+| `Sources/Security/SecureEnclaveComposite*` | Split-custody classical-component store and in-enclave ML-DSA/ML-KEM operations for Device-Bound Post-Quantum. |
 | `Sources/Security/KeychainManager.swift` | Access control flags. Wrong flags = wrong auth behavior. |
 | `Sources/Security/AuthenticationManager.swift` | Mode switching re-wrap. Error = keys permanently lost. |
 | `Sources/Security/ProtectedData/` | Root-secret authorization, SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
@@ -242,8 +242,7 @@ These hold for every change, independent of which file is touched:
 ### Functions Requiring Human Review
 
 - Any function that calls `SecAccessControlCreateWithFlags`
-- Any function that calls `SecKeyCreateRandomKey`, `SecItemCopyMatching`, or `SecItemDelete` for `kSecClassKey`
-- Any function that calls `SecureEnclave.P256.KeyAgreement.PrivateKey()` or the SecureEnclave ML-DSA/ML-KEM constructors
+- Any function that calls a `SecureEnclave.P256`, `SecureEnclave.MLDSA*`, or `SecureEnclave.MLKEM*` constructor
 - Any function that calls `AES.GCM.seal()` or `AES.GCM.open()` on key material
 - Any function that calls `HKDF<SHA256>.deriveKey()`
 - Any function that writes to or deletes from Keychain

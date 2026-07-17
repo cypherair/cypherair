@@ -57,9 +57,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-signing" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7369676e696e67" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -89,7 +94,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             XCTAssertEqual(signerRoute.signingHandle.binding, pair.signing)
             XCTAssertEqual(
                 signerRoute.publicBindingInspection.signingPublicKeyX963,
-                pair.signing.publicKeyX963
+                pair.signing.publicKeyRaw
             )
         }
     }
@@ -118,9 +123,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-agreement" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d61677265656d656e74" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -144,7 +154,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         XCTAssertEqual(keyAgreementRoute.keyAgreementHandle.binding, pair.keyAgreement)
         XCTAssertEqual(
             keyAgreementRoute.publicBindingInspection.keyAgreementPublicKeyX963,
-            pair.keyAgreement.publicKeyX963
+            pair.keyAgreement.publicKeyRaw
         )
     }
 
@@ -246,9 +256,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-fpmismatch" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d66706d69736d61746368" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(
@@ -320,57 +335,24 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         )
     }
 
-    func test_wrongHandleRoleMapsToRoleMismatch() async throws {
-        let keyStore = MockSecureEnclaveCustodyKeyStore()
-        let signingReference = try reference("router-wrong-role", .signing)
-        let keyAgreementReference = try reference("router-wrong-role", .keyAgreement)
-        let wrongSigningHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(keyAgreementReference, byte: 0x51),
-            privateKey: nil
-        )
-        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try binding(keyAgreementReference, byte: 0x52),
-            privateKey: nil
-        )
-        keyStore.insert(wrongSigningHandle, for: signingReference)
-        keyStore.insert(keyAgreementHandle)
-
-        let identity = makeSecureEnclaveIdentity()
-        let inspector = RecordingPublicBindingInspector()
-        inspector.inspection = makeInspection(
-            identity: identity,
-            signingPublicKeyX963: wrongSigningHandle.binding.publicKeyX963,
-            keyAgreementPublicKeyX963: keyAgreementHandle.binding.publicKeyX963
-        )
-        let router = try makeRouter(
-            identities: [identity],
-            policy: .testSecureEnclaveSigningRoutes,
-            inspector: inspector,
-            keyStore: keyStore
-        )
-
-        assertBlocked(
-            await router.route(for: PrivateKeyOperationRequest(
-                fingerprint: identity.fingerprint,
-                operation: .sign
-            )),
-            .unavailable(.privateOperationRoleMismatch)
-        )
-    }
-
     func test_wrongPublicBindingMapsToBindingMismatch() async throws {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-wrong-binding" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d77726f6e672d62696e64696e67" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(
             identity: identity,
             signingPublicKeyX963: makePublicKey(byte: 0x61),
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyRaw
         )
         let router = try makeRouter(
             identities: [identity],
@@ -399,9 +381,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             let keyStore = MockSecureEnclaveCustodyKeyStore()
             let setupStore = SecureEnclaveCustodyHandleStore(
                 keyStore: keyStore,
-                handleSetIdentifierGenerator: { "router-auth-\(index)" }
+                tier: .classicalP256,
+                handleSetIdentifierGenerator: { "726f757465722d617574682d5c28696e64657829" }
             )
-            let pair = try setupStore.createHandlePair()
+            let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
             keyStore.failLoadError = loadError
 
             let identity = makeSecureEnclaveIdentity()
@@ -428,9 +415,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-signer" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d7369676e6572" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -468,9 +460,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-agreement" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d61677265656d656e74" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -506,9 +503,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-cancel" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d63616e63656c" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -538,9 +540,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-fail" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d6661696c" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -569,9 +576,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-lockout" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d6c6f636b6f7574" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -601,9 +613,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-nil" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d6e696c" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -674,9 +691,14 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-p7f-loadfail" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d7037662d6c6f61646661696c" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
@@ -767,14 +789,19 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         let keyStore = MockSecureEnclaveCustodyKeyStore()
         let setupStore = SecureEnclaveCustodyHandleStore(
             keyStore: keyStore,
-            handleSetIdentifierGenerator: { "router-composition" }
+            tier: .classicalP256,
+            handleSetIdentifierGenerator: { "726f757465722d636f6d706f736974696f6e" }
         )
-        let pair = try setupStore.createHandlePair()
+        let pairLoaded = try setupStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         let identity = makeSecureEnclaveIdentity()
         let inspector = RecordingPublicBindingInspector()
         inspector.inspection = makeInspection(identity: identity, pair: pair)
         let loadObservation = LockedBool()
-        keyStore.onLoadKeys = {
+        keyStore.onLoadKey = {
             loadObservation.set(harness.coordinator.isOperationPromptInProgress)
         }
         let gate = GatedRouterCustodyAuthenticator(coordinator: harness.coordinator)
@@ -844,7 +871,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
             catalogStore: catalogStore,
             resolver: PGPKeyCapabilityResolver(policy: policy),
             publicBindingInspector: inspector,
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore),
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256),
             custodyOperationAuthenticator: custodyOperationAuthenticator,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )
@@ -947,8 +974,8 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
         makeInspection(
             identity: identity,
             fingerprint: fingerprint,
-            signingPublicKeyX963: pair.signing.publicKeyX963,
-            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyX963
+            signingPublicKeyX963: pair.signing.publicKeyRaw,
+            keyAgreementPublicKeyX963: pair.keyAgreement.publicKeyRaw
         )
     }
 
@@ -986,7 +1013,8 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     ) throws -> SecureEnclaveCustodyHandleReference {
         try SecureEnclaveCustodyHandleReference(
             handleSetIdentifier: handleSetIdentifier,
-            role: role
+            role: role,
+            tier: .classicalP256
         )
     }
 
@@ -996,7 +1024,7 @@ final class PrivateKeyOperationRouterTests: XCTestCase {
     ) throws -> SecureEnclaveCustodyHandlePublicBinding {
         try SecureEnclaveCustodyHandlePublicBinding(
             reference: reference,
-            publicKeyX963: makePublicKey(byte: byte)
+            publicKeyRaw: makePublicKey(byte: byte)
         )
     }
 

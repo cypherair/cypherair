@@ -1,35 +1,54 @@
 import CryptoKit
 import LocalAuthentication
-import Security
 import XCTest
 @testable import CypherAir
 
-/// Device-only evidence for the future Secure Enclave custody handle store.
+/// Device-only evidence for the Secure Enclave custody handle store.
 ///
-/// These tests exercise real Secure Enclave `kSecClassKey` rows created by
-/// `SystemSecureEnclaveCustodyKeyStore`. They are intentionally selected only by
-/// `CypherAir-DeviceTests`.
+/// These tests exercise real Secure Enclave keys created by
+/// `SystemSecureEnclaveCustodyKeyStore` as CryptoKit blob rows. They are
+/// intentionally selected only by `CypherAir-DeviceTests`.
 final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDeviceTestCase {
     func test_custodyHandlePair_createReloadInventoryDelete_onDevice() throws {
         try requireSecureEnclaveCustodyHardware()
 
-        let traceStore = AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        let keyStore = SystemSecureEnclaveCustodyKeyStore(traceStore: traceStore)
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
+        let keyStore = SystemSecureEnclaveCustodyKeyStore()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
         defer {
             try? store.deleteHandlePair(pair)
         }
 
-        XCTAssertEqual(pair.signing.publicKeyX963.count, 65)
-        XCTAssertEqual(pair.keyAgreement.publicKeyX963.count, 65)
-        XCTAssertNotEqual(pair.signing.publicKeyX963, pair.keyAgreement.publicKeyX963)
+        XCTAssertEqual(pair.signing.publicKeyRaw.count, 65)
+        XCTAssertEqual(pair.keyAgreement.publicKeyRaw.count, 65)
+        XCTAssertNotEqual(pair.signing.publicKeyRaw, pair.keyAgreement.publicKeyRaw)
+        XCTAssertNotNil(created.signing.privateKey)
+        XCTAssertNotNil(created.keyAgreement.privateKey)
 
-        let loadedPair = try store.loadHandlePair(expected: pair, authenticationContext: nil)
-        XCTAssertEqual(loadedPair.signing.binding, pair.signing)
-        XCTAssertEqual(loadedPair.keyAgreement.binding, pair.keyAgreement)
-        XCTAssertNotNil(loadedPair.signing.privateKey)
-        XCTAssertNotNil(loadedPair.keyAgreement.privateKey)
+        let reloadedSigning = try store.loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyRaw: pair.signing.publicKeyRaw,
+            authenticationContext: nil
+        )
+        let reloadedKeyAgreement = try store.loadHandle(
+            reference: pair.keyAgreement.reference,
+            expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
+            authenticationContext: nil
+        )
+        XCTAssertEqual(reloadedSigning.binding, pair.signing)
+        XCTAssertEqual(reloadedKeyAgreement.binding, pair.keyAgreement)
+        XCTAssertNotNil(reloadedSigning.privateKey)
+        XCTAssertNotNil(reloadedKeyAgreement.privateKey)
+
+        let located = try store.locateHandlePair(
+            signingPublicKeyRaw: pair.signing.publicKeyRaw,
+            keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw
+        )
+        XCTAssertEqual(located, pair)
 
         let summary = try store.inventorySummaryForLocalRecovery()
         XCTAssertGreaterThanOrEqual(summary.totalHandleCount, 2)
@@ -37,7 +56,6 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
 
         try store.deleteHandlePair(pair)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
-        assertTraceIsSanitized(traceStore.recentEntries, pair: pair)
         recordEvidence(
             .handlePairGenerationPersistence,
             handleCount: summary.totalHandleCount,
@@ -49,8 +67,12 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try requireSecureEnclaveCustodyHardware()
 
         let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
         defer {
             try? store.deleteHandlePair(pair)
         }
@@ -61,30 +83,40 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             context.invalidate()
         }
 
-        let signingKey = try loadPrivateKey(
+        let signingHandle = try store.loadHandle(
             reference: pair.signing.reference,
+            expectedPublicKeyRaw: pair.signing.publicKeyRaw,
             authenticationContext: context
         )
         let digest = Data(SHA256.hash(data: Data("CypherAir custody device signing evidence".utf8)))
-        let signature = try signDigest(digest, using: signingKey)
-        let signingPublicKey = try XCTUnwrap(SecKeyCopyPublicKey(signingKey))
-        try verifySignature(signature, digest: digest, publicKey: signingPublicKey)
+        let signature = try SystemSecureEnclaveCustodyDigestSigner()
+            .signSHA256Digest(digest, using: signingHandle)
+        try assertValidP256Signature(
+            signature,
+            digest: digest,
+            publicKeyX963: pair.signing.publicKeyRaw
+        )
 
-        let agreementKey = try loadPrivateKey(
+        let keyAgreementHandle = try store.loadHandle(
             reference: pair.keyAgreement.reference,
+            expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
             authenticationContext: context
         )
         let peerPrivateKey = P256.KeyAgreement.PrivateKey()
-        let peerPublicKey = try secKeyFromP256PublicKey(peerPrivateKey.publicKey.x963Representation)
-        let sharedSecret = try deriveSharedSecret(privateKey: agreementKey, peerPublicKey: peerPublicKey)
-        XCTAssertEqual(sharedSecret.count, 32)
+        let request = ExternalP256KeyAgreementRequest(
+            recipientPublicKey: pair.keyAgreement.publicKeyRaw,
+            ephemeralPublicKey: peerPrivateKey.publicKey.x963Representation
+        )
+        let sharedSecret = try SystemSecureEnclaveCustodyKeyAgreement()
+            .deriveSharedSecret(request: request, using: keyAgreementHandle)
+        XCTAssertEqual(sharedSecret.raw.count, 32)
 
         let custodyPublicKey = try P256.KeyAgreement.PublicKey(
-            x963Representation: pair.keyAgreement.publicKeyX963
+            x963Representation: pair.keyAgreement.publicKeyRaw
         )
         let expectedSecret = try peerPrivateKey.sharedSecretFromKeyAgreement(with: custodyPublicKey)
         let expectedSecretData = expectedSecret.withUnsafeBytes { Data($0) }
-        XCTAssertEqual(sharedSecret, expectedSecretData)
+        XCTAssertEqual(sharedSecret.raw, expectedSecretData)
         recordEvidence(.signing)
     }
 
@@ -92,8 +124,12 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try requireSecureEnclaveCustodyHardware()
 
         let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
         defer {
             try? store.deleteHandlePair(pair)
         }
@@ -101,12 +137,16 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         context.interactionNotAllowed = true
 
         do {
-            let signingKey = try loadPrivateKey(
+            let signingHandle = try store.loadHandle(
                 reference: pair.signing.reference,
+                expectedPublicKeyRaw: pair.signing.publicKeyRaw,
                 authenticationContext: context
             )
             let digest = Data(SHA256.hash(data: Data("CypherAir custody denied signing evidence".utf8)))
-            XCTAssertThrowsError(try signDigest(digest, using: signingKey)) { error in
+            XCTAssertThrowsError(
+                try SystemSecureEnclaveCustodyDigestSigner()
+                    .signSHA256Digest(digest, using: signingHandle)
+            ) { error in
                 XCTAssertTrue(
                     sanitizedPrivateOperationFailureCategories.contains(failureCategory(for: error)),
                     "Unexpected signing failure category: \(error)"
@@ -127,27 +167,23 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try requireSecureEnclaveCustodyHardware()
 
         let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
         defer {
             try? store.deleteHandlePair(pair)
         }
 
-        let wrongPublicPair = try SecureEnclaveCustodyHandlePair(
-            signing: SecureEnclaveCustodyHandlePublicBinding(
-                reference: pair.signing.reference,
-                publicKeyX963: pair.keyAgreement.publicKeyX963
-            ),
-            keyAgreement: SecureEnclaveCustodyHandlePublicBinding(
-                reference: pair.keyAgreement.reference,
-                publicKeyX963: pair.signing.publicKeyX963
-            )
-        )
-        XCTAssertEqual(
-            store.classifyHandleAvailability(expected: wrongPublicPair),
-            .unavailable(.handlePublicKeyBindingMismatch)
-        )
-        XCTAssertThrowsError(try store.loadHandlePair(expected: wrongPublicPair, authenticationContext: nil)) { error in
+        // A load whose expected public key disagrees with the stored row fails
+        // closed as a binding mismatch, with no leak in the error text.
+        XCTAssertThrowsError(try store.loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
+            authenticationContext: nil
+        )) { error in
             XCTAssertEqual(
                 (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
                 .handlePublicKeyBindingMismatch
@@ -160,14 +196,29 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
             store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier),
             .partial(presentRoles: [.keyAgreement])
         )
-        XCTAssertEqual(
-            store.classifyHandleAvailability(expected: pair),
-            .unavailable(.migrationOrRecoveryRequired)
-        )
+        XCTAssertThrowsError(try store.loadHandle(
+            reference: pair.signing.reference,
+            expectedPublicKeyRaw: pair.signing.publicKeyRaw,
+            authenticationContext: nil
+        )) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .privateHandleMissing
+            )
+            assertDoesNotLeak(error, pair: pair)
+        }
 
         try keyStore.deleteKey(reference: pair.keyAgreement.reference)
         XCTAssertEqual(store.inspectHandlePair(handleSetIdentifier: pair.handleSetIdentifier), .missing)
-        XCTAssertEqual(store.classifyHandleAvailability(expected: pair), .unavailable(.privateHandleMissing))
+        XCTAssertThrowsError(try store.locateHandlePair(
+            signingPublicKeyRaw: pair.signing.publicKeyRaw,
+            keyAgreementPublicKeyRaw: pair.keyAgreement.publicKeyRaw
+        )) { error in
+            XCTAssertEqual(
+                (error as? SecureEnclaveCustodyHandleError)?.failureCategory,
+                .privateHandleMissing
+            )
+        }
         recordEvidence(.wrongPublicBinding, observedCategory: .handlePublicKeyBindingMismatch)
         recordEvidence(.missingHandle, observedCategory: .privateHandleMissing)
     }
@@ -181,8 +232,12 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         try requireSecureEnclaveCustodyHardware()
 
         let keyStore = SystemSecureEnclaveCustodyKeyStore()
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
+        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
+        let created = try store.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: created.signing.binding,
+            keyAgreement: created.keyAgreement.binding
+        )
         defer {
             try? store.deleteHandlePair(pair)
         }
@@ -210,8 +265,8 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
 
         // A .signing handle must not perform key agreement.
         let request = ExternalP256KeyAgreementRequest(
-            recipientPublicKey: pair.signing.publicKeyX963,
-            ephemeralPublicKey: pair.keyAgreement.publicKeyX963
+            recipientPublicKey: pair.signing.publicKeyRaw,
+            ephemeralPublicKey: pair.keyAgreement.publicKeyRaw
         )
         XCTAssertThrowsError(
             try SystemSecureEnclaveCustodyKeyAgreement().deriveSharedSecret(request: request, using: signingBoundHandle)
@@ -224,21 +279,5 @@ final class DeviceSecureEnclaveCustodyHandleStoreTests: SecureEnclaveCustodyDevi
         }
 
         recordEvidence(.wrongRole, observedCategory: .privateOperationRoleMismatch)
-    }
-
-    func test_custodyTraceMetadataDoesNotLeakHandleLocators_onDevice() throws {
-        try requireSecureEnclaveCustodyHardware()
-
-        let traceStore = AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
-        let keyStore = SystemSecureEnclaveCustodyKeyStore(traceStore: traceStore)
-        let store = SecureEnclaveCustodyHandleStore(keyStore: keyStore)
-        let pair = try store.createHandlePair()
-        defer {
-            try? store.deleteHandlePair(pair)
-        }
-        _ = try store.loadHandlePair(expected: pair, authenticationContext: nil)
-        try store.deleteHandlePair(pair)
-
-        assertTraceIsSanitized(traceStore.recentEntries, pair: pair)
     }
 }

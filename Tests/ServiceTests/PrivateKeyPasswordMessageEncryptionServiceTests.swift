@@ -78,7 +78,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
 
         let ciphertext = try await service.encrypt(
@@ -110,7 +110,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
 
         let ciphertext = try await service.encrypt(
@@ -143,11 +143,11 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner,
             compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
 
@@ -183,11 +183,11 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner,
             compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
         let (contactService, contactsDirectory) = await TestHelpers.makeContactService(engine: engine)
@@ -230,11 +230,11 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             router: keyManagement.makePrivateKeyOperationRouter(
                 resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveSigningRoutes),
                 publicBindingInspector: PGPSecureEnclaveCustodyPublicBindingInspector(engine: engine),
-                handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore())
+                handleStore: SecureEnclaveCustodyHandleStore(keyStore: MockSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
             ),
             softwarePrivateKeyAccess: unwrapper,
             messageAdapter: messageAdapter,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner(),
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner,
             compositeSigner: SystemSecureEnclaveCompositeOperations()
         )
 
@@ -327,7 +327,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         let service = makeService(
             router: router,
             unwrapper: unwrapper,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
 
         do {
@@ -438,7 +438,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         router: StaticPasswordPrivateKeyOperationRouter,
         unwrapper: RecordingPasswordSoftwareSecretCertificateUnwrapper,
         messageAdapter: PGPMessageOperationAdapter? = nil,
-        digestSigner: any SecureEnclaveCustodyDigestSigning = SystemSecureEnclaveCustodyDigestSigner()
+        digestSigner: any SecureEnclaveCustodyDigestSigning = SoftwareP256CustodyProvider.shared.digestSigner
     ) -> PrivateKeyPasswordMessageEncryptionService {
         PrivateKeyPasswordMessageEncryptionService(
             router: router,
@@ -485,37 +485,10 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
     private func makeSecureEnclaveRouteFixture(
         configurationIdentity: PGPKeyConfiguration.Identity = .compatibleP256V4
     ) async throws -> PasswordSecureEnclaveRouteFixture {
-        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
-        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
-        let handleSetIdentifier = "password-encrypt-\(UUID().uuidString.lowercased())"
-        let signingReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .signing
-        )
-        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
-        )
-        let signingHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: signingReference,
-                publicKeyX963: signingPublicKeyX963
-            ),
-            privateKey: signingPrivateKey
-        )
-        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: keyAgreementReference,
-                publicKeyX963: keyAgreementPublicKeyX963
-            ),
-            privateKey: keyAgreementPrivateKey
-        )
-        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: signingHandle,
-            keyAgreement: keyAgreementHandle
-        )
+        let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
+        let signingHandle = handlePair.signing
+        let keyAgreementHandle = handlePair.keyAgreement
         let label = configurationIdentity == .modernP256V6 ? "v6" : "v4"
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
@@ -525,7 +498,7 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
             expirySeconds: 3600,
             configuration: configurationIdentity.configuration,
             handlePair: handlePair,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
@@ -560,34 +533,6 @@ final class PrivateKeyPasswordMessageEncryptionServiceTests: XCTestCase {
         )
     }
 
-    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to create test P-256 key."
-            )
-        }
-        return key
-    }
-
-    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw CypherAirError.keyGenerationFailed(reason: "Missing test public key.")
-        }
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to export test P-256 public key."
-            )
-        }
-        return data
-    }
 }
 
 private struct PasswordSecureEnclaveRouteFixture {

@@ -117,7 +117,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
             resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveKeyAgreementRoutes),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
         )
 
         let plaintext = "secure enclave routed decrypt"
@@ -155,7 +155,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             keyManagement: keyManagement,
             messageAdapter: messageAdapter,
             resolver: PGPKeyCapabilityResolver(policy: .testSecureEnclaveOperationsBlocked),
-            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore)
+            handleStore: SecureEnclaveCustodyHandleStore(keyStore: keyStore, tier: .classicalP256)
         )
 
         let ciphertext = try await messageAdapter.encrypt(
@@ -540,7 +540,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         router: StaticPrivateKeyOperationRouter,
         unwrapper: RecordingSoftwareSecretCertificateUnwrapper,
         messageAdapter: PGPMessageOperationAdapter? = nil,
-        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SystemSecureEnclaveCustodyKeyAgreement()
+        keyAgreement: any SecureEnclaveCustodyKeyAgreement = SoftwareP256CustodyProvider.shared.keyAgreement
     ) -> PrivateKeyMessageDecryptionService {
         PrivateKeyMessageDecryptionService(
             router: router,
@@ -597,37 +597,10 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
     private func makeSecureEnclaveDecryptFixture(
         configurationIdentity: PGPKeyConfiguration.Identity
     ) async throws -> SecureEnclaveDecryptFixture {
-        let signingPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let keyAgreementPrivateKey = try Self.makeEphemeralP256PrivateKey()
-        let signingPublicKeyX963 = try Self.publicKeyX963(from: signingPrivateKey)
-        let keyAgreementPublicKeyX963 = try Self.publicKeyX963(from: keyAgreementPrivateKey)
-        let handleSetIdentifier = "decrypt-\(UUID().uuidString.lowercased())"
-        let signingReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .signing
-        )
-        let keyAgreementReference = try SecureEnclaveCustodyHandleReference(
-            handleSetIdentifier: handleSetIdentifier,
-            role: .keyAgreement
-        )
-        let signingHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: signingReference,
-                publicKeyX963: signingPublicKeyX963
-            ),
-            privateKey: signingPrivateKey
-        )
-        let keyAgreementHandle = SecureEnclaveCustodyLoadedHandle(
-            binding: try SecureEnclaveCustodyHandlePublicBinding(
-                reference: keyAgreementReference,
-                publicKeyX963: keyAgreementPublicKeyX963
-            ),
-            privateKey: keyAgreementPrivateKey
-        )
-        let handlePair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: signingHandle,
-            keyAgreement: keyAgreementHandle
-        )
+        let custodyMaterial = SoftwareP256CustodyProvider.shared.makeMaterial()
+        let handlePair = try SoftwareP256CustodyProvider.shared.loadedHandlePair(for: custodyMaterial)
+        let signingHandle = handlePair.signing
+        let keyAgreementHandle = handlePair.keyAgreement
         let material = try await PGPSecureEnclaveCustodyGenerationAdapter(
             engine: engine
         ).generatePublicCertificate(
@@ -636,7 +609,7 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
             expirySeconds: 3600,
             configuration: configurationIdentity.configuration,
             handlePair: handlePair,
-            digestSigner: SystemSecureEnclaveCustodyDigestSigner()
+            digestSigner: SoftwareP256CustodyProvider.shared.digestSigner
         )
         let identity = PGPKeyIdentity(
             fingerprint: material.metadata.fingerprint,
@@ -671,34 +644,6 @@ final class PrivateKeyMessageDecryptionServiceTests: XCTestCase {
         )
     }
 
-    private static func makeEphemeralP256PrivateKey() throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to create test P-256 key."
-            )
-        }
-        return key
-    }
-
-    private static func publicKeyX963(from privateKey: SecKey) throws -> Data {
-        guard let publicKey = SecKeyCopyPublicKey(privateKey) else {
-            throw CypherAirError.keyGenerationFailed(reason: "Missing test public key.")
-        }
-        var error: Unmanaged<CFError>?
-        guard let data = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
-            throw CypherAirError.keyGenerationFailed(
-                reason: error.map { CFErrorCopyDescription($0.takeRetainedValue()) as String }
-                    ?? "Failed to export test P-256 public key."
-            )
-        }
-        return data
-    }
 }
 
 private struct SecureEnclaveDecryptFixture {

@@ -705,26 +705,27 @@ final class AppContainer: @unchecked Sendable {
         let engine = PgpEngine()
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
+        // One key store backs every device-bound tier (its keychain rows are
+        // namespaced per tier/role); each tier gets its own handle store so a
+        // create/load shape-checks against the correct parameter set.
+        let secureEnclaveCustodyKeyStore = SystemSecureEnclaveCustodyKeyStore()
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+            keyStore: secureEnclaveCustodyKeyStore,
+            tier: .classicalP256
         )
         let secureEnclaveCustodyPublicBindingInspector = PGPSecureEnclaveCustodyPublicBindingInspector(
             engine: engine
         )
         let secureEnclaveCustodyDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
         // Device-Bound Post-Quantum split custody (campaign #567 Phase 3):
-        // composite Secure Enclave blob store, per-identity classical component
-        // envelope, and the composite binding inspector, shared by routing,
-        // generation, and deletion.
-        // One key store backs both tiers (its keychain rows are namespaced per
-        // tier); each tier gets its own handle store so a create/load
-        // shape-checks against the correct ML-DSA/ML-KEM parameter set.
-        let secureEnclaveCompositeKeyStore = SystemSecureEnclaveCompositeKeyStore()
-        let secureEnclaveCompositeHandleStore = SecureEnclaveCompositeHandleStore(
-            keyStore: secureEnclaveCompositeKeyStore
+        // per-identity classical component envelope and the composite binding
+        // inspector, shared by routing, generation, and deletion.
+        let secureEnclaveCompositeHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: secureEnclaveCustodyKeyStore,
+            tier: .postQuantum
         )
-        let secureEnclaveCompositeHighHandleStore = SecureEnclaveCompositeHandleStore(
-            keyStore: secureEnclaveCompositeKeyStore,
+        let secureEnclaveCompositeHighHandleStore = SecureEnclaveCustodyHandleStore(
+            keyStore: secureEnclaveCustodyKeyStore,
             tier: .postQuantumHigh
         )
         let secureEnclaveCompositeBindingInspector = PGPSecureEnclaveCompositeBindingInspector(
@@ -982,7 +983,6 @@ final class AppContainer: @unchecked Sendable {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
             secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            secureEnclaveCompositeHandleStore: secureEnclaveCompositeHandleStore,
             traceStore: authLifecycleTraceStore
         )
 
@@ -1281,7 +1281,8 @@ final class AppContainer: @unchecked Sendable {
             keyManagement: keyManagement,
             contactService: contactService,
             secureEnclaveCustodyHandleStore: SecureEnclaveCustodyHandleStore(
-                keyStore: SystemSecureEnclaveCustodyKeyStore(traceStore: authLifecycleTraceStore)
+                keyStore: SystemSecureEnclaveCustodyKeyStore(),
+                tier: .classicalP256
             ),
             secureEnclaveDigestSigner: SystemSecureEnclaveCustodyDigestSigner(),
             secureEnclaveCompositeOperations: SystemSecureEnclaveCompositeOperations()

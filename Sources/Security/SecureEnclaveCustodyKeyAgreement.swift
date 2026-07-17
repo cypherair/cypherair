@@ -1,5 +1,5 @@
+import CryptoKit
 import Foundation
-import Security
 
 struct SecureEnclaveP256RawSharedSecret: Equatable, Sendable {
     private var rawStorage: Data
@@ -49,7 +49,7 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
                 actual: handle.role
             )
         }
-        guard request.recipientPublicKey == handle.binding.publicKeyX963 else {
+        guard request.recipientPublicKey == handle.binding.publicKeyRaw else {
             throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
         }
         guard SecureEnclaveCustodyHandlePublicBinding
@@ -58,62 +58,42 @@ struct SystemSecureEnclaveCustodyKeyAgreement: SecureEnclaveCustodyKeyAgreement 
             // not a fault of the local key-agreement handle.
             throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
-        guard let privateKey = handle.privateKey else {
+        guard case .p256KeyAgreement(let privateKey)? = handle.privateKey else {
             throw SecureEnclaveCustodyHandleError.privateHandleMissing(.keyAgreement)
         }
 
-        let peerPublicKey = try Self.importP256PublicKey(request.ephemeralPublicKey)
-        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandard
-        guard SecKeyIsAlgorithmSupported(privateKey, .keyExchange, algorithm) else {
-            throw SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-
-        var error: Unmanaged<CFError>?
-        guard var sharedSecret = SecKeyCopyKeyExchangeResult(
-            privateKey,
-            algorithm,
-            peerPublicKey,
-            [:] as CFDictionary,
-            &error
-        ) as Data? else {
-            throw Self.mapCFError(error)
-        }
-        // KNOWN LIMITATION: SecKeyCopyKeyExchangeResult returns the shared secret
-        // as an immutable CFData bridged to Data. `resetBytes` triggers Data's
-        // copy-on-write, so it may zero a fresh copy while the original CFData
-        // backing lingers until ARC releases it. The SecKey-backed custody handle
-        // leaves no zeroizable alternative here (cf. SECURITY.md §9 on String);
-        // exposure is bounded by the short lifetime, ASLR, and MIE. The validated
-        // SecureEnclaveP256RawSharedSecret copy below is the carrier; this defer is
-        // best-effort scrubbing of the transient bridged buffer.
-        defer { sharedSecret.resetBytes(in: 0..<sharedSecret.count) }
-        return try SecureEnclaveP256RawSharedSecret(raw: sharedSecret)
-    }
-
-    private static func importP256PublicKey(_ publicKeyX963: Data) throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let publicKey = SecKeyCreateWithData(
-            publicKeyX963 as CFData,
-            attributes as CFDictionary,
-            &error
-        ) else {
-            // SecKeyCreateWithData rejects malformed/off-curve peer points. This
-            // is invalid peer input, not a local handle fault — release the CFError
-            // to balance its +1 retain, then surface an invalid-request category.
-            _ = error?.takeRetainedValue()
+        let peerPublicKey: P256.KeyAgreement.PublicKey
+        do {
+            // The x963 initializer rejects malformed and off-curve points.
+            peerPublicKey = try P256.KeyAgreement.PublicKey(
+                x963Representation: request.ephemeralPublicKey
+            )
+        } catch {
             throw SecureEnclaveCustodyHandleError.invalidPeerPublicKey(.keyAgreement)
         }
-        return publicKey
+
+        let sharedSecret: SharedSecret
+        do {
+            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: peerPublicKey)
+        } catch {
+            throw Self.mapEnclaveOperationError(error)
+        }
+
+        var raw = sharedSecret.withUnsafeBytes { Data($0) }
+        // The validated carrier below copies; this transient extraction buffer
+        // is ours to scrub. CryptoKit zeroizes the SharedSecret backing itself.
+        defer { raw.resetBytes(in: 0..<raw.count) }
+        return try SecureEnclaveP256RawSharedSecret(raw: raw)
     }
 
-    private static func mapCFError(
-        _ error: Unmanaged<CFError>?
-    ) -> SecureEnclaveCustodyHandleError {
-        SecureEnclaveCustodyOSStatusMapper.handleError(for: error, role: .keyAgreement)
+    private static func mapEnclaveOperationError(_ error: Error) -> SecureEnclaveCustodyHandleError {
+        switch SecureEnclaveCustodyAuthenticationErrorNormalizer.normalize(error) {
+        case .operationCancelled:
+            return .localAuthenticationCancelled(.keyAgreement)
+        case .authenticationFailed:
+            return .localAuthenticationFailed(.keyAgreement)
+        default:
+            return .privateHandleUnauthorized(.keyAgreement)
+        }
     }
 }

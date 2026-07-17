@@ -5,11 +5,11 @@ import Foundation
 /// exactly the enclave primitive — a pure ML-DSA-65 signature over the OpenPGP
 /// signature digest; the Ed25519 half and all composite assembly stay in Rust.
 final class PGPExternalMlDsa65SigningProviderBridge: ExternalMlDsa65SigningProvider, @unchecked Sendable {
-    private let handle: SecureEnclaveCompositeLoadedHandle
+    private let handle: SecureEnclaveCustodyLoadedHandle
     private let compositeSigner: any SecureEnclaveCompositeSigning
 
     init(
-        handle: SecureEnclaveCompositeLoadedHandle,
+        handle: SecureEnclaveCustodyLoadedHandle,
         compositeSigner: any SecureEnclaveCompositeSigning
     ) {
         self.handle = handle

@@ -10,15 +10,15 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     private let publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting
     private let handleStore: SecureEnclaveCustodyHandleStore
     private let compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)?
-    private let compositeHandleStore: SecureEnclaveCompositeHandleStore?
-    private let compositeHighHandleStore: SecureEnclaveCompositeHandleStore?
+    private let compositeHandleStore: SecureEnclaveCustodyHandleStore?
+    private let compositeHighHandleStore: SecureEnclaveCustodyHandleStore?
 
     init(
         publicBindingInspector: any SecureEnclaveCustodyPublicBindingInspecting,
         handleStore: SecureEnclaveCustodyHandleStore,
         compositeBindingInspector: (any SecureEnclaveCompositeBindingInspecting)? = nil,
-        compositeHandleStore: SecureEnclaveCompositeHandleStore? = nil,
-        compositeHighHandleStore: SecureEnclaveCompositeHandleStore? = nil
+        compositeHandleStore: SecureEnclaveCustodyHandleStore? = nil,
+        compositeHighHandleStore: SecureEnclaveCustodyHandleStore? = nil
     ) {
         self.publicBindingInspector = publicBindingInspector
         self.handleStore = handleStore
@@ -80,12 +80,19 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
                 ? .unavailable(.revocationArtifactUnavailable)
                 : .available
 
-        // Composite (split-custody Device-Bound Post-Quantum) families share the
-        // `.appleSecureEnclavePrivateOperations` custody kind with P-256 but carry
-        // an ML-DSA/ML-KEM suite, so they must route through the composite handle
-        // path (the P-256 `algorithmSuite == .p256` gate below would otherwise
-        // false-flag every healthy composite key as invalid custody).
-        if let tier = identity.openPGPConfiguration.identity.deviceBoundCompositeTier {
+        guard let tier = identity.openPGPConfiguration.identity.deviceBoundCustodyTier else {
+            return assessment(
+                identity: identity,
+                ordinal: ordinal,
+                publicMaterialAvailability: .unavailable(.invalidConfigurationCustody),
+                revocationArtifactAvailability: revocationAvailability,
+                handleAvailability: .unavailable(.invalidConfigurationCustody)
+            )
+        }
+        switch tier {
+        case .classicalP256:
+            break
+        case .postQuantum, .postQuantumHigh:
             return classifyCompositeIdentity(
                 identity,
                 ordinal: ordinal,
@@ -95,8 +102,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         }
 
         let configuration = identity.openPGPConfiguration
-        guard configuration.algorithmSuite == .p256,
-              configuration.keyVersion == identity.keyVersion else {
+        guard configuration.keyVersion == identity.keyVersion else {
             return assessment(
                 identity: identity,
                 ordinal: ordinal,
@@ -162,7 +168,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     private func classifyCompositeIdentity(
         _ identity: PGPKeyIdentity,
         ordinal: Int,
-        tier: SecureEnclaveCompositeTier,
+        tier: SecureEnclaveCustodyTier,
         revocationAvailability: SecureEnclaveCustodyRecoveryMaterialAvailability
     ) -> SecureEnclaveCustodyGenerationRecoveryAssessment {
         guard identity.openPGPConfiguration.keyVersion == identity.keyVersion else {
@@ -188,8 +194,10 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
         // Each tier shape-checks handles against its own ML-DSA/ML-KEM parameter
         // set, so the store is selected by tier (exhaustive: a new tier fails to
         // compile until wired here).
-        let tierHandleStore: SecureEnclaveCompositeHandleStore?
+        let tierHandleStore: SecureEnclaveCustodyHandleStore?
         switch tier {
+        case .classicalP256:
+            tierHandleStore = nil
         case .postQuantum:
             tierHandleStore = compositeHandleStore
         case .postQuantumHigh:
@@ -245,7 +253,7 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
 
     private func locateCompositeHandlePair(
         _ inspection: PGPSecureEnclaveCompositeBindingInspection,
-        store: SecureEnclaveCompositeHandleStore
+        store: SecureEnclaveCustodyHandleStore
     ) -> SecureEnclaveCustodyHandleAvailability {
         do {
             _ = try store.locateHandlePair(
@@ -265,8 +273,8 @@ final class SecureEnclaveCustodyGenerationRecoveryService: SecureEnclaveCustodyG
     ) -> SecureEnclaveCustodyHandleAvailability {
         do {
             _ = try handleStore.locateHandlePair(
-                signingPublicKeyX963: inspection.signingPublicKeyX963,
-                keyAgreementPublicKeyX963: inspection.keyAgreementPublicKeyX963
+                signingPublicKeyRaw: inspection.signingPublicKeyX963,
+                keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
             return .available
         } catch let error as SecureEnclaveCustodyHandleError {

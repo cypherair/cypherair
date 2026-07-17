@@ -1,6 +1,7 @@
 import Foundation
 
-struct SecureEnclaveCustodyHandlePair: Equatable, Sendable {
+/// The two public bindings of one device-bound custody identity.
+struct SecureEnclaveCustodyHandlePair: Hashable, Sendable {
     let signing: SecureEnclaveCustodyHandlePublicBinding
     let keyAgreement: SecureEnclaveCustodyHandlePublicBinding
 
@@ -20,10 +21,11 @@ struct SecureEnclaveCustodyHandlePair: Equatable, Sendable {
                 actual: keyAgreement.role
             )
         }
-        guard signing.reference.handleSetIdentifier == keyAgreement.reference.handleSetIdentifier else {
+        guard signing.reference.handleSetIdentifier == keyAgreement.reference.handleSetIdentifier,
+              signing.reference.tier == keyAgreement.reference.tier else {
             throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
         }
-        guard signing.publicKeyX963 != keyAgreement.publicKeyX963 else {
+        guard signing.publicKeyRaw != keyAgreement.publicKeyRaw else {
             throw SecureEnclaveCustodyHandleError.handlePublicKeyBindingMismatch(.keyAgreement)
         }
 
@@ -33,6 +35,10 @@ struct SecureEnclaveCustodyHandlePair: Equatable, Sendable {
 
     var handleSetIdentifier: String {
         signing.reference.handleSetIdentifier
+    }
+
+    var tier: SecureEnclaveCustodyTier {
+        signing.reference.tier
     }
 
     var references: [SecureEnclaveCustodyHandleReference] {

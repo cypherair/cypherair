@@ -32,8 +32,12 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
         try requireSecureEnclaveCustodyHardware()
         let gpg = try requireGpg()
 
-        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore())
-        let pair = try handleStore.createHandlePair()
+        let handleStore = SecureEnclaveCustodyHandleStore(keyStore: SystemSecureEnclaveCustodyKeyStore(), tier: .classicalP256)
+        let pairLoaded = try handleStore.createLoadedHandlePair(authenticationContext: nil)
+        let pair = try SecureEnclaveCustodyHandlePair(
+            signing: pairLoaded.signing.binding,
+            keyAgreement: pairLoaded.keyAgreement.binding
+        )
         defer {
             try? handleStore.deleteHandlePair(pair)
         }
@@ -46,14 +50,17 @@ final class DeviceSecureEnclaveGnuPGInteropEvidenceTests: SecureEnclaveCustodyDe
             context.invalidate()
         }
 
-        let signingKey = try loadPrivateKey(reference: pair.signing.reference, authenticationContext: context)
-        let keyAgreementKey = try loadPrivateKey(
-            reference: pair.keyAgreement.reference,
-            authenticationContext: context
-        )
         let loadedPair = try SecureEnclaveCustodyLoadedHandlePair(
-            signing: SecureEnclaveCustodyLoadedHandle(binding: pair.signing, privateKey: signingKey),
-            keyAgreement: SecureEnclaveCustodyLoadedHandle(binding: pair.keyAgreement, privateKey: keyAgreementKey)
+            signing: handleStore.loadHandle(
+                reference: pair.signing.reference,
+                expectedPublicKeyRaw: pair.signing.publicKeyRaw,
+                authenticationContext: context
+            ),
+            keyAgreement: handleStore.loadHandle(
+                reference: pair.keyAgreement.reference,
+                expectedPublicKeyRaw: pair.keyAgreement.publicKeyRaw,
+                authenticationContext: context
+            )
         )
 
         let engine = PgpEngine()

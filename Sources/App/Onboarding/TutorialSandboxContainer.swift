@@ -111,7 +111,8 @@ final class TutorialSandboxContainer {
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: SystemSecureEnclaveCustodyKeyStore()
+            keyStore: SystemSecureEnclaveCustodyKeyStore(),
+            tier: .classicalP256
         )
         let secureEnclaveDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
         let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()

@@ -1,17 +1,17 @@
 import CryptoKit
 import LocalAuthentication
-import Security
 import XCTest
 @testable import CypherAir
 
 /// Shared base for device-only Secure Enclave **custody** tests — the device-bound
-/// P-256 signing + key-agreement handle model, distinct from the legacy Secure
+/// signing + key-agreement handle model, distinct from the legacy Secure
 /// Enclave software-key wrapping exercised through `DeviceSecurityTestCase`.
 ///
-/// It owns the hardware/biometric guards, the real `SecKey` private-operation
-/// helpers, failure-category mapping, and the sanitized-output assertions shared by
-/// the custody device tests, so each lives in exactly one place. Custody test
-/// classes inherit from this instead of copying these helpers per file.
+/// It owns the hardware/biometric guards, software cross-verification of real
+/// enclave outputs, failure-category mapping, and the sanitized-output
+/// assertions shared by the custody device tests, so each lives in exactly one
+/// place. Custody test classes inherit from this instead of copying these
+/// helpers per file.
 class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
     // MARK: - Hardware / biometric guards
 
@@ -49,112 +49,29 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         return context
     }
 
-    // MARK: - Real SecKey private operations
+    // MARK: - Software cross-verification of real enclave outputs
 
-    /// Load a Secure Enclave custody private key by application tag. A nil context
-    /// omits `kSecUseAuthenticationContext`, which is how the non-interactive
-    /// fail-closed path is exercised.
-    final func loadPrivateKey(
-        reference: SecureEnclaveCustodyHandleReference,
-        authenticationContext: LAContext?
-    ) throws -> SecKey {
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecAttrApplicationTag as String: reference.applicationTagData,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecReturnRef as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        if let authenticationContext {
-            query[kSecUseAuthenticationContext as String] = authenticationContext
-        }
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let result,
-              CFGetTypeID(result) == SecKeyGetTypeID() else {
-            throw secureEnclaveCustodyError(for: status, role: reference.role)
-        }
-        return result as! SecKey
-    }
-
-    final func signDigest(_ digest: Data, using privateKey: SecKey) throws -> Data {
-        let algorithm = SecKeyAlgorithm.ecdsaSignatureDigestX962SHA256
-        try XCTSkipUnless(
-            SecKeyIsAlgorithmSupported(privateKey, .sign, algorithm),
-            "ECDSA SHA-256 digest signing is unavailable for this key."
+    /// Verify a raw r‖s ECDSA signature produced by the enclave against the
+    /// handle's public binding with software CryptoKit — independent of the
+    /// production signer's own self-verify.
+    final func assertValidP256Signature(
+        _ signature: SecureEnclaveP256RawSignature,
+        digest: Data,
+        publicKeyX963: Data,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let publicKey = try P256.Signing.PublicKey(x963Representation: publicKeyX963)
+        let ecdsaSignature = try P256.Signing.ECDSASignature(
+            rawRepresentation: signature.r + signature.s
         )
-
-        var error: Unmanaged<CFError>?
-        guard let signature = SecKeyCreateSignature(
-            privateKey,
-            algorithm,
-            digest as CFData,
-            &error
-        ) as Data? else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-        return signature
-    }
-
-    final func verifySignature(_ signature: Data, digest: Data, publicKey: SecKey) throws {
-        let algorithm = SecKeyAlgorithm.ecdsaSignatureDigestX962SHA256
-        var error: Unmanaged<CFError>?
-        let verified = SecKeyVerifySignature(
-            publicKey,
-            algorithm,
-            digest as CFData,
-            signature as CFData,
-            &error
+        let rawDigest = try XCTUnwrap(SecureEnclaveP256SHA256Digest(digest), file: file, line: line)
+        XCTAssertTrue(
+            publicKey.isValidSignature(ecdsaSignature, for: rawDigest),
+            "Enclave signature failed software verification",
+            file: file,
+            line: line
         )
-        if !verified {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.signing)
-        }
-    }
-
-    final func deriveSharedSecret(privateKey: SecKey, peerPublicKey: SecKey) throws -> Data {
-        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandard
-        try XCTSkipUnless(
-            SecKeyIsAlgorithmSupported(privateKey, .keyExchange, algorithm),
-            "P-256 ECDH key exchange is unavailable for this key."
-        )
-
-        var error: Unmanaged<CFError>?
-        guard let sharedSecret = SecKeyCopyKeyExchangeResult(
-            privateKey,
-            algorithm,
-            peerPublicKey,
-            [:] as CFDictionary,
-            &error
-        ) as Data? else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.privateHandleInaccessible(.keyAgreement)
-        }
-        return sharedSecret
-    }
-
-    final func secKeyFromP256PublicKey(_ publicKeyX963: Data) throws -> SecKey {
-        let attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits as String: 256
-        ]
-        var error: Unmanaged<CFError>?
-        guard let publicKey = SecKeyCreateWithData(
-            publicKeyX963 as CFData,
-            attributes as CFDictionary,
-            &error
-        ) else {
-            throw error?.takeRetainedValue() as Error?
-                ?? SecureEnclaveCustodyHandleError.invalidPublicKey(.keyAgreement)
-        }
-        return publicKey
     }
 
     // MARK: - Failure-category mapping
@@ -170,26 +87,6 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
             .privateHandleInaccessible,
             .privateHandleUnauthorized
         ]
-    }
-
-    final func secureEnclaveCustodyError(
-        for status: OSStatus,
-        role: PGPPrivateOperationRole
-    ) -> SecureEnclaveCustodyHandleError {
-        switch status {
-        case errSecItemNotFound:
-            return .privateHandleMissing(role)
-        case errSecUserCanceled:
-            return .localAuthenticationCancelled(role)
-        case errSecAuthFailed:
-            return .localAuthenticationFailed(role)
-        case errSecInteractionNotAllowed:
-            return .privateHandleUnauthorized(role)
-        case errSecNotAvailable:
-            return .hardwareUnavailable
-        default:
-            return .privateHandleInaccessible(role)
-        }
     }
 
     final func failureCategory(for error: Error) -> PGPKeyOperationFailureCategory {
@@ -251,12 +148,10 @@ class SecureEnclaveCustodyDeviceTestCase: DeviceSecurityTestCase {
         line: UInt
     ) {
         XCTAssertFalse(text.contains(pair.handleSetIdentifier), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.signing.reference.applicationTagString), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.keyAgreement.reference.applicationTagString), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.signing.publicKeyX963.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(pair.keyAgreement.publicKeyX963.base64EncodedString()), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.signing.publicKeyX963)), file: file, line: line)
-        XCTAssertFalse(text.contains(hex(pair.keyAgreement.publicKeyX963)), file: file, line: line)
+        XCTAssertFalse(text.contains(pair.signing.publicKeyRaw.base64EncodedString()), file: file, line: line)
+        XCTAssertFalse(text.contains(pair.keyAgreement.publicKeyRaw.base64EncodedString()), file: file, line: line)
+        XCTAssertFalse(text.contains(hex(pair.signing.publicKeyRaw)), file: file, line: line)
+        XCTAssertFalse(text.contains(hex(pair.keyAgreement.publicKeyRaw)), file: file, line: line)
     }
 
     final func hex(_ data: Data) -> String {
