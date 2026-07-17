@@ -736,7 +736,7 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
-        let prompt = coordinator.beginOperationPrompt(source: "op")
+        let prompt = coordinator.beginOperationPrompt()
         controller.noteForegroundActive(false)
         controller.handleAwayEvent(source: "macResignActive")
 
@@ -777,7 +777,7 @@ final class AppLockControllerTests: XCTestCase {
         XCTAssertEqual(controller.lockState, .unlocked)
         let relocksBefore = spy.relockCount
 
-        let prompt = coordinator.beginOperationPrompt(source: "op")
+        let prompt = coordinator.beginOperationPrompt()
         await settle() // began-hop lands: mirror opens
         coordinator.endOperationPrompt(prompt)
 

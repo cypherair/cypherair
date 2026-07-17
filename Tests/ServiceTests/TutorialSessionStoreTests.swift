@@ -61,7 +61,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         XCTAssertEqual(container.contactService.contactsAvailability, .availableProtectedDomain)
         XCTAssertEqual(container.contactService.testContactKeyRecords.count, 0)
         XCTAssertEqual(container.keyManagement.keys.count, 0)
-        XCTAssertFalse(container.contactsDirectory.path.contains("/Documents/contacts"))
+        XCTAssertTrue(container.contactsDirectory.path.contains("CypherAirGuidedTutorial-"))
     }
 
     func test_tutorialSandboxContainer_clearsFixedDefaultsSuiteOnCreation() throws {

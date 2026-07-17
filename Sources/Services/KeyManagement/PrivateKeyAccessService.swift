@@ -39,7 +39,7 @@ final class PrivateKeyAccessService {
         fingerprint: String,
         authenticationContext: LAContext? = nil
     ) async throws -> Data {
-        try await authenticationPromptCoordinator.withOperationPrompt(source: "privateKey.unwrap") {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
 
             // Reconstruct + unwrap run OFF the main actor. `reconstructKey` is a

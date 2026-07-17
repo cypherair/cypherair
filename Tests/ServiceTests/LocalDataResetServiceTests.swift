@@ -110,7 +110,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertNotNil(container.appSessionOrchestrator.lastAuthenticationDate)
     }
 
-    func test_resetAllLocalData_cleansPhase7TemporaryArtifactsAndTutorialDefaultsSuites() async throws {
+    func test_resetAllLocalData_cleansTemporaryArtifactsAndTutorialDefaultsSuites() async throws {
         let container = AppContainer.makeUITest()
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("CypherAirResetTemp-\(UUID().uuidString)", isDirectory: true)
@@ -124,7 +124,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             UserDefaults(suiteName: unrelatedSuiteName)?.removePersistentDomain(forName: unrelatedSuiteName)
         }
 
-        try makePhase7TemporaryArtifacts(in: temporaryDirectory)
+        try makeSweepableTemporaryArtifacts(in: temporaryDirectory)
         let fixedTutorialDefaults = try XCTUnwrap(UserDefaults(suiteName: fixedTutorialSuiteName))
         fixedTutorialDefaults.set("fixed", forKey: "marker")
         _ = fixedTutorialDefaults.synchronize()
@@ -374,7 +374,7 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
         )
     }
 
-    private func makePhase7TemporaryArtifacts(in temporaryDirectory: URL) throws {
+    private func makeSweepableTemporaryArtifacts(in temporaryDirectory: URL) throws {
         let decryptedDir = temporaryDirectory.appendingPathComponent("decrypted", isDirectory: true)
         let streamingDir = temporaryDirectory.appendingPathComponent("streaming", isDirectory: true)
         let exportURL = temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)-sample.asc")

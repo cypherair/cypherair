@@ -158,7 +158,7 @@ final class KeyGenerationScreenModelTests: XCTestCase {
     }
 
     func test_availableFamilies_lockedConfigurationShowsFullCatalogWithoutWiredService() {
-        // Locked mode (tutorial sandbox) is display-only: the full eight-family
+        // Locked mode (tutorial sandbox) is display-only: the full key-family
         // catalog is listed even though this container has no wired Secure
         // Enclave generation service, because every row renders disabled and
         // generation never leaves the locked family.

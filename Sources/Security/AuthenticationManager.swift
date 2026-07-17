@@ -200,17 +200,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
     }
 
     func evaluate(mode: AuthenticationMode, reason: String) async throws -> Bool {
-        try await evaluate(mode: mode, reason: reason, source: "unspecified")
-    }
-
-    func evaluate(mode: AuthenticationMode, reason: String, source: String) async throws -> Bool {
         if isUITestAuthenticationBypassEnabled {
             return true
         }
 
         let context = LAContext()
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { _ in
+            let success = try await authenticationPromptCoordinator.withPrivacyPrompt { _ in
                 let policy: LAPolicy
                 switch mode {
                 case .standard:
@@ -254,8 +250,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
     func evaluateAppSession(
         policy: AppSessionAuthenticationPolicy,
-        reason: String,
-        source: String = "unspecified"
+        reason: String
     ) async throws -> AppSessionAuthenticationResult {
         if isUITestAuthenticationBypassEnabled {
             return .authenticated(context: nil)
@@ -265,7 +260,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         policy.configure(context)
 
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { _ in
+            let success = try await authenticationPromptCoordinator.withPrivacyPrompt { _ in
                 try await evaluateLocalAuthenticationPolicyWithCallback(
                     context,
                     appSessionPolicy: policy,
@@ -395,9 +390,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         }
 
         // Step 0: Authenticate under the CURRENT mode before any Keychain modification.
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "privateKeyProtection.switch.authenticate"
-        ) {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             try await modeSwitchAuthenticator.authenticateCurrentMode(
                 oldMode,
                 authenticator: authenticator

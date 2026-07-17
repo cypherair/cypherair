@@ -91,8 +91,7 @@ final class SettingsScreenModel {
         self.localDataResetAuthenticationAction = localDataResetAuthenticationAction ?? { policy, reason in
             try await authManager.evaluateAppSession(
                 policy: policy,
-                reason: reason,
-                source: "localDataReset"
+                reason: reason
             )
         }
         self.operationPromptCoordinator = operationPromptCoordinator ?? authManager.promptCoordinator
@@ -436,9 +435,7 @@ final class SettingsScreenModel {
                 defer {
                     resetAuthenticationContext?.invalidate()
                 }
-                let result = try await operationPromptCoordinator.withOperationPrompt(
-                    source: "localDataReset.authenticate"
-                ) {
+                let result = try await operationPromptCoordinator.withOperationPrompt {
                     try await localDataResetAuthenticationAction(
                         appConfiguration.appSessionAuthenticationPolicy,
                         String(

@@ -375,9 +375,7 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     private func createAuthorizedHandlePair(
         handleStore: SecureEnclaveCustodyHandleStore
     ) async throws -> AuthorizedCustodyGenerationHandlePair {
-        try await withOperationPromptIfConfigured(
-            source: "keyProvisioning.generateSecureEnclaveCustody.authorize"
-        ) {
+        try await withOperationPromptIfConfigured {
             var authorizedContext: LAContext?
             if let custodyOperationAuthenticator {
                 do {
@@ -445,13 +443,12 @@ final class SecureEnclaveCustodyGenerationService: @unchecked Sendable {
     }
 
     private func withOperationPromptIfConfigured<T>(
-        source: String,
         operation: () async throws -> T
     ) async throws -> T {
         guard let authenticationPromptCoordinator else {
             return try await operation()
         }
-        return try await authenticationPromptCoordinator.withOperationPrompt(source: source) {
+        return try await authenticationPromptCoordinator.withOperationPrompt {
             try await operation()
         }
     }

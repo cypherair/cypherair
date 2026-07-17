@@ -173,11 +173,10 @@ final class AppContainer: @unchecked Sendable {
             canEvaluate: { policy in
                 authManager.canEvaluate(appSessionPolicy: policy)
             },
-            evaluateAppSession: { policy, reason, source in
+            evaluateAppSession: { policy, reason in
                 try await authManager.evaluateAppSession(
                     policy: policy,
-                    reason: reason,
-                    source: source
+                    reason: reason
                 )
             },
             reprotectPersistedRootSecret: { from, to, context in
@@ -844,11 +843,10 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason, source in
+            evaluateAppSessionAuthentication: { reason, _ in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
-                    reason: reason,
-                    source: source
+                    reason: reason
                 )
             },
             recordSuccessfulAuthentication: { context in
@@ -1152,11 +1150,10 @@ final class AppContainer: @unchecked Sendable {
                 protectedOrdinarySettingsCoordinator.gracePeriodForSession
             },
             lastAuthenticationDateProvider: { appSessionOrchestrator.lastAuthenticationDate },
-            evaluateAppSessionAuthentication: { reason, source in
+            evaluateAppSessionAuthentication: { reason, _ in
                 try await authManager.evaluateAppSession(
                     policy: config.appSessionAuthenticationPolicy,
-                    reason: reason,
-                    source: source
+                    reason: reason
                 )
             },
             recordSuccessfulAuthentication: { context in

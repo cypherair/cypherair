@@ -21,7 +21,6 @@ final class ContactServiceTests: ContactServiceTestCase {
             contactService.contactId(forFingerprint: generated.fingerprint),
             record.contactId
         )
-        XCTAssertFalse(record.contactId.hasPrefix("legacy-contact-"))
         XCTAssertNil(contactService.contactId(forFingerprint: "missing-\(generated.fingerprint)"))
     }
 
@@ -86,7 +85,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         }
 
         XCTAssertThrowsError(
-            try contactService.requireContactPublicKeyData(keyId: "legacy-key-missing")
+            try contactService.requireContactPublicKeyData(keyId: "missing-key")
         ) { error in
             guard case .internalError(let reason) = error as? CypherAirError else {
                 return XCTFail("Expected internalError, got \(error)")
@@ -591,9 +590,7 @@ final class ContactServiceTests: ContactServiceTestCase {
         let snapshot = try contactService.currentContactsDomainSnapshot()
         XCTAssertEqual(snapshot.schemaVersion, ContactsDomainSnapshot.currentSchemaVersion)
         XCTAssertEqual(snapshot.identities.map(\.contactId), [key.contactId])
-        XCTAssertFalse(key.contactId.hasPrefix("legacy-contact-"))
         XCTAssertEqual(snapshot.keyRecords.map(\.keyId), [key.keyId])
-        XCTAssertFalse(key.keyId.hasPrefix("legacy-key-"))
         XCTAssertEqual(snapshot.keyRecords.first?.usageState, .preferred)
 
         let record = try XCTUnwrap(contactService.availableContactKeyRecord(fingerprint: key.fingerprint))

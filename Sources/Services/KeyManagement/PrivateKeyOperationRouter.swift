@@ -174,9 +174,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyRaw: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
-            let authorized = try await withOperationPromptIfConfigured(
-                source: "privateKeyOperation.sign.authorize"
-            ) {
+            let authorized = try await withOperationPromptIfConfigured {
                 let authorization = try await makeOperationAuthorizationIfConfigured()
                 do {
                     let signingHandle = try handleStore.loadHandle(
@@ -222,9 +220,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyRaw: inspection.signingPublicKeyX963,
                 keyAgreementPublicKeyRaw: inspection.keyAgreementPublicKeyX963
             )
-            let authorized = try await withOperationPromptIfConfigured(
-                source: "privateKeyOperation.keyAgreement.authorize"
-            ) {
+            let authorized = try await withOperationPromptIfConfigured {
                 let authorization = try await makeOperationAuthorizationIfConfigured()
                 do {
                     let keyAgreementHandle = try handleStore.loadHandle(
@@ -346,9 +342,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyRaw: inspection.signingComponentPublicKey,
                 keyAgreementPublicKeyRaw: inspection.keyAgreementComponentPublicKey
             )
-            let authorized = try await withOperationPromptIfConfigured(
-                source: "privateKeyOperation.sign.authorize"
-            ) {
+            let authorized = try await withOperationPromptIfConfigured {
                 let authorization = try await makeOperationAuthorizationIfConfigured()
                 do {
                     let signingHandle = try compositeHandleStore.loadHandle(
@@ -404,9 +398,7 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
                 signingPublicKeyRaw: inspection.signingComponentPublicKey,
                 keyAgreementPublicKeyRaw: inspection.keyAgreementComponentPublicKey
             )
-            let authorized = try await withOperationPromptIfConfigured(
-                source: "privateKeyOperation.keyAgreement.authorize"
-            ) {
+            let authorized = try await withOperationPromptIfConfigured {
                 let authorization = try await makeOperationAuthorizationIfConfigured()
                 do {
                     let keyAgreementHandle = try compositeHandleStore.loadHandle(
@@ -468,15 +460,12 @@ final class PrivateKeyOperationRouter: PrivateKeyOperationRouting, @unchecked Se
     }
 
     private func withOperationPromptIfConfigured<T>(
-        source: String,
         operation: () async throws -> T
     ) async throws -> T {
         guard let authenticationPromptCoordinator else {
             return try await operation()
         }
-        return try await authenticationPromptCoordinator.withOperationPrompt(
-            source: source
-        ) {
+        return try await authenticationPromptCoordinator.withOperationPrompt {
             try await operation()
         }
     }

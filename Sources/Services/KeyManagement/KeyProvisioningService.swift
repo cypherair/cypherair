@@ -97,8 +97,7 @@ final class KeyProvisioningService {
         let bundle = try await wrapForProvisioning(
             privateKey: generated.certData,
             fingerprint: generated.metadata.fingerprint,
-            accessControl: accessControl,
-            source: "keyProvisioning.generate.wrap"
+            accessControl: accessControl
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
@@ -180,8 +179,7 @@ final class KeyProvisioningService {
         let bundle = try await wrapForProvisioning(
             privateKey: imported.secretKeyData,
             fingerprint: imported.metadata.fingerprint,
-            accessControl: accessControl,
-            source: "keyProvisioning.import.wrap"
+            accessControl: accessControl
         )
         try Task.checkCancellation()
         try invalidationGate.checkValid(token)
@@ -221,10 +219,9 @@ final class KeyProvisioningService {
     private func wrapForProvisioning(
         privateKey: Data,
         fingerprint: String,
-        accessControl: SecAccessControl,
-        source: String
+        accessControl: SecAccessControl
     ) async throws -> WrappedKeyBundle {
-        try await authenticationPromptCoordinator.withOperationPrompt(source: source) {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             if let wrappingPromptCheckpoint {
                 await wrappingPromptCheckpoint()
             }

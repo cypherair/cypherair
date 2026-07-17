@@ -89,9 +89,7 @@ final class PrivateKeyRewrapWorkflow {
         newAccessControl: SecAccessControl,
         authenticator: any AuthenticationEvaluable
     ) async throws -> WrappedKeyBundle {
-        try await authenticationPromptCoordinator.withOperationPrompt(
-            source: "privateKeyProtection.switch.rewrap"
-        ) {
+        try await authenticationPromptCoordinator.withOperationPrompt {
             let existingSeKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
                 from: existingBundle.envelope,
                 expectedFingerprint: fingerprint
