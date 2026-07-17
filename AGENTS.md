@@ -144,7 +144,7 @@ the code alone:
 - Design identity is quiet and system-native — system accent only, no brand
   tint. Reuse the `Sources/App/DesignSystem/` primitives instead of per-view
   literals.
-- One type per file, grouped by feature; mocks under `Security/Mocks/`; all user
+- One type per file, grouped by feature; test doubles under `Tests/Support/SecurityMocks/` (Sources ships no mocks); all user
   strings in the String Catalog.
 - Prefer architecturally correct fixes while keeping scope limited to the user
   request. Do not normalize, revert, or clean up unrelated local changes.
