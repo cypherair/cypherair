@@ -228,13 +228,13 @@ These hold for every change, independent of which file is touched:
 | `Sources/Security/ProtectedData/` | Root-secret authorization, SE device-binding envelope, domain master-key wrapping, reset semantics. Error = protected app data lost or opened under the wrong gate. |
 | `Sources/Security/MemoryZeroingUtility.swift` | Removing a zeroize call = key material leaks. |
 | `Sources/Extensions/Data+Zeroing.swift` | Contains the `@_optimize(none)` zeroing barrier. Weakening = compiler may eliminate all memory zeroing app-wide. |
-| `Sources/Services/DecryptionService.swift` | Phase 1/Phase 2 auth boundary. Skipping Phase 2 auth = biometric bypass. |
-| `Sources/Services/QRService.swift` | Parses untrusted external input (`cypherair://` URLs). |
+| `Sources/Services/Messaging/DecryptionService.swift` | Phase 1/Phase 2 auth boundary. Skipping Phase 2 auth = biometric bypass. |
+| `Sources/Services/Common/QRService.swift` | Parses untrusted external input (`cypherair://` URLs). |
 | `pgp-mobile/src/decrypt.rs` | AEAD hard-fail enforcement. Weakening = plaintext leaks. |
 | `pgp-mobile/src/streaming.rs` | Streaming encrypt/decrypt with buffer zeroing and the `.tmp`-then-rename output contract. |
 | `pgp-mobile/src/composite_kem.rs` + `external_composite_*.rs` | Vendored RFC 9980 KEM combiner and composite seams. Error = wrong KEK derivation or split-custody boundary break. |
 | `pgp-mobile/src/error.rs` | `PgpError` enum. Must stay 1:1 with Swift. |
-| `Sources/Services/DiskSpaceChecker.swift` | Disk-space threshold. Wrong threshold = Jetsam termination during file operations. |
+| `Sources/Services/Common/DiskSpaceChecker.swift` | Disk-space threshold. Wrong threshold = Jetsam termination during file operations. |
 | `CypherAir.entitlements` / `CypherAirMacOS.entitlements` | MIE / Enhanced Security entitlements. |
 | `CypherAir.xcodeproj/project.pbxproj` | Build settings (`ENABLE_ENHANCED_SECURITY`), script phases, target membership. |
 | `CypherAir-Info.plist` | Only `NSFaceIDUsageDescription` permitted. No other usage descriptions. |
