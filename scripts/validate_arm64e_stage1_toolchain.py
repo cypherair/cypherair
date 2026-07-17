@@ -26,7 +26,6 @@ EXPECTED_ASSET_PURPOSE = EXPECTED_ASSET_PREFIX
 PROJECT_REQUIRED_ARM64E_TARGETS = (
     "arm64e-apple-darwin",
     "arm64e-apple-ios",
-    "arm64e-apple-tvos",
     "arm64e-apple-visionos",
 )
 

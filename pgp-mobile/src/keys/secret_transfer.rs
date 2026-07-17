@@ -1,25 +1,6 @@
 use super::*;
 
 /// Encrypt a secret key using Argon2id S2K.
-/// Uses an explicit export strategy rather than inline magic numbers so Swift-side
-/// calibration can later plug into the same path without rewriting the export flow.
-struct Argon2idExportS2kStrategy {
-    time_passes: u8,
-    parallelism: u8,
-    memory_exponent: u8,
-}
-
-impl Argon2idExportS2kStrategy {
-    fn interactive_default() -> Self {
-        Self {
-            // PRD target: roughly 3 seconds on contemporary hardware.
-            time_passes: 3,
-            parallelism: 4,
-            memory_exponent: 19, // 2^19 KiB = 512 MiB
-        }
-    }
-}
-
 fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     key: openpgp::packet::Key<openpgp::packet::key::SecretParts, R>,
     password: &openpgp::crypto::Password,
@@ -30,16 +11,13 @@ fn encrypt_key_argon2id<R: openpgp::packet::key::KeyRole>(
     let mut salt = [0u8; 16];
     openpgp::crypto::random(&mut salt)?;
 
-    let strategy = Argon2idExportS2kStrategy::interactive_default();
-
-    // The default export strategy is intentionally explicit and centralized.
-    // Future device calibration can override these fields via the same strategy model
-    // without touching the encryption pipeline below.
+    // PRD target: roughly 3 seconds on contemporary hardware —
+    // t=3 passes, p=4 lanes, m=2^19 KiB = 512 MiB.
     let s2k = openpgp::crypto::S2K::Argon2 {
         salt,
-        t: strategy.time_passes,
-        p: strategy.parallelism,
-        m: strategy.memory_exponent,
+        t: 3,
+        p: 4,
+        m: 19,
     };
 
     let (key_pub, mut secret) = key.take_secret();

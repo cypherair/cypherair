@@ -11,7 +11,7 @@
 > Update triggers: A Rust or LLVM rebase, an upstream merge that retires a
 > carried change, a change to the fork topology, or an approved production
 > re-pin.
-> Last reviewed: 2026-07-16.
+> Last reviewed: 2026-07-17.
 
 ## 1. Current Decision
 
@@ -198,26 +198,6 @@ separate maintainer approval. The exact production pin is therefore the one in
 [ARM64E_STATUS.md](ARM64E_STATUS.md). Opening any upstream Rust or LLVM pull
 request remains outside this approval and requires a new explicit decision;
 all upstream-facing work remains on CypherAir-owned branches.
-
-## 8. Stable-1.96 To Stable-1.97 Lineage
-
-The reconstruction preserves the useful archaeology from the former 29-patch
-analysis while removing stale carry advice:
-
-| Stable-1.96 source | Stable-1.97 result |
-| --- | --- |
-| `1b3d8853` + `b34d21ad` + `46da820b` | Squashed into target commit `f6f0b28920eb` |
-| `e5eeab87` | Rebuilt as feature-model commit `acd9bbd79335` |
-| `1a4c19c5` | Rebuilt as module-metadata commit `69be3054de1f` |
-| `98c04c76` | Frontend call emission retained in `701aa4548eb4`; stripper logic deleted |
-| `e2009504` | Rebuilt as function-pointer-data commit `3026427dab1e` |
-| `88546cd4` + `e63ffa3e` | Rebuilt as diagnostics commits `8d2ee46cf833` + `3d4d7458ed47` |
-| `edd113bf` + `55651c15` | Consolidated into bootstrap commit `def17bd149bd` |
-| `ba4f1852` | Frontend IR fixes retained in `c3a04d4e4ff9`; stripper bookkeeping deleted |
-| `ecc85bfa` | Dropped because Rust 1.97 contains upstream equivalent `8c029d5f456775294204a8c28b24d6ba19865d79` |
-| `df93416f` + `c6de391a` | Consolidated into test commit `23f3f80209af` |
-| Twelve stable-1.96 fork-CI commits | Consolidated into `ed9539c2e21d` + `92e1dbfed5a2` |
-| `6f895c2d` + `394813b6` | Deleted, not relocated; LLVM root-cause contracts are represented by `cde471330089` + `ec9476ea9f6e` |
 
 ## 9. Future Rebase And Upstream Guidance
 

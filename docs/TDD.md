@@ -4,7 +4,7 @@
 > Purpose: Exact technical values and project-specific contracts — profiles, format selection, FFI rules, key wrapping values, storage contracts.
 > Audience: Developers, security auditors, and AI coding tools.
 > Update triggers: Library/backend selection, profile configuration, FFI contract rules, SE wrapping, storage contracts, or MIE enablement change.
-> Last reviewed: 2026-07-16.
+> Last reviewed: 2026-07-17.
 
 ## 1. OpenPGP Engine
 
@@ -140,7 +140,7 @@ Migration and exception rules:
 
 - `private-key-control` settings and recovery-journal state mutate only inside the protected payload; key metadata persists only in `key-metadata`; private-key envelope rows stay in the Keychain/Secure Enclave private-key domain.
 - Self-test reports are in-memory export-only data. Temporary/export/tutorial artifacts run through `AppTemporaryArtifactStore` with the ephemeral-with-cleanup behavior classified in the inventory.
-- Legacy flat Contacts files under `Documents/contacts` are outside supported app state — not read, migrated, quarantined, or reset-cleaned — and must never become fallback sources of truth. Unsupported Contacts schema versions fail closed to recovery.
+- Unsupported Contacts schema versions fail closed to recovery.
 - Future protected-domain migrations preserve readable source state until the protected destination is created, opened, and verified through the normal post-auth path.
 - Protected-after-unlock settings must not add pre-unlock shadow copies; `appSessionAuthenticationPolicy` is the only ordinary-settings boot-authentication exception.
 - Contacts package exchange is not implemented; any future complete Contacts backup must be designed separately as mandatory encrypted export/import.

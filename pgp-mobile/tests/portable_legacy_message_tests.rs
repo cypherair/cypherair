@@ -333,7 +333,7 @@ fn test_armor_roundtrip_legacy() {
     assert_eq!(original_info.fingerprint, dearmored_info.fingerprint);
 }
 
-/// Fix #4 verification: encrypt_binary rejects recipient without encryption subkey.
+/// encrypt_binary rejects recipient without encryption subkey.
 /// This test creates a signing-only cert and verifies that encrypt_binary produces
 /// the same error as encrypt.
 #[test]
