@@ -61,8 +61,8 @@ The Secure Enclave natively holds only some key types (P-256, and on current OS 
 
 1. Generate `SecureEnclave.P256.KeyAgreement.PrivateKey()` with access-control flags matching the current auth mode.
 2. Generate a software-ephemeral `P256.KeyAgreement.PrivateKey()` and compute `ECDH(ephemeral private × persistent SE public)`.
-3. Derive an AES-256 key with HKDF-SHA256 over a random salt and `sharedInfo` (prefix `CAPKKI`) binding the magic, algorithmID, lowercase hex fingerprint, SHA-256 hashes of the SE key blob and both public keys, and the plaintext length.
-4. Seal with AES-GCM, authenticating the same binding as AAD under prefix `CAPKAD` (domain-separated from the HKDF info).
+3. Derive an AES-256 key with HKDF-SHA256 over a random salt and `sharedInfo` (prefix `CAPKKI5`) binding the magic, algorithmID, lowercase hex fingerprint, SHA-256 hashes of the SE key blob and both public keys, and the plaintext length.
+4. Seal with AES-GCM, authenticating the same binding as AAD under prefix `CAPKAD5` (domain-separated from the HKDF info).
 5. Store one Keychain row: the encoded `CAPKEV5` envelope (SE key blob, both public keys, salt, nonce, ciphertext, tag). **Confirm the write succeeds.**
 6. Only after successful storage: zeroize the raw private key bytes (CryptoKit's `SymmetricKey`/`SharedSecret` clear their own storage).
 

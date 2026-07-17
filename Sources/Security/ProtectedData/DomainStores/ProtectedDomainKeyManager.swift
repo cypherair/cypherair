@@ -403,7 +403,7 @@ final class ProtectedDomainKeyManager {
         }
 
         var info = Data("CADMKKI5".utf8)
-        info.append(1)
+        info.append(UInt8(WrappedDomainMasterKeyRecord.currentFormatVersion))
         info.append(UInt16(domainIDData.count).bigEndianData)
         info.append(domainIDData)
         return info
