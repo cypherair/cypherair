@@ -47,18 +47,18 @@ SwiftUI views, navigation, onboarding, and application composition. Views stay t
 
 Composition and infrastructure files at the top level: `CypherAirApp` (entry point, scene wiring), `AppContainer` (centralized dependency construction, shared default/UI-test graph helpers), `AppStartupCoordinator` (synchronous pre-auth bootstrap, cold-start loading, crash recovery, temp-file cleanup, startup warnings), `AppRoute` + `AppShellComposition` + `Shell/` (route model and per-platform shells: iOS tabs, macOS split-view presentation, keyboard commands), `AppLaunchConfiguration` (launch/UI-test environment parsing), `AppLoadWarningCoordinator`, `ContentView`/`HomeView`. Feature surfaces live in `Encrypt/`, `Decrypt/`, `Sign/`, `Keys/`, `Contacts/` (including `Import/AppSceneIncomingURLRouter` for scene-level URL handoff), `Settings/` (including `LocalDataResetService`, `ProtectedSettingsAccessCoordinator`, `ProtectedSettingsHost`), and `Onboarding/`.
 
-Shared presentation infrastructure in `Common/`:
+Cross-cutting app infrastructure grouped by concern — file-I/O and async-operation plumbing under `FileIO/`, app lifecycle/lock/identity under `Shell/` (`Common/` retains only the shared `TextImport/` input state):
 
-| Helper | Responsibility |
-|--------|---------------|
-| `OperationController` | Shared task lifecycle, cancellation, progress, error presentation, and clipboard notices for encrypt/decrypt/sign/verify flows |
-| `SecurityScopedFileAccess` | Uniform wrapper around security-scoped file URL access |
-| `FileExportController` | Shared `fileExporter` state for exporting generated data or existing files |
-| `CosmeticPrivacyCover` | Pure content-obscuring overlay whenever the app is not foreground-active; zero coupling to authentication (cover ≠ lock) |
-| `AppLockSurfaceView` | Opaque lock surface driven by `AppLockController.lockState`; auto-invokes system authentication on appear, hosts retry/lockout messaging |
-| `AppLifecycleObserver` | Routes platform lifecycle signals (ScenePhase / app-resign / screen-lock) into `AppLockController` foreground-active and away events |
+| Helper | Home | Responsibility |
+|--------|------|---------------|
+| `OperationController` | `FileIO/` | Shared task lifecycle, cancellation, progress, error presentation, and clipboard notices for encrypt/decrypt/sign/verify flows |
+| `SecurityScopedFileAccess` | `FileIO/` | Uniform wrapper around security-scoped file URL access |
+| `FileExportController` | `FileIO/` | Shared `fileExporter` state for exporting generated data or existing files |
+| `CosmeticPrivacyCover` | `Shell/` | Pure content-obscuring overlay whenever the app is not foreground-active; zero coupling to authentication (cover ≠ lock) |
+| `AppLockSurfaceView` | `Shell/` | Opaque lock surface driven by `AppLockController.lockState`; auto-invokes system authentication on appear, hosts retry/lockout messaging |
+| `AppLifecycleObserver` | `Shell/` | Routes platform lifecycle signals (ScenePhase / app-resign / screen-lock) into `AppLockController` foreground-active and away events |
 
-### Guided Tutorial (`Sources/App/Onboarding/`)
+### Guided Tutorial (`Sources/App/Onboarding/Tutorial/`)
 
 A host-driven sandbox (`TutorialView`, `TutorialSessionStore`, `TutorialSandboxContainer`) that teaches the real workflow against a separate dependency graph — fixed `com.cypherair.tutorial.sandbox` defaults suite, temporary contacts directory, real services over mock Secure Enclave/Keychain primitives. Route blocklisting and output interception keep the sandbox isolated; the mock primitives are accepted debt whose naming/containment rules live in [SECURITY.md](SECURITY.md) §6.
 
@@ -82,7 +82,7 @@ Orchestrates user-facing operations by coordinating the Security layer, Models, 
 | `FileProgressReporter` | Observable progress/cancellation for streaming operations, bridged to UniFFI progress callbacks. |
 | `DiskSpaceChecker` | Disk-space validation before streaming file encryption (`volumeAvailableCapacityForImportantUsageKey`) to prevent Jetsam termination. |
 
-`Sources/Services/KeyManagement/` holds the router-owned private-key operation helpers (text/streaming encryption, message/streaming decryption, cleartext/detached signing, password-message encryption, expiry mutation, selective revocation, contact certification), the custody generation/recovery services, and the key catalog/provisioning stores. `Sources/Services/SQLCipher/` holds the raw-key and preflight helpers for Contacts persistence.
+`Sources/Services/KeyManagement/` holds the router-owned private-key operation helpers (text/streaming encryption, message/streaming decryption, cleartext/detached signing, password-message encryption, expiry mutation, selective revocation, contact certification), the custody generation/recovery services, and the key catalog/provisioning stores. `Sources/Services/Common/` holds the shared service utilities — disk-space checks, progress reporting, QR, certificate inspection, and the SQLCipher raw-key helper for Contacts persistence.
 
 ### FFI Adapters (`Sources/Services/FFI/`)
 
