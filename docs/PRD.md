@@ -5,7 +5,7 @@
 > **Audience:** Human developers, product reviewers, and AI coding tools.<br>
 > **Companion documents:** [TDD](TDD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [SECURITY](SECURITY.md)<br>
 > **Update triggers:** Product scope, user workflows, profile behavior, or roadmap change.<br>
-> **Last reviewed:** 2026-07-16.
+> **Last reviewed:** 2026-07-17.
 
 ## 1. Product Overview
 
@@ -197,4 +197,3 @@ Sequoia PGP (Rust, vendored OpenSSL backend) behind UniFFI; the Xcode project li
 ## 6. Roadmap
 
 - **Share Extension** (v2.0 candidate).
-- Remaining post-quantum scope — the `sq` cross-implementation interop pack — is tracked on issue #567 ([POST_QUANTUM](POST_QUANTUM.md) §5).

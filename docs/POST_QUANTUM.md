@@ -1,6 +1,6 @@
 # Post-Quantum OpenPGP (RFC 9980) — Design Rationale
 
-> Status: Design rationale for the shipped post-quantum families (campaign #567). Current-state facts live in the canonical docs: PRD §3 (families), TDD §1 (profiles/formats), SECURE_ENCLAVE_CUSTODY §4.1 (split custody), PERSISTED_STATE_INVENTORY (storage rows). This document keeps the reasoning and red lines that are not obvious from the code, plus the remaining campaign scope.
+> Status: Design rationale for the post-quantum families. Current-state facts live in the canonical docs: PRD §3 (families), TDD §1 (profiles/formats), SECURE_ENCLAVE_CUSTODY §4.1 (split custody), PERSISTED_STATE_INVENTORY (storage rows). This document keeps the reasoning and red lines that are not obvious from the code.
 > Purpose: Why the post-quantum families are shaped the way they are.
 > Audience: Maintainer, reviewers, and AI coding tools.
 > Update triggers: Any change to the custody split, seam ownership, format floor, or exchange rules.
@@ -34,8 +34,6 @@ The quantum-safe indicator claims quantum safety **only when every recipient key
 
 A PQ public certificate armors to ~30 KB — an order of magnitude beyond single-QR capacity, and multi-part QR is rejected by decision. PQ public keys exchange via file / AirDrop / share sheet / armored clipboard; QR key-exchange surfaces show an explicit "not available for this key type" state (never a silent omission); fingerprint QR verification is retained for all families. Message and signature payloads (≈1.8 KB / ≈4.8 KB armored for short texts) remain clipboard-friendly.
 
-## 5. Remaining scope (tracked on issue #567)
+## 5. Scope decisions
 
-- **`sq` interop pack (landed):** cross-implementation RFC 9580/9980 fixtures plus live `sq` lanes, preserved under `pgp-mobile/tests/` and documented in [TESTING.md](TESTING.md) §5. The vendored-combiner cross-implementation check decrypts the committed `sq`-encapsulated post-quantum fixtures through the split-custody path — real-`sq` sample messages stand in for RFC-appendix sample-message vectors.
-- Watch sequoia issue #1249 (`multi_key_combine` export) to delete the vendored combiner.
 - First-party constant-time / side-channel auditing of the PQ dependency chain (Sequoia's composite code, `ossl`, vendored OpenSSL) is declined by decision: CypherAir consumes pinned upstream releases and carries no cryptographic delta beyond the byte-verified combiner (§3); side-channel posture belongs to the upstreams.

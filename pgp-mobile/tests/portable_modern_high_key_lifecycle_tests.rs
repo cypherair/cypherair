@@ -83,7 +83,7 @@ fn test_export_modern_high_uses_argon2id() {
     assert!(argon2_keys >= 2, "Expected primary + subkey packets");
 }
 
-/// Fix #3 verification: expired Modern High key detected.
+/// Expired Modern High key detected.
 #[test]
 fn test_expired_key_detected_modern_high() {
     let key =

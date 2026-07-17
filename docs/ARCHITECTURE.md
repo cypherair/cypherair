@@ -4,7 +4,7 @@
 > Purpose: Module breakdown, dependency relationships, and data flow for CypherAir.
 > Audience: Human developers and AI coding tools.
 > Update triggers: Module ownership, the FFI adapter surface, data flows, tightly-coupled pairs, or storage layout change.
-> Last reviewed: 2026-07-05.
+> Last reviewed: 2026-07-17.
 
 ## 1. Layer Overview
 
@@ -262,7 +262,6 @@ App Sandbox:
 ├── Library/Preferences/
 │   ├── com.cypherair.preference.appSessionAuthenticationPolicy  → boot auth profile (UserDefaults)
 │   └── com.cypherair.tutorial.sandbox.plist                     → fixed tutorial suite; startup/reset cleanup
-├── Documents/contacts/          → unsupported legacy flat Contacts files (not read; see inventory)
 └── tmp/
     ├── decrypted/op-<UUID>/  streaming/op-<UUID>/  export-<UUID>-<filename>
     └── CypherAirGuidedTutorial-<UUID>/            (all with verified complete file protection)

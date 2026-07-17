@@ -61,7 +61,7 @@ fn test_import_wrong_passphrase_modern_high() {
     }
 }
 
-/// Fix #1 verification: exported Modern High key is truly passphrase-protected.
+/// Exported Modern High key is truly passphrase-protected.
 #[test]
 #[ignore = "slow"]
 fn test_export_produces_encrypted_key_modern_high() {
@@ -81,7 +81,7 @@ fn test_export_produces_encrypted_key_modern_high() {
     );
 }
 
-/// Fix #1+#2 verification: full export → import → decrypt round-trip (Modern High).
+/// Full export → import → decrypt round-trip (Modern High).
 #[test]
 #[ignore = "slow"]
 fn test_export_import_decrypt_roundtrip_modern_high() {

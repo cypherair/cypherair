@@ -133,7 +133,7 @@ fn test_unicode_user_id_legacy() {
     );
 }
 
-/// Fix #1 verification: exported key is truly passphrase-protected.
+/// Exported key is truly passphrase-protected.
 /// After export, the key should not be usable without decryption (import).
 #[test]
 fn test_export_produces_encrypted_key_legacy() {
@@ -153,7 +153,7 @@ fn test_export_produces_encrypted_key_legacy() {
     );
 }
 
-/// Fix #1+#2 verification: full export → import → decrypt message round-trip.
+/// Full export → import → decrypt message round-trip.
 #[test]
 fn test_export_import_decrypt_roundtrip_legacy() {
     let key = keys::generate_key_with_suite(
@@ -204,7 +204,7 @@ fn test_export_legacy_uses_iterated_salted() {
     );
 }
 
-/// Fix #3 verification: expired key detected by parse_key_info.
+/// Expired key detected by parse_key_info.
 #[test]
 fn test_expired_key_detected_legacy() {
     let key =

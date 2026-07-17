@@ -156,7 +156,7 @@ fn test_streaming_decrypt_tampered_modern_high_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Bob", KeySuite::Ed448X448);
 
-    let plaintext = b"AEAD error reclassification test for M2 fix";
+    let plaintext = b"AEAD error reclassification test plaintext.";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
@@ -200,7 +200,7 @@ fn test_streaming_decrypt_tampered_legacy_returns_specific_error() {
     let dir = tempfile::tempdir().unwrap();
     let key = gen_key("Alice", KeySuite::Ed25519LegacyCurve25519Legacy);
 
-    let plaintext = b"MDC error reclassification test for M2 fix";
+    let plaintext = b"MDC error reclassification test plaintext.";
     let input_path = dir.path().join("input.txt");
     let encrypted_path = dir.path().join("encrypted.gpg");
     let decrypted_path = dir.path().join("decrypted.txt");
