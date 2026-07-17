@@ -13,7 +13,7 @@ protocol KeychainManageable {
     ///
     /// - Parameters:
     ///   - data: The data to store.
-    ///   - service: The Keychain service identifier (e.g., "com.cypherair.v1.privkey-envelope.{fingerprint}").
+    ///   - service: The Keychain service identifier (e.g., "com.cypherair.v5.privkey-envelope.{fingerprint}").
     ///   - account: The Keychain account identifier.
     ///   - accessControl: Optional SecAccessControl for biometric/passcode protection.
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws
@@ -50,7 +50,7 @@ protocol KeychainManageable {
     /// Used by reset cleanup.
     ///
     /// - Parameters:
-    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v1.").
+    ///   - servicePrefix: The prefix to filter by (e.g., "com.cypherair.v5.").
     ///   - account: The Keychain account identifier.
     /// - Returns: Array of full service names matching the prefix.
     func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String]
@@ -81,8 +81,9 @@ extension KeychainManageable {
 /// Keychain service name constants.
 /// See ARCHITECTURE.md Section 5 for the full storage layout.
 enum KeychainConstants {
-    /// Prefix for all Keychain items. The "v1" segment enables future migration.
-    static let prefix = "com.cypherair.v1"
+    /// Prefix for all Keychain items. The version segment is the schema
+    /// generation of the persisted format family, nothing more.
+    static let prefix = "com.cypherair.v5"
 
     /// Single self-contained private-key envelope row (`PrivateKeyEnvelope`).
     static func privateKeyEnvelopeService(fingerprint: String) -> String {
@@ -94,7 +95,7 @@ enum KeychainConstants {
         "\(prefix).pending-privkey-envelope.\(fingerprint)"
     }
 
-    /// Stable ProtectedData CAPDSEV3 device-binding label; not a persisted Keychain item.
+    /// Stable ProtectedData CAPDSEV5 device-binding label; not a persisted Keychain item.
     static let protectedDataDeviceBindingKeyService = "\(prefix).protected-data.device-binding-key"
 
     /// Prefix for ProtectedData wrapped domain master key rows.

@@ -3,7 +3,7 @@ import LocalAuthentication
 import Security
 
 enum ProtectedDataRightIdentifiers {
-    static let productionSharedRightIdentifier = "com.cypherair.protected-data.shared-right.v1"
+    static let productionSharedRightIdentifier = "com.cypherair.v5.protected-data.shared-right"
 }
 
 protocol ProtectedDataRootSecretStoreProtocol: AnyObject {

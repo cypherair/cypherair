@@ -201,15 +201,15 @@ final class SensitiveBytesBox: @unchecked Sendable {
 /// stored and bound into the AES-GCM AAD alongside the domain / schema / generation
 /// identity, and decoding rejects any unknown or missing field.
 ///
-/// Domain-separated by its own magic (`CPDENV2`) and AAD prefix (`CPDENVA2`).
+/// Domain-separated by its own magic (`CPDENV5`) and AAD prefix (`CPDENVA5`).
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
 /// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDomainEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CPDENV2"
-    static let currentFormatVersion = 2
-    static let currentAADVersion = 2
-    static let algorithmID = "aes-256-gcm-v1"
+    static let magic = "CPDENV5"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "aes-256-gcm-v5"
     static let expectedNonceLength = 12
     static let expectedAuthenticationTagLength = 16
 
@@ -375,7 +375,7 @@ enum ProtectedDomainEnvelopeCodec {
             )
         }
 
-        var aad = Data("CPDENVA2".utf8)
+        var aad = Data("CPDENVA5".utf8)
         aad.append(UInt8(ProtectedDomainEnvelope.currentFormatVersion))
         aad.append(UInt8(ProtectedDomainEnvelope.currentAADVersion))
         aad.append(UInt16(magicData.count).bigEndianData)

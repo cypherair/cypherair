@@ -380,11 +380,11 @@ final class SecureEnclaveCustodyHandleStoreTests: XCTestCase {
         )
         XCTAssertEqual(
             signing.serviceString,
-            "com.cypherair.v1.secure-enclave-custody.p256.signing"
+            "com.cypherair.v5.secure-enclave-custody.p256.signing"
         )
         XCTAssertEqual(
             keyAgreement.serviceString,
-            "com.cypherair.v1.secure-enclave-custody.post-quantum-high.keyAgreement"
+            "com.cypherair.v5.secure-enclave-custody.post-quantum-high.keyAgreement"
         )
     }
 

@@ -15,9 +15,9 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
         )
 
         XCTAssertEqual(record.magic, WrappedDomainMasterKeyRecord.magic)
-        XCTAssertEqual(record.magic, "CADMKV2")
+        XCTAssertEqual(record.magic, "CADMKV5")
         XCTAssertEqual(record.formatVersion, WrappedDomainMasterKeyRecord.currentFormatVersion)
-        XCTAssertEqual(record.formatVersion, 2)
+        XCTAssertEqual(record.formatVersion, 5)
         XCTAssertEqual(record.algorithmID, WrappedDomainMasterKeyRecord.algorithmID)
         XCTAssertEqual(record.aadVersion, WrappedDomainMasterKeyRecord.currentAADVersion)
         XCTAssertEqual(record.nonce.count, WrappedDomainMasterKeyRecord.expectedNonceLength)
@@ -108,7 +108,7 @@ final class WrappedDomainMasterKeyRecordCodecTests: XCTestCase {
             domainWrappingKey: wrappingKey
         )
 
-        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, magic: "CADMKV1")))
+        XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, magic: "CADMKX5")))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, formatVersion: 1)))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, algorithmID: "other")))
         XCTAssertThrowsError(try WrappedDomainMasterKeyRecordCodec.encode(replacing(record, aadVersion: 1)))

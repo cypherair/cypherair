@@ -27,7 +27,7 @@ final class ProtectedDataRootSecretTests: ProtectedDataFrameworkTestCase {
         XCTAssertEqual(decoded.magic, ProtectedDataRootSecretEnvelope.magic)
         XCTAssertEqual(decoded.formatVersion, ProtectedDataRootSecretEnvelope.currentFormatVersion)
         XCTAssertEqual(decoded.aadVersion, ProtectedDataRootSecretEnvelope.currentAADVersion)
-        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 3)
+        XCTAssertEqual(ProtectedDataRootSecretEnvelope.currentAADVersion, 5)
         XCTAssertEqual(decoded.algorithmID, ProtectedDataRootSecretEnvelope.algorithmID)
         XCTAssertEqual(decoded.hkdfSalt.count, ProtectedDataRootSecretEnvelope.expectedSaltLength)
         XCTAssertEqual(decoded.nonce.count, ProtectedDataRootSecretEnvelope.expectedNonceLength)

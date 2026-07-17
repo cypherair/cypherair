@@ -172,7 +172,7 @@ final class PrivateKeyEnvelopeTests: XCTestCase {
             expectedFingerprint: fingerprint
         )
 
-        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEV0")))
+        XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, magic: "CAPKEX5")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, formatVersion: 0)))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, algorithmID: "other")))
         XCTAssertThrowsError(try PrivateKeyEnvelopeCodec.encode(replacing(envelope, aadVersion: 2)))

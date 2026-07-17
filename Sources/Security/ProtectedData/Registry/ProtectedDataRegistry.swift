@@ -73,7 +73,7 @@ enum PendingMutation: Codable, Equatable, Sendable {
 }
 
 struct ProtectedDataRegistry: Codable, Equatable, Sendable {
-    static let currentFormatVersion = 1
+    static let currentFormatVersion = 5
 
     let formatVersion: Int
     let sharedRightIdentifier: String

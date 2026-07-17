@@ -12,16 +12,16 @@ import Security
 /// SE-encrypted key that is useless off-device, and its hash is bound into both the
 /// HKDF `sharedInfo` and the AES-GCM AAD.
 ///
-/// Domain-separated from the per-key private-key envelope (`CAPKEV1`) by distinct
-/// `magic` (`CAPDSEV3`) and HKDF/AAD prefixes so neither blob can be misread.
+/// Domain-separated from the per-key private-key envelope (`CAPKEV5`) by distinct
+/// `magic` (`CAPDSEV5`) and HKDF/AAD prefixes so neither blob can be misread.
 ///
 /// SECURITY-CRITICAL: Changes to this file require human review.
 /// See SECURITY.md Section 3 and Section 10.
 struct ProtectedDataRootSecretEnvelope: Codable, Equatable, Sendable {
-    static let magic = "CAPDSEV3"
-    static let currentFormatVersion = 3
-    static let currentAADVersion = 3
-    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v1"
+    static let magic = "CAPDSEV5"
+    static let currentFormatVersion = 5
+    static let currentAADVersion = 5
+    static let algorithmID = "p256-ecdh-hkdf-sha256-aes-gcm-v5"
     static let expectedRootSecretLength = 32
     static let expectedSaltLength = 32
     static let expectedNonceLength = 12
@@ -235,7 +235,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         rootSecretLength: Int
     ) throws -> Data {
         try rootSecretEnvelopeBindingData(
-            prefix: "CAPDSEAD",
+            prefix: "CAPDSEAD5",
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData,
@@ -256,7 +256,7 @@ enum ProtectedDataRootSecretEnvelopeCodec {
         rootSecretLength: Int
     ) throws -> SymmetricKey {
         let sharedInfo = try rootSecretEnvelopeBindingData(
-            prefix: "CAPDSEKI",
+            prefix: "CAPDSEKI5",
             sharedRightIdentifier: sharedRightIdentifier,
             deviceBindingKeyIdentifier: deviceBindingKeyIdentifier,
             deviceBindingKeyData: deviceBindingKeyData,
