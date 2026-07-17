@@ -6,7 +6,6 @@ final class PrivateKeyAccessService {
     private let secureEnclave: any SecureEnclaveManageable
     private let bundleStore: KeyBundleStore
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let traceStore: AuthLifecycleTraceStore?
 
     /// Returns the primary-key fingerprint (lowercase hex) of unwrapped
     /// secret-certificate material. Injected so the service stays free of the
@@ -18,14 +17,12 @@ final class PrivateKeyAccessService {
         secureEnclave: any SecureEnclaveManageable,
         bundleStore: KeyBundleStore,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String,
-        traceStore: AuthLifecycleTraceStore? = nil
+        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String
     ) {
         self.secureEnclave = secureEnclave
         self.bundleStore = bundleStore
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
         self.certificatePrimaryFingerprint = certificatePrimaryFingerprint
-        self.traceStore = traceStore
     }
 
     /// Triggers device authentication and returns the unwrapped secret certificate material.
@@ -42,64 +39,29 @@ final class PrivateKeyAccessService {
         fingerprint: String,
         authenticationContext: LAContext? = nil
     ) async throws -> Data {
-        traceStore?.record(category: .operation, name: "privateKey.unwrap.start")
-        do {
-            let unwrapped = try await authenticationPromptCoordinator.withOperationPrompt(source: "privateKey.unwrap") {
-                traceStore?.record(category: .operation, name: "privateKey.unwrap.bundle.load.start")
-                let bundle: WrappedKeyBundle
-                do {
-                    bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
-                    traceStore?.record(
-                        category: .operation,
-                        name: "privateKey.unwrap.bundle.load.finish",
-                        metadata: ["result": "success"]
-                    )
-                } catch {
-                    traceStore?.record(
-                        category: .operation,
-                        name: "privateKey.unwrap.bundle.load.finish",
-                        metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failure"])
-                    )
-                    throw error
-                }
+        try await authenticationPromptCoordinator.withOperationPrompt(source: "privateKey.unwrap") {
+            let bundle = try bundleStore.loadBundle(fingerprint: fingerprint)
 
-                // Reconstruct + unwrap run OFF the main actor. `reconstructKey` is a
-                // SYNCHRONOUS, blocking Secure Enclave biometric; if it ran on the main
-                // actor it would block the main thread, so the `.inactive`/`.active`
-                // scene transitions the biometric sheet causes would only be delivered
-                // AFTER `endOperationPrompt` reset the operation-prompt depth to 0. The
-                // app-session lifecycle gate would then never observe the operation
-                // in-progress and would mistake the transient blip for a real app
-                // backgrounding — under grace period "Immediately" (0) that clears
-                // content and shows a spurious second prompt. Running it off-main frees
-                // the main actor so `.inactive` is observed while the operation-prompt
-                // depth is still > 0, letting the existing gate suppression engage.
-                // `loadBundle` above stays on-main: it is a plain Keychain read with no
-                // biometric, so it does not block.
-                let unwrapped = try await Self.reconstructAndUnwrapOffMainActor(
-                    secureEnclave: secureEnclave,
-                    bundle: bundle,
-                    fingerprint: fingerprint,
-                    authenticationContext: AuthenticationContextCarrier(context: authenticationContext),
-                    certificatePrimaryFingerprint: certificatePrimaryFingerprint,
-                    traceStore: traceStore
-                )
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKey.unwrap.closure.return",
-                    metadata: ["result": "success"]
-                )
-                return unwrapped
-            }
-            traceStore?.record(category: .operation, name: "privateKey.unwrap.finish", metadata: ["result": "success"])
-            return unwrapped
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.finish",
-                metadata: ["result": "failure", "errorType": String(describing: type(of: error))]
+            // Reconstruct + unwrap run OFF the main actor. `reconstructKey` is a
+            // SYNCHRONOUS, blocking Secure Enclave biometric; if it ran on the main
+            // actor it would block the main thread, so the `.inactive`/`.active`
+            // scene transitions the biometric sheet causes would only be delivered
+            // AFTER `endOperationPrompt` reset the operation-prompt depth to 0. The
+            // app-session lifecycle gate would then never observe the operation
+            // in-progress and would mistake the transient blip for a real app
+            // backgrounding — under grace period "Immediately" (0) that clears
+            // content and shows a spurious second prompt. Running it off-main frees
+            // the main actor so `.inactive` is observed while the operation-prompt
+            // depth is still > 0, letting the existing gate suppression engage.
+            // `loadBundle` above stays on-main: it is a plain Keychain read with no
+            // biometric, so it does not block.
+            return try await Self.reconstructAndUnwrapOffMainActor(
+                secureEnclave: secureEnclave,
+                bundle: bundle,
+                fingerprint: fingerprint,
+                authenticationContext: AuthenticationContextCarrier(context: authenticationContext),
+                certificatePrimaryFingerprint: certificatePrimaryFingerprint
             )
-            throw error
         }
     }
 
@@ -127,51 +89,18 @@ final class PrivateKeyAccessService {
         bundle: WrappedKeyBundle,
         fingerprint: String,
         authenticationContext: AuthenticationContextCarrier,
-        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String,
-        traceStore: AuthLifecycleTraceStore?
+        certificatePrimaryFingerprint: @escaping @Sendable (Data) throws -> String
     ) async throws -> Data {
-        traceStore?.record(category: .operation, name: "privateKey.unwrap.reconstruct.start")
-        let handle: any SEKeyHandle
-        do {
-            let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
-                from: bundle.envelope,
-                expectedFingerprint: fingerprint
-            )
-            handle = try secureEnclave.reconstructKey(
-                from: seKeyData,
-                authenticationContext: authenticationContext.context
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.reconstruct.finish",
-                metadata: ["result": "success"]
-            )
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.reconstruct.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failure"])
-            )
-            throw error
-        }
+        let seKeyData = try PrivateKeyEnvelopeCodec.seKeyData(
+            from: bundle.envelope,
+            expectedFingerprint: fingerprint
+        )
+        let handle = try secureEnclave.reconstructKey(
+            from: seKeyData,
+            authenticationContext: authenticationContext.context
+        )
 
-        traceStore?.record(category: .operation, name: "privateKey.unwrap.seUnwrap.call.start")
-        var unwrapped: Data
-        do {
-            unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.seUnwrap.call.finish",
-                metadata: ["result": "success"]
-            )
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.seUnwrap.call.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failure"])
-            )
-            throw error
-        }
+        var unwrapped = try secureEnclave.unwrap(bundle: bundle, using: handle, fingerprint: fingerprint)
 
         // Custody-integrity gate: the envelope's AES-GCM tag and device binding
         // prove the wrapped bytes were sealed by this device, but NOT that they
@@ -188,11 +117,6 @@ final class PrivateKeyAccessService {
             let unwrappedFingerprint = try certificatePrimaryFingerprint(unwrapped)
             guard unwrappedFingerprint.caseInsensitiveCompare(fingerprint) == .orderedSame else {
                 unwrapped.resetBytes(in: 0..<unwrapped.count)
-                traceStore?.record(
-                    category: .operation,
-                    name: "privateKey.unwrap.identityMismatch",
-                    metadata: ["result": "mismatch"]
-                )
                 throw CypherAirError.keyOperationUnavailable(
                     category: .publicCertificateAssociationMismatch
                 )
@@ -202,11 +126,6 @@ final class PrivateKeyAccessService {
             throw error
         } catch {
             unwrapped.resetBytes(in: 0..<unwrapped.count)
-            traceStore?.record(
-                category: .operation,
-                name: "privateKey.unwrap.identityMismatch",
-                metadata: ["result": "unparseable"]
-            )
             throw CypherAirError.keyOperationUnavailable(
                 category: .publicCertificateAssociationMismatch
             )

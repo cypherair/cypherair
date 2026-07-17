@@ -40,24 +40,11 @@ final class AppLoadWarningCoordinator {
     func presentPendingIfPossible(
         source: String,
         presentationState: LoadWarningPresentationState,
-        isRestartRequiredAfterLocalDataReset: Bool,
-        traceStore: AuthLifecycleTraceStore?
+        isRestartRequiredAfterLocalDataReset: Bool
     ) {
         guard !isRestartRequiredAfterLocalDataReset else { return }
         guard presentedWarning == nil, let pendingWarning else { return }
         guard LoadWarningPresentationGate.canPresent(presentationState) else {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "loadWarning.pending",
-                metadata: [
-                    "source": source,
-                    "appLocked": presentationState.isAppLocked ? "true" : "false",
-                    "isAuthenticating": presentationState.isAuthenticating ? "true" : "false",
-                    "lockCoverVisible": presentationState.isLockCoverVisible ? "true" : "false",
-                    "hasAuthenticatedSession": presentationState.hasAuthenticatedSession ? "true" : "false",
-                    "allowsPreAuthenticationPresentation": presentationState.allowsPreAuthenticationPresentation ? "true" : "false"
-                ]
-            )
             return
         }
 

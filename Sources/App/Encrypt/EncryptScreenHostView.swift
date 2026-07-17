@@ -15,7 +15,6 @@ struct EncryptScreenHostView: View {
         config: AppConfiguration,
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
         appSessionOrchestrator: AppSessionOrchestrator,
-        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: EncryptView.Configuration
     ) {
@@ -29,7 +28,6 @@ struct EncryptScreenHostView: View {
                 contactService: contactService,
                 config: config,
                 protectedOrdinarySettings: protectedOrdinarySettings,
-                authLifecycleTraceStore: authLifecycleTraceStore,
                 protectedSettingsHost: protectedSettingsHost,
                 configuration: configuration
             )

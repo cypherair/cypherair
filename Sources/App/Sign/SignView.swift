@@ -39,7 +39,6 @@ struct SignView: View {
     @Environment(KeyManagementService.self) private var keyManagement
     @Environment(AppConfiguration.self) private var config
     @Environment(AppSessionOrchestrator.self) private var appSessionOrchestrator
-    @Environment(\.authLifecycleTraceStore) private var authLifecycleTraceStore
     @Environment(\.protectedSettingsHost) private var protectedSettingsHost
 
     let configuration: Configuration
@@ -54,7 +53,6 @@ struct SignView: View {
             keyManagement: keyManagement,
             config: config,
             appSessionOrchestrator: appSessionOrchestrator,
-            authLifecycleTraceStore: authLifecycleTraceStore,
             protectedSettingsHost: protectedSettingsHost,
             configuration: configuration
         )
@@ -72,7 +70,6 @@ private struct SignScreenHostView: View {
         keyManagement: KeyManagementService,
         config: AppConfiguration,
         appSessionOrchestrator: AppSessionOrchestrator,
-        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         protectedSettingsHost: ProtectedSettingsHost?,
         configuration: SignView.Configuration
     ) {
@@ -82,7 +79,6 @@ private struct SignScreenHostView: View {
                 signingService: signingService,
                 keyManagement: keyManagement,
                 config: config,
-                authLifecycleTraceStore: authLifecycleTraceStore,
                 protectedSettingsHost: protectedSettingsHost,
                 configuration: configuration
             )

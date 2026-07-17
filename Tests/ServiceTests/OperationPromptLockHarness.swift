@@ -57,8 +57,7 @@ final class OperationPromptLockHarness {
             shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: { [weak coordinator] in
                 coordinator?.isOperationPromptInProgress ?? false
-            },
-            traceStore: AuthLifecycleTraceStore(isEnabled: true, sink: { _ in })
+            }
         )
         self.controller = controller
 

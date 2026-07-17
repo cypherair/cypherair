@@ -40,7 +40,6 @@ final class ProtectedSettingsAccessCoordinator {
         let syncPreAuthorizationSectionState: @MainActor () -> DomainState
         let syncSectionStateFromStore: @MainActor () -> Void
         let syncSectionStateAfterOperationError: @MainActor () -> Void
-        let stateMetadata: @MainActor (_ domainState: DomainState?) -> [String: String]
     }
 
     private struct MutationAuthorizationResult: @unchecked Sendable {
@@ -68,29 +67,19 @@ final class ProtectedSettingsAccessCoordinator {
 
     private let dependencies: Dependencies
     private let stateAdapter: StateAdapter
-    private let traceEvent: @MainActor (_ name: String, _ metadata: [String: String]) -> Void
 
     private var hasEvaluatedProtectedAccessGate = false
 
     init(
         dependencies: Dependencies,
-        stateAdapter: StateAdapter,
-        traceEvent: @escaping @MainActor (_ name: String, _ metadata: [String: String]) -> Void
+        stateAdapter: StateAdapter
     ) {
         self.dependencies = dependencies
         self.stateAdapter = stateAdapter
-        self.traceEvent = traceEvent
     }
 
     func currentAccessGateDecision() -> AccessGateDecision {
         let decision = dependencies.evaluateAccessGate(!hasEvaluatedProtectedAccessGate)
-        traceCoordinatorEvent(
-            "protectedSettings.gate.decision",
-            metadata: [
-                "decision": accessGateTraceValue(decision),
-                "isFirstProtectedAccess": hasEvaluatedProtectedAccessGate ? "false" : "true"
-            ]
-        )
         hasEvaluatedProtectedAccessGate = true
         return decision
     }
@@ -100,47 +89,22 @@ final class ProtectedSettingsAccessCoordinator {
         authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async -> Bool {
         stateAdapter.setSectionState(.loading)
-        traceCoordinatorEvent(
-            "protectedSettings.open.start",
-            metadata: stateMetadata()
-                .merging(["authorizationMode": authorizationModeTraceValue(authorizationMode)], uniquingKeysWith: { _, new in new })
-        )
         do {
             guard try await ensureProtectedSettingsAccess(
                 localizedReason: localizedReason,
                 authorizationMode: authorizationMode
             ) else {
                 stateAdapter.syncSectionStateFromStore()
-                traceCoordinatorEvent(
-                    "protectedSettings.open.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "accessDenied"], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
 
             stateAdapter.syncSectionStateFromStore()
             if case .available = stateAdapter.currentSectionState() {
-                traceCoordinatorEvent(
-                    "protectedSettings.open.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "available"], uniquingKeysWith: { _, new in new })
-                )
                 return true
             }
-            traceCoordinatorEvent(
-                "protectedSettings.open.finish",
-                metadata: stateMetadata()
-                    .merging(["result": "openedButUnavailable"], uniquingKeysWith: { _, new in new })
-            )
             return false
         } catch {
             stateAdapter.syncSectionStateAfterOperationError()
-            traceCoordinatorEvent(
-                "protectedSettings.open.finish",
-                metadata: stateMetadata()
-                    .merging(traceErrorMetadata(error, extra: ["result": "error"]), uniquingKeysWith: { _, new in new })
-            )
             return false
         }
     }
@@ -255,40 +219,17 @@ final class ProtectedSettingsAccessCoordinator {
         operation: String,
         interactionMode: AuthorizationInteractionMode = .allowInteraction
     ) async throws -> MutationAuthorizationResult {
-        traceCoordinatorEvent(
-            "protectedSettings.mutationAuthorization.start",
-            metadata: [
-                "operation": operation,
-                "requirement": mutationAuthorizationRequirementTraceValue(requirement)
-            ]
-        )
-
         switch requirement {
         case .notRequired:
-            traceCoordinatorEvent(
-                "protectedSettings.mutationAuthorization.finish",
-                metadata: ["operation": operation, "result": "notRequired"]
-            )
             return .authorized(authenticationContext: nil)
         case .frameworkRecoveryNeeded:
             dependencies.syncPreAuthorizationState()
             stateAdapter.setSectionState(.frameworkUnavailable)
-            traceCoordinatorEvent(
-                "protectedSettings.mutationAuthorization.finish",
-                metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
-            )
             return .notAuthorized
         case .wrappingRootKeyRequired:
             let authorizationResult = await dependencies.authorizeSharedRight(
                 localizedReason,
                 interactionMode
-            )
-            traceCoordinatorEvent(
-                "protectedSettings.mutationAuthorization.result",
-                metadata: [
-                    "operation": operation,
-                    "outcome": authorizationOutcomeTraceValue(authorizationResult)
-                ]
             )
             switch authorizationResult {
             case .authorized, .authorizedWithContext:
@@ -299,26 +240,14 @@ final class ProtectedSettingsAccessCoordinator {
                     authorizationResult.authenticationContext?.invalidate()
                     throw error
                 }
-                traceCoordinatorEvent(
-                    "protectedSettings.mutationAuthorization.finish",
-                    metadata: ["operation": operation, "result": "authorized"]
-                )
                 return .authorized(authenticationContext: authorizationResult.authenticationContext)
             case .cancelledOrDenied:
                 dependencies.syncPreAuthorizationState()
                 stateAdapter.syncSectionStateFromStore()
-                traceCoordinatorEvent(
-                    "protectedSettings.mutationAuthorization.finish",
-                    metadata: ["operation": operation, "result": "cancelledOrDenied"]
-                )
                 return .notAuthorized
             case .frameworkRecoveryNeeded:
                 dependencies.syncPreAuthorizationState()
                 stateAdapter.setSectionState(.frameworkUnavailable)
-                traceCoordinatorEvent(
-                    "protectedSettings.mutationAuthorization.finish",
-                    metadata: ["operation": operation, "result": "frameworkRecoveryNeeded"]
-                )
                 return .notAuthorized
             }
         }
@@ -328,63 +257,20 @@ final class ProtectedSettingsAccessCoordinator {
         gateDecision: AccessGateDecision,
         preauthorized: Bool
     ) async throws {
-        traceCoordinatorEvent(
-            "protectedSettings.ensureCommitted.start",
-            metadata: [
-                "gateDecision": accessGateTraceValue(gateDecision),
-                "preauthorized": preauthorized ? "true" : "false"
-            ]
-        )
-        do {
-            try await dependencies.ensureCommittedSettingsIfNeeded()
-            traceCoordinatorEvent(
-                "protectedSettings.ensureCommitted.finish",
-                metadata: [
-                    "result": "success",
-                    "gateDecision": accessGateTraceValue(gateDecision),
-                    "preauthorized": preauthorized ? "true" : "false"
-                ]
-            )
-        } catch {
-            traceCoordinatorEvent(
-                "protectedSettings.ensureCommitted.finish",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "result": "failed",
-                        "gateDecision": accessGateTraceValue(gateDecision),
-                        "preauthorized": preauthorized ? "true" : "false"
-                    ]
-                )
-            )
-            throw error
-        }
+        try await dependencies.ensureCommittedSettingsIfNeeded()
     }
 
     private func ensureProtectedSettingsAccess(
         localizedReason: String,
         authorizationMode: AccessAuthorizationMode = .authorizeIfNeeded
     ) async throws -> Bool {
-        traceCoordinatorEvent(
-            "protectedSettings.ensureAccess.start",
-            metadata: ["authorizationMode": authorizationModeTraceValue(authorizationMode)]
-        )
         var operationAuthenticationContexts: [LAContext] = []
         defer {
             operationAuthenticationContexts.forEach { $0.invalidate() }
         }
         let preAuthorizationState = stateAdapter.syncPreAuthorizationSectionState()
-        traceCoordinatorEvent(
-            "protectedSettings.ensureAccess.preAuthorization",
-            metadata: stateMetadata(domainState: preAuthorizationState)
-        )
         switch preAuthorizationState {
         case .recoveryNeeded, .pendingRetryRequired, .pendingResetRequired, .frameworkUnavailable:
-            traceCoordinatorEvent(
-                "protectedSettings.ensureAccess.finish",
-                metadata: stateMetadata(domainState: preAuthorizationState)
-                    .merging(["result": "blockedByDomainState"], uniquingKeysWith: { _, new in new })
-            )
             return false
         case .locked, .unlocked:
             break
@@ -395,43 +281,23 @@ final class ProtectedSettingsAccessCoordinator {
         case .frameworkRecoveryNeeded:
             dependencies.syncPreAuthorizationState()
             stateAdapter.setSectionState(.frameworkUnavailable)
-            traceCoordinatorEvent(
-                "protectedSettings.ensureAccess.finish",
-                metadata: stateMetadata()
-                    .merging(["result": "frameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-            )
             return false
         case .pendingMutationRecoveryRequired:
             dependencies.syncPreAuthorizationState()
             stateAdapter.syncSectionStateFromStore()
-            traceCoordinatorEvent(
-                "protectedSettings.ensureAccess.finish",
-                metadata: stateMetadata()
-                    .merging(["result": "pendingMutationRecoveryRequired", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-            )
             return false
         case .noProtectedDomainPresent:
             guard authorizationMode == .authorizeIfNeeded else {
                 stateAdapter.setSectionState(.locked)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
             try await ensureCommittedSettingsIfNeeded(
                 gateDecision: decision,
                 preauthorized: false
             )
-            traceCoordinatorEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await dependencies.authorizeSharedRight(
                 localizedReason,
                 .allowInteraction
-            )
-            traceCoordinatorEvent(
-                "protectedSettings.authorization.result",
-                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
             )
             switch authorizationResult {
             case .authorized, .authorizedWithContext:
@@ -440,29 +306,14 @@ final class ProtectedSettingsAccessCoordinator {
                 }
             case .cancelledOrDenied:
                 stateAdapter.setSectionState(.locked)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             case .frameworkRecoveryNeeded:
                 stateAdapter.setSectionState(.frameworkUnavailable)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
         case .authorizationRequired:
             guard authorizationMode == .authorizeIfNeeded || authorizationMode == .handoffOnly else {
                 stateAdapter.setSectionState(.locked)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
             let interactionMode: AuthorizationInteractionMode
@@ -472,38 +323,16 @@ final class ProtectedSettingsAccessCoordinator {
             case .handoffOnly:
                 guard dependencies.hasAuthorizationHandoffContext() else {
                     stateAdapter.setSectionState(.locked)
-                    traceCoordinatorEvent(
-                        "protectedSettings.ensureAccess.finish",
-                        metadata: stateMetadata()
-                            .merging(
-                                [
-                                    "result": "handoffMissing",
-                                    "gateDecision": accessGateTraceValue(decision),
-                                    "hasHandoff": "false"
-                                ],
-                                uniquingKeysWith: { _, new in new }
-                            )
-                    )
                     return false
                 }
                 interactionMode = .handoffOnly
             case .requireExistingAuthorization:
                 stateAdapter.setSectionState(.locked)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "authorizationModeBlocked", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
-            traceCoordinatorEvent("protectedSettings.authorization.request", metadata: ["gateDecision": accessGateTraceValue(decision)])
             let authorizationResult = await dependencies.authorizeSharedRight(
                 localizedReason,
                 interactionMode
-            )
-            traceCoordinatorEvent(
-                "protectedSettings.authorization.result",
-                metadata: ["outcome": authorizationOutcomeTraceValue(authorizationResult)]
             )
             switch authorizationResult {
             case .authorized, .authorizedWithContext:
@@ -516,19 +345,9 @@ final class ProtectedSettingsAccessCoordinator {
                 )
             case .cancelledOrDenied:
                 stateAdapter.setSectionState(.locked)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "cancelledOrDenied", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             case .frameworkRecoveryNeeded:
                 stateAdapter.setSectionState(.frameworkUnavailable)
-                traceCoordinatorEvent(
-                    "protectedSettings.ensureAccess.finish",
-                    metadata: stateMetadata()
-                        .merging(["result": "authorizationFrameworkRecoveryNeeded", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-                )
                 return false
             }
         case .alreadyAuthorized:
@@ -539,106 +358,7 @@ final class ProtectedSettingsAccessCoordinator {
         }
 
         let wrappingRootKey = try dependencies.currentWrappingRootKey()
-        traceCoordinatorEvent(
-            "protectedSettings.openDomain.start",
-            metadata: ["gateDecision": accessGateTraceValue(decision)]
-        )
-        do {
-            try await dependencies.openDomainIfNeeded(wrappingRootKey)
-            traceCoordinatorEvent(
-                "protectedSettings.openDomain.finish",
-                metadata: stateMetadata()
-                    .merging(["result": "success", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-            )
-        } catch {
-            traceCoordinatorEvent(
-                "protectedSettings.openDomain.finish",
-                metadata: stateMetadata()
-                    .merging(
-                        traceErrorMetadata(
-                            error,
-                            extra: ["result": "failed", "gateDecision": accessGateTraceValue(decision)]
-                        ),
-                        uniquingKeysWith: { _, new in new }
-                    )
-            )
-            throw error
-        }
-        traceCoordinatorEvent(
-            "protectedSettings.ensureAccess.finish",
-            metadata: stateMetadata()
-                .merging(["result": "success", "gateDecision": accessGateTraceValue(decision)], uniquingKeysWith: { _, new in new })
-        )
+        try await dependencies.openDomainIfNeeded(wrappingRootKey)
         return true
-    }
-
-    private func stateMetadata(domainState: DomainState? = nil) -> [String: String] {
-        stateAdapter.stateMetadata(domainState)
-    }
-
-    private func traceErrorMetadata(
-        _ error: Error,
-        extra: [String: String] = [:]
-    ) -> [String: String] {
-        var metadata = extra
-        metadata["errorType"] = String(describing: type(of: error))
-        return metadata
-    }
-
-    private func traceCoordinatorEvent(
-        _ name: String,
-        metadata: [String: String] = [:]
-    ) {
-        traceEvent(name, metadata)
-    }
-
-    private func authorizationModeTraceValue(_ mode: AccessAuthorizationMode) -> String {
-        switch mode {
-        case .authorizeIfNeeded:
-            "authorizeIfNeeded"
-        case .requireExistingAuthorization:
-            "requireExistingAuthorization"
-        case .handoffOnly:
-            "handoffOnly"
-        }
-    }
-
-    private func accessGateTraceValue(_ decision: AccessGateDecision) -> String {
-        switch decision {
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        case .pendingMutationRecoveryRequired:
-            "pendingMutationRecoveryRequired"
-        case .noProtectedDomainPresent:
-            "noProtectedDomainPresent"
-        case .authorizationRequired:
-            "authorizationRequired"
-        case .alreadyAuthorized:
-            "alreadyAuthorized"
-        }
-    }
-
-    private func authorizationOutcomeTraceValue(_ outcome: AuthorizationOutcome) -> String {
-        switch outcome {
-        case .authorized, .authorizedWithContext:
-            "authorized"
-        case .cancelledOrDenied:
-            "cancelledOrDenied"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
-    }
-
-    private func mutationAuthorizationRequirementTraceValue(
-        _ requirement: MutationAuthorizationRequirement
-    ) -> String {
-        switch requirement {
-        case .notRequired:
-            "notRequired"
-        case .wrappingRootKeyRequired:
-            "wrappingRootKeyRequired"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
     }
 }

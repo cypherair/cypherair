@@ -38,18 +38,13 @@ struct CypherAirApp: App {
         if launchConfiguration.usesUITestAppContainer {
             container = AppContainer.makeUITest(
                 requiresManualAuthentication: launchConfiguration.requiresManualAuthentication,
-                preloadContact: launchConfiguration.preloadsUITestContact,
-                authTraceEnabled: launchConfiguration.isAuthTraceEnabled
+                preloadContact: launchConfiguration.preloadsUITestContact
             )
         } else {
-            container = AppContainer.makeDefault(
-                authTraceEnabled: launchConfiguration.isAuthTraceEnabled
-            )
+            container = AppContainer.makeDefault()
         }
         #else
-        container = AppContainer.makeDefault(
-            authTraceEnabled: launchConfiguration.isAuthTraceEnabled
-        )
+        container = AppContainer.makeDefault()
         #endif
         if launchConfiguration.usesUITestAppContainer && !launchConfiguration.requiresManualAuthentication {
             container.appSessionOrchestrator.recordAuthentication()
@@ -57,37 +52,13 @@ struct CypherAirApp: App {
         if launchConfiguration.shouldSkipOnboarding {
             container.protectedOrdinarySettingsCoordinator.applyOnboardingCompletionOverrideForTesting(true)
         }
-        container.authLifecycleTraceStore?.record(
-            category: .lifecycle,
-            name: "app.init.containerReady",
-            metadata: [
-                "root": launchConfiguration.root.rawValue,
-                "uiTestMode": launchConfiguration.isUITestMode ? "true" : "false",
-                "xctestHost": launchConfiguration.isXCTestHost ? "true" : "false",
-                "requiresManualAuthentication": launchConfiguration.requiresManualAuthentication ? "true" : "false",
-                "authTraceEnabled": launchConfiguration.isAuthTraceEnabled ? "true" : "false"
-            ]
-        )
         let tutorialStore = TutorialSessionStore()
         let incomingURLImportCoordinator = IncomingURLImportCoordinator(
             importLoader: PublicKeyImportLoader(qrService: container.qrService),
             importWorkflow: ContactImportWorkflow(contactService: container.contactService)
         )
         let startupCoordinator = AppStartupCoordinator()
-        container.authLifecycleTraceStore?.record(
-            category: .lifecycle,
-            name: "app.init.preAuthBootstrap.start"
-        )
         let startupSnapshot = startupCoordinator.performPreAuthBootstrap(using: container)
-        container.authLifecycleTraceStore?.record(
-            category: .lifecycle,
-            name: "app.init.preAuthBootstrap.finish",
-            metadata: [
-                "bootstrapOutcome": Self.traceValue(for: startupSnapshot.bootstrapOutcome),
-                "frameworkState": Self.traceValue(for: startupSnapshot.protectedDataFrameworkState),
-                "hasLoadError": startupSnapshot.loadError == nil ? "false" : "true"
-            ]
-        )
         let firstDomainSharedRightCleaner = ProtectedDataFirstDomainSharedRightCleaner(
             storageRoot: container.protectedDataStorageRoot,
             hasPersistedSharedRight: { identifier in
@@ -98,8 +69,7 @@ struct CypherAirApp: App {
             },
             removePersistedSharedRight: { identifier in
                 try await container.protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            },
-            traceStore: container.authLifecycleTraceStore
+            }
         )
         let protectedSettingsHost = ProtectedSettingsHost(
             evaluateAccessGate: { isFirstProtectedAccess in
@@ -240,8 +210,7 @@ struct CypherAirApp: App {
                         try container.protectedDataSessionCoordinator.wrappingRootKeyData()
                     }
                 )
-            },
-            traceStore: container.authLifecycleTraceStore
+            }
         )
 
         _launchConfiguration = State(initialValue: launchConfiguration)
@@ -371,16 +340,6 @@ struct CypherAirApp: App {
         ) {
             ImportConfirmationSheetHost(coordinator: incomingURLImportCoordinator.importConfirmationCoordinator) {
                 mainWindowContent
-                    .onAppear {
-                        container.authLifecycleTraceStore?.record(
-                            category: .lifecycle,
-                            name: "mainWindow.content.appear",
-                            metadata: [
-                                "root": launchConfiguration.root.rawValue,
-                                "hasLoadWarning": loadWarningCoordinator.presentedWarning == nil ? "false" : "true"
-                            ]
-                        )
-                    }
                     .task {
                         await prepareUITestContactsIfNeeded()
                     }
@@ -409,7 +368,6 @@ struct CypherAirApp: App {
                     .environment(\.localDataResetService, container.localDataResetService)
                     .environment(\.localDataResetRestartCoordinator, localDataResetRestartCoordinator)
                     .environment(\.appAccessPolicySwitchAction, appAccessPolicySwitchAction)
-                    .environment(\.authLifecycleTraceStore, container.authLifecycleTraceStore)
                     .environment(\.protectedSettingsHost, protectedSettingsHost)
                     .environment(tutorialStore)
                     #if os(iOS) || os(visionOS)
@@ -441,13 +399,6 @@ struct CypherAirApp: App {
         .appLoadWarningAlert(coordinator: loadWarningCoordinator)
         .onAppear {
             presentPendingLoadWarningIfPossible(source: "initialState")
-        }
-        .onChange(of: loadWarningCoordinator.presentedWarning != nil) { _, isPresented in
-            container.authLifecycleTraceStore?.record(
-                category: .lifecycle,
-                name: isPresented ? "loadWarning.presented" : "loadWarning.dismissed",
-                metadata: ["source": "stateChange"]
-            )
         }
         .onChange(of: loadWarningPresentationState) { _, _ in
             presentPendingLoadWarningIfPossible(source: "presentationStateChange")
@@ -493,8 +444,7 @@ struct CypherAirApp: App {
         loadWarningCoordinator.presentPendingIfPossible(
             source: source,
             presentationState: loadWarningPresentationState,
-            isRestartRequiredAfterLocalDataReset: localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset,
-            traceStore: container.authLifecycleTraceStore
+            isRestartRequiredAfterLocalDataReset: localDataResetRestartCoordinator.restartRequiredAfterLocalDataReset
         )
     }
 
@@ -610,41 +560,6 @@ struct CypherAirApp: App {
         }
     }
     #endif
-
-    private static func traceValue(for outcome: ProtectedDataBootstrapOutcome) -> String {
-        switch outcome {
-        case .emptySteadyState(_, let didBootstrap):
-            didBootstrap ? "emptySteadyState.bootstrapped" : "emptySteadyState.existing"
-        case .loadedRegistry(_, let recoveryDisposition):
-            "loadedRegistry.\(traceValue(for: recoveryDisposition))"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
-    }
-
-    private static func traceValue(for recoveryDisposition: ProtectedDataRecoveryDisposition) -> String {
-        switch recoveryDisposition {
-        case .resumeSteadyState:
-            "resumeSteadyState"
-        case .continuePendingMutation:
-            "continuePendingMutation"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        }
-    }
-
-    private static func traceValue(for state: ProtectedDataFrameworkState) -> String {
-        switch state {
-        case .sessionLocked:
-            "sessionLocked"
-        case .sessionAuthorized:
-            "sessionAuthorized"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        case .restartRequired:
-            "restartRequired"
-        }
-    }
 
 }
 

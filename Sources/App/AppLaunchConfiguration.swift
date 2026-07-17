@@ -14,7 +14,6 @@ struct AppLaunchConfiguration {
     let requiresManualAuthentication: Bool
     let opensAuthModeConfirmation: Bool
     let preloadsUITestContact: Bool
-    let isAuthTraceEnabled: Bool
 
     var usesUITestAppContainer: Bool {
         isUITestMode || isXCTestHost
@@ -37,8 +36,6 @@ struct AppLaunchConfiguration {
         detectsXCTestHost: Bool = false,
         allowsUITestLaunchOverrides: Bool = Self.defaultAllowsUITestLaunchOverrides
     ) {
-        self.isAuthTraceEnabled = environment["CYPHERAIR_DEBUG_AUTH_TRACE"] == "1"
-
         guard allowsUITestLaunchOverrides else {
             self.root = .main
             self.isUITestMode = false

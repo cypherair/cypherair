@@ -2,7 +2,6 @@ import Foundation
 
 /// Centralized dependency container for the application.
 final class AppContainer: @unchecked Sendable {
-    let authLifecycleTraceStore: AuthLifecycleTraceStore?
     let appLockController: AppLockController
     let authPromptCoordinator: AuthenticationPromptCoordinator
     let keychain: any KeychainManageable
@@ -34,7 +33,6 @@ final class AppContainer: @unchecked Sendable {
     private var uiTestContactsBootstrap: UITestContactsBootstrap?
 
     init(
-        authLifecycleTraceStore: AuthLifecycleTraceStore?,
         appLockController: AppLockController,
         authPromptCoordinator: AuthenticationPromptCoordinator,
         keychain: any KeychainManageable,
@@ -64,7 +62,6 @@ final class AppContainer: @unchecked Sendable {
         localDataResetService: LocalDataResetService,
         defaultsSuiteName: String? = nil
     ) {
-        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.appLockController = appLockController
         self.authPromptCoordinator = authPromptCoordinator
         self.keychain = keychain
@@ -105,11 +102,6 @@ final class AppContainer: @unchecked Sendable {
         var waiters: [CheckedContinuation<ContactsAvailability, Never>] = []
     }
 
-    private struct AuthenticationPromptStack {
-        let authLifecycleTraceStore: AuthLifecycleTraceStore
-        let authPromptCoordinator: AuthenticationPromptCoordinator
-    }
-
     private struct PgpServiceGraph {
         let temporaryArtifactStore: AppTemporaryArtifactStore
         let encryptionService: EncryptionService
@@ -118,17 +110,6 @@ final class AppContainer: @unchecked Sendable {
         let certificateSignatureService: CertificateSignatureService
         let qrService: QRService
         let selfTestService: SelfTestService
-    }
-
-    private static func makeAuthenticationPromptStack(authTraceEnabled: Bool) -> AuthenticationPromptStack {
-        let authLifecycleTraceStore = AuthLifecycleTraceStore(isEnabled: authTraceEnabled)
-        let authPromptCoordinator = AuthenticationPromptCoordinator(
-            traceStore: authLifecycleTraceStore
-        )
-        return AuthenticationPromptStack(
-            authLifecycleTraceStore: authLifecycleTraceStore,
-            authPromptCoordinator: authPromptCoordinator
-        )
     }
 
     #if os(macOS)
@@ -209,8 +190,7 @@ final class AppContainer: @unchecked Sendable {
             discardHandoffContextForPolicyChange: {
                 appSessionOrchestrator.discardProtectedDataAuthorizationHandoffContextForPolicyChange()
             },
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            authenticationPromptCoordinator: authPromptCoordinator
         )
     }
 
@@ -218,24 +198,21 @@ final class AppContainer: @unchecked Sendable {
         rootSecretStore: any ProtectedDataRootSecretStoreProtocol,
         domainKeyManager: ProtectedDomainKeyManager,
         config: AppConfiguration,
-        authPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore?
+        authPromptCoordinator: AuthenticationPromptCoordinator
     ) -> ProtectedDataSessionCoordinator {
         ProtectedDataSessionCoordinator(
             rootSecretStore: rootSecretStore,
             domainKeyManager: domainKeyManager,
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             appSessionPolicyProvider: { config.appSessionAuthenticationPolicy },
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: traceStore
+            authenticationPromptCoordinator: authPromptCoordinator
         )
     }
 
     private static func makeFirstDomainSharedRightCleaner(
         storageRoot: ProtectedDataStorageRoot,
         domainKeyManager: ProtectedDomainKeyManager,
-        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator,
-        traceStore: AuthLifecycleTraceStore?
+        protectedDataSessionCoordinator: ProtectedDataSessionCoordinator
     ) -> ProtectedDataFirstDomainSharedRightCleaner {
         ProtectedDataFirstDomainSharedRightCleaner(
             storageRoot: storageRoot,
@@ -247,8 +224,7 @@ final class AppContainer: @unchecked Sendable {
             },
             removePersistedSharedRight: { identifier in
                 try await protectedDataSessionCoordinator.removePersistedSharedRight(identifier: identifier)
-            },
-            traceStore: traceStore
+            }
         )
     }
 
@@ -620,23 +596,18 @@ final class AppContainer: @unchecked Sendable {
     // which is main-actor-isolated. Called from `CypherAirApp.init` (App is
     // main-actor) and from `@MainActor` test cases.
     @MainActor
-    static func makeDefault(
-        authTraceEnabled: Bool = false
-    ) -> AppContainer {
-        let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
-        let authLifecycleTraceStore = authentication.authLifecycleTraceStore
-        let authPromptCoordinator = authentication.authPromptCoordinator
-        let secureEnclave = HardwareSecureEnclave(traceStore: authLifecycleTraceStore)
-        let keychain = SystemKeychain(traceStore: authLifecycleTraceStore)
+    static func makeDefault() -> AppContainer {
+        let authPromptCoordinator = AuthenticationPromptCoordinator()
+        let secureEnclave = HardwareSecureEnclave()
+        let keychain = SystemKeychain()
         let authManager = AuthenticationManager(
             secureEnclave: secureEnclave,
             keychain: keychain,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let defaults = UserDefaults.standard
         let config = AppConfiguration(defaults: defaults)
-        let protectedDataStorageRoot = ProtectedDataStorageRoot(traceStore: authLifecycleTraceStore)
+        let protectedDataStorageRoot = ProtectedDataStorageRoot()
         let protectedDomainKeyManager = ProtectedDomainKeyManager(
             storageRoot: protectedDataStorageRoot,
             keychain: keychain
@@ -646,24 +617,21 @@ final class AppContainer: @unchecked Sendable {
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             hasExternalProtectedDataArtifacts: {
                 try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
-            },
-            traceStore: authLifecycleTraceStore
+            }
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
-            rootSecretStore: KeychainProtectedDataRootSecretStore(traceStore: authLifecycleTraceStore),
+            rootSecretStore: KeychainProtectedDataRootSecretStore(),
             domainKeyManager: protectedDomainKeyManager,
             config: config,
-            authPromptCoordinator: authPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            authPromptCoordinator: authPromptCoordinator
         )
         let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
             domainKeyManager: protectedDomainKeyManager,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            traceStore: authLifecycleTraceStore
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
         let privateKeyControlStore = PrivateKeyControlStore(
             storageRoot: protectedDataStorageRoot,
@@ -779,7 +747,6 @@ final class AppContainer: @unchecked Sendable {
                 compositeBindingInspector: secureEnclaveCompositeBindingInspector,
                 compositeHandleStore: secureEnclaveCompositeHandleStore
             ),
-            authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: keyMetadataDomainStore,
             // Device-bound Secure Enclave custody generation. Hardware-guarded
             // at the composition root; on hardware without a Secure Enclave the
@@ -864,15 +831,13 @@ final class AppContainer: @unchecked Sendable {
                 makeProtectedDataFrameworkSentinelPostUnlockOpener(
                     protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
-            ],
-            traceStore: authLifecycleTraceStore
+            ]
         )
         let appSessionOrchestrator = AppSessionOrchestrator(
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            traceStore: authLifecycleTraceStore
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
         let appLockController = AppLockController(
             gracePeriodProvider: {
@@ -946,8 +911,7 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { false },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
-            },
-            traceStore: authLifecycleTraceStore
+            }
         )
         #if os(macOS)
         wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
@@ -982,12 +946,10 @@ final class AppContainer: @unchecked Sendable {
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
             },
-            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore,
-            traceStore: authLifecycleTraceStore
+            secureEnclaveCustodyHandleStore: secureEnclaveCustodyHandleStore
         )
 
         return AppContainer(
-            authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
             keychain: keychain,
@@ -1022,12 +984,9 @@ final class AppContainer: @unchecked Sendable {
     @MainActor
     static func makeUITest(
         requiresManualAuthentication: Bool = false,
-        preloadContact: Bool = false,
-        authTraceEnabled: Bool = false
+        preloadContact: Bool = false
     ) -> AppContainer {
-        let authentication = makeAuthenticationPromptStack(authTraceEnabled: authTraceEnabled)
-        let authLifecycleTraceStore = authentication.authLifecycleTraceStore
-        let authPromptCoordinator = authentication.authPromptCoordinator
+        let authPromptCoordinator = AuthenticationPromptCoordinator()
         let secureEnclave = MockSecureEnclave()
         let keychain = MockKeychain()
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
@@ -1040,8 +999,7 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             defaults: defaults,
             allowsUITestAuthenticationBypass: true,
-            authenticationPromptCoordinator: authPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            authenticationPromptCoordinator: authPromptCoordinator
         )
         let config = AppConfiguration(defaults: defaults)
         let engine = PgpEngine()
@@ -1064,8 +1022,7 @@ final class AppContainer: @unchecked Sendable {
         )
         let protectedDataStorageRoot = ProtectedDataStorageRoot(
             baseDirectory: protectedDataBaseDirectory,
-            validationMode: .enforceAppSupportContainment,
-            traceStore: authLifecycleTraceStore
+            validationMode: .enforceAppSupportContainment
         )
         let protectedDomainKeyManager = ProtectedDomainKeyManager(
             storageRoot: protectedDataStorageRoot,
@@ -1076,8 +1033,7 @@ final class AppContainer: @unchecked Sendable {
             sharedRightIdentifier: ProtectedDataRightIdentifiers.productionSharedRightIdentifier,
             hasExternalProtectedDataArtifacts: {
                 try protectedDomainKeyManager.hasAnyPersistedDomainKeyRecord()
-            },
-            traceStore: authLifecycleTraceStore
+            }
         )
         let protectedDomainRecoveryCoordinator = ProtectedDomainRecoveryCoordinator(
             registryStore: protectedDataRegistryStore
@@ -1086,14 +1042,12 @@ final class AppContainer: @unchecked Sendable {
             rootSecretStore: MockProtectedDataRootSecretStore(),
             domainKeyManager: protectedDomainKeyManager,
             config: config,
-            authPromptCoordinator: authPromptCoordinator,
-            traceStore: authLifecycleTraceStore
+            authPromptCoordinator: authPromptCoordinator
         )
         let firstDomainSharedRightCleaner = makeFirstDomainSharedRightCleaner(
             storageRoot: protectedDataStorageRoot,
             domainKeyManager: protectedDomainKeyManager,
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            traceStore: authLifecycleTraceStore
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
         let privateKeyControlStore = PrivateKeyControlStore(
             storageRoot: protectedDataStorageRoot,
@@ -1169,8 +1123,7 @@ final class AppContainer: @unchecked Sendable {
                 makeProtectedDataFrameworkSentinelPostUnlockOpener(
                     protectedDataFrameworkSentinelStore: protectedDataFrameworkSentinelStore
                 )
-            ],
-            traceStore: authLifecycleTraceStore
+            ]
         )
         let keyManagement = KeyManagementService(
             keyAdapter: keyAdapter,
@@ -1179,7 +1132,6 @@ final class AppContainer: @unchecked Sendable {
             keychain: keychain,
             authenticationPromptCoordinator: authPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
-            authLifecycleTraceStore: authLifecycleTraceStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? keyManagement.loadKeys()
@@ -1193,8 +1145,7 @@ final class AppContainer: @unchecked Sendable {
             currentRegistryProvider: {
                 try protectedDomainRecoveryCoordinator.loadCurrentRegistry()
             },
-            protectedDataSessionCoordinator: protectedDataSessionCoordinator,
-            traceStore: authLifecycleTraceStore
+            protectedDataSessionCoordinator: protectedDataSessionCoordinator
         )
         let appLockController = AppLockController(
             gracePeriodProvider: {
@@ -1266,8 +1217,7 @@ final class AppContainer: @unchecked Sendable {
             shouldBypassAuthentication: { !requiresManualAuthentication },
             operationPromptInProgressProvider: {
                 authPromptCoordinator.isOperationPromptInProgress
-            },
-            traceStore: authLifecycleTraceStore
+            }
         )
         #if os(macOS)
         wireOperationPromptLifecycle(from: authPromptCoordinator, to: appLockController)
@@ -1304,12 +1254,10 @@ final class AppContainer: @unchecked Sendable {
             temporaryArtifactStore: pgpServices.temporaryArtifactStore,
             protectedDataRootSecretExists: {
                 protectedDataSessionCoordinator.hasPersistedRootSecret()
-            },
-            traceStore: authLifecycleTraceStore
+            }
         )
 
         let container = AppContainer(
-            authLifecycleTraceStore: authLifecycleTraceStore,
             appLockController: appLockController,
             authPromptCoordinator: authPromptCoordinator,
             keychain: keychain,

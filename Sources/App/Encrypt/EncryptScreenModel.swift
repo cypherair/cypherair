@@ -41,7 +41,6 @@ final class EncryptScreenModel {
     private let contactService: ContactService
     private let appConfiguration: AppConfiguration
     private let protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator
-    private let authLifecycleTraceStore: AuthLifecycleTraceStore?
     private let protectedSettingsHost: ProtectedSettingsHost?
     private let textEncryptionAction: TextEncryptionAction
     private let messageQuantumSafetyAction: MessageQuantumSafetyAction
@@ -91,7 +90,6 @@ final class EncryptScreenModel {
         contactService: ContactService,
         config: AppConfiguration,
         protectedOrdinarySettings: ProtectedOrdinarySettingsCoordinator,
-        authLifecycleTraceStore: AuthLifecycleTraceStore? = nil,
         protectedSettingsHost: ProtectedSettingsHost? = nil,
         configuration: EncryptView.Configuration,
         operation: OperationController = OperationController(),
@@ -110,7 +108,6 @@ final class EncryptScreenModel {
         self.contactService = contactService
         self.appConfiguration = config
         self.protectedOrdinarySettings = protectedOrdinarySettings
-        self.authLifecycleTraceStore = authLifecycleTraceStore
         self.protectedSettingsHost = protectedSettingsHost
         self.clipboardNoticeDecision = clipboardNoticeDecision ?? {
             await protectedSettingsHost?.clipboardNoticeDecision() ?? true
@@ -535,11 +532,6 @@ final class EncryptScreenModel {
 
         ciphertext = nil
         resultQuantumSafety = nil
-        authLifecycleTraceStore?.record(
-            category: .operation,
-            name: "encrypt.text.start",
-            metadata: ["mode": "text", "signed": signerFingerprint == nil ? "false" : "true"]
-        )
 
         operation.run(mapError: mapEncryptionError) { [self] in
             let result = try await self.textEncryptionAction(
@@ -554,11 +546,6 @@ final class EncryptScreenModel {
             self.resultQuantumSafety = try? self.messageQuantumSafetyAction(result)
             self.textInputSectionEpoch &+= 1
             onEncrypted?(result)
-            self.authLifecycleTraceStore?.record(
-                category: .operation,
-                name: "encrypt.text.finish",
-                metadata: ["result": "success"]
-            )
         }
     }
 
@@ -584,11 +571,6 @@ final class EncryptScreenModel {
         let encryptToSelfFingerprint = encryptToSelf ? self.encryptToSelfFingerprint : nil
 
         cleanupTemporaryEncryptedFile()
-        authLifecycleTraceStore?.record(
-            category: .operation,
-            name: "encrypt.file.start",
-            metadata: ["mode": "file", "signed": signerFingerprint == nil ? "false" : "true"]
-        )
 
         operation.runFileOperation(mapError: mapEncryptionError) { [self] progress in
             let output = try await self.fileEncryptionAction(
@@ -608,11 +590,6 @@ final class EncryptScreenModel {
             try Task.checkCancellation()
             self.adoptEncryptedFileOutput(output)
             pendingOutput = nil
-            self.authLifecycleTraceStore?.record(
-                category: .operation,
-                name: "encrypt.file.finish",
-                metadata: ["result": "success"]
-            )
         }
     }
 

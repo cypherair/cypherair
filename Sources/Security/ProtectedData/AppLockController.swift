@@ -66,7 +66,6 @@ final class AppLockController {
     /// absent, tests that exercise the controller directly fall back to the
     /// main-actor mirror.
     private let operationPromptInProgressProvider: (() -> Bool)?
-    private let traceStore: AuthLifecycleTraceStore?
 
     private(set) var lockState: LockState = .locked
 
@@ -75,7 +74,8 @@ final class AppLockController {
     /// flight (the `.authenticating` rule). The away decision is
     /// deferred to the prompts' end: `handleOperationPromptsEnded()` processes it
     /// if the app is still not foreground-active, and discards it if the user
-    /// returned. Holds the original away source for tracing.
+    /// returned. Holds the original away source so the deferred dispatch carries
+    /// the provenance that began the deferral.
     private var pendingOperationPromptAway: String?
 
     /// Main-actor mirror of "an operation-prompt session is open", maintained by
@@ -148,8 +148,7 @@ final class AppLockController {
         postAuthenticationHandler: @escaping (LAContext?, String) async -> Void = { _, _ in },
         contentClearHandler: @escaping () -> Void = {},
         shouldBypassAuthentication: @escaping () -> Bool = { false },
-        operationPromptInProgressProvider: (() -> Bool)? = nil,
-        traceStore: AuthLifecycleTraceStore? = nil
+        operationPromptInProgressProvider: (() -> Bool)? = nil
     ) {
         self.gracePeriodProvider = gracePeriodProvider
         self.lastAuthenticationDateProvider = lastAuthenticationDateProvider
@@ -161,7 +160,6 @@ final class AppLockController {
         self.contentClearHandler = contentClearHandler
         self.shouldBypassAuthentication = shouldBypassAuthentication
         self.operationPromptInProgressProvider = operationPromptInProgressProvider
-        self.traceStore = traceStore
     }
 
     // MARK: - Computed projections (read by views)
@@ -219,11 +217,6 @@ final class AppLockController {
             // right after this call — clears it on every exit path.
             isResolvingForegroundLock = true
         }
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.foregroundActiveChanged",
-            metadata: ["active": active ? "true" : "false", "state": stateName(lockState)]
-        )
     }
 
     /// A genuine away event for this platform: iOS/iPadOS/visionOS
@@ -242,11 +235,6 @@ final class AppLockController {
         //     is not routed here and therefore still wins (it bumps
         //     `awayGeneration`, so the in-flight result is discarded).
         if isAuthenticating {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.authenticatingRule.resignDuringUnlock",
-                metadata: ["source": source]
-            )
             return
         }
         // (b) A private-key operation prompt is in flight: the resign is ambiguous
@@ -258,16 +246,11 @@ final class AppLockController {
         if isOperationPromptInProgressForAwayRule {
             // First resign wins: later resigns during the same prompt session carry
             // no additional information (the decision at the prompts' end depends
-            // only on `isForegroundActive`), and keeping the earliest source makes
-            // the trace reflect when the deferral began.
+            // only on `isForegroundActive`), and keeping the earliest source carries
+            // the away provenance that began the deferral into the eventual dispatch.
             if pendingOperationPromptAway == nil {
                 pendingOperationPromptAway = source
             }
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.authenticatingRule.deferredOperationAway",
-                metadata: ["source": source]
-            )
             return
         }
         #endif
@@ -277,16 +260,6 @@ final class AppLockController {
         discardHandoffContext("away:\(source)")
 
         let interval = effectiveGracePeriod()
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.awayEvent",
-            metadata: [
-                "source": source,
-                "interval": String(interval),
-                "lockImmediately": interval == 0 ? "true" : "false",
-                "state": stateName(lockState)
-            ]
-        )
 
         // "Immediately" (interval 0) locks on the away event, literally.
         // For a non-zero interval the relock is evaluated lazily on the next
@@ -331,26 +304,11 @@ final class AppLockController {
         guard !isLockedState else {
             // An explicit lock (lockNow / screen-lock) or a processed away
             // already locked the app; the deferred decision is moot.
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.authenticatingRule.deferredAwaySupersededByLock",
-                metadata: ["source": source]
-            )
             return
         }
         guard !isForegroundActive else {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.authenticatingRule.deferredAwayDiscarded",
-                metadata: ["source": source]
-            )
             return
         }
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.authenticatingRule.deferredAwayProcessed",
-            metadata: ["source": source]
-        )
         handleAwayEvent(source: "deferredOperationAway:\(source)")
         #endif
     }
@@ -378,12 +336,6 @@ final class AppLockController {
         // prevents a cover stuck up forever.
         defer { isResolvingForegroundLock = false }
 
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.foregroundActive",
-            metadata: ["source": source, "state": stateName(lockState)]
-        )
-
         if shouldBypassAuthentication() {
             if isLocked {
                 setLockState(.unlocked, source: "bypass:\(source)")
@@ -397,11 +349,6 @@ final class AppLockController {
         // `handledAwayGeneration` marking, no `runUnlockFlow`) so the away epoch is
         // not consumed and the genuine `.active` return drives auth.
         guard isForegroundActive else {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.foreground.notForegroundActiveIgnored",
-                metadata: ["source": source, "state": stateName(lockState)]
-            )
             return
         }
 
@@ -421,11 +368,6 @@ final class AppLockController {
         // `awayGeneration`) warrants a fresh response; the explicit retry button uses
         // `retryUnlock`, which bypasses this.
         if let handled = handledAwayGeneration, handled == awayGeneration {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.foreground.spuriousIgnored",
-                metadata: ["source": source, "state": stateName(lockState)]
-            )
             return
         }
 
@@ -516,22 +458,8 @@ final class AppLockController {
         await enterRelock(source: "unlock:\(source)")
 
         let reason = Self.localizedResumeReason
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.unlock.evaluate.start",
-            metadata: ["source": source]
-        )
         do {
             let result = try await evaluateAppSessionAuthentication(reason, source)
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.unlock.evaluate.finish",
-                metadata: [
-                    "source": source,
-                    "result": result.isAuthenticated ? "authenticated" : "failed",
-                    "hasContext": result.context == nil ? "false" : "true"
-                ]
-            )
 
             // The app genuinely left the foreground during authentication: discard
             // the result and stay locked ("real background wins"). On macOS the
@@ -560,11 +488,6 @@ final class AppLockController {
                 // discards the handoff, clears content, awaits the real relock, and
                 // settles `.locked`.
                 guard attemptAwayGeneration == awayGeneration else {
-                    traceStore?.record(
-                        category: .lifecycle,
-                        name: "lock.unlock.stalePostAuth",
-                        metadata: ["source": source]
-                    )
                     await enterLocked(source: "stalePostAuth:\(source)")
                     return
                 }
@@ -574,11 +497,6 @@ final class AppLockController {
                 setLockState(.authenticationFailed(.authenticationFailed), source: "unlock.failed:\(source)")
             }
         } catch {
-            traceStore?.record(
-                category: .lifecycle,
-                name: "lock.unlock.evaluate.throw",
-                metadata: AuthErrorTraceMetadata.errorMetadata(error, extra: ["source": source])
-            )
             discardHandoffContext("authThrew")
             guard attemptAwayGeneration == awayGeneration else {
                 if !isLockedState {
@@ -608,17 +526,7 @@ final class AppLockController {
     }
 
     private func enterRelock(source: String) async {
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.relock.start",
-            metadata: ["source": source]
-        )
         await relockProtectedData()
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.relock.finish",
-            metadata: ["source": source]
-        )
     }
 
     // MARK: - Grace
@@ -648,31 +556,8 @@ final class AppLockController {
         guard newState != lockState else {
             return
         }
-        let previous = lockState
         lockState = newState
         transitionGeneration &+= 1
-        traceStore?.record(
-            category: .lifecycle,
-            name: "lock.transition",
-            metadata: [
-                "from": stateName(previous),
-                "to": stateName(newState),
-                "source": source
-            ]
-        )
-    }
-
-    private func stateName(_ state: LockState) -> String {
-        switch state {
-        case .locked:
-            return "locked"
-        case .authenticating:
-            return "authenticating"
-        case .unlocked:
-            return "unlocked"
-        case .authenticationFailed(let reason):
-            return "authenticationFailed.\(reason.rawValue)"
-        }
     }
 
     private static var localizedResumeReason: String {

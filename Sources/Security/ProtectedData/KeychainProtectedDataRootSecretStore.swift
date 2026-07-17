@@ -32,18 +32,13 @@ protocol ProtectedDataRootSecretStoreProtocol: AnyObject {
 final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStoreProtocol {
     private let account: String
     private let deviceBindingProvider: any ProtectedDataDeviceBindingProvider
-    private let traceStore: AuthLifecycleTraceStore?
 
     init(
         account: String = KeychainConstants.defaultAccount,
-        deviceBindingProvider: (any ProtectedDataDeviceBindingProvider)? = nil,
-        traceStore: AuthLifecycleTraceStore? = nil
+        deviceBindingProvider: (any ProtectedDataDeviceBindingProvider)? = nil
     ) {
         self.account = account
-        self.deviceBindingProvider = deviceBindingProvider ?? HardwareProtectedDataDeviceBindingProvider(
-            traceStore: traceStore
-        )
-        self.traceStore = traceStore
+        self.deviceBindingProvider = deviceBindingProvider ?? HardwareProtectedDataDeviceBindingProvider()
     }
 
     func saveRootSecret(
@@ -56,32 +51,11 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
             sharedRightIdentifier: identifier
         )
         let encodedEnvelope = try ProtectedDataRootSecretEnvelopeCodec.encode(envelope)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.save.start",
-            metadata: [
-                "serviceKind": "protectedDataRootSecret",
-                "policy": policy.rawValue,
-                "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
-            ]
-        )
         var query = baseQuery(identifier: identifier)
         query[kSecValueData as String] = encodedEnvelope
         query[kSecAttrAccessControl as String] = try policy.createRootSecretAccessControl()
 
         let status = SecItemAdd(query as CFDictionary, nil)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.save.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: [
-                    "serviceKind": "protectedDataRootSecret",
-                    "policy": policy.rawValue,
-                    "envelopeVersion": String(ProtectedDataRootSecretEnvelope.currentFormatVersion)
-                ]
-            )
-        )
         try handleMutationStatus(status)
     }
 
@@ -89,14 +63,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         identifier: String,
         authenticationContext: LAContext
     ) throws -> Data {
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.load.start",
-            metadata: [
-                "serviceKind": "protectedDataRootSecret",
-                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
-            ]
-        )
         var query = baseQuery(identifier: identifier)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -104,18 +70,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.load.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: [
-                    "serviceKind": "protectedDataRootSecret",
-                    "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
-                ]
-            )
-        )
-
         switch status {
         case errSecSuccess:
             guard var payload = result as? Data else {
@@ -139,29 +93,11 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
     }
 
     func deleteRootSecret(identifier: String) throws {
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.delete.start",
-            metadata: ["serviceKind": "protectedDataRootSecret"]
-        )
         let status = SecItemDelete(baseQuery(identifier: identifier) as CFDictionary)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.delete.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: ["serviceKind": "protectedDataRootSecret"]
-            )
-        )
         try handleMutationStatus(status)
     }
 
     func rootSecretExists(identifier: String) -> Bool {
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.exists.start",
-            metadata: ["serviceKind": "protectedDataRootSecret", "interactionNotAllowed": "true"]
-        )
         let context = LAContext()
         context.interactionNotAllowed = true
 
@@ -171,22 +107,9 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         query[kSecUseAuthenticationContext as String] = context
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
-        let exists = status == errSecSuccess
+        return status == errSecSuccess
             || status == errSecInteractionNotAllowed
             || status == errSecAuthFailed
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.exists.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: [
-                    "serviceKind": "protectedDataRootSecret",
-                    "interactionNotAllowed": "true",
-                    "exists": exists ? "true" : "false"
-                ]
-            )
-        )
-        return exists
     }
 
     func reprotectRootSecret(
@@ -196,16 +119,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         authenticationContext: LAContext
     ) throws {
         _ = currentPolicy
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.reprotect.start",
-            metadata: [
-                "serviceKind": "protectedDataRootSecret",
-                "currentPolicy": currentPolicy.rawValue,
-                "newPolicy": newPolicy.rawValue,
-                "interactionNotAllowed": authenticationContext.interactionNotAllowed ? "true" : "false"
-            ]
-        )
         var originalSecret = try loadRootSecret(
             identifier: identifier,
             authenticationContext: authenticationContext
@@ -221,17 +134,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         ]
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.reprotect.update",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: [
-                    "serviceKind": "protectedDataRootSecret",
-                    "newPolicy": newPolicy.rawValue
-                ]
-            )
-        )
         try handleMutationStatus(status)
 
         var verifiedSecret = try loadRootSecret(
@@ -243,15 +145,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         }
 
         guard verifiedSecret == originalSecret else {
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.rootSecret.reprotect.finish",
-                metadata: [
-                    "serviceKind": "protectedDataRootSecret",
-                    "result": "verificationFailed",
-                    "newPolicy": newPolicy.rawValue
-                ]
-            )
             throw ProtectedDataError.internalFailure(
                 String(
                     localized: "error.protectedData.rootSecretVerification",
@@ -259,15 +152,6 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
                 )
             )
         }
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.rootSecret.reprotect.finish",
-            metadata: [
-                "serviceKind": "protectedDataRootSecret",
-                "result": "success",
-                "newPolicy": newPolicy.rawValue
-            ]
-        )
     }
 
     private func baseQuery(identifier: String) -> [String: Any] {
@@ -283,29 +167,14 @@ final class KeychainProtectedDataRootSecretStore: ProtectedDataRootSecretStorePr
         _ payload: Data,
         identifier: String
     ) throws -> Data {
-        do {
-            let envelope = try ProtectedDataRootSecretEnvelopeCodec.decode(
-                payload,
-                expectedSharedRightIdentifier: identifier
-            )
-            let rootSecret = try deviceBindingProvider.openRootSecret(
-                envelope: envelope,
-                expectedSharedRightIdentifier: identifier
-            )
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.rootSecret.payload.finish",
-                metadata: ["result": "success"]
-            )
-            return rootSecret
-        } catch {
-            traceStore?.record(
-                category: .operation,
-                name: "protectedData.rootSecret.payload.finish",
-                metadata: AuthTraceMetadata.errorMetadata(error, extra: ["result": "failed"])
-            )
-            throw error
-        }
+        let envelope = try ProtectedDataRootSecretEnvelopeCodec.decode(
+            payload,
+            expectedSharedRightIdentifier: identifier
+        )
+        return try deviceBindingProvider.openRootSecret(
+            envelope: envelope,
+            expectedSharedRightIdentifier: identifier
+        )
     }
 
     private func handleMutationStatus(_ status: OSStatus) throws {

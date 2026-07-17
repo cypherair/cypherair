@@ -45,24 +45,7 @@ enum KeychainError: Error, Equatable, KeychainFailureRepresentable {
 /// SECURITY-CRITICAL: Changes to this file require human review.
 /// See SECURITY.md Section 10.
 struct SystemKeychain: KeychainManageable {
-    private let traceStore: AuthLifecycleTraceStore?
-
-    init(traceStore: AuthLifecycleTraceStore? = nil) {
-        self.traceStore = traceStore
-    }
-
     func save(_ data: Data, service: String, account: String, accessControl: SecAccessControl?) throws {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.save.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "accessControl": accessControl == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -81,15 +64,6 @@ struct SystemKeychain: KeychainManageable {
         }
 
         let status = SecItemAdd(query as CFDictionary, nil)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.save.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-            )
-        )
-
         switch status {
         case errSecSuccess:
             return
@@ -101,17 +75,6 @@ struct SystemKeychain: KeychainManageable {
     }
 
     func load(service: String, account: String, authenticationContext: LAContext?) throws -> Data {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.load.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -126,15 +89,6 @@ struct SystemKeychain: KeychainManageable {
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.load.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-            )
-        )
-
         switch status {
         case errSecSuccess:
             guard let data = result as? Data else {
@@ -155,17 +109,6 @@ struct SystemKeychain: KeychainManageable {
     }
 
     func update(_ data: Data, service: String, account: String, authenticationContext: LAContext?) throws {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.update.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -181,15 +124,6 @@ struct SystemKeychain: KeychainManageable {
         ]
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.update.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-            )
-        )
-
         switch status {
         case errSecSuccess:
             return
@@ -207,17 +141,6 @@ struct SystemKeychain: KeychainManageable {
     }
 
     func delete(service: String, account: String, authenticationContext: LAContext?) throws {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.delete.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -229,15 +152,6 @@ struct SystemKeychain: KeychainManageable {
         }
 
         let status = SecItemDelete(query as CFDictionary)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.delete.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-            )
-        )
-
         switch status {
         case errSecSuccess:
             return
@@ -255,17 +169,6 @@ struct SystemKeychain: KeychainManageable {
     }
 
     func exists(service: String, account: String, authenticationContext: LAContext?) -> Bool {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(for: service)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.exists.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -278,33 +181,10 @@ struct SystemKeychain: KeychainManageable {
         }
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.exists.finish",
-            metadata: AuthTraceMetadata.statusMetadata(
-                status,
-                extra: [
-                    "serviceKind": serviceKind,
-                    "accountKind": accountKind,
-                    "exists": status == errSecSuccess ? "true" : "false"
-                ]
-            )
-        )
         return status == errSecSuccess
     }
 
     func listItems(servicePrefix: String, account: String, authenticationContext: LAContext?) throws -> [String] {
-        let serviceKind = AuthTraceMetadata.keychainServiceKind(forPrefix: servicePrefix)
-        let accountKind = AuthTraceMetadata.keychainAccountKind(for: account)
-        traceStore?.record(
-            category: .operation,
-            name: "keychain.listItems.start",
-            metadata: [
-                "serviceKind": serviceKind,
-                "accountKind": accountKind,
-                "hasAuthenticationContext": authenticationContext == nil ? "false" : "true"
-            ]
-        )
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: account,
@@ -322,19 +202,6 @@ struct SystemKeychain: KeychainManageable {
         switch status {
         case errSecSuccess:
             guard let items = result as? [[String: Any]] else {
-                traceStore?.record(
-                    category: .operation,
-                    name: "keychain.listItems.finish",
-                    metadata: AuthTraceMetadata.statusMetadata(
-                        status,
-                        extra: [
-                            "serviceKind": serviceKind,
-                            "accountKind": accountKind,
-                            "result": "invalidResult",
-                            "count": "0"
-                        ]
-                    )
-                )
                 return []
             }
             let services: [String] = items.compactMap { item -> String? in
@@ -342,68 +209,16 @@ struct SystemKeychain: KeychainManageable {
                       service.hasPrefix(servicePrefix) else { return nil }
                 return service
             }
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: [
-                        "serviceKind": serviceKind,
-                        "accountKind": accountKind,
-                        "count": String(services.count)
-                    ]
-                )
-            )
             return services
         case errSecItemNotFound:
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: ["serviceKind": serviceKind, "accountKind": accountKind, "count": "0"]
-                )
-            )
             return []
         case errSecUserCanceled:
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-                )
-            )
             throw KeychainError.userCancelled
         case errSecAuthFailed:
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-                )
-            )
             throw KeychainError.authenticationFailed
         case errSecInteractionNotAllowed:
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-                )
-            )
             throw KeychainError.interactionNotAllowed
         default:
-            traceStore?.record(
-                category: .operation,
-                name: "keychain.listItems.finish",
-                metadata: AuthTraceMetadata.statusMetadata(
-                    status,
-                    extra: ["serviceKind": serviceKind, "accountKind": accountKind]
-                )
-            )
             throw KeychainError.unhandledError(status)
         }
     }

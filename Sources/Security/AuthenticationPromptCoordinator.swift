@@ -62,7 +62,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     var onOperationPromptsEnded: (@Sendable () -> Void)? {
         didSet { precondition(oldValue == nil, "onOperationPromptsEnded is write-once") }
     }
-    private let traceStore: AuthLifecycleTraceStore?
     private let now: @Sendable () -> Date
     private var privacyPromptDepth = 0
     private var operationPromptDepth = 0
@@ -75,10 +74,8 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
     private var operationPromptStack: [PromptTraceContext] = []
 
     init(
-        traceStore: AuthLifecycleTraceStore? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
-        self.traceStore = traceStore
         self.now = now
     }
 
@@ -141,26 +138,13 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         _ operation: (PromptTraceContext) async throws -> T
     ) async rethrows -> T {
         let context = beginPrivacyPrompt(source: source)
-        tracePrivacyPromptStage("prompt.privacy.handler.enter", context: context)
         await Task.yield()
         do {
-            tracePrivacyPromptStage("prompt.privacy.operation.await.start", context: context)
             let result = try await operation(context)
-            tracePrivacyPromptStage("prompt.privacy.operation.await.finish", context: context)
-            tracePrivacyPromptStage("prompt.privacy.endDepth.start", context: context)
             endPrivacyPrompt(context)
-            tracePrivacyPromptStage("prompt.privacy.endDepth.finish", context: context)
             return result
         } catch {
-            tracePrivacyPromptStage(
-                "prompt.privacy.operation.await.throw",
-                context: context,
-                metadata: AuthErrorTraceMetadata.errorMetadata(error)
-            )
-            tracePromptError(context: context, error: error)
-            tracePrivacyPromptStage("prompt.privacy.endDepth.start", context: context)
             endPrivacyPrompt(context)
-            tracePrivacyPromptStage("prompt.privacy.endDepth.finish", context: context)
             throw error
         }
     }
@@ -179,26 +163,13 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
         _ operation: (PromptTraceContext) async throws -> T
     ) async rethrows -> T {
         let context = beginOperationPrompt(source: source)
-        traceOperationPromptStage("prompt.operation.handler.enter", context: context)
         await Task.yield()
         do {
-            traceOperationPromptStage("prompt.operation.operation.await.start", context: context)
             let result = try await operation(context)
-            traceOperationPromptStage("prompt.operation.operation.await.finish", context: context)
-            traceOperationPromptStage("prompt.operation.endDepth.start", context: context)
             endOperationPrompt(context)
-            traceOperationPromptStage("prompt.operation.endDepth.finish", context: context)
             return result
         } catch {
-            traceOperationPromptStage(
-                "prompt.operation.operation.await.throw",
-                context: context,
-                metadata: AuthErrorTraceMetadata.errorMetadata(error)
-            )
-            tracePromptError(context: context, error: error)
-            traceOperationPromptStage("prompt.operation.endDepth.start", context: context)
             endOperationPrompt(context)
-            traceOperationPromptStage("prompt.operation.endDepth.finish", context: context)
             throw error
         }
     }
@@ -273,20 +244,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             )
         }
 
-        traceStore?.record(
-            category: .prompt,
-            name: delta > 0 ? "prompt.begin" : "prompt.end",
-            metadata: [
-                "promptID": String(snapshot.context.promptID),
-                "source": snapshot.context.source,
-                "kind": snapshot.context.kind,
-                "privacyDepth": String(snapshot.privacyDepth),
-                "operationDepth": String(snapshot.operationDepth),
-                "operationGeneration": String(snapshot.operationGeneration),
-                "operationSessionGeneration": String(snapshot.operationSessionGeneration),
-                "active": snapshot.privacyDepth > 0 || snapshot.operationDepth > 0 ? "true" : "false"
-            ]
-        )
         if snapshot.operationSessionBegan {
             onOperationPromptSessionBegan?()
         }
@@ -305,57 +262,6 @@ final class AuthenticationPromptCoordinator: @unchecked Sendable {
             promptID: nextPromptID,
             source: source,
             kind: kind.traceValue
-        )
-    }
-
-    private func tracePromptError(context: PromptTraceContext, error: Error) {
-        var metadata = [
-            "promptID": String(context.promptID),
-            "source": context.source,
-            "kind": context.kind,
-            "errorType": String(describing: type(of: error))
-        ]
-        if let laError = error as? LAError {
-            metadata["laCode"] = String(laError.errorCode)
-            metadata["laCodeName"] = String(describing: laError.code)
-        }
-        traceStore?.record(
-            category: .prompt,
-            name: "prompt.error",
-            metadata: metadata
-        )
-    }
-
-    private func traceOperationPromptStage(
-        _ name: String,
-        context: PromptTraceContext,
-        metadata: [String: String] = [:]
-    ) {
-        tracePromptStage(name, context: context, metadata: metadata)
-    }
-
-    private func tracePrivacyPromptStage(
-        _ name: String,
-        context: PromptTraceContext,
-        metadata: [String: String] = [:]
-    ) {
-        tracePromptStage(name, context: context, metadata: metadata)
-    }
-
-    private func tracePromptStage(
-        _ name: String,
-        context: PromptTraceContext,
-        metadata: [String: String]
-    ) {
-        var mergedMetadata = metadata
-        mergedMetadata["promptID"] = String(context.promptID)
-        mergedMetadata["source"] = context.source
-        mergedMetadata["kind"] = context.kind
-        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
-        traceStore?.record(
-            category: .prompt,
-            name: name,
-            metadata: mergedMetadata
         )
     }
 

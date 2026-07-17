@@ -86,12 +86,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         static let bypassAuthenticationKey = "com.cypherair.preference.uiTestBypassAuthentication"
     }
 
-    private struct LocalAuthenticationPolicyTraceHooks {
-        var callStart: () -> Void = {}
-        var reply: ([String: String]) -> Void = { _ in }
-        var resume: ([String: String]) -> Void = { _ in }
-    }
-
     // MARK: - Dependencies
 
     private let defaults: UserDefaults
@@ -107,7 +101,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
     var promptCoordinator: AuthenticationPromptCoordinator {
         authenticationPromptCoordinator
     }
-    private let traceStore: AuthLifecycleTraceStore?
     private let localAuthenticationPolicyEvaluator: (
         LAContext,
         LAPolicy,
@@ -141,7 +134,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         defaults: UserDefaults = .standard,
         allowsUITestAuthenticationBypass: Bool = false,
         authenticationPromptCoordinator: AuthenticationPromptCoordinator,
-        traceStore: AuthLifecycleTraceStore? = nil,
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)? = nil,
         localAuthenticationPolicyEvaluator: @escaping (
             LAContext,
@@ -158,12 +150,11 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.defaults = defaults
         self.allowsUITestAuthenticationBypass = allowsUITestAuthenticationBypass
         self.authenticationPromptCoordinator = authenticationPromptCoordinator
-        self.traceStore = traceStore
         self.localAuthenticationPolicyEvaluator = localAuthenticationPolicyEvaluator
         self.privateKeyControlStore = privateKeyControlStore
         let bundleStore = KeyBundleStore(keychain: keychain)
         let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
-        self.modeSwitchAuthenticator = PrivateKeyModeSwitchAuthenticator(traceStore: traceStore)
+        self.modeSwitchAuthenticator = PrivateKeyModeSwitchAuthenticator()
         self.rewrapRecoveryCoordinator = PrivateKeyRewrapRecoveryCoordinator(
             bundleStore: bundleStore,
             migrationCoordinator: migrationCoordinator
@@ -171,8 +162,7 @@ final class AuthenticationManager: AuthenticationEvaluable {
         self.rewrapWorkflow = PrivateKeyRewrapWorkflow(
             secureEnclave: secureEnclave,
             bundleStore: bundleStore,
-            authenticationPromptCoordinator: authenticationPromptCoordinator,
-            traceStore: traceStore
+            authenticationPromptCoordinator: authenticationPromptCoordinator
         )
     }
 
@@ -215,29 +205,12 @@ final class AuthenticationManager: AuthenticationEvaluable {
 
     func evaluate(mode: AuthenticationMode, reason: String, source: String) async throws -> Bool {
         if isUITestAuthenticationBypassEnabled {
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.start",
-                metadata: ["mode": mode.rawValue, "source": source, "promptID": "none"]
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.finish",
-                metadata: ["result": "bypass", "mode": mode.rawValue, "source": source, "promptID": "none"]
-            )
             return true
         }
 
         let context = LAContext()
-        var promptID = "none"
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { promptContext in
-                promptID = String(promptContext.promptID)
-                traceStore?.record(
-                    category: .prompt,
-                    name: "privateKey.evaluate.start",
-                    metadata: ["mode": mode.rawValue, "source": source, "promptID": promptID]
-                )
+            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { _ in
                 let policy: LAPolicy
                 switch mode {
                 case .standard:
@@ -257,16 +230,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
                 )
             }
 
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.finish",
-                metadata: [
-                    "result": success ? "success" : "failed",
-                    "mode": mode.rawValue,
-                    "source": source,
-                    "promptID": promptID
-                ]
-            )
             if success {
                 lastEvaluatedContext = context
             }
@@ -275,86 +238,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
                                         && (error.code == .biometryNotAvailable
                                             || error.code == .biometryNotEnrolled
                                             || error.code == .biometryLockout) {
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "mode": mode.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "biometricsUnavailable"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "mode": mode.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "biometricsUnavailable"
-                ]
-            )
             throw AuthenticationError.biometricsUnavailable
         } catch let error as LAError where mode == .highSecurity
                                         && (error.code == .userCancel
                                             || error.code == .appCancel
                                             || error.code == .systemCancel) {
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "mode": mode.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "cancelled"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "mode": mode.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "cancelled"
-                ]
-            )
             throw AuthenticationError.cancelled
         } catch {
-            let mappedError = mode == .highSecurity ? "failed" : "unmapped"
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "mode": mode.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": mappedError
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "privateKey.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "mode": mode.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": mappedError
-                ]
-            )
             if mode == .highSecurity {
                 throw AuthenticationError.failed
             }
@@ -368,192 +258,31 @@ final class AuthenticationManager: AuthenticationEvaluable {
         source: String = "unspecified"
     ) async throws -> AppSessionAuthenticationResult {
         if isUITestAuthenticationBypassEnabled {
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.start",
-                metadata: ["policy": policy.rawValue, "source": source, "promptID": "none"]
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": "bypass",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": "none",
-                    "hasContext": "false"
-                ]
-            )
             return .authenticated(context: nil)
         }
 
         let context = LAContext()
         policy.configure(context)
-        var promptID = "none"
 
         do {
-            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { promptContext in
-                promptID = String(promptContext.promptID)
-                traceStore?.record(
-                    category: .prompt,
-                    name: "appSession.evaluate.start",
-                    metadata: ["policy": policy.rawValue, "source": source, "promptID": promptID]
+            let success = try await authenticationPromptCoordinator.withPrivacyPrompt(source: source) { _ in
+                try await evaluateLocalAuthenticationPolicyWithCallback(
+                    context,
+                    appSessionPolicy: policy,
+                    reason: reason
                 )
-                traceAppSessionPolicyAwaitStage(
-                    "appSession.evaluate.policy.await.start",
-                    policy: policy,
-                    source: source,
-                    promptID: promptID
-                )
-                do {
-                    let success = try await evaluateLocalAuthenticationPolicyWithCallback(
-                        context,
-                        appSessionPolicy: policy,
-                        reason: reason,
-                        source: source,
-                        promptID: promptID
-                    )
-                    traceAppSessionPolicyAwaitStage(
-                        "appSession.evaluate.policy.await.finish",
-                        policy: policy,
-                        source: source,
-                        promptID: promptID,
-                        metadata: ["result": success ? "success" : "failed"]
-                    )
-                    return success
-                } catch {
-                    traceAppSessionPolicyAwaitStage(
-                        "appSession.evaluate.policy.await.throw",
-                        policy: policy,
-                        source: source,
-                        promptID: promptID,
-                        metadata: AuthErrorTraceMetadata.errorMetadata(error)
-                    )
-                    throw error
-                }
             }
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": success ? "success" : "failed",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "hasContext": success ? "true" : "false"
-                ]
-            )
             return success ? .authenticated(context: context) : .failed
         } catch let error as LAError where error.code == .biometryLockout {
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "policy": policy.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "appAccessBiometricsLockedOut"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "appAccessBiometricsLockedOut",
-                    "hasContext": "false"
-                ]
-            )
             throw AuthenticationError.appAccessBiometricsLockedOut
         } catch let error as LAError where error.code == .biometryNotAvailable
                                          || error.code == .biometryNotEnrolled {
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "policy": policy.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "appAccessBiometricsUnavailable"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "appAccessBiometricsUnavailable",
-                    "hasContext": "false"
-                ]
-            )
             throw AuthenticationError.appAccessBiometricsUnavailable
         } catch let error as LAError where error.code == .userCancel
                                          || error.code == .appCancel
                                          || error.code == .systemCancel {
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "policy": policy.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "cancelled"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "cancelled",
-                    "hasContext": "false"
-                ]
-            )
             throw AuthenticationError.cancelled
         } catch {
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.error",
-                metadata: traceErrorMetadata(
-                    error,
-                    extra: [
-                        "policy": policy.rawValue,
-                        "source": source,
-                        "promptID": promptID,
-                        "mappedError": "failed"
-                    ]
-                )
-            )
-            traceStore?.record(
-                category: .prompt,
-                name: "appSession.evaluate.finish",
-                metadata: [
-                    "result": "error",
-                    "policy": policy.rawValue,
-                    "source": source,
-                    "promptID": promptID,
-                    "mappedError": "failed",
-                    "hasContext": "false"
-                ]
-            )
             throw AuthenticationError.failed
         }
     }
@@ -565,25 +294,14 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private func evaluateLocalAuthenticationPolicy(
         _ context: LAContext,
         policy: LAPolicy,
-        reason: String,
-        traceHooks: LocalAuthenticationPolicyTraceHooks = LocalAuthenticationPolicyTraceHooks()
+        reason: String
     ) async throws -> Bool {
-        traceHooks.callStart()
-
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             localAuthenticationPolicyEvaluator(
                 context,
                 policy,
                 reason
             ) { success, error in
-                var metadata = Self.callbackReplyMetadata(success: success, error: error)
-                traceHooks.reply(metadata)
-
-                if !success && error == nil {
-                    metadata["mappedError"] = "failedWithoutError"
-                }
-                traceHooks.resume(metadata)
-
                 if success {
                     continuation.resume(returning: true)
                 } else if let error {
@@ -598,104 +316,13 @@ final class AuthenticationManager: AuthenticationEvaluable {
     private func evaluateLocalAuthenticationPolicyWithCallback(
         _ context: LAContext,
         appSessionPolicy policy: AppSessionAuthenticationPolicy,
-        reason: String,
-        source: String,
-        promptID: String
+        reason: String
     ) async throws -> Bool {
         try await evaluateLocalAuthenticationPolicy(
             context,
             policy: policy.localAuthenticationPolicy,
-            reason: reason,
-            traceHooks: LocalAuthenticationPolicyTraceHooks(
-                callStart: {
-                    self.traceAppSessionCallbackStage(
-                        "appSession.evaluate.callback.call.start",
-                        policy: policy,
-                        source: source,
-                        promptID: promptID
-                    )
-                },
-                reply: { metadata in
-                    self.traceAppSessionCallbackStage(
-                        "appSession.evaluate.callback.reply",
-                        policy: policy,
-                        source: source,
-                        promptID: promptID,
-                        metadata: metadata
-                    )
-                },
-                resume: { metadata in
-                    self.traceAppSessionCallbackStage(
-                        "appSession.evaluate.callback.resume",
-                        policy: policy,
-                        source: source,
-                        promptID: promptID,
-                        metadata: metadata
-                    )
-                }
-            )
+            reason: reason
         )
-    }
-
-    private func traceAppSessionPolicyAwaitStage(
-        _ name: String,
-        policy: AppSessionAuthenticationPolicy,
-        source: String,
-        promptID: String,
-        metadata: [String: String] = [:]
-    ) {
-        var mergedMetadata = metadata
-        mergedMetadata["policy"] = policy.rawValue
-        mergedMetadata["source"] = source
-        mergedMetadata["promptID"] = promptID
-        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
-        traceStore?.record(
-            category: .prompt,
-            name: name,
-            metadata: mergedMetadata
-        )
-    }
-
-    private func traceAppSessionCallbackStage(
-        _ name: String,
-        policy: AppSessionAuthenticationPolicy,
-        source: String,
-        promptID: String,
-        metadata: [String: String] = [:]
-    ) {
-        var mergedMetadata = metadata
-        mergedMetadata["policy"] = policy.rawValue
-        mergedMetadata["source"] = source
-        mergedMetadata["promptID"] = promptID
-        mergedMetadata["isMainThread"] = Thread.isMainThread ? "true" : "false"
-        traceStore?.record(
-            category: .prompt,
-            name: name,
-            metadata: mergedMetadata
-        )
-    }
-
-    private static func callbackReplyMetadata(success: Bool, error: Error?) -> [String: String] {
-        if success {
-            return ["result": "success"]
-        }
-
-        guard let error else {
-            return ["result": "failed"]
-        }
-
-        var metadata = [
-            "result": "error",
-            "errorType": String(describing: type(of: error))
-        ]
-        let nsError = error as NSError
-        metadata["errorDomain"] = nsError.domain
-        metadata["errorCode"] = String(nsError.code)
-        if let laError = error as? LAError {
-            metadata["laCode"] = String(laError.errorCode)
-            metadata["laCodeName"] = String(describing: laError.code)
-        }
-        return metadata
     }
 
     // MARK: - Access Control Creation
@@ -752,43 +379,18 @@ final class AuthenticationManager: AuthenticationEvaluable {
             throw PrivateKeyControlError.missingStore
         }
         let oldMode = try privateKeyControlStore.requireUnlockedAuthMode()
-        traceStore?.record(
-            category: .operation,
-            name: "privateKeyProtection.switch.start",
-            metadata: [
-                "currentMode": oldMode.rawValue,
-                "targetMode": newMode.rawValue,
-                "keyCount": String(fingerprints.count),
-                "hasBackup": hasBackup ? "true" : "false"
-            ]
-        )
 
         guard !fingerprints.isEmpty else {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "noIdentities", "targetMode": newMode.rawValue]
-            )
             throw AuthenticationError.noIdentities
         }
 
         // Defense-in-depth: require at least one backed-up key before enabling
         // High Security mode. The UI should also warn; this is the safety net.
         if newMode == .highSecurity && !hasBackup {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "backupRequired", "targetMode": newMode.rawValue]
-            )
             throw AuthenticationError.backupRequired
         }
 
         guard newMode != oldMode else {
-            traceStore?.record(
-                category: .operation,
-                name: "privateKeyProtection.switch.finish",
-                metadata: ["result": "noChange", "targetMode": newMode.rawValue]
-            )
             return
         }
 
@@ -798,7 +400,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
         ) {
             try await modeSwitchAuthenticator.authenticateCurrentMode(
                 oldMode,
-                targetMode: newMode,
                 authenticator: authenticator
             )
         }
@@ -809,19 +410,6 @@ final class AuthenticationManager: AuthenticationEvaluable {
             authenticator: authenticator,
             privateKeyControlStore: privateKeyControlStore
         )
-    }
-
-    private func traceErrorMetadata(
-        _ error: Error,
-        extra: [String: String] = [:]
-    ) -> [String: String] {
-        var metadata = extra
-        metadata["errorType"] = String(describing: type(of: error))
-        if let laError = error as? LAError {
-            metadata["laCode"] = String(laError.errorCode)
-            metadata["laCodeName"] = String(describing: laError.code)
-        }
-        return metadata
     }
 
     // MARK: - Crash Recovery

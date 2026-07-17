@@ -47,20 +47,17 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
     private let currentRegistryProvider: () throws -> ProtectedDataRegistry
     private let protectedDataSessionCoordinator: ProtectedDataSessionCoordinator?
     private let domainOpeners: [ProtectedDataPostUnlockDomainOpener]
-    private let traceStore: AuthLifecycleTraceStore?
 
     init(
         currentRegistryProvider: @escaping () throws -> ProtectedDataRegistry = {
             throw ProtectedDataError.authorizingUnavailable
         },
         protectedDataSessionCoordinator: ProtectedDataSessionCoordinator? = nil,
-        domainOpeners: [ProtectedDataPostUnlockDomainOpener] = [],
-        traceStore: AuthLifecycleTraceStore? = nil
+        domainOpeners: [ProtectedDataPostUnlockDomainOpener] = []
     ) {
         self.currentRegistryProvider = currentRegistryProvider
         self.protectedDataSessionCoordinator = protectedDataSessionCoordinator
         self.domainOpeners = domainOpeners
-        self.traceStore = traceStore
     }
 
     func openRegisteredDomains(
@@ -69,41 +66,41 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
         source: String
     ) async -> ProtectedDataPostUnlockOutcome {
         guard !domainOpeners.isEmpty else {
-            return finish(.noRegisteredOpeners, source: source)
+            return .noRegisteredOpeners
         }
         guard let authenticationContext else {
-            return finish(.noAuthenticatedContext, source: source)
+            return .noAuthenticatedContext
         }
         guard let protectedDataSessionCoordinator else {
-            return finish(.frameworkRecoveryNeeded, source: source)
+            return .frameworkRecoveryNeeded
         }
 
         let registry: ProtectedDataRegistry
         do {
             registry = try currentRegistryProvider()
         } catch {
-            return finish(.frameworkRecoveryNeeded, source: source, error: error)
+            return .frameworkRecoveryNeeded
         }
 
         switch registry.classifyRecoveryDisposition() {
         case .frameworkRecoveryNeeded:
-            return finish(.frameworkRecoveryNeeded, source: source)
+            return .frameworkRecoveryNeeded
         case .continuePendingMutation:
-            return finish(.pendingMutationRecoveryRequired, source: source)
+            return .pendingMutationRecoveryRequired
         case .resumeSteadyState:
             break
         }
 
         guard !registry.committedMembership.isEmpty,
               registry.sharedResourceLifecycleState == .ready else {
-            return finish(.noProtectedDomainPresent, source: source)
+            return .noProtectedDomainPresent
         }
 
         let initiallyCommittedOpeners = domainOpeners.filter {
             registry.committedMembership[$0.domainID] != nil
         }
         guard !initiallyCommittedOpeners.isEmpty else {
-            return finish(.noRegisteredDomainPresent, source: source)
+            return .noRegisteredDomainPresent
         }
 
         if protectedDataSessionCoordinator.frameworkState != .sessionAuthorized {
@@ -116,9 +113,9 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
             case .authorized:
                 break
             case .cancelledOrDenied:
-                return finish(.authorizationDenied, source: source)
+                return .authorizationDenied
             case .frameworkRecoveryNeeded:
-                return finish(.frameworkRecoveryNeeded, source: source)
+                return .frameworkRecoveryNeeded
             }
         }
 
@@ -144,68 +141,18 @@ struct ProtectedDataPostUnlockCoordinator: @unchecked Sendable {
                     }
                     guard currentRegistry.pendingMutation == nil,
                           currentRegistry.sharedResourceLifecycleState == .ready else {
-                        return finish(
-                            .pendingMutationRecoveryRequired,
-                            source: source
-                        )
+                        return .pendingMutationRecoveryRequired
                     }
                     try await opener.openDomain(wrappingRootKey: wrappingRootKey)
                     openedDomainIDs.append(opener.domainID)
                 } catch {
-                    return finish(
-                        .domainOpenFailed(opener.domainID),
-                        source: source,
-                        error: error
-                    )
+                    return .domainOpenFailed(opener.domainID)
                 }
             }
 
-            return finish(.opened(openedDomainIDs), source: source)
+            return .opened(openedDomainIDs)
         } catch {
-            return finish(.frameworkRecoveryNeeded, source: source, error: error)
-        }
-    }
-
-    private func finish(
-        _ outcome: ProtectedDataPostUnlockOutcome,
-        source: String,
-        error: Error? = nil
-    ) -> ProtectedDataPostUnlockOutcome {
-        var metadata = [
-            "outcome": traceValue(for: outcome),
-            "source": source
-        ]
-        if let error {
-            metadata.merge(AuthTraceMetadata.errorMetadata(error), uniquingKeysWith: { _, new in new })
-        }
-        traceStore?.record(
-            category: .operation,
-            name: "protectedData.postUnlock.openDomains",
-            metadata: metadata
-        )
-        return outcome
-    }
-
-    private func traceValue(for outcome: ProtectedDataPostUnlockOutcome) -> String {
-        switch outcome {
-        case .opened(let domainIDs):
-            "opened:\(domainIDs.map(\.rawValue).joined(separator: ","))"
-        case .noAuthenticatedContext:
-            "noAuthenticatedContext"
-        case .noRegisteredOpeners:
-            "noRegisteredOpeners"
-        case .noProtectedDomainPresent:
-            "noProtectedDomainPresent"
-        case .noRegisteredDomainPresent:
-            "noRegisteredDomainPresent"
-        case .pendingMutationRecoveryRequired:
-            "pendingMutationRecoveryRequired"
-        case .frameworkRecoveryNeeded:
-            "frameworkRecoveryNeeded"
-        case .authorizationDenied:
-            "authorizationDenied"
-        case .domainOpenFailed(let domainID):
-            "domainOpenFailed:\(domainID.rawValue)"
+            return .frameworkRecoveryNeeded
         }
     }
 }

@@ -36,20 +36,21 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
         XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedPlist.path))
     }
 
-    func test_appStartupCoordinator_mergedStartupMessages_appendsRecoveryDiagnostics() {
+    func test_appStartupCoordinator_mergedStartupMessages_joinsAndDeduplicatesRecoveryDiagnostics() {
         let coordinator = AppStartupCoordinator()
         let merged = coordinator.mergedStartupMessages(
-            loadErrors: ["Contacts failed to load"],
             recoveryDiagnostics: [
-                "A previous secure key migration could not be recovered. Restore from backup if private-key operations fail."
+                "Protected app data is unavailable and may require recovery.",
+                "Protected app data has pending recovery work that must complete before protected content can open.",
+                "Protected app data is unavailable and may require recovery."
             ]
         )
 
         XCTAssertEqual(
             merged,
             """
-            Contacts failed to load
-            A previous secure key migration could not be recovered. Restore from backup if private-key operations fail.
+            Protected app data is unavailable and may require recovery.
+            Protected app data has pending recovery work that must complete before protected content can open.
             """
         )
     }
@@ -57,7 +58,6 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
     func test_appStartupCoordinator_mergedStartupMessages_recoveryDiagnostic_isGeneric() {
         let coordinator = AppStartupCoordinator()
         let merged = coordinator.mergedStartupMessages(
-            loadErrors: [],
             recoveryDiagnostics: [
                 "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
             ]
