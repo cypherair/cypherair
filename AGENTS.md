@@ -17,7 +17,7 @@ stage1 toolchain policy.
   stable. `SWIFT_VERSION = 6.0` is the Swift language mode, not the compiler
   release.
 - **OpenPGP:** Sequoia PGP 2.4.1 through the Rust `pgp-mobile` wrapper and
-  Mozilla UniFFI 0.31.x.
+  Mozilla UniFFI 0.32.x.
 - **Key families:** Nine, chosen at key generation and immutable per key.
   Portable (software, exportable): Legacy (Ed25519 v4, GnuPG-compatible),
   Modern (Ed25519+X25519 v6), Modern · High (Ed448+X448 v6), Post-Quantum
