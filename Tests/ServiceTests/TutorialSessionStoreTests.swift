@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import XCTest
 @testable import CypherAir
@@ -45,7 +46,7 @@ private final class TutorialContactsOpenGate {
 
 @MainActor
 final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase {
-    func test_tutorialSandboxContainer_usesSandboxStorageAndMocks() async throws {
+    func test_tutorialSandboxContainer_usesIsolatedSandboxStorage() async throws {
         let container = try TutorialSandboxContainer()
         defer { container.cleanup() }
 
@@ -211,6 +212,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_returnToOverview_keepsSandboxArtifactsAndProgressForSameAppRun() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
@@ -282,6 +286,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_resetTutorial_recreatesSandboxAndClearsProgress() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let oldContainer = try XCTUnwrap(store.container)
@@ -305,6 +312,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_tutorialSessionStore_recordsArtifactsAcrossFullModuleFlow() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
@@ -360,7 +370,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
             to: .highSecurity,
             fingerprints: container.keyManagement.keys.map(\.fingerprint),
             hasBackup: true,
-            authenticator: container.mockAuthenticator
+            authenticator: MockAuthenticator()
         )
         container.config.privateKeyControlState = .unlocked(.highSecurity)
         store.noteHighSecurityEnabled(.highSecurity)
@@ -442,7 +452,7 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
         let coordinator = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        coordinator.loadForAuthenticatedTestBypass()
+        coordinator.loadFromUngatedEphemeralPersistence()
         return coordinator
     }
 
@@ -567,6 +577,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_tutorialConfigurationFactory_addContactConfiguration_restrictsModesAndRoutesCallbacks() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
@@ -631,6 +644,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_tutorialConfigurationFactory_encryptRuntimeSyncKey_changesBetweenInactiveAndActiveStates() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)
@@ -666,6 +682,9 @@ final class TutorialSessionStoreTests: TutorialSandboxDefaultsSerializedTestCase
     }
 
     func test_tutorialConfigurationFactory_decryptRuntimeSyncKey_changesBetweenInactiveAndActiveStates() async throws {
+        guard SecureEnclave.isAvailable else {
+            throw XCTSkip("Secure Enclave unavailable — the tutorial custody path requires real SE by design (E1).")
+        }
         let store = TutorialSessionStore()
         await startTutorialSession(store)
         let container = try XCTUnwrap(store.container)

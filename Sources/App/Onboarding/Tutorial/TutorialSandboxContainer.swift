@@ -4,6 +4,7 @@ enum TutorialSandboxContainerError: LocalizedError {
     case defaultsUnavailable
     case contactsDirectoryCreationFailed
     case contactsProtectedDomainOpenFailed
+    case contactsWrappingRootKeyUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -13,18 +14,26 @@ enum TutorialSandboxContainerError: LocalizedError {
             String(localized: "guidedTutorial.error.contactsDirectory", defaultValue: "Could not create isolated tutorial contacts storage.")
         case .contactsProtectedDomainOpenFailed:
             String(localized: "guidedTutorial.error.contactsProtectedDomain", defaultValue: "Could not open isolated tutorial contacts storage.")
+        case .contactsWrappingRootKeyUnavailable:
+            String(localized: "guidedTutorial.error.contactsRootKey", defaultValue: "Could not prepare isolated tutorial contacts protection.")
         }
     }
 }
 
 /// Isolated dependency graph for the guided tutorial.
-/// Uses real app services backed by sandbox storage and mock security primitives.
-/// The product flow owns a single active tutorial sandbox at a time.
+///
+/// Uses real app services backed by sandbox storage and real, ephemeral
+/// security primitives: software-key wrapping runs on the actual Secure
+/// Enclave through `EphemeralKeyWrappingCustody` (promptless nil-ACL wrapping
+/// keys whose representations live only inside envelope rows), and those
+/// envelope rows live in an in-memory `EphemeralKeychainStore` that is wiped
+/// on cleanup. Device-bound custody seams are wired to the inert fail-closed
+/// conformances in `InertCustodyStores.swift`, so the sandbox cannot reach
+/// real custody state by construction. The product flow owns a single active
+/// tutorial sandbox at a time.
 final class TutorialSandboxContainer {
     let engine: PgpEngine
-    let mockSecureEnclave: MockSecureEnclave
-    let mockKeychain: MockKeychain
-    let mockAuthenticator: MockAuthenticator
+    let keychain: EphemeralKeychainStore
     let authManager: AuthenticationManager
     let privateKeyControlStore: InMemoryPrivateKeyControlStore
     let config: AppConfiguration
@@ -40,16 +49,31 @@ final class TutorialSandboxContainer {
     let contactsDirectory: URL
     let defaultsSuiteName: String
 
+    /// Shares one root-key buffer between the container and the contacts
+    /// domain-store closures, so `cleanup()` can zeroize the buffer in place
+    /// instead of a copy-on-write duplicate.
+    private final class ContactsWrappingRootKeyBox {
+        var key: Data
+
+        init(key: Data) {
+            self.key = key
+        }
+
+        func zeroize() {
+            key.zeroize()
+        }
+    }
+
+    private let keyWrappingCustody: EphemeralKeyWrappingCustody
     private let defaults: UserDefaults
     private let authenticationPromptCoordinator: AuthenticationPromptCoordinator
-    private let contactsWrappingRootKey: Data
+    private let contactsWrappingRootKeyBox: ContactsWrappingRootKeyBox
     private var didCleanup = false
 
     init(temporaryArtifactStore: AppTemporaryArtifactStore = AppTemporaryArtifactStore()) throws {
         self.engine = PgpEngine()
-        self.mockSecureEnclave = MockSecureEnclave()
-        self.mockKeychain = MockKeychain()
-        self.mockAuthenticator = MockAuthenticator()
+        self.keyWrappingCustody = EphemeralKeyWrappingCustody()
+        self.keychain = EphemeralKeychainStore()
         self.authenticationPromptCoordinator = AuthenticationPromptCoordinator()
 
         let suiteName = AppTemporaryArtifactStore.tutorialSandboxDefaultsSuiteName
@@ -69,8 +93,8 @@ final class TutorialSandboxContainer {
         }
 
         self.authManager = AuthenticationManager(
-            secureEnclave: mockSecureEnclave,
-            keychain: mockKeychain,
+            secureEnclave: keyWrappingCustody,
+            keychain: keychain,
             defaults: defaults,
             authenticationPromptCoordinator: authenticationPromptCoordinator
         )
@@ -81,7 +105,7 @@ final class TutorialSandboxContainer {
         let protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+        protectedOrdinarySettingsCoordinator.loadFromUngatedEphemeralPersistence()
         self.protectedOrdinarySettingsCoordinator = protectedOrdinarySettingsCoordinator
         let keyAdapter = PGPKeyOperationAdapter(engine: engine)
         let certificateAdapter = PGPCertificateOperationAdapter(engine: engine)
@@ -90,19 +114,26 @@ final class TutorialSandboxContainer {
         self.keyManagement = KeyManagementService(
             keyAdapter: keyAdapter,
             certificateAdapter: certificateAdapter,
-            secureEnclave: mockSecureEnclave,
-            keychain: mockKeychain,
+            secureEnclave: keyWrappingCustody,
+            keychain: keychain,
             authenticationPromptCoordinator: authenticationPromptCoordinator,
             privateKeyControlStore: privateKeyControlStore,
             metadataPersistence: InMemoryKeyMetadataStore()
         )
         try? self.keyManagement.loadKeys()
-        let contactsWrappingRootKey = Data(repeating: 0x54, count: 32)
-        self.contactsWrappingRootKey = contactsWrappingRootKey
+        let contactsWrappingRootKeyBox: ContactsWrappingRootKeyBox
+        do {
+            contactsWrappingRootKeyBox = ContactsWrappingRootKeyBox(
+                key: try EphemeralWrappingRootKey.generate()
+            )
+        } catch {
+            throw TutorialSandboxContainerError.contactsWrappingRootKeyUnavailable
+        }
+        self.contactsWrappingRootKeyBox = contactsWrappingRootKeyBox
         let contactsDomainStore = try Self.makeContactsDomainStore(
             baseDirectory: contactsDirectory.appendingPathComponent("protected-contacts", isDirectory: true),
-            wrappingRootKey: contactsWrappingRootKey,
-            keychain: mockKeychain
+            wrappingRootKey: { contactsWrappingRootKeyBox.key },
+            keychain: keychain
         )
         self.contactService = ContactService(
             contactImportAdapter: contactImportAdapter,
@@ -110,12 +141,14 @@ final class TutorialSandboxContainer {
             contactsDomainStore: contactsDomainStore
         )
         let messageAdapter = PGPMessageOperationAdapter(engine: engine)
+        // Inert fail-closed custody seams: the sandbox offers no device-bound
+        // families, and must not be able to reach real custody state.
         let secureEnclaveCustodyHandleStore = SecureEnclaveCustodyHandleStore(
-            keyStore: SystemSecureEnclaveCustodyKeyStore(),
+            keyStore: InertCustodyKeyStore(),
             tier: .classicalP256
         )
-        let secureEnclaveDigestSigner = SystemSecureEnclaveCustodyDigestSigner()
-        let secureEnclaveCompositeOperations = SystemSecureEnclaveCompositeOperations()
+        let secureEnclaveDigestSigner = InertCustodyDigestSigner()
+        let secureEnclaveCompositeOperations = InertCustodyCompositeOperations()
         keyManagement.configurePrivateKeyExpiryMutationService(
             PrivateKeyExpiryMutationService(
                 router: keyManagement.makePrivateKeyOperationRouter(
@@ -172,7 +205,7 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            keyAgreement: InertCustodyKeyAgreement(),
             compositeDecapsulator: secureEnclaveCompositeOperations
         )
         let fileDecryptor = PrivateKeyStreamingFileDecryptionService(
@@ -182,7 +215,7 @@ final class TutorialSandboxContainer {
             ),
             softwarePrivateKeyAccess: keyManagement,
             messageAdapter: messageAdapter,
-            keyAgreement: SystemSecureEnclaveCustodyKeyAgreement(),
+            keyAgreement: InertCustodyKeyAgreement(),
             compositeDecapsulator: secureEnclaveCompositeOperations
         )
         self.decryptionService = DecryptionService(
@@ -241,10 +274,6 @@ final class TutorialSandboxContainer {
             selfTestAdapter: selfTestAdapter,
             messageAdapter: messageAdapter
         )
-
-        self.mockAuthenticator.shouldSucceed = true
-        self.mockAuthenticator.biometricsAvailable = true
-        self.mockSecureEnclave.simulatedAuthMode = authManager.currentMode ?? .standard
     }
 
     func openContactsIfNeeded() async throws {
@@ -254,7 +283,7 @@ final class TutorialSandboxContainer {
 
         try Task.checkCancellation()
         let contactService = self.contactService
-        let wrappingRootKey = contactsWrappingRootKey
+        let wrappingRootKey = contactsWrappingRootKeyBox.key
         let availability = await Task.detached {
             await contactService.openContactsAfterPostUnlock(
                 gateDecision: ContactsPostAuthGateDecision(
@@ -277,6 +306,8 @@ final class TutorialSandboxContainer {
         try? FileManager.default.removeItem(at: contactsDirectory)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         _ = defaults.synchronize()
+        keychain.wipe()
+        contactsWrappingRootKeyBox.zeroize()
     }
 
     deinit {
@@ -285,7 +316,7 @@ final class TutorialSandboxContainer {
 
     private static func makeContactsDomainStore(
         baseDirectory: URL,
-        wrappingRootKey: Data,
+        wrappingRootKey: @escaping () -> Data,
         keychain: any KeychainManageable
     ) throws -> ContactsDomainStore {
         let storageRoot = ProtectedDataStorageRoot(baseDirectory: baseDirectory)
@@ -313,7 +344,7 @@ final class TutorialSandboxContainer {
             storageRoot: storageRoot,
             registryStore: registryStore,
             domainKeyManager: domainKeyManager,
-            currentWrappingRootKey: { wrappingRootKey }
+            currentWrappingRootKey: wrappingRootKey
         )
     }
 }

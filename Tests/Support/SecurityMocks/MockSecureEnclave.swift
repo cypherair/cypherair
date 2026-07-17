@@ -1,6 +1,7 @@
 import Foundation
 import LocalAuthentication
 import Security
+@testable import CypherAir
 #if canImport(CryptoKit)
 import CryptoKit
 #endif

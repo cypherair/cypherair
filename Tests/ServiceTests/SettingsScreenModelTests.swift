@@ -27,7 +27,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
         protectedOrdinarySettings = ProtectedOrdinarySettingsCoordinator(
             persistence: InMemoryOrdinarySettingsStore()
         )
-        protectedOrdinarySettings.loadForAuthenticatedTestBypass()
+        protectedOrdinarySettings.loadFromUngatedEphemeralPersistence()
         config.privateKeyControlState = .unlocked(.standard)
         authManager = AuthenticationManager(
             secureEnclave: stack.mockSE,
@@ -523,9 +523,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     func test_localDataReset_successMarksRestartRequiredWithoutResultAlert() async {
         let resetContainer = AppContainer.makeUITest()
         defer { cleanup(resetContainer) }
-        guard let keychain = resetContainer.keychain as? MockKeychain else {
-            return XCTFail("Expected UI-test container to use MockKeychain")
-        }
+        let keychain = MockKeychain()
         let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7SUCCESS"
         do {
             try keychain.save(
@@ -544,7 +542,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
             authManagerOverride: resetContainer.authManager,
             keyManagementOverride: resetContainer.keyManagement,
-            localDataResetService: resetContainer.localDataResetService,
+            localDataResetService: makeResetService(from: resetContainer, keychain: keychain),
             localDataResetRestartCoordinator: restartCoordinator,
             localDataResetAuthenticationAction: { policy, reason in
                 XCTAssertEqual(policy, resetContainer.config.appSessionAuthenticationPolicy)
@@ -682,9 +680,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     func test_localDataReset_authUnavailableDoesNotReset() async {
         let resetContainer = AppContainer.makeUITest()
         defer { cleanup(resetContainer) }
-        guard let keychain = resetContainer.keychain as? MockKeychain else {
-            return XCTFail("Expected UI-test container to use MockKeychain")
-        }
+        let keychain = MockKeychain()
         let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7UNAVAILABLE"
         do {
             try keychain.save(
@@ -704,7 +700,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
             authManagerOverride: resetContainer.authManager,
             keyManagementOverride: resetContainer.keyManagement,
-            localDataResetService: resetContainer.localDataResetService,
+            localDataResetService: makeResetService(from: resetContainer, keychain: keychain),
             localDataResetRestartCoordinator: restartCoordinator,
             localDataResetAuthenticationAction: { _, _ in
                 authCallCount += 1
@@ -735,9 +731,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
     func test_localDataReset_authFailureDoesNotReset() async {
         let resetContainer = AppContainer.makeUITest()
         defer { cleanup(resetContainer) }
-        guard let keychain = resetContainer.keychain as? MockKeychain else {
-            return XCTFail("Expected UI-test container to use MockKeychain")
-        }
+        let keychain = MockKeychain()
         let markerService = "\(KeychainConstants.prefix).test-reset-marker.SRFIX7FAILED"
         do {
             try keychain.save(
@@ -757,7 +751,7 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
             protectedOrdinarySettingsOverride: resetContainer.protectedOrdinarySettingsCoordinator,
             authManagerOverride: resetContainer.authManager,
             keyManagementOverride: resetContainer.keyManagement,
-            localDataResetService: resetContainer.localDataResetService,
+            localDataResetService: makeResetService(from: resetContainer, keychain: keychain),
             localDataResetRestartCoordinator: restartCoordinator,
             localDataResetAuthenticationAction: { _, _ in
                 authCallCount += 1
@@ -1746,6 +1740,36 @@ final class SettingsScreenModelTests: TutorialSandboxDefaultsSerializedTestCase 
                 ? .deviceBoundEcdsaNistP256EcdhNistP256V4
                 : .portableEd25519LegacyCurve25519Legacy,
             privateKeyCustodyKind: custody
+        )
+    }
+
+    /// Reset service over the UI-test container's graph with an injected
+    /// `MockKeychain`, so reset tests keep call-history assertions now that the
+    /// container itself runs on the uninstrumented `EphemeralKeychainStore`.
+    @MainActor
+    private func makeResetService(
+        from container: AppContainer,
+        keychain: any KeychainManageable
+    ) -> LocalDataResetService {
+        let defaultsSuiteName = container.defaultsSuiteName ?? UUID().uuidString
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        return LocalDataResetService(
+            keychain: keychain,
+            protectedDataStorageRoot: container.protectedDataStorageRoot,
+            defaults: defaults,
+            defaultsDomainName: defaultsSuiteName,
+            config: container.config,
+            protectedOrdinarySettingsCoordinator: container.protectedOrdinarySettingsCoordinator,
+            authManager: container.authManager,
+            keyManagement: container.keyManagement,
+            contactService: container.contactService,
+            selfTestService: container.selfTestService,
+            protectedDataSessionCoordinator: container.protectedDataSessionCoordinator,
+            appSessionOrchestrator: container.appSessionOrchestrator,
+            appLockController: container.appLockController,
+            temporaryArtifactStore: nil,
+            protectedDataRootSecretExists: { false },
+            secureEnclaveCustodyHandleStore: nil
         )
     }
 

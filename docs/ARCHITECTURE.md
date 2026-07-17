@@ -60,7 +60,7 @@ Cross-cutting app infrastructure grouped by concern — file-I/O and async-opera
 
 ### Guided Tutorial (`Sources/App/Onboarding/Tutorial/`)
 
-A host-driven sandbox (`TutorialView`, `TutorialSessionStore`, `TutorialSandboxContainer`) that teaches the real workflow against a separate dependency graph — fixed `com.cypherair.tutorial.sandbox` defaults suite, temporary contacts directory, real services over mock Secure Enclave/Keychain primitives. Route blocklisting and output interception keep the sandbox isolated; the mock primitives are accepted debt whose naming/containment rules live in [SECURITY.md](SECURITY.md) §6.
+A host-driven sandbox (`TutorialView`, `TutorialSessionStore`, `TutorialSandboxContainer`) that teaches the real workflow against a separate dependency graph — fixed `com.cypherair.tutorial.sandbox` defaults suite, temporary contacts directory, real services over real ephemeral security primitives: promptless real-Secure Enclave wrapping (`EphemeralKeyWrappingCustody`), an in-memory keychain wiped at cleanup (`EphemeralKeychainStore`), and inert fail-closed device-bound custody seams (`InertCustodyStores.swift`). Route blocklisting and output interception keep the sandbox isolated; the custody and containment rules live in [SECURITY.md](SECURITY.md) §6.
 
 ### Services Layer (`Sources/Services/`)
 
@@ -113,7 +113,7 @@ All hardware-backed security operations. The most sensitive module — see [SECU
 | `SecureEnclaveCompositeOperations` | In-enclave ML-DSA signing and ML-KEM decapsulation primitives (ML-DSA-65/ML-KEM-768 and ML-DSA-87/ML-KEM-1024) consumed by the composite provider bridges |
 | `Argon2idMemoryGuard` | Validates `os_proc_available_memory()` against Argon2id S2K requirements before key import; 75% threshold ([SECURITY.md](SECURITY.md) §7) |
 | `MemoryZeroingUtility` | Extensions on `Data` and `[UInt8]` for secure clearing |
-| `Mocks/` | Tutorial/UI-test mock boundary (accepted debt). Implementations stay visibly named `Mock*` and stay in this directory ([SECURITY.md](SECURITY.md) §6). |
+| `EphemeralKeyWrappingCustody` / `EphemeralKeychainStore` | Ephemeral sandbox custody for the guided tutorial and the DEBUG UI-test container: real promptless Secure Enclave wrapping (fail-closed without an enclave) and an in-memory keychain with real row semantics, own error types, and a zeroizing wipe ([SECURITY.md](SECURITY.md) §6). |
 
 ### ProtectedData (`Sources/Security/ProtectedData/`)
 

@@ -985,8 +985,8 @@ final class AppContainer: @unchecked Sendable {
         preloadContact: Bool = false
     ) -> AppContainer {
         let authPromptCoordinator = AuthenticationPromptCoordinator()
-        let secureEnclave = MockSecureEnclave()
-        let keychain = MockKeychain()
+        let secureEnclave = EphemeralKeyWrappingCustody()
+        let keychain = EphemeralKeychainStore()
         let suiteName = "com.cypherair.uitests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName) ?? .standard
         defaults.removePersistentDomain(forName: suiteName)
@@ -1037,7 +1037,7 @@ final class AppContainer: @unchecked Sendable {
             registryStore: protectedDataRegistryStore
         )
         let protectedDataSessionCoordinator = makeProtectedDataSessionCoordinator(
-            rootSecretStore: MockProtectedDataRootSecretStore(),
+            rootSecretStore: EphemeralProtectedDataRootSecretStore(),
             domainKeyManager: protectedDomainKeyManager,
             config: config,
             authPromptCoordinator: authPromptCoordinator
@@ -1076,7 +1076,7 @@ final class AppContainer: @unchecked Sendable {
             protectedOrdinarySettingsCoordinator = ProtectedOrdinarySettingsCoordinator(
                 persistence: InMemoryOrdinarySettingsStore()
             )
-            protectedOrdinarySettingsCoordinator.loadForAuthenticatedTestBypass()
+            protectedOrdinarySettingsCoordinator.loadFromUngatedEphemeralPersistence()
         }
         let protectedDataFrameworkSentinelStore = ProtectedDataFrameworkSentinelStore(
             storageRoot: protectedDataStorageRoot,
@@ -1086,7 +1086,12 @@ final class AppContainer: @unchecked Sendable {
                 try protectedDataSessionCoordinator.wrappingRootKeyData()
             }
         )
-        let contactsWrappingRootKey = Data(repeating: 0xCA, count: 32)
+        let contactsWrappingRootKey: Data
+        do {
+            contactsWrappingRootKey = try EphemeralWrappingRootKey.generate()
+        } catch {
+            fatalError("Failed to generate the UI-test contacts wrapping root key: \(error)")
+        }
         let contactsDomainStore: ContactsDomainStore
         do {
             contactsDomainStore = try makeSandboxContactsDomainStore(

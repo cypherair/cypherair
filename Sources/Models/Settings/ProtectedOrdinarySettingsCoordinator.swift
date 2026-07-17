@@ -56,7 +56,13 @@ final class ProtectedOrdinarySettingsCoordinator {
         }
     }
 
-    func loadForAuthenticatedTestBypass() {
+    /// Load immediately from a persistence backend that has no authentication
+    /// gate of its own (an in-memory store an ephemeral container just
+    /// created). This bypasses no authentication — there is nothing to bypass;
+    /// the production post-unlock path is `loadAfterAppAuthentication`.
+    /// Legitimate callers: the tutorial sandbox container and the DEBUG
+    /// UI-test container (plus unit tests standing up loaded coordinators).
+    func loadFromUngatedEphemeralPersistence() {
         loadFromPersistence()
     }
 

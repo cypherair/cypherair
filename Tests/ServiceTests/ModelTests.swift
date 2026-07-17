@@ -914,7 +914,7 @@ final class ModelTests: XCTestCase {
         let coordinator = ProtectedOrdinarySettingsCoordinator(
             persistence: store
         )
-        coordinator.loadForAuthenticatedTestBypass()
+        coordinator.loadFromUngatedEphemeralPersistence()
         return coordinator
     }
 

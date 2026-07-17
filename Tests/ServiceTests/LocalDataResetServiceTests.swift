@@ -243,18 +243,21 @@ final class LocalDataResetServiceTests: TutorialSandboxDefaultsSerializedTestCas
             cleanup(container)
         }
 
-        try container.keychain.save(
+        let failingKeychain = MockKeychain()
+        try failingKeychain.save(
             Data([0x01]),
             service: "\(KeychainConstants.prefix).residual",
             account: KeychainConstants.defaultAccount,
             accessControl: nil
         )
-        if let mockKeychain = container.keychain as? MockKeychain {
-            mockKeychain.failOnDeleteNumber = 1
-        }
+        failingKeychain.failOnDeleteNumber = 1
+        let resetService = makeResetService(
+            from: container,
+            keychain: failingKeychain
+        )
 
         await XCTAssertThrowsErrorAsync({
-            try await container.localDataResetService.resetAllLocalData()
+            try await resetService.resetAllLocalData()
         }) { error in
             XCTAssertTrue(error is LocalDataResetError, "Expected LocalDataResetError, got \(type(of: error))")
         }

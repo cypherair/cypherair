@@ -30,9 +30,9 @@ protocol SEKeyHandle {
 ///
 /// `Sendable` so an instance can be handed to the off-main reconstruct/unwrap in
 /// `PrivateKeyAccessService` (the synchronous SE biometric must not block the main
-/// actor). Both conformers are already safe to share: `HardwareSecureEnclave` is a
-/// struct whose only field is an `@unchecked Sendable` trace store, and
-/// `MockSecureEnclave` is `@unchecked Sendable`.
+/// actor). Both app-module conformers are stateless structs that are safe to
+/// share: `HardwareSecureEnclave`, and `EphemeralKeyWrappingCustody`, which
+/// wraps it for the promptless sandbox containers.
 protocol SecureEnclaveManageable: Sendable {
     /// Generate a new P-256 wrapping key in the Secure Enclave.
     /// The access control flags determine auth requirements (Standard vs High Security).
