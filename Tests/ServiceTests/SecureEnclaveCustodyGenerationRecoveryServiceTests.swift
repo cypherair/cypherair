@@ -192,7 +192,7 @@ final class SecureEnclaveCustodyGenerationRecoveryServiceTests: XCTestCase {
         .classify(identities: [identity])
         XCTAssertEqual(
             partialReport.assessments[0].handleAvailability,
-            .unavailable(.migrationOrRecoveryRequired)
+            .unavailable(.recoveryRequired)
         )
 
         let wrongPublicKeyStore = MockSecureEnclaveCustodyKeyStore()

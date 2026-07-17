@@ -27,7 +27,7 @@ enum PGPKeyOperationFailureCategory: String, CaseIterable, Codable, Hashable, Se
     case externalOperationFailed
     case openPGPSemanticFailure
     case payloadAuthenticationFailure
-    case migrationOrRecoveryRequired
+    case recoveryRequired
     case prohibitedFallbackAttempted
     case cleanupOrRollbackFailure
 }

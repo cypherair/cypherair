@@ -47,7 +47,7 @@ enum SecureEnclaveCustodyHandleError: Error, Equatable {
         case .handlePublicKeyBindingMismatch:
             return .handlePublicKeyBindingMismatch
         case .partialHandlePair:
-            return .migrationOrRecoveryRequired
+            return .recoveryRequired
         case .cleanupOrRollbackFailed:
             return .cleanupOrRollbackFailure
         }

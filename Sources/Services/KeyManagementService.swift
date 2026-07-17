@@ -69,7 +69,7 @@ final class KeyManagementService: @unchecked Sendable {
         secureEnclaveCustodyRecoveryService: (any SecureEnclaveCustodyGenerationRecoveryClassifying)? = nil
     ) {
         let bundleStore = KeyBundleStore(keychain: keychain)
-        let migrationCoordinator = KeyMigrationCoordinator(bundleStore: bundleStore)
+        let rewrapRecoveryStrategy = PrivateKeyRewrapRecoveryStrategy(bundleStore: bundleStore)
         let catalogStore = KeyCatalogStore(metadataStore: metadataPersistence)
         let privateKeyAccessService = PrivateKeyAccessService(
             secureEnclave: secureEnclave,
@@ -130,7 +130,7 @@ final class KeyManagementService: @unchecked Sendable {
             secureEnclave: secureEnclave,
             keychain: keychain,
             bundleStore: bundleStore,
-            migrationCoordinator: migrationCoordinator,
+            rewrapRecoveryStrategy: rewrapRecoveryStrategy,
             catalogStore: catalogStore,
             privateKeyAccessService: privateKeyAccessService,
             privateKeyControlStore: effectivePrivateKeyControlStore,
@@ -492,7 +492,7 @@ final class KeyManagementService: @unchecked Sendable {
     // MARK: - Key Deletion
 
     /// Permanently delete a key and all of its Keychain items, including
-    /// any pending migration bundles and related crash-recovery state.
+    /// any pending rewrap bundles and related crash-recovery state.
     /// Keychain deletions are best-effort: `itemNotFound` is benign (idempotent delete),
     /// but other errors are collected and reported after all items are attempted.
     func deleteKey(fingerprint: String) throws {
@@ -562,7 +562,7 @@ final class KeyManagementService: @unchecked Sendable {
     /// - Old + pending both exist: interrupted before old deletion. Delete pending. Originals intact.
     /// - Only pending exists: interrupted after old deletion. Promote pending to permanent.
     /// - Neither exists: catastrophic loss. Clear flag. User must restore from backup.
-    func checkAndRecoverFromInterruptedModifyExpiry() -> KeyMigrationRecoveryOutcome? {
+    func checkAndRecoverFromInterruptedModifyExpiry() -> PrivateKeyRewrapRecoveryOutcome? {
         mutationService.checkAndRecoverFromInterruptedModifyExpiry()
     }
 

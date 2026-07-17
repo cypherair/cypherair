@@ -546,7 +546,7 @@ final class ModelTests: XCTestCase {
             .externalOperationFailed,
             .openPGPSemanticFailure,
             .payloadAuthenticationFailure,
-            .migrationOrRecoveryRequired,
+            .recoveryRequired,
             .prohibitedFallbackAttempted,
             .cleanupOrRollbackFailure,
         ]
@@ -580,7 +580,7 @@ final class ModelTests: XCTestCase {
                 "externalOperationFailed",
                 "openPGPSemanticFailure",
                 "payloadAuthenticationFailure",
-                "migrationOrRecoveryRequired",
+                "recoveryRequired",
                 "prohibitedFallbackAttempted",
                 "cleanupOrRollbackFailure",
             ]

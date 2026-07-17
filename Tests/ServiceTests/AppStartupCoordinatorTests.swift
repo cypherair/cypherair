@@ -59,7 +59,7 @@ final class AppStartupCoordinatorTests: TutorialSandboxDefaultsSerializedTestCas
         let coordinator = AppStartupCoordinator()
         let merged = coordinator.mergedStartupMessages(
             recoveryDiagnostics: [
-                "A previous secure key migration could not be fully recovered. CypherAir X will retry recovery on next launch."
+                "A previous secure key protection change could not be fully recovered. CypherAir X will retry recovery on next launch."
             ]
         )
 

@@ -38,7 +38,7 @@ final class KeyMutationService {
     private let secureEnclave: any SecureEnclaveManageable
     private let keychain: any KeychainManageable
     private let bundleStore: KeyBundleStore
-    private let migrationCoordinator: KeyMigrationCoordinator
+    private let rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy
     private let catalogStore: KeyCatalogStore
     private let privateKeyAccessService: PrivateKeyAccessService
     private let privateKeyControlStore: any PrivateKeyControlStoreProtocol
@@ -52,7 +52,7 @@ final class KeyMutationService {
         secureEnclave: any SecureEnclaveManageable,
         keychain: any KeychainManageable,
         bundleStore: KeyBundleStore,
-        migrationCoordinator: KeyMigrationCoordinator,
+        rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy,
         catalogStore: KeyCatalogStore,
         privateKeyAccessService: PrivateKeyAccessService,
         privateKeyControlStore: any PrivateKeyControlStoreProtocol,
@@ -64,7 +64,7 @@ final class KeyMutationService {
         self.secureEnclave = secureEnclave
         self.keychain = keychain
         self.bundleStore = bundleStore
-        self.migrationCoordinator = migrationCoordinator
+        self.rewrapRecoveryStrategy = rewrapRecoveryStrategy
         self.catalogStore = catalogStore
         self.privateKeyAccessService = privateKeyAccessService
         self.privateKeyControlStore = privateKeyControlStore
@@ -543,12 +543,12 @@ final class KeyMutationService {
         try catalogStore.setDefaultKey(fingerprint: fingerprint)
     }
 
-    func checkAndRecoverFromInterruptedModifyExpiry() -> KeyMigrationRecoveryOutcome? {
+    func checkAndRecoverFromInterruptedModifyExpiry() -> PrivateKeyRewrapRecoveryOutcome? {
         guard let entry = try? privateKeyControlStore.recoveryJournal().modifyExpiry else {
             return nil
         }
 
-        let recoveryOutcome = migrationCoordinator.recoverInterruptedMigration(for: entry.fingerprint)
+        let recoveryOutcome = rewrapRecoveryStrategy.recoverInterruptedRewrap(for: entry.fingerprint)
 
         if recoveryOutcome.shouldClearRecoveryFlag {
             try? privateKeyControlStore.clearModifyExpiryJournal()

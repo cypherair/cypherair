@@ -140,8 +140,8 @@ extension CypherAirError: LocalizedError {
             String(localized: "error.keyOperationUnavailable.openPGPSemanticFailure", defaultValue: "The OpenPGP operation failed.")
         case .payloadAuthenticationFailure:
             String(localized: "error.keyOperationUnavailable.payloadAuthenticationFailure", defaultValue: "Message authentication failed. The content may have been tampered with.")
-        case .migrationOrRecoveryRequired:
-            String(localized: "error.keyOperationUnavailable.migrationOrRecoveryRequired", defaultValue: "This key needs recovery before it can be used.")
+        case .recoveryRequired:
+            String(localized: "error.keyOperationUnavailable.recoveryRequired", defaultValue: "This key needs recovery before it can be used.")
         case .prohibitedFallbackAttempted:
             String(localized: "error.keyOperationUnavailable.prohibitedFallbackAttempted", defaultValue: "A prohibited fallback was blocked. Nothing was changed.")
         case .cleanupOrRollbackFailure:

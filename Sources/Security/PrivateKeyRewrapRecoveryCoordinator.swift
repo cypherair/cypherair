@@ -2,20 +2,20 @@ import Foundation
 
 final class PrivateKeyRewrapRecoveryCoordinator {
     private let bundleStore: KeyBundleStore
-    private let migrationCoordinator: KeyMigrationCoordinator
+    private let rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy
 
     init(
         bundleStore: KeyBundleStore,
-        migrationCoordinator: KeyMigrationCoordinator
+        rewrapRecoveryStrategy: PrivateKeyRewrapRecoveryStrategy
     ) {
         self.bundleStore = bundleStore
-        self.migrationCoordinator = migrationCoordinator
+        self.rewrapRecoveryStrategy = rewrapRecoveryStrategy
     }
 
     func checkAndRecoverFromInterruptedRewrap(
         fingerprints: [String],
         privateKeyControlStore: (any PrivateKeyControlStoreProtocol)?
-    ) -> KeyMigrationRecoverySummary? {
+    ) -> PrivateKeyRewrapRecoverySummary? {
         guard let privateKeyControlStore,
               let journal = try? privateKeyControlStore.recoveryJournal(),
               let targetMode = journal.rewrapTargetMode else {
@@ -24,11 +24,11 @@ final class PrivateKeyRewrapRecoveryCoordinator {
 
         // If the metadata set is empty but a recovery flag was present, we cannot
         // identify which bundles need recovery. Treat that as unrecoverable.
-        let effectiveSummary: KeyMigrationRecoverySummary
+        let effectiveSummary: PrivateKeyRewrapRecoverySummary
         if fingerprints.isEmpty {
-            effectiveSummary = KeyMigrationRecoverySummary(outcomes: [.unrecoverable])
+            effectiveSummary = PrivateKeyRewrapRecoverySummary(outcomes: [.unrecoverable])
         } else {
-            effectiveSummary = recoverInterruptedRewrapMigrations(
+            effectiveSummary = recoverInterruptedRewraps(
                 for: fingerprints,
                 phase: journal.rewrapPhase
             )
@@ -56,22 +56,22 @@ final class PrivateKeyRewrapRecoveryCoordinator {
         return effectiveSummary
     }
 
-    private func recoverInterruptedRewrapMigrations(
+    private func recoverInterruptedRewraps(
         for fingerprints: [String],
         phase: PrivateKeyControlRewrapPhase?
-    ) -> KeyMigrationRecoverySummary {
+    ) -> PrivateKeyRewrapRecoverySummary {
         guard phase == .commitRequired else {
-            return migrationCoordinator.recoverInterruptedMigrations(for: fingerprints)
+            return rewrapRecoveryStrategy.recoverInterruptedRewraps(for: fingerprints)
         }
 
-        return KeyMigrationRecoverySummary(
-            outcomes: fingerprints.map(recoverCommitRequiredRewrapMigration)
+        return PrivateKeyRewrapRecoverySummary(
+            outcomes: fingerprints.map(recoverCommitRequiredRewrap)
         )
     }
 
-    private func recoverCommitRequiredRewrapMigration(
+    private func recoverCommitRequiredRewrap(
         for fingerprint: String
-    ) -> KeyMigrationRecoveryOutcome {
+    ) -> PrivateKeyRewrapRecoveryOutcome {
         let permanentState = bundleStore.bundleState(
             fingerprint: fingerprint,
             namespace: .permanent

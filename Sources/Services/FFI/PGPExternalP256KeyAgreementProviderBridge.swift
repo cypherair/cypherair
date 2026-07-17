@@ -79,7 +79,7 @@ final class PGPExternalP256KeyAgreementProviderBridge: ExternalP256KeyAgreementP
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
-             .migrationOrRecoveryRequired,
+             .recoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed

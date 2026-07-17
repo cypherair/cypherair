@@ -42,12 +42,12 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         try await authManager.switchMode(to: .standard, fingerprints: ["abc123"], hasBackup: true, authenticator: mockAuth)
     }
 
-    // MARK: - Mode Switch Migration Flow on Device (SE + Keychain)
+    // MARK: - Mode Switch Re-wrap Flow on Device (SE + Keychain)
 
-    /// Verifies the migration flow completes on real device infrastructure.
+    /// Verifies the mode-switch re-wrap flow completes on real device infrastructure.
     /// This test intentionally uses a mock authenticator and a non-ACL initial key so it
     /// remains non-interactive; it does NOT prove the final High Security boundary.
-    func test_switchMode_standardToHighSecurity_migrationFlowCompletesWithMockAuthenticator() async throws {
+    func test_switchMode_standardToHighSecurity_rewrapFlowCompletesWithMockAuthenticator() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
@@ -57,7 +57,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test") }
         // 1. Initial wrap under Standard mode (no access control for test simplicity).
-        // This keeps the test non-interactive and focused on migration mechanics only.
+        // This keeps the test non-interactive and focused on re-wrap mechanics only.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 
@@ -288,10 +288,10 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
 
     // MARK: - High Security → Standard Reverse Mode Switch (Device)
 
-    /// Verifies the reverse migration flow completes on real device infrastructure.
-    /// Like the forward migration test, this remains non-interactive and does not
+    /// Verifies the reverse re-wrap flow completes on real device infrastructure.
+    /// Like the forward re-wrap test, this remains non-interactive and does not
     /// prove the final Standard-mode passcode fallback boundary.
-    func test_switchMode_highSecurityToStandard_migrationFlowCompletesWithMockAuthenticator() async throws {
+    func test_switchMode_highSecurityToStandard_rewrapFlowCompletesWithMockAuthenticator() async throws {
         try XCTSkipUnless(SecureEnclave.isAvailable, "Secure Enclave not available")
 
         let fingerprint = uniqueFingerprint()
@@ -301,7 +301,7 @@ final class DeviceModeSwitchTests: DeviceSecurityTestCase {
         let testDefaults = UserDefaults(suiteName: "com.cypherair.test.hs2std")!
         defer { testDefaults.removePersistentDomain(forName: "com.cypherair.test.hs2std") }
         // 1. Initial wrap under High Security mode.
-        // No initial ACL so this test stays focused on migration mechanics.
+        // No initial ACL so this test stays focused on re-wrap mechanics.
         let handle = try secureEnclave.generateWrappingKey(accessControl: nil, authenticationContext: nil)
         let bundle = try secureEnclave.wrap(privateKey: fakePrivateKey, using: handle, fingerprint: fingerprint)
 

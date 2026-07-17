@@ -74,7 +74,7 @@ final class PGPExternalMlDsa87SigningProviderBridge: ExternalMlDsa87SigningProvi
              .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
-             .migrationOrRecoveryRequired,
+             .recoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed

@@ -68,7 +68,7 @@ final class PGPExternalP256SigningProviderBridge: ExternalP256SigningProvider, @
              .externalOperationInvalidResponse,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
-             .migrationOrRecoveryRequired,
+             .recoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed

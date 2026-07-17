@@ -81,7 +81,7 @@ final class PGPExternalMlKem1024DecapsulationProviderBridge: ExternalMlKem1024De
              .revocationArtifactUnavailable,
              .openPGPSemanticFailure,
              .payloadAuthenticationFailure,
-             .migrationOrRecoveryRequired,
+             .recoveryRequired,
              .prohibitedFallbackAttempted,
              .cleanupOrRollbackFailure:
             return .externalOperationFailed
